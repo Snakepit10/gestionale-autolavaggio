@@ -1,0 +1,393 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}Check-in Prenotazioni - Gestionale Autolavaggio{% endblock %}
+
+{% block extra_css %}
+<style>
+.checkin-header {
+    background: linear-gradient(135deg, #28a745, #20c997);
+    color: white;
+    border-radius: 15px;
+    padding: 30px;
+    margin-bottom: 30px;
+}
+
+.stats-card {
+    border: none;
+    border-radius: 15px;
+    box-shadow: 0 5px 15px rgba(0,0,0,0.1);
+    transition: all 0.3s ease;
+}
+
+.stats-card:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 8px 25px rgba(0,0,0,0.15);
+}
+
+.prenotazione-card {
+    border: none;
+    border-radius: 12px;
+    box-shadow: 0 3px 10px rgba(0,0,0,0.1);
+    margin-bottom: 20px;
+    transition: all 0.3s ease;
+}
+
+.prenotazione-card:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 6px 20px rgba(0,0,0,0.15);
+}
+
+.prenotazione-urgente {
+    border-left: 4px solid #dc3545;
+}
+
+.prenotazione-imminente {
+    border-left: 4px solid #ffc107;
+}
+
+.prenotazione-normale {
+    border-left: 4px solid #28a745;
+}
+
+.btn-checkin {
+    background: linear-gradient(135deg, #28a745, #20c997);
+    border: none;
+    color: white;
+    font-weight: 600;
+    padding: 12px 24px;
+    border-radius: 8px;
+    transition: all 0.3s ease;
+}
+
+.btn-checkin:hover {
+    background: linear-gradient(135deg, #20c997, #28a745);
+    transform: translateY(-1px);
+    color: white;
+}
+
+.cliente-info {
+    background: #f8f9fa;
+    padding: 15px;
+    border-radius: 8px;
+    margin-bottom: 15px;
+}
+
+.servizi-list {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+}
+
+.servizio-badge {
+    background: #007bff;
+    color: white;
+    padding: 4px 8px;
+    border-radius: 12px;
+    font-size: 0.8rem;
+    font-weight: 500;
+}
+
+.filter-card {
+    background: #f8f9fa;
+    border-radius: 12px;
+    padding: 20px;
+    margin-bottom: 25px;
+}
+
+.prossimi-slot {
+    background: #fff3cd;
+    border: 1px solid #ffeaa7;
+    border-radius: 8px;
+    padding: 15px;
+    margin-bottom: 20px;
+}
+
+.slot-time {
+    font-weight: bold;
+    color: #856404;
+}
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <!-- Header -->
+    <div class="checkin-header text-center">
+        <h1 class="h2 mb-3">
+            <i class="bi bi-check-circle"></i>
+            Check-in Prenotazioni
+        </h1>
+        <p class="lead mb-0">Gestisci l'arrivo dei clienti e converti le prenotazioni in ordini</p>
+    </div>
+
+    <!-- Statistiche -->
+    <div class="row mb-4">
+        <div class="col-md-4">
+            <div class="card stats-card text-center">
+                <div class="card-body">
+                    <div class="d-flex align-items-center justify-content-center mb-2">
+                        <i class="bi bi-calendar-check text-primary me-2" style="font-size: 2rem;"></i>
+                        <h3 class="mb-0">{{ stats.totali_oggi }}</h3>
+                    </div>
+                    <p class="text-muted mb-0">Prenotazioni Oggi</p>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-4">
+            <div class="card stats-card text-center">
+                <div class="card-body">
+                    <div class="d-flex align-items-center justify-content-center mb-2">
+                        <i class="bi bi-clock text-warning me-2" style="font-size: 2rem;"></i>
+                        <h3 class="mb-0">{{ stats.da_fare_checkin }}</h3>
+                    </div>
+                    <p class="text-muted mb-0">Da Fare Check-in</p>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-4">
+            <div class="card stats-card text-center">
+                <div class="card-body">
+                    <div class="d-flex align-items-center justify-content-center mb-2">
+                        <i class="bi bi-check-circle-fill text-success me-2" style="font-size: 2rem;"></i>
+                        <h3 class="mb-0">{{ stats.checkin_completati }}</h3>
+                    </div>
+                    <p class="text-muted mb-0">Check-in Completati</p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Prossimi Slot -->
+    {% if prossimi_slot %}
+    <div class="prossimi-slot">
+        <h6><i class="bi bi-clock-history"></i> Prossimi Slot</h6>
+        <div class="row">
+            {% for slot in prossimi_slot %}
+            <div class="col-md-2">
+                <div class="text-center">
+                    <div class="slot-time">{{ slot.slot.ora_inizio }}</div>
+                    <small>{{ slot.cliente.nome|truncatewords:2 }}</small>
+                </div>
+            </div>
+            {% endfor %}
+        </div>
+    </div>
+    {% endif %}
+
+    <div class="row">
+        <!-- Filtri -->
+        <div class="col-lg-3">
+            <div class="filter-card">
+                <h6 class="mb-3">
+                    <i class="bi bi-funnel"></i> Filtri
+                </h6>
+                <form method="get" id="filterForm">
+                    <div class="mb-3">
+                        <label for="data" class="form-label">Data</label>
+                        <input type="date" class="form-control" id="data" name="data" 
+                               value="{{ filtri.data }}" onchange="submitFilter()">
+                    </div>
+                    <div class="mb-3">
+                        <label for="cliente" class="form-label">Cliente</label>
+                        <input type="text" class="form-control" id="cliente" name="cliente" 
+                               value="{{ filtri.cliente }}" placeholder="Nome o email..."
+                               onchange="submitFilter()">
+                    </div>
+                    <button type="button" class="btn btn-outline-secondary btn-sm w-100" onclick="clearFilters()">
+                        <i class="bi bi-x-circle"></i> Pulisci Filtri
+                    </button>
+                </form>
+            </div>
+
+            <!-- Link rapidi -->
+            <div class="card">
+                <div class="card-header">
+                    <h6 class="mb-0">
+                        <i class="bi bi-link"></i> Link Rapidi
+                    </h6>
+                </div>
+                <div class="card-body">
+                    <div class="d-grid gap-2">
+                        <a href="{% url 'prenotazioni:prenotazioni-admin' %}" class="btn btn-outline-primary btn-sm">
+                            <i class="bi bi-list"></i> Tutte le Prenotazioni
+                        </a>
+                        <a href="{% url 'prenotazioni:nuova-prenotazione' %}" class="btn btn-outline-success btn-sm">
+                            <i class="bi bi-plus-circle"></i> Nuova Prenotazione
+                        </a>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Lista Prenotazioni -->
+        <div class="col-lg-9">
+            <div class="d-flex justify-content-between align-items-center mb-3">
+                <h5>
+                    <i class="bi bi-list-check"></i> 
+                    Prenotazioni da Fare Check-in ({{ prenotazioni.count }})
+                </h5>
+                <button class="btn btn-outline-primary" onclick="location.reload()">
+                    <i class="bi bi-arrow-clockwise"></i> Aggiorna
+                </button>
+            </div>
+
+            {% if prenotazioni %}
+                {% for prenotazione in prenotazioni %}
+                <div class="card prenotazione-card 
+                    {% if prenotazione.slot.data == today and prenotazione.slot.ora_inizio <= now_time %}
+                        prenotazione-urgente
+                    {% elif prenotazione.slot.data == today %}
+                        prenotazione-imminente
+                    {% else %}
+                        prenotazione-normale
+                    {% endif %}">
+                    <div class="card-body">
+                        <div class="row align-items-center">
+                            <!-- Info Principale -->
+                            <div class="col-lg-6">
+                                <div class="cliente-info">
+                                    <h6 class="mb-2">
+                                        <i class="bi bi-person-circle"></i>
+                                        {{ prenotazione.cliente.nome }}
+                                    </h6>
+                                    <div class="row text-sm">
+                                        <div class="col-6">
+                                            <small class="text-muted">
+                                                <i class="bi bi-envelope"></i> 
+                                                {{ prenotazione.cliente.email|default:"Non fornita" }}
+                                            </small>
+                                        </div>
+                                        <div class="col-6">
+                                            <small class="text-muted">
+                                                <i class="bi bi-telephone"></i> 
+                                                {{ prenotazione.cliente.telefono|default:"Non fornito" }}
+                                            </small>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <!-- Data e Ora -->
+                                <div class="mb-2">
+                                    <strong>
+                                        <i class="bi bi-calendar-event"></i>
+                                        {{ prenotazione.slot.data|date:"d/m/Y" }} alle {{ prenotazione.slot.ora_inizio }}
+                                    </strong>
+                                    <span class="badge bg-secondary ms-2">{{ prenotazione.durata_stimata_minuti }} min</span>
+                                </div>
+
+                                <!-- Servizi -->
+                                <div class="servizi-list">
+                                    {% for servizio in prenotazione.servizi.all %}
+                                        <span class="servizio-badge">{{ servizio.titolo }}</span>
+                                    {% endfor %}
+                                </div>
+                            </div>
+
+                            <!-- Info Aggiuntive -->
+                            <div class="col-lg-4">
+                                <div class="text-center">
+                                    <div class="mb-2">
+                                        <strong>Codice: {{ prenotazione.codice_prenotazione }}</strong>
+                                    </div>
+                                    <div class="mb-2">
+                                        <strong class="text-primary">
+                                            €{{ prenotazione.totale_stimato|floatformat:2 }}
+                                        </strong>
+                                    </div>
+                                    {% if prenotazione.nota_cliente %}
+                                        <div class="mb-2">
+                                            <small class="text-muted">
+                                                <i class="bi bi-chat-text"></i>
+                                                {{ prenotazione.nota_cliente|truncatewords:8 }}
+                                            </small>
+                                        </div>
+                                    {% endif %}
+                                </div>
+                            </div>
+
+                            <!-- Azioni -->
+                            <div class="col-lg-2">
+                                <div class="d-grid">
+                                    <form method="post" action="{% url 'prenotazioni:checkin-prenotazione' prenotazione.pk %}?from_checkin=true" 
+                                          onsubmit="return confirm('Confermi il check-in per {{ prenotazione.cliente.nome }}?')">
+                                        {% csrf_token %}
+                                        <button type="submit" class="btn btn-checkin">
+                                            <i class="bi bi-check-circle-fill"></i>
+                                            Check-in
+                                        </button>
+                                    </form>
+                                    <a href="{% url 'prenotazioni:dettaglio-prenotazione' prenotazione.pk %}" 
+                                       class="btn btn-outline-info btn-sm mt-2">
+                                        <i class="bi bi-eye"></i> Dettagli
+                                    </a>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                {% endfor %}
+
+                <!-- Paginazione -->
+                {% if is_paginated %}
+                <nav aria-label="Paginazione prenotazioni">
+                    <ul class="pagination justify-content-center">
+                        {% if page_obj.has_previous %}
+                            <li class="page-item">
+                                <a class="page-link" href="?page={{ page_obj.previous_page_number }}{% if request.GET.data %}&data={{ request.GET.data }}{% endif %}{% if request.GET.cliente %}&cliente={{ request.GET.cliente }}{% endif %}">
+                                    Precedente
+                                </a>
+                            </li>
+                        {% endif %}
+                        
+                        <li class="page-item active">
+                            <span class="page-link">
+                                Pagina {{ page_obj.number }} di {{ page_obj.paginator.num_pages }}
+                            </span>
+                        </li>
+                        
+                        {% if page_obj.has_next %}
+                            <li class="page-item">
+                                <a class="page-link" href="?page={{ page_obj.next_page_number }}{% if request.GET.data %}&data={{ request.GET.data }}{% endif %}{% if request.GET.cliente %}&cliente={{ request.GET.cliente }}{% endif %}">
+                                    Successiva
+                                </a>
+                            </li>
+                        {% endif %}
+                    </ul>
+                </nav>
+                {% endif %}
+
+            {% else %}
+                <div class="text-center py-5">
+                    <i class="bi bi-calendar-x text-muted" style="font-size: 3rem;"></i>
+                    <h5 class="text-muted mt-3">Nessuna prenotazione da fare check-in</h5>
+                    <p class="text-muted">
+                        {% if filtri.data or filtri.cliente %}
+                            Modifica i filtri per vedere altre prenotazioni
+                        {% else %}
+                            Tutte le prenotazioni sono state processate!
+                        {% endif %}
+                    </p>
+                </div>
+            {% endif %}
+        </div>
+    </div>
+</div>
+
+<script>
+function submitFilter() {
+    document.getElementById('filterForm').submit();
+}
+
+function clearFilters() {
+    document.getElementById('data').value = '';
+    document.getElementById('cliente').value = '';
+    submitFilter();
+}
+
+// Auto-refresh ogni 5 minuti
+setTimeout(() => {
+    location.reload();
+}, 300000);
+</script>
+{% endblock %}

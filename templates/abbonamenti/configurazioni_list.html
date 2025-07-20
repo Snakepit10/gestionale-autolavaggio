@@ -1,0 +1,297 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}Configurazioni Abbonamenti - Gestionale Autolavaggio{% endblock %}
+
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <h1><i class="bi bi-card-checklist"></i> Configurazioni Abbonamenti</h1>
+    <div>
+        <a href="{% url 'abbonamenti:config-abbonamento-wizard' %}" class="btn btn-primary">
+            <i class="bi bi-plus-circle"></i> Nuova Configurazione
+        </a>
+    </div>
+</div>
+
+{% if messages %}
+    {% for message in messages %}
+        <div class="alert alert-{{ message.tags }} alert-dismissible fade show" role="alert">
+            {{ message }}
+            <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+        </div>
+    {% endfor %}
+{% endif %}
+
+<!-- Statistiche -->
+<div class="row mb-4">
+    <div class="col-md-3">
+        <div class="card bg-primary text-white">
+            <div class="card-body text-center">
+                <i class="bi bi-gear display-6"></i>
+                <h4>{{ configurazioni|length }}</h4>
+                <small>Configurazioni Totali</small>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-3">
+        <div class="card bg-success text-white">
+            <div class="card-body text-center">
+                <i class="bi bi-check-circle display-6"></i>
+                <h4>{{ configurazioni_attive|default:0 }}</h4>
+                <small>Attive</small>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-3">
+        <div class="card bg-info text-white">
+            <div class="card-body text-center">
+                <i class="bi bi-people display-6"></i>
+                <h4>{{ abbonamenti_attivi_totali|default:0 }}</h4>
+                <small>Abbonamenti Attivi</small>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-3">
+        <div class="card bg-warning text-white">
+            <div class="card-body text-center">
+                <i class="bi bi-currency-euro display-6"></i>
+                <h4>€{{ ricavo_mensile|default:0|floatformat:0 }}</h4>
+                <small>Ricavo Mensile</small>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="card">
+    <div class="card-body">
+        {% if configurazioni %}
+            <div class="row">
+                {% for config in configurazioni %}
+                <div class="col-lg-6 col-xl-4 mb-4">
+                    <div class="card h-100 {% if not config.attiva %}border-secondary{% endif %}">
+                        <div class="card-header d-flex justify-content-between align-items-center">
+                            <h5 class="mb-0">{{ config.titolo }}</h5>
+                            <div>
+                                {% if config.attiva %}
+                                    <span class="badge bg-success">Attiva</span>
+                                {% else %}
+                                    <span class="badge bg-secondary">Inattiva</span>
+                                {% endif %}
+                            </div>
+                        </div>
+                        <div class="card-body">
+                            {% if config.descrizione %}
+                                <p class="card-text text-muted small">{{ config.descrizione|truncatewords:15 }}</p>
+                            {% endif %}
+                            
+                            <!-- Informazioni principali -->
+                            <div class="row mb-3">
+                                <div class="col-6">
+                                    <div class="text-center border rounded p-2">
+                                        <h4 class="text-primary mb-1">€{{ config.prezzo }}</h4>
+                                        <small class="text-muted">Prezzo</small>
+                                    </div>
+                                </div>
+                                <div class="col-6">
+                                    <div class="text-center border rounded p-2">
+                                        <h6 class="text-info mb-1">{{ config.get_durata_display }}</h6>
+                                        <small class="text-muted">Durata</small>
+                                    </div>
+                                </div>
+                            </div>
+                            
+                            <!-- Modalità Targa -->
+                            <div class="mb-3">
+                                <small class="text-muted">Modalità Targa:</small><br>
+                                {% if config.modalita_targa == 'fissa' %}
+                                    <span class="badge bg-warning">
+                                        <i class="bi bi-lock"></i> Fissa
+                                    </span>
+                                    <small class="text-muted">(max {{ config.numero_massimo_targhe }})</small>
+                                {% elif config.modalita_targa == 'variabile' %}
+                                    <span class="badge bg-info">
+                                        <i class="bi bi-arrow-repeat"></i> Variabile
+                                    </span>
+                                {% else %}
+                                    <span class="badge bg-success">
+                                        <i class="bi bi-unlock"></i> Libera
+                                    </span>
+                                {% endif %}
+                            </div>
+                            
+                            <!-- Servizi inclusi -->
+                            <div class="mb-3">
+                                <small class="text-muted">Servizi Inclusi:</small><br>
+                                {% if config.servizi_inclusi.all %}
+                                    {% for servizio_incluso in config.servizi_inclusi.all|slice:":2" %}
+                                        <div class="d-flex justify-content-between align-items-center mb-1">
+                                            <span class="badge bg-light text-dark">{{ servizio_incluso.servizio.titolo }}</span>
+                                            <small class="fw-bold">x{{ servizio_incluso.quantita_inclusa }}</small>
+                                        </div>
+                                    {% endfor %}
+                                    {% if config.servizi_inclusi.count > 2 %}
+                                        <small class="text-muted">+{{ config.servizi_inclusi.count|add:"-2" }} altri servizi</small>
+                                    {% endif %}
+                                {% else %}
+                                    <small class="text-muted">Nessun servizio configurato</small>
+                                {% endif %}
+                            </div>
+                            
+                            <!-- Statistiche -->
+                            <div class="row text-center">
+                                <div class="col-4">
+                                    <div class="border rounded p-1">
+                                        <h6 class="text-success mb-0">{{ config.abbonamenti_attivi|default:0 }}</h6>
+                                        <small class="text-muted">Attivi</small>
+                                    </div>
+                                </div>
+                                <div class="col-4">
+                                    <div class="border rounded p-1">
+                                        <h6 class="text-info mb-0">{{ config.abbonamenti_totali|default:0 }}</h6>
+                                        <small class="text-muted">Totali</small>
+                                    </div>
+                                </div>
+                                <div class="col-4">
+                                    <div class="border rounded p-1">
+                                        <h6 class="text-warning mb-0">€{{ config.ricavo_totale|default:0|floatformat:0 }}</h6>
+                                        <small class="text-muted">Ricavo</small>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="card-footer bg-transparent">
+                            <div class="d-flex justify-content-between">
+                                <div class="btn-group" role="group">
+                                    <a href="{% url 'abbonamenti:vendita-abbonamento' %}?config={{ config.pk }}" 
+                                       class="btn btn-sm btn-success" title="Vendi">
+                                        <i class="bi bi-cart-plus"></i>
+                                    </a>
+                                    <a href="{% url 'abbonamenti:config-abbonamento-update' config.pk %}" 
+                                       class="btn btn-sm btn-outline-primary" title="Modifica">
+                                        <i class="bi bi-pencil"></i>
+                                    </a>
+                                    <button class="btn btn-sm btn-outline-info" 
+                                            onclick="mostraDettagli('{{ config.pk }}')" title="Dettagli">
+                                        <i class="bi bi-eye"></i>
+                                    </button>
+                                </div>
+                                <div class="btn-group" role="group">
+                                    <button class="btn btn-sm btn-outline-secondary" 
+                                            onclick="clonaConfigurazione('{{ config.pk }}')" title="Clona">
+                                        <i class="bi bi-files"></i>
+                                    </button>
+                                    {% if config.attiva %}
+                                        <button class="btn btn-sm btn-outline-warning" 
+                                                onclick="toggleConfigurazione('{{ config.pk }}', false)" title="Disattiva">
+                                            <i class="bi bi-pause"></i>
+                                        </button>
+                                    {% else %}
+                                        <button class="btn btn-sm btn-outline-success" 
+                                                onclick="toggleConfigurazione('{{ config.pk }}', true)" title="Attiva">
+                                            <i class="bi bi-play"></i>
+                                        </button>
+                                    {% endif %}
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                {% endfor %}
+            </div>
+        {% else %}
+            <div class="text-center py-5">
+                <i class="bi bi-card-checklist display-1 text-muted"></i>
+                <h3 class="text-muted mt-3">Nessuna Configurazione</h3>
+                <p class="text-muted">Non ci sono ancora configurazioni di abbonamento create.</p>
+                <a href="{% url 'abbonamenti:config-abbonamento-wizard' %}" class="btn btn-primary">
+                    <i class="bi bi-plus-circle"></i> Crea la Prima Configurazione
+                </a>
+            </div>
+        {% endif %}
+    </div>
+</div>
+
+<!-- Modal Dettagli Configurazione -->
+<div class="modal fade" id="modalDettagli" tabindex="-1">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">
+                    <i class="bi bi-info-circle"></i>
+                    Dettagli Configurazione
+                </h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body" id="dettagli-content">
+                <!-- Contenuto caricato dinamicamente -->
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">
+                    <i class="bi bi-x-circle"></i> Chiudi
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+function mostraDettagli(configId) {
+    fetch(`/abbonamenti/configurazioni/${configId}/dettagli/`)
+        .then(response => response.text())
+        .then(html => {
+            document.getElementById('dettagli-content').innerHTML = html;
+            const modal = new bootstrap.Modal(document.getElementById('modalDettagli'));
+            modal.show();
+        })
+        .catch(error => {
+            console.error('Errore:', error);
+            alert('Errore nel caricamento dei dettagli');
+        });
+}
+
+function clonaConfigurazione(configId) {
+    if (!confirm('Confermi di voler clonare questa configurazione?')) return;
+    
+    fetch(`/abbonamenti/configurazioni/${configId}/clona/`, {
+        method: 'POST',
+        headers: {
+            'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]').value
+        }
+    })
+    .then(response => {
+        if (response.ok) {
+            location.reload();
+        } else {
+            alert('Errore nella clonazione');
+        }
+    });
+}
+
+function toggleConfigurazione(configId, attiva) {
+    const azione = attiva ? 'attivare' : 'disattivare';
+    if (!confirm(`Confermi di voler ${azione} questa configurazione?`)) return;
+    
+    fetch(`/abbonamenti/configurazioni/${configId}/toggle/`, {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+            'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]').value
+        },
+        body: JSON.stringify({ attiva: attiva })
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            location.reload();
+        } else {
+            alert('Errore: ' + data.error);
+        }
+    });
+}
+
+// Ordinamento trascinabile
+document.addEventListener('DOMContentLoaded', function() {
+    // Implementa ordinamento drag&drop se necessario
+});
+</script>
+{% endblock %}

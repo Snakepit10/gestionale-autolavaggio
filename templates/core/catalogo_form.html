@@ -1,0 +1,149 @@
+{% extends 'base.html' %}
+{% load static %}
+{% load crispy_forms_tags %}
+
+{% block title %}
+    {% if form.instance.pk %}Modifica Prodotto/Servizio{% else %}Nuovo Prodotto/Servizio{% endif %} - Gestionale Autolavaggio
+{% endblock %}
+
+{% block content %}
+<div class="row justify-content-center">
+    <div class="col-lg-10">
+        <div class="card">
+            <div class="card-header d-flex justify-content-between align-items-center">
+                <h4 class="mb-0">
+                    <i class="bi bi-grid-3x3-gap"></i>
+                    {% if form.instance.pk %}
+                        Modifica: {{ form.instance.titolo }}
+                    {% else %}
+                        Nuovo Prodotto/Servizio
+                    {% endif %}
+                </h4>
+                <a href="{% url 'core:catalogo-list' %}" class="btn btn-outline-secondary">
+                    <i class="bi bi-arrow-left"></i> Torna al Catalogo
+                </a>
+            </div>
+            <div class="card-body">
+                <form method="post">
+                    {% csrf_token %}
+                    
+                    <!-- Informazioni Base -->
+                    <div class="row mb-4">
+                        <div class="col-12">
+                            <h5 class="border-bottom pb-2 mb-3">Informazioni Base</h5>
+                        </div>
+                        <div class="col-md-8">
+                            {{ form.titolo|as_crispy_field }}
+                        </div>
+                        <div class="col-md-4">
+                            {{ form.tipo|as_crispy_field }}
+                        </div>
+                        <div class="col-12">
+                            {{ form.descrizione|as_crispy_field }}
+                        </div>
+                        <div class="col-md-6">
+                            {{ form.categoria|as_crispy_field }}
+                        </div>
+                        <div class="col-md-6">
+                            {{ form.codice_prodotto|as_crispy_field }}
+                        </div>
+                    </div>
+
+                    <!-- Prezzo e Tempi -->
+                    <div class="row mb-4">
+                        <div class="col-12">
+                            <h5 class="border-bottom pb-2 mb-3">Prezzo e Tempi</h5>
+                        </div>
+                        <div class="col-md-4">
+                            {{ form.prezzo|as_crispy_field }}
+                        </div>
+                        <div class="col-md-6">
+                            {{ form.durata_minuti|as_crispy_field }}
+                        </div>
+                    </div>
+
+                    <!-- Gestione Scorte (solo per prodotti) -->
+                    <div class="row mb-4" id="sezione-scorte" style="display: none;">
+                        <div class="col-12">
+                            <h5 class="border-bottom pb-2 mb-3">Gestione Scorte</h5>
+                        </div>
+                        <div class="col-md-4">
+                            {{ form.quantita_disponibile|as_crispy_field }}
+                        </div>
+                        <div class="col-md-4">
+                            {{ form.quantita_minima_alert|as_crispy_field }}
+                        </div>
+                        <div class="col-md-4">
+                            <div class="form-group">
+                                <label for="scorta-status" class="form-label">Stato Scorte</label>
+                                <div class="alert alert-info" id="scorta-status">
+                                    <i class="bi bi-info-circle"></i> Verrà calcolato automaticamente
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Configurazione Servizi (solo per servizi) -->
+                    <div class="row mb-4" id="sezione-servizi" style="display: none;">
+                        <div class="col-12">
+                            <h5 class="border-bottom pb-2 mb-3">Configurazione Servizi</h5>
+                        </div>
+                        <div class="col-12">
+                            {{ form.postazioni|as_crispy_field }}
+                        </div>
+                    </div>
+
+                    <!-- Opzioni -->
+                    <div class="row mb-4">
+                        <div class="col-12">
+                            <h5 class="border-bottom pb-2 mb-3">Opzioni</h5>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="form-check form-switch">
+                                {{ form.attivo }}
+                                <label class="form-check-label" for="{{ form.attivo.id_for_label }}">
+                                    Attivo
+                                </label>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="d-flex justify-content-between">
+                        <a href="{% url 'core:catalogo-list' %}" class="btn btn-secondary">
+                            <i class="bi bi-x-circle"></i> Annulla
+                        </a>
+                        <button type="submit" class="btn btn-primary">
+                            <i class="bi bi-check-circle"></i>
+                            {% if form.instance.pk %}Aggiorna{% else %}Crea{% endif %} Elemento
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    const tipoField = document.getElementById('{{ form.tipo.id_for_label }}');
+    const sezioneScorte = document.getElementById('sezione-scorte');
+    const sezioneServizi = document.getElementById('sezione-servizi');
+
+    function toggleSezioni() {
+        if (tipoField.value === 'prodotto') {
+            sezioneScorte.style.display = 'block';
+            sezioneServizi.style.display = 'none';
+        } else {
+            sezioneScorte.style.display = 'none';
+            sezioneServizi.style.display = 'block';
+        }
+    }
+
+    // Inizializza al caricamento
+    toggleSezioni();
+
+    // Ascolta cambiamenti
+    tipoField.addEventListener('change', toggleSezioni);
+});
+</script>
+{% endblock %}

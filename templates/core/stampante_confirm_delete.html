@@ -1,0 +1,61 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}Elimina Stampante - Gestionale Autolavaggio{% endblock %}
+
+{% block content %}
+<div class="row justify-content-center">
+    <div class="col-lg-6">
+        <div class="card border-danger">
+            <div class="card-header bg-danger text-white">
+                <h4 class="mb-0">
+                    <i class="bi bi-exclamation-triangle"></i>
+                    Conferma Eliminazione
+                </h4>
+            </div>
+            <div class="card-body">
+                <div class="alert alert-warning">
+                    <i class="bi bi-warning"></i>
+                    <strong>Attenzione!</strong> Questa operazione non può essere annullata.
+                </div>
+                
+                <div class="d-flex align-items-center mb-3">
+                    <i class="bi bi-printer text-primary me-3 fs-2"></i>
+                    <div>
+                        <h5>{{ object.nome }}</h5>
+                        <p class="mb-0">
+                            <span class="badge bg-info">{{ object.get_tipo_display }}</span>
+                            <br><small class="text-muted">Indirizzo: <code>{{ object.indirizzo_ip }}:{{ object.porta }}</code></small>
+                        </p>
+                    </div>
+                </div>
+                
+                {% if object.descrizione %}
+                    <p><small class="text-muted">{{ object.descrizione }}</small></p>
+                {% endif %}
+                
+                {% if object.ultimo_test %}
+                    <div class="alert alert-info">
+                        <i class="bi bi-info-circle"></i>
+                        Ultimo test di stampa: <strong>{{ object.ultimo_test|date:"d/m/Y H:i" }}</strong>
+                    </div>
+                {% endif %}
+                
+                <p>Sei sicuro di voler eliminare questa stampante?</p>
+                
+                <form method="post">
+                    {% csrf_token %}
+                    <div class="d-flex justify-content-between">
+                        <a href="{% url 'core:stampanti-list' %}" class="btn btn-secondary">
+                            <i class="bi bi-arrow-left"></i> Annulla
+                        </a>
+                        <button type="submit" class="btn btn-danger">
+                            <i class="bi bi-trash"></i> Elimina Stampante
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

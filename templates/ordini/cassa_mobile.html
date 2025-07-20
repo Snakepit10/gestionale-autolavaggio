@@ -1,0 +1,1072 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}Cassa Mobile - PWA{% endblock %}
+
+{% block extra_css %}
+<style>
+/* PWA Mobile Optimized Styles */
+body {
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    user-select: none;
+    -webkit-user-select: none;
+    -webkit-touch-callout: none;
+    -webkit-tap-highlight-color: transparent;
+}
+
+.mobile-container {
+    height: 100vh;
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+    background: #f8f9fa;
+}
+
+.mobile-header {
+    background: linear-gradient(135deg, #007bff, #0056b3);
+    color: white;
+    padding: 10px 15px;
+    display: flex;
+    justify-content: between;
+    align-items: center;
+    box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+    z-index: 1000;
+}
+
+.mobile-content {
+    flex: 1;
+    overflow-y: auto;
+    padding: 10px;
+    -webkit-overflow-scrolling: touch;
+}
+
+.mobile-footer {
+    background: white;
+    border-top: 1px solid #dee2e6;
+    padding: 15px;
+    box-shadow: 0 -2px 10px rgba(0,0,0,0.1);
+}
+
+/* Category Tabs */
+.category-tabs {
+    display: flex;
+    overflow-x: auto;
+    padding: 10px 0;
+    gap: 10px;
+    -webkit-overflow-scrolling: touch;
+}
+
+.category-tab {
+    flex-shrink: 0;
+    padding: 8px 16px;
+    background: white;
+    border: 2px solid #e9ecef;
+    border-radius: 20px;
+    font-size: 0.9rem;
+    white-space: nowrap;
+    transition: all 0.3s ease;
+    cursor: pointer;
+}
+
+.category-tab.active {
+    background: #007bff;
+    color: white;
+    border-color: #007bff;
+}
+
+/* Service Grid */
+.services-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+    gap: 10px;
+    padding: 10px 0;
+}
+
+.service-card {
+    background: white;
+    border-radius: 12px;
+    padding: 15px;
+    text-align: center;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+    transition: all 0.3s ease;
+    cursor: pointer;
+    border: 2px solid transparent;
+    position: relative;
+}
+
+.service-card:active {
+    transform: scale(0.95);
+}
+
+.service-card.servizio {
+    border-left: 4px solid #28a745;
+}
+
+.service-card.prodotto {
+    border-left: 4px solid #ffc107;
+}
+
+.service-card.added {
+    border-color: #007bff;
+    background: #f0f8ff;
+}
+
+.service-price {
+    font-size: 1.2rem;
+    font-weight: bold;
+    color: #007bff;
+    margin-top: 5px;
+}
+
+.service-duration {
+    font-size: 0.8rem;
+    color: #6c757d;
+    margin-top: 2px;
+}
+
+/* Cart */
+.cart-summary {
+    background: white;
+    border-radius: 12px;
+    padding: 15px;
+    margin-bottom: 15px;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+}
+
+.cart-item {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 10px 0;
+    border-bottom: 1px solid #eee;
+}
+
+.cart-item:last-child {
+    border-bottom: none;
+}
+
+.cart-item-info {
+    flex: 1;
+}
+
+.cart-item-title {
+    font-weight: 600;
+    font-size: 0.9rem;
+}
+
+.cart-item-price {
+    color: #6c757d;
+    font-size: 0.8rem;
+}
+
+.quantity-controls {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+
+.quantity-btn {
+    width: 32px;
+    height: 32px;
+    border-radius: 50%;
+    border: none;
+    background: #007bff;
+    color: white;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 0.9rem;
+    cursor: pointer;
+    transition: all 0.3s ease;
+}
+
+.quantity-btn:active {
+    transform: scale(0.9);
+}
+
+.quantity-btn.remove {
+    background: #dc3545;
+}
+
+.quantity-display {
+    min-width: 30px;
+    text-align: center;
+    font-weight: bold;
+}
+
+/* Total Section */
+.total-section {
+    background: white;
+    border-radius: 12px;
+    padding: 20px;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+}
+
+.total-row {
+    display: flex;
+    justify-content: space-between;
+    margin-bottom: 10px;
+}
+
+.total-final {
+    font-size: 1.3rem;
+    font-weight: bold;
+    color: #007bff;
+    border-top: 2px solid #007bff;
+    padding-top: 10px;
+    margin-top: 10px;
+}
+
+/* Action Buttons */
+.action-btn {
+    width: 100%;
+    padding: 15px;
+    border: none;
+    border-radius: 12px;
+    font-size: 1.1rem;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    margin-bottom: 10px;
+}
+
+.action-btn:active {
+    transform: scale(0.98);
+}
+
+.btn-primary-mobile {
+    background: linear-gradient(135deg, #007bff, #0056b3);
+    color: white;
+}
+
+.btn-success-mobile {
+    background: linear-gradient(135deg, #28a745, #1e7e34);
+    color: white;
+}
+
+.btn-warning-mobile {
+    background: linear-gradient(135deg, #ffc107, #d39e00);
+    color: #212529;
+}
+
+/* Quick Access Buttons */
+.quick-actions {
+    display: flex;
+    gap: 10px;
+    margin-bottom: 15px;
+}
+
+.quick-btn {
+    flex: 1;
+    padding: 12px 8px;
+    background: white;
+    border: 2px solid #e9ecef;
+    border-radius: 8px;
+    font-size: 0.8rem;
+    text-align: center;
+    cursor: pointer;
+    transition: all 0.3s ease;
+}
+
+.quick-btn:active {
+    transform: scale(0.95);
+}
+
+.quick-btn.active {
+    border-color: #007bff;
+    background: #f0f8ff;
+}
+
+/* Status Indicators */
+.status-indicator {
+    position: absolute;
+    top: 5px;
+    right: 5px;
+    width: 12px;
+    height: 12px;
+    border-radius: 50%;
+    background: #28a745;
+}
+
+.status-indicator.low-stock {
+    background: #ffc107;
+}
+
+.status-indicator.out-of-stock {
+    background: #dc3545;
+}
+
+/* Scanner Button */
+.scanner-btn {
+    position: fixed;
+    bottom: 80px;
+    right: 20px;
+    width: 60px;
+    height: 60px;
+    background: linear-gradient(135deg, #17a2b8, #138496);
+    color: white;
+    border: none;
+    border-radius: 50%;
+    box-shadow: 0 4px 15px rgba(0,0,0,0.3);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 1.5rem;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    z-index: 1000;
+}
+
+.scanner-btn:active {
+    transform: scale(0.9);
+}
+
+/* Touch Feedback */
+.touch-feedback {
+    position: relative;
+    overflow: hidden;
+}
+
+.touch-feedback::after {
+    content: '';
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    width: 0;
+    height: 0;
+    background: rgba(255,255,255,0.4);
+    border-radius: 50%;
+    transform: translate(-50%, -50%);
+    transition: width 0.3s ease, height 0.3s ease;
+}
+
+.touch-feedback:active::after {
+    width: 200px;
+    height: 200px;
+}
+
+/* Responsive adjustments */
+@media (max-width: 480px) {
+    .services-grid {
+        grid-template-columns: repeat(2, 1fr);
+    }
+    
+    .service-card {
+        padding: 12px;
+    }
+}
+
+/* PWA specific styles */
+@media (display-mode: standalone) {
+    .mobile-header {
+        padding-top: env(safe-area-inset-top);
+    }
+}
+
+/* Loading Animation */
+.loading-spinner {
+    display: inline-block;
+    width: 20px;
+    height: 20px;
+    border: 3px solid rgba(255,255,255,.3);
+    border-radius: 50%;
+    border-top-color: #fff;
+    animation: spin 1s ease-in-out infinite;
+}
+
+@keyframes spin {
+    to { transform: rotate(360deg); }
+}
+
+/* Vibration feedback simulation */
+.vibrate {
+    animation: vibrate 0.3s ease-in-out;
+}
+
+@keyframes vibrate {
+    0%, 100% { transform: translateX(0); }
+    10%, 30%, 50%, 70%, 90% { transform: translateX(-2px); }
+    20%, 40%, 60%, 80% { transform: translateX(2px); }
+}
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="mobile-container">
+    <!-- Header -->
+    <div class="mobile-header">
+        <div class="d-flex align-items-center">
+            <i class="bi bi-car-front me-2"></i>
+            <span class="fw-bold">Cassa Mobile</span>
+        </div>
+        <div class="d-flex align-items-center gap-2">
+            <span class="badge bg-light text-dark" id="cart-count">0</span>
+            <button class="btn btn-sm btn-outline-light" onclick="toggleOfflineMode()">
+                <i class="bi bi-wifi" id="wifi-icon"></i>
+            </button>
+        </div>
+    </div>
+    
+    <!-- Content -->
+    <div class="mobile-content">
+        <!-- Quick Actions -->
+        <div class="quick-actions">
+            <div class="quick-btn touch-feedback" onclick="quickAction('frequenti')">
+                <i class="bi bi-star d-block"></i>
+                Frequenti
+            </div>
+            <div class="quick-btn touch-feedback" onclick="quickAction('scanner')">
+                <i class="bi bi-qr-code-scan d-block"></i>
+                Scanner
+            </div>
+            <div class="quick-btn touch-feedback" onclick="quickAction('cliente')">
+                <i class="bi bi-person d-block"></i>
+                Cliente
+            </div>
+            <div class="quick-btn touch-feedback" onclick="quickAction('tempo')">
+                <i class="bi bi-clock d-block"></i>
+                Tempo
+            </div>
+        </div>
+        
+        <!-- Category Tabs -->
+        <div class="category-tabs">
+            <div class="category-tab active touch-feedback" data-categoria="all" onclick="filterCategory('all')">
+                Tutti
+            </div>
+            {% for categoria in categorie %}
+            <div class="category-tab touch-feedback" data-categoria="{{ categoria.id }}" onclick="filterCategory('{{ categoria.id }}')">
+                {{ categoria.nome }}
+            </div>
+            {% endfor %}
+        </div>
+        
+        <!-- Services Grid -->
+        <div class="services-grid" id="services-grid">
+            {% for servizio in servizi_frequenti %}
+            <div class="service-card {{ servizio.tipo }} touch-feedback" 
+                 data-id="{{ servizio.id }}" 
+                 data-categoria="{{ servizio.categoria.id }}"
+                 onclick="addToCart({{ servizio.id }})">
+                
+                {% if servizio.tipo == 'prodotto' and servizio.scorta_bassa %}
+                <div class="status-indicator low-stock"></div>
+                {% elif servizio.tipo == 'prodotto' and not servizio.disponibile %}
+                <div class="status-indicator out-of-stock"></div>
+                {% else %}
+                <div class="status-indicator"></div>
+                {% endif %}
+                
+                <div class="service-title">{{ servizio.titolo }}</div>
+                <div class="service-price">€{{ servizio.prezzo }}</div>
+                {% if servizio.tipo == 'servizio' %}
+                <div class="service-duration">{{ servizio.durata_minuti }} min</div>
+                {% endif %}
+            </div>
+            {% endfor %}
+        </div>
+        
+        <!-- Cart Summary -->
+        <div class="cart-summary" id="cart-summary" style="display: none;">
+            <div class="d-flex justify-content-between align-items-center mb-3">
+                <h6 class="mb-0">Carrello</h6>
+                <button class="btn btn-sm btn-outline-danger" onclick="clearCart()">
+                    <i class="bi bi-trash"></i>
+                </button>
+            </div>
+            <div id="cart-items"></div>
+        </div>
+    </div>
+    
+    <!-- Footer with Totals and Actions -->
+    <div class="mobile-footer">
+        <div class="total-section" id="total-section" style="display: none;">
+            <div class="total-row">
+                <span>Subtotale:</span>
+                <span id="subtotal">€0.00</span>
+            </div>
+            <div class="total-row" id="discount-row" style="display: none;">
+                <span>Sconto:</span>
+                <span id="discount" class="text-success">-€0.00</span>
+            </div>
+            <div class="total-row total-final">
+                <span>Totale:</span>
+                <span id="total">€0.00</span>
+            </div>
+        </div>
+        
+        <div class="mt-3">
+            <button class="action-btn btn-success-mobile touch-feedback" 
+                    id="complete-btn" onclick="completeOrder()" disabled>
+                <i class="bi bi-check-circle me-2"></i>
+                Completa Ordine
+            </button>
+        </div>
+    </div>
+    
+    <!-- Floating Scanner Button -->
+    <button class="scanner-btn touch-feedback" onclick="startScanner()">
+        <i class="bi bi-qr-code-scan"></i>
+    </button>
+</div>
+
+<!-- Modals -->
+<!-- Cliente Modal -->
+<div class="modal fade" id="clienteModal" tabindex="-1">
+    <div class="modal-dialog modal-fullscreen-sm-down">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Cliente</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <div class="mb-3">
+                    <input type="text" class="form-control form-control-lg" 
+                           id="client-search" placeholder="Cerca cliente...">
+                </div>
+                <div id="client-results"></div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Payment Modal -->
+<div class="modal fade" id="paymentModal" tabindex="-1">
+    <div class="modal-dialog modal-fullscreen-sm-down">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Pagamento</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <!-- Sezione Consegna -->
+                <div class="mb-4">
+                    <h6>Consegna</h6>
+                    <div class="row g-3">
+                        <div class="col-6">
+                            <button class="action-btn btn-info-mobile touch-feedback" onclick="selectDelivery('immediata')">
+                                <i class="bi bi-lightning me-2"></i>Immediata
+                            </button>
+                        </div>
+                        <div class="col-6">
+                            <button class="action-btn btn-info-mobile touch-feedback" onclick="selectDelivery('programmata')">
+                                <i class="bi bi-clock me-2"></i>Programmata
+                            </button>
+                        </div>
+                    </div>
+                    <div class="mt-3" id="delivery-time-section" style="display: none;">
+                        <label class="form-label">Ora consegna</label>
+                        <input type="time" class="form-control form-control-lg text-center" id="mobile-delivery-time">
+                    </div>
+                    <div class="mt-2 text-center text-info">
+                        <i class="bi bi-clock"></i> Tempo attesa: <span id="mobile-wait-time">--</span>
+                    </div>
+                </div>
+                
+                <!-- Sezione Pagamento -->
+                <div class="mb-4">
+                    <h6>Pagamento</h6>
+                    <div class="row g-3">
+                        <div class="col-6">
+                            <button class="action-btn btn-primary-mobile touch-feedback" onclick="selectPayment('contanti')">
+                                <i class="bi bi-cash me-2"></i>Contanti
+                            </button>
+                        </div>
+                        <div class="col-6">
+                            <button class="action-btn btn-primary-mobile touch-feedback" onclick="selectPayment('carta')">
+                                <i class="bi bi-credit-card me-2"></i>Carta
+                            </button>
+                        </div>
+                    </div>
+                    <div class="mt-3">
+                        <label class="form-label">Importo ricevuto</label>
+                        <input type="number" class="form-control form-control-lg text-center" 
+                               id="amount-received" step="0.01" onchange="calculateChange()">
+                    </div>
+                </div>
+                <div id="change-display" class="mt-3 text-center" style="display: none;">
+                    <div class="alert alert-success">
+                        <strong>Resto: €<span id="change-amount">0.00</span></strong>
+                    </div>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button class="action-btn btn-success-mobile touch-feedback" onclick="processPayment()">
+                    Conferma Pagamento
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Scanner Modal -->
+<div class="modal fade" id="scannerModal" tabindex="-1">
+    <div class="modal-dialog modal-fullscreen">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Scanner QR/NFC</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body text-center">
+                <div id="scanner-container">
+                    <i class="bi bi-qr-code-scan display-1 text-muted"></i>
+                    <p class="mt-3">Avvicina il codice QR o la tessera NFC</p>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+// PWA Mobile App JavaScript
+class MobileCashRegister {
+    constructor() {
+        this.cart = new Map();
+        this.selectedClient = null;
+        this.paymentMethod = 'contanti';
+        this.isOffline = false;
+        this.init();
+    }
+    
+    init() {
+        this.setupTouchEvents();
+        this.setupServiceWorker();
+        this.loadOfflineData();
+        this.setupVibration();
+        
+        // Update cart display
+        this.updateCartDisplay();
+    }
+    
+    setupTouchEvents() {
+        // Disable double-tap zoom on iOS
+        document.addEventListener('touchstart', (e) => {
+            if (e.touches.length > 1) {
+                e.preventDefault();
+            }
+        });
+        
+        let lastTouchEnd = 0;
+        document.addEventListener('touchend', (e) => {
+            const now = Date.now();
+            if (now - lastTouchEnd <= 300) {
+                e.preventDefault();
+            }
+            lastTouchEnd = now;
+        }, false);
+    }
+    
+    setupServiceWorker() {
+        if ('serviceWorker' in navigator) {
+            navigator.serviceWorker.register('/service-worker.js')
+                .then(() => console.log('Service Worker registered'))
+                .catch(err => console.log('Service Worker registration failed'));
+        }
+    }
+    
+    setupVibration() {
+        this.canVibrate = 'vibrate' in navigator;
+    }
+    
+    vibrate(pattern = [10]) {
+        if (this.canVibrate) {
+            navigator.vibrate(pattern);
+        }
+    }
+    
+    loadOfflineData() {
+        // Load cached data for offline mode
+        const cachedCart = localStorage.getItem('mobile-cart');
+        if (cachedCart) {
+            this.cart = new Map(JSON.parse(cachedCart));
+            this.updateCartDisplay();
+        }
+    }
+    
+    saveOfflineData() {
+        localStorage.setItem('mobile-cart', JSON.stringify([...this.cart]));
+    }
+    
+    addToCart(serviceId) {
+        this.vibrate([50]);
+        
+        const serviceCard = document.querySelector(`[data-id="${serviceId}"]`);
+        if (!serviceCard) return;
+        
+        serviceCard.classList.add('vibrate');
+        setTimeout(() => serviceCard.classList.remove('vibrate'), 300);
+        
+        // Get service data
+        const title = serviceCard.querySelector('.service-title').textContent;
+        const price = parseFloat(serviceCard.querySelector('.service-price').textContent.replace('€', ''));
+        
+        if (this.cart.has(serviceId)) {
+            const item = this.cart.get(serviceId);
+            item.quantity++;
+        } else {
+            this.cart.set(serviceId, {
+                id: serviceId,
+                title: title,
+                price: price,
+                quantity: 1
+            });
+        }
+        
+        serviceCard.classList.add('added');
+        this.updateCartDisplay();
+        this.saveOfflineData();
+        
+        // Show toast
+        this.showToast(`${title} aggiunto al carrello`, 'success');
+    }
+    
+    removeFromCart(serviceId) {
+        this.vibrate([30]);
+        
+        if (this.cart.has(serviceId)) {
+            const item = this.cart.get(serviceId);
+            if (item.quantity > 1) {
+                item.quantity--;
+            } else {
+                this.cart.delete(serviceId);
+                document.querySelector(`[data-id="${serviceId}"]`)?.classList.remove('added');
+            }
+        }
+        
+        this.updateCartDisplay();
+        this.saveOfflineData();
+    }
+    
+    clearCart() {
+        if (this.cart.size === 0) return;
+        
+        if (confirm('Svuotare il carrello?')) {
+            this.vibrate([100, 50, 100]);
+            this.cart.clear();
+            
+            // Remove added class from all cards
+            document.querySelectorAll('.service-card.added').forEach(card => {
+                card.classList.remove('added');
+            });
+            
+            this.updateCartDisplay();
+            this.saveOfflineData();
+            this.showToast('Carrello svuotato', 'info');
+        }
+    }
+    
+    updateCartDisplay() {
+        const cartCount = document.getElementById('cart-count');
+        const cartSummary = document.getElementById('cart-summary');
+        const cartItems = document.getElementById('cart-items');
+        const totalSection = document.getElementById('total-section');
+        const completeBtn = document.getElementById('complete-btn');
+        
+        // Update cart count
+        const totalItems = Array.from(this.cart.values()).reduce((sum, item) => sum + item.quantity, 0);
+        cartCount.textContent = totalItems;
+        
+        if (this.cart.size === 0) {
+            cartSummary.style.display = 'none';
+            totalSection.style.display = 'none';
+            completeBtn.disabled = true;
+            return;
+        }
+        
+        // Show cart sections
+        cartSummary.style.display = 'block';
+        totalSection.style.display = 'block';
+        completeBtn.disabled = false;
+        
+        // Update cart items
+        let cartHTML = '';
+        let subtotal = 0;
+        
+        this.cart.forEach((item, serviceId) => {
+            const itemTotal = item.price * item.quantity;
+            subtotal += itemTotal;
+            
+            cartHTML += `
+                <div class="cart-item">
+                    <div class="cart-item-info">
+                        <div class="cart-item-title">${item.title}</div>
+                        <div class="cart-item-price">€${item.price.toFixed(2)} × ${item.quantity}</div>
+                    </div>
+                    <div class="quantity-controls">
+                        <button class="quantity-btn" onclick="mobileApp.removeFromCart('${serviceId}')">
+                            <i class="bi bi-dash"></i>
+                        </button>
+                        <span class="quantity-display">${item.quantity}</span>
+                        <button class="quantity-btn" onclick="mobileApp.addToCart('${serviceId}')">
+                            <i class="bi bi-plus"></i>
+                        </button>
+                        <button class="quantity-btn remove" onclick="mobileApp.removeFromCart('${serviceId}')">
+                            <i class="bi bi-x"></i>
+                        </button>
+                    </div>
+                </div>
+            `;
+        });
+        
+        cartItems.innerHTML = cartHTML;
+        
+        // Update totals
+        document.getElementById('subtotal').textContent = `€${subtotal.toFixed(2)}`;
+        document.getElementById('total').textContent = `€${subtotal.toFixed(2)}`;
+    }
+    
+    completeOrder() {
+        if (this.cart.size === 0) {
+            this.showToast('Carrello vuoto', 'warning');
+            return;
+        }
+        
+        // Show payment modal
+        const modal = new bootstrap.Modal(document.getElementById('paymentModal'));
+        const total = Array.from(this.cart.values()).reduce((sum, item) => sum + (item.price * item.quantity), 0);
+        document.getElementById('amount-received').value = total.toFixed(2);
+        modal.show();
+    }
+    
+    processPayment() {
+        this.vibrate([200]);
+        
+        // Simulate order processing
+        const completeBtn = document.querySelector('#paymentModal .btn-success-mobile');
+        const originalText = completeBtn.innerHTML;
+        completeBtn.innerHTML = '<span class="loading-spinner"></span> Processando...';
+        completeBtn.disabled = true;
+        
+        setTimeout(() => {
+            // Reset
+            this.cart.clear();
+            this.updateCartDisplay();
+            this.saveOfflineData();
+            
+            // Close modal
+            bootstrap.Modal.getInstance(document.getElementById('paymentModal')).hide();
+            
+            // Show success
+            this.showToast('Ordine completato con successo!', 'success');
+            this.vibrate([100, 50, 100, 50, 100]);
+            
+            // Reset button
+            completeBtn.innerHTML = originalText;
+            completeBtn.disabled = false;
+        }, 2000);
+    }
+    
+    selectPayment(method) {
+        this.paymentMethod = method;
+        this.vibrate([30]);
+        
+        // Update UI
+        document.querySelectorAll('#paymentModal .btn-primary-mobile').forEach(btn => {
+            btn.classList.remove('active');
+        });
+        event.target.closest('button').classList.add('active');
+    }
+    
+    calculateChange() {
+        const received = parseFloat(document.getElementById('amount-received').value) || 0;
+        const total = Array.from(this.cart.values()).reduce((sum, item) => sum + (item.price * item.quantity), 0);
+        const change = Math.max(0, received - total);
+        
+        const changeDisplay = document.getElementById('change-display');
+        const changeAmount = document.getElementById('change-amount');
+        
+        if (change > 0) {
+            changeAmount.textContent = change.toFixed(2);
+            changeDisplay.style.display = 'block';
+        } else {
+            changeDisplay.style.display = 'none';
+        }
+    }
+    
+    showToast(message, type = 'info') {
+        // Create toast element
+        const toast = document.createElement('div');
+        toast.className = `toast align-items-center text-white bg-${type} border-0`;
+        toast.style.position = 'fixed';
+        toast.style.top = '70px';
+        toast.style.right = '20px';
+        toast.style.zIndex = '9999';
+        
+        toast.innerHTML = `
+            <div class="d-flex">
+                <div class="toast-body">${message}</div>
+                <button type="button" class="btn-close btn-close-white me-2 m-auto" data-bs-dismiss="toast"></button>
+            </div>
+        `;
+        
+        document.body.appendChild(toast);
+        
+        const bsToast = new bootstrap.Toast(toast);
+        bsToast.show();
+        
+        toast.addEventListener('hidden.bs.toast', () => {
+            toast.remove();
+        });
+    }
+}
+
+// Global functions
+function filterCategory(categoryId) {
+    // Update active tab
+    document.querySelectorAll('.category-tab').forEach(tab => {
+        tab.classList.remove('active');
+    });
+    document.querySelector(`[data-categoria="${categoryId}"]`).classList.add('active');
+    
+    // Filter services
+    document.querySelectorAll('.service-card').forEach(card => {
+        const cardCategory = card.dataset.categoria;
+        if (categoryId === 'all' || cardCategory === categoryId) {
+            card.style.display = 'block';
+        } else {
+            card.style.display = 'none';
+        }
+    });
+    
+    mobileApp.vibrate([20]);
+}
+
+function quickAction(action) {
+    mobileApp.vibrate([30]);
+    
+    switch (action) {
+        case 'frequenti':
+            filterCategory('all');
+            break;
+        case 'scanner':
+            startScanner();
+            break;
+        case 'cliente':
+            showClientModal();
+            break;
+        case 'tempo':
+            calculateWaitTime();
+            break;
+    }
+}
+
+function startScanner() {
+    const modal = new bootstrap.Modal(document.getElementById('scannerModal'));
+    modal.show();
+    
+    // Simulate scanner functionality
+    mobileApp.showToast('Scanner non implementato in demo', 'info');
+}
+
+function showClientModal() {
+    const modal = new bootstrap.Modal(document.getElementById('clienteModal'));
+    modal.show();
+}
+
+function calculateWaitTime() {
+    mobileApp.showToast('Tempo di attesa: 15 minuti', 'info');
+}
+
+function addToCart(serviceId) {
+    mobileApp.addToCart(serviceId);
+}
+
+function completeOrder() {
+    mobileApp.completeOrder();
+}
+
+function clearCart() {
+    mobileApp.clearCart();
+}
+
+function selectPayment(method) {
+    mobileApp.selectPayment(method);
+}
+
+function selectDelivery(type) {
+    // Aggiorna UI buttons
+    document.querySelectorAll('#paymentModal .btn-info-mobile').forEach(btn => {
+        btn.classList.remove('active');
+    });
+    event.target.closest('button').classList.add('active');
+    
+    // Gestisci campo ora consegna
+    const timeSection = document.getElementById('delivery-time-section');
+    const timeInput = document.getElementById('mobile-delivery-time');
+    
+    if (type === 'programmata') {
+        timeSection.style.display = 'block';
+        timeInput.required = true;
+        // Imposta ora minima
+        const now = new Date();
+        now.setMinutes(now.getMinutes() + 30);
+        timeInput.min = now.toTimeString().slice(0, 5);
+    } else {
+        timeSection.style.display = 'none';
+        timeInput.required = false;
+        timeInput.value = '';
+    }
+    
+    // Aggiorna tempo attesa
+    const waitTimeElement = document.getElementById('mobile-wait-time');
+    if (waitTimeElement) {
+        waitTimeElement.textContent = type === 'immediata' ? 'Immediato' : 'Programmata';
+    }
+}
+
+function calculateChange() {
+    mobileApp.calculateChange();
+}
+
+function processPayment() {
+    mobileApp.processPayment();
+}
+
+function toggleOfflineMode() {
+    mobileApp.isOffline = !mobileApp.isOffline;
+    const icon = document.getElementById('wifi-icon');
+    
+    if (mobileApp.isOffline) {
+        icon.className = 'bi bi-wifi-off';
+        mobileApp.showToast('Modalità offline attivata', 'warning');
+    } else {
+        icon.className = 'bi bi-wifi';
+        mobileApp.showToast('Modalità online attivata', 'success');
+    }
+}
+
+// Initialize mobile app
+let mobileApp;
+document.addEventListener('DOMContentLoaded', function() {
+    mobileApp = new MobileCashRegister();
+});
+
+// PWA Install prompt
+let deferredPrompt;
+window.addEventListener('beforeinstallprompt', (e) => {
+    e.preventDefault();
+    deferredPrompt = e;
+    
+    // Show install button
+    const installBtn = document.createElement('button');
+    installBtn.textContent = 'Installa App';
+    installBtn.className = 'btn btn-success btn-sm position-fixed';
+    installBtn.style.top = '10px';
+    installBtn.style.left = '10px';
+    installBtn.style.zIndex = '9999';
+    
+    installBtn.addEventListener('click', async () => {
+        if (deferredPrompt) {
+            deferredPrompt.prompt();
+            const { outcome } = await deferredPrompt.userChoice;
+            deferredPrompt = null;
+            installBtn.remove();
+        }
+    });
+    
+    document.body.appendChild(installBtn);
+});
+</script>
+{% endblock %}

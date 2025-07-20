@@ -1,0 +1,312 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}Movimenti Scorte - Gestionale Autolavaggio{% endblock %}
+
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <h1><i class="bi bi-arrow-repeat"></i> Movimenti Scorte</h1>
+    <div>
+        <a href="{% url 'core:alert-scorte' %}" class="btn btn-warning me-2">
+            <i class="bi bi-exclamation-triangle"></i> Alert Scorte
+        </a>
+        <a href="{% url 'core:scorte-list' %}" class="btn btn-outline-secondary">
+            <i class="bi bi-arrow-left"></i> Torna alle Scorte
+        </a>
+    </div>
+</div>
+
+{% if messages %}
+    {% for message in messages %}
+        <div class="alert alert-{{ message.tags }} alert-dismissible fade show" role="alert">
+            {{ message }}
+            <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+        </div>
+    {% endfor %}
+{% endif %}
+
+<!-- Filtri -->
+<div class="card mb-4">
+    <div class="card-body">
+        <div class="row">
+            <div class="col-md-3">
+                <input type="text" id="filtro-prodotto" class="form-control" placeholder="Cerca prodotto...">
+            </div>
+            <div class="col-md-2">
+                <select id="filtro-tipo" class="form-select">
+                    <option value="">Tutti i tipi</option>
+                    <option value="carico">Carico</option>
+                    <option value="scarico">Scarico</option>
+                    <option value="rettifica">Rettifica</option>
+                </select>
+            </div>
+            <div class="col-md-2">
+                <input type="date" id="filtro-data-da" class="form-control" placeholder="Data da">
+            </div>
+            <div class="col-md-2">
+                <input type="date" id="filtro-data-a" class="form-control" placeholder="Data a">
+            </div>
+            <div class="col-md-2">
+                <input type="text" id="filtro-operatore" class="form-control" placeholder="Operatore...">
+            </div>
+            <div class="col-md-1">
+                <button type="button" class="btn btn-outline-secondary w-100" onclick="resetFiltri()">
+                    <i class="bi bi-arrow-clockwise"></i>
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="card">
+    <div class="card-body">
+        {% if movimenti %}
+            <div class="table-responsive">
+                <table class="table table-hover" id="tabella-movimenti">
+                    <thead class="table-dark">
+                        <tr>
+                            <th>Data/Ora</th>
+                            <th>Prodotto</th>
+                            <th>Tipo</th>
+                            <th>Quantità</th>
+                            <th>Scorte</th>
+                            <th>Operatore</th>
+                            <th>Nota</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for movimento in movimenti %}
+                        <tr data-prodotto="{{ movimento.prodotto.titolo|lower }}"
+                            data-tipo="{{ movimento.tipo }}"
+                            data-data="{{ movimento.data_movimento|date:'Y-m-d' }}"
+                            data-operatore="{{ movimento.operatore.username|default:''|lower }}">
+                            <td>
+                                <div>
+                                    <strong>{{ movimento.data_movimento|date:"d/m/Y" }}</strong>
+                                    <br><small class="text-muted">{{ movimento.data_movimento|date:"H:i:s" }}</small>
+                                </div>
+                            </td>
+                            <td>
+                                <div class="d-flex align-items-center">
+                                    <i class="bi bi-box me-2 text-primary"></i>
+                                    <div>
+                                        <strong>{{ movimento.prodotto.titolo }}</strong>
+                                        {% if movimento.prodotto.categoria %}
+                                            <br><small class="text-muted">{{ movimento.prodotto.categoria.nome }}</small>
+                                        {% endif %}
+                                    </div>
+                                </div>
+                            </td>
+                            <td>
+                                {% if movimento.tipo == 'carico' %}
+                                    <span class="badge bg-success">
+                                        <i class="bi bi-plus-circle"></i> Carico
+                                    </span>
+                                {% elif movimento.tipo == 'scarico' %}
+                                    <span class="badge bg-warning">
+                                        <i class="bi bi-dash-circle"></i> Scarico
+                                    </span>
+                                {% elif movimento.tipo == 'rettifica' %}
+                                    <span class="badge bg-info">
+                                        <i class="bi bi-arrow-repeat"></i> Rettifica
+                                    </span>
+                                {% else %}
+                                    <span class="badge bg-secondary">{{ movimento.get_tipo_display }}</span>
+                                {% endif %}
+                            </td>
+                            <td>
+                                <div class="text-center">
+                                    {% if movimento.tipo == 'carico' %}
+                                        <span class="text-success fw-bold">+{{ movimento.quantita }}</span>
+                                    {% elif movimento.tipo == 'scarico' %}
+                                        <span class="text-warning fw-bold">{{ movimento.quantita }}</span>
+                                    {% else %}
+                                        <span class="text-info fw-bold">{{ movimento.quantita|stringformat:"+d" }}</span>
+                                    {% endif %}
+                                </div>
+                            </td>
+                            <td>
+                                <div class="text-center">
+                                    <small class="text-muted">{{ movimento.quantita_prima }}</small>
+                                    <i class="bi bi-arrow-right mx-1"></i>
+                                    <strong>{{ movimento.quantita_dopo }}</strong>
+                                </div>
+                            </td>
+                            <td>
+                                {% if movimento.operatore %}
+                                    <div class="d-flex align-items-center">
+                                        <i class="bi bi-person me-1"></i>
+                                        <small>{{ movimento.operatore.username }}</small>
+                                    </div>
+                                {% else %}
+                                    <small class="text-muted">Sistema</small>
+                                {% endif %}
+                            </td>
+                            <td>
+                                {% if movimento.nota %}
+                                    <small class="text-muted">{{ movimento.nota|truncatewords:8 }}</small>
+                                {% else %}
+                                    <small class="text-muted">-</small>
+                                {% endif %}
+                                {% if movimento.riferimento_ordine %}
+                                    <br><small class="text-info">
+                                        <i class="bi bi-receipt"></i> 
+                                        Ordine #{{ movimento.riferimento_ordine.numero_ordine }}
+                                    </small>
+                                {% endif %}
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+            
+            <!-- Paginazione -->
+            {% if is_paginated %}
+                <nav aria-label="Paginazione movimenti">
+                    <ul class="pagination justify-content-center">
+                        {% if page_obj.has_previous %}
+                            <li class="page-item">
+                                <a class="page-link" href="?page=1">&laquo; Prima</a>
+                            </li>
+                            <li class="page-item">
+                                <a class="page-link" href="?page={{ page_obj.previous_page_number }}">Precedente</a>
+                            </li>
+                        {% endif %}
+                        
+                        <li class="page-item active">
+                            <span class="page-link">
+                                Pagina {{ page_obj.number }} di {{ page_obj.paginator.num_pages }}
+                            </span>
+                        </li>
+                        
+                        {% if page_obj.has_next %}
+                            <li class="page-item">
+                                <a class="page-link" href="?page={{ page_obj.next_page_number }}">Successiva</a>
+                            </li>
+                            <li class="page-item">
+                                <a class="page-link" href="?page={{ page_obj.paginator.num_pages }}">Ultima &raquo;</a>
+                            </li>
+                        {% endif %}
+                    </ul>
+                </nav>
+            {% endif %}
+        {% else %}
+            <div class="text-center py-5">
+                <i class="bi bi-arrow-repeat display-1 text-muted"></i>
+                <h3 class="text-muted mt-3">Nessun Movimento</h3>
+                <p class="text-muted">Non ci sono ancora movimenti di magazzino registrati.</p>
+                <a href="{% url 'core:scorte-list' %}" class="btn btn-primary">
+                    <i class="bi bi-boxes"></i> Vai alle Scorte
+                </a>
+            </div>
+        {% endif %}
+    </div>
+</div>
+
+<!-- Statistiche -->
+{% if movimenti %}
+<div class="row mt-4">
+    <div class="col-md-3">
+        <div class="card bg-success text-white">
+            <div class="card-body text-center">
+                <i class="bi bi-plus-circle display-6"></i>
+                <h4>{{ stats.carichi|default:0 }}</h4>
+                <small>Carichi Oggi</small>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-3">
+        <div class="card bg-warning text-white">
+            <div class="card-body text-center">
+                <i class="bi bi-dash-circle display-6"></i>
+                <h4>{{ stats.scarichi|default:0 }}</h4>
+                <small>Scarichi Oggi</small>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-3">
+        <div class="card bg-info text-white">
+            <div class="card-body text-center">
+                <i class="bi bi-arrow-repeat display-6"></i>
+                <h4>{{ stats.rettifiche|default:0 }}</h4>
+                <small>Rettifiche Oggi</small>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-3">
+        <div class="card bg-primary text-white">
+            <div class="card-body text-center">
+                <i class="bi bi-calendar-event display-6"></i>
+                <h4>{{ movimenti|length }}</h4>
+                <small>Totale Movimenti</small>
+            </div>
+        </div>
+    </div>
+</div>
+{% endif %}
+
+<script>
+// Filtri
+document.getElementById('filtro-prodotto').addEventListener('input', applicaFiltri);
+document.getElementById('filtro-tipo').addEventListener('change', applicaFiltri);
+document.getElementById('filtro-data-da').addEventListener('change', applicaFiltri);
+document.getElementById('filtro-data-a').addEventListener('change', applicaFiltri);
+document.getElementById('filtro-operatore').addEventListener('input', applicaFiltri);
+
+function applicaFiltri() {
+    const filtroProdotto = document.getElementById('filtro-prodotto').value.toLowerCase();
+    const filtroTipo = document.getElementById('filtro-tipo').value;
+    const filtroDataDa = document.getElementById('filtro-data-da').value;
+    const filtroDataA = document.getElementById('filtro-data-a').value;
+    const filtroOperatore = document.getElementById('filtro-operatore').value.toLowerCase();
+    
+    const righe = document.querySelectorAll('#tabella-movimenti tbody tr');
+    
+    righe.forEach(riga => {
+        const prodotto = riga.dataset.prodotto;
+        const tipo = riga.dataset.tipo;
+        const data = riga.dataset.data;
+        const operatore = riga.dataset.operatore;
+        
+        let mostra = true;
+        
+        // Filtro prodotto
+        if (filtroProdotto && !prodotto.includes(filtroProdotto)) {
+            mostra = false;
+        }
+        
+        // Filtro tipo
+        if (filtroTipo && tipo !== filtroTipo) {
+            mostra = false;
+        }
+        
+        // Filtro data da
+        if (filtroDataDa && data < filtroDataDa) {
+            mostra = false;
+        }
+        
+        // Filtro data a
+        if (filtroDataA && data > filtroDataA) {
+            mostra = false;
+        }
+        
+        // Filtro operatore
+        if (filtroOperatore && !operatore.includes(filtroOperatore)) {
+            mostra = false;
+        }
+        
+        riga.style.display = mostra ? '' : 'none';
+    });
+}
+
+function resetFiltri() {
+    document.getElementById('filtro-prodotto').value = '';
+    document.getElementById('filtro-tipo').value = '';
+    document.getElementById('filtro-data-da').value = '';
+    document.getElementById('filtro-data-a').value = '';
+    document.getElementById('filtro-operatore').value = '';
+    applicaFiltri();
+}
+</script>
+{% endblock %}

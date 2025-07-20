@@ -1,0 +1,334 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}Dashboard - Gestionale Autolavaggio{% endblock %}
+
+{% block content %}
+<div class="row">
+    <div class="col-12">
+        <h1 class="mb-4">
+            <i class="bi bi-speedometer2"></i> Dashboard
+        </h1>
+    </div>
+</div>
+
+<!-- Cards Statistiche -->
+<div class="row mb-4">
+    <div class="col-md-3">
+        <div class="card stats-card bg-primary">
+            <div class="card-body text-center">
+                <i class="bi bi-cart-check display-4 mb-3"></i>
+                <h3 id="ordini-oggi">-</h3>
+                <p>Ordini Oggi</p>
+            </div>
+        </div>
+    </div>
+    
+    <div class="col-md-3">
+        <div class="card stats-card bg-success">
+            <div class="card-body text-center">
+                <i class="bi bi-cash-stack display-4 mb-3"></i>
+                <h3 id="incasso-oggi">-</h3>
+                <p>Incasso Oggi</p>
+            </div>
+        </div>
+    </div>
+    
+    <div class="col-md-3">
+        <div class="card stats-card bg-warning">
+            <div class="card-body text-center">
+                <i class="bi bi-clock display-4 mb-3"></i>
+                <h3 id="ordini-in-lavorazione">-</h3>
+                <p>In Lavorazione</p>
+            </div>
+        </div>
+    </div>
+    
+    <div class="col-md-3">
+        <div class="card stats-card bg-info">
+            <div class="card-body text-center">
+                <i class="bi bi-people display-4 mb-3"></i>
+                <h3 id="clienti-totali">-</h3>
+                <p>Clienti Totali</p>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Alert Scorte Basse -->
+{% if prodotti_scorta_bassa > 0 %}
+<div class="row mb-4">
+    <div class="col-12">
+        <div class="alert alert-warning">
+            <i class="bi bi-exclamation-triangle"></i>
+            <strong>Attenzione!</strong> 
+            {{ prodotti_scorta_bassa }} prodotto{{ prodotti_scorta_bassa|pluralize }} con scorte basse.
+            <a href="{% url 'core:alert-scorte' %}" class="alert-link">Visualizza dettagli</a>
+        </div>
+    </div>
+</div>
+{% endif %}
+
+<!-- Azioni Rapide -->
+<div class="row mb-4">
+    <div class="col-12">
+        <div class="card">
+            <div class="card-header">
+                <h5 class="mb-0"><i class="bi bi-lightning"></i> Azioni Rapide</h5>
+            </div>
+            <div class="card-body">
+                <div class="row">
+                    <div class="col-md-2">
+                        <a href="{% url 'ordini:cassa' %}" class="btn btn-primary btn-lg w-100 mb-2">
+                            <i class="bi bi-cash-register"></i><br>
+                            Nuovo Ordine
+                        </a>
+                    </div>
+                    <div class="col-md-2">
+                        <a href="{% url 'clienti:cliente-create' %}" class="btn btn-success btn-lg w-100 mb-2">
+                            <i class="bi bi-person-plus"></i><br>
+                            Nuovo Cliente
+                        </a>
+                    </div>
+                    <div class="col-md-2">
+                        <a href="{% url 'abbonamenti:vendita-abbonamento' %}" class="btn btn-info btn-lg w-100 mb-2">
+                            <i class="bi bi-card-checklist"></i><br>
+                            Nuovo Abbonamento
+                        </a>
+                    </div>
+                    <div class="col-md-2">
+                        <a href="{% url 'abbonamenti:verifica-accesso' %}" class="btn btn-warning btn-lg w-100 mb-2">
+                            <i class="bi bi-qr-code-scan"></i><br>
+                            Verifica NFC
+                        </a>
+                    </div>
+                    <div class="col-md-2">
+                        <a href="{% url 'prenotazioni:prenotazioni-admin' %}" class="btn btn-secondary btn-lg w-100 mb-2">
+                            <i class="bi bi-calendar-check"></i><br>
+                            Prenotazioni
+                        </a>
+                    </div>
+                    {% comment "Reportistica temporarily disabled" %}
+                    <div class="col-md-2">
+                        <a href="{% url 'reportistica:dashboard' %}" class="btn btn-dark btn-lg w-100 mb-2">
+                            <i class="bi bi-bar-chart"></i><br>
+                            Report
+                        </a>
+                    </div>
+                    {% endcomment %}
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Ultimi Ordini e Postazioni -->
+<div class="row">
+    <!-- Ultimi Ordini -->
+    <div class="col-md-6">
+        <div class="card">
+            <div class="card-header d-flex justify-content-between align-items-center">
+                <h5 class="mb-0"><i class="bi bi-list-ul"></i> Ultimi Ordini</h5>
+                <a href="{% url 'ordini:ordini-list' %}" class="btn btn-sm btn-outline-primary">Vedi tutti</a>
+            </div>
+            <div class="card-body">
+                <div id="ultimi-ordini">
+                    <div class="text-center">
+                        <div class="spinner-border" role="status">
+                            <span class="visually-hidden">Caricamento...</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Stato Postazioni -->
+    <div class="col-md-6">
+        <div class="card">
+            <div class="card-header d-flex justify-content-between align-items-center">
+                <h5 class="mb-0"><i class="bi bi-diagram-3"></i> Stato Postazioni</h5>
+                <a href="{% url 'postazioni:postazioni-list' %}" class="btn btn-sm btn-outline-primary">Gestisci</a>
+            </div>
+            <div class="card-body">
+                <div id="stato-postazioni">
+                    <div class="text-center">
+                        <div class="spinner-border" role="status">
+                            <span class="visually-hidden">Caricamento...</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Grafico Ordini Settimanali -->
+<div class="row mt-4">
+    <div class="col-12">
+        <div class="card">
+            <div class="card-header">
+                <h5 class="mb-0"><i class="bi bi-graph-up"></i> Andamento Ordini Ultimi 7 Giorni</h5>
+            </div>
+            <div class="card-body">
+                <canvas id="chartOrdiniSettimanali" width="400" height="100"></canvas>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    // Carica statistiche dashboard
+    caricaStatistiche();
+    
+    // Carica ultimi ordini
+    caricaUltimiOrdini();
+    
+    // Carica stato postazioni
+    caricaStatoPostazioni();
+    
+    // Carica grafico
+    caricaGraficoOrdini();
+    
+    // Aggiorna ogni 30 secondi
+    setInterval(function() {
+        caricaStatistiche();
+        caricaUltimiOrdini();
+        caricaStatoPostazioni();
+    }, 30000);
+});
+
+function caricaStatistiche() {
+    fetch('/api/dashboard/stats/')
+    .then(response => response.json())
+    .then(data => {
+        document.getElementById('ordini-oggi').textContent = data.ordini_oggi || '0';
+        document.getElementById('incasso-oggi').textContent = AutolavaggioJS.formatCurrency(data.incasso_oggi || 0);
+        document.getElementById('ordini-in-lavorazione').textContent = data.ordini_in_lavorazione || '0';
+        document.getElementById('clienti-totali').textContent = data.clienti_totali || '0';
+    })
+    .catch(error => console.error('Errore caricamento statistiche:', error));
+}
+
+function caricaUltimiOrdini() {
+    fetch('/api/ordini/ultimi/')
+    .then(response => response.json())
+    .then(data => {
+        const container = document.getElementById('ultimi-ordini');
+        container.innerHTML = '';
+        
+        if (data.ordini.length === 0) {
+            container.innerHTML = '<p class="text-muted">Nessun ordine recente</p>';
+            return;
+        }
+        
+        data.ordini.forEach(ordine => {
+            const row = document.createElement('div');
+            row.className = 'border-bottom py-2';
+            row.innerHTML = `
+                <div class="d-flex justify-content-between align-items-center">
+                    <div>
+                        <strong>#${ordine.numero_progressivo}</strong><br>
+                        <small class="text-muted">${ordine.cliente || 'Anonimo'}</small>
+                    </div>
+                    <div class="text-end">
+                        <span class="badge status-${ordine.stato}">${ordine.stato_display}</span><br>
+                        <small class="text-muted">${AutolavaggioJS.formatCurrency(ordine.totale_finale)}</small>
+                    </div>
+                </div>
+            `;
+            container.appendChild(row);
+        });
+    })
+    .catch(error => console.error('Errore caricamento ordini:', error));
+}
+
+function caricaStatoPostazioni() {
+    fetch('/api/postazioni/stato/')
+    .then(response => response.json())
+    .then(data => {
+        const container = document.getElementById('stato-postazioni');
+        container.innerHTML = '';
+        
+        if (data.postazioni.length === 0) {
+            container.innerHTML = '<p class="text-muted">Nessuna postazione configurata</p>';
+            return;
+        }
+        
+        data.postazioni.forEach(postazione => {
+            const row = document.createElement('div');
+            row.className = 'border-bottom py-2';
+            row.innerHTML = `
+                <div class="d-flex justify-content-between align-items-center">
+                    <div>
+                        <strong>${postazione.nome}</strong><br>
+                        <small class="text-muted">${postazione.ordini_in_coda} in coda</small>
+                    </div>
+                    <div class="text-end">
+                        <span class="badge ${postazione.ordini_in_coda > 0 ? 'bg-warning' : 'bg-success'}">
+                            ${postazione.ordini_in_coda > 0 ? 'Occupata' : 'Libera'}
+                        </span>
+                    </div>
+                </div>
+            `;
+            container.appendChild(row);
+        });
+    })
+    .catch(error => console.error('Errore caricamento postazioni:', error));
+}
+
+function caricaGraficoOrdini() {
+    fetch('/api/dashboard/chart-ordini/')
+    .then(response => response.json())
+    .then(data => {
+        const ctx = document.getElementById('chartOrdiniSettimanali').getContext('2d');
+        new Chart(ctx, {
+            type: 'line',
+            data: {
+                labels: data.labels,
+                datasets: [{
+                    label: 'Ordini',
+                    data: data.ordini,
+                    borderColor: '#0066cc',
+                    backgroundColor: 'rgba(0, 102, 204, 0.1)',
+                    tension: 0.1
+                }, {
+                    label: 'Incassi (€)',
+                    data: data.incassi,
+                    borderColor: '#28a745',
+                    backgroundColor: 'rgba(40, 167, 69, 0.1)',
+                    tension: 0.1,
+                    yAxisID: 'y1'
+                }]
+            },
+            options: {
+                responsive: true,
+                interaction: {
+                    mode: 'index',
+                    intersect: false,
+                },
+                scales: {
+                    y: {
+                        type: 'linear',
+                        display: true,
+                        position: 'left',
+                    },
+                    y1: {
+                        type: 'linear',
+                        display: true,
+                        position: 'right',
+                        grid: {
+                            drawOnChartArea: false,
+                        },
+                    }
+                }
+            }
+        });
+    })
+    .catch(error => console.error('Errore caricamento grafico:', error));
+}
+</script>
+{% endblock %}

@@ -1,0 +1,571 @@
+{% extends 'base.html' %}
+{% load static %}
+{% load crispy_forms_tags %}
+
+{% block title %}Configurazione Abbonamento - Servizi Inclusi{% endblock %}
+
+{% block extra_css %}
+<style>
+.wizard-steps {
+    display: flex;
+    justify-content: space-between;
+    margin-bottom: 30px;
+    counter-reset: step;
+}
+
+.wizard-step {
+    flex: 1;
+    text-align: center;
+    position: relative;
+    counter-increment: step;
+}
+
+.wizard-step::before {
+    content: counter(step);
+    width: 40px;
+    height: 40px;
+    border-radius: 50%;
+    background: #6c757d;
+    color: white;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    margin: 0 auto 10px;
+    font-weight: bold;
+}
+
+.wizard-step.active::before {
+    background: #0d6efd;
+}
+
+.wizard-step.completed::before {
+    background: #28a745;
+    content: "✓";
+}
+
+.wizard-step:not(:last-child)::after {
+    content: '';
+    position: absolute;
+    top: 20px;
+    left: 60%;
+    right: -40%;
+    height: 2px;
+    background: #dee2e6;
+    z-index: -1;
+}
+
+.wizard-step.completed:not(:last-child)::after {
+    background: #28a745;
+}
+
+.form-section {
+    background: white;
+    border-radius: 10px;
+    padding: 30px;
+    box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+    margin-bottom: 20px;
+}
+
+.servizio-card {
+    border: 2px solid #e9ecef;
+    border-radius: 10px;
+    padding: 20px;
+    margin-bottom: 15px;
+    transition: all 0.3s ease;
+}
+
+.servizio-card:hover {
+    border-color: #0d6efd;
+    box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+}
+
+.servizio-card.selected {
+    border-color: #0d6efd;
+    background: #f8f9ff;
+}
+
+.servizio-card .form-check {
+    margin-bottom: 15px;
+}
+
+.servizio-card .form-check-input {
+    transform: scale(1.3);
+}
+
+.servizio-card .form-check-label {
+    font-weight: 600;
+    font-size: 1.1em;
+    margin-left: 10px;
+}
+
+.servizio-details {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 15px;
+}
+
+.servizio-price {
+    font-size: 1.2em;
+    font-weight: bold;
+    color: #0d6efd;
+}
+
+.servizio-duration {
+    color: #6c757d;
+    font-size: 0.9em;
+}
+
+.quantita-section {
+    display: none;
+    margin-top: 15px;
+    padding: 15px;
+    background: #f8f9fa;
+    border-radius: 8px;
+}
+
+.quantita-section.show {
+    display: block;
+}
+
+.quantita-controls {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+
+.quantita-btn {
+    width: 35px;
+    height: 35px;
+    border-radius: 50%;
+    border: 2px solid #0d6efd;
+    background: white;
+    color: #0d6efd;
+    font-weight: bold;
+    cursor: pointer;
+    transition: all 0.3s ease;
+}
+
+.quantita-btn:hover {
+    background: #0d6efd;
+    color: white;
+}
+
+.quantita-input {
+    width: 60px;
+    text-align: center;
+    font-weight: bold;
+}
+
+.preview-card {
+    background: linear-gradient(135deg, #0d6efd, #6610f2);
+    color: white;
+    border-radius: 15px;
+    padding: 25px;
+    text-align: center;
+}
+
+.help-section {
+    background: #f8f9fa;
+    border-radius: 10px;
+    padding: 20px;
+    margin-top: 20px;
+}
+
+.summary-card {
+    background: #e8f5e8;
+    border-radius: 10px;
+    padding: 20px;
+    margin-bottom: 20px;
+    border-left: 4px solid #28a745;
+}
+
+.servizi-selected {
+    display: none;
+}
+
+.servizi-selected.show {
+    display: block;
+}
+
+.servizio-summary {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 10px 0;
+    border-bottom: 1px solid #dee2e6;
+}
+
+.servizio-summary:last-child {
+    border-bottom: none;
+}
+
+.total-value {
+    font-size: 1.5em;
+    font-weight: bold;
+    color: #28a745;
+}
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="container">
+    <div class="row">
+        <div class="col-lg-8 mx-auto">
+            <h1 class="text-center mb-4">
+                <i class="bi bi-magic"></i>
+                Wizard Configurazione Abbonamento
+            </h1>
+            
+            <!-- Steps Indicator -->
+            <div class="wizard-steps">
+                <div class="wizard-step completed">
+                    <div>Informazioni Base</div>
+                </div>
+                <div class="wizard-step completed">
+                    <div>Modalità Targa</div>
+                </div>
+                <div class="wizard-step completed">
+                    <div>Accessi e Reset</div>
+                </div>
+                <div class="wizard-step active">
+                    <div>Servizi Inclusi</div>
+                </div>
+            </div>
+
+            <form method="post" id="servizi-form">
+                {% csrf_token %}
+                {{ wizard.management_form }}
+                
+                <div class="form-section">
+                    <h3 class="mb-4">
+                        <i class="bi bi-tools text-primary"></i>
+                        Servizi Inclusi nell'Abbonamento
+                    </h3>
+                    
+                    <p class="text-muted mb-4">
+                        Seleziona i servizi che saranno inclusi in questo abbonamento e definisci le quantità 
+                        disponibili per ogni periodo di reset.
+                    </p>
+                    
+                    <div class="alert alert-info">
+                        <i class="bi bi-info-circle"></i>
+                        <strong>Nota:</strong> Le quantità si riferiscono al numero di servizi disponibili 
+                        {% if preview_data.periodicita_reset == 'settimanale' %}
+                            ogni settimana
+                        {% elif preview_data.periodicita_reset == 'mensile' %}
+                            ogni mese
+                        {% else %}
+                            per tutta la durata dell'abbonamento
+                        {% endif %}
+                    </div>
+                    
+                    <div class="row">
+                        {% for field in form %}
+                            {% if field.name|slice:"-8:" == '_incluso' %}
+                                {% with servizio_id=field.name|slice:"9:-8" %}
+                                <div class="col-md-6 mb-3">
+                                    <div class="servizio-card" data-servizio="{{ servizio_id }}">
+                                        <div class="form-check">
+                                            {{ field }}
+                                            <label class="form-check-label" for="{{ field.id_for_label }}">
+                                                {{ field.label|slice:"8:" }}
+                                            </label>
+                                        </div>
+                                        
+                                        <div class="servizio-details">
+                                            <div class="servizio-price">
+                                                €{{ field.help_text|slice:"23:"|cut:" - Prezzo: €"|cut:"Durata: "|cut:" min" }}
+                                            </div>
+                                            <div class="servizio-duration">
+                                                {{ field.help_text|slice:"8:"|cut:" - Prezzo: €"|cut:"0" }} min
+                                            </div>
+                                        </div>
+                                        
+                                        <div class="quantita-section" id="quantita-{{ servizio_id }}">
+                                            <label class="form-label">
+                                                <i class="bi bi-123"></i>
+                                                Quantità per periodo
+                                            </label>
+                                            <div class="quantita-controls">
+                                                <button type="button" class="quantita-btn" onclick="changeQuantita('{{ servizio_id }}', -1)">
+                                                    <i class="bi bi-dash"></i>
+                                                </button>
+                                                {% for qfield in form %}
+                                                    {% if qfield.name == 'servizio_'|add:servizio_id|add:'_quantita' %}
+                                                        {{ qfield }}
+                                                    {% endif %}
+                                                {% endfor %}
+                                                <button type="button" class="quantita-btn" onclick="changeQuantita('{{ servizio_id }}', 1)">
+                                                    <i class="bi bi-plus"></i>
+                                                </button>
+                                            </div>
+                                            <small class="text-muted">
+                                                Numero di volte che questo servizio può essere utilizzato
+                                            </small>
+                                        </div>
+                                    </div>
+                                </div>
+                                {% endwith %}
+                            {% endif %}
+                        {% endfor %}
+                    </div>
+                </div>
+
+                <!-- Riepilogo servizi selezionati -->
+                <div class="summary-card servizi-selected" id="servizi-summary">
+                    <h4 class="mb-3">
+                        <i class="bi bi-check-circle text-success"></i>
+                        Riepilogo Servizi Selezionati
+                    </h4>
+                    <div id="servizi-list"></div>
+                    <hr>
+                    <div class="d-flex justify-content-between align-items-center">
+                        <span><strong>Valore totale servizi:</strong></span>
+                        <span class="total-value" id="total-value">€0.00</span>
+                    </div>
+                </div>
+
+                <!-- Riepilogo configurazione completa -->
+                {% if preview_data %}
+                <div class="form-section">
+                    <h4 class="mb-3">
+                        <i class="bi bi-check-all text-success"></i>
+                        Configurazione Completa
+                    </h4>
+                    
+                    <div class="row">
+                        <div class="col-md-12">
+                            <div class="card">
+                                <div class="card-header bg-primary text-white">
+                                    <h5 class="mb-0">{{ preview_data.titolo }}</h5>
+                                </div>
+                                <div class="card-body">
+                                    <div class="row">
+                                        <div class="col-md-6">
+                                            <p><strong>Descrizione:</strong> {{ preview_data.descrizione }}</p>
+                                            <p><strong>Prezzo:</strong> €{{ preview_data.prezzo }}</p>
+                                            <p><strong>Durata:</strong> {{ preview_data.get_durata_display }}</p>
+                                        </div>
+                                        <div class="col-md-6">
+                                            <p><strong>Modalità Targa:</strong> {{ preview_data.get_modalita_targa_display }}
+                                                {% if preview_data.modalita_targa == 'variabile' %}
+                                                    (max {{ preview_data.numero_massimo_targhe }} targhe)
+                                                {% endif %}
+                                            </p>
+                                            <p><strong>Reset Contatori:</strong> {{ preview_data.get_periodicita_reset_display }}</p>
+                                            <p><strong>Rinnovo:</strong> {{ preview_data.rinnovo_automatico|yesno:"Automatico,Manuale" }}</p>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                {% endif %}
+
+                <!-- Navigazione -->
+                <div class="d-flex justify-content-between mt-4">
+                    <div>
+                        <button type="submit" name="wizard_goto_step" value="{{ wizard.steps.prev }}" class="btn btn-outline-secondary">
+                            <i class="bi bi-arrow-left"></i> Indietro
+                        </button>
+                    </div>
+                    <div>
+                        <button type="submit" class="btn btn-success btn-lg">
+                            <i class="bi bi-check-circle"></i> Completa Configurazione
+                        </button>
+                    </div>
+                </div>
+            </form>
+        </div>
+        
+        <!-- Sidebar con Preview -->
+        <div class="col-lg-4">
+            <div class="sticky-top" style="top: 20px;">
+                <div class="preview-card">
+                    <h4>{{ preview_data.titolo|default:"Abbonamento" }}</h4>
+                    <h2>€{{ preview_data.prezzo|default:"0.00" }}</h2>
+                    <p>{{ preview_data.get_durata_display|default:"Durata da definire" }}</p>
+                    <hr>
+                    <div id="preview-servizi">
+                        <i class="bi bi-tools"></i>
+                        <span>Seleziona i servizi</span>
+                    </div>
+                </div>
+                
+                <div class="help-section">
+                    <h6><i class="bi bi-lightbulb"></i> Suggerimenti per i Servizi</h6>
+                    <ul class="small">
+                        <li><strong>Quantità moderata:</strong> Non esagerare con le quantità, meglio creare abbonamenti diversi</li>
+                        <li><strong>Servizi popolari:</strong> Includi i servizi più richiesti dai clienti</li>
+                        <li><strong>Valore percepito:</strong> Il valore totale dei servizi deve giustificare il prezzo</li>
+                        <li><strong>Varietà:</strong> Offri un mix di servizi base e premium</li>
+                    </ul>
+                </div>
+                
+                <div class="help-section">
+                    <h6><i class="bi bi-calculator"></i> Calcolo del Valore</h6>
+                    <div class="small">
+                        <p>Il valore totale dei servizi viene calcolato moltiplicando il prezzo di ogni servizio per la quantità selezionata.</p>
+                        <p><strong>Esempio:</strong> Se includi 2 lavaggi da €10 ciascuno, il valore è €20.</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+function toggleServizio(servizioId) {
+    const checkbox = document.querySelector(`input[name="servizio_${servizioId}_incluso"]`);
+    const card = document.querySelector(`[data-servizio="${servizioId}"]`);
+    const quantitaSection = document.getElementById(`quantita-${servizioId}`);
+    
+    if (checkbox.checked) {
+        card.classList.add('selected');
+        quantitaSection.classList.add('show');
+    } else {
+        card.classList.remove('selected');
+        quantitaSection.classList.remove('show');
+    }
+    
+    updateSummary();
+}
+
+function changeQuantita(servizioId, delta) {
+    const input = document.querySelector(`input[name="servizio_${servizioId}_quantita"]`);
+    const currentValue = parseInt(input.value) || 1;
+    const newValue = Math.max(1, currentValue + delta);
+    
+    input.value = newValue;
+    updateSummary();
+}
+
+function updateSummary() {
+    const servizi = [];
+    let totalValue = 0;
+    
+    document.querySelectorAll('input[name$="_incluso"]:checked').forEach(checkbox => {
+        const servizioId = checkbox.name.match(/servizio_(\d+)_incluso/)[1];
+        const quantitaInput = document.querySelector(`input[name="servizio_${servizioId}_quantita"]`);
+        const label = checkbox.closest('.servizio-card').querySelector('.form-check-label');
+        const priceElement = checkbox.closest('.servizio-card').querySelector('.servizio-price');
+        
+        const nome = label.textContent.trim();
+        const quantita = parseInt(quantitaInput.value) || 1;
+        const prezzo = parseFloat(priceElement.textContent.replace('€', '')) || 0;
+        const subtotal = prezzo * quantita;
+        
+        servizi.push({
+            nome: nome,
+            quantita: quantita,
+            prezzo: prezzo,
+            subtotal: subtotal
+        });
+        
+        totalValue += subtotal;
+    });
+    
+    // Aggiorna il riepilogo
+    const summary = document.getElementById('servizi-summary');
+    const serviziList = document.getElementById('servizi-list');
+    const totalValueElement = document.getElementById('total-value');
+    
+    if (servizi.length > 0) {
+        summary.classList.add('show');
+        
+        serviziList.innerHTML = servizi.map(servizio => `
+            <div class="servizio-summary">
+                <div>
+                    <strong>${servizio.nome}</strong>
+                    <small class="text-muted"> (${servizio.quantita}x €${servizio.prezzo.toFixed(2)})</small>
+                </div>
+                <div class="text-success">€${servizio.subtotal.toFixed(2)}</div>
+            </div>
+        `).join('');
+        
+        totalValueElement.textContent = `€${totalValue.toFixed(2)}`;
+    } else {
+        summary.classList.remove('show');
+    }
+    
+    // Aggiorna preview
+    updatePreview(servizi);
+}
+
+function updatePreview(servizi) {
+    const previewServizi = document.getElementById('preview-servizi');
+    
+    if (servizi.length > 0) {
+        previewServizi.innerHTML = `
+            <i class="bi bi-tools"></i>
+            <span>${servizi.length} servizi inclusi</span>
+        `;
+    } else {
+        previewServizi.innerHTML = `
+            <i class="bi bi-tools"></i>
+            <span>Seleziona i servizi</span>
+        `;
+    }
+}
+
+// Setup event listeners
+document.addEventListener('DOMContentLoaded', function() {
+    // Aggiungi listener per le checkbox
+    document.querySelectorAll('input[name$="_incluso"]').forEach(checkbox => {
+        const servizioId = checkbox.name.match(/servizio_(\d+)_incluso/)[1];
+        
+        checkbox.addEventListener('change', function() {
+            toggleServizio(servizioId);
+        });
+        
+        // Inizializza stato se già selezionato
+        if (checkbox.checked) {
+            toggleServizio(servizioId);
+        }
+    });
+    
+    // Aggiungi listener per i campi quantità
+    document.querySelectorAll('input[name$="_quantita"]').forEach(input => {
+        input.addEventListener('change', updateSummary);
+    });
+    
+    // Aggiungi classe CSS per gli input quantità
+    document.querySelectorAll('input[name$="_quantita"]').forEach(input => {
+        input.classList.add('quantita-input', 'form-control');
+    });
+    
+    updateSummary();
+});
+
+// Validazione form
+document.getElementById('servizi-form').addEventListener('submit', function(e) {
+    const serviziSelezionati = document.querySelectorAll('input[name$="_incluso"]:checked');
+    
+    if (serviziSelezionati.length === 0) {
+        e.preventDefault();
+        alert('Seleziona almeno un servizio per completare la configurazione dell\'abbonamento');
+        return false;
+    }
+    
+    // Verifica che ogni servizio selezionato abbia una quantità valida
+    let quantitaValida = true;
+    serviziSelezionati.forEach(checkbox => {
+        const servizioId = checkbox.name.match(/servizio_(\d+)_incluso/)[1];
+        const quantitaInput = document.querySelector(`input[name="servizio_${servizioId}_quantita"]`);
+        const quantita = parseInt(quantitaInput.value) || 0;
+        
+        if (quantita < 1) {
+            quantitaValida = false;
+        }
+    });
+    
+    if (!quantitaValida) {
+        e.preventDefault();
+        alert('Ogni servizio selezionato deve avere una quantità di almeno 1');
+        return false;
+    }
+});
+</script>
+{% endblock %}

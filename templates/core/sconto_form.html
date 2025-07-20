@@ -1,0 +1,172 @@
+{% extends 'base.html' %}
+{% load static %}
+{% load crispy_forms_tags %}
+
+{% block title %}
+    {% if form.instance.pk %}Modifica Sconto{% else %}Nuovo Sconto{% endif %} - Gestionale Autolavaggio
+{% endblock %}
+
+{% block content %}
+<div class="row justify-content-center">
+    <div class="col-lg-8">
+        <div class="card">
+            <div class="card-header d-flex justify-content-between align-items-center">
+                <h4 class="mb-0">
+                    <i class="bi bi-percent"></i>
+                    {% if form.instance.pk %}
+                        Modifica Sconto: {{ form.instance.nome }}
+                    {% else %}
+                        Nuovo Sconto
+                    {% endif %}
+                </h4>
+                <a href="{% url 'core:sconti-list' %}" class="btn btn-outline-secondary">
+                    <i class="bi bi-arrow-left"></i> Torna alla Lista
+                </a>
+            </div>
+            <div class="card-body">
+                <form method="post">
+                    {% csrf_token %}
+                    
+                    <!-- Informazioni Base -->
+                    <div class="row mb-4">
+                        <div class="col-12">
+                            <h5 class="border-bottom pb-2 mb-3">Informazioni Base</h5>
+                        </div>
+                        <div class="col-md-8">
+                            {{ form.nome|as_crispy_field }}
+                        </div>
+                        <div class="col-md-4">
+                            {{ form.codice|as_crispy_field }}
+                        </div>
+                        <div class="col-12">
+                            {{ form.descrizione|as_crispy_field }}
+                        </div>
+                    </div>
+
+                    <!-- Tipo e Valore -->
+                    <div class="row mb-4">
+                        <div class="col-12">
+                            <h5 class="border-bottom pb-2 mb-3">Tipo e Valore</h5>
+                        </div>
+                        <div class="col-md-6">
+                            {{ form.tipo|as_crispy_field }}
+                        </div>
+                        <div class="col-md-6">
+                            <div id="valore-field">
+                                {{ form.valore|as_crispy_field }}
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            {{ form.importo_minimo|as_crispy_field }}
+                        </div>
+                        <div class="col-md-6">
+                            {{ form.sconto_massimo|as_crispy_field }}
+                        </div>
+                    </div>
+
+                    <!-- Validità -->
+                    <div class="row mb-4">
+                        <div class="col-12">
+                            <h5 class="border-bottom pb-2 mb-3">Periodo di Validità</h5>
+                        </div>
+                        <div class="col-md-6">
+                            {{ form.data_inizio|as_crispy_field }}
+                        </div>
+                        <div class="col-md-6">
+                            {{ form.data_fine|as_crispy_field }}
+                        </div>
+                    </div>
+
+                    <!-- Limitazioni -->
+                    <div class="row mb-4">
+                        <div class="col-12">
+                            <h5 class="border-bottom pb-2 mb-3">Limitazioni d'Uso</h5>
+                        </div>
+                        <div class="col-md-6">
+                            {{ form.utilizzi_massimi|as_crispy_field }}
+                        </div>
+                        <div class="col-md-6">
+                            {{ form.utilizzi_per_cliente|as_crispy_field }}
+                        </div>
+                    </div>
+
+                    <!-- Applicabilità -->
+                    <div class="row mb-4">
+                        <div class="col-12">
+                            <h5 class="border-bottom pb-2 mb-3">Applicabilità</h5>
+                        </div>
+                        <div class="col-md-6">
+                            {{ form.categorie_applicabili|as_crispy_field }}
+                        </div>
+                        <div class="col-md-6">
+                            {{ form.servizi_applicabili|as_crispy_field }}
+                        </div>
+                    </div>
+
+                    <!-- Opzioni -->
+                    <div class="row mb-4">
+                        <div class="col-12">
+                            <h5 class="border-bottom pb-2 mb-3">Opzioni</h5>
+                        </div>
+                        <div class="col-md-4">
+                            <div class="form-check form-switch">
+                                {{ form.attivo }}
+                                <label class="form-check-label" for="{{ form.attivo.id_for_label }}">
+                                    Sconto Attivo
+                                </label>
+                            </div>
+                        </div>
+                        <div class="col-md-4">
+                            <div class="form-check form-switch">
+                                {{ form.cumulabile }}
+                                <label class="form-check-label" for="{{ form.cumulabile.id_for_label }}">
+                                    Cumulabile con Altri Sconti
+                                </label>
+                            </div>
+                        </div>
+                        <div class="col-md-4">
+                            <div class="form-check form-switch">
+                                {{ form.solo_primo_acquisto }}
+                                <label class="form-check-label" for="{{ form.solo_primo_acquisto.id_for_label }}">
+                                    Solo Primo Acquisto
+                                </label>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="d-flex justify-content-between">
+                        <a href="{% url 'core:sconti-list' %}" class="btn btn-secondary">
+                            <i class="bi bi-x-circle"></i> Annulla
+                        </a>
+                        <button type="submit" class="btn btn-primary">
+                            <i class="bi bi-check-circle"></i>
+                            {% if form.instance.pk %}Aggiorna{% else %}Crea{% endif %} Sconto
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    const tipoField = document.getElementById('{{ form.tipo.id_for_label }}');
+    const valoreField = document.querySelector('#valore-field label');
+
+    function aggiornaSimbolo() {
+        if (tipoField.value === 'percentuale') {
+            valoreField.textContent = valoreField.textContent.replace('€', '%');
+        } else {
+            valoreField.textContent = valoreField.textContent.replace('%', '€');
+        }
+    }
+
+    // Inizializza al caricamento
+    if (tipoField && valoreField) {
+        aggiornaSimbolo();
+        tipoField.addEventListener('change', aggiornaSimbolo);
+    }
+});
+</script>
+{% endblock %}

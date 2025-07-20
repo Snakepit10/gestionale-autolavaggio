@@ -1,0 +1,276 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}Gestione Clienti - Gestionale Autolavaggio{% endblock %}
+
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <h1><i class="bi bi-people"></i> Gestione Clienti</h1>
+    <div>
+        <a href="{% url 'clienti:export-clienti-csv' %}" class="btn btn-outline-success me-2">
+            <i class="bi bi-file-earmark-excel"></i> Esporta CSV
+        </a>
+        <a href="{% url 'clienti:cliente-create' %}" class="btn btn-primary">
+            <i class="bi bi-person-plus"></i> Nuovo Cliente
+        </a>
+    </div>
+</div>
+
+{% if messages %}
+    {% for message in messages %}
+        <div class="alert alert-{{ message.tags }} alert-dismissible fade show" role="alert">
+            {{ message }}
+            <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+        </div>
+    {% endfor %}
+{% endif %}
+
+<!-- Statistiche -->
+<div class="row mb-4">
+    <div class="col-md-4">
+        <div class="card bg-primary text-white">
+            <div class="card-body text-center">
+                <i class="bi bi-people display-6"></i>
+                <h4>{{ total_clienti }}</h4>
+                <small>Clienti Totali</small>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-4">
+        <div class="card bg-info text-white">
+            <div class="card-body text-center">
+                <i class="bi bi-person display-6"></i>
+                <h4>{{ clienti_privati }}</h4>
+                <small>Clienti Privati</small>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-4">
+        <div class="card bg-success text-white">
+            <div class="card-body text-center">
+                <i class="bi bi-building display-6"></i>
+                <h4>{{ clienti_aziende }}</h4>
+                <small>Aziende</small>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Filtri -->
+<div class="card mb-4">
+    <div class="card-body">
+        <form method="get" class="row g-3">
+            <div class="col-md-6">
+                <input type="text" name="search" class="form-control" 
+                       placeholder="Cerca per nome, email, telefone, codice fiscale/P.IVA..."
+                       value="{{ request.GET.search }}">
+            </div>
+            <div class="col-md-3">
+                <select name="tipo" class="form-select">
+                    <option value="">Tutti i tipi</option>
+                    <option value="privato" {% if request.GET.tipo == 'privato' %}selected{% endif %}>Privati</option>
+                    <option value="azienda" {% if request.GET.tipo == 'azienda' %}selected{% endif %}>Aziende</option>
+                </select>
+            </div>
+            <div class="col-md-3">
+                <button type="submit" class="btn btn-primary me-2">
+                    <i class="bi bi-search"></i> Cerca
+                </button>
+                <a href="{% url 'clienti:clienti-list' %}" class="btn btn-outline-secondary">
+                    <i class="bi bi-arrow-clockwise"></i>
+                </a>
+            </div>
+        </form>
+    </div>
+</div>
+
+<div class="card">
+    <div class="card-body">
+        {% if clienti %}
+            <div class="table-responsive">
+                <table class="table table-hover">
+                    <thead class="table-dark">
+                        <tr>
+                            <th>Cliente</th>
+                            <th>Contatti</th>
+                            <th>Tipo</th>
+                            <th>Ordini</th>
+                            <th>Spesa Totale</th>
+                            <th>Registrazione</th>
+                            <th class="text-center">Azioni</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for cliente in clienti %}
+                        <tr>
+                            <td>
+                                <div class="d-flex align-items-center">
+                                    {% if cliente.tipo == 'privato' %}
+                                        <i class="bi bi-person me-2 text-primary"></i>
+                                    {% else %}
+                                        <i class="bi bi-building me-2 text-success"></i>
+                                    {% endif %}
+                                    <div>
+                                        <strong>{{ cliente.nome_completo }}</strong>
+                                        {% if cliente.tipo == 'privato' and cliente.codice_fiscale %}
+                                            <br><small class="text-muted">CF: {{ cliente.codice_fiscale }}</small>
+                                        {% elif cliente.tipo == 'azienda' and cliente.partita_iva %}
+                                            <br><small class="text-muted">P.IVA: {{ cliente.partita_iva }}</small>
+                                        {% endif %}
+                                    </div>
+                                </div>
+                            </td>
+                            <td>
+                                <div>
+                                    <small><i class="bi bi-envelope"></i> {{ cliente.email }}</small><br>
+                                    <small><i class="bi bi-telephone"></i> {{ cliente.telefono }}</small>
+                                    {% if cliente.user %}
+                                        <br><span class="badge bg-success">
+                                            <i class="bi bi-person-check"></i> Account Online
+                                        </span>
+                                    {% endif %}
+                                </div>
+                            </td>
+                            <td>
+                                {% if cliente.tipo == 'privato' %}
+                                    <span class="badge bg-primary">Privato</span>
+                                {% else %}
+                                    <span class="badge bg-success">Azienda</span>
+                                {% endif %}
+                                {% if cliente.consenso_marketing %}
+                                    <br><span class="badge bg-info">
+                                        <i class="bi bi-envelope-check"></i> Marketing
+                                    </span>
+                                {% endif %}
+                            </td>
+                            <td class="text-center">
+                                <span class="badge bg-secondary fs-6">{{ cliente.ordini_count|default:0 }}</span>
+                            </td>
+                            <td>
+                                <strong>€{{ cliente.spesa_totale|default:0|floatformat:2 }}</strong>
+                            </td>
+                            <td>
+                                <small>{{ cliente.data_registrazione|date:"d/m/Y" }}</small>
+                            </td>
+                            <td class="text-center">
+                                <div class="btn-group" role="group">
+                                    <a href="{% url 'clienti:storico-cliente' cliente.pk %}" 
+                                       class="btn btn-sm btn-outline-info" title="Storico">
+                                        <i class="bi bi-clock-history"></i>
+                                    </a>
+                                    <a href="{% url 'clienti:cliente-update' cliente.pk %}" 
+                                       class="btn btn-sm btn-outline-primary" title="Modifica">
+                                        <i class="bi bi-pencil"></i>
+                                    </a>
+                                    <button class="btn btn-sm btn-outline-danger" 
+                                            onclick="confermaEliminazione('{{ cliente.nome_completo }}', '{{ cliente.pk }}')"
+                                            title="Elimina">
+                                        <i class="bi bi-trash"></i>
+                                    </button>
+                                </div>
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+            
+            <!-- Paginazione -->
+            {% if is_paginated %}
+                <nav aria-label="Paginazione clienti">
+                    <ul class="pagination justify-content-center">
+                        {% if page_obj.has_previous %}
+                            <li class="page-item">
+                                <a class="page-link" href="?page=1{% if request.GET.search %}&search={{ request.GET.search }}{% endif %}{% if request.GET.tipo %}&tipo={{ request.GET.tipo }}{% endif %}">&laquo; Prima</a>
+                            </li>
+                            <li class="page-item">
+                                <a class="page-link" href="?page={{ page_obj.previous_page_number }}{% if request.GET.search %}&search={{ request.GET.search }}{% endif %}{% if request.GET.tipo %}&tipo={{ request.GET.tipo }}{% endif %}">Precedente</a>
+                            </li>
+                        {% endif %}
+                        
+                        <li class="page-item active">
+                            <span class="page-link">
+                                Pagina {{ page_obj.number }} di {{ page_obj.paginator.num_pages }}
+                            </span>
+                        </li>
+                        
+                        {% if page_obj.has_next %}
+                            <li class="page-item">
+                                <a class="page-link" href="?page={{ page_obj.next_page_number }}{% if request.GET.search %}&search={{ request.GET.search }}{% endif %}{% if request.GET.tipo %}&tipo={{ request.GET.tipo }}{% endif %}">Successiva</a>
+                            </li>
+                            <li class="page-item">
+                                <a class="page-link" href="?page={{ page_obj.paginator.num_pages }}{% if request.GET.search %}&search={{ request.GET.search }}{% endif %}{% if request.GET.tipo %}&tipo={{ request.GET.tipo }}{% endif %}">Ultima &raquo;</a>
+                            </li>
+                        {% endif %}
+                    </ul>
+                </nav>
+            {% endif %}
+        {% else %}
+            <div class="text-center py-5">
+                <i class="bi bi-people display-1 text-muted"></i>
+                <h3 class="text-muted mt-3">Nessun Cliente</h3>
+                <p class="text-muted">Non ci sono ancora clienti registrati nel sistema.</p>
+                <a href="{% url 'clienti:cliente-create' %}" class="btn btn-primary">
+                    <i class="bi bi-person-plus"></i> Registra il Primo Cliente
+                </a>
+            </div>
+        {% endif %}
+    </div>
+</div>
+
+<!-- Modal Conferma Eliminazione -->
+<div class="modal fade" id="modalConfermaEliminazione" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header bg-danger text-white">
+                <h5 class="modal-title">
+                    <i class="bi bi-exclamation-triangle"></i>
+                    Conferma Eliminazione
+                </h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <p>Sei sicuro di voler eliminare il cliente <strong id="nome-cliente"></strong>?</p>
+                <div class="alert alert-warning">
+                    <i class="bi bi-warning"></i>
+                    <strong>Attenzione!</strong> Questa operazione eliminerà anche:
+                    <ul class="mb-0">
+                        <li>Tutti gli ordini associati</li>
+                        <li>I punti fedeltà</li>
+                        <li>Gli abbonamenti</li>
+                        <li>L'eventuale account online</li>
+                    </ul>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">
+                    <i class="bi bi-x-circle"></i> Annulla
+                </button>
+                <a id="btn-conferma-eliminazione" href="#" class="btn btn-danger">
+                    <i class="bi bi-trash"></i> Elimina Cliente
+                </a>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+function confermaEliminazione(nome, pk) {
+    document.getElementById('nome-cliente').textContent = nome;
+    document.getElementById('btn-conferma-eliminazione').href = `/clienti/${pk}/elimina/`;
+    
+    const modal = new bootstrap.Modal(document.getElementById('modalConfermaEliminazione'));
+    modal.show();
+}
+
+// Auto-submit ricerca dopo 500ms di inattività
+let searchTimeout;
+document.querySelector('input[name="search"]').addEventListener('input', function() {
+    clearTimeout(searchTimeout);
+    const form = this.closest('form');
+    searchTimeout = setTimeout(() => {
+        form.submit();
+    }, 500);
+});
+</script>
+{% endblock %}

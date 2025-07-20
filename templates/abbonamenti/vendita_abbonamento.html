@@ -1,0 +1,763 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}Vendita Abbonamento - Gestionale Autolavaggio{% endblock %}
+
+{% block extra_css %}
+<style>
+.config-card {
+    cursor: pointer;
+    transition: all 0.3s ease;
+    border: 2px solid transparent;
+}
+
+.config-card:hover {
+    transform: translateY(-5px);
+    box-shadow: 0 8px 16px rgba(0,0,0,0.1);
+}
+
+.config-card.selected {
+    border-color: #0d6efd;
+    background-color: #f8f9ff;
+}
+
+.step-indicator {
+    counter-reset: step;
+}
+
+.step-indicator li {
+    counter-increment: step;
+    position: relative;
+}
+
+.step-indicator li::before {
+    content: counter(step);
+    position: absolute;
+    left: -35px;
+    top: 50%;
+    transform: translateY(-50%);
+    background: #6c757d;
+    color: white;
+    width: 25px;
+    height: 25px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 12px;
+    font-weight: bold;
+}
+
+.step-indicator li.completed::before {
+    background: #28a745;
+}
+
+.step-indicator li.active::before {
+    background: #007bff;
+}
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <h1><i class="bi bi-cart-plus"></i> Vendita Nuovo Abbonamento</h1>
+    <div>
+        <a href="{% url 'abbonamenti:abbonamenti-list' %}" class="btn btn-outline-secondary">
+            <i class="bi bi-arrow-left"></i> Torna alla Lista
+        </a>
+    </div>
+</div>
+
+{% if messages %}
+    {% for message in messages %}
+        <div class="alert alert-{{ message.tags }} alert-dismissible fade show" role="alert">
+            {{ message }}
+            <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+        </div>
+    {% endfor %}
+{% endif %}
+
+<div class="row">
+    <!-- Colonna sinistra: Processo di vendita -->
+    <div class="col-lg-8">
+        <!-- Indicatore steps -->
+        <div class="card mb-4">
+            <div class="card-body">
+                <ol class="step-indicator list-unstyled d-flex justify-content-between mb-0">
+                    <li class="active">Selezione Configurazione</li>
+                    <li>Dati Cliente</li>
+                    <li>Configurazione Targhe</li>
+                    <li>Pagamento</li>
+                </ol>
+            </div>
+        </div>
+
+        <!-- Step 1: Selezione Configurazione -->
+        <div id="step-configurazione" class="step-content">
+            <div class="card">
+                <div class="card-header">
+                    <h5 class="mb-0">
+                        <i class="bi bi-1-circle"></i>
+                        Seleziona Configurazione Abbonamento
+                    </h5>
+                </div>
+                <div class="card-body">
+                    {% if configurazioni %}
+                        <div class="row">
+                            {% for config in configurazioni %}
+                            <div class="col-md-6 col-lg-4 mb-3">
+                                <div class="card config-card h-100" onclick="selezionaConfigurazione('{{ config.pk }}')">
+                                    <div class="card-body text-center">
+                                        <h5 class="card-title">{{ config.titolo }}</h5>
+                                        <h3 class="text-primary">€{{ config.prezzo }}</h3>
+                                        <p class="text-muted">{{ config.get_durata_display }}</p>
+                                        
+                                        <!-- Servizi inclusi -->
+                                        <div class="mt-3">
+                                            <h6 class="text-muted mb-2">Servizi Inclusi:</h6>
+                                            {% for servizio_incluso in config.servizi_inclusi.all %}
+                                                <div class="d-flex justify-content-between align-items-center mb-1">
+                                                    <span class="badge bg-light text-dark">{{ servizio_incluso.servizio.titolo }}</span>
+                                                    <small class="fw-bold">x{{ servizio_incluso.quantita_inclusa }}</small>
+                                                </div>
+                                            {% endfor %}
+                                        </div>
+                                        
+                                        <!-- Modalità targa -->
+                                        <div class="mt-3">
+                                            {% if config.modalita_targa == 'fissa' %}
+                                                <span class="badge bg-warning">
+                                                    <i class="bi bi-lock"></i> Targa Fissa
+                                                </span>
+                                            {% elif config.modalita_targa == 'variabile' %}
+                                                <span class="badge bg-info">
+                                                    <i class="bi bi-arrow-repeat"></i> Targa Variabile
+                                                </span>
+                                            {% else %}
+                                                <span class="badge bg-success">
+                                                    <i class="bi bi-unlock"></i> Targa Libera
+                                                </span>
+                                            {% endif %}
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                            {% endfor %}
+                        </div>
+                    {% else %}
+                        <div class="text-center py-5">
+                            <i class="bi bi-exclamation-triangle display-1 text-warning"></i>
+                            <h3 class="text-warning mt-3">Nessuna Configurazione Disponibile</h3>
+                            <p class="text-muted">Non ci sono configurazioni di abbonamento attive per la vendita.</p>
+                            <a href="{% url 'abbonamenti:wizard-configurazione' %}" class="btn btn-primary">
+                                <i class="bi bi-plus-circle"></i> Crea Configurazione
+                            </a>
+                        </div>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+
+        <!-- Step 2: Dati Cliente -->
+        <div id="step-cliente" class="step-content" style="display: none;">
+            <div class="card">
+                <div class="card-header">
+                    <h5 class="mb-0">
+                        <i class="bi bi-2-circle"></i>
+                        Seleziona o Crea Cliente
+                    </h5>
+                </div>
+                <div class="card-body">
+                    <ul class="nav nav-tabs mb-3">
+                        <li class="nav-item">
+                            <button class="nav-link active" data-bs-toggle="tab" data-bs-target="#tab-cerca-cliente">
+                                Cerca Cliente Esistente
+                            </button>
+                        </li>
+                        <li class="nav-item">
+                            <button class="nav-link" data-bs-toggle="tab" data-bs-target="#tab-nuovo-cliente">
+                                Nuovo Cliente
+                            </button>
+                        </li>
+                    </ul>
+                    
+                    <div class="tab-content">
+                        <!-- Cerca Cliente -->
+                        <div class="tab-pane fade show active" id="tab-cerca-cliente">
+                            <div class="mb-3">
+                                <input type="text" class="form-control" id="cerca-cliente" 
+                                       placeholder="Cerca per nome, email, telefono...">
+                            </div>
+                            <div id="risultati-cliente">
+                                <div class="text-muted">
+                                    <i class="bi bi-search"></i>
+                                    Digita almeno 2 caratteri per cercare un cliente esistente
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <!-- Nuovo Cliente -->
+                        <div class="tab-pane fade" id="tab-nuovo-cliente">
+                            <form id="form-nuovo-cliente">
+                                <div class="row">
+                                    <div class="col-md-6">
+                                        <div class="mb-3">
+                                            <label class="form-label">Tipo Cliente:</label>
+                                            <select class="form-select" name="tipo" required>
+                                                <option value="privato">Privato</option>
+                                                <option value="azienda">Azienda</option>
+                                            </select>
+                                        </div>
+                                    </div>
+                                </div>
+                                <div class="row">
+                                    <div class="col-md-6">
+                                        <div class="mb-3">
+                                            <label class="form-label">Nome *</label>
+                                            <input type="text" class="form-control" name="nome" required>
+                                        </div>
+                                    </div>
+                                    <div class="col-md-6">
+                                        <div class="mb-3">
+                                            <label class="form-label">Cognome *</label>
+                                            <input type="text" class="form-control" name="cognome" required>
+                                        </div>
+                                    </div>
+                                </div>
+                                <div class="row">
+                                    <div class="col-md-6">
+                                        <div class="mb-3">
+                                            <label class="form-label">Email *</label>
+                                            <input type="email" class="form-control" name="email" required>
+                                        </div>
+                                    </div>
+                                    <div class="col-md-6">
+                                        <div class="mb-3">
+                                            <label class="form-label">Telefono *</label>
+                                            <input type="tel" class="form-control" name="telefono" required>
+                                        </div>
+                                    </div>
+                                </div>
+                            </form>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Step 3: Configurazione Targhe -->
+        <div id="step-targhe" class="step-content" style="display: none;">
+            <div class="card">
+                <div class="card-header">
+                    <h5 class="mb-0">
+                        <i class="bi bi-3-circle"></i>
+                        Configurazione Targhe
+                    </h5>
+                </div>
+                <div class="card-body">
+                    <div id="configurazione-targhe-content">
+                        <!-- Contenuto dinamico basato sulla configurazione selezionata -->
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Step 4: Pagamento -->
+        <div id="step-pagamento" class="step-content" style="display: none;">
+            <div class="card">
+                <div class="card-header">
+                    <h5 class="mb-0">
+                        <i class="bi bi-4-circle"></i>
+                        Pagamento e Conferma
+                    </h5>
+                </div>
+                <div class="card-body">
+                    <form id="form-vendita">
+                        {% csrf_token %}
+                        <input type="hidden" id="configurazione-id" name="configurazione_id">
+                        <input type="hidden" id="cliente-id" name="cliente_id">
+                        <input type="hidden" id="targhe-data" name="targhe">
+                        
+                        <div class="row">
+                            <div class="col-md-6">
+                                <div class="mb-3">
+                                    <label class="form-label">Metodo Pagamento:</label>
+                                    <select class="form-select" name="metodo_pagamento" required>
+                                        <option value="contanti">Contanti</option>
+                                        <option value="carta">Carta di Credito/Debito</option>
+                                        <option value="pos">POS</option>
+                                        <option value="satispay">Satispay</option>
+                                        <option value="bonifico">Bonifico</option>
+                                        <option value="differito">Pagamento Differito</option>
+                                    </select>
+                                </div>
+                            </div>
+                            <div class="col-md-6">
+                                <div class="mb-3">
+                                    <label class="form-label">Importo Ricevuto:</label>
+                                    <input type="number" class="form-control" name="importo_pagamento" 
+                                           step="0.01" min="0" id="importo-ricevuto">
+                                    <div id="resto-info" class="form-text"></div>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <div class="mb-3">
+                            <label class="form-label">Note:</label>
+                            <textarea class="form-control" name="note" rows="2"></textarea>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+
+        <!-- Navigazione -->
+        <div class="d-flex justify-content-between mt-4">
+            <button class="btn btn-secondary" id="btn-precedente" onclick="stepPrecedente()" style="display: none;">
+                <i class="bi bi-arrow-left"></i> Precedente
+            </button>
+            <div class="ms-auto">
+                <button class="btn btn-primary" id="btn-successivo" onclick="stepSuccessivo()" disabled>
+                    Successivo <i class="bi bi-arrow-right"></i>
+                </button>
+                <button class="btn btn-success" id="btn-completa" onclick="completaVendita()" style="display: none;">
+                    <i class="bi bi-check-circle"></i> Completa Vendita
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Colonna destra: Riepilogo -->
+    <div class="col-lg-4">
+        <div class="card sticky-top" style="top: 20px;">
+            <div class="card-header">
+                <h5 class="mb-0">
+                    <i class="bi bi-receipt"></i>
+                    Riepilogo Abbonamento
+                </h5>
+            </div>
+            <div class="card-body">
+                <!-- Configurazione selezionata -->
+                <div id="riepilogo-configurazione" style="display: none;">
+                    <h6 class="border-bottom pb-2">Configurazione:</h6>
+                    <div id="config-selezionata"></div>
+                </div>
+                
+                <!-- Cliente selezionato -->
+                <div id="riepilogo-cliente" style="display: none;">
+                    <h6 class="border-bottom pb-2">Cliente:</h6>
+                    <div id="cliente-selezionato"></div>
+                </div>
+                
+                <!-- Targhe configurate -->
+                <div id="riepilogo-targhe" style="display: none;">
+                    <h6 class="border-bottom pb-2">Targhe:</h6>
+                    <div id="targhe-configurate"></div>
+                </div>
+                
+                <!-- Totale -->
+                <div id="riepilogo-totale" style="display: none;">
+                    <hr>
+                    <div class="d-flex justify-content-between h5">
+                        <strong>Totale:</strong>
+                        <strong id="prezzo-totale">€0.00</strong>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+let currentStep = 1;
+let configurazioneSelezionata = null;
+let clienteSelezionato = null;
+let targheConfigurate = [];
+
+// Gestione selezione configurazione
+function selezionaConfigurazione(configId) {
+    // Rimuovi selezione precedente
+    document.querySelectorAll('.config-card').forEach(card => {
+        card.classList.remove('selected');
+    });
+    
+    // Seleziona nuova configurazione
+    event.currentTarget.classList.add('selected');
+    
+    // Salva configurazione
+    configurazioneSelezionata = configId;
+    document.getElementById('configurazione-id').value = configId;
+    
+    // Carica dati configurazione
+    fetch(`/abbonamenti/configurazioni/${configId}/dettagli-json/`)
+        .then(response => response.json())
+        .then(data => {
+            configurazioneSelezionata = data;
+            aggiornaRiepilogoConfigurazione();
+            document.getElementById('btn-successivo').disabled = false;
+        });
+}
+
+function aggiornaRiepilogoConfigurazione() {
+    const riepilogo = document.getElementById('riepilogo-configurazione');
+    const content = document.getElementById('config-selezionata');
+    
+    content.innerHTML = `
+        <div class="mb-2">
+            <strong>${configurazioneSelezionata.titolo}</strong>
+            <br><span class="text-success h6">€${configurazioneSelezionata.prezzo}</span>
+        </div>
+        <small class="text-muted">${configurazioneSelezionata.descrizione}</small>
+    `;
+    
+    riepilogo.style.display = 'block';
+    document.getElementById('riepilogo-totale').style.display = 'block';
+    document.getElementById('prezzo-totale').textContent = `€${configurazioneSelezionata.prezzo}`;
+}
+
+// Gestione navigazione steps
+function stepSuccessivo() {
+    if (currentStep < 4) {
+        document.getElementById(`step-${getStepName(currentStep)}`).style.display = 'none';
+        currentStep++;
+        document.getElementById(`step-${getStepName(currentStep)}`).style.display = 'block';
+        
+        aggiornaNavigazione();
+        aggiornaIndicatoriStep();
+        
+        if (currentStep === 3) {
+            configuraTarghe();
+        } else if (currentStep === 4) {
+            configuraPagamento();
+        }
+    }
+}
+
+function stepPrecedente() {
+    if (currentStep > 1) {
+        document.getElementById(`step-${getStepName(currentStep)}`).style.display = 'none';
+        currentStep--;
+        document.getElementById(`step-${getStepName(currentStep)}`).style.display = 'block';
+        
+        aggiornaNavigazione();
+        aggiornaIndicatoriStep();
+    }
+}
+
+function getStepName(step) {
+    const names = ['configurazione', 'cliente', 'targhe', 'pagamento'];
+    return names[step - 1];
+}
+
+function aggiornaNavigazione() {
+    const btnPrecedente = document.getElementById('btn-precedente');
+    const btnSuccessivo = document.getElementById('btn-successivo');
+    const btnCompleta = document.getElementById('btn-completa');
+    
+    btnPrecedente.style.display = currentStep > 1 ? 'block' : 'none';
+    
+    if (currentStep === 4) {
+        btnSuccessivo.style.display = 'none';
+        btnCompleta.style.display = 'block';
+    } else {
+        btnSuccessivo.style.display = 'block';
+        btnCompleta.style.display = 'none';
+    }
+}
+
+function aggiornaIndicatoriStep() {
+    document.querySelectorAll('.step-indicator li').forEach((li, index) => {
+        li.classList.remove('active', 'completed');
+        if (index + 1 < currentStep) {
+            li.classList.add('completed');
+        } else if (index + 1 === currentStep) {
+            li.classList.add('active');
+        }
+    });
+}
+
+// Ricerca cliente
+let searchTimeout;
+document.getElementById('cerca-cliente').addEventListener('input', function() {
+    clearTimeout(searchTimeout);
+    const term = this.value.trim();
+    
+    if (term.length < 2) {
+        document.getElementById('risultati-cliente').innerHTML = '';
+        return;
+    }
+    
+    searchTimeout = setTimeout(() => {
+        fetch(`/clienti/cerca/?term=${encodeURIComponent(term)}`)
+        .then(response => {
+            if (!response.ok) {
+                throw new Error('Errore nella ricerca clienti');
+            }
+            return response.json();
+        })
+        .then(data => {
+            mostraRisultatiCliente(data.results || []);
+        })
+        .catch(error => {
+            console.error('Errore ricerca clienti:', error);
+            document.getElementById('risultati-cliente').innerHTML = 
+                '<div class="alert alert-warning">Errore nella ricerca clienti. Riprova.</div>';
+        });
+    }, 300);
+});
+
+function mostraRisultatiCliente(risultati) {
+    const container = document.getElementById('risultati-cliente');
+    
+    if (risultati.length === 0) {
+        container.innerHTML = '<p class="text-muted">Nessun cliente trovato</p>';
+        return;
+    }
+    
+    let html = '<div class="list-group">';
+    risultati.forEach(cliente => {
+        html += `
+            <button type="button" class="list-group-item list-group-item-action" 
+                    onclick="selezionaCliente(${cliente.id}, '${cliente.text}', '${cliente.email}', '${cliente.telefono}')">
+                <div class="d-flex w-100 justify-content-between">
+                    <h6 class="mb-1">${cliente.text}</h6>
+                    <small class="text-muted">${cliente.tipo}</small>
+                </div>
+                <p class="mb-1">${cliente.email}</p>
+                <small>${cliente.telefono}</small>
+            </button>
+        `;
+    });
+    html += '</div>';
+    
+    container.innerHTML = html;
+}
+
+function selezionaCliente(id, nome, email, telefono) {
+    clienteSelezionato = { id, nome, email, telefono };
+    document.getElementById('cliente-id').value = id;
+    
+    aggiornaRiepilogoCliente();
+    document.getElementById('btn-successivo').disabled = false;
+}
+
+function aggiornaRiepilogoCliente() {
+    const riepilogo = document.getElementById('riepilogo-cliente');
+    const content = document.getElementById('cliente-selezionato');
+    
+    content.innerHTML = `
+        <div>
+            <strong>${clienteSelezionato.nome}</strong>
+            <br><small class="text-muted">${clienteSelezionato.email}</small>
+            <br><small class="text-muted">${clienteSelezionato.telefono}</small>
+        </div>
+    `;
+    
+    riepilogo.style.display = 'block';
+}
+
+// Configurazione targhe
+function configuraTarghe() {
+    const content = document.getElementById('configurazione-targhe-content');
+    
+    if (configurazioneSelezionata.modalita_targa === 'libera') {
+        content.innerHTML = `
+            <div class="alert alert-info">
+                <i class="bi bi-info-circle"></i>
+                <strong>Modalità Targa Libera:</strong> Il cliente potrà utilizzare qualsiasi targa per accedere ai servizi.
+            </div>
+        `;
+        document.getElementById('btn-successivo').disabled = false;
+    } else {
+        const maxTarghe = configurazioneSelezionata.numero_massimo_targhe || 1;
+        
+        content.innerHTML = `
+            <div class="mb-3">
+                <label class="form-label">Targhe Autorizzate (max ${maxTarghe}):</label>
+                <div id="targhe-container">
+                    <div class="input-group mb-2">
+                        <input type="text" class="form-control targa-input" placeholder="Es: AB123CD" 
+                               onchange="validateTarghe()" required>
+                        <button class="btn btn-outline-secondary" type="button" onclick="aggiungiTarga()">
+                            <i class="bi bi-plus"></i>
+                        </button>
+                    </div>
+                </div>
+            </div>
+            <small class="text-muted">Inserisci le targhe che potranno utilizzare questo abbonamento</small>
+        `;
+        
+        document.getElementById('btn-successivo').disabled = true;
+    }
+}
+
+function aggiungiTarga() {
+    const container = document.getElementById('targhe-container');
+    const maxTarghe = configurazioneSelezionata.numero_massimo_targhe || 1;
+    const currentTarghe = container.querySelectorAll('.targa-input').length;
+    
+    if (currentTarghe < maxTarghe) {
+        const div = document.createElement('div');
+        div.className = 'input-group mb-2';
+        div.innerHTML = `
+            <input type="text" class="form-control targa-input" placeholder="Es: AB123CD" 
+                   onchange="validateTarghe()">
+            <button class="btn btn-outline-danger" type="button" onclick="rimuoviTarga(this)">
+                <i class="bi bi-trash"></i>
+            </button>
+        `;
+        container.appendChild(div);
+    }
+}
+
+function rimuoviTarga(button) {
+    button.parentElement.remove();
+    validateTarghe();
+}
+
+function validateTarghe() {
+    const inputs = document.querySelectorAll('.targa-input');
+    targheConfigurate = [];
+    let valid = true;
+    
+    inputs.forEach(input => {
+        const targa = input.value.trim().toUpperCase();
+        if (targa) {
+            if (targa.length >= 6 && targa.length <= 8) {
+                targheConfigurate.push(targa);
+                input.classList.remove('is-invalid');
+                input.classList.add('is-valid');
+            } else {
+                valid = false;
+                input.classList.remove('is-valid');
+                input.classList.add('is-invalid');
+            }
+        } else if (inputs.length === 1) {
+            valid = false;
+        }
+    });
+    
+    document.getElementById('btn-successivo').disabled = !valid || targheConfigurate.length === 0;
+    
+    if (targheConfigurate.length > 0) {
+        aggiornaRiepilogoTarghe();
+    }
+}
+
+function aggiornaRiepilogoTarghe() {
+    const riepilogo = document.getElementById('riepilogo-targhe');
+    const content = document.getElementById('targhe-configurate');
+    
+    content.innerHTML = targheConfigurate.map(targa => 
+        `<span class="badge bg-primary me-1">${targa}</span>`
+    ).join('');
+    
+    riepilogo.style.display = 'block';
+}
+
+// Configurazione pagamento
+function configuraPagamento() {
+    const importoRicevuto = document.getElementById('importo-ricevuto');
+    importoRicevuto.value = configurazioneSelezionata.prezzo;
+    calcolaResto();
+    
+    importoRicevuto.addEventListener('input', calcolaResto);
+}
+
+function calcolaResto() {
+    const totale = parseFloat(configurazioneSelezionata.prezzo);
+    const ricevuto = parseFloat(document.getElementById('importo-ricevuto').value) || 0;
+    const resto = ricevuto - totale;
+    
+    const restoInfo = document.getElementById('resto-info');
+    if (ricevuto > 0) {
+        if (resto >= 0) {
+            restoInfo.innerHTML = `<span class="text-success">Resto: €${resto.toFixed(2)}</span>`;
+        } else {
+            restoInfo.innerHTML = `<span class="text-danger">Mancano: €${Math.abs(resto).toFixed(2)}</span>`;
+        }
+    } else {
+        restoInfo.innerHTML = '';
+    }
+}
+
+// Completamento vendita
+function completaVendita() {
+    try {
+        // Validazione dati
+        const configurazioneId = document.getElementById('configurazione-id');
+        const clienteId = document.getElementById('cliente-id');
+        const targheData = document.getElementById('targhe-data');
+        const csrfToken = document.querySelector('[name=csrfmiddlewaretoken]');
+        
+        if (!configurazioneId || !configurazioneId.value) {
+            alert('Seleziona una configurazione abbonamento');
+            return;
+        }
+        
+        if (!clienteId || !clienteId.value) {
+            alert('Seleziona o crea un cliente');
+            return;
+        }
+        
+        if (!csrfToken) {
+            alert('Errore: token CSRF mancante');
+            return;
+        }
+        
+        // Prepara dati targhe - invia come lista invece di JSON
+        const formData = new FormData(document.getElementById('form-vendita'));
+        
+        // Rimuovi il campo targhe JSON e aggiungi le singole targhe
+        formData.delete('targhe');
+        if (targheConfigurate && targheConfigurate.length > 0) {
+            targheConfigurate.forEach(targa => {
+                formData.append('targhe', targa);
+            });
+        }
+        
+        console.log('Dati vendita:', {
+            configurazione_id: formData.get('configurazione_id'),
+            cliente_id: formData.get('cliente_id'),
+            targhe: formData.getAll('targhe'),
+            metodo_pagamento: formData.get('metodo_pagamento'),
+            importo_pagamento: formData.get('importo_pagamento')
+        });
+        
+        // Invia richiesta
+        fetch('{% url "abbonamenti:vendita-abbonamento" %}', {
+            method: 'POST',
+            headers: {
+                'X-CSRFToken': csrfToken.value
+            },
+            body: formData
+        })
+        .then(response => {
+            console.log('Response status:', response.status);
+            if (response.ok) {
+                return response.text();
+            }
+            throw new Error(`Errore HTTP ${response.status}`);
+        })
+        .then(html => {
+            // Successo - reindirizza o mostra messaggio
+            console.log('Vendita completata con successo');
+            window.location.href = '{% url "abbonamenti:abbonamenti-list" %}';
+        })
+        .catch(error => {
+            console.error('Errore vendita:', error);
+            alert('Errore nella vendita: ' + error.message);
+        });
+    } catch (error) {
+        console.error('Errore JavaScript:', error);
+        alert('Errore nell\'applicazione: ' + error.message);
+    }
+}
+
+// Inizializzazione
+document.addEventListener('DOMContentLoaded', function() {
+    aggiornaNavigazione();
+    aggiornaIndicatoriStep();
+});
+</script>
+{% endblock %}

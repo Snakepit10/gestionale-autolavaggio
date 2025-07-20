@@ -1,0 +1,404 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}Configurazione Slot Prenotazioni - Gestionale Autolavaggio{% endblock %}
+
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <h1><i class="bi bi-calendar-week"></i> Configurazione Slot Prenotazioni</h1>
+    <div>
+        <a href="{% url 'prenotazioni:config-slot-create' %}" class="btn btn-primary">
+            <i class="bi bi-plus-circle"></i> Nuovo Slot
+        </a>
+    </div>
+</div>
+
+{% if messages %}
+    {% for message in messages %}
+        <div class="alert alert-{{ message.tags }} alert-dismissible fade show" role="alert">
+            {{ message }}
+            <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+        </div>
+    {% endfor %}
+{% endif %}
+
+<!-- Statistiche -->
+<div class="row mb-4">
+    <div class="col-md-3">
+        <div class="card bg-primary text-white">
+            <div class="card-body text-center">
+                <i class="bi bi-calendar-week display-6"></i>
+                <h4>{{ object_list|length }}</h4>
+                <small>Configurazioni Totali</small>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-3">
+        <div class="card bg-success text-white">
+            <div class="card-body text-center">
+                <i class="bi bi-check-circle display-6"></i>
+                <h4>{{ configurazioni_attive|default:0 }}</h4>
+                <small>Attive</small>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-3">
+        <div class="card bg-info text-white">
+            <div class="card-body text-center">
+                <i class="bi bi-clock display-6"></i>
+                <h4>{{ slot_giornalieri|default:0 }}</h4>
+                <small>Slot per Giorno</small>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-3">
+        <div class="card bg-warning text-white">
+            <div class="card-body text-center">
+                <i class="bi bi-people display-6"></i>
+                <h4>{{ prenotazioni_oggi|default:0 }}</h4>
+                <small>Prenotazioni Oggi</small>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Filtri -->
+<div class="card mb-4">
+    <div class="card-body">
+        <form method="get" class="row g-3">
+            <div class="col-md-3">
+                <label for="giorno_settimana" class="form-label">Giorno Settimana</label>
+                <select name="giorno_settimana" id="giorno_settimana" class="form-select">
+                    <option value="">Tutti i giorni</option>
+                    <option value="0">Lunedì</option>
+                    <option value="1">Martedì</option>
+                    <option value="2">Mercoledì</option>
+                    <option value="3">Giovedì</option>
+                    <option value="4">Venerdì</option>
+                    <option value="5">Sabato</option>
+                    <option value="6">Domenica</option>
+                </select>
+            </div>
+            <div class="col-md-3">
+                <label for="attivo" class="form-label">Stato</label>
+                <select name="attivo" id="attivo" class="form-select">
+                    <option value="">Tutti</option>
+                    <option value="true">Attivi</option>
+                    <option value="false">Inattivi</option>
+                </select>
+            </div>
+            <div class="col-md-3">
+                <label for="servizio" class="form-label">Servizio</label>
+                <select name="servizio" id="servizio" class="form-select">
+                    <option value="">Tutti i servizi</option>
+                    <!-- Le opzioni saranno popolate dalla view -->
+                </select>
+            </div>
+            <div class="col-md-3 d-flex align-items-end">
+                <button type="submit" class="btn btn-outline-primary me-2">
+                    <i class="bi bi-search"></i> Filtra
+                </button>
+                <a href="{% url 'prenotazioni:config-slot-list' %}" class="btn btn-outline-secondary">
+                    <i class="bi bi-x-circle"></i> Reset
+                </a>
+            </div>
+        </form>
+    </div>
+</div>
+
+<!-- Lista Configurazioni Slot -->
+<div class="card">
+    <div class="card-body">
+        {% if object_list %}
+            <!-- Vista Griglia per Giorni della Settimana -->
+            <div class="row">
+                {% for giorno_num, giorno_nome in giorni_settimana %}
+                <div class="col-lg-6 col-xl-4 mb-4">
+                    <div class="card h-100">
+                        <div class="card-header d-flex justify-content-between align-items-center">
+                            <h5 class="mb-0">
+                                <i class="bi bi-calendar-day"></i> {{ giorno_nome }}
+                            </h5>
+                            <span class="badge bg-info">
+                                {{ slot_per_giorno|default_if_none:giorno_num }} slot
+                            </span>
+                        </div>
+                        <div class="card-body p-2">
+                            {% for slot in object_list %}
+                                {% if slot.giorno_settimana == giorno_num %}
+                                <div class="border rounded p-2 mb-2 {% if not slot.attivo %}bg-light text-muted{% endif %}">
+                                    <div class="d-flex justify-content-between align-items-start">
+                                        <div class="flex-grow-1">
+                                            <div class="fw-bold">
+                                                {{ slot.ora_inizio|time:"H:i" }} - {{ slot.ora_fine|time:"H:i" }}
+                                                {% if not slot.attivo %}
+                                                    <span class="badge bg-secondary ms-1">Inattivo</span>
+                                                {% endif %}
+                                            </div>
+                                            <small class="text-muted">
+                                                {{ slot.durata_slot_minuti }}min • 
+                                                max {{ slot.max_prenotazioni_per_slot }} prenotazioni
+                                            </small>
+                                            
+                                            <!-- Servizi ammessi -->
+                                            {% if slot.servizi_ammessi.all %}
+                                            <div class="mt-1">
+                                                {% for servizio in slot.servizi_ammessi.all|slice:":2" %}
+                                                    <span class="badge bg-light text-dark">{{ servizio.titolo }}</span>
+                                                {% endfor %}
+                                                {% if slot.servizi_ammessi.count > 2 %}
+                                                    <span class="text-muted">+{{ slot.servizi_ammessi.count|add:"-2" }}</span>
+                                                {% endif %}
+                                            </div>
+                                            {% endif %}
+                                        </div>
+                                        
+                                        <!-- Azioni -->
+                                        <div class="btn-group btn-group-sm" role="group">
+                                            <a href="{% url 'prenotazioni:config-slot-update' slot.pk %}" 
+                                               class="btn btn-outline-primary btn-sm" title="Modifica">
+                                                <i class="bi bi-pencil"></i>
+                                            </a>
+                                            <button class="btn btn-outline-danger btn-sm" 
+                                                    onclick="eliminaSlot({{ slot.pk }})" title="Elimina">
+                                                <i class="bi bi-trash"></i>
+                                            </button>
+                                        </div>
+                                    </div>
+                                    
+                                    <!-- Statistiche -->
+                                    <div class="row mt-2 text-center">
+                                        <div class="col-4">
+                                            <small class="text-success">
+                                                <strong>{{ slot.prenotazioni_oggi|default:0 }}</strong><br>
+                                                <span class="text-muted">Oggi</span>
+                                            </small>
+                                        </div>
+                                        <div class="col-4">
+                                            <small class="text-info">
+                                                <strong>{{ slot.prenotazioni_settimana|default:0 }}</strong><br>
+                                                <span class="text-muted">Settimana</span>
+                                            </small>
+                                        </div>
+                                        <div class="col-4">
+                                            <small class="text-warning">
+                                                <strong>{{ slot.utilizzo_percentuale|default:0 }}%</strong><br>
+                                                <span class="text-muted">Utilizzo</span>
+                                            </small>
+                                        </div>
+                                    </div>
+                                </div>
+                                {% endif %}
+                            {% endfor %}
+                            
+                            <!-- Aggiungi slot per questo giorno -->
+                            <div class="text-center mt-2">
+                                <a href="{% url 'prenotazioni:config-slot-create' %}?giorno={{ giorno_num }}" 
+                                   class="btn btn-outline-primary btn-sm">
+                                    <i class="bi bi-plus"></i> Aggiungi Slot
+                                </a>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                {% endfor %}
+            </div>
+            
+            <!-- Vista Tabella Alternativa -->
+            <div class="mt-4">
+                <h5>Vista Dettagliata</h5>
+                <div class="table-responsive">
+                    <table class="table table-hover">
+                        <thead class="table-light">
+                            <tr>
+                                <th>Giorno</th>
+                                <th>Orario</th>
+                                <th>Durata Slot</th>
+                                <th>Max Prenotazioni</th>
+                                <th>Servizi Ammessi</th>
+                                <th>Stato</th>
+                                <th>Statistiche</th>
+                                <th>Azioni</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for slot in object_list %}
+                            <tr {% if not slot.attivo %}class="table-secondary"{% endif %}>
+                                <td>
+                                    <strong>{{ slot.get_giorno_settimana_display }}</strong>
+                                </td>
+                                <td>
+                                    {{ slot.ora_inizio|time:"H:i" }} - {{ slot.ora_fine|time:"H:i" }}
+                                </td>
+                                <td>
+                                    <span class="badge bg-info">{{ slot.durata_slot_minuti }} min</span>
+                                </td>
+                                <td>
+                                    <span class="badge bg-warning">{{ slot.max_prenotazioni_per_slot }}</span>
+                                </td>
+                                <td>
+                                    {% if slot.servizi_ammessi.all %}
+                                        {% for servizio in slot.servizi_ammessi.all|slice:":3" %}
+                                            <span class="badge bg-light text-dark me-1">{{ servizio.titolo }}</span>
+                                        {% endfor %}
+                                        {% if slot.servizi_ammessi.count > 3 %}
+                                            <small class="text-muted">+{{ slot.servizi_ammessi.count|add:"-3" }}</small>
+                                        {% endif %}
+                                    {% else %}
+                                        <span class="text-muted">Nessuno</span>
+                                    {% endif %}
+                                </td>
+                                <td>
+                                    {% if slot.attivo %}
+                                        <span class="badge bg-success">Attivo</span>
+                                    {% else %}
+                                        <span class="badge bg-secondary">Inattivo</span>
+                                    {% endif %}
+                                </td>
+                                <td>
+                                    <small>
+                                        Oggi: <strong>{{ slot.prenotazioni_oggi|default:0 }}</strong><br>
+                                        Utilizzo: <strong>{{ slot.utilizzo_percentuale|default:0 }}%</strong>
+                                    </small>
+                                </td>
+                                <td>
+                                    <div class="btn-group btn-group-sm" role="group">
+                                        <a href="{% url 'prenotazioni:config-slot-update' slot.pk %}" 
+                                           class="btn btn-outline-primary" title="Modifica">
+                                            <i class="bi bi-pencil"></i>
+                                        </a>
+                                        <button class="btn btn-outline-info" 
+                                                onclick="duplicaSlot({{ slot.pk }})" title="Duplica">
+                                            <i class="bi bi-files"></i>
+                                        </button>
+                                        <button class="btn btn-outline-danger" 
+                                                onclick="eliminaSlot({{ slot.pk }})" title="Elimina">
+                                            <i class="bi bi-trash"></i>
+                                        </button>
+                                    </div>
+                                </td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        {% else %}
+            <div class="text-center py-5">
+                <i class="bi bi-calendar-week display-1 text-muted"></i>
+                <h3 class="text-muted mt-3">Nessuno Slot Configurato</h3>
+                <p class="text-muted">Non ci sono ancora slot di prenotazione configurati.</p>
+                <a href="{% url 'prenotazioni:config-slot-create' %}" class="btn btn-primary">
+                    <i class="bi bi-plus-circle"></i> Configura il Primo Slot
+                </a>
+            </div>
+        {% endif %}
+    </div>
+</div>
+
+<!-- Modal Conferma Eliminazione -->
+<div class="modal fade" id="modalElimina" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">
+                    <i class="bi bi-exclamation-triangle text-warning"></i>
+                    Conferma Eliminazione
+                </h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <p>Sei sicuro di voler eliminare questa configurazione slot?</p>
+                <div class="alert alert-warning">
+                    <i class="bi bi-exclamation-triangle"></i>
+                    <strong>Attenzione:</strong> Questa azione eliminerà anche tutte le prenotazioni associate a questo slot.
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">
+                    <i class="bi bi-x-circle"></i> Annulla
+                </button>
+                <button type="button" class="btn btn-danger" id="confermaElimina">
+                    <i class="bi bi-trash"></i> Elimina Definitivamente
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+let slotDaEliminare = null;
+
+function eliminaSlot(slotId) {
+    slotDaEliminare = slotId;
+    const modal = new bootstrap.Modal(document.getElementById('modalElimina'));
+    modal.show();
+}
+
+function duplicaSlot(slotId) {
+    if (!confirm('Confermi di voler duplicare questa configurazione slot?')) return;
+    
+    fetch(`/prenotazioni/configurazione/slot/${slotId}/duplica/`, {
+        method: 'POST',
+        headers: {
+            'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]').value
+        }
+    })
+    .then(response => {
+        if (response.ok) {
+            location.reload();
+        } else {
+            alert('Errore nella duplicazione dello slot');
+        }
+    })
+    .catch(error => {
+        console.error('Errore:', error);
+        alert('Errore nella duplicazione dello slot');
+    });
+}
+
+document.getElementById('confermaElimina').addEventListener('click', function() {
+    if (!slotDaEliminare) return;
+    
+    fetch(`/prenotazioni/configurazione/slot/${slotDaEliminare}/elimina/`, {
+        method: 'DELETE',
+        headers: {
+            'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]').value
+        }
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            location.reload();
+        } else {
+            alert('Errore: ' + (data.error || 'Impossibile eliminare lo slot'));
+        }
+    })
+    .catch(error => {
+        console.error('Errore:', error);
+        alert('Errore nell\'eliminazione dello slot');
+    })
+    .finally(() => {
+        const modal = bootstrap.Modal.getInstance(document.getElementById('modalElimina'));
+        modal.hide();
+        slotDaEliminare = null;
+    });
+});
+
+// Mantieni i valori dei filtri
+document.addEventListener('DOMContentLoaded', function() {
+    const urlParams = new URLSearchParams(window.location.search);
+    
+    // Ripristina i valori dei filtri
+    ['giorno_settimana', 'attivo', 'servizio'].forEach(param => {
+        const value = urlParams.get(param);
+        if (value) {
+            const element = document.getElementById(param);
+            if (element) element.value = value;
+        }
+    });
+});
+</script>
+
+{% csrf_token %}
+{% endblock %}

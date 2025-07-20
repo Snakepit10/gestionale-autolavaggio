@@ -1,0 +1,445 @@
+{% extends 'base.html' %}
+{% load static %}
+{% load crispy_forms_tags %}
+
+{% block title %}
+    {% if form.instance.pk %}Modifica Slot Prenotazione{% else %}Nuovo Slot Prenotazione{% endif %} - Gestionale Autolavaggio
+{% endblock %}
+
+{% block extra_css %}
+<style>
+.time-slot-preview {
+    background: linear-gradient(135deg, #0d6efd, #6610f2);
+    color: white;
+    border-radius: 15px;
+    padding: 25px;
+    text-align: center;
+    margin-top: 20px;
+}
+
+.service-card {
+    border: 2px solid #e9ecef;
+    border-radius: 10px;
+    padding: 15px;
+    margin-bottom: 10px;
+    transition: all 0.3s ease;
+}
+
+.service-card:hover {
+    border-color: #0d6efd;
+    transform: translateY(-2px);
+    box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+}
+
+.service-card.selected {
+    border-color: #0d6efd;
+    background: #f8f9ff;
+}
+
+.time-input-group {
+    position: relative;
+}
+
+.time-input-group .form-control {
+    padding-left: 40px;
+}
+
+.time-input-group .input-icon {
+    position: absolute;
+    left: 12px;
+    top: 50%;
+    transform: translateY(-50%);
+    z-index: 5;
+    color: #6c757d;
+}
+
+.slot-statistics {
+    background: #f8f9fa;
+    border-radius: 10px;
+    padding: 20px;
+    margin-top: 20px;
+}
+
+.help-section {
+    background: #e3f2fd;
+    border-left: 4px solid #2196f3;
+    padding: 15px;
+    border-radius: 0 8px 8px 0;
+    margin-top: 15px;
+}
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="row justify-content-center">
+    <div class="col-lg-10">
+        <div class="card">
+            <div class="card-header d-flex justify-content-between align-items-center">
+                <h4 class="mb-0">
+                    <i class="bi bi-calendar-plus"></i>
+                    {% if form.instance.pk %}
+                        Modifica Slot: {{ form.instance }}
+                    {% else %}
+                        Nuovo Slot Prenotazione
+                    {% endif %}
+                </h4>
+                <a href="{% url 'prenotazioni:config-slot-list' %}" class="btn btn-outline-secondary">
+                    <i class="bi bi-arrow-left"></i> Torna alla Lista
+                </a>
+            </div>
+            <div class="card-body">
+                <form method="post" id="slot-form">
+                    {% csrf_token %}
+                    
+                    <!-- Configurazione Base -->
+                    <div class="row mb-4">
+                        <div class="col-12">
+                            <h5 class="border-bottom pb-2 mb-3">
+                                <i class="bi bi-calendar-day text-primary"></i>
+                                Configurazione Base
+                            </h5>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="mb-3">
+                                <label for="{{ form.giorno_settimana.id_for_label }}" class="form-label">
+                                    <i class="bi bi-calendar-week"></i> Giorno della Settimana *
+                                </label>
+                                {{ form.giorno_settimana }}
+                                <div class="form-text">Seleziona il giorno per questo slot</div>
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="form-check form-switch mt-4">
+                                {{ form.attivo }}
+                                <label class="form-check-label" for="{{ form.attivo.id_for_label }}">
+                                    <strong>Slot Attivo</strong>
+                                </label>
+                                <div class="form-text">Lo slot sarà disponibile per le prenotazioni</div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Orari -->
+                    <div class="row mb-4">
+                        <div class="col-12">
+                            <h5 class="border-bottom pb-2 mb-3">
+                                <i class="bi bi-clock text-info"></i>
+                                Configurazione Orari
+                            </h5>
+                        </div>
+                        <div class="col-md-4">
+                            <div class="mb-3">
+                                <label for="{{ form.ora_inizio.id_for_label }}" class="form-label">
+                                    Ora Inizio *
+                                </label>
+                                <div class="time-input-group">
+                                    <i class="bi bi-clock input-icon"></i>
+                                    {{ form.ora_inizio }}
+                                </div>
+                                <div class="form-text">Ora di inizio dello slot</div>
+                            </div>
+                        </div>
+                        <div class="col-md-4">
+                            <div class="mb-3">
+                                <label for="{{ form.ora_fine.id_for_label }}" class="form-label">
+                                    Ora Fine *
+                                </label>
+                                <div class="time-input-group">
+                                    <i class="bi bi-clock-fill input-icon"></i>
+                                    {{ form.ora_fine }}
+                                </div>
+                                <div class="form-text">Ora di fine dello slot</div>
+                            </div>
+                        </div>
+                        <div class="col-md-4">
+                            <div class="mb-3">
+                                <label for="{{ form.durata_slot_minuti.id_for_label }}" class="form-label">
+                                    Durata Slot (minuti) *
+                                </label>
+                                <div class="input-group">
+                                    {{ form.durata_slot_minuti }}
+                                    <span class="input-group-text">min</span>
+                                </div>
+                                <div class="form-text">Durata di ogni singolo slot</div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Capacità -->
+                    <div class="row mb-4">
+                        <div class="col-12">
+                            <h5 class="border-bottom pb-2 mb-3">
+                                <i class="bi bi-people text-warning"></i>
+                                Gestione Capacità
+                            </h5>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="mb-3">
+                                <label for="{{ form.max_prenotazioni_per_slot.id_for_label }}" class="form-label">
+                                    Massimo Prenotazioni per Slot *
+                                </label>
+                                <div class="input-group">
+                                    <span class="input-group-text">
+                                        <i class="bi bi-person-check"></i>
+                                    </span>
+                                    {{ form.max_prenotazioni_per_slot }}
+                                    <span class="input-group-text">prenotazioni</span>
+                                </div>
+                                <div class="form-text">Numero massimo di prenotazioni contemporanee</div>
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="slot-statistics">
+                                <h6 class="text-muted mb-3">
+                                    <i class="bi bi-graph-up"></i> Statistiche Calcolate
+                                </h6>
+                                <div id="calculated-stats">
+                                    <div class="row text-center">
+                                        <div class="col-4">
+                                            <div class="border rounded p-2">
+                                                <strong id="slot-count">0</strong>
+                                                <br><small class="text-muted">Slot Totali</small>
+                                            </div>
+                                        </div>
+                                        <div class="col-4">
+                                            <div class="border rounded p-2">
+                                                <strong id="capacity-total">0</strong>
+                                                <br><small class="text-muted">Capacità Tot.</small>
+                                            </div>
+                                        </div>
+                                        <div class="col-4">
+                                            <div class="border rounded p-2">
+                                                <strong id="duration-total">0h</strong>
+                                                <br><small class="text-muted">Durata Tot.</small>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Servizi Ammessi -->
+                    <div class="row mb-4">
+                        <div class="col-12">
+                            <h5 class="border-bottom pb-2 mb-3">
+                                <i class="bi bi-grid-3x3-gap text-success"></i>
+                                Servizi Ammessi
+                            </h5>
+                            <p class="text-muted">Seleziona i servizi che possono essere prenotati in questo slot</p>
+                        </div>
+                        <div class="col-12">
+                            {{ form.servizi_ammessi|as_crispy_field }}
+                            
+                            <div class="help-section">
+                                <h6><i class="bi bi-info-circle"></i> Suggerimenti</h6>
+                                <ul class="mb-0">
+                                    <li>Se non selezioni nessun servizio, tutti i servizi saranno ammessi</li>
+                                    <li>Considera la durata dei servizi rispetto alla durata dello slot</li>
+                                    <li>Servizi più lunghi potrebbero richiedere slot dedicati</li>
+                                </ul>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Anteprima Slot -->
+                    <div class="time-slot-preview" id="slot-preview">
+                        <h4 class="mb-3">
+                            <i class="bi bi-eye"></i> Anteprima Slot
+                        </h4>
+                        <div class="row">
+                            <div class="col-md-6">
+                                <h5 id="preview-day">Seleziona un giorno</h5>
+                                <p id="preview-time" class="mb-0">--:-- - --:--</p>
+                            </div>
+                            <div class="col-md-6">
+                                <p class="mb-1">
+                                    <strong id="preview-duration">0</strong> minuti per slot
+                                </p>
+                                <p class="mb-0">
+                                    Fino a <strong id="preview-capacity">0</strong> prenotazioni
+                                </p>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- Azioni -->
+                    <div class="d-flex justify-content-between mt-4">
+                        <a href="{% url 'prenotazioni:config-slot-list' %}" class="btn btn-secondary">
+                            <i class="bi bi-x-circle"></i> Annulla
+                        </a>
+                        <div>
+                            {% if form.instance.pk %}
+                                <button type="button" class="btn btn-outline-info me-2" onclick="duplicaSlot()">
+                                    <i class="bi bi-files"></i> Duplica Slot
+                                </button>
+                            {% endif %}
+                            <button type="submit" class="btn btn-primary">
+                                <i class="bi bi-check-circle"></i>
+                                {% if form.instance.pk %}Aggiorna{% else %}Crea{% endif %} Slot
+                            </button>
+                        </div>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    const giornoSelect = document.getElementById('{{ form.giorno_settimana.id_for_label }}');
+    const oraInizioInput = document.getElementById('{{ form.ora_inizio.id_for_label }}');
+    const oraFineInput = document.getElementById('{{ form.ora_fine.id_for_label }}');
+    const durataInput = document.getElementById('{{ form.durata_slot_minuti.id_for_label }}');
+    const capacitaInput = document.getElementById('{{ form.max_prenotazioni_per_slot.id_for_label }}');
+    
+    const previewDay = document.getElementById('preview-day');
+    const previewTime = document.getElementById('preview-time');
+    const previewDuration = document.getElementById('preview-duration');
+    const previewCapacity = document.getElementById('preview-capacity');
+    
+    const slotCount = document.getElementById('slot-count');
+    const capacityTotal = document.getElementById('capacity-total');
+    const durationTotal = document.getElementById('duration-total');
+
+    function updatePreview() {
+        // Aggiorna anteprima giorno
+        if (giornoSelect.value) {
+            const selectedOption = giornoSelect.options[giornoSelect.selectedIndex];
+            previewDay.textContent = selectedOption.text;
+        } else {
+            previewDay.textContent = 'Seleziona un giorno';
+        }
+        
+        // Aggiorna anteprima orari
+        const oraInizio = oraInizioInput.value;
+        const oraFine = oraFineInput.value;
+        if (oraInizio && oraFine) {
+            previewTime.textContent = `${oraInizio} - ${oraFine}`;
+        } else {
+            previewTime.textContent = '--:-- - --:--';
+        }
+        
+        // Aggiorna durata e capacità
+        previewDuration.textContent = durataInput.value || '0';
+        previewCapacity.textContent = capacitaInput.value || '0';
+        
+        // Calcola statistiche
+        calculateStatistics();
+    }
+    
+    function calculateStatistics() {
+        const oraInizio = oraInizioInput.value;
+        const oraFine = oraFineInput.value;
+        const durata = parseInt(durataInput.value) || 30;
+        const capacita = parseInt(capacitaInput.value) || 1;
+        
+        if (oraInizio && oraFine) {
+            // Calcola numero di slot
+            const inizioMinutes = timeToMinutes(oraInizio);
+            const fineMinutes = timeToMinutes(oraFine);
+            const totalMinutes = fineMinutes - inizioMinutes;
+            
+            if (totalMinutes > 0) {
+                const numSlots = Math.floor(totalMinutes / durata);
+                const totalCapacity = numSlots * capacita;
+                const totalDuration = (totalMinutes / 60).toFixed(1);
+                
+                slotCount.textContent = numSlots;
+                capacityTotal.textContent = totalCapacity;
+                durationTotal.textContent = totalDuration + 'h';
+            } else {
+                slotCount.textContent = '0';
+                capacityTotal.textContent = '0';
+                durationTotal.textContent = '0h';
+            }
+        }
+    }
+    
+    function timeToMinutes(timeStr) {
+        const [hours, minutes] = timeStr.split(':').map(Number);
+        return hours * 60 + minutes;
+    }
+    
+    function validateTimes() {
+        const oraInizio = oraInizioInput.value;
+        const oraFine = oraFineInput.value;
+        
+        if (oraInizio && oraFine) {
+            const inizioMinutes = timeToMinutes(oraInizio);
+            const fineMinutes = timeToMinutes(oraFine);
+            
+            if (fineMinutes <= inizioMinutes) {
+                alert('L\'ora di fine deve essere successiva all\'ora di inizio');
+                oraFineInput.focus();
+                return false;
+            }
+            
+            const durata = parseInt(durataInput.value) || 30;
+            const totalMinutes = fineMinutes - inizioMinutes;
+            
+            if (totalMinutes < durata) {
+                alert(`La durata totale (${totalMinutes} min) deve essere almeno pari alla durata del slot (${durata} min)`);
+                return false;
+            }
+        }
+        
+        return true;
+    }
+    
+    // Event listeners
+    [giornoSelect, oraInizioInput, oraFineInput, durataInput, capacitaInput].forEach(element => {
+        element.addEventListener('change', updatePreview);
+        element.addEventListener('input', updatePreview);
+    });
+    
+    // Validazione del form
+    document.getElementById('slot-form').addEventListener('submit', function(e) {
+        if (!validateTimes()) {
+            e.preventDefault();
+        }
+    });
+    
+    // Auto-calcolo ora fine basato su durata
+    durataInput.addEventListener('change', function() {
+        const oraInizio = oraInizioInput.value;
+        const durata = parseInt(this.value);
+        
+        if (oraInizio && durata && !oraFineInput.value) {
+            const inizioMinutes = timeToMinutes(oraInizio);
+            const fineMinutes = inizioMinutes + durata;
+            
+            const hours = Math.floor(fineMinutes / 60);
+            const minutes = fineMinutes % 60;
+            
+            if (hours < 24) {
+                const fineTime = `${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}`;
+                oraFineInput.value = fineTime;
+                updatePreview();
+            }
+        }
+    });
+    
+    // Inizializza anteprima
+    updatePreview();
+});
+
+function duplicaSlot() {
+    if (!confirm('Confermi di voler duplicare questo slot?')) return;
+    
+    // Implementa duplicazione via AJAX
+    const currentValues = {
+        giorno_settimana: document.getElementById('{{ form.giorno_settimana.id_for_label }}').value,
+        ora_inizio: document.getElementById('{{ form.ora_inizio.id_for_label }}').value,
+        ora_fine: document.getElementById('{{ form.ora_fine.id_for_label }}').value,
+        durata_slot_minuti: document.getElementById('{{ form.durata_slot_minuti.id_for_label }}').value,
+        max_prenotazioni_per_slot: document.getElementById('{{ form.max_prenotazioni_per_slot.id_for_label }}').value,
+    };
+    
+    // Redirige alla pagina di creazione con parametri
+    const params = new URLSearchParams(currentValues);
+    window.location.href = '{% url "prenotazioni:config-slot-create" %}?' + params.toString();
+}
+</script>
+{% endblock %}

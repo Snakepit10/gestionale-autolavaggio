@@ -1,0 +1,647 @@
+{% extends 'base.html' %}
+{% load static %}
+{% load crispy_forms_tags %}
+
+{% block title %}Gestione Ordini - Gestionale Autolavaggio{% endblock %}
+
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <h1><i class="bi bi-receipt"></i> Gestione Ordini</h1>
+    <div>
+        <a href="{% url 'ordini:ordini-non-pagati' %}" class="btn btn-warning me-2">
+            <i class="bi bi-exclamation-triangle"></i> Non Pagati
+        </a>
+        <a href="{% url 'ordini:cassa' %}" class="btn btn-primary">
+            <i class="bi bi-plus-circle"></i> Nuovo Ordine
+        </a>
+    </div>
+</div>
+
+{% if messages %}
+    {% for message in messages %}
+        <div class="alert alert-{{ message.tags }} alert-dismissible fade show" role="alert">
+            {{ message }}
+            <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+        </div>
+    {% endfor %}
+{% endif %}
+
+<!-- Filtri -->
+<div class="card mb-4">
+    <div class="card-body">
+        <form method="get" class="row g-3">
+            <div class="col-md-3">
+                <label class="form-label">Stato Ordine:</label>
+                <select name="stato" class="form-select">
+                    <option value="">Tutti gli stati</option>
+                    <option value="in_attesa" {% if request.GET.stato == 'in_attesa' %}selected{% endif %}>In Attesa</option>
+                    <option value="in_lavorazione" {% if request.GET.stato == 'in_lavorazione' %}selected{% endif %}>In Lavorazione</option>
+                    <option value="completato" {% if request.GET.stato == 'completato' %}selected{% endif %}>Completato</option>
+                    <option value="annullato" {% if request.GET.stato == 'annullato' %}selected{% endif %}>Annullato</option>
+                </select>
+            </div>
+            <div class="col-md-3">
+                <label class="form-label">Data da:</label>
+                <input type="date" name="data_da" class="form-control" value="{{ request.GET.data_da }}">
+            </div>
+            <div class="col-md-3">
+                <label class="form-label">Data a:</label>
+                <input type="date" name="data_a" class="form-control" value="{{ request.GET.data_a }}">
+            </div>
+            <div class="col-md-3">
+                <label class="form-label">&nbsp;</label>
+                <div class="d-flex gap-2">
+                    <button type="submit" class="btn btn-primary">
+                        <i class="bi bi-search"></i> Filtra
+                    </button>
+                    <a href="{% url 'ordini:ordini-list' %}" class="btn btn-outline-secondary">
+                        <i class="bi bi-arrow-clockwise"></i>
+                    </a>
+                </div>
+            </div>
+        </form>
+    </div>
+</div>
+
+<!-- Statistiche rapide -->
+<div class="row mb-4">
+    <div class="col-md-3">
+        <div class="card bg-primary text-white">
+            <div class="card-body text-center">
+                <i class="bi bi-receipt display-6"></i>
+                <h4>{{ ordini.count }}</h4>
+                <small>Ordini Totali</small>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-3">
+        <div class="card bg-warning text-white">
+            <div class="card-body text-center">
+                <i class="bi bi-clock display-6"></i>
+                <h4>{{ ordini_in_lavorazione|default:0 }}</h4>
+                <small>In Lavorazione</small>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-3">
+        <div class="card bg-success text-white">
+            <div class="card-body text-center">
+                <i class="bi bi-check-circle display-6"></i>
+                <h4>{{ ordini_completati|default:0 }}</h4>
+                <small>Completati</small>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-3">
+        <div class="card bg-info text-white">
+            <div class="card-body text-center">
+                <i class="bi bi-currency-euro display-6"></i>
+                <h4>€{{ fatturato_giorno|default:0|floatformat:0 }}</h4>
+                <small>Fatturato Oggi</small>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="card">
+    <div class="card-body">
+        {% if ordini %}
+            <div class="table-responsive">
+                <table class="table table-hover">
+                    <thead class="table-dark">
+                        <tr>
+                            <th>N° Ordine</th>
+                            <th>Data/Ora</th>
+                            <th>Cliente</th>
+                            <th>Servizi</th>
+                            <th>Totale</th>
+                            <th>Pagamento</th>
+                            <th>Stato</th>
+                            <th>Operatore</th>
+                            <th class="text-center">Azioni</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for ordine in ordini %}
+                        <tr data-ordine-id="{{ ordine.id }}">
+                            <td>
+                                <a href="{% url 'ordini:ordine-detail' ordine.pk %}" 
+                                   class="text-decoration-none fw-bold">
+                                    #{{ ordine.numero_progressivo }}
+                                </a>
+                                {% if ordine.origine != 'operatore' %}
+                                    <br><small class="text-muted">
+                                        <i class="bi bi-globe"></i> {{ ordine.get_origine_display }}
+                                    </small>
+                                {% endif %}
+                            </td>
+                            <td>
+                                <div>
+                                    <strong>{{ ordine.data_ora|date:"d/m/Y" }}</strong>
+                                    <br><small class="text-muted">{{ ordine.data_ora|date:"H:i" }}</small>
+                                </div>
+                            </td>
+                            <td>
+                                {% if ordine.cliente %}
+                                    <div class="d-flex align-items-center">
+                                        <i class="bi bi-person me-1"></i>
+                                        <div>
+                                            <strong>{{ ordine.cliente.nome_completo }}</strong>
+                                            <br><small class="text-muted">{{ ordine.cliente.telefono }}</small>
+                                        </div>
+                                    </div>
+                                {% else %}
+                                    <span class="text-muted">
+                                        <i class="bi bi-person-x"></i> Cliente anonimo
+                                    </span>
+                                {% endif %}
+                            </td>
+                            <td>
+                                <div class="small">
+                                    {% for item in ordine.items.all|slice:":3" %}
+                                        <div class="d-flex justify-content-between">
+                                            <span>{{ item.servizio_prodotto.titolo }}</span>
+                                            <span class="text-muted">x{{ item.quantita }}</span>
+                                        </div>
+                                    {% endfor %}
+                                    {% if ordine.items.count > 3 %}
+                                        <small class="text-muted">+{{ ordine.items.count|add:"-3" }} altri</small>
+                                    {% endif %}
+                                </div>
+                            </td>
+                            <td>
+                                <div>
+                                    {% if ordine.importo_sconto > 0 %}
+                                        <small class="text-muted text-decoration-line-through">€{{ ordine.totale }}</small><br>
+                                    {% endif %}
+                                    <strong class="h6">€{{ ordine.totale_finale }}</strong>
+                                    {% if ordine.importo_sconto > 0 %}
+                                        <br><small class="text-success">
+                                            <i class="bi bi-percent"></i> -€{{ ordine.importo_sconto }}
+                                        </small>
+                                    {% endif %}
+                                </div>
+                            </td>
+                            <td>
+                                {% if ordine.stato_pagamento == 'pagato' %}
+                                    <span class="badge bg-success">
+                                        <i class="bi bi-check-circle"></i> Pagato
+                                    </span>
+                                    {% if ordine.pagamenti.all %}
+                                        <br><small class="text-muted">
+                                            {% if ordine.pagamenti.count == 1 %}
+                                                {{ ordine.pagamenti.first.get_metodo_display }}
+                                            {% else %}
+                                                {{ ordine.pagamenti.count }} pagamenti
+                                            {% endif %}
+                                        </small>
+                                    {% endif %}
+                                {% elif ordine.stato_pagamento == 'parziale' %}
+                                    <span class="badge bg-warning">
+                                        <i class="bi bi-clock"></i> Parziale
+                                    </span>
+                                    <br><small class="text-muted">€{{ ordine.importo_pagato }}</small>
+                                    {% if ordine.pagamenti.all %}
+                                        <br><small class="text-muted">
+                                            {% if ordine.pagamenti.count == 1 %}
+                                                {{ ordine.pagamenti.first.get_metodo_display }}
+                                            {% else %}
+                                                {{ ordine.pagamenti.count }} pagamenti
+                                            {% endif %}
+                                        </small>
+                                    {% endif %}
+                                {% elif ordine.stato_pagamento == 'differito' %}
+                                    <span class="badge bg-info">
+                                        <i class="bi bi-calendar"></i> Differito
+                                    </span>
+                                    {% if ordine.data_scadenza_pagamento %}
+                                        <br><small class="text-muted">Scad: {{ ordine.data_scadenza_pagamento|date:"d/m" }}</small>
+                                    {% endif %}
+                                {% else %}
+                                    <span class="badge bg-danger">
+                                        <i class="bi bi-x-circle"></i> Non Pagato
+                                    </span>
+                                {% endif %}
+                            </td>
+                            <td class="stato-cell">
+                                {% if ordine.stato == 'in_attesa' %}
+                                    <span class="badge bg-primary">
+                                        <i class="bi bi-clock"></i> In Attesa
+                                    </span>
+                                {% elif ordine.stato == 'in_lavorazione' %}
+                                    <span class="badge bg-warning">
+                                        <i class="bi bi-clock"></i> In Lavorazione
+                                    </span>
+                                    {% if ordine.tempo_attesa_minuti %}
+                                        <br><small class="text-muted">{{ ordine.tempo_attesa_minuti }}min</small>
+                                    {% endif %}
+                                {% elif ordine.stato == 'completato' %}
+                                    <span class="badge bg-success">
+                                        <i class="bi bi-check-circle"></i> Completato
+                                    </span>
+                                {% elif ordine.stato == 'annullato' %}
+                                    <span class="badge bg-danger">
+                                        <i class="bi bi-x-circle"></i> Annullato
+                                    </span>
+                                {% endif %}
+                            </td>
+                            <td>
+                                {% if ordine.operatore %}
+                                    <small>
+                                        <i class="bi bi-person-badge"></i>
+                                        {{ ordine.operatore.username }}
+                                    </small>
+                                {% else %}
+                                    <small class="text-muted">Sistema</small>
+                                {% endif %}
+                            </td>
+                            <td class="text-center azioni-cell">
+                                <div class="btn-group" role="group">
+                                    <a href="{% url 'ordini:ordine-detail' ordine.pk %}" 
+                                       class="btn btn-sm btn-outline-primary" title="Dettagli">
+                                        <i class="bi bi-eye"></i>
+                                    </a>
+                                    {% if ordine.stato != 'completato' and ordine.stato != 'annullato' %}
+                                        <button class="btn btn-sm btn-outline-success" 
+                                                onclick="cambiaStato('{{ ordine.pk }}', 'completato')"
+                                                title="Completa">
+                                            <i class="bi bi-check"></i>
+                                        </button>
+                                    {% endif %}
+                                    {% if ordine.stato_pagamento != 'pagato' %}
+                                        <button class="btn btn-sm btn-outline-warning" 
+                                                onclick="aggiungiPagamento('{{ ordine.pk }}')"
+                                                title="Pagamento">
+                                            <i class="bi bi-credit-card"></i>
+                                        </button>
+                                    {% endif %}
+                                    <button class="btn btn-sm btn-outline-info" 
+                                            onclick="stampaOrdine('{{ ordine.pk }}')"
+                                            title="Stampa">
+                                        <i class="bi bi-printer"></i>
+                                    </button>
+                                </div>
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+            
+            <!-- Paginazione -->
+            {% if is_paginated %}
+                <nav aria-label="Paginazione ordini">
+                    <ul class="pagination justify-content-center">
+                        {% if page_obj.has_previous %}
+                            <li class="page-item">
+                                <a class="page-link" href="?page=1{% for key, value in request.GET.items %}{% if key != 'page' %}&{{ key }}={{ value }}{% endif %}{% endfor %}">&laquo; Prima</a>
+                            </li>
+                            <li class="page-item">
+                                <a class="page-link" href="?page={{ page_obj.previous_page_number }}{% for key, value in request.GET.items %}{% if key != 'page' %}&{{ key }}={{ value }}{% endif %}{% endfor %}">Precedente</a>
+                            </li>
+                        {% endif %}
+                        
+                        <li class="page-item active">
+                            <span class="page-link">
+                                Pagina {{ page_obj.number }} di {{ page_obj.paginator.num_pages }}
+                            </span>
+                        </li>
+                        
+                        {% if page_obj.has_next %}
+                            <li class="page-item">
+                                <a class="page-link" href="?page={{ page_obj.next_page_number }}{% for key, value in request.GET.items %}{% if key != 'page' %}&{{ key }}={{ value }}{% endif %}{% endfor %}">Successiva</a>
+                            </li>
+                            <li class="page-item">
+                                <a class="page-link" href="?page={{ page_obj.paginator.num_pages }}{% for key, value in request.GET.items %}{% if key != 'page' %}&{{ key }}={{ value }}{% endif %}{% endfor %}">Ultima &raquo;</a>
+                            </li>
+                        {% endif %}
+                    </ul>
+                </nav>
+            {% endif %}
+        {% else %}
+            <div class="text-center py-5">
+                <i class="bi bi-receipt display-1 text-muted"></i>
+                <h3 class="text-muted mt-3">Nessun Ordine</h3>
+                <p class="text-muted">Non ci sono ancora ordini che corrispondono ai filtri selezionati.</p>
+                <a href="{% url 'ordini:cassa' %}" class="btn btn-primary">
+                    <i class="bi bi-plus-circle"></i> Crea il Primo Ordine
+                </a>
+            </div>
+        {% endif %}
+    </div>
+</div>
+
+<!-- Modal Pagamento Veloce -->
+<div class="modal fade" id="modalPagamento" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">
+                    <i class="bi bi-credit-card"></i>
+                    Registra Pagamento
+                </h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <form id="form-pagamento">
+                <div class="modal-body">
+                    {% csrf_token %}
+                    <input type="hidden" id="ordine-id">
+                    
+                    <div class="alert alert-info">
+                        Ordine: <strong id="ordine-numero"></strong><br>
+                        Totale: <strong id="ordine-totale"></strong><br>
+                        Già pagato: <strong id="ordine-pagato"></strong><br>
+                        <hr class="my-2">
+                        <strong>Da pagare: <span id="ordine-residuo"></span></strong>
+                    </div>
+                    
+                    <div class="mb-3">
+                        <label class="form-label">Importo Pagamento:</label>
+                        <input type="number" class="form-control" id="importo-pagamento" 
+                               step="0.01" min="0" required>
+                    </div>
+                    
+                    <div class="mb-3">
+                        <label class="form-label">Metodo Pagamento:</label>
+                        <select class="form-select" id="metodo-pagamento-modal" required>
+                            <option value="">Seleziona metodo</option>
+                            <option value="contanti">Contanti</option>
+                            <option value="carta">Carta di Credito/Debito</option>
+                            <option value="bancomat">Bancomat</option>
+                            <option value="bonifico">Bonifico</option>
+                            <option value="assegno">Assegno</option>
+                            <option value="abbonamento">Abbonamento</option>
+                        </select>
+                    </div>
+                    
+                    <div class="mb-3">
+                        <label class="form-label">Note:</label>
+                        <textarea class="form-control" id="note-pagamento" rows="2"></textarea>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">
+                        <i class="bi bi-x-circle"></i> Annulla
+                    </button>
+                    <button type="submit" class="btn btn-success">
+                        <i class="bi bi-check-circle"></i> Registra Pagamento
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<script>
+function cambiaStato(ordineId, nuovoStato) {
+    if (!confirm(`Confermi il cambio stato a "${nuovoStato}"?`)) return;
+    
+    fetch(`{% url 'ordini:cambia-stato' 0 %}`.replace('0', ordineId), {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+            'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]').value
+        },
+        body: JSON.stringify({ stato: nuovoStato })
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            location.reload();
+        } else {
+            alert('Errore: ' + data.error);
+        }
+    })
+    .catch(error => {
+        console.error('Errore:', error);
+        alert('Errore durante il cambio stato');
+    });
+}
+
+function aggiungiPagamento(ordineId) {
+    // Recupera dati ordine
+    fetch(`{% url 'ordini:dettaglio-json' 0 %}`.replace('0', ordineId))
+        .then(response => response.json())
+        .then(data => {
+            document.getElementById('ordine-id').value = ordineId;
+            document.getElementById('ordine-numero').textContent = `#${data.numero_progressivo}`;
+            document.getElementById('ordine-totale').textContent = `€${data.totale_finale.toFixed(2)}`;
+            document.getElementById('ordine-pagato').textContent = `€${data.importo_pagato.toFixed(2)}`;
+            document.getElementById('ordine-residuo').textContent = `€${data.saldo_dovuto.toFixed(2)}`;
+            document.getElementById('importo-pagamento').value = data.saldo_dovuto.toFixed(2);
+            
+            const modal = new bootstrap.Modal(document.getElementById('modalPagamento'));
+            modal.show();
+        })
+        .catch(error => {
+            console.error('Errore nel caricamento dati ordine:', error);
+            alert('Errore nel caricamento dati ordine');
+        });
+}
+
+function stampaOrdine(ordineId) {
+    window.open(`{% url 'ordini:stampa-ordine' 0 %}`.replace('0', ordineId), '_blank');
+}
+
+// Gestione form pagamento
+document.getElementById('form-pagamento').addEventListener('submit', function(e) {
+    e.preventDefault();
+    
+    const ordineId = document.getElementById('ordine-id').value;
+    const importo = document.getElementById('importo-pagamento').value;
+    const metodo = document.getElementById('metodo-pagamento-modal').value;
+    const note = document.getElementById('note-pagamento').value;
+    
+    fetch(`{% url 'ordini:registra-pagamento' 0 %}`.replace('0', ordineId), {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+            'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]').value
+        },
+        body: JSON.stringify({
+            importo: importo,
+            metodo_pagamento: metodo,
+            note: note
+        })
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            bootstrap.Modal.getInstance(document.getElementById('modalPagamento')).hide();
+            
+            // Reset form
+            document.getElementById('form-pagamento').reset();
+            
+            // Mostra messaggio di successo
+            const alertDiv = document.createElement('div');
+            alertDiv.className = 'alert alert-success alert-dismissible fade show';
+            alertDiv.innerHTML = `
+                <i class="bi bi-check-circle"></i> ${data.message}
+                ${data.ordine_completamente_pagato ? '<br><strong>Ordine completamente saldato!</strong>' : ''}
+                <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+            `;
+            document.querySelector('.d-flex.justify-content-between').insertAdjacentElement('afterend', alertDiv);
+            
+            // Ricarica la pagina dopo 2 secondi
+            setTimeout(() => {
+                location.reload();
+            }, 2000);
+        } else {
+            alert('Errore: ' + data.error);
+        }
+    })
+    .catch(error => {
+        console.error('Errore:', error);
+        alert('Errore durante la registrazione del pagamento');
+    });
+});
+
+// WebSocket per aggiornamenti real-time
+let webSocket = null;
+
+function inizializzaWebSocket() {
+    const wsProtocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+    const wsUrl = `${wsProtocol}//${window.location.host}/ws/ordini/`;
+    
+    try {
+        webSocket = new WebSocket(wsUrl);
+        
+        webSocket.onopen = function() {
+            console.log('WebSocket connesso per lista ordini');
+        };
+        
+        webSocket.onmessage = function(event) {
+            const data = JSON.parse(event.data);
+            handleWebSocketMessage(data);
+        };
+        
+        webSocket.onclose = function() {
+            console.log('WebSocket disconnesso, tentativo riconnessione...');
+            setTimeout(inizializzaWebSocket, 3000);
+        };
+        
+        webSocket.onerror = function(error) {
+            console.error('Errore WebSocket:', error);
+        };
+    } catch (error) {
+        console.warn('WebSocket non supportato, uso auto-refresh');
+        webSocket = null;
+        // Fallback: Auto-refresh ogni 30 secondi per ordini in lavorazione
+        if (document.querySelector('.badge.bg-warning')) {
+            setInterval(() => {
+                location.reload();
+            }, 30000);
+        }
+    }
+}
+
+function handleWebSocketMessage(data) {
+    switch (data.type) {
+        case 'order_status_update':
+            console.log(`Ordine ${data.numero_progressivo} cambiato da ${data.vecchio_stato} a ${data.nuovo_stato}`);
+            aggiornaStatoOrdineInLista(data);
+            break;
+            
+        case 'nuovo_ordine':
+            console.log('Nuovo ordine ricevuto, ricarico la pagina');
+            location.reload();
+            break;
+            
+        default:
+            console.log('Messaggio WebSocket non gestito:', data);
+    }
+}
+
+function aggiornaStatoOrdineInLista(data) {
+    // Trova la riga dell'ordine nella tabella
+    const ordineRow = document.querySelector(`tr[data-ordine-id="${data.ordine_id}"]`);
+    if (!ordineRow) {
+        console.log(`Riga ordine ${data.ordine_id} non trovata`);
+        return;
+    }
+    
+    // Aggiorna la colonna stato
+    const statoCell = ordineRow.querySelector('.stato-cell');
+    if (statoCell) {
+        let badgeClass = '';
+        let iconClass = '';
+        
+        switch (data.nuovo_stato) {
+            case 'in_attesa':
+                badgeClass = 'bg-primary';
+                iconClass = 'bi-clock';
+                break;
+            case 'in_lavorazione':
+                badgeClass = 'bg-warning';
+                iconClass = 'bi-clock';
+                break;
+            case 'completato':
+                badgeClass = 'bg-success';
+                iconClass = 'bi-check-circle';
+                break;
+            case 'annullato':
+                badgeClass = 'bg-danger';
+                iconClass = 'bi-x-circle';
+                break;
+        }
+        
+        statoCell.innerHTML = `
+            <span class="badge ${badgeClass}">
+                <i class="${iconClass}"></i> ${data.stato_display}
+            </span>
+        `;
+    }
+    
+    // Aggiorna i bottoni di azione se necessario
+    const azioniCell = ordineRow.querySelector('.azioni-cell');
+    if (azioniCell) {
+        aggiornaBottoniAzione(azioniCell, data.ordine_id, data.nuovo_stato);
+    }
+    
+    // Mostra notifica
+    const alertDiv = document.createElement('div');
+    alertDiv.className = 'alert alert-info alert-dismissible fade show';
+    alertDiv.innerHTML = `
+        <i class="bi bi-info-circle"></i> Ordine #${data.numero_progressivo} aggiornato a: ${data.stato_display}
+        <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+    `;
+    
+    // Inserisce l'alert dopo il titolo
+    const titleDiv = document.querySelector('.d-flex.justify-content-between');
+    titleDiv.insertAdjacentElement('afterend', alertDiv);
+    
+    // Rimuove l'alert dopo 5 secondi
+    setTimeout(() => {
+        alertDiv.remove();
+    }, 5000);
+}
+
+function aggiornaBottoniAzione(azioniCell, ordineId, nuovoStato) {
+    const btnGroup = azioniCell.querySelector('.btn-group');
+    if (!btnGroup) return;
+    
+    // Rimuovi bottone "Completa" se l'ordine è completato o annullato
+    const completaBtn = btnGroup.querySelector('[title="Completa"]');
+    if (completaBtn && (nuovoStato === 'completato' || nuovoStato === 'annullato')) {
+        completaBtn.remove();
+    }
+    
+    // Aggiorna il bottone se necessario
+    if (nuovoStato === 'completato' || nuovoStato === 'annullato') {
+        btnGroup.classList.add('opacity-50');
+    }
+}
+
+// Inizializza WebSocket quando la pagina è caricata
+document.addEventListener('DOMContentLoaded', function() {
+    inizializzaWebSocket();
+});
+
+// Cleanup quando si chiude la pagina
+window.addEventListener('beforeunload', function() {
+    if (webSocket) {
+        webSocket.close();
+    }
+});
+</script>
+{% endblock %}

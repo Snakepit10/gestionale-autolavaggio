@@ -1,0 +1,127 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Offline - Gestionale Autolavaggio</title>
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            margin: 0;
+            padding: 0;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            text-align: center;
+        }
+        
+        .offline-container {
+            max-width: 400px;
+            padding: 2rem;
+        }
+        
+        .offline-icon {
+            font-size: 4rem;
+            margin-bottom: 1rem;
+            opacity: 0.8;
+        }
+        
+        .offline-title {
+            font-size: 1.5rem;
+            font-weight: 600;
+            margin-bottom: 1rem;
+        }
+        
+        .offline-message {
+            font-size: 1rem;
+            opacity: 0.9;
+            line-height: 1.5;
+            margin-bottom: 2rem;
+        }
+        
+        .retry-btn {
+            background: rgba(255, 255, 255, 0.2);
+            border: 1px solid rgba(255, 255, 255, 0.3);
+            color: white;
+            padding: 0.75rem 1.5rem;
+            border-radius: 25px;
+            font-size: 1rem;
+            cursor: pointer;
+            transition: all 0.3s ease;
+        }
+        
+        .retry-btn:hover {
+            background: rgba(255, 255, 255, 0.3);
+            transform: translateY(-2px);
+        }
+        
+        .offline-info {
+            margin-top: 2rem;
+            font-size: 0.875rem;
+            opacity: 0.7;
+        }
+        
+        @keyframes pulse {
+            0%, 100% { opacity: 0.8; }
+            50% { opacity: 1; }
+        }
+        
+        .pulse {
+            animation: pulse 2s infinite;
+        }
+    </style>
+</head>
+<body>
+    <div class="offline-container">
+        <div class="offline-icon pulse">📶</div>
+        <h1 class="offline-title">Sei Offline</h1>
+        <p class="offline-message">
+            Non riesco a connettermi al server. 
+            Controlla la tua connessione internet e riprova.
+        </p>
+        <button class="retry-btn" onclick="window.location.reload()">
+            Riprova
+        </button>
+        <div class="offline-info">
+            <p>
+                <strong>Modalità Offline Attiva</strong><br>
+                Le funzioni basic del POS sono disponibili offline.
+                I dati verranno sincronizzati quando tornerai online.
+            </p>
+        </div>
+    </div>
+    
+    <script>
+        // Rileva quando la connessione torna online
+        window.addEventListener('online', function() {
+            // Ricarica automaticamente la pagina quando torna online
+            setTimeout(() => {
+                window.location.reload();
+            }, 1000);
+        });
+        
+        // Aggiorna il messaggio se offline
+        window.addEventListener('offline', function() {
+            document.querySelector('.offline-message').innerHTML = 
+                'Connessione persa. Le modifiche verranno salvate localmente e sincronizzate quando tornerai online.';
+        });
+        
+        // Mostra stato connessione
+        function updateConnectionStatus() {
+            const isOnline = navigator.onLine;
+            const message = document.querySelector('.offline-message');
+            
+            if (isOnline) {
+                message.innerHTML = 'Connessione ripristinata! Ricaricamento in corso...';
+                setTimeout(() => window.location.reload(), 1500);
+            }
+        }
+        
+        // Controlla periodicamente la connessione
+        setInterval(updateConnectionStatus, 3000);
+    </script>
+</body>
+</html>

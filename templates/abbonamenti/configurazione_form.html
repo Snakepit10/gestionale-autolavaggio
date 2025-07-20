@@ -1,0 +1,752 @@
+{% extends 'base.html' %}
+{% load static %}
+{% load crispy_forms_tags %}
+
+{% block title %}
+    {% if form.instance.pk %}
+        Modifica Configurazione - Gestionale Autolavaggio
+    {% else %}
+        Nuova Configurazione - Gestionale Autolavaggio
+    {% endif %}
+{% endblock %}
+
+{% block extra_css %}
+<style>
+.step-preview {
+    background: #f8f9fa;
+    border-radius: 10px;
+    padding: 20px;
+    margin-bottom: 20px;
+}
+
+.service-item {
+    background: white;
+    border: 1px solid #dee2e6;
+    border-radius: 8px;
+    padding: 15px;
+    margin-bottom: 10px;
+    transition: all 0.3s ease;
+}
+
+.service-item:hover {
+    box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+}
+
+.service-item.selected {
+    border-color: #0d6efd;
+    background-color: #f8f9ff;
+}
+
+.quantity-controls {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+
+.quantity-controls button {
+    width: 30px;
+    height: 30px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 0;
+}
+
+.price-preview {
+    background: linear-gradient(135deg, #0d6efd, #6610f2);
+    color: white;
+    border-radius: 15px;
+    padding: 20px;
+    text-align: center;
+}
+
+.duration-selector .btn {
+    margin: 5px;
+}
+
+.targa-mode-card {
+    cursor: pointer;
+    transition: all 0.3s ease;
+    height: 100%;
+}
+
+.targa-mode-card:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+}
+
+.targa-mode-card.selected {
+    border-color: #0d6efd;
+    background-color: #f8f9ff;
+}
+
+.terms-preview {
+    max-height: 300px;
+    overflow-y: auto;
+    background: #f8f9fa;
+    border-radius: 8px;
+    padding: 15px;
+    font-size: 0.9em;
+}
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="row">
+    <div class="col-lg-8">
+        <div class="d-flex justify-content-between align-items-center mb-4">
+            <h1>
+                <i class="bi bi-gear"></i>
+                {% if form.instance.pk %}
+                    Modifica Configurazione Abbonamento
+                {% else %}
+                    Nuova Configurazione Abbonamento
+                {% endif %}
+            </h1>
+            <div>
+                <a href="{% url 'abbonamenti:config-abbonamento-wizard' %}" class="btn btn-outline-info me-2">
+                    <i class="bi bi-magic"></i> Usa Wizard
+                </a>
+                <a href="{% url 'abbonamenti:config-abbonamenti-list' %}" class="btn btn-outline-secondary">
+                    <i class="bi bi-arrow-left"></i> Torna alla Lista
+                </a>
+            </div>
+        </div>
+
+        {% if messages %}
+            {% for message in messages %}
+                <div class="alert alert-{{ message.tags }} alert-dismissible fade show" role="alert">
+                    {{ message }}
+                    <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+                </div>
+            {% endfor %}
+        {% endif %}
+
+        <form method="post" id="configurazione-form">
+            {% csrf_token %}
+            
+            <!-- Informazioni di Base -->
+            <div class="card mb-4">
+                <div class="card-header">
+                    <h5 class="mb-0">
+                        <i class="bi bi-info-circle"></i>
+                        Informazioni di Base
+                    </h5>
+                </div>
+                <div class="card-body">
+                    <div class="row">
+                        <div class="col-md-6">
+                            {{ form.titolo|as_crispy_field }}
+                        </div>
+                        <div class="col-md-6">
+                            <div class="mb-3">
+                                <label class="form-label">Prezzo (€)</label>
+                                <div class="input-group">
+                                    <span class="input-group-text">€</span>
+                                    {{ form.prezzo }}
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="row">
+                        <div class="col-12">
+                            {{ form.descrizione|as_crispy_field }}
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Durata e Validità -->
+            <div class="card mb-4">
+                <div class="card-header">
+                    <h5 class="mb-0">
+                        <i class="bi bi-calendar"></i>
+                        Durata e Validità
+                    </h5>
+                </div>
+                <div class="card-body">
+                    <div class="row">
+                        <div class="col-md-6">
+                            <label class="form-label">Durata Abbonamento:</label>
+                            <div class="duration-selector">
+                                {% for value, label in form.durata.field.choices %}
+                                    <input type="radio" class="btn-check" name="durata" id="durata-{{ value }}" 
+                                           value="{{ value }}" {% if form.durata.value == value %}checked{% endif %}>
+                                    <label class="btn btn-outline-primary" for="durata-{{ value }}">
+                                        {{ label }}
+                                    </label>
+                                {% endfor %}
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            {{ form.periodicita_reset|as_crispy_field }}
+                        </div>
+                    </div>
+                    <div class="row mt-3">
+                        <div class="col-md-6">
+                            <div class="form-check">
+                                {{ form.rinnovo_automatico }}
+                                <label class="form-check-label" for="{{ form.rinnovo_automatico.id_for_label }}">
+                                    Rinnovo Automatico
+                                </label>
+                                <div class="form-text">Il sistema rinnoverà automaticamente l'abbonamento alla scadenza</div>
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            {{ form.giorni_preavviso_scadenza|as_crispy_field }}
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Modalità Targa -->
+            <div class="card mb-4">
+                <div class="card-header">
+                    <h5 class="mb-0">
+                        <i class="bi bi-car-front"></i>
+                        Modalità Targa
+                    </h5>
+                </div>
+                <div class="card-body">
+                    <div class="row">
+                        <div class="col-md-4">
+                            <div class="card targa-mode-card" onclick="selectTargaMode('fissa')">
+                                <div class="card-body text-center">
+                                    <i class="bi bi-lock display-6 text-warning"></i>
+                                    <h6 class="mt-2">Targa Fissa</h6>
+                                    <p class="small text-muted">Il cliente deve registrare le targhe autorizzate</p>
+                                    <input type="radio" name="modalita_targa" value="fissa" id="targa-fissa" 
+                                           {% if form.modalita_targa.value == 'fissa' %}checked{% endif %} style="display: none;">
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-md-4">
+                            <div class="card targa-mode-card" onclick="selectTargaMode('variabile')">
+                                <div class="card-body text-center">
+                                    <i class="bi bi-arrow-repeat display-6 text-info"></i>
+                                    <h6 class="mt-2">Targa Variabile</h6>
+                                    <p class="small text-muted">Il cliente può cambiare targa ma una alla volta</p>
+                                    <input type="radio" name="modalita_targa" value="variabile" id="targa-variabile" 
+                                           {% if form.modalita_targa.value == 'variabile' %}checked{% endif %} style="display: none;">
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-md-4">
+                            <div class="card targa-mode-card" onclick="selectTargaMode('libera')">
+                                <div class="card-body text-center">
+                                    <i class="bi bi-unlock display-6 text-success"></i>
+                                    <h6 class="mt-2">Targa Libera</h6>
+                                    <p class="small text-muted">Qualsiasi targa può utilizzare l'abbonamento</p>
+                                    <input type="radio" name="modalita_targa" value="libera" id="targa-libera" 
+                                           {% if form.modalita_targa.value == 'libera' %}checked{% endif %} style="display: none;">
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div id="numero-targhe-container" class="mt-3" style="display: none;">
+                        <div class="row">
+                            <div class="col-md-6">
+                                {{ form.numero_massimo_targhe|as_crispy_field }}
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Servizi Inclusi -->
+            <div class="card mb-4">
+                <div class="card-header d-flex justify-content-between align-items-center">
+                    <h5 class="mb-0">
+                        <i class="bi bi-list-check"></i>
+                        Servizi Inclusi
+                    </h5>
+                    <button type="button" class="btn btn-sm btn-outline-primary" onclick="aggiungiTuttiServizi()">
+                        <i class="bi bi-plus-circle"></i> Aggiungi Tutti
+                    </button>
+                </div>
+                <div class="card-body">
+                    <div id="servizi-container">
+                        <!-- Servizi disponibili caricheranno via JavaScript -->
+                    </div>
+                    <div class="text-center" id="nessun-servizio" style="display: none;">
+                        <i class="bi bi-inbox display-6 text-muted"></i>
+                        <h6 class="text-muted mt-2">Nessun servizio selezionato</h6>
+                        <p class="text-muted">Aggiungi i servizi che saranno inclusi in questo abbonamento</p>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Stato -->
+            <div class="card mb-4">
+                <div class="card-header">
+                    <h5 class="mb-0">
+                        <i class="bi bi-toggle-on"></i>
+                        Stato e Visibilità
+                    </h5>
+                </div>
+                <div class="card-body">
+                    <div class="row">
+                        <div class="col-md-6">
+                            <div class="form-check form-switch">
+                                {{ form.attiva }}
+                                <label class="form-check-label" for="{{ form.attiva.id_for_label }}">
+                                    Configurazione Attiva
+                                </label>
+                                <div class="form-text">Se disattivata, non sarà possibile vendere nuovi abbonamenti di questo tipo</div>
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="form-check form-switch">
+                                {{ form.visibile_online }}
+                                <label class="form-check-label" for="{{ form.visibile_online.id_for_label }}">
+                                    Visibile Online
+                                </label>
+                                <div class="form-text">Se abilitata, la configurazione sarà visibile sul sito web</div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Pulsanti di Azione -->
+            <div class="d-flex justify-content-between">
+                <div>
+                    {% if form.instance.pk %}
+                        <button type="button" class="btn btn-outline-danger" onclick="eliminaConfigurazione()">
+                            <i class="bi bi-trash"></i> Elimina Configurazione
+                        </button>
+                    {% endif %}
+                </div>
+                <div>
+                    <a href="{% url 'abbonamenti:config-abbonamenti-list' %}" class="btn btn-secondary me-2">
+                        <i class="bi bi-x-circle"></i> Annulla
+                    </a>
+                    <button type="button" class="btn btn-outline-info me-2" onclick="anteprima()">
+                        <i class="bi bi-eye"></i> Anteprima
+                    </button>
+                    <button type="submit" class="btn btn-primary">
+                        <i class="bi bi-check-circle"></i>
+                        {% if form.instance.pk %}Aggiorna{% else %}Crea{% endif %} Configurazione
+                    </button>
+                </div>
+            </div>
+        </form>
+    </div>
+
+    <!-- Sidebar con Preview -->
+    <div class="col-lg-4">
+        <div class="card sticky-top" style="top: 20px;">
+            <div class="card-header">
+                <h6 class="mb-0">
+                    <i class="bi bi-eye"></i>
+                    Anteprima Configurazione
+                </h6>
+            </div>
+            <div class="card-body">
+                <div id="preview-container">
+                    <div class="price-preview mb-3">
+                        <h4 id="preview-titolo">Inserisci titolo</h4>
+                        <h2 id="preview-prezzo">€0.00</h2>
+                        <small id="preview-durata">Durata da selezionare</small>
+                    </div>
+                    
+                    <div id="preview-descrizione" class="mb-3 text-muted">
+                        Aggiungi una descrizione...
+                    </div>
+                    
+                    <div id="preview-targa" class="mb-3">
+                        <h6>Modalità Targa:</h6>
+                        <span class="badge bg-secondary">Da selezionare</span>
+                    </div>
+                    
+                    <div id="preview-servizi" class="mb-3">
+                        <h6>Servizi Inclusi:</h6>
+                        <div id="servizi-list">
+                            <small class="text-muted">Nessun servizio selezionato</small>
+                        </div>
+                    </div>
+                    
+                    <div id="preview-termini" class="mb-3">
+                        <h6>Termini:</h6>
+                        <ul class="small">
+                            <li id="rinnovo-info">Rinnovo: Da configurare</li>
+                            <li id="preavviso-info">Preavviso: 7 giorni</li>
+                        </ul>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Modal Anteprima -->
+<div class="modal fade" id="modalAnteprima" tabindex="-1">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">
+                    <i class="bi bi-eye"></i>
+                    Anteprima Configurazione
+                </h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <div id="anteprima-completa">
+                    <!-- Contenuto generato via JavaScript -->
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">
+                    <i class="bi bi-x-circle"></i> Chiudi
+                </button>
+                <button type="button" class="btn btn-primary" onclick="salvaEContinua()">
+                    <i class="bi bi-check-circle"></i> Salva e Continua
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+let serviziDisponibili = [];
+let serviziSelezionati = new Map();
+
+// Carica servizi disponibili
+document.addEventListener('DOMContentLoaded', function() {
+    caricaServizi();
+    aggiornaPreview();
+    setupEventListeners();
+    updateTargaModeVisibility();
+});
+
+function caricaServizi() {
+    fetch('/core/api/servizi/')
+        .then(response => response.json())
+        .then(data => {
+            serviziDisponibili = data.servizi;
+            renderServizi();
+        });
+}
+
+function renderServizi() {
+    const container = document.getElementById('servizi-container');
+    const nessunServizio = document.getElementById('nessun-servizio');
+    
+    if (serviziSelezionati.size === 0) {
+        container.style.display = 'none';
+        nessunServizio.style.display = 'block';
+        return;
+    }
+    
+    container.style.display = 'block';
+    nessunServizio.style.display = 'none';
+    
+    let html = '';
+    serviziSelezionati.forEach((quantita, servizioId) => {
+        const servizio = serviziDisponibili.find(s => s.id == servizioId);
+        if (servizio) {
+            html += `
+                <div class="service-item">
+                    <div class="d-flex justify-content-between align-items-center">
+                        <div>
+                            <h6 class="mb-1">${servizio.titolo}</h6>
+                            <small class="text-muted">€${servizio.prezzo}</small>
+                        </div>
+                        <div class="quantity-controls">
+                            <button type="button" class="btn btn-sm btn-outline-secondary" 
+                                    onclick="modificaQuantita(${servizioId}, -1)">
+                                <i class="bi bi-dash"></i>
+                            </button>
+                            <span class="fw-bold px-2">${quantita}</span>
+                            <button type="button" class="btn btn-sm btn-outline-secondary" 
+                                    onclick="modificaQuantita(${servizioId}, 1)">
+                                <i class="bi bi-plus"></i>
+                            </button>
+                            <button type="button" class="btn btn-sm btn-outline-danger ms-2" 
+                                    onclick="rimuoviServizio(${servizioId})">
+                                <i class="bi bi-trash"></i>
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            `;
+        }
+    });
+    
+    // Aggiungi selector per nuovi servizi
+    html += `
+        <div class="mt-3">
+            <select class="form-select" onchange="aggiungiServizio(this)">
+                <option value="">Seleziona un servizio da aggiungere...</option>
+                ${serviziDisponibili.filter(s => !serviziSelezionati.has(s.id.toString())).map(s => 
+                    `<option value="${s.id}">${s.titolo} - €${s.prezzo}</option>`
+                ).join('')}
+            </select>
+        </div>
+    `;
+    
+    container.innerHTML = html;
+}
+
+function aggiungiServizio(select) {
+    const servizioId = select.value;
+    if (servizioId) {
+        serviziSelezionati.set(servizioId, 1);
+        select.value = '';
+        renderServizi();
+        aggiornaPreview();
+    }
+}
+
+function modificaQuantita(servizioId, delta) {
+    const quantitaAttuale = serviziSelezionati.get(servizioId.toString());
+    const nuovaQuantita = quantitaAttuale + delta;
+    
+    if (nuovaQuantita <= 0) {
+        rimuoviServizio(servizioId);
+    } else {
+        serviziSelezionati.set(servizioId.toString(), nuovaQuantita);
+        renderServizi();
+        aggiornaPreview();
+    }
+}
+
+function rimuoviServizio(servizioId) {
+    serviziSelezionati.delete(servizioId.toString());
+    renderServizi();
+    aggiornaPreview();
+}
+
+function aggiungiTuttiServizi() {
+    serviziDisponibili.forEach(servizio => {
+        if (!serviziSelezionati.has(servizio.id.toString())) {
+            serviziSelezionati.set(servizio.id.toString(), 1);
+        }
+    });
+    renderServizi();
+    aggiornaPreview();
+}
+
+function selectTargaMode(mode) {
+    // Rimuovi selezione precedente
+    document.querySelectorAll('.targa-mode-card').forEach(card => {
+        card.classList.remove('selected');
+    });
+    
+    // Seleziona nuovo modo
+    document.querySelector(`input[value="${mode}"]`).checked = true;
+    document.querySelector(`input[value="${mode}"]`).closest('.targa-mode-card').classList.add('selected');
+    
+    updateTargaModeVisibility();
+    aggiornaPreview();
+}
+
+function updateTargaModeVisibility() {
+    const mode = document.querySelector('input[name="modalita_targa"]:checked')?.value;
+    const container = document.getElementById('numero-targhe-container');
+    
+    if (mode === 'fissa') {
+        container.style.display = 'block';
+    } else {
+        container.style.display = 'none';
+    }
+}
+
+function setupEventListeners() {
+    // Aggiorna preview quando cambiano i campi
+    ['titolo', 'prezzo', 'descrizione'].forEach(field => {
+        const element = document.querySelector(`[name="${field}"]`);
+        if (element) {
+            element.addEventListener('input', aggiornaPreview);
+        }
+    });
+    
+    // Durata
+    document.querySelectorAll('input[name="durata"]').forEach(radio => {
+        radio.addEventListener('change', aggiornaPreview);
+    });
+    
+    // Rinnovo automatico
+    document.querySelector('[name="rinnovo_automatico"]')?.addEventListener('change', aggiornaPreview);
+    document.querySelector('[name="giorni_preavviso_scadenza"]')?.addEventListener('input', aggiornaPreview);
+}
+
+function aggiornaPreview() {
+    // Titolo
+    const titolo = document.querySelector('[name="titolo"]').value || 'Inserisci titolo';
+    document.getElementById('preview-titolo').textContent = titolo;
+    
+    // Prezzo
+    const prezzo = document.querySelector('[name="prezzo"]').value || '0.00';
+    document.getElementById('preview-prezzo').textContent = `€${parseFloat(prezzo).toFixed(2)}`;
+    
+    // Durata
+    const durata = document.querySelector('input[name="durata"]:checked');
+    if (durata) {
+        document.getElementById('preview-durata').textContent = durata.nextElementSibling.textContent;
+    }
+    
+    // Descrizione
+    const descrizione = document.querySelector('[name="descrizione"]').value || 'Aggiungi una descrizione...';
+    document.getElementById('preview-descrizione').textContent = descrizione;
+    
+    // Modalità targa
+    const targaMode = document.querySelector('input[name="modalita_targa"]:checked');
+    const targaContainer = document.getElementById('preview-targa');
+    if (targaMode) {
+        let badgeClass = 'bg-secondary';
+        let icon = '';
+        let text = '';
+        
+        switch(targaMode.value) {
+            case 'fissa':
+                badgeClass = 'bg-warning';
+                icon = 'bi-lock';
+                text = 'Targa Fissa';
+                break;
+            case 'variabile':
+                badgeClass = 'bg-info';
+                icon = 'bi-arrow-repeat';
+                text = 'Targa Variabile';
+                break;
+            case 'libera':
+                badgeClass = 'bg-success';
+                icon = 'bi-unlock';
+                text = 'Targa Libera';
+                break;
+        }
+        
+        targaContainer.innerHTML = `
+            <h6>Modalità Targa:</h6>
+            <span class="badge ${badgeClass}">
+                <i class="bi ${icon}"></i> ${text}
+            </span>
+        `;
+    }
+    
+    // Servizi
+    const serviziList = document.getElementById('servizi-list');
+    if (serviziSelezionati.size > 0) {
+        let html = '';
+        serviziSelezionati.forEach((quantita, servizioId) => {
+            const servizio = serviziDisponibili.find(s => s.id == servizioId);
+            if (servizio) {
+                html += `
+                    <div class="d-flex justify-content-between align-items-center mb-1">
+                        <span class="badge bg-light text-dark">${servizio.titolo}</span>
+                        <small class="fw-bold">x${quantita}</small>
+                    </div>
+                `;
+            }
+        });
+        serviziList.innerHTML = html;
+    } else {
+        serviziList.innerHTML = '<small class="text-muted">Nessun servizio selezionato</small>';
+    }
+    
+    // Termini
+    const rinnovoAuto = document.querySelector('[name="rinnovo_automatico"]').checked;
+    const preavviso = document.querySelector('[name="giorni_preavviso_scadenza"]').value || '7';
+    
+    document.getElementById('rinnovo-info').textContent = 
+        `Rinnovo: ${rinnovoAuto ? 'Automatico' : 'Manuale'}`;
+    document.getElementById('preavviso-info').textContent = 
+        `Preavviso: ${preavviso} giorni`;
+}
+
+function anteprima() {
+    const modal = new bootstrap.Modal(document.getElementById('modalAnteprima'));
+    
+    // Genera anteprima completa
+    const anteprimaContainer = document.getElementById('anteprima-completa');
+    anteprimaContainer.innerHTML = `
+        <div class="row">
+            <div class="col-md-8">
+                <h4>${document.querySelector('[name="titolo"]').value || 'Configurazione Abbonamento'}</h4>
+                <p class="text-muted">${document.querySelector('[name="descrizione"]').value || 'Nessuna descrizione'}</p>
+                
+                <h6>Dettagli:</h6>
+                <ul>
+                    <li>Prezzo: €${document.querySelector('[name="prezzo"]').value || '0.00'}</li>
+                    <li>Durata: ${document.querySelector('input[name="durata"]:checked')?.nextElementSibling?.textContent || 'Non selezionata'}</li>
+                    <li>Modalità Targa: ${document.querySelector('input[name="modalita_targa"]:checked')?.nextElementSibling?.closest('.card-body')?.querySelector('h6')?.textContent || 'Non selezionata'}</li>
+                    <li>Rinnovo: ${document.querySelector('[name="rinnovo_automatico"]').checked ? 'Automatico' : 'Manuale'}</li>
+                </ul>
+                
+                <h6>Servizi Inclusi:</h6>
+                <div id="anteprima-servizi"></div>
+            </div>
+            <div class="col-md-4">
+                <div class="card bg-primary text-white">
+                    <div class="card-body text-center">
+                        <h2>€${document.querySelector('[name="prezzo"]').value || '0.00'}</h2>
+                        <p class="mb-0">${document.querySelector('input[name="durata"]:checked')?.nextElementSibling?.textContent || 'Durata'}</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    `;
+    
+    modal.show();
+}
+
+function eliminaConfigurazione() {
+    if (!confirm('Sei sicuro di voler eliminare questa configurazione? Questa azione non può essere annullata.')) {
+        return;
+    }
+    
+    const form = document.createElement('form');
+    form.method = 'POST';
+    form.action = '{% if form.instance.pk %}{% url "abbonamenti:config-abbonamento-delete" form.instance.pk %}{% endif %}';
+    
+    const csrfToken = document.createElement('input');
+    csrfToken.type = 'hidden';
+    csrfToken.name = 'csrfmiddlewaretoken';
+    csrfToken.value = document.querySelector('[name=csrfmiddlewaretoken]').value;
+    
+    form.appendChild(csrfToken);
+    document.body.appendChild(form);
+    form.submit();
+}
+
+function salvaEContinua() {
+    // Aggiungi servizi selezionati al form
+    const form = document.getElementById('configurazione-form');
+    
+    // Rimuovi input nascosti precedenti
+    form.querySelectorAll('input[name^="servizi_"]').forEach(input => input.remove());
+    
+    // Aggiungi servizi correnti
+    let index = 0;
+    serviziSelezionati.forEach((quantita, servizioId) => {
+        const servizioInput = document.createElement('input');
+        servizioInput.type = 'hidden';
+        servizioInput.name = `servizi_${index}_servizio`;
+        servizioInput.value = servizioId;
+        form.appendChild(servizioInput);
+        
+        const quantitaInput = document.createElement('input');
+        quantitaInput.type = 'hidden';
+        quantitaInput.name = `servizi_${index}_quantita`;
+        quantitaInput.value = quantita;
+        form.appendChild(quantitaInput);
+        
+        index++;
+    });
+    
+    // Chiudi modal e submit
+    bootstrap.Modal.getInstance(document.getElementById('modalAnteprima')).hide();
+    form.submit();
+}
+
+// Inizializza le modalità targa al caricamento
+document.addEventListener('DOMContentLoaded', function() {
+    const selectedTarga = document.querySelector('input[name="modalita_targa"]:checked');
+    if (selectedTarga) {
+        selectedTarga.closest('.targa-mode-card').classList.add('selected');
+    }
+});
+</script>
+{% endblock %}

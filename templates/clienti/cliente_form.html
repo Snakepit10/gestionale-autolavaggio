@@ -1,0 +1,227 @@
+{% extends 'base.html' %}
+{% load static %}
+{% load crispy_forms_tags %}
+
+{% block title %}
+    {% if form.instance.pk %}Modifica Cliente{% else %}Nuovo Cliente{% endif %} - Gestionale Autolavaggio
+{% endblock %}
+
+{% block content %}
+<div class="row justify-content-center">
+    <div class="col-lg-10">
+        <div class="card">
+            <div class="card-header d-flex justify-content-between align-items-center">
+                <h4 class="mb-0">
+                    <i class="bi bi-person-plus"></i>
+                    {% if form.instance.pk %}
+                        Modifica Cliente: {{ form.instance.nome_completo }}
+                    {% else %}
+                        Nuovo Cliente
+                    {% endif %}
+                </h4>
+                <a href="{% url 'clienti:clienti-list' %}" class="btn btn-outline-secondary">
+                    <i class="bi bi-arrow-left"></i> Torna alla Lista
+                </a>
+            </div>
+            <div class="card-body">
+                <form method="post">
+                    {% csrf_token %}
+                    
+                    <!-- Informazioni Base -->
+                    <div class="row mb-4">
+                        <div class="col-12">
+                            <h5 class="border-bottom pb-2 mb-3">Informazioni Base</h5>
+                        </div>
+                        <div class="col-md-6">
+                            {{ form.tipo|as_crispy_field }}
+                            {{ form.email|as_crispy_field }}
+                            {{ form.telefono|as_crispy_field }}
+                        </div>
+                        <div class="col-md-6">
+                            {{ form.indirizzo|as_crispy_field }}
+                            <div class="row">
+                                <div class="col-md-4">
+                                    {{ form.cap|as_crispy_field }}
+                                </div>
+                                <div class="col-md-8">
+                                    {{ form.citta|as_crispy_field }}
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Dati Specifici -->
+                    <div class="row mb-4">
+                        <!-- Dati Privato -->
+                        <div class="col-md-6" id="dati-privato">
+                            <h5 class="border-bottom pb-2 mb-3" id="dati-privato-title">
+                                <i class="bi bi-person"></i> Dati Privato
+                            </h5>
+                            {{ form.nome|as_crispy_field }}
+                            {{ form.cognome|as_crispy_field }}
+                            {{ form.codice_fiscale|as_crispy_field }}
+                        </div>
+                        
+                        <!-- Dati Azienda -->
+                        <div class="col-md-6" id="dati-azienda">
+                            <h5 class="border-bottom pb-2 mb-3" id="dati-azienda-title">
+                                <i class="bi bi-building"></i> Dati Azienda
+                            </h5>
+                            {{ form.ragione_sociale|as_crispy_field }}
+                            {{ form.partita_iva|as_crispy_field }}
+                            {{ form.codice_sdi|as_crispy_field }}
+                            {{ form.pec|as_crispy_field }}
+                        </div>
+                    </div>
+
+                    <!-- Opzioni Account -->
+                    <div class="row mb-4">
+                        <div class="col-12">
+                            <h5 class="border-bottom pb-2 mb-3">Opzioni Account</h5>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="form-check form-switch">
+                                {{ form.consenso_marketing }}
+                                <label class="form-check-label" for="{{ form.consenso_marketing.id_for_label }}">
+                                    <i class="bi bi-envelope"></i> Consenso Marketing
+                                </label>
+                                <div class="form-text">Acconsente a ricevere comunicazioni promozionali</div>
+                            </div>
+                        </div>
+                        {% if not form.instance.pk %}
+                        <div class="col-md-6">
+                            <div class="form-check form-switch">
+                                {{ form.crea_account_online }}
+                                <label class="form-check-label" for="{{ form.crea_account_online.id_for_label }}">
+                                    <i class="bi bi-person-check"></i> Crea Account Online
+                                </label>
+                                <div class="form-text">Crea automaticamente l'account per l'area clienti</div>
+                            </div>
+                        </div>
+                        {% endif %}
+                    </div>
+                    
+                    <div class="d-flex justify-content-between">
+                        <a href="{% url 'clienti:clienti-list' %}" class="btn btn-secondary">
+                            <i class="bi bi-x-circle"></i> Annulla
+                        </a>
+                        <button type="submit" class="btn btn-primary">
+                            <i class="bi bi-check-circle"></i>
+                            {% if form.instance.pk %}Aggiorna{% else %}Crea{% endif %} Cliente
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Card informazioni sui campi -->
+<div class="row justify-content-center mt-4">
+    <div class="col-lg-10">
+        <div class="card bg-light">
+            <div class="card-header">
+                <h6 class="mb-0">
+                    <i class="bi bi-info-circle"></i>
+                    Informazioni sui Campi
+                </h6>
+            </div>
+            <div class="card-body">
+                <div class="row">
+                    <div class="col-md-6">
+                        <h6>Clienti Privati:</h6>
+                        <ul class="small">
+                            <li><strong>Nome e Cognome:</strong> Obbligatori</li>
+                            <li><strong>Codice Fiscale:</strong> 16 caratteri alfanumerici</li>
+                            <li><strong>Email:</strong> Deve essere univoca nel sistema</li>
+                        </ul>
+                    </div>
+                    <div class="col-md-6">
+                        <h6>Clienti Azienda:</h6>
+                        <ul class="small">
+                            <li><strong>Ragione Sociale:</strong> Obbligatoria</li>
+                            <li><strong>Partita IVA:</strong> Obbligatoria, 11 cifre</li>
+                            <li><strong>Codice SDI:</strong> Per fatturazione elettronica</li>
+                            <li><strong>PEC:</strong> Per comunicazioni ufficiali</li>
+                        </ul>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+function toggleClienteFields() {
+    const tipo = document.getElementById('{{ form.tipo.id_for_label }}').value;
+    const datiPrivato = document.getElementById('dati-privato');
+    const datiAzienda = document.getElementById('dati-azienda');
+    
+    if (tipo === 'privato') {
+        datiPrivato.style.display = 'block';
+        datiAzienda.style.display = 'none';
+        
+        // Rendi obbligatori i campi privato
+        document.getElementById('{{ form.nome.id_for_label }}').required = true;
+        document.getElementById('{{ form.cognome.id_for_label }}').required = true;
+        
+        // Rimuovi obbligatorietà campi azienda
+        document.getElementById('{{ form.ragione_sociale.id_for_label }}').required = false;
+        document.getElementById('{{ form.partita_iva.id_for_label }}').required = false;
+        
+    } else if (tipo === 'azienda') {
+        datiPrivato.style.display = 'none';
+        datiAzienda.style.display = 'block';
+        
+        // Rendi obbligatori i campi azienda
+        document.getElementById('{{ form.ragione_sociale.id_for_label }}').required = true;
+        document.getElementById('{{ form.partita_iva.id_for_label }}').required = true;
+        
+        // Rimuovi obbligatorietà campi privato
+        document.getElementById('{{ form.nome.id_for_label }}').required = false;
+        document.getElementById('{{ form.cognome.id_for_label }}').required = false;
+    }
+}
+
+// Inizializza al caricamento della pagina
+document.addEventListener('DOMContentLoaded', function() {
+    toggleClienteFields();
+});
+
+// Validazione codice fiscale in tempo reale
+document.getElementById('{{ form.codice_fiscale.id_for_label }}').addEventListener('input', function() {
+    const cf = this.value.toUpperCase();
+    this.value = cf;
+    
+    if (cf.length === 16) {
+        // Validazione base codice fiscale (pattern)
+        const cfPattern = /^[A-Z]{6}[0-9]{2}[A-Z][0-9]{2}[A-Z][0-9]{3}[A-Z]$/;
+        if (cfPattern.test(cf)) {
+            this.classList.remove('is-invalid');
+            this.classList.add('is-valid');
+        } else {
+            this.classList.remove('is-valid');
+            this.classList.add('is-invalid');
+        }
+    } else {
+        this.classList.remove('is-valid', 'is-invalid');
+    }
+});
+
+// Validazione partita IVA in tempo reale
+document.getElementById('{{ form.partita_iva.id_for_label }}').addEventListener('input', function() {
+    const piva = this.value.replace(/\D/g, ''); // Solo numeri
+    this.value = piva;
+    
+    if (piva.length === 11) {
+        this.classList.remove('is-invalid');
+        this.classList.add('is-valid');
+    } else if (piva.length > 0) {
+        this.classList.remove('is-valid');
+        this.classList.add('is-invalid');
+    } else {
+        this.classList.remove('is-valid', 'is-invalid');
+    }
+});
+</script>
+{% endblock %}

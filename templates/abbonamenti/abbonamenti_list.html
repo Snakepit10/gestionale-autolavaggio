@@ -1,0 +1,432 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}Gestione Abbonamenti - Gestionale Autolavaggio{% endblock %}
+
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <h1><i class="bi bi-credit-card"></i> Gestione Abbonamenti</h1>
+    <div>
+        <a href="{% url 'abbonamenti:abbonamenti-scadenza' %}" class="btn btn-warning me-2">
+            <i class="bi bi-clock"></i> In Scadenza
+        </a>
+        <a href="{% url 'abbonamenti:vendita-abbonamento' %}" class="btn btn-primary">
+            <i class="bi bi-plus-circle"></i> Nuovo Abbonamento
+        </a>
+    </div>
+</div>
+
+{% if messages %}
+    {% for message in messages %}
+        <div class="alert alert-{{ message.tags }} alert-dismissible fade show" role="alert">
+            {{ message }}
+            <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+        </div>
+    {% endfor %}
+{% endif %}
+
+<!-- Statistiche -->
+<div class="row mb-4">
+    <div class="col-md-3">
+        <div class="card bg-primary text-white">
+            <div class="card-body text-center">
+                <i class="bi bi-credit-card display-6"></i>
+                <h4>{{ totale_abbonamenti }}</h4>
+                <small>Abbonamenti Totali</small>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-3">
+        <div class="card bg-success text-white">
+            <div class="card-body text-center">
+                <i class="bi bi-check-circle display-6"></i>
+                <h4>{{ abbonamenti_attivi }}</h4>
+                <small>Attivi</small>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-3">
+        <div class="card bg-warning text-white">
+            <div class="card-body text-center">
+                <i class="bi bi-clock display-6"></i>
+                <h4>{{ abbonamenti_in_scadenza }}</h4>
+                <small>In Scadenza (7 giorni)</small>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-3">
+        <div class="card bg-info text-white">
+            <div class="card-body text-center">
+                <i class="bi bi-currency-euro display-6"></i>
+                <h4>€{{ fatturato_abbonamenti|default:0|floatformat:0 }}</h4>
+                <small>Fatturato Totale</small>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Filtri -->
+<div class="card mb-4">
+    <div class="card-body">
+        <form method="get" class="row g-3">
+            <div class="col-md-3">
+                <label class="form-label">Stato:</label>
+                <select name="stato" class="form-select">
+                    <option value="">Tutti gli stati</option>
+                    <option value="attivo" {% if request.GET.stato == 'attivo' %}selected{% endif %}>Attivo</option>
+                    <option value="sospeso" {% if request.GET.stato == 'sospeso' %}selected{% endif %}>Sospeso</option>
+                    <option value="scaduto" {% if request.GET.stato == 'scaduto' %}selected{% endif %}>Scaduto</option>
+                    <option value="cancellato" {% if request.GET.stato == 'cancellato' %}selected{% endif %}>Cancellato</option>
+                </select>
+            </div>
+            <div class="col-md-3">
+                <label class="form-label">Configurazione:</label>
+                <select name="configurazione" class="form-select">
+                    <option value="">Tutte le configurazioni</option>
+                    {% for config in configurazioni %}
+                        <option value="{{ config.pk }}" {% if request.GET.configurazione == config.pk|stringformat:"s" %}selected{% endif %}>
+                            {{ config.titolo }}
+                        </option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div class="col-md-3">
+                <label class="form-label">Cliente:</label>
+                <input type="text" name="cliente_search" class="form-control" 
+                       placeholder="Cerca cliente..." value="{{ request.GET.cliente_search }}">
+            </div>
+            <div class="col-md-3">
+                <label class="form-label">&nbsp;</label>
+                <div class="d-flex gap-2">
+                    <button type="submit" class="btn btn-primary">
+                        <i class="bi bi-search"></i> Filtra
+                    </button>
+                    <a href="{% url 'abbonamenti:abbonamenti-list' %}" class="btn btn-outline-secondary">
+                        <i class="bi bi-arrow-clockwise"></i>
+                    </a>
+                </div>
+            </div>
+        </form>
+    </div>
+</div>
+
+<div class="card">
+    <div class="card-body">
+        {% if abbonamenti %}
+            <div class="table-responsive">
+                <table class="table table-hover">
+                    <thead class="table-dark">
+                        <tr>
+                            <th>Codice</th>
+                            <th>Cliente</th>
+                            <th>Configurazione</th>
+                            <th>Stato</th>
+                            <th>Scadenza</th>
+                            <th>Utilizzo</th>
+                            <th>Ultimo Accesso</th>
+                            <th class="text-center">Azioni</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for abbonamento in abbonamenti %}
+                        <tr class="{% if abbonamento.stato == 'scaduto' %}table-warning{% elif abbonamento.stato == 'sospeso' %}table-secondary{% elif abbonamento.giorni_alla_scadenza <= 7 %}table-light border-warning{% endif %}">
+                            <td>
+                                <a href="{% url 'abbonamenti:dettaglio-abbonamento' abbonamento.pk %}" 
+                                   class="text-decoration-none fw-bold">
+                                    {{ abbonamento.codice_accesso }}
+                                </a>
+                                {% if abbonamento.codice_nfc %}
+                                    <br><small class="text-muted">
+                                        <i class="bi bi-credit-card"></i> NFC
+                                    </small>
+                                {% endif %}
+                            </td>
+                            <td>
+                                <div class="d-flex align-items-center">
+                                    <i class="bi bi-person me-2"></i>
+                                    <div>
+                                        <strong>{{ abbonamento.cliente.nome_completo }}</strong>
+                                        <br><small class="text-muted">{{ abbonamento.cliente.telefono }}</small>
+                                        {% if abbonamento.targhe.exists %}
+                                            <br><small class="text-info">
+                                                <i class="bi bi-car-front"></i>
+                                                {% for targa in abbonamento.targhe.all|slice:":2" %}
+                                                    {{ targa.targa }}{% if not forloop.last %}, {% endif %}
+                                                {% endfor %}
+                                                {% if abbonamento.targhe.count > 2 %}
+                                                    +{{ abbonamento.targhe.count|add:"-2" }}
+                                                {% endif %}
+                                            </small>
+                                        {% endif %}
+                                    </div>
+                                </div>
+                            </td>
+                            <td>
+                                <div>
+                                    <strong>{{ abbonamento.configurazione.titolo }}</strong>
+                                    <br><small class="text-muted">€{{ abbonamento.configurazione.prezzo }} - {{ abbonamento.configurazione.get_durata_display }}</small>
+                                    {% if abbonamento.configurazione.modalita_targa != 'libera' %}
+                                        <br><span class="badge bg-info">
+                                            {{ abbonamento.configurazione.get_modalita_targa_display }}
+                                        </span>
+                                    {% endif %}
+                                </div>
+                            </td>
+                            <td>
+                                {% if abbonamento.stato == 'attivo' %}
+                                    <span class="badge bg-success">
+                                        <i class="bi bi-check-circle"></i> Attivo
+                                    </span>
+                                {% elif abbonamento.stato == 'sospeso' %}
+                                    <span class="badge bg-warning">
+                                        <i class="bi bi-pause-circle"></i> Sospeso
+                                    </span>
+                                {% elif abbonamento.stato == 'scaduto' %}
+                                    <span class="badge bg-danger">
+                                        <i class="bi bi-x-circle"></i> Scaduto
+                                    </span>
+                                {% elif abbonamento.stato == 'cancellato' %}
+                                    <span class="badge bg-secondary">
+                                        <i class="bi bi-trash"></i> Cancellato
+                                    </span>
+                                {% endif %}
+                            </td>
+                            <td>
+                                <div>
+                                    <strong>{{ abbonamento.data_scadenza|date:"d/m/Y" }}</strong>
+                                    {% if abbonamento.stato == 'attivo' %}
+                                        {% if abbonamento.giorni_alla_scadenza <= 0 %}
+                                            <br><span class="badge bg-danger">Scaduto</span>
+                                        {% elif abbonamento.giorni_alla_scadenza <= 7 %}
+                                            <br><span class="badge bg-warning">{{ abbonamento.giorni_alla_scadenza }} giorni</span>
+                                        {% else %}
+                                            <br><small class="text-muted">{{ abbonamento.giorni_alla_scadenza }} giorni</small>
+                                        {% endif %}
+                                    {% endif %}
+                                </div>
+                            </td>
+                            <td>
+                                <div class="small">
+                                    {% for contatore in abbonamento.contatori_attuali %}
+                                        <div class="d-flex justify-content-between mb-1">
+                                            <span>{{ contatore.servizio.titolo|truncatewords:2 }}:</span>
+                                            <span class="fw-bold">
+                                                {{ contatore.utilizzati }}/{{ contatore.totali }}
+                                            </span>
+                                        </div>
+                                        <div class="progress" style="height: 4px;">
+                                            <div class="progress-bar {% if contatore.percentuale >= 80 %}bg-danger{% elif contatore.percentuale >= 60 %}bg-warning{% else %}bg-success{% endif %}" 
+                                                 style="width: {{ contatore.percentuale }}%"></div>
+                                        </div>
+                                    {% endfor %}
+                                </div>
+                            </td>
+                            <td>
+                                {% if abbonamento.data_ultimo_accesso %}
+                                    <div>
+                                        <strong>{{ abbonamento.data_ultimo_accesso|date:"d/m/Y" }}</strong>
+                                        <br><small class="text-muted">{{ abbonamento.data_ultimo_accesso|date:"H:i" }}</small>
+                                    </div>
+                                {% else %}
+                                    <span class="text-muted">Mai utilizzato</span>
+                                {% endif %}
+                            </td>
+                            <td class="text-center">
+                                <div class="btn-group" role="group">
+                                    <a href="{% url 'abbonamenti:dettaglio-abbonamento' abbonamento.pk %}" 
+                                       class="btn btn-sm btn-outline-primary" title="Dettagli">
+                                        <i class="bi bi-eye"></i>
+                                    </a>
+                                    {% if abbonamento.stato == 'attivo' %}
+                                        <button class="btn btn-sm btn-outline-warning" 
+                                                onclick="sospendiAbbonamento('{{ abbonamento.pk }}')" title="Sospendi">
+                                            <i class="bi bi-pause"></i>
+                                        </button>
+                                    {% elif abbonamento.stato == 'sospeso' %}
+                                        <button class="btn btn-sm btn-outline-success" 
+                                                onclick="riattivaAbbonamento('{{ abbonamento.pk }}')" title="Riattiva">
+                                            <i class="bi bi-play"></i>
+                                        </button>
+                                    {% elif abbonamento.stato == 'scaduto' %}
+                                        <button class="btn btn-sm btn-outline-info" 
+                                                onclick="rinnovaAbbonamento('{{ abbonamento.pk }}')" title="Rinnova">
+                                            <i class="bi bi-arrow-repeat"></i>
+                                        </button>
+                                    {% endif %}
+                                    <button class="btn btn-sm btn-outline-info" 
+                                            onclick="stampaQR('{{ abbonamento.pk }}')" title="Stampa QR">
+                                        <i class="bi bi-qr-code"></i>
+                                    </button>
+                                </div>
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+            
+            <!-- Paginazione -->
+            {% if is_paginated %}
+                <nav aria-label="Paginazione abbonamenti" class="mt-4">
+                    <ul class="pagination justify-content-center">
+                        {% if page_obj.has_previous %}
+                            <li class="page-item">
+                                <a class="page-link" href="?page=1{% for key, value in request.GET.items %}{% if key != 'page' %}&{{ key }}={{ value }}{% endif %}{% endfor %}">&laquo; Prima</a>
+                            </li>
+                            <li class="page-item">
+                                <a class="page-link" href="?page={{ page_obj.previous_page_number }}{% for key, value in request.GET.items %}{% if key != 'page' %}&{{ key }}={{ value }}{% endif %}{% endfor %}">Precedente</a>
+                            </li>
+                        {% endif %}
+                        
+                        <li class="page-item active">
+                            <span class="page-link">
+                                Pagina {{ page_obj.number }} di {{ page_obj.paginator.num_pages }}
+                            </span>
+                        </li>
+                        
+                        {% if page_obj.has_next %}
+                            <li class="page-item">
+                                <a class="page-link" href="?page={{ page_obj.next_page_number }}{% for key, value in request.GET.items %}{% if key != 'page' %}&{{ key }}={{ value }}{% endif %}{% endfor %}">Successiva</a>
+                            </li>
+                            <li class="page-item">
+                                <a class="page-link" href="?page={{ page_obj.paginator.num_pages }}{% for key, value in request.GET.items %}{% if key != 'page' %}&{{ key }}={{ value }}{% endif %}{% endfor %}">Ultima &raquo;</a>
+                            </li>
+                        {% endif %}
+                    </ul>
+                </nav>
+            {% endif %}
+        {% else %}
+            <div class="text-center py-5">
+                <i class="bi bi-credit-card display-1 text-muted"></i>
+                <h3 class="text-muted mt-3">Nessun Abbonamento</h3>
+                <p class="text-muted">Non ci sono ancora abbonamenti che corrispondono ai filtri selezionati.</p>
+                <a href="{% url 'abbonamenti:vendita-abbonamento' %}" class="btn btn-primary">
+                    <i class="bi bi-plus-circle"></i> Vendi il Primo Abbonamento
+                </a>
+            </div>
+        {% endif %}
+    </div>
+</div>
+
+<!-- Modal Sospensione -->
+<div class="modal fade" id="modalSospensione" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header bg-warning">
+                <h5 class="modal-title">
+                    <i class="bi bi-pause-circle"></i>
+                    Sospendi Abbonamento
+                </h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <form id="form-sospensione">
+                <div class="modal-body">
+                    <input type="hidden" id="abbonamento-id-sospensione">
+                    
+                    <div class="mb-3">
+                        <label class="form-label">Motivo Sospensione:</label>
+                        <select class="form-select" id="motivo-sospensione" required>
+                            <option value="">Seleziona motivo</option>
+                            <option value="richiesta_cliente">Richiesta del cliente</option>
+                            <option value="mancato_pagamento">Mancato pagamento</option>
+                            <option value="problemi_tecnici">Problemi tecnici</option>
+                            <option value="violazione_termini">Violazione dei termini</option>
+                            <option value="altro">Altro</option>
+                        </select>
+                    </div>
+                    
+                    <div class="mb-3">
+                        <label class="form-label">Note Aggiuntive:</label>
+                        <textarea class="form-control" id="note-sospensione" rows="3"></textarea>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">
+                        <i class="bi bi-x-circle"></i> Annulla
+                    </button>
+                    <button type="submit" class="btn btn-warning">
+                        <i class="bi bi-pause-circle"></i> Sospendi Abbonamento
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<script>
+function sospendiAbbonamento(abbonamentoId) {
+    document.getElementById('abbonamento-id-sospensione').value = abbonamentoId;
+    const modal = new bootstrap.Modal(document.getElementById('modalSospensione'));
+    modal.show();
+}
+
+function riattivaAbbonamento(abbonamentoId) {
+    if (!confirm('Confermi di voler riattivare questo abbonamento?')) return;
+    
+    fetch(`/abbonamenti/${abbonamentoId}/riattiva/`, {
+        method: 'POST',
+        headers: {
+            'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]').value
+        }
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            location.reload();
+        } else {
+            alert('Errore: ' + data.error);
+        }
+    });
+}
+
+function rinnovaAbbonamento(abbonamentoId) {
+    if (!confirm('Confermi di voler rinnovare questo abbonamento? Verrà creato un nuovo ordine per il pagamento.')) return;
+    
+    window.location.href = `/abbonamenti/${abbonamentoId}/rinnova/`;
+}
+
+function stampaQR(abbonamentoId) {
+    window.open(`/abbonamenti/${abbonamentoId}/stampa-qr/`, '_blank');
+}
+
+// Gestione form sospensione
+document.getElementById('form-sospensione').addEventListener('submit', function(e) {
+    e.preventDefault();
+    
+    const abbonamentoId = document.getElementById('abbonamento-id-sospensione').value;
+    const motivo = document.getElementById('motivo-sospensione').value;
+    const note = document.getElementById('note-sospensione').value;
+    
+    fetch(`/abbonamenti/${abbonamentoId}/sospendi/`, {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+            'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]').value
+        },
+        body: JSON.stringify({
+            motivo: motivo,
+            note: note
+        })
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            bootstrap.Modal.getInstance(document.getElementById('modalSospensione')).hide();
+            location.reload();
+        } else {
+            alert('Errore: ' + data.error);
+        }
+    });
+});
+
+// Auto-submit ricerca cliente dopo 500ms di inattività
+let searchTimeout;
+document.querySelector('input[name="cliente_search"]').addEventListener('input', function() {
+    clearTimeout(searchTimeout);
+    const form = this.closest('form');
+    searchTimeout = setTimeout(() => {
+        form.submit();
+    }, 500);
+});
+</script>
+{% endblock %}

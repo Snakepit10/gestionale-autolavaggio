@@ -1,0 +1,148 @@
+{% extends 'base.html' %}
+{% load static %}
+{% load crispy_forms_tags %}
+
+{% block title %}
+    {% if form.instance.pk %}Modifica Stampante{% else %}Nuova Stampante{% endif %} - Gestionale Autolavaggio
+{% endblock %}
+
+{% block content %}
+<div class="row justify-content-center">
+    <div class="col-lg-8">
+        <div class="card">
+            <div class="card-header d-flex justify-content-between align-items-center">
+                <h4 class="mb-0">
+                    <i class="bi bi-printer"></i>
+                    {% if form.instance.pk %}
+                        Modifica Stampante: {{ form.instance.nome }}
+                    {% else %}
+                        Nuova Stampante
+                    {% endif %}
+                </h4>
+                <a href="{% url 'core:stampanti-list' %}" class="btn btn-outline-secondary">
+                    <i class="bi bi-arrow-left"></i> Torna alla Lista
+                </a>
+            </div>
+            <div class="card-body">
+                <form method="post">
+                    {% csrf_token %}
+                    
+                    <!-- Informazioni Base -->
+                    <div class="row mb-4">
+                        <div class="col-12">
+                            <h5 class="border-bottom pb-2 mb-3">Informazioni Base</h5>
+                        </div>
+                        <div class="col-md-8">
+                            {{ form.nome|as_crispy_field }}
+                        </div>
+                        <div class="col-md-4">
+                            {{ form.tipo|as_crispy_field }}
+                        </div>
+                        <div class="col-12">
+                            {{ form.modello|as_crispy_field }}
+                        </div>
+                    </div>
+
+                    <!-- Configurazione Rete -->
+                    <div class="row mb-4">
+                        <div class="col-12">
+                            <h5 class="border-bottom pb-2 mb-3">Configurazione di Rete</h5>
+                        </div>
+                        <div class="col-md-8">
+                            {{ form.indirizzo_ip|as_crispy_field }}
+                        </div>
+                        <div class="col-md-4">
+                            {{ form.porta|as_crispy_field }}
+                        </div>
+                    </div>
+
+                    <!-- Configurazione Stampa -->
+                    <div class="row mb-4">
+                        <div class="col-12">
+                            <h5 class="border-bottom pb-2 mb-3">Configurazione Stampa</h5>
+                        </div>
+                        <div class="col-md-12">
+                            {{ form.larghezza_carta|as_crispy_field }}
+                        </div>
+                    </div>
+
+
+                    <!-- Opzioni -->
+                    <div class="row mb-4">
+                        <div class="col-12">
+                            <h5 class="border-bottom pb-2 mb-3">Opzioni</h5>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="form-check form-switch">
+                                {{ form.attiva }}
+                                <label class="form-check-label" for="{{ form.attiva.id_for_label }}">
+                                    Stampante Attiva
+                                </label>
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="form-check form-switch">
+                                {{ form.predefinita }}
+                                <label class="form-check-label" for="{{ form.predefinita.id_for_label }}">
+                                    Stampante Predefinita
+                                </label>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="d-flex justify-content-between">
+                        <a href="{% url 'core:stampanti-list' %}" class="btn btn-secondary">
+                            <i class="bi bi-x-circle"></i> Annulla
+                        </a>
+                        <div>
+                            {% if form.instance.pk %}
+                                <a href="{% url 'core:test-stampante' form.instance.pk %}" class="btn btn-info me-2">
+                                    <i class="bi bi-play-circle"></i> Test Stampa
+                                </a>
+                            {% endif %}
+                            <button type="submit" class="btn btn-primary">
+                                <i class="bi bi-check-circle"></i>
+                                {% if form.instance.pk %}Aggiorna{% else %}Crea{% endif %} Stampante
+                            </button>
+                        </div>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Card di aiuto per la configurazione -->
+<div class="row justify-content-center mt-4">
+    <div class="col-lg-8">
+        <div class="card bg-light">
+            <div class="card-header">
+                <h6 class="mb-0">
+                    <i class="bi bi-info-circle"></i>
+                    Informazioni sulla Configurazione
+                </h6>
+            </div>
+            <div class="card-body">
+                <div class="row">
+                    <div class="col-md-6">
+                        <h6>Tipi di Stampante:</h6>
+                        <ul class="small">
+                            <li><strong>Termica:</strong> Per scontrini e ricevute</li>
+                            <li><strong>Laser:</strong> Per documenti ufficiali</li>
+                            <li><strong>Inkjet:</strong> Per stampe a colori</li>
+                        </ul>
+                    </div>
+                    <div class="col-md-6">
+                        <h6>Comandi di Taglio Comuni:</h6>
+                        <ul class="small">
+                            <li><code>\x1d\x56\x00</code> - Taglio completo</li>
+                            <li><code>\x1d\x56\x01</code> - Taglio parziale</li>
+                            <li><code>\x0a\x0a\x0a</code> - Solo avanzamento carta</li>
+                        </ul>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

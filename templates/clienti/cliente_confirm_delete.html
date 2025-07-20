@@ -1,0 +1,109 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}Elimina Cliente - Gestionale Autolavaggio{% endblock %}
+
+{% block content %}
+<div class="row justify-content-center">
+    <div class="col-lg-6">
+        <div class="card border-danger">
+            <div class="card-header bg-danger text-white">
+                <h4 class="mb-0">
+                    <i class="bi bi-exclamation-triangle"></i>
+                    Conferma Eliminazione Cliente
+                </h4>
+            </div>
+            <div class="card-body">
+                <div class="alert alert-warning">
+                    <i class="bi bi-warning"></i>
+                    <strong>Attenzione!</strong> Questa operazione non può essere annullata.
+                </div>
+                
+                <div class="d-flex align-items-center mb-4">
+                    {% if object.tipo == 'privato' %}
+                        <i class="bi bi-person text-primary me-3 fs-1"></i>
+                    {% else %}
+                        <i class="bi bi-building text-success me-3 fs-1"></i>
+                    {% endif %}
+                    <div>
+                        <h5>{{ object.nome_completo }}</h5>
+                        <p class="mb-0">
+                            {% if object.tipo == 'privato' %}
+                                <span class="badge bg-primary">Cliente Privato</span>
+                                {% if object.codice_fiscale %}
+                                    <br><small class="text-muted">CF: {{ object.codice_fiscale }}</small>
+                                {% endif %}
+                            {% else %}
+                                <span class="badge bg-success">Azienda</span>
+                                {% if object.partita_iva %}
+                                    <br><small class="text-muted">P.IVA: {{ object.partita_iva }}</small>
+                                {% endif %}
+                            {% endif %}
+                        </p>
+                    </div>
+                </div>
+                
+                <!-- Informazioni contatto -->
+                <div class="row mb-3">
+                    <div class="col-6">
+                        <small class="text-muted">Email:</small><br>
+                        <strong>{{ object.email }}</strong>
+                    </div>
+                    <div class="col-6">
+                        <small class="text-muted">Telefono:</small><br>
+                        <strong>{{ object.telefono }}</strong>
+                    </div>
+                </div>
+                
+                {% if object.indirizzo %}
+                <div class="mb-3">
+                    <small class="text-muted">Indirizzo:</small><br>
+                    <strong>{{ object.indirizzo }}</strong>
+                    {% if object.cap or object.citta %}
+                        <br><small>{{ object.cap }} {{ object.citta }}</small>
+                    {% endif %}
+                </div>
+                {% endif %}
+                
+                <!-- Dati correlati che verranno eliminati -->
+                <div class="alert alert-danger">
+                    <h6><i class="bi bi-exclamation-circle"></i> Dati che verranno eliminati:</h6>
+                    <ul class="mb-0">
+                        <li><strong>{{ object.get_ordini_totali }}</strong> ordini (€{{ object.get_spesa_totale|floatformat:2 }} totali)</li>
+                        <li>Storico punti fedeltà</li>
+                        {% if object.user %}
+                            <li>Account online (username: {{ object.user.username }})</li>
+                        {% endif %}
+                        <li>Eventuali abbonamenti attivi</li>
+                        <li>Tutte le prenotazioni</li>
+                    </ul>
+                </div>
+                
+                {% if object.get_ordini_totali > 0 %}
+                    <div class="alert alert-warning">
+                        <i class="bi bi-info-circle"></i>
+                        <strong>Suggerimento:</strong> Questo cliente ha {{ object.get_ordini_totali }} ordini.
+                        Considera di disattivare il cliente invece di eliminarlo per mantenere lo storico.
+                    </div>
+                {% endif %}
+                
+                <p class="text-center mt-4">
+                    <strong>Sei sicuro di voler eliminare definitivamente questo cliente?</strong>
+                </p>
+                
+                <form method="post">
+                    {% csrf_token %}
+                    <div class="d-flex justify-content-between">
+                        <a href="{% url 'clienti:clienti-list' %}" class="btn btn-secondary">
+                            <i class="bi bi-arrow-left"></i> Annulla
+                        </a>
+                        <button type="submit" class="btn btn-danger">
+                            <i class="bi bi-trash"></i> Elimina Cliente Definitivamente
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

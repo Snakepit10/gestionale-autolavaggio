@@ -1,0 +1,1230 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}Punto Cassa - Gestionale Autolavaggio{% endblock %}
+
+{% block extra_css %}
+<style>
+.cassa-container {
+    height: calc(100vh - 120px);
+    overflow: hidden;
+}
+
+.catalogo-panel {
+    height: 100%;
+    overflow-y: auto;
+    background: #f8f9fa;
+    border-right: 1px solid #dee2e6;
+}
+
+.carrello-panel {
+    height: 100%;
+    display: flex;
+    flex-direction: column;
+    background: white;
+    overflow: hidden;
+}
+
+.carrello-items {
+    flex: 1;
+    overflow-y: auto;
+    min-height: 300px;
+    max-height: none;
+}
+
+.item-card {
+    cursor: pointer;
+    transition: all 0.3s ease;
+    border: 2px solid transparent;
+}
+
+.item-card:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 4px 8px rgba(0,0,0,0.15);
+    border-color: var(--primary-color);
+}
+
+.item-card.servizio {
+    border-left: 4px solid #28a745;
+}
+
+.item-card.prodotto {
+    border-left: 4px solid #ffc107;
+}
+
+/* Sovrascrive i colori per tipo quando presente la categoria */
+.item-card[data-categoria]:not([data-categoria=""]) {
+    border-left: 4px solid transparent;
+}
+
+.carrello-item {
+    border-bottom: 1px solid #eee;
+    padding: 8px 0;
+    font-size: 0.9rem;
+}
+
+.carrello-item:last-child {
+    border-bottom: none;
+}
+
+.carrello-item h6 {
+    margin-bottom: 2px;
+    font-size: 0.95rem;
+}
+
+.carrello-item .btn-group-sm .btn {
+    padding: 0.25rem 0.5rem;
+    font-size: 0.8rem;
+}
+
+.carrello-panel .card-body {
+    padding: 0.75rem;
+}
+
+.carrello-panel .mb-3 {
+    margin-bottom: 0.75rem !important;
+}
+
+.carrello-panel .form-label {
+    margin-bottom: 0.25rem;
+}
+
+.carrello-panel .form-control,
+.carrello-panel .form-select {
+    padding: 0.375rem 0.75rem;
+    font-size: 0.9rem;
+}
+
+.carrello-footer {
+    flex-shrink: 0;
+    overflow-y: auto;
+    max-height: 50vh;
+}
+
+.carrello-footer .form-label.small {
+    font-weight: 600;
+    color: #495057;
+    margin-bottom: 0.2rem;
+}
+
+.carrello-panel h5 {
+    font-size: 1.1rem;
+}
+
+.carrello-panel .btn-outline-danger {
+    padding: 0.25rem 0.5rem;
+}
+
+.cliente-info {
+    background: #e3f2fd;
+    border-radius: 6px;
+    padding: 6px 8px;
+    margin-bottom: 8px;
+    font-size: 0.9rem;
+}
+
+.tempo-attesa {
+    background: #fff3cd;
+    border: 1px solid #ffeaa7;
+    border-radius: 6px;
+    padding: 6px 8px;
+    text-align: center;
+    font-size: 0.9rem;
+}
+
+.btn-categoria {
+    margin: 2px;
+    border-radius: 20px;
+}
+
+.btn-categoria.active {
+    background-color: var(--primary-color);
+    color: white;
+}
+
+/* Colori per le categorie */
+.categoria-color-1 { background-color: #ff6b6b !important; }
+.categoria-color-2 { background-color: #4ecdc4 !important; }
+.categoria-color-3 { background-color: #45b7d1 !important; }
+.categoria-color-4 { background-color: #f9ca24 !important; }
+.categoria-color-5 { background-color: #f0932b !important; }
+.categoria-color-6 { background-color: #6c5ce7 !important; }
+.categoria-color-7 { background-color: #fd79a8 !important; }
+.categoria-color-8 { background-color: #00b894 !important; }
+.categoria-color-9 { background-color: #e17055 !important; }
+.categoria-color-10 { background-color: #74b9ff !important; }
+
+/* Rimuovi gli effetti hover e focus per i badge colorati */
+.btn-categoria:hover,
+.btn-categoria:focus {
+    color: white !important;
+    border-color: transparent !important;
+}
+
+/* Stato attivo per i badge colorati */
+.btn-categoria.active:not([data-categoria="all"]) {
+    background-color: #333 !important;
+    color: white !important;
+    border-color: #333 !important;
+}
+
+/* Colori per le card degli item */
+.item-card[data-categoria="1"] { background-color: rgba(255, 107, 107, 0.1); border-color: #ff6b6b; }
+.item-card[data-categoria="2"] { background-color: rgba(78, 205, 196, 0.1); border-color: #4ecdc4; }
+.item-card[data-categoria="3"] { background-color: rgba(69, 183, 209, 0.1); border-color: #45b7d1; }
+.item-card[data-categoria="4"] { background-color: rgba(249, 202, 36, 0.1); border-color: #f9ca24; }
+.item-card[data-categoria="5"] { background-color: rgba(240, 147, 43, 0.1); border-color: #f0932b; }
+.item-card[data-categoria="6"] { background-color: rgba(108, 92, 231, 0.1); border-color: #6c5ce7; }
+.item-card[data-categoria="7"] { background-color: rgba(253, 121, 168, 0.1); border-color: #fd79a8; }
+.item-card[data-categoria="8"] { background-color: rgba(0, 184, 148, 0.1); border-color: #00b894; }
+.item-card[data-categoria="9"] { background-color: rgba(225, 112, 85, 0.1); border-color: #e17055; }
+.item-card[data-categoria="10"] { background-color: rgba(116, 185, 255, 0.1); border-color: #74b9ff; }
+
+@media (max-width: 768px) {
+    .cassa-container {
+        height: auto;
+    }
+    
+    .catalogo-panel, .carrello-panel {
+        height: auto;
+        margin-bottom: 20px;
+    }
+}
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="row g-0 cassa-container">
+    <!-- Pannello Catalogo -->
+    <div class="col-lg-8 catalogo-panel p-3">
+        <div class="d-flex justify-content-between align-items-center mb-3">
+            <h4><i class="bi bi-grid"></i> Catalogo</h4>
+            <div class="btn-group" role="group">
+                <button type="button" class="btn btn-outline-primary btn-sm btn-categoria active" data-categoria="all">
+                    Tutti
+                </button>
+                {% for categoria in categorie %}
+                <button type="button" class="btn btn-sm btn-categoria categoria-color-{{ categoria.id }}" data-categoria="{{ categoria.id }}" style="color: white; border-color: transparent;">
+                    {{ categoria.nome }}
+                </button>
+                {% endfor %}
+            </div>
+        </div>
+        
+        <!-- Griglia Servizi/Prodotti -->
+        <div class="row g-2" id="catalogo-grid">
+            {% for item in servizi_prodotti %}
+            <div class="col-sm-6 col-md-4 col-lg-3 catalogo-item" data-categoria="{{ item.categoria.id }}">
+                <div class="card item-card {{ item.tipo }}" data-id="{{ item.id }}" data-categoria="{{ item.categoria.id }}" onclick="aggiungiAlCarrello({{ item.id }})">
+                    <div class="card-body text-center p-2">
+                        <h6 class="card-title mb-1">{{ item.titolo }}</h6>
+                        <p class="card-text text-muted small mb-1">{{ item.categoria.nome }}</p>
+                        <p class="text-primary fw-bold mb-0">€{{ item.prezzo }}</p>
+                        {% if item.tipo == 'servizio' %}
+                            <small class="text-muted">{{ item.durata_minuti }} min</small>
+                        {% elif item.scorta_bassa %}
+                            <small class="text-danger"><i class="bi bi-exclamation-triangle"></i> Scorta bassa</small>
+                        {% endif %}
+                    </div>
+                </div>
+            </div>
+            {% endfor %}
+        </div>
+    </div>
+    
+    <!-- Pannello Carrello -->
+    <div class="col-lg-4 carrello-panel p-3">
+        <div class="d-flex justify-content-between align-items-center mb-2">
+            <h5 class="mb-0"><i class="bi bi-cart"></i> Carrello</h5>
+            <button class="btn btn-outline-danger btn-sm" onclick="svuotaCarrello()">
+                <i class="bi bi-trash"></i>
+            </button>
+        </div>
+        
+        <!-- Info Cliente -->
+        <div id="cliente-info" class="cliente-info d-none">
+            <div class="d-flex justify-content-between align-items-center">
+                <small class="fw-bold" id="cliente-nome"></small>
+                <button class="btn btn-sm btn-outline-secondary py-0 px-1" onclick="rimuoviCliente()">
+                    <i class="bi bi-x"></i>
+                </button>
+            </div>
+        </div>
+        
+        <!-- Items Carrello -->
+        <div class="carrello-items mb-2" id="carrello-items">
+            <div class="text-center text-muted py-3">
+                <i class="bi bi-cart-x display-6"></i>
+                <p>Carrello vuoto</p>
+            </div>
+        </div>
+        
+        <div class="carrello-footer">
+            <!-- Sconti -->
+            <div class="mb-1">
+                <label class="form-label small">Sconto</label>
+                <select class="form-select form-select-sm" id="sconto-select" onchange="applicaSconto()">
+                    <option value="">Nessun sconto</option>
+                    {% for sconto in sconti %}
+                    <option value="{{ sconto.id }}" data-tipo="{{ sconto.tipo_sconto }}" data-valore="{{ sconto.valore }}">
+                        {{ sconto.titolo }} 
+                        ({% if sconto.tipo_sconto == 'percentuale' %}{{ sconto.valore }}%{% else %}€{{ sconto.valore }}{% endif %})
+                    </option>
+                    {% endfor %}
+                </select>
+            </div>
+            
+            <!-- Tempo Attesa -->
+            <div id="tempo-attesa" class="tempo-attesa mb-2 d-none">
+                <div class="fw-bold mb-1" style="font-size: 0.85rem;">Tempo stimato</div>
+                <div class="text-warning fw-bold mb-1" id="tempo-attesa-minuti" style="font-size: 1rem;">-</div>
+                <small style="font-size: 0.8rem;">Pronto: <span id="ora-consegna"></span></small>
+            </div>
+            
+            <!-- Totali -->
+            <div class="border-top pt-2">
+                <div class="d-flex justify-content-between mb-1">
+                    <span>Subtotale:</span>
+                    <span id="subtotale">€0.00</span>
+                </div>
+                <div class="d-flex justify-content-between mb-1" id="riga-sconto" style="display: none !important;">
+                    <span>Sconto:</span>
+                    <span class="text-success" id="importo-sconto">-€0.00</span>
+                </div>
+                <div class="d-flex justify-content-between mb-2 h6">
+                    <strong>Totale:</strong>
+                    <strong id="totale-finale">€0.00</strong>
+                </div>
+                
+                <!-- Consegna -->
+                <div class="row mb-2">
+                    <div class="col-5">
+                        <label class="form-label small">Tipo consegna</label>
+                        <select class="form-select form-select-sm" id="tipo-consegna" onchange="toggleOraConsegna()">
+                            <option value="immediata">Immediata</option>
+                            <option value="programmata">Programmata</option>
+                        </select>
+                    </div>
+                    <div class="col-7">
+                        <label class="form-label small">Ora consegna</label>
+                        <input type="time" class="form-control form-control-sm" id="ora-consegna-richiesta" disabled>
+                    </div>
+                </div>
+                
+                
+                <!-- Tipo Auto -->
+                <div class="mb-2">
+                    <label class="form-label small">Tipo auto</label>
+                    <input type="text" class="form-control form-control-sm" id="tipo-auto" placeholder="es. Fiat 500 bianca, BMW X3 nera...">
+                </div>
+                
+                <!-- Note -->
+                <div class="mb-2">
+                    <label class="form-label small">Note ordine</label>
+                    <textarea class="form-control form-control-sm" id="note-ordine" rows="2" placeholder="Note aggiuntive..."></textarea>
+                </div>
+                
+                <!-- Azioni -->
+                <div class="d-grid gap-1">
+                    <button class="btn btn-success btn-sm" id="btn-completa-ordine" onclick="completaOrdine()" disabled>
+                        <i class="bi bi-check-circle"></i> Completa Ordine
+                    </button>
+                    <div class="row g-1">
+                        <div class="col-6">
+                            <button class="btn btn-primary btn-sm w-100" onclick="mostraModalCliente()">
+                                <i class="bi bi-person-plus"></i> Cliente
+                            </button>
+                        </div>
+                        <div class="col-6">
+                            <button class="btn btn-info btn-sm w-100" onclick="calcolaTempoAttesa()">
+                                <i class="bi bi-clock"></i> Tempo
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Modal Pagamento -->
+<div class="modal fade" id="modalPagamento" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">
+                    <i class="bi bi-check-circle"></i>
+                    Completa Ordine
+                </h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <!-- Riepilogo Ordine -->
+                <div class="card mb-3">
+                    <div class="card-body">
+                        <h6 class="card-title">Riepilogo Ordine</h6>
+                        <div class="d-flex justify-content-between">
+                            <span>Subtotale:</span>
+                            <span id="modal-subtotale">€0.00</span>
+                        </div>
+                        <div class="d-flex justify-content-between" id="modal-riga-sconto" style="display: none;">
+                            <span>Sconto:</span>
+                            <span class="text-success" id="modal-sconto">-€0.00</span>
+                        </div>
+                        <hr class="my-2">
+                        <div class="d-flex justify-content-between h6">
+                            <strong>Totale finale:</strong>
+                            <strong id="modal-totale">€0.00</strong>
+                        </div>
+                        <div id="modal-cliente-info" class="mt-2 d-none">
+                            <small class="text-muted">Cliente: <span id="modal-cliente-nome"></span></small>
+                        </div>
+                    </div>
+                </div>
+
+
+                <!-- Selezione Pagamento -->
+                <div class="card">
+                    <div class="card-body">
+                        <h6 class="card-title">Pagamento</h6>
+                        
+                        <!-- Opzioni Pagamento -->
+                        <div class="mb-3">
+                            <div class="form-check">
+                                <input class="form-check-input" type="radio" name="tipoPagamento" id="nessunPagamento" value="nessuno" checked>
+                                <label class="form-check-label" for="nessunPagamento">
+                                    <strong>Non pagato</strong> - L'ordine verrà saldato successivamente
+                                </label>
+                            </div>
+                            <div class="form-check">
+                                <input class="form-check-input" type="radio" name="tipoPagamento" id="pagamentoCompleto" value="completo">
+                                <label class="form-check-label" for="pagamentoCompleto">
+                                    <strong>Pagamento completo</strong> - Incassa l'intero importo
+                                </label>
+                            </div>
+                            <div class="form-check">
+                                <input class="form-check-input" type="radio" name="tipoPagamento" id="pagamentoParziale" value="parziale">
+                                <label class="form-check-label" for="pagamentoParziale">
+                                    <strong>Pagamento parziale</strong> - Incassa un importo specifico
+                                </label>
+                            </div>
+                        </div>
+
+                        <!-- Dettagli Pagamento -->
+                        <div id="dettagliPagamento" class="d-none">
+                            <div class="row">
+                                <div class="col-md-6">
+                                    <label class="form-label">Metodo pagamento</label>
+                                    <select class="form-select" id="modal-metodo-pagamento">
+                                        <option value="contanti">Contanti</option>
+                                        <option value="carta">Carta di Credito/Debito</option>
+                                        <option value="bancomat">Bancomat</option>
+                                        <option value="bonifico">Bonifico</option>
+                                        <option value="assegno">Assegno</option>
+                                    </select>
+                                </div>
+                                <div class="col-md-6">
+                                    <label class="form-label">Importo ricevuto</label>
+                                    <input type="number" class="form-control" id="modal-importo-ricevuto" step="0.01" min="0">
+                                </div>
+                            </div>
+                            
+                            <div id="modal-resto-info" class="mt-2 p-2 bg-success text-white rounded d-none">
+                                <strong>Resto da dare: €<span id="modal-resto-importo">0.00</span></strong>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">
+                    <i class="bi bi-x-circle"></i> Annulla
+                </button>
+                <button type="button" class="btn btn-success" id="btn-conferma-ordine">
+                    <i class="bi bi-check-circle"></i> Conferma Ordine
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Modal Cliente -->
+<div class="modal fade" id="modalCliente" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Seleziona o Crea Cliente</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <ul class="nav nav-tabs mb-3" id="clienteTabs" role="tablist">
+                    <li class="nav-item" role="presentation">
+                        <button class="nav-link active" id="cerca-tab" data-bs-toggle="tab" data-bs-target="#cerca" type="button">
+                            Cerca Esistente
+                        </button>
+                    </li>
+                    <li class="nav-item" role="presentation">
+                        <button class="nav-link" id="nuovo-tab" data-bs-toggle="tab" data-bs-target="#nuovo" type="button">
+                            Nuovo Cliente
+                        </button>
+                    </li>
+                </ul>
+                
+                <div class="tab-content" id="clienteTabContent">
+                    <!-- Tab Cerca Cliente -->
+                    <div class="tab-pane fade show active" id="cerca" role="tabpanel">
+                        <div class="mb-3">
+                            <input type="text" class="form-control" id="cerca-cliente" 
+                                   placeholder="Cerca per nome, email, telefono...">
+                        </div>
+                        <div id="risultati-ricerca"></div>
+                    </div>
+                    
+                    <!-- Tab Nuovo Cliente -->
+                    <div class="tab-pane fade" id="nuovo" role="tabpanel">
+                        <form id="form-nuovo-cliente">
+                            <div class="row">
+                                <div class="col-md-6">
+                                    <div class="mb-3">
+                                        <label class="form-label">Nome *</label>
+                                        <input type="text" class="form-control" name="nome" required>
+                                    </div>
+                                </div>
+                                <div class="col-md-6">
+                                    <div class="mb-3">
+                                        <label class="form-label">Cognome *</label>
+                                        <input type="text" class="form-control" name="cognome" required>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="row">
+                                <div class="col-md-6">
+                                    <div class="mb-3">
+                                        <label class="form-label">Telefono *</label>
+                                        <input type="tel" class="form-control" name="telefono" required>
+                                    </div>
+                                </div>
+                                <div class="col-md-6">
+                                    <div class="mb-3">
+                                        <label class="form-label">Email</label>
+                                        <input type="email" class="form-control" name="email">
+                                    </div>
+                                </div>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Annulla</button>
+                <button type="button" class="btn btn-primary" onclick="selezionaCliente()">Conferma</button>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+// Variabili globali
+let carrello = {};
+let clienteSelezionato = null;
+let scontoApplicato = null;
+let importoModificatoManualmente = false;
+
+// Inizializzazione
+document.addEventListener('DOMContentLoaded', function() {
+    inizializzaCarrello();
+    configuraCercaCliente();
+    configuraCategorieFilter();
+    configuraTracciamentoImporto();
+    configuraModalePagamento();
+});
+
+// Configura il tracciamento dell'importo ricevuto
+function configuraTracciamentoImporto() {
+    const importoRicevuto = document.getElementById('importo-ricevuto');
+    
+    // Controllo se l'elemento esiste prima di aggiungere listener
+    if (importoRicevuto) {
+        // Traccia modifiche manuali
+        importoRicevuto.addEventListener('input', function() {
+            importoModificatoManualmente = true;
+        });
+        
+        // Reset quando viene modificato automaticamente
+        importoRicevuto.addEventListener('focus', function() {
+            if (this.value && !importoModificatoManualmente) {
+                this.select(); // Seleziona tutto per facilitare la modifica
+            }
+        });
+    }
+}
+
+// Inizializza il carrello dalla sessione
+function inizializzaCarrello() {
+    // Recupera il carrello corrente dal server
+    fetch('/ordini/api/stato-carrello/')
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                carrello = data.carrello || {};
+                scontoApplicato = data.sconto_applicato || null;
+                
+                // Aggiorna l'interfaccia
+                aggiornaCarrello();
+                
+                // Aggiorna il select dello sconto
+                if (scontoApplicato) {
+                    document.getElementById('sconto-select').value = scontoApplicato.id;
+                }
+            } else {
+                // Fallback se non c'è API
+                aggiornaCarrello();
+            }
+        })
+        .catch(error => {
+            console.error('Errore caricamento carrello:', error);
+            aggiornaCarrello();
+        });
+}
+
+// Gestione categorie
+function configuraCategorieFilter() {
+    document.querySelectorAll('.btn-categoria').forEach(btn => {
+        btn.addEventListener('click', function() {
+            // Aggiorna bottoni attivi
+            document.querySelectorAll('.btn-categoria').forEach(b => b.classList.remove('active'));
+            this.classList.add('active');
+            
+            const categoria = this.dataset.categoria;
+            filtraPerCategoria(categoria);
+        });
+    });
+}
+
+function filtraPerCategoria(categoriaId) {
+    document.querySelectorAll('.catalogo-item').forEach(item => {
+        if (categoriaId === 'all' || item.dataset.categoria === categoriaId) {
+            item.style.display = 'block';
+        } else {
+            item.style.display = 'none';
+        }
+    });
+}
+
+// Gestione carrello
+function aggiungiAlCarrello(servizioId) {
+    AutolavaggioJS.fetchWithCSRF('/ordini/api/aggiungi-carrello/', {
+        method: 'POST',
+        body: JSON.stringify({
+            servizio_prodotto_id: servizioId,
+            quantita: 1
+        })
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            carrello = data.carrello;
+            aggiornaCarrello();
+            // Messaggio rimosso per non disturbare l'utente
+        } else {
+            AutolavaggioJS.showToast(data.error || 'Errore nell\'aggiungere il prodotto', 'error');
+        }
+    })
+    .catch(error => {
+        console.error('Errore:', error);
+        AutolavaggioJS.showToast('Errore di connessione', 'error');
+    });
+}
+
+function rimuoviDalCarrello(servizioId) {
+    AutolavaggioJS.fetchWithCSRF('/ordini/api/rimuovi-carrello/', {
+        method: 'POST',
+        body: JSON.stringify({
+            servizio_prodotto_id: servizioId
+        })
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            carrello = data.carrello;
+            aggiornaCarrello();
+            // Messaggio rimosso per non disturbare l'utente
+        }
+    })
+    .catch(error => console.error('Errore:', error));
+}
+
+function modificaQuantita(servizioId, delta) {
+    const item = carrello[servizioId];
+    if (!item) return;
+    
+    const nuovaQuantita = item.quantita + delta;
+    
+    if (nuovaQuantita <= 0) {
+        rimuoviDalCarrello(servizioId);
+        return;
+    }
+    
+    // Aggiorna la quantità localmente
+    item.quantita = nuovaQuantita;
+    
+    // Sincronizza con il server
+    AutolavaggioJS.fetchWithCSRF('/ordini/api/aggiungi-carrello/', {
+        method: 'POST',
+        body: JSON.stringify({
+            servizio_prodotto_id: servizioId,
+            quantita: delta
+        })
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            carrello = data.carrello;
+            aggiornaCarrello();
+        }
+    })
+    .catch(error => console.error('Errore:', error));
+}
+
+function svuotaCarrello() {
+    if (Object.keys(carrello).length === 0) return;
+    
+    if (confirm('Svuotare il carrello?')) {
+        // Chiama API per pulire la sessione
+        AutolavaggioJS.fetchWithCSRF('/ordini/api/rimuovi-carrello/', {
+            method: 'POST',
+            body: JSON.stringify({servizio_prodotto_id: 'all'})
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                // Aggiorna il carrello locale con i dati dal server
+                carrello = data.carrello;
+                aggiornaCarrello();
+                
+                // Pulisce anche eventuali sconti applicati
+                scontoApplicato = null;
+                document.getElementById('sconto-select').value = '';
+                
+                // Messaggio rimosso per non disturbare l'utente
+            } else {
+                console.error('Errore svuotamento carrello:', data.error);
+            }
+        })
+        .catch(error => {
+            console.error('Errore:', error);
+        });
+    }
+}
+
+function aggiornaCarrello() {
+    const container = document.getElementById('carrello-items');
+    const btnCompleta = document.getElementById('btn-completa-ordine');
+    
+    if (Object.keys(carrello).length === 0) {
+        container.innerHTML = `
+            <div class="text-center text-muted py-4">
+                <i class="bi bi-cart-x display-6"></i>
+                <p>Carrello vuoto</p>
+            </div>
+        `;
+        btnCompleta.disabled = true;
+        aggiornaTotali(0, 0, 0);
+        return;
+    }
+    
+    let html = '';
+    let totale = 0;
+    
+    Object.values(carrello).forEach(item => {
+        const subtotale = item.prezzo * item.quantita;
+        totale += subtotale;
+        
+        html += `
+            <div class="carrello-item">
+                <div class="d-flex justify-content-between align-items-center">
+                    <div class="flex-grow-1">
+                        <h6 class="mb-0">${item.titolo}</h6>
+                        <small class="text-muted">${item.tipo}</small>
+                    </div>
+                    <div class="text-end">
+                        <strong class="d-block">€${subtotale.toFixed(2)}</strong>
+                        <button class="btn btn-sm btn-outline-danger" onclick="rimuoviDalCarrello(${item.id})" title="Rimuovi">
+                            <i class="bi bi-x"></i>
+                        </button>
+                    </div>
+                </div>
+                <div class="d-flex justify-content-between align-items-center mt-1">
+                    <div class="btn-group btn-group-sm" role="group">
+                        <button class="btn btn-outline-secondary" onclick="modificaQuantita(${item.id}, -1)">-</button>
+                        <span class="btn btn-outline-secondary">${item.quantita}</span>
+                        <button class="btn btn-outline-secondary" onclick="modificaQuantita(${item.id}, 1)">+</button>
+                    </div>
+                    <small class="text-muted">€${item.prezzo.toFixed(2)} x ${item.quantita}</small>
+                </div>
+            </div>
+        `;
+    });
+    
+    container.innerHTML = html;
+    btnCompleta.disabled = false;
+    
+    // Aggiorna totali
+    aggiornaTotali(totale, 0, totale);
+    
+    // Ricalcola con sconto se applicato
+    if (scontoApplicato) {
+        applicaSconto();
+    }
+}
+
+function aggiornaTotali(subtotale, sconto, finale) {
+    document.getElementById('subtotale').textContent = `€${subtotale.toFixed(2)}`;
+    document.getElementById('importo-sconto').textContent = `-€${sconto.toFixed(2)}`;
+    document.getElementById('totale-finale').textContent = `€${finale.toFixed(2)}`;
+    
+    const rigaSconto = document.getElementById('riga-sconto');
+    if (sconto > 0) {
+        rigaSconto.style.display = 'flex';
+    } else {
+        rigaSconto.style.display = 'none';
+    }
+    
+    // Aggiorna importo ricevuto solo se non è stato modificato manualmente e se esiste
+    const importoRicevuto = document.getElementById('importo-ricevuto');
+    if (importoRicevuto && !importoModificatoManualmente) {
+        importoRicevuto.value = '';
+        importoRicevuto.placeholder = `€${finale.toFixed(2)}`;
+    }
+    
+    // Calcola resto solo se l'elemento esiste
+    if (importoRicevuto) {
+        calcolaResto();
+    }
+}
+
+// Gestione sconti
+function applicaSconto() {
+    const select = document.getElementById('sconto-select');
+    const scontoId = select.value;
+    
+    AutolavaggioJS.fetchWithCSRF('/ordini/api/applica-sconto/', {
+        method: 'POST',
+        body: JSON.stringify({
+            sconto_id: scontoId || null
+        })
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            scontoApplicato = data.sconto_applicato;
+            aggiornaTotali(data.totale_prezzo, data.importo_sconto, data.totale_finale);
+        }
+    })
+    .catch(error => console.error('Errore:', error));
+}
+
+// Calcolo resto
+function calcolaResto() {
+    const importoRicevutoElement = document.getElementById('importo-ricevuto');
+    const restoInfo = document.getElementById('resto-info');
+    const restoImporto = document.getElementById('resto-importo');
+    
+    // Controlla se tutti gli elementi esistono
+    if (!importoRicevutoElement || !restoInfo || !restoImporto) {
+        return;
+    }
+    
+    const importoRicevutoStr = importoRicevutoElement.value;
+    const importoRicevuto = parseFloat(importoRicevutoStr) || 0;
+    const totaleFinal = parseFloat(document.getElementById('totale-finale').textContent.replace('€', ''));
+    const resto = Math.max(0, importoRicevuto - totaleFinal);
+    
+    restoImporto.textContent = resto.toFixed(2);
+    
+    // Mostra resto solo se c'è un importo inserito e c'è effettivamente un resto
+    if (importoRicevutoStr && importoRicevutoStr.trim() && resto > 0) {
+        restoInfo.classList.remove('d-none');
+    } else {
+        restoInfo.classList.add('d-none');
+    }
+}
+
+// Gestione consegna
+function toggleOraConsegna() {
+    const tipoConsegna = document.getElementById('tipo-consegna').value;
+    const oraConsegnaInput = document.getElementById('ora-consegna-richiesta');
+    
+    if (tipoConsegna === 'programmata') {
+        oraConsegnaInput.disabled = false;
+        oraConsegnaInput.required = true;
+        // Imposta ora minima come ora corrente + 30 minuti
+        const now = new Date();
+        now.setMinutes(now.getMinutes() + 30);
+        oraConsegnaInput.min = now.toTimeString().slice(0, 5);
+    } else {
+        oraConsegnaInput.disabled = true;
+        oraConsegnaInput.required = false;
+        oraConsegnaInput.value = '';
+    }
+}
+
+
+// Calcolo tempo attesa
+function calcolaTempoAttesa() {
+    if (Object.keys(carrello).length === 0) {
+        AutolavaggioJS.showToast('Aggiungi servizi al carrello', 'warning');
+        return;
+    }
+    
+    AutolavaggioJS.fetchWithCSRF('/ordini/api/calcola-tempo-attesa/')
+    .then(response => response.json())
+    .then(data => {
+        if (data.tempo_attesa_minuti > 0) {
+            document.getElementById('tempo-attesa-minuti').textContent = `${data.tempo_attesa_minuti} minuti`;
+            document.getElementById('ora-consegna').textContent = data.consegna_suggerita;
+            document.getElementById('tempo-attesa').classList.remove('d-none');
+        } else {
+            document.getElementById('tempo-attesa').classList.add('d-none');
+        }
+    })
+    .catch(error => console.error('Errore:', error));
+}
+
+// Gestione cliente
+function mostraModalCliente() {
+    const modal = new bootstrap.Modal(document.getElementById('modalCliente'));
+    modal.show();
+}
+
+function configuraCercaCliente() {
+    const input = document.getElementById('cerca-cliente');
+    let timeout;
+    
+    input.addEventListener('input', function() {
+        clearTimeout(timeout);
+        const term = this.value.trim();
+        
+        if (term.length < 2) {
+            document.getElementById('risultati-ricerca').innerHTML = '';
+            return;
+        }
+        
+        timeout = setTimeout(() => {
+            fetch(`/clienti/cerca/?term=${encodeURIComponent(term)}`)
+            .then(response => response.json())
+            .then(data => {
+                mostraRisultatiRicerca(data.results);
+            })
+            .catch(error => console.error('Errore ricerca:', error));
+        }, 300);
+    });
+}
+
+function mostraRisultatiRicerca(risultati) {
+    const container = document.getElementById('risultati-ricerca');
+    
+    if (risultati.length === 0) {
+        container.innerHTML = '<p class="text-muted">Nessun cliente trovato</p>';
+        return;
+    }
+    
+    let html = '<div class="list-group">';
+    risultati.forEach(cliente => {
+        html += `
+            <button type="button" class="list-group-item list-group-item-action" 
+                    onclick="selezionaClienteTrovato(${cliente.id}, '${cliente.text}')">
+                <div class="d-flex w-100 justify-content-between">
+                    <h6 class="mb-1">${cliente.text}</h6>
+                    <small class="text-muted">${cliente.tipo}</small>
+                </div>
+                <p class="mb-1">${cliente.email}</p>
+                <small>${cliente.telefono}</small>
+            </button>
+        `;
+    });
+    html += '</div>';
+    
+    container.innerHTML = html;
+}
+
+function selezionaClienteTrovato(id, nome) {
+    clienteSelezionato = {id: id, nome: nome};
+    bootstrap.Modal.getInstance(document.getElementById('modalCliente')).hide();
+    mostraClienteSelezionato();
+}
+
+function selezionaCliente() {
+    const tabAttivo = document.querySelector('#clienteTabs .nav-link.active').id;
+    
+    if (tabAttivo === 'nuovo-tab') {
+        // Crea nuovo cliente
+        const form = document.getElementById('form-nuovo-cliente');
+        const formData = new FormData(form);
+        
+        if (!form.checkValidity()) {
+            form.reportValidity();
+            return;
+        }
+        
+        clienteSelezionato = {
+            nuovo: true,
+            nome: formData.get('nome'),
+            cognome: formData.get('cognome'),
+            telefono: formData.get('telefono'),
+            email: formData.get('email')
+        };
+        
+        bootstrap.Modal.getInstance(document.getElementById('modalCliente')).hide();
+        mostraClienteSelezionato();
+    }
+}
+
+function mostraClienteSelezionato() {
+    const container = document.getElementById('cliente-info');
+    const nomeElement = document.getElementById('cliente-nome');
+    
+    if (clienteSelezionato) {
+        let nomeCompleto;
+        if (clienteSelezionato.nuovo) {
+            nomeCompleto = `${clienteSelezionato.nome} ${clienteSelezionato.cognome}`;
+        } else {
+            nomeCompleto = clienteSelezionato.nome;
+        }
+        
+        nomeElement.textContent = nomeCompleto;
+        container.classList.remove('d-none');
+    }
+}
+
+function rimuoviCliente() {
+    clienteSelezionato = null;
+    document.getElementById('cliente-info').classList.add('d-none');
+}
+
+// Completamento ordine
+function completaOrdine() {
+    if (Object.keys(carrello).length === 0) {
+        AutolavaggioJS.showToast('Carrello vuoto', 'warning');
+        return;
+    }
+    
+    // Popola il modale con i dati dell'ordine
+    popolaModalePagamento();
+    
+    // Mostra il modale
+    const modal = new bootstrap.Modal(document.getElementById('modalPagamento'));
+    modal.show();
+}
+
+function popolaModalePagamento() {
+    // Calcola totali
+    const subtotale = Object.values(carrello).reduce((sum, item) => sum + (item.prezzo * item.quantita), 0);
+    const importoSconto = scontoApplicato ? calcolaImportoSconto(subtotale, scontoApplicato) : 0;
+    const totaleFinale = subtotale - importoSconto;
+    
+    // Popola riepilogo
+    document.getElementById('modal-subtotale').textContent = `€${subtotale.toFixed(2)}`;
+    document.getElementById('modal-sconto').textContent = `-€${importoSconto.toFixed(2)}`;
+    document.getElementById('modal-totale').textContent = `€${totaleFinale.toFixed(2)}`;
+    
+    // Mostra/nascondi riga sconto
+    const rigaSconto = document.getElementById('modal-riga-sconto');
+    if (importoSconto > 0) {
+        rigaSconto.style.display = 'flex';
+    } else {
+        rigaSconto.style.display = 'none';
+    }
+    
+    // Mostra cliente se presente
+    const clienteInfo = document.getElementById('modal-cliente-info');
+    const clienteNome = document.getElementById('modal-cliente-nome');
+    if (clienteSelezionato) {
+        let nomeCompleto;
+        if (clienteSelezionato.nuovo) {
+            nomeCompleto = `${clienteSelezionato.nome} ${clienteSelezionato.cognome}`;
+        } else {
+            nomeCompleto = clienteSelezionato.nome;
+        }
+        clienteNome.textContent = nomeCompleto;
+        clienteInfo.classList.remove('d-none');
+    } else {
+        clienteInfo.classList.add('d-none');
+    }
+    
+    
+    // Reset form pagamento
+    document.getElementById('nessunPagamento').checked = true;
+    document.getElementById('dettagliPagamento').classList.add('d-none');
+    document.getElementById('modal-importo-ricevuto').value = '';
+    document.getElementById('modal-resto-info').classList.add('d-none');
+}
+
+function calcolaImportoSconto(subtotale, sconto) {
+    if (sconto.tipo === 'percentuale') {
+        return subtotale * (sconto.valore / 100);
+    } else {
+        return Math.min(sconto.valore, subtotale);
+    }
+}
+
+// Configura il modale pagamento
+function configuraModalePagamento() {
+    // Listener per radio buttons tipo pagamento
+    document.querySelectorAll('input[name="tipoPagamento"]').forEach(radio => {
+        radio.addEventListener('change', function() {
+            const dettagliPagamento = document.getElementById('dettagliPagamento');
+            const importoRicevuto = document.getElementById('modal-importo-ricevuto');
+            const totaleFinale = parseFloat(document.getElementById('modal-totale').textContent.replace('€', ''));
+            
+            if (this.value === 'nessuno') {
+                dettagliPagamento.classList.add('d-none');
+            } else {
+                dettagliPagamento.classList.remove('d-none');
+                
+                if (this.value === 'completo') {
+                    importoRicevuto.value = totaleFinale.toFixed(2);
+                } else if (this.value === 'parziale') {
+                    importoRicevuto.value = '';
+                    importoRicevuto.focus();
+                }
+                
+                calcolaRestoModale();
+            }
+        });
+    });
+    
+    // Listener per calcolo resto
+    document.getElementById('modal-importo-ricevuto').addEventListener('input', calcolaRestoModale);
+    
+    // Listener per conferma ordine
+    document.getElementById('btn-conferma-ordine').addEventListener('click', confermaOrdine);
+}
+
+function calcolaRestoModale() {
+    const importoRicevuto = parseFloat(document.getElementById('modal-importo-ricevuto').value) || 0;
+    const totaleFinale = parseFloat(document.getElementById('modal-totale').textContent.replace('€', ''));
+    const resto = Math.max(0, importoRicevuto - totaleFinale);
+    
+    const restoInfo = document.getElementById('modal-resto-info');
+    document.getElementById('modal-resto-importo').textContent = resto.toFixed(2);
+    
+    if (resto > 0) {
+        restoInfo.classList.remove('d-none');
+    } else {
+        restoInfo.classList.add('d-none');
+    }
+}
+
+function confermaOrdine() {
+    console.log('confermaOrdine chiamata');
+    const tipoPagamento = document.querySelector('input[name="tipoPagamento"]:checked').value;
+    const btn = document.getElementById('btn-conferma-ordine');
+    const originalText = btn.innerHTML;
+    
+    AutolavaggioJS.showLoading(btn);
+    
+    const datiOrdine = {
+        cliente_id: clienteSelezionato && !clienteSelezionato.nuovo ? clienteSelezionato.id : null,
+        nuovo_cliente: clienteSelezionato && clienteSelezionato.nuovo ? clienteSelezionato : null,
+        nota: document.getElementById('note-ordine').value,
+        tipo_auto: document.getElementById('tipo-auto').value,
+        stampa_scontrino: true,
+        // Dati consegna
+        tipo_consegna: document.getElementById('tipo-consegna').value,
+        ora_consegna_richiesta: document.getElementById('ora-consegna-richiesta').value || null
+    };
+    
+    // Aggiungi dati pagamento se necessario
+    if (tipoPagamento !== 'nessuno') {
+        const importoRicevuto = document.getElementById('modal-importo-ricevuto').value;
+        const metodoPagamento = document.getElementById('modal-metodo-pagamento').value;
+        
+        if (importoRicevuto && parseFloat(importoRicevuto) > 0) {
+            datiOrdine.importo_pagamento = importoRicevuto;
+            datiOrdine.metodo_pagamento = metodoPagamento;
+        }
+    }
+    
+    AutolavaggioJS.fetchWithCSRF('/ordini/api/completa-ordine/', {
+        method: 'POST',
+        body: JSON.stringify(datiOrdine)
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            // Chiudi modale
+            bootstrap.Modal.getInstance(document.getElementById('modalPagamento')).hide();
+            
+            // Reset interfaccia
+            carrello = {};
+            clienteSelezionato = null;
+            scontoApplicato = null;
+            importoModificatoManualmente = false;
+            
+            aggiornaCarrello();
+            rimuoviCliente();
+            document.getElementById('sconto-select').value = '';
+            document.getElementById('note-ordine').value = '';
+            document.getElementById('tipo-auto').value = '';
+            document.getElementById('importo-ricevuto').value = '';
+            document.getElementById('tempo-attesa').classList.add('d-none');
+            
+            // Determina messaggio in base al tipo di pagamento
+            let messaggio = `Ordine ${data.numero_progressivo} creato! Totale: €${data.totale_finale}`;
+            
+            if (tipoPagamento === 'nessuno') {
+                messaggio += ' - Non pagato';
+            } else if (tipoPagamento === 'completo') {
+                messaggio += ' - Pagato completamente';
+            } else if (tipoPagamento === 'parziale') {
+                messaggio += ` - Pagamento parziale di €${data.importo_pagamento || 0}`;
+            }
+            
+            AutolavaggioJS.showToast(messaggio, 'success');
+            
+            if (data.resto > 0) {
+                AutolavaggioJS.showToast(`Resto da dare: €${data.resto.toFixed(2)}`, 'info');
+            }
+        } else {
+            AutolavaggioJS.showToast(data.error || 'Errore nella creazione dell\'ordine', 'error');
+        }
+    })
+    .catch(error => {
+        console.error('Errore:', error);
+        AutolavaggioJS.showToast('Errore di connessione', 'error');
+    })
+    .finally(() => {
+        AutolavaggioJS.hideLoading(btn, originalText);
+    });
+}
+
+// Shortcuts tastiera
+document.addEventListener('keydown', function(e) {
+    // F1 - Nuovo cliente
+    if (e.key === 'F1') {
+        e.preventDefault();
+        mostraModalCliente();
+    }
+    
+    // F2 - Calcola tempo attesa
+    if (e.key === 'F2') {
+        e.preventDefault();
+        calcolaTempoAttesa();
+    }
+    
+    // F3 - Completa ordine
+    if (e.key === 'F3') {
+        e.preventDefault();
+        completaOrdine();
+    }
+    
+    // ESC - Svuota carrello
+    if (e.key === 'Escape') {
+        svuotaCarrello();
+    }
+});
+</script>
+{% endblock %}

@@ -1,0 +1,166 @@
+/* Custom styles for Autolavaggio Management System */
+
+:root {
+    --primary-color: #0066cc;
+    --secondary-color: #6c757d;
+    --success-color: #28a745;
+    --warning-color: #ffc107;
+    --danger-color: #dc3545;
+    --info-color: #17a2b8;
+    --light-color: #f8f9fa;
+    --dark-color: #343a40;
+}
+
+/* Global Styles */
+body {
+    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+    background-color: #f5f6fa;
+}
+
+.navbar-brand {
+    font-weight: bold;
+    font-size: 1.5rem;
+}
+
+/* Cards */
+.card {
+    border-radius: 10px;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+    border: none;
+}
+
+.card-header {
+    background: linear-gradient(135deg, var(--primary-color), #0052a3);
+    color: white;
+    border-radius: 10px 10px 0 0 !important;
+    font-weight: 600;
+}
+
+/* Buttons */
+.btn {
+    border-radius: 6px;
+    font-weight: 500;
+}
+
+.btn-primary {
+    background: linear-gradient(135deg, var(--primary-color), #0052a3);
+    border: none;
+}
+
+.btn-primary:hover {
+    background: linear-gradient(135deg, #0052a3, var(--primary-color));
+    transform: translateY(-1px);
+}
+
+/* Tables */
+.table {
+    background: white;
+    border-radius: 8px;
+    overflow: hidden;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+}
+
+.table thead th {
+    background-color: var(--light-color);
+    border-bottom: 2px solid var(--primary-color);
+    font-weight: 600;
+    color: var(--dark-color);
+}
+
+.table tbody tr:hover {
+    background-color: rgba(0, 102, 204, 0.1);
+}
+
+/* Status badges */
+.badge {
+    font-size: 0.75em;
+    padding: 0.5em 0.75em;
+}
+
+.status-nuovo { background-color: var(--info-color); }
+.status-in-lavorazione { background-color: var(--warning-color); color: black; }
+.status-completato { background-color: var(--success-color); }
+.status-annullato { background-color: var(--danger-color); }
+.status-attivo { background-color: var(--success-color); }
+.status-sospeso { background-color: var(--warning-color); color: black; }
+.status-scaduto { background-color: var(--danger-color); }
+
+/* Alert scorte basse */
+.scorta-bassa {
+    color: var(--danger-color);
+    font-weight: bold;
+}
+
+.scorta-normale {
+    color: var(--success-color);
+}
+
+/* Dashboard Stats Cards */
+.stats-card {
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    color: white;
+    border-radius: 15px;
+    padding: 2rem;
+    margin-bottom: 1rem;
+}
+
+.stats-card h3 {
+    font-size: 2.5rem;
+    font-weight: bold;
+    margin-bottom: 0.5rem;
+}
+
+.stats-card p {
+    margin: 0;
+    opacity: 0.9;
+}
+
+/* Form styles */
+.form-control:focus, .form-select:focus {
+    border-color: var(--primary-color);
+    box-shadow: 0 0 0 0.2rem rgba(0, 102, 204, 0.25);
+}
+
+/* Loading spinner */
+.spinner {
+    display: inline-block;
+    width: 20px;
+    height: 20px;
+    border: 3px solid rgba(255,255,255,.3);
+    border-radius: 50%;
+    border-top-color: #fff;
+    animation: spin 1s ease-in-out infinite;
+}
+
+@keyframes spin {
+    to { transform: rotate(360deg); }
+}
+
+/* Responsive adjustments */
+@media (max-width: 768px) {
+    .container-fluid {
+        padding-left: 10px;
+        padding-right: 10px;
+    }
+    
+    .stats-card {
+        padding: 1rem;
+        text-align: center;
+    }
+    
+    .stats-card h3 {
+        font-size: 2rem;
+    }
+}
+
+/* Print styles */
+@media print {
+    .navbar, .btn, .alert {
+        display: none !important;
+    }
+    
+    .container-fluid {
+        margin: 0;
+        padding: 0;
+    }
+}

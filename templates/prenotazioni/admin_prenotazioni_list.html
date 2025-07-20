@@ -1,0 +1,390 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}Gestione Prenotazioni - Amministrazione{% endblock %}
+
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <h1>
+        <i class="bi bi-calendar-check"></i>
+        Gestione Prenotazioni
+    </h1>
+    <div>
+        <a href="#" class="btn btn-outline-success me-2" onclick="exportCSV()">
+            <i class="bi bi-download"></i> Esporta CSV
+        </a>
+        <a href="{% url 'prenotazioni:calendario-prenotazioni' %}" class="btn btn-outline-primary">
+            <i class="bi bi-calendar3"></i> Vista Calendario
+        </a>
+    </div>
+</div>
+
+{% if messages %}
+    {% for message in messages %}
+        <div class="alert alert-{{ message.tags }} alert-dismissible fade show" role="alert">
+            {{ message }}
+            <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+        </div>
+    {% endfor %}
+{% endif %}
+
+<!-- Filtri -->
+<div class="card mb-4">
+    <div class="card-header">
+        <h5 class="mb-0">
+            <i class="bi bi-funnel"></i>
+            Filtri di Ricerca
+        </h5>
+    </div>
+    <div class="card-body">
+        <form method="get" class="row g-3">
+            <div class="col-md-3">
+                <label for="data_da" class="form-label">Data da</label>
+                <input type="date" class="form-control" id="data_da" name="data_da" 
+                       value="{{ request.GET.data_da }}">
+            </div>
+            <div class="col-md-3">
+                <label for="data_a" class="form-label">Data a</label>
+                <input type="date" class="form-control" id="data_a" name="data_a" 
+                       value="{{ request.GET.data_a }}">
+            </div>
+            <div class="col-md-3">
+                <label for="stato" class="form-label">Stato</label>
+                <select class="form-select" id="stato" name="stato">
+                    <option value="">Tutti gli stati</option>
+                    <option value="confermata" {% if request.GET.stato == 'confermata' %}selected{% endif %}>Confermata</option>
+                    <option value="in_attesa" {% if request.GET.stato == 'in_attesa' %}selected{% endif %}>In Attesa</option>
+                    <option value="completata" {% if request.GET.stato == 'completata' %}selected{% endif %}>Completata</option>
+                    <option value="cancellata" {% if request.GET.stato == 'cancellata' %}selected{% endif %}>Cancellata</option>
+                </select>
+            </div>
+            <div class="col-md-3">
+                <label for="cliente" class="form-label">Cliente</label>
+                <input type="text" class="form-control" id="cliente" name="cliente" 
+                       placeholder="Nome o email cliente" value="{{ request.GET.cliente }}">
+            </div>
+            <div class="col-md-3">
+                <label for="postazione" class="form-label">Postazione</label>
+                <select class="form-select" id="postazione" name="postazione">
+                    <option value="">Tutte le postazioni</option>
+                    {% for postazione in postazioni %}
+                        <option value="{{ postazione.id }}" 
+                                {% if request.GET.postazione == postazione.id|stringformat:"s" %}selected{% endif %}>
+                            {{ postazione.nome }}
+                        </option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div class="col-md-3">
+                <label for="servizio" class="form-label">Servizio</label>
+                <select class="form-select" id="servizio" name="servizio">
+                    <option value="">Tutti i servizi</option>
+                    {% for servizio in servizi %}
+                        <option value="{{ servizio.id }}" 
+                                {% if request.GET.servizio == servizio.id|stringformat:"s" %}selected{% endif %}>
+                            {{ servizio.titolo }}
+                        </option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div class="col-md-6 d-flex align-items-end">
+                <button type="submit" class="btn btn-primary me-2">
+                    <i class="bi bi-search"></i> Cerca
+                </button>
+                <a href="{% url 'prenotazioni:prenotazioni-admin' %}" class="btn btn-outline-secondary">
+                    <i class="bi bi-x-circle"></i> Reset
+                </a>
+            </div>
+        </form>
+    </div>
+</div>
+
+<!-- Statistiche Rapide -->
+<div class="row mb-4">
+    <div class="col-md-3">
+        <div class="card bg-primary text-white">
+            <div class="card-body text-center">
+                <i class="bi bi-calendar-check display-6"></i>
+                <h4>{{ statistiche.oggi }}</h4>
+                <small>Prenotazioni Oggi</small>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-3">
+        <div class="card bg-warning text-white">
+            <div class="card-body text-center">
+                <i class="bi bi-clock display-6"></i>
+                <h4>{{ statistiche.in_attesa }}</h4>
+                <small>In Attesa</small>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-3">
+        <div class="card bg-success text-white">
+            <div class="card-body text-center">
+                <i class="bi bi-check-circle display-6"></i>
+                <h4>{{ statistiche.confermate }}</h4>
+                <small>Confermate</small>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-3">
+        <div class="card bg-info text-white">
+            <div class="card-body text-center">
+                <i class="bi bi-currency-euro display-6"></i>
+                <h4>€{{ statistiche.fatturato_mese|floatformat:0 }}</h4>
+                <small>Fatturato Mese</small>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Lista Prenotazioni -->
+<div class="card">
+    <div class="card-header">
+        <h5 class="mb-0">
+            <i class="bi bi-list-check"></i>
+            Prenotazioni
+            {% if prenotazioni %}
+                <span class="badge bg-secondary">{{ prenotazioni|length }}</span>
+            {% endif %}
+        </h5>
+    </div>
+    <div class="card-body">
+        {% if prenotazioni %}
+            <div class="table-responsive">
+                <table class="table table-hover">
+                    <thead class="table-light">
+                        <tr>
+                            <th>Data/Ora</th>
+                            <th>Cliente</th>
+                            <th>Servizi</th>
+                            <th>Postazione</th>
+                            <th>Stato</th>
+                            <th>Totale</th>
+                            <th>Azioni</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for prenotazione in prenotazioni %}
+                        <tr>
+                            <td>
+                                <strong>{{ prenotazione.data_prenotazione|date:"d/m/Y" }}</strong><br>
+                                <small class="text-muted">{{ prenotazione.ora_prenotazione|time:"H:i" }}</small>
+                            </td>
+                            <td>
+                                {% if prenotazione.cliente %}
+                                    <a href="{% url 'clienti:storico-cliente' prenotazione.cliente.pk %}" 
+                                       class="text-decoration-none">
+                                        {{ prenotazione.cliente.nome_completo }}
+                                    </a>
+                                    <br><small class="text-muted">{{ prenotazione.cliente.email }}</small>
+                                {% else %}
+                                    <strong>{{ prenotazione.nome_cliente }}</strong>
+                                    <br><small class="text-muted">{{ prenotazione.email_cliente }}</small>
+                                {% endif %}
+                            </td>
+                            <td>
+                                {% for servizio in prenotazione.servizi_selezionati.all %}
+                                    <span class="badge bg-secondary me-1">{{ servizio.titolo }}</span>
+                                {% endfor %}
+                            </td>
+                            <td>
+                                {% if prenotazione.postazione_preferita %}
+                                    <span class="badge bg-info">{{ prenotazione.postazione_preferita.nome }}</span>
+                                {% else %}
+                                    <span class="text-muted">Qualsiasi</span>
+                                {% endif %}
+                            </td>
+                            <td>
+                                {% if prenotazione.stato == 'confermata' %}
+                                    <span class="badge bg-success">Confermata</span>
+                                {% elif prenotazione.stato == 'in_attesa' %}
+                                    <span class="badge bg-warning">In Attesa</span>
+                                {% elif prenotazione.stato == 'completata' %}
+                                    <span class="badge bg-primary">Completata</span>
+                                {% elif prenotazione.stato == 'cancellata' %}
+                                    <span class="badge bg-danger">Cancellata</span>
+                                {% else %}
+                                    <span class="badge bg-secondary">{{ prenotazione.get_stato_display }}</span>
+                                {% endif %}
+                            </td>
+                            <td>
+                                <strong>€{{ prenotazione.totale_stimato|floatformat:2 }}</strong>
+                            </td>
+                            <td>
+                                <div class="btn-group" role="group">
+                                    <a href="{% url 'prenotazioni:dettaglio-prenotazione' prenotazione.pk %}" 
+                                       class="btn btn-sm btn-outline-primary" title="Dettagli">
+                                        <i class="bi bi-eye"></i>
+                                    </a>
+                                    <a href="{% url 'prenotazioni:modifica-prenotazione' prenotazione.pk %}" 
+                                       class="btn btn-sm btn-outline-warning" title="Modifica">
+                                        <i class="bi bi-pencil"></i>
+                                    </a>
+                                    {% if prenotazione.stato == 'in_attesa' %}
+                                        <button class="btn btn-sm btn-outline-success" 
+                                                onclick="confermaPrenotazione({{ prenotazione.pk }})" title="Conferma">
+                                            <i class="bi bi-check-circle"></i>
+                                        </button>
+                                    {% endif %}
+                                    {% if prenotazione.stato in 'in_attesa,confermata' %}
+                                        <button class="btn btn-sm btn-outline-danger" 
+                                                onclick="cancellaPrenotazione({{ prenotazione.pk }})" title="Cancella">
+                                            <i class="bi bi-x-circle"></i>
+                                        </button>
+                                    {% endif %}
+                                    <a href="{% url 'prenotazioni:elimina-prenotazione' prenotazione.pk %}" 
+                                       class="btn btn-sm btn-outline-dark" title="Elimina">
+                                        <i class="bi bi-trash"></i>
+                                    </a>
+                                    {% if prenotazione.stato == 'confermata' %}
+                                        <a href="#" 
+                                           class="btn btn-sm btn-outline-warning" title="Crea Ordine">
+                                            <i class="bi bi-receipt"></i>
+                                        </a>
+                                    {% endif %}
+                                </div>
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+
+            <!-- Paginazione -->
+            {% if is_paginated %}
+                <nav aria-label="Paginazione prenotazioni">
+                    <ul class="pagination justify-content-center">
+                        {% if page_obj.has_previous %}
+                            <li class="page-item">
+                                <a class="page-link" href="?page=1{% if request.GET.urlencode %}&{{ request.GET.urlencode }}{% endif %}">
+                                    <i class="bi bi-chevron-double-left"></i>
+                                </a>
+                            </li>
+                            <li class="page-item">
+                                <a class="page-link" href="?page={{ page_obj.previous_page_number }}{% if request.GET.urlencode %}&{{ request.GET.urlencode }}{% endif %}">
+                                    <i class="bi bi-chevron-left"></i>
+                                </a>
+                            </li>
+                        {% endif %}
+
+                        {% for num in page_obj.paginator.page_range %}
+                            {% if page_obj.number == num %}
+                                <li class="page-item active">
+                                    <span class="page-link">{{ num }}</span>
+                                </li>
+                            {% elif num > page_obj.number|add:'-3' and num < page_obj.number|add:'3' %}
+                                <li class="page-item">
+                                    <a class="page-link" href="?page={{ num }}{% if request.GET.urlencode %}&{{ request.GET.urlencode }}{% endif %}">{{ num }}</a>
+                                </li>
+                            {% endif %}
+                        {% endfor %}
+
+                        {% if page_obj.has_next %}
+                            <li class="page-item">
+                                <a class="page-link" href="?page={{ page_obj.next_page_number }}{% if request.GET.urlencode %}&{{ request.GET.urlencode }}{% endif %}">
+                                    <i class="bi bi-chevron-right"></i>
+                                </a>
+                            </li>
+                            <li class="page-item">
+                                <a class="page-link" href="?page={{ page_obj.paginator.num_pages }}{% if request.GET.urlencode %}&{{ request.GET.urlencode }}{% endif %}">
+                                    <i class="bi bi-chevron-double-right"></i>
+                                </a>
+                            </li>
+                        {% endif %}
+                    </ul>
+                </nav>
+            {% endif %}
+        {% else %}
+            <div class="text-center py-5">
+                <i class="bi bi-calendar-x display-1 text-muted"></i>
+                <h4 class="text-muted mt-3">Nessuna prenotazione trovata</h4>
+                <p class="text-muted">Non ci sono prenotazioni che corrispondono ai criteri di ricerca.</p>
+                <a href="{% url 'prenotazioni:prenotazioni-admin' %}" class="btn btn-outline-primary">
+                    <i class="bi bi-arrow-clockwise"></i> Rimuovi Filtri
+                </a>
+            </div>
+        {% endif %}
+    </div>
+</div>
+
+<!-- Modal Conferma Azione -->
+<div class="modal fade" id="modalConfermaAzione" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="modalTitolo">Conferma Azione</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <p id="modalMessaggio">Sei sicuro di voler procedere?</p>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Annulla</button>
+                <button type="button" class="btn btn-primary" id="btnConfermaAzione">Conferma</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+let azioneCorrente = null;
+let prenotazioneId = null;
+
+function confermaPrenotazione(id) {
+    azioneCorrente = 'conferma';
+    prenotazioneId = id;
+    document.getElementById('modalTitolo').textContent = 'Conferma Prenotazione';
+    document.getElementById('modalMessaggio').textContent = 'Sei sicuro di voler confermare questa prenotazione?';
+    document.getElementById('btnConfermaAzione').className = 'btn btn-success';
+    document.getElementById('btnConfermaAzione').innerHTML = '<i class="bi bi-check-circle"></i> Conferma';
+    
+    const modal = new bootstrap.Modal(document.getElementById('modalConfermaAzione'));
+    modal.show();
+}
+
+function cancellaPrenotazione(id) {
+    azioneCorrente = 'cancella';
+    prenotazioneId = id;
+    document.getElementById('modalTitolo').textContent = 'Cancella Prenotazione';
+    document.getElementById('modalMessaggio').textContent = 'Sei sicuro di voler cancellare questa prenotazione? Questa azione non può essere annullata.';
+    document.getElementById('btnConfermaAzione').className = 'btn btn-danger';
+    document.getElementById('btnConfermaAzione').innerHTML = '<i class="bi bi-x-circle"></i> Cancella';
+    
+    const modal = new bootstrap.Modal(document.getElementById('modalConfermaAzione'));
+    modal.show();
+}
+
+document.getElementById('btnConfermaAzione').addEventListener('click', function() {
+    if (azioneCorrente && prenotazioneId) {
+        const form = document.createElement('form');
+        form.method = 'POST';
+        form.action = `{% url 'prenotazioni:prenotazioni-admin' %}${prenotazioneId}/${azioneCorrente}/`;
+        
+        const csrfToken = document.createElement('input');
+        csrfToken.type = 'hidden';
+        csrfToken.name = 'csrfmiddlewaretoken';
+        csrfToken.value = '{{ csrf_token }}';
+        form.appendChild(csrfToken);
+        
+        document.body.appendChild(form);
+        form.submit();
+    }
+});
+
+// Auto-refresh ogni 30 secondi per aggiornare lo stato delle prenotazioni
+setInterval(function() {
+    if (!document.querySelector('.modal.show')) {
+        location.reload();
+    }
+}, 30000);
+
+// Funzione per esportare CSV
+function exportCSV() {
+    const params = new URLSearchParams(window.location.search);
+    const csvUrl = '{% url "prenotazioni:prenotazioni-admin" %}export-csv/?' + params.toString();
+    window.open(csvUrl, '_blank');
+}
+</script>
+{% endblock %}

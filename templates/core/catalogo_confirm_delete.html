@@ -1,0 +1,62 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}Elimina Prodotto/Servizio - Gestionale Autolavaggio{% endblock %}
+
+{% block content %}
+<div class="row justify-content-center">
+    <div class="col-lg-6">
+        <div class="card border-danger">
+            <div class="card-header bg-danger text-white">
+                <h4 class="mb-0">
+                    <i class="bi bi-exclamation-triangle"></i>
+                    Conferma Eliminazione
+                </h4>
+            </div>
+            <div class="card-body">
+                <div class="alert alert-warning">
+                    <i class="bi bi-warning"></i>
+                    <strong>Attenzione!</strong> Questa operazione non può essere annullata.
+                </div>
+                
+                <div class="d-flex align-items-center mb-3">
+                    {% if object.tipo == 'servizio' %}
+                        <i class="bi bi-gear text-primary me-3 fs-2"></i>
+                    {% else %}
+                        <i class="bi bi-box text-success me-3 fs-2"></i>
+                    {% endif %}
+                    <div>
+                        <h5>{{ object.titolo }}</h5>
+                        <p class="mb-0">
+                            <span class="badge bg-secondary">{{ object.categoria.nome }}</span>
+                            {% if object.tipo == 'servizio' %}
+                                <span class="badge bg-primary">Servizio</span>
+                            {% else %}
+                                <span class="badge bg-success">Prodotto</span>
+                            {% endif %}
+                        </p>
+                    </div>
+                </div>
+                
+                {% if object.descrizione %}
+                    <p><small class="text-muted">{{ object.descrizione }}</small></p>
+                {% endif %}
+                
+                <p>Sei sicuro di voler eliminare questo elemento dal catalogo?</p>
+                
+                <form method="post">
+                    {% csrf_token %}
+                    <div class="d-flex justify-content-between">
+                        <a href="{% url 'core:catalogo-list' %}" class="btn btn-secondary">
+                            <i class="bi bi-arrow-left"></i> Annulla
+                        </a>
+                        <button type="submit" class="btn btn-danger">
+                            <i class="bi bi-trash"></i> Elimina Elemento
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

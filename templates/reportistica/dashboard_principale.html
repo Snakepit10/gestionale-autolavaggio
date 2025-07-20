@@ -1,0 +1,656 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}Dashboard Reportistica{% endblock %}
+
+{% block extra_css %}
+<link href="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/3.9.1/chart.min.css" rel="stylesheet">
+<style>
+.kpi-card {
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    color: white;
+    border-radius: 15px;
+    padding: 20px;
+    margin-bottom: 20px;
+    box-shadow: 0 4px 15px rgba(0,0,0,0.1);
+    transition: transform 0.3s ease;
+}
+
+.kpi-card:hover {
+    transform: translateY(-5px);
+}
+
+.kpi-card.success {
+    background: linear-gradient(135deg, #4facfe 0%, #00f2fe 100%);
+}
+
+.kpi-card.warning {
+    background: linear-gradient(135deg, #fa709a 0%, #fee140 100%);
+}
+
+.kpi-card.info {
+    background: linear-gradient(135deg, #a8edea 0%, #fed6e3 100%);
+    color: #333;
+}
+
+.kpi-value {
+    font-size: 2.5rem;
+    font-weight: bold;
+    margin-bottom: 5px;
+}
+
+.kpi-label {
+    font-size: 0.9rem;
+    opacity: 0.9;
+    margin-bottom: 10px;
+}
+
+.kpi-trend {
+    font-size: 0.8rem;
+    display: flex;
+    align-items: center;
+    gap: 5px;
+}
+
+.trend-up {
+    color: #00ff88;
+}
+
+.trend-down {
+    color: #ff6b6b;
+}
+
+.trend-stable {
+    color: #ffd93d;
+}
+
+.chart-container {
+    background: white;
+    border-radius: 15px;
+    padding: 20px;
+    box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+    margin-bottom: 20px;
+}
+
+.stats-table {
+    background: white;
+    border-radius: 15px;
+    overflow: hidden;
+    box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+}
+
+.stats-table .table {
+    margin-bottom: 0;
+}
+
+.stats-table .table thead th {
+    background: #f8f9fa;
+    border-bottom: 2px solid #dee2e6;
+    font-weight: 600;
+}
+
+.refresh-btn {
+    position: fixed;
+    bottom: 20px;
+    right: 20px;
+    width: 60px;
+    height: 60px;
+    background: linear-gradient(135deg, #667eea, #764ba2);
+    color: white;
+    border: none;
+    border-radius: 50%;
+    box-shadow: 0 4px 15px rgba(0,0,0,0.3);
+    cursor: pointer;
+    transition: all 0.3s ease;
+    z-index: 1000;
+}
+
+.refresh-btn:hover {
+    transform: scale(1.1);
+}
+
+.loading-spinner {
+    display: inline-block;
+    width: 20px;
+    height: 20px;
+    border: 3px solid rgba(255,255,255,.3);
+    border-radius: 50%;
+    border-top-color: #fff;
+    animation: spin 1s ease-in-out infinite;
+}
+
+@keyframes spin {
+    to { transform: rotate(360deg); }
+}
+
+.dashboard-header {
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    color: white;
+    padding: 30px 0;
+    margin-bottom: 30px;
+    border-radius: 0 0 20px 20px;
+}
+
+.time-filter {
+    background: white;
+    border-radius: 10px;
+    padding: 15px;
+    margin-bottom: 20px;
+    box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+}
+
+.postazione-badge {
+    display: inline-block;
+    padding: 4px 8px;
+    border-radius: 15px;
+    font-size: 0.75rem;
+    margin-right: 5px;
+}
+
+.postazione-active {
+    background: #d4edda;
+    color: #155724;
+}
+
+.postazione-busy {
+    background: #fff3cd;
+    color: #856404;
+}
+
+.postazione-maintenance {
+    background: #f8d7da;
+    color: #721c24;
+}
+</style>
+{% endblock %}
+
+{% block content %}
+<!-- Header Dashboard -->
+<div class="dashboard-header">
+    <div class="container">
+        <div class="row align-items-center">
+            <div class="col-md-8">
+                <h1 class="mb-0">
+                    <i class="bi bi-graph-up me-2"></i>
+                    Dashboard Reportistica
+                </h1>
+                <p class="mb-0 opacity-75">Panoramica generale delle performance</p>
+            </div>
+            <div class="col-md-4 text-end">
+                <div class="text-white">
+                    <small>Ultimo aggiornamento:</small><br>
+                    <span id="last-update">{{ now|date:"d/m/Y H:i" }}</span>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="container-fluid">
+    <!-- Filtri Temporali -->
+    <div class="time-filter">
+        <div class="row align-items-center">
+            <div class="col-md-8">
+                <div class="btn-group" role="group">
+                    <input type="radio" class="btn-check" name="timeRange" id="today" value="today" checked>
+                    <label class="btn btn-outline-primary" for="today">Oggi</label>
+                    
+                    <input type="radio" class="btn-check" name="timeRange" id="week" value="week">
+                    <label class="btn btn-outline-primary" for="week">Settimana</label>
+                    
+                    <input type="radio" class="btn-check" name="timeRange" id="month" value="month">
+                    <label class="btn btn-outline-primary" for="month">Mese</label>
+                    
+                    <input type="radio" class="btn-check" name="timeRange" id="year" value="year">
+                    <label class="btn btn-outline-primary" for="year">Anno</label>
+                </div>
+            </div>
+            <div class="col-md-4 text-end">
+                <button class="btn btn-primary" onclick="exportDashboard()">
+                    <i class="bi bi-download me-1"></i> Esporta Report
+                </button>
+            </div>
+        </div>
+    </div>
+    
+    <!-- KPI Cards -->
+    <div class="row">
+        <div class="col-xl-3 col-md-6">
+            <div class="kpi-card">
+                <div class="kpi-value" id="kpi-fatturato">
+                    €{{ kpi_data.fatturato.valore|floatformat:2 }}
+                </div>
+                <div class="kpi-label">Fatturato</div>
+                <div class="kpi-trend trend-{{ kpi_data.fatturato.trend }}">
+                    <i class="bi bi-arrow-{{ kpi_data.fatturato.trend|yesno:'up,down,right' }}"></i>
+                    <span>{{ kpi_data.fatturato.variazione|floatformat:1 }}%</span>
+                </div>
+            </div>
+        </div>
+        
+        <div class="col-xl-3 col-md-6">
+            <div class="kpi-card success">
+                <div class="kpi-value" id="kpi-ordini">
+                    {{ kpi_data.ordini.valore }}
+                </div>
+                <div class="kpi-label">Ordini</div>
+                <div class="kpi-trend trend-{{ kpi_data.ordini.trend }}">
+                    <i class="bi bi-arrow-{{ kpi_data.ordini.trend|yesno:'up,down,right' }}"></i>
+                    <span>{{ kpi_data.ordini.variazione|floatformat:1 }}%</span>
+                </div>
+            </div>
+        </div>
+        
+        <div class="col-xl-3 col-md-6">
+            <div class="kpi-card warning">
+                <div class="kpi-value" id="kpi-clienti">
+                    {{ kpi_data.nuovi_clienti.valore }}
+                </div>
+                <div class="kpi-label">Nuovi Clienti</div>
+                <div class="kpi-trend trend-{{ kpi_data.nuovi_clienti.trend }}">
+                    <i class="bi bi-arrow-{{ kpi_data.nuovi_clienti.trend|yesno:'up,down,right' }}"></i>
+                    <span>{{ kpi_data.nuovi_clienti.variazione|floatformat:1 }}%</span>
+                </div>
+            </div>
+        </div>
+        
+        <div class="col-xl-3 col-md-6">
+            <div class="kpi-card info">
+                <div class="kpi-value" id="kpi-scontrino">
+                    €{{ kpi_data.scontrino_medio.valore|floatformat:2 }}
+                </div>
+                <div class="kpi-label">Scontrino Medio</div>
+                <div class="kpi-trend trend-{{ kpi_data.scontrino_medio.trend }}">
+                    <i class="bi bi-arrow-{{ kpi_data.scontrino_medio.trend|yesno:'up,down,right' }}"></i>
+                    <span>{{ kpi_data.scontrino_medio.variazione|floatformat:1 }}%</span>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Grafici -->
+    <div class="row">
+        <div class="col-xl-8 col-lg-7">
+            <div class="chart-container">
+                <h5 class="mb-3">
+                    <i class="bi bi-graph-up me-2"></i>
+                    Andamento Fatturato
+                </h5>
+                <canvas id="fatturato-chart" height="100"></canvas>
+            </div>
+        </div>
+        
+        <div class="col-xl-4 col-lg-5">
+            <div class="chart-container">
+                <h5 class="mb-3">
+                    <i class="bi bi-pie-chart me-2"></i>
+                    Distribuzione per Categoria
+                </h5>
+                <canvas id="categorie-chart" height="200"></canvas>
+            </div>
+        </div>
+    </div>
+    
+    <div class="row">
+        <!-- Servizi Top -->
+        <div class="col-xl-6 col-lg-6">
+            <div class="stats-table">
+                <div class="table-responsive">
+                    <table class="table">
+                        <thead>
+                            <tr>
+                                <th colspan="3">
+                                    <i class="bi bi-star me-2"></i>
+                                    Top Servizi
+                                </th>
+                            </tr>
+                            <tr>
+                                <th>Servizio</th>
+                                <th>Vendite</th>
+                                <th>Fatturato</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for servizio in grafici_data.servizi_top|slice:":10" %}
+                            <tr>
+                                <td>{{ servizio.servizio__titolo }}</td>
+                                <td>
+                                    <span class="badge bg-primary">{{ servizio.count }}</span>
+                                </td>
+                                <td>€{{ servizio.fatturato|floatformat:2 }}</td>
+                            </tr>
+                            {% empty %}
+                            <tr>
+                                <td colspan="3" class="text-center text-muted">
+                                    Nessun dato disponibile
+                                </td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Statistiche Postazioni -->
+        <div class="col-xl-6 col-lg-6">
+            <div class="stats-table">
+                <div class="table-responsive">
+                    <table class="table">
+                        <thead>
+                            <tr>
+                                <th colspan="4">
+                                    <i class="bi bi-geo me-2"></i>
+                                    Statistiche Postazioni
+                                </th>
+                            </tr>
+                            <tr>
+                                <th>Postazione</th>
+                                <th>Ordini</th>
+                                <th>Fatturato</th>
+                                <th>Utilizzo</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for stat in statistiche_postazioni %}
+                            <tr>
+                                <td>
+                                    {{ stat.postazione.nome }}
+                                    <span class="postazione-badge postazione-active">
+                                        Attiva
+                                    </span>
+                                </td>
+                                <td>
+                                    <span class="badge bg-success">{{ stat.ordini }}</span>
+                                </td>
+                                <td>€{{ stat.fatturato|floatformat:2 }}</td>
+                                <td>
+                                    <div class="progress" style="height: 6px;">
+                                        <div class="progress-bar bg-info" 
+                                             style="width: {{ stat.utilizzo_percentuale }}%">
+                                        </div>
+                                    </div>
+                                    <small>{{ stat.utilizzo_percentuale }}%</small>
+                                </td>
+                            </tr>
+                            {% empty %}
+                            <tr>
+                                <td colspan="4" class="text-center text-muted">
+                                    Nessuna postazione disponibile
+                                </td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Ordini Recenti -->
+    <div class="row">
+        <div class="col-12">
+            <div class="stats-table">
+                <div class="table-responsive">
+                    <table class="table">
+                        <thead>
+                            <tr>
+                                <th colspan="6">
+                                    <i class="bi bi-clock-history me-2"></i>
+                                    Ordini Recenti
+                                </th>
+                            </tr>
+                            <tr>
+                                <th>N. Ordine</th>
+                                <th>Data/Ora</th>
+                                <th>Cliente</th>
+                                <th>Postazione</th>
+                                <th>Totale</th>
+                                <th>Stato</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for ordine in ordini_recenti %}
+                            <tr>
+                                <td>
+                                    <strong>{{ ordine.numero_ordine }}</strong>
+                                </td>
+                                <td>
+                                    {{ ordine.data_creazione|date:"d/m/Y H:i" }}
+                                </td>
+                                <td>
+                                    {% if ordine.cliente %}
+                                        {{ ordine.cliente.nome_completo }}
+                                    {% else %}
+                                        <em class="text-muted">Anonimo</em>
+                                    {% endif %}
+                                </td>
+                                <td>
+                                    {% if ordine.postazione %}
+                                        <span class="badge bg-secondary">
+                                            {{ ordine.postazione.nome }}
+                                        </span>
+                                    {% else %}
+                                        -
+                                    {% endif %}
+                                </td>
+                                <td>
+                                    <strong>€{{ ordine.totale|floatformat:2 }}</strong>
+                                </td>
+                                <td>
+                                    {% if ordine.stato == 'completato' %}
+                                        <span class="badge bg-success">Completato</span>
+                                    {% elif ordine.stato == 'in_corso' %}
+                                        <span class="badge bg-warning">In Corso</span>
+                                    {% else %}
+                                        <span class="badge bg-secondary">{{ ordine.get_stato_display }}</span>
+                                    {% endif %}
+                                </td>
+                            </tr>
+                            {% empty %}
+                            <tr>
+                                <td colspan="6" class="text-center text-muted">
+                                    Nessun ordine recente
+                                </td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Pulsante Refresh -->
+<button class="refresh-btn" onclick="refreshDashboard()" title="Aggiorna Dashboard">
+    <i class="bi bi-arrow-clockwise" id="refresh-icon"></i>
+</button>
+{% endblock %}
+
+{% block extra_js %}
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/3.9.1/chart.min.js"></script>
+<script>
+// Variabili globali
+let fatturato_chart, categorie_chart;
+let refreshInterval;
+
+// Inizializzazione
+document.addEventListener('DOMContentLoaded', function() {
+    initializeCharts();
+    setupAutoRefresh();
+    setupTimeFilters();
+});
+
+function initializeCharts() {
+    // Grafico Fatturato
+    const ctx_fatturato = document.getElementById('fatturato-chart').getContext('2d');
+    fatturato_chart = new Chart(ctx_fatturato, {
+        type: 'line',
+        data: {
+            labels: {{ grafici_data.fatturato_giornaliero|safe|default:"[]" }}.map(item => {
+                return new Date(item.data).toLocaleDateString('it-IT', {day: 'numeric', month: 'short'});
+            }),
+            datasets: [{
+                label: 'Fatturato (€)',
+                data: {{ grafici_data.fatturato_giornaliero|safe|default:"[]" }}.map(item => item.fatturato),
+                borderColor: '#667eea',
+                backgroundColor: 'rgba(102, 126, 234, 0.1)',
+                borderWidth: 2,
+                fill: true,
+                tension: 0.4
+            }]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: {
+                legend: {
+                    display: false
+                }
+            },
+            scales: {
+                y: {
+                    beginAtZero: true,
+                    ticks: {
+                        callback: function(value) {
+                            return '€' + value.toLocaleString('it-IT');
+                        }
+                    }
+                }
+            }
+        }
+    });
+    
+    // Grafico Categorie
+    const ctx_categorie = document.getElementById('categorie-chart').getContext('2d');
+    const categorieData = {{ grafici_data.categorie_distribuzione|safe|default:"[]" }};
+    
+    categorie_chart = new Chart(ctx_categorie, {
+        type: 'doughnut',
+        data: {
+            labels: categorieData.map(item => item.servizio__categoria__nome || 'Senza categoria'),
+            datasets: [{
+                data: categorieData.map(item => item.fatturato),
+                backgroundColor: [
+                    '#FF6384',
+                    '#36A2EB',
+                    '#FFCE56',
+                    '#4BC0C0',
+                    '#9966FF',
+                    '#FF9F40'
+                ]
+            }]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: {
+                legend: {
+                    position: 'bottom'
+                }
+            }
+        }
+    });
+}
+
+function setupAutoRefresh() {
+    // Auto-refresh ogni 5 minuti
+    refreshInterval = setInterval(refreshKPIData, 300000);
+}
+
+function setupTimeFilters() {
+    document.querySelectorAll('input[name="timeRange"]').forEach(input => {
+        input.addEventListener('change', function() {
+            const timeRange = this.value;
+            updateDashboardData(timeRange);
+        });
+    });
+}
+
+function refreshDashboard() {
+    const refreshIcon = document.getElementById('refresh-icon');
+    refreshIcon.className = 'loading-spinner';
+    
+    refreshKPIData().finally(() => {
+        refreshIcon.className = 'bi bi-arrow-clockwise';
+        updateLastUpdate();
+    });
+}
+
+async function refreshKPIData() {
+    try {
+        // const response = await fetch('{% url "reportistica:api-kpi" %}');
+        const response = await fetch('#'); // Temporarily disabled
+        const data = await response.json();
+        
+        // Aggiorna KPI
+        document.getElementById('kpi-fatturato').textContent = 
+            '€' + data.fatturato_oggi.toLocaleString('it-IT', {minimumFractionDigits: 2});
+        document.getElementById('kpi-ordini').textContent = data.ordini_oggi;
+        document.getElementById('kpi-clienti').textContent = data.clienti_attivi;
+        
+        return data;
+    } catch (error) {
+        console.error('Errore nel caricamento KPI:', error);
+        showToast('Errore nel caricamento dati', 'error');
+    }
+}
+
+function updateDashboardData(timeRange) {
+    // Placeholder per aggiornamento dati con nuovo intervallo temporale
+    showToast('Aggiornamento periodo: ' + timeRange, 'info');
+}
+
+function updateLastUpdate() {
+    const now = new Date();
+    document.getElementById('last-update').textContent = 
+        now.toLocaleDateString('it-IT') + ' ' + now.toLocaleTimeString('it-IT', {hour: '2-digit', minute: '2-digit'});
+}
+
+function exportDashboard() {
+    // Mostra modal per selezione formato export
+    if (confirm('Vuoi esportare il report corrente in PDF?')) {
+        // window.open('{% url "reportistica:export-completo" %}', '_blank');
+        alert('Export funzionalità temporaneamente disabilitata'); // Temporarily disabled
+    }
+}
+
+function showToast(message, type = 'info') {
+    // Crea toast dinamico
+    const toastHtml = `
+        <div class="toast align-items-center text-white bg-${type} border-0" role="alert">
+            <div class="d-flex">
+                <div class="toast-body">${message}</div>
+                <button type="button" class="btn-close btn-close-white me-2 m-auto" data-bs-dismiss="toast"></button>
+            </div>
+        </div>
+    `;
+    
+    // Container per toast
+    let toastContainer = document.querySelector('.toast-container');
+    if (!toastContainer) {
+        toastContainer = document.createElement('div');
+        toastContainer.className = 'toast-container position-fixed bottom-0 end-0 p-3';
+        document.body.appendChild(toastContainer);
+    }
+    
+    toastContainer.insertAdjacentHTML('beforeend', toastHtml);
+    
+    const toastElement = toastContainer.lastElementChild;
+    const toast = new bootstrap.Toast(toastElement);
+    toast.show();
+    
+    toastElement.addEventListener('hidden.bs.toast', () => {
+        toastElement.remove();
+    });
+}
+
+// Cleanup interval quando si lascia la pagina
+window.addEventListener('beforeunload', function() {
+    if (refreshInterval) {
+        clearInterval(refreshInterval);
+    }
+});
+</script>
+{% endblock %}

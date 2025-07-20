@@ -1,0 +1,292 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}Alert Scorte Basse - Gestionale Autolavaggio{% endblock %}
+
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <h1><i class="bi bi-exclamation-triangle text-warning"></i> Alert Scorte Basse</h1>
+    <div>
+        <a href="{% url 'core:movimenti-scorte' %}" class="btn btn-info me-2">
+            <i class="bi bi-arrow-repeat"></i> Movimenti
+        </a>
+        <a href="{% url 'core:scorte-list' %}" class="btn btn-outline-secondary">
+            <i class="bi bi-arrow-left"></i> Torna alle Scorte
+        </a>
+    </div>
+</div>
+
+{% if messages %}
+    {% for message in messages %}
+        <div class="alert alert-{{ message.tags }} alert-dismissible fade show" role="alert">
+            {{ message }}
+            <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+        </div>
+    {% endfor %}
+{% endif %}
+
+{% if prodotti_sotto_scorta %}
+    <!-- Riepilogo Alert -->
+    <div class="row mb-4">
+        <div class="col-md-4">
+            <div class="card bg-danger text-white">
+                <div class="card-body text-center">
+                    <i class="bi bi-x-circle display-6"></i>
+                    <h4>{{ prodotti_esauriti|default:0 }}</h4>
+                    <small>Prodotti Esauriti</small>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-4">
+            <div class="card bg-warning text-white">
+                <div class="card-body text-center">
+                    <i class="bi bi-exclamation-triangle display-6"></i>
+                    <h4>{{ prodotti_sotto_scorta|length }}</h4>
+                    <small>Prodotti Sotto Scorta</small>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-4">
+            <div class="card bg-info text-white">
+                <div class="card-body text-center">
+                    <i class="bi bi-clock display-6"></i>
+                    <h4>{{ giorni_autonomia_media|default:0 }}</h4>
+                    <small>Giorni Autonomia Media</small>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="card">
+        <div class="card-header bg-warning text-dark">
+            <h5 class="mb-0">
+                <i class="bi bi-exclamation-triangle"></i>
+                Prodotti che Necessitano Rifornimento
+            </h5>
+        </div>
+        <div class="card-body">
+            <div class="table-responsive">
+                <table class="table table-hover">
+                    <thead class="table-dark">
+                        <tr>
+                            <th>Prodotto</th>
+                            <th>Categoria</th>
+                            <th>Scorte Attuali</th>
+                            <th>Soglia Minima</th>
+                            <th>Criticità</th>
+                            <th>Ultimo Movimento</th>
+                            <th class="text-center">Azioni</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for prodotto in prodotti_sotto_scorta %}
+                        <tr>
+                            <td>
+                                <div class="d-flex align-items-center">
+                                    <i class="bi bi-box me-2 text-primary"></i>
+                                    <div>
+                                        <strong>{{ prodotto.titolo }}</strong>
+                                        {% if prodotto.descrizione %}
+                                            <br><small class="text-muted">{{ prodotto.descrizione|truncatewords:8 }}</small>
+                                        {% endif %}
+                                    </div>
+                                </div>
+                            </td>
+                            <td>
+                                {% if prodotto.categoria %}
+                                    <span class="badge bg-secondary">{{ prodotto.categoria.nome }}</span>
+                                {% else %}
+                                    <span class="text-muted">-</span>
+                                {% endif %}
+                            </td>
+                            <td>
+                                <div class="text-center">
+                                    {% if prodotto.quantita_disponibile <= 0 %}
+                                        <span class="badge bg-danger fs-6">
+                                            <i class="bi bi-x-circle"></i> 0
+                                        </span>
+                                    {% else %}
+                                        <span class="badge bg-warning fs-6">
+                                            {{ prodotto.quantita_disponibile }}
+                                        </span>
+                                    {% endif %}
+                                </div>
+                            </td>
+                            <td class="text-center">
+                                <span class="badge bg-secondary">{{ prodotto.quantita_minima_alert }}</span>
+                            </td>
+                            <td>
+                                {% if prodotto.quantita_disponibile <= 0 %}
+                                    <span class="badge bg-danger">
+                                        <i class="bi bi-exclamation-circle"></i> CRITICA
+                                    </span>
+                                {% elif prodotto.quantita_disponibile <= prodotto.quantita_minima_alert|floatformat:0|add:"-3" %}
+                                    <span class="badge bg-danger">
+                                        <i class="bi bi-exclamation-triangle"></i> ALTA
+                                    </span>
+                                {% else %}
+                                    <span class="badge bg-warning">
+                                        <i class="bi bi-exclamation"></i> MEDIA
+                                    </span>
+                                {% endif %}
+                            </td>
+                            <td>
+                                {% if prodotto.ultimo_movimento %}
+                                    <small>{{ prodotto.ultimo_movimento|date:"d/m/Y" }}</small>
+                                {% else %}
+                                    <small class="text-muted">Nessuno</small>
+                                {% endif %}
+                            </td>
+                            <td class="text-center">
+                                <div class="btn-group" role="group">
+                                    <button class="btn btn-sm btn-success" 
+                                            onclick="riforninseciCarico('{{ prodotto.pk }}')"
+                                            title="Rifornimento Rapido">
+                                        <i class="bi bi-plus-circle"></i>
+                                    </button>
+                                    <a href="{% url 'core:catalogo-update' prodotto.pk %}" 
+                                       class="btn btn-sm btn-outline-primary" title="Modifica Soglie">
+                                        <i class="bi bi-gear"></i>
+                                    </a>
+                                </div>
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
+    <!-- Suggerimenti Rifornimento -->
+    <div class="card mt-4">
+        <div class="card-header bg-info text-white">
+            <h6 class="mb-0">
+                <i class="bi bi-lightbulb"></i>
+                Suggerimenti per il Rifornimento
+            </h6>
+        </div>
+        <div class="card-body">
+            <div class="row">
+                <div class="col-md-6">
+                    <h6>Rifornimento Urgente:</h6>
+                    <ul class="list-unstyled">
+                        {% for prodotto in prodotti_sotto_scorta %}
+                            {% if prodotto.quantita_disponibile <= 0 %}
+                                <li class="text-danger">
+                                    <i class="bi bi-exclamation-circle"></i>
+                                    {{ prodotto.titolo }} - <strong>ESAURITO</strong>
+                                </li>
+                            {% endif %}
+                        {% endfor %}
+                    </ul>
+                </div>
+                <div class="col-md-6">
+                    <h6>Ordine Rifornimento Consigliato:</h6>
+                    <ul class="list-unstyled">
+                        {% for prodotto in prodotti_sotto_scorta %}
+                            {% if prodotto.quantita_disponibile > 0 %}
+                                <li class="text-warning">
+                                    <i class="bi bi-box"></i>
+                                    {{ prodotto.titolo }} - 
+                                    <strong>{{ prodotto.quantita_minima_alert|add:10 }} unità</strong>
+                                </li>
+                            {% endif %}
+                        {% endfor %}
+                    </ul>
+                </div>
+            </div>
+        </div>
+    </div>
+
+{% else %}
+    <!-- Nessun Alert -->
+    <div class="card">
+        <div class="card-body">
+            <div class="text-center py-5">
+                <i class="bi bi-check-circle display-1 text-success"></i>
+                <h3 class="text-success mt-3">Tutto OK!</h3>
+                <p class="text-muted">Non ci sono prodotti sotto la soglia minima di scorte.</p>
+                <div class="mt-4">
+                    <a href="{% url 'core:scorte-list' %}" class="btn btn-primary me-2">
+                        <i class="bi bi-boxes"></i> Gestisci Scorte
+                    </a>
+                    <a href="{% url 'core:movimenti-scorte' %}" class="btn btn-outline-info">
+                        <i class="bi bi-arrow-repeat"></i> Vedi Movimenti
+                    </a>
+                </div>
+            </div>
+        </div>
+    </div>
+{% endif %}
+
+<!-- Modal Rifornimento Rapido -->
+<div class="modal fade" id="modalRifornimento" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header bg-success text-white">
+                <h5 class="modal-title">
+                    <i class="bi bi-plus-circle"></i>
+                    Rifornimento Rapido
+                </h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+            </div>
+            <form id="form-rifornimento" method="post" action="{% url 'core:movimento-scorte' %}">
+                <div class="modal-body">
+                    {% csrf_token %}
+                    <input type="hidden" id="prodotto-id" name="prodotto_id">
+                    <input type="hidden" name="tipo" value="carico">
+                    
+                    <div class="alert alert-info">
+                        <i class="bi bi-info-circle"></i>
+                        <strong>Rifornimento Suggerito:</strong> 
+                        <span id="quantita-suggerita"></span> unità
+                    </div>
+                    
+                    <div class="mb-3">
+                        <label for="quantita-rifornimento" class="form-label">Quantità da Caricare</label>
+                        <input type="number" class="form-control" id="quantita-rifornimento" 
+                               name="quantita" min="1" required>
+                    </div>
+                    
+                    <div class="mb-3">
+                        <label for="nota-rifornimento" class="form-label">Nota</label>
+                        <textarea class="form-control" id="nota-rifornimento" name="nota" rows="2"
+                                  placeholder="Es: Rifornimento urgente per scorte basse"></textarea>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">
+                        <i class="bi bi-x-circle"></i> Annulla
+                    </button>
+                    <button type="submit" class="btn btn-success">
+                        <i class="bi bi-check-circle"></i> Conferma Carico
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<script>
+function riforninseciCarico(prodottoId) {
+    document.getElementById('prodotto-id').value = prodottoId;
+    
+    // Calcola quantità suggerita (soglia minima + 10)
+    const riga = document.querySelector(`tr:has(button[onclick*="${prodottoId}"])`);
+    const sogliaMinima = parseInt(riga.querySelector('.badge.bg-secondary').textContent);
+    const quantitaSuggerita = sogliaMinima + 10;
+    
+    document.getElementById('quantita-suggerita').textContent = quantitaSuggerita;
+    document.getElementById('quantita-rifornimento').value = quantitaSuggerita;
+    
+    const modal = new bootstrap.Modal(document.getElementById('modalRifornimento'));
+    modal.show();
+}
+
+// Auto-refresh ogni 5 minuti per aggiornare gli alert
+setTimeout(() => {
+    location.reload();
+}, 300000);
+</script>
+{% endblock %}

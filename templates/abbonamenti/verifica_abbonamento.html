@@ -1,0 +1,642 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}Verifica Abbonamento - {{ abbonamento.codice_accesso }}{% endblock %}
+
+{% block extra_css %}
+<style>
+.verifica-container {
+    max-width: 800px;
+    margin: 0 auto;
+    padding: 20px;
+}
+
+.card-abbonamento {
+    border: 2px solid #28a745;
+    border-radius: 15px;
+    box-shadow: 0 4px 20px rgba(40, 167, 69, 0.3);
+    background: linear-gradient(135deg, #ffffff 0%, #f8fff9 100%);
+}
+
+.card-abbonamento.scaduto {
+    border-color: #dc3545;
+    box-shadow: 0 4px 20px rgba(220, 53, 69, 0.3);
+    background: linear-gradient(135deg, #ffffff 0%, #fff8f8 100%);
+}
+
+.card-abbonamento.sospeso {
+    border-color: #ffc107;
+    box-shadow: 0 4px 20px rgba(255, 193, 7, 0.3);
+    background: linear-gradient(135deg, #ffffff 0%, #fffbf0 100%);
+}
+
+.header-abbonamento {
+    background: linear-gradient(135deg, #28a745, #20c997);
+    color: white;
+    padding: 20px;
+    border-radius: 13px 13px 0 0;
+    text-align: center;
+}
+
+.header-abbonamento.scaduto {
+    background: linear-gradient(135deg, #dc3545, #e74c3c);
+}
+
+.header-abbonamento.sospeso {
+    background: linear-gradient(135deg, #ffc107, #f39c12);
+    color: black;
+}
+
+.badge-stato {
+    font-size: 1.2rem;
+    padding: 8px 16px;
+    border-radius: 25px;
+}
+
+.servizio-card {
+    border: 1px solid #e9ecef;
+    border-radius: 10px;
+    padding: 15px;
+    margin-bottom: 15px;
+    background: white;
+    transition: all 0.3s ease;
+    cursor: pointer;
+}
+
+.servizio-card:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+}
+
+.servizio-card.selezionato {
+    border-color: #007bff;
+    background: #f0f8ff;
+    box-shadow: 0 0 0 2px rgba(0, 123, 255, 0.25);
+}
+
+.servizio-card.non-disponibile {
+    opacity: 0.6;
+    cursor: not-allowed;
+    background: #f8f9fa;
+}
+
+.progress-accessi {
+    height: 8px;
+    border-radius: 4px;
+    background: #e9ecef;
+    overflow: hidden;
+}
+
+.progress-bar-accessi {
+    height: 100%;
+    transition: width 0.3s ease;
+}
+
+.targa-input {
+    border: 2px solid #007bff;
+    border-radius: 10px;
+    padding: 15px;
+    font-size: 1.2rem;
+    text-align: center;
+    text-transform: uppercase;
+    background: #f8f9fa;
+}
+
+.btn-conferma {
+    background: linear-gradient(135deg, #28a745, #20c997);
+    border: none;
+    border-radius: 10px;
+    padding: 15px 30px;
+    font-size: 1.2rem;
+    font-weight: bold;
+    color: white;
+    transition: all 0.3s ease;
+}
+
+.btn-conferma:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 4px 12px rgba(40, 167, 69, 0.4);
+    color: white;
+}
+
+.btn-conferma:disabled {
+    opacity: 0.6;
+    cursor: not-allowed;
+    transform: none;
+}
+
+.info-cliente {
+    background: #e3f2fd;
+    border-radius: 10px;
+    padding: 15px;
+    margin-bottom: 20px;
+}
+
+.countdown-timer {
+    font-family: 'Courier New', monospace;
+    font-size: 1.5rem;
+    font-weight: bold;
+    color: #dc3545;
+}
+
+@media (max-width: 768px) {
+    .verifica-container {
+        padding: 10px;
+    }
+    
+    .servizio-card {
+        padding: 10px;
+    }
+    
+    .btn-conferma {
+        width: 100%;
+        margin-top: 10px;
+    }
+}
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="verifica-container">
+    <!-- Informazioni Abbonamento -->
+    <div class="card card-abbonamento {{ abbonamento.stato }}">
+        <div class="header-abbonamento {{ abbonamento.stato }}">
+            <h3 class="mb-2">{{ abbonamento.configurazione.titolo }}</h3>
+            <div class="d-flex justify-content-center align-items-center gap-3">
+                <span class="badge badge-stato bg-light text-dark">
+                    {{ abbonamento.codice_accesso }}
+                </span>
+                <span class="badge badge-stato status-{{ abbonamento.stato }}">
+                    {{ abbonamento.get_stato_display }}
+                </span>
+            </div>
+        </div>
+        
+        <div class="card-body">
+            <!-- Info Cliente -->
+            <div class="info-cliente">
+                <div class="row">
+                    <div class="col-md-6">
+                        <h6><i class="bi bi-person"></i> Cliente</h6>
+                        <p class="mb-1"><strong>{{ abbonamento.cliente.nome_completo }}</strong></p>
+                        <small class="text-muted">{{ abbonamento.cliente.email }}</small>
+                    </div>
+                    <div class="col-md-6">
+                        <h6><i class="bi bi-calendar"></i> Validità</h6>
+                        <p class="mb-1">
+                            <strong>Scade il: {{ abbonamento.data_scadenza|date:"d/m/Y" }}</strong>
+                        </p>
+                        <small class="text-muted">
+                            {% if abbonamento.giorni_rimanenti > 0 %}
+                                {{ abbonamento.giorni_rimanenti }} giorni rimanenti
+                            {% else %}
+                                Scaduto
+                            {% endif %}
+                        </small>
+                    </div>
+                </div>
+            </div>
+            
+            {% if abbonamento.stato == 'attivo' %}
+            <!-- Servizi Disponibili -->
+            <h5 class="mb-3"><i class="bi bi-list-check"></i> Servizi Disponibili</h5>
+            
+            <div id="servizi-container">
+                {% for servizio_data in servizi_disponibili %}
+                <div class="servizio-card {% if servizio_data.disponibili <= 0 %}non-disponibile{% endif %}" 
+                     data-servizio-id="{{ servizio_data.servizio.id }}"
+                     onclick="selezionaServizio({{ servizio_data.servizio.id }})">
+                    
+                    <div class="d-flex justify-content-between align-items-start mb-2">
+                        <div>
+                            <h6 class="mb-1">{{ servizio_data.servizio.titolo }}</h6>
+                            <small class="text-muted">{{ servizio_data.servizio.durata_minuti }} minuti</small>
+                        </div>
+                        <div class="text-end">
+                            {% if servizio_data.disponibili > 0 %}
+                                <span class="badge bg-success">{{ servizio_data.disponibili }} disponibili</span>
+                            {% else %}
+                                <span class="badge bg-danger">Esauriti</span>
+                            {% endif %}
+                        </div>
+                    </div>
+                    
+                    <!-- Progress bar accessi -->
+                    <div class="progress-accessi mb-2">
+                        {% widthratio servizio_data.utilizzati servizio_data.totali 100 as percentuale %}
+                        <div class="progress-bar-accessi {% if percentuale >= 80 %}bg-warning{% elif percentuale >= 100 %}bg-danger{% else %}bg-primary{% endif %}" 
+                             style="width: {{ percentuale }}%"></div>
+                    </div>
+                    
+                    <div class="d-flex justify-content-between">
+                        <small class="text-muted">
+                            Utilizzati: {{ servizio_data.utilizzati }}/{{ servizio_data.totali }}
+                        </small>
+                        <small class="text-muted">
+                            Periodo: {{ abbonamento.configurazione.get_periodicita_reset_display }}
+                        </small>
+                    </div>
+                </div>
+                {% empty %}
+                <div class="text-center text-muted py-4">
+                    <i class="bi bi-exclamation-circle display-4"></i>
+                    <p class="mt-2">Nessun servizio disponibile</p>
+                </div>
+                {% endfor %}
+            </div>
+            
+            <!-- Sezione Targa (se richiesta) -->
+            {% if abbonamento.configurazione.modalita_targa != 'libera' %}
+            <div id="sezione-targa" class="mt-4" style="display: none;">
+                <h5><i class="bi bi-car-front"></i> Targa Veicolo</h5>
+                
+                {% if targhe_autorizzate %}
+                <div class="mb-3">
+                    <label class="form-label">Seleziona targa autorizzata:</label>
+                    <select id="targa-select" class="form-select">
+                        <option value="">Seleziona targa...</option>
+                        {% for targa in targhe_autorizzate %}
+                        <option value="{{ targa.targa }}">{{ targa.targa }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+                {% else %}
+                <div class="mb-3">
+                    <label class="form-label">Inserisci targa:</label>
+                    <input type="text" id="targa-input" class="form-control targa-input" 
+                           placeholder="ES: AB123CD" maxlength="8" 
+                           style="text-transform: uppercase;">
+                </div>
+                {% endif %}
+            </div>
+            {% endif %}
+            
+            <!-- Azioni -->
+            <div class="d-grid gap-2 mt-4">
+                <button id="btn-conferma-accesso" class="btn btn-conferma" 
+                        onclick="confermaAccesso()" disabled>
+                    <i class="bi bi-check-circle"></i> Conferma Accesso
+                </button>
+                
+                <div class="row">
+                    <div class="col-6">
+                        <button class="btn btn-outline-primary w-100" onclick="creaOrdineCompleto()">
+                            <i class="bi bi-plus-circle"></i> Crea Ordine
+                        </button>
+                    </div>
+                    <div class="col-6">
+                        <button class="btn btn-outline-secondary w-100" onclick="tornaInizio()">
+                            <i class="bi bi-arrow-left"></i> Indietro
+                        </button>
+                    </div>
+                </div>
+            </div>
+            
+            {% else %}
+            <!-- Abbonamento non attivo -->
+            <div class="text-center py-4">
+                <i class="bi bi-exclamation-triangle display-4 text-warning"></i>
+                <h4 class="mt-3">Abbonamento {{ abbonamento.get_stato_display }}</h4>
+                <p class="text-muted">
+                    {% if abbonamento.stato == 'scaduto' %}
+                        Questo abbonamento è scaduto il {{ abbonamento.data_scadenza|date:"d/m/Y" }}
+                    {% elif abbonamento.stato == 'sospeso' %}
+                        Questo abbonamento è temporaneamente sospeso
+                    {% else %}
+                        Questo abbonamento non è attivo
+                    {% endif %}
+                </p>
+                
+                <div class="mt-3">
+                    <button class="btn btn-primary" onclick="contattaOperatore()">
+                        <i class="bi bi-telephone"></i> Contatta Operatore
+                    </button>
+                </div>
+            </div>
+            {% endif %}
+        </div>
+    </div>
+    
+    <!-- Timer auto-refresh -->
+    <div class="text-center mt-3">
+        <small class="text-muted">
+            Aggiornamento automatico tra: <span class="countdown-timer" id="countdown">30</span>s
+        </small>
+    </div>
+</div>
+
+<!-- Modal Conferma -->
+<div class="modal fade" id="modalConferma" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header bg-success text-white">
+                <h5 class="modal-title">Conferma Accesso</h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body text-center">
+                <i class="bi bi-check-circle-fill text-success display-4"></i>
+                <h4 class="mt-3">Accesso Autorizzato!</h4>
+                <div id="dettagli-accesso"></div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-success" data-bs-dismiss="modal" onclick="tornaInizio()">
+                    <i class="bi bi-arrow-left"></i> Nuovo Accesso
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Modal Errore -->
+<div class="modal fade" id="modalErrore" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header bg-danger text-white">
+                <h5 class="modal-title">Accesso Negato</h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body text-center">
+                <i class="bi bi-x-circle-fill text-danger display-4"></i>
+                <h4 class="mt-3">Accesso Non Autorizzato</h4>
+                <div id="motivo-errore"></div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">
+                    Chiudi
+                </button>
+                <button type="button" class="btn btn-primary" onclick="contattaOperatore()">
+                    Contatta Operatore
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+// Variabili globali
+let servizioSelezionato = null;
+let countdownTimer = 30;
+let countdownInterval;
+
+// Inizializzazione
+document.addEventListener('DOMContentLoaded', function() {
+    inizializzaContdown();
+    
+    // Auto-focus su primo servizio disponibile
+    const primoServizio = document.querySelector('.servizio-card:not(.non-disponibile)');
+    if (primoServizio) {
+        primoServizio.scrollIntoView({behavior: 'smooth', block: 'center'});
+    }
+});
+
+// Countdown per auto-refresh
+function inizializzaContdown() {
+    const countdownElement = document.getElementById('countdown');
+    
+    countdownInterval = setInterval(() => {
+        countdownTimer--;
+        countdownElement.textContent = countdownTimer;
+        
+        if (countdownTimer <= 0) {
+            window.location.reload();
+        }
+    }, 1000);
+}
+
+// Selezione servizio
+function selezionaServizio(servizioId) {
+    const card = document.querySelector(`[data-servizio-id="${servizioId}"]`);
+    
+    // Verifica se il servizio è disponibile
+    if (card.classList.contains('non-disponibile')) {
+        AutolavaggioJS.showToast('Servizio non disponibile', 'warning');
+        return;
+    }
+    
+    // Rimuovi selezione precedente
+    document.querySelectorAll('.servizio-card').forEach(c => c.classList.remove('selezionato'));
+    
+    // Seleziona nuovo servizio
+    card.classList.add('selezionato');
+    servizioSelezionato = servizioId;
+    
+    // Mostra sezione targa se richiesta
+    const sezioneTarga = document.getElementById('sezione-targa');
+    if (sezioneTarga) {
+        sezioneTarga.style.display = 'block';
+        sezioneTarga.scrollIntoView({behavior: 'smooth'});
+    }
+    
+    // Abilita pulsante conferma
+    verificaAbilitazioneConferma();
+}
+
+function verificaAbilitazioneConferma() {
+    const btnConferma = document.getElementById('btn-conferma-accesso');
+    const sezioneTarga = document.getElementById('sezione-targa');
+    
+    let abilitato = servizioSelezionato !== null;
+    
+    // Verifica targa se richiesta
+    if (sezioneTarga && sezioneTarga.style.display !== 'none') {
+        const targaSelect = document.getElementById('targa-select');
+        const targaInput = document.getElementById('targa-input');
+        
+        if (targaSelect && !targaSelect.value) {
+            abilitato = false;
+        } else if (targaInput && !targaInput.value.trim()) {
+            abilitato = false;
+        }
+    }
+    
+    btnConferma.disabled = !abilitato;
+}
+
+// Event listeners per targa
+document.addEventListener('DOMContentLoaded', function() {
+    const targaSelect = document.getElementById('targa-select');
+    const targaInput = document.getElementById('targa-input');
+    
+    if (targaSelect) {
+        targaSelect.addEventListener('change', verificaAbilitazioneConferma);
+    }
+    
+    if (targaInput) {
+        targaInput.addEventListener('input', function() {
+            this.value = this.value.toUpperCase();
+            verificaAbilitazioneConferma();
+        });
+    }
+});
+
+// Conferma accesso
+function confermaAccesso() {
+    if (!servizioSelezionato) {
+        AutolavaggioJS.showToast('Seleziona un servizio', 'warning');
+        return;
+    }
+    
+    const btn = document.getElementById('btn-conferma-accesso');
+    const originalText = btn.innerHTML;
+    AutolavaggioJS.showLoading(btn);
+    
+    // Prepara dati
+    const dati = {
+        servizio_id: servizioSelezionato,
+        metodo: 'web',
+        crea_ordine: true
+    };
+    
+    // Aggiungi targa se richiesta
+    const targaSelect = document.getElementById('targa-select');
+    const targaInput = document.getElementById('targa-input');
+    
+    if (targaSelect && targaSelect.value) {
+        dati.targa = targaSelect.value;
+    } else if (targaInput && targaInput.value) {
+        dati.targa = targaInput.value.trim().toUpperCase();
+    }
+    
+    // Invia richiesta
+    fetch(`/abbonamenti/verifica/{{ abbonamento.codice_nfc }}/registra-accesso/`, {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+            'X-CSRFToken': AutolavaggioJS.getCookie('csrftoken')
+        },
+        body: JSON.stringify(dati)
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.autorizzato) {
+            mostraConfermaAccesso(data);
+        } else {
+            mostraErroreAccesso(data.motivo);
+        }
+    })
+    .catch(error => {
+        console.error('Errore:', error);
+        AutolavaggioJS.showToast('Errore di connessione', 'error');
+    })
+    .finally(() => {
+        AutolavaggioJS.hideLoading(btn, originalText);
+    });
+}
+
+function mostraConfermaAccesso(data) {
+    const modal = new bootstrap.Modal(document.getElementById('modalConferma'));
+    const dettagli = document.getElementById('dettagli-accesso');
+    
+    const servizioNome = document.querySelector(`[data-servizio-id="${servizioSelezionato}"] h6`).textContent;
+    
+    dettagli.innerHTML = `
+        <p class="mb-2"><strong>Servizio:</strong> ${servizioNome}</p>
+        <p class="mb-2"><strong>Orario:</strong> ${new Date().toLocaleTimeString('it-IT')}</p>
+        ${data.targa ? `<p class="mb-2"><strong>Targa:</strong> ${data.targa}</p>` : ''}
+        <div class="alert alert-success mt-3">
+            Accesso registrato con successo!<br>
+            Dirigiti alla postazione indicata.
+        </div>
+    `;
+    
+    modal.show();
+    
+    // Stop countdown
+    clearInterval(countdownInterval);
+    
+    // Riproduci suono successo
+    riproduciSuono('success');
+}
+
+function mostraErroreAccesso(motivo) {
+    const modal = new bootstrap.Modal(document.getElementById('modalErrore'));
+    const motivoElement = document.getElementById('motivo-errore');
+    
+    motivoElement.innerHTML = `
+        <div class="alert alert-danger">
+            <strong>Motivo:</strong> ${motivo}
+        </div>
+        <p class="text-muted">
+            Se ritieni che ci sia un errore, contatta l'operatore per assistenza.
+        </p>
+    `;
+    
+    modal.show();
+    
+    // Riproduci suono errore
+    riproduciSuono('error');
+}
+
+// Funzioni utility
+function creaOrdineCompleto() {
+    if (!servizioSelezionato) {
+        AutolavaggioJS.showToast('Seleziona prima un servizio', 'warning');
+        return;
+    }
+    
+    // Reindirizza alla cassa con servizio preselezionato
+    const url = `/ordini/cassa/?cliente={{ abbonamento.cliente.id }}&servizio=${servizioSelezionato}`;
+    window.open(url, '_blank');
+}
+
+function tornaInizio() {
+    window.location.href = '/abbonamenti/verifica/';
+}
+
+function contattaOperatore() {
+    // Implementa logica per contattare operatore
+    AutolavaggioJS.showToast('Funzione non implementata', 'info');
+}
+
+function riproduciSuono(tipo) {
+    try {
+        const audio = new Audio(`/static/sounds/${tipo}.mp3`);
+        audio.volume = 0.5;
+        audio.play().catch(e => console.log('Audio non riproducibile'));
+    } catch (error) {
+        console.log('Audio non supportato');
+    }
+}
+
+// Gestione Web NFC API (se supportato)
+if ('NDEFReader' in window) {
+    // Auto-start NFC reading per nuovi accessi
+    console.log('Web NFC supportato');
+    
+    // Potresti implementare un sistema per leggere automaticamente
+    // nuove tessere NFC senza input manuale
+}
+
+// Keyboard shortcuts
+document.addEventListener('keydown', function(e) {
+    // Numeri 1-9 per selezionare servizi
+    if (e.key >= '1' && e.key <= '9') {
+        const index = parseInt(e.key) - 1;
+        const servizi = document.querySelectorAll('.servizio-card:not(.non-disponibile)');
+        if (servizi[index]) {
+            const servizioId = servizi[index].dataset.servizioId;
+            selezionaServizio(parseInt(servizioId));
+        }
+    }
+    
+    // Enter per confermare
+    if (e.key === 'Enter' && !document.getElementById('btn-conferma-accesso').disabled) {
+        confermaAccesso();
+    }
+    
+    // Escape per tornare indietro
+    if (e.key === 'Escape') {
+        tornaInizio();
+    }
+});
+
+// Cleanup al cambio pagina
+window.addEventListener('beforeunload', function() {
+    if (countdownInterval) {
+        clearInterval(countdownInterval);
+    }
+});
+</script>
+{% endblock %}

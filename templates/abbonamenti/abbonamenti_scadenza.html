@@ -1,0 +1,575 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}Abbonamenti in Scadenza - Gestionale Autolavaggio{% endblock %}
+
+{% block extra_css %}
+<style>
+.urgency-high {
+    border-left: 4px solid #dc3545;
+    background-color: #fff5f5;
+}
+
+.urgency-medium {
+    border-left: 4px solid #ffc107;
+    background-color: #fffbf0;
+}
+
+.urgency-low {
+    border-left: 4px solid #fd7e14;
+    background-color: #fff8f0;
+}
+
+.days-counter {
+    font-size: 2rem;
+    font-weight: bold;
+}
+
+.action-buttons .btn {
+    margin: 2px;
+}
+
+.expiry-timeline {
+    position: relative;
+    padding-left: 30px;
+}
+
+.expiry-timeline::before {
+    content: '';
+    position: absolute;
+    left: 15px;
+    top: 0;
+    bottom: 0;
+    width: 2px;
+    background: #dee2e6;
+}
+
+.timeline-item {
+    position: relative;
+    margin-bottom: 15px;
+}
+
+.timeline-item::before {
+    content: '';
+    position: absolute;
+    left: -22px;
+    top: 8px;
+    width: 10px;
+    height: 10px;
+    border-radius: 50%;
+    border: 2px solid white;
+}
+
+.timeline-item.expired::before {
+    background: #dc3545;
+    box-shadow: 0 0 0 2px #dc3545;
+}
+
+.timeline-item.urgent::before {
+    background: #ffc107;
+    box-shadow: 0 0 0 2px #ffc107;
+}
+
+.timeline-item.warning::before {
+    background: #fd7e14;
+    box-shadow: 0 0 0 2px #fd7e14;
+}
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <h1><i class="bi bi-clock-fill text-warning"></i> Abbonamenti in Scadenza</h1>
+    <div>
+        <button class="btn btn-outline-primary me-2" onclick="inviaPromemoriBatch()">
+            <i class="bi bi-envelope"></i> Invia Promemoria a Tutti
+        </button>
+        <button class="btn btn-outline-info me-2" onclick="esportaScadenze()">
+            <i class="bi bi-download"></i> Esporta Lista
+        </button>
+        <a href="{% url 'abbonamenti:abbonamenti-list' %}" class="btn btn-outline-secondary">
+            <i class="bi bi-arrow-left"></i> Torna alla Lista
+        </a>
+    </div>
+</div>
+
+{% if messages %}
+    {% for message in messages %}
+        <div class="alert alert-{{ message.tags }} alert-dismissible fade show" role="alert">
+            {{ message }}
+            <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+        </div>
+    {% endfor %}
+{% endif %}
+
+<!-- Statistiche Scadenze -->
+<div class="row mb-4">
+    <div class="col-md-3">
+        <div class="card bg-danger text-white">
+            <div class="card-body text-center">
+                <i class="bi bi-exclamation-triangle display-6"></i>
+                <h4>{{ scaduti_count|default:0 }}</h4>
+                <small>Già Scaduti</small>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-3">
+        <div class="card bg-warning text-white">
+            <div class="card-body text-center">
+                <i class="bi bi-clock display-6"></i>
+                <h4>{{ urgenti_count|default:0 }}</h4>
+                <small>Scadono in 3 giorni</small>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-3">
+        <div class="card bg-info text-white">
+            <div class="card-body text-center">
+                <i class="bi bi-calendar-week display-6"></i>
+                <h4>{{ questa_settimana_count|default:0 }}</h4>
+                <small>Questa Settimana</small>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-3">
+        <div class="card bg-secondary text-white">
+            <div class="card-body text-center">
+                <i class="bi bi-calendar-month display-6"></i>
+                <h4>{{ questo_mese_count|default:0 }}</h4>
+                <small>Questo Mese</small>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Filtri -->
+<div class="card mb-4">
+    <div class="card-body">
+        <form method="get" class="row g-3">
+            <div class="col-md-3">
+                <label class="form-label">Urgenza:</label>
+                <select name="urgenza" class="form-select">
+                    <option value="">Tutte le urgenze</option>
+                    <option value="scaduto" {% if request.GET.urgenza == 'scaduto' %}selected{% endif %}>Già scaduti</option>
+                    <option value="urgente" {% if request.GET.urgenza == 'urgente' %}selected{% endif %}>Urgenti (≤3 giorni)</option>
+                    <option value="settimana" {% if request.GET.urgenza == 'settimana' %}selected{% endif %}>Questa settimana</option>
+                    <option value="mese" {% if request.GET.urgenza == 'mese' %}selected{% endif %}>Questo mese</option>
+                </select>
+            </div>
+            <div class="col-md-3">
+                <label class="form-label">Cliente:</label>
+                <input type="text" name="cliente_search" class="form-control" 
+                       placeholder="Cerca cliente..." value="{{ request.GET.cliente_search }}">
+            </div>
+            <div class="col-md-3">
+                <label class="form-label">Configurazione:</label>
+                <select name="configurazione" class="form-select">
+                    <option value="">Tutte le configurazioni</option>
+                    {% for config in configurazioni %}
+                        <option value="{{ config.pk }}" {% if request.GET.configurazione == config.pk|stringformat:"s" %}selected{% endif %}>
+                            {{ config.titolo }}
+                        </option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div class="col-md-3">
+                <label class="form-label">&nbsp;</label>
+                <div class="d-flex gap-2">
+                    <button type="submit" class="btn btn-primary">
+                        <i class="bi bi-search"></i> Filtra
+                    </button>
+                    <a href="{% url 'abbonamenti:abbonamenti-scadenza' %}" class="btn btn-outline-secondary">
+                        <i class="bi bi-arrow-clockwise"></i>
+                    </a>
+                </div>
+            </div>
+        </form>
+    </div>
+</div>
+
+<div class="card">
+    <div class="card-body">
+        {% if abbonamenti %}
+            <!-- Vista Tabella -->
+            <div id="vista-tabella">
+                <div class="table-responsive">
+                    <table class="table table-hover">
+                        <thead class="table-dark">
+                            <tr>
+                                <th>
+                                    <input type="checkbox" id="select-all" onchange="toggleSelectAll()">
+                                </th>
+                                <th>Urgenza</th>
+                                <th>Cliente</th>
+                                <th>Abbonamento</th>
+                                <th>Scadenza</th>
+                                <th>Utilizzo</th>
+                                <th>Ultimo Accesso</th>
+                                <th class="text-center">Azioni</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for abbonamento in abbonamenti %}
+                            {% with giorni=abbonamento.giorni_alla_scadenza %}
+                            <tr class="{% if giorni <= 0 %}urgency-high{% elif giorni <= 3 %}urgency-medium{% elif giorni <= 7 %}urgency-low{% endif %}">
+                                <td>
+                                    <input type="checkbox" class="abbonamento-check" value="{{ abbonamento.pk }}">
+                                </td>
+                                <td>
+                                    <div class="text-center">
+                                        {% if giorni <= 0 %}
+                                            <div class="days-counter text-danger">{{ giorni|abs }}</div>
+                                            <small class="text-danger">giorni fa</small>
+                                        {% else %}
+                                            <div class="days-counter {% if giorni <= 3 %}text-warning{% elif giorni <= 7 %}text-info{% endif %}">{{ giorni }}</div>
+                                            <small class="text-muted">giorni</small>
+                                        {% endif %}
+                                    </div>
+                                </td>
+                                <td>
+                                    <div class="d-flex align-items-center">
+                                        <i class="bi bi-person me-2"></i>
+                                        <div>
+                                            <strong>{{ abbonamento.cliente.nome_completo }}</strong>
+                                            <br><small class="text-muted">{{ abbonamento.cliente.telefono }}</small>
+                                            <br><small class="text-muted">{{ abbonamento.cliente.email }}</small>
+                                        </div>
+                                    </div>
+                                </td>
+                                <td>
+                                    <div>
+                                        <a href="{% url 'abbonamenti:dettaglio-abbonamento' abbonamento.pk %}" 
+                                           class="text-decoration-none fw-bold">
+                                            {{ abbonamento.codice_accesso }}
+                                        </a>
+                                        <br><small class="text-muted">{{ abbonamento.configurazione.titolo }}</small>
+                                        <br><small class="text-success">€{{ abbonamento.configurazione.prezzo }}</small>
+                                    </div>
+                                </td>
+                                <td>
+                                    <div>
+                                        <strong>{{ abbonamento.data_scadenza|date:"d/m/Y" }}</strong>
+                                        <br>
+                                        {% if giorni <= 0 %}
+                                            <span class="badge bg-danger">Scaduto</span>
+                                        {% elif giorni <= 3 %}
+                                            <span class="badge bg-warning">Urgente</span>
+                                        {% elif giorni <= 7 %}
+                                            <span class="badge bg-info">Questa settimana</span>
+                                        {% else %}
+                                            <span class="badge bg-secondary">{{ giorni }} giorni</span>
+                                        {% endif %}
+                                    </div>
+                                </td>
+                                <td>
+                                    <div class="small">
+                                        {% for contatore in abbonamento.contatori_attuali %}
+                                            <div class="d-flex justify-content-between mb-1">
+                                                <span>{{ contatore.servizio.titolo|truncatewords:2 }}:</span>
+                                                <span class="fw-bold">{{ contatore.utilizzati }}/{{ contatore.totali }}</span>
+                                            </div>
+                                            <div class="progress" style="height: 4px;">
+                                                <div class="progress-bar {% if contatore.percentuale >= 80 %}bg-danger{% elif contatore.percentuale >= 60 %}bg-warning{% else %}bg-success{% endif %}" 
+                                                     style="width: {{ contatore.percentuale }}%"></div>
+                                            </div>
+                                        {% endfor %}
+                                    </div>
+                                </td>
+                                <td>
+                                    {% if abbonamento.data_ultimo_accesso %}
+                                        <div>
+                                            <strong>{{ abbonamento.data_ultimo_accesso|date:"d/m/Y" }}</strong>
+                                            <br><small class="text-muted">{{ abbonamento.data_ultimo_accesso|date:"H:i" }}</small>
+                                        </div>
+                                    {% else %}
+                                        <span class="text-muted">Mai utilizzato</span>
+                                    {% endif %}
+                                </td>
+                                <td>
+                                    <div class="action-buttons text-center">
+                                        <a href="{% url 'abbonamenti:dettaglio-abbonamento' abbonamento.pk %}" 
+                                           class="btn btn-sm btn-outline-primary" title="Dettagli">
+                                            <i class="bi bi-eye"></i>
+                                        </a>
+                                        <button class="btn btn-sm btn-outline-info" 
+                                                onclick="inviaPromemoria('{{ abbonamento.pk }}')" title="Invia Promemoria">
+                                            <i class="bi bi-envelope"></i>
+                                        </button>
+                                        <a href="{% url 'abbonamenti:rinnova-abbonamento' abbonamento.pk %}" 
+                                           class="btn btn-sm btn-outline-success" title="Rinnova">
+                                            <i class="bi bi-arrow-repeat"></i>
+                                        </a>
+                                        <button class="btn btn-sm btn-outline-warning" 
+                                                onclick="contatlaCliente('{{ abbonamento.cliente.telefono }}')" title="Contatta">
+                                            <i class="bi bi-telephone"></i>
+                                        </button>
+                                    </div>
+                                </td>
+                            </tr>
+                            {% endwith %}
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+
+            <!-- Azioni di Massa -->
+            <div class="row mt-3">
+                <div class="col-md-6">
+                    <div class="d-flex align-items-center">
+                        <span class="me-3">Azioni selezionate:</span>
+                        <div class="btn-group">
+                            <button class="btn btn-sm btn-outline-primary" onclick="inviaPromemoriSelezionati()">
+                                <i class="bi bi-envelope"></i> Invia Promemoria
+                            </button>
+                            <button class="btn btn-sm btn-outline-info" onclick="esportaSelezionati()">
+                                <i class="bi bi-download"></i> Esporta
+                            </button>
+                            <button class="btn btn-sm btn-outline-success" onclick="rinnovaSelezionati()">
+                                <i class="bi bi-arrow-repeat"></i> Rinnova
+                            </button>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-md-6 text-end">
+                    <span id="selected-count">0</span> abbonamenti selezionati
+                </div>
+            </div>
+
+            <!-- Paginazione -->
+            {% if is_paginated %}
+                <nav aria-label="Paginazione abbonamenti in scadenza" class="mt-4">
+                    <ul class="pagination justify-content-center">
+                        {% if page_obj.has_previous %}
+                            <li class="page-item">
+                                <a class="page-link" href="?page=1{% for key, value in request.GET.items %}{% if key != 'page' %}&{{ key }}={{ value }}{% endif %}{% endfor %}">&laquo; Prima</a>
+                            </li>
+                            <li class="page-item">
+                                <a class="page-link" href="?page={{ page_obj.previous_page_number }}{% for key, value in request.GET.items %}{% if key != 'page' %}&{{ key }}={{ value }}{% endif %}{% endfor %}">Precedente</a>
+                            </li>
+                        {% endif %}
+                        
+                        <li class="page-item active">
+                            <span class="page-link">
+                                Pagina {{ page_obj.number }} di {{ page_obj.paginator.num_pages }}
+                            </span>
+                        </li>
+                        
+                        {% if page_obj.has_next %}
+                            <li class="page-item">
+                                <a class="page-link" href="?page={{ page_obj.next_page_number }}{% for key, value in request.GET.items %}{% if key != 'page' %}&{{ key }}={{ value }}{% endif %}{% endfor %}">Successiva</a>
+                            </li>
+                            <li class="page-item">
+                                <a class="page-link" href="?page={{ page_obj.paginator.num_pages }}{% for key, value in request.GET.items %}{% if key != 'page' %}&{{ key }}={{ value }}{% endif %}{% endfor %}">Ultima &raquo;</a>
+                            </li>
+                        {% endif %}
+                    </ul>
+                </nav>
+            {% endif %}
+        {% else %}
+            <div class="text-center py-5">
+                <i class="bi bi-check-circle display-1 text-success"></i>
+                <h3 class="text-success mt-3">Nessun Abbonamento in Scadenza</h3>
+                <p class="text-muted">Ottimo! Non ci sono abbonamenti che scadono nei prossimi 30 giorni.</p>
+                <a href="{% url 'abbonamenti:abbonamenti-list' %}" class="btn btn-primary">
+                    <i class="bi bi-arrow-left"></i> Torna agli Abbonamenti
+                </a>
+            </div>
+        {% endif %}
+    </div>
+</div>
+
+<!-- Vista Timeline (alternativa) -->
+<div class="card mt-4" style="display: none;" id="vista-timeline">
+    <div class="card-header">
+        <h5 class="mb-0">
+            <i class="bi bi-clock-history"></i>
+            Timeline Scadenze
+        </h5>
+    </div>
+    <div class="card-body">
+        <div class="expiry-timeline">
+            {% for abbonamento in abbonamenti %}
+            {% with giorni=abbonamento.giorni_alla_scadenza %}
+            <div class="timeline-item {% if giorni <= 0 %}expired{% elif giorni <= 3 %}urgent{% elif giorni <= 7 %}warning{% endif %}">
+                <div class="d-flex justify-content-between align-items-start">
+                    <div>
+                        <h6 class="mb-1">{{ abbonamento.cliente.nome_completo }}</h6>
+                        <small class="text-muted">
+                            {{ abbonamento.codice_accesso }} • {{ abbonamento.configurazione.titolo }}
+                            <br>Scade il {{ abbonamento.data_scadenza|date:"d/m/Y" }}
+                        </small>
+                    </div>
+                    <div class="text-end">
+                        {% if giorni <= 0 %}
+                            <span class="badge bg-danger">Scaduto {{ giorni|abs }} giorni fa</span>
+                        {% else %}
+                            <span class="badge bg-warning">{{ giorni }} giorni</span>
+                        {% endif %}
+                    </div>
+                </div>
+            </div>
+            {% endwith %}
+            {% endfor %}
+        </div>
+    </div>
+</div>
+
+<script>
+let selectedAbbonamenti = new Set();
+
+function toggleSelectAll() {
+    const selectAll = document.getElementById('select-all');
+    const checkboxes = document.querySelectorAll('.abbonamento-check');
+    
+    checkboxes.forEach(cb => {
+        cb.checked = selectAll.checked;
+        if (selectAll.checked) {
+            selectedAbbonamenti.add(cb.value);
+        } else {
+            selectedAbbonamenti.delete(cb.value);
+        }
+    });
+    
+    updateSelectedCount();
+}
+
+// Gestione selezioni individuali
+document.querySelectorAll('.abbonamento-check').forEach(cb => {
+    cb.addEventListener('change', function() {
+        if (this.checked) {
+            selectedAbbonamenti.add(this.value);
+        } else {
+            selectedAbbonamenti.delete(this.value);
+        }
+        updateSelectedCount();
+    });
+});
+
+function updateSelectedCount() {
+    document.getElementById('selected-count').textContent = selectedAbbonamenti.size;
+}
+
+function inviaPromemoria(abbonamentoId) {
+    if (!confirm('Confermi di voler inviare un promemoria di scadenza?')) return;
+    
+    fetch(`/abbonamenti/${abbonamentoId}/invia-promemoria/`, {
+        method: 'POST',
+        headers: {
+            'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]').value
+        }
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            alert('Promemoria inviato con successo!');
+        } else {
+            alert('Errore: ' + data.error);
+        }
+    });
+}
+
+function inviaPromemoriSelezionati() {
+    if (selectedAbbonamenti.size === 0) {
+        alert('Seleziona almeno un abbonamento');
+        return;
+    }
+    
+    if (!confirm(`Confermi di voler inviare promemoria a ${selectedAbbonamenti.size} clienti?`)) return;
+    
+    fetch('/abbonamenti/invia-promemoria-batch/', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+            'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]').value
+        },
+        body: JSON.stringify({
+            abbonamenti: Array.from(selectedAbbonamenti)
+        })
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            alert(`Promemoria inviati con successo a ${data.inviati} clienti!`);
+        } else {
+            alert('Errore: ' + data.error);
+        }
+    });
+}
+
+function inviaPromemoriBatch() {
+    if (!confirm('Confermi di voler inviare promemoria a tutti gli abbonamenti in scadenza?')) return;
+    
+    fetch('/abbonamenti/invia-promemoria-batch/', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+            'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]').value
+        },
+        body: JSON.stringify({ tutti: true })
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            alert(`Promemoria inviati con successo a ${data.inviati} clienti!`);
+        } else {
+            alert('Errore: ' + data.error);
+        }
+    });
+}
+
+function esportaScadenze() {
+    window.open('/abbonamenti/esporta-scadenze/?' + window.location.search.substring(1), '_blank');
+}
+
+function esportaSelezionati() {
+    if (selectedAbbonamenti.size === 0) {
+        alert('Seleziona almeno un abbonamento');
+        return;
+    }
+    
+    const params = new URLSearchParams();
+    selectedAbbonamenti.forEach(id => params.append('ids', id));
+    
+    window.open('/abbonamenti/esporta-scadenze/?' + params.toString(), '_blank');
+}
+
+function contatlaCliente(telefono) {
+    if (telefono) {
+        window.open(`tel:${telefono}`);
+    } else {
+        alert('Numero di telefono non disponibile');
+    }
+}
+
+function rinnovaSelezionati() {
+    if (selectedAbbonamenti.size === 0) {
+        alert('Seleziona almeno un abbonamento');
+        return;
+    }
+    
+    if (!confirm(`Confermi di voler avviare il rinnovo per ${selectedAbbonamenti.size} abbonamenti?`)) return;
+    
+    // Apri wizard rinnovo multiplo
+    window.location.href = '/abbonamenti/rinnova-multipli/?' + 
+        Array.from(selectedAbbonamenti).map(id => `ids=${id}`).join('&');
+}
+
+// Auto-submit ricerca cliente dopo 500ms di inattività
+let searchTimeout;
+document.querySelector('input[name="cliente_search"]').addEventListener('input', function() {
+    clearTimeout(searchTimeout);
+    const form = this.closest('form');
+    searchTimeout = setTimeout(() => {
+        form.submit();
+    }, 500);
+});
+
+// Aggiorna automaticamente ogni 5 minuti
+setInterval(() => {
+    if (!document.hidden) {
+        location.reload();
+    }
+}, 300000);
+</script>
+{% endblock %}

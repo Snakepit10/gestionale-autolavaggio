@@ -1,0 +1,474 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}Prenotazione {{ prenotazione.codice_prenotazione }} - Gestionale Autolavaggio{% endblock %}
+
+{% block extra_css %}
+<style>
+.detail-card {
+    border: none;
+    border-radius: 15px;
+    box-shadow: 0 5px 15px rgba(0,0,0,0.1);
+    margin-bottom: 20px;
+}
+
+.status-badge {
+    font-size: 0.9rem;
+    padding: 8px 16px;
+    border-radius: 20px;
+}
+
+.status-confermata {
+    background-color: #d4edda;
+    color: #155724;
+}
+
+.status-in_corso {
+    background-color: #d1ecf1;
+    color: #0c5460;
+}
+
+.status-completata {
+    background-color: #d1ecf1;
+    color: #0c5460;
+}
+
+.status-annullata {
+    background-color: #f8d7da;
+    color: #721c24;
+}
+
+.info-item {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 10px 0;
+    border-bottom: 1px solid #f0f0f0;
+}
+
+.info-item:last-child {
+    border-bottom: none;
+}
+
+.service-item {
+    background: #f8f9fa;
+    border-radius: 8px;
+    padding: 15px;
+    margin-bottom: 10px;
+    border-left: 4px solid #0d6efd;
+}
+
+.timeline-item {
+    display: flex;
+    align-items: center;
+    padding: 10px 0;
+}
+
+.timeline-icon {
+    width: 40px;
+    height: 40px;
+    border-radius: 50%;
+    background: #0d6efd;
+    color: white;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    margin-right: 15px;
+    font-size: 0.9rem;
+}
+
+.timeline-icon.completed {
+    background: #28a745;
+}
+
+.timeline-icon.cancelled {
+    background: #dc3545;
+}
+
+.action-buttons {
+    display: flex;
+    gap: 10px;
+    flex-wrap: wrap;
+}
+
+@media (max-width: 768px) {
+    .action-buttons {
+        flex-direction: column;
+    }
+    
+    .action-buttons .btn {
+        width: 100%;
+    }
+}
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <div class="row mb-4">
+        <div class="col">
+            <nav aria-label="breadcrumb">
+                <ol class="breadcrumb">
+                    <li class="breadcrumb-item"><a href="{% url 'core:home' %}">Home</a></li>
+                    <li class="breadcrumb-item"><a href="{% url 'prenotazioni:prenotazioni' %}">Prenotazioni</a></li>
+                    <li class="breadcrumb-item active">{{ prenotazione.codice_prenotazione }}</li>
+                </ol>
+            </nav>
+        </div>
+    </div>
+
+    <div class="row">
+        <div class="col-12">
+            <div class="d-flex justify-content-between align-items-center mb-4">
+                <div>
+                    <h1 class="h3 mb-2">
+                        <i class="bi bi-calendar-check text-primary"></i>
+                        Prenotazione {{ prenotazione.codice_prenotazione }}
+                    </h1>
+                    <span class="status-badge status-{{ prenotazione.stato }}">
+                        {{ prenotazione.get_stato_display }}
+                    </span>
+                </div>
+                <div class="action-buttons">
+                    {% if prenotazione.can_be_cancelled %}
+                        <button type="button" class="btn btn-outline-warning" onclick="modificaPrenotazione()">
+                            <i class="bi bi-pencil"></i> Modifica
+                        </button>
+                        <button type="button" class="btn btn-outline-danger" onclick="annullaPrenotazione()">
+                            <i class="bi bi-x-circle"></i> Annulla
+                        </button>
+                    {% endif %}
+                    <button type="button" class="btn btn-primary" onclick="stampaPrenotazione()">
+                        <i class="bi bi-printer"></i> Stampa
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    {% if messages %}
+        {% for message in messages %}
+            <div class="alert alert-{{ message.tags }} alert-dismissible fade show" role="alert">
+                {{ message }}
+                <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+            </div>
+        {% endfor %}
+    {% endif %}
+
+    <div class="row">
+        <!-- Colonna principale -->
+        <div class="col-lg-8">
+            <!-- Dettagli Prenotazione -->
+            <div class="detail-card card">
+                <div class="card-header">
+                    <h5 class="mb-0">
+                        <i class="bi bi-info-circle text-primary"></i>
+                        Dettagli Prenotazione
+                    </h5>
+                </div>
+                <div class="card-body">
+                    <div class="info-item">
+                        <div>
+                            <strong>Data e Ora:</strong>
+                        </div>
+                        <div>
+                            {{ prenotazione.slot.data|date:"l d F Y" }} alle {{ prenotazione.slot.ora_inizio }}
+                        </div>
+                    </div>
+                    <div class="info-item">
+                        <div>
+                            <strong>Durata Stimata:</strong>
+                        </div>
+                        <div>
+                            {{ prenotazione.durata_stimata_minuti }} minuti
+                        </div>
+                    </div>
+                    <div class="info-item">
+                        <div>
+                            <strong>Cliente:</strong>
+                        </div>
+                        <div>
+                            {{ prenotazione.cliente.nome }}
+                            {% if prenotazione.cliente.email %}
+                                <br><small class="text-muted">{{ prenotazione.cliente.email }}</small>
+                            {% endif %}
+                            {% if prenotazione.cliente.telefono %}
+                                <br><small class="text-muted">{{ prenotazione.cliente.telefono }}</small>
+                            {% endif %}
+                        </div>
+                    </div>
+                    <div class="info-item">
+                        <div>
+                            <strong>Prenotazione Creata:</strong>
+                        </div>
+                        <div>
+                            {{ prenotazione.creata_il|date:"d/m/Y H:i" }}
+                        </div>
+                    </div>
+                    {% if prenotazione.ordine %}
+                    <div class="info-item">
+                        <div>
+                            <strong>Ordine Collegato:</strong>
+                        </div>
+                        <div>
+                            <a href="{% url 'ordini:ordine-detail' prenotazione.ordine.pk %}" class="btn btn-sm btn-outline-primary">
+                                Ordine #{{ prenotazione.ordine.id }}
+                            </a>
+                        </div>
+                    </div>
+                    {% endif %}
+                </div>
+            </div>
+
+            <!-- Servizi -->
+            <div class="detail-card card">
+                <div class="card-header">
+                    <h5 class="mb-0">
+                        <i class="bi bi-list-check text-primary"></i>
+                        Servizi Prenotati
+                    </h5>
+                </div>
+                <div class="card-body">
+                    {% for servizio in prenotazione.servizi.all %}
+                    <div class="service-item">
+                        <div class="d-flex justify-content-between align-items-center">
+                            <div>
+                                <h6 class="mb-1">{{ servizio.titolo }}</h6>
+                                {% if servizio.descrizione %}
+                                    <p class="mb-1 text-muted small">{{ servizio.descrizione }}</p>
+                                {% endif %}
+                                <small class="text-primary">
+                                    <i class="bi bi-clock"></i> {{ servizio.durata_minuti }} minuti
+                                </small>
+                            </div>
+                            <div class="text-end">
+                                <div class="h6 text-primary mb-0">€{{ servizio.prezzo }}</div>
+                            </div>
+                        </div>
+                    </div>
+                    {% empty %}
+                    <p class="text-muted">Nessun servizio specificato</p>
+                    {% endfor %}
+                    
+                    {% if prenotazione.servizi.all %}
+                    <hr>
+                    <div class="d-flex justify-content-between align-items-center">
+                        <strong>Totale Servizi:</strong>
+                        <strong class="text-primary h5">€{{ prenotazione.servizi.all|length|floatformat:2 }}</strong>
+                    </div>
+                    {% endif %}
+                </div>
+            </div>
+
+            <!-- Note -->
+            {% if prenotazione.nota_cliente or prenotazione.nota_interna %}
+            <div class="detail-card card">
+                <div class="card-header">
+                    <h5 class="mb-0">
+                        <i class="bi bi-chat-left-text text-primary"></i>
+                        Note
+                    </h5>
+                </div>
+                <div class="card-body">
+                    {% if prenotazione.nota_cliente %}
+                    <div class="mb-3">
+                        <h6 class="text-primary">Note Cliente:</h6>
+                        <p class="mb-0">{{ prenotazione.nota_cliente }}</p>
+                    </div>
+                    {% endif %}
+                    
+                    {% if prenotazione.nota_interna %}
+                    <div>
+                        <h6 class="text-warning">Note Interne:</h6>
+                        <p class="mb-0">{{ prenotazione.nota_interna }}</p>
+                    </div>
+                    {% endif %}
+                </div>
+            </div>
+            {% endif %}
+        </div>
+
+        <!-- Sidebar -->
+        <div class="col-lg-4">
+            <!-- Timeline Status -->
+            <div class="detail-card card">
+                <div class="card-header">
+                    <h6 class="mb-0">
+                        <i class="bi bi-clock-history text-primary"></i>
+                        Stato Prenotazione
+                    </h6>
+                </div>
+                <div class="card-body">
+                    <div class="timeline-item">
+                        <div class="timeline-icon completed">
+                            <i class="bi bi-check"></i>
+                        </div>
+                        <div>
+                            <strong>Prenotazione Creata</strong>
+                            <br><small class="text-muted">{{ prenotazione.creata_il|date:"d/m/Y H:i" }}</small>
+                        </div>
+                    </div>
+                    
+                    {% if prenotazione.stato == 'confermata' %}
+                    <div class="timeline-item">
+                        <div class="timeline-icon completed">
+                            <i class="bi bi-check-circle"></i>
+                        </div>
+                        <div>
+                            <strong>Confermata</strong>
+                            <br><small class="text-muted">In attesa di servizio</small>
+                        </div>
+                    </div>
+                    {% elif prenotazione.stato == 'in_corso' %}
+                    <div class="timeline-item">
+                        <div class="timeline-icon completed">
+                            <i class="bi bi-check-circle"></i>
+                        </div>
+                        <div>
+                            <strong>Confermata</strong>
+                        </div>
+                    </div>
+                    <div class="timeline-item">
+                        <div class="timeline-icon">
+                            <i class="bi bi-play-circle"></i>
+                        </div>
+                        <div>
+                            <strong>In Corso</strong>
+                            <br><small class="text-muted">Servizio in esecuzione</small>
+                        </div>
+                    </div>
+                    {% elif prenotazione.stato == 'completata' %}
+                    <div class="timeline-item">
+                        <div class="timeline-icon completed">
+                            <i class="bi bi-check-circle"></i>
+                        </div>
+                        <div>
+                            <strong>Confermata</strong>
+                        </div>
+                    </div>
+                    <div class="timeline-item">
+                        <div class="timeline-icon completed">
+                            <i class="bi bi-play-circle-fill"></i>
+                        </div>
+                        <div>
+                            <strong>Completata</strong>
+                        </div>
+                    </div>
+                    <div class="timeline-item">
+                        <div class="timeline-icon completed">
+                            <i class="bi bi-check-all"></i>
+                        </div>
+                        <div>
+                            <strong>Finita</strong>
+                            <br><small class="text-muted">Servizio completato</small>
+                        </div>
+                    </div>
+                    {% elif prenotazione.stato == 'annullata' %}
+                    <div class="timeline-item">
+                        <div class="timeline-icon cancelled">
+                            <i class="bi bi-x"></i>
+                        </div>
+                        <div>
+                            <strong>Annullata</strong>
+                            <br><small class="text-muted">{{ prenotazione.aggiornata_il|date:"d/m/Y H:i" }}</small>
+                        </div>
+                    </div>
+                    {% endif %}
+                </div>
+            </div>
+
+            <!-- Informazioni Slot -->
+            <div class="detail-card card">
+                <div class="card-header">
+                    <h6 class="mb-0">
+                        <i class="bi bi-calendar-range text-primary"></i>
+                        Informazioni Slot
+                    </h6>
+                </div>
+                <div class="card-body">
+                    <div class="info-item">
+                        <small class="text-muted">Slot:</small>
+                        <div>{{ prenotazione.slot.ora_inizio }} - {{ prenotazione.slot.ora_fine }}</div>
+                    </div>
+                    <div class="info-item">
+                        <small class="text-muted">Posti Totali:</small>
+                        <div>{{ prenotazione.slot.max_prenotazioni }}</div>
+                    </div>
+                    <div class="info-item">
+                        <small class="text-muted">Prenotazioni:</small>
+                        <div>{{ prenotazione.slot.num_prenotazioni_confermate }} / {{ prenotazione.slot.max_prenotazioni }}</div>
+                    </div>
+                    <div class="info-item">
+                        <small class="text-muted">Disponibilità:</small>
+                        <div>
+                            {% if prenotazione.slot.is_disponibile %}
+                                <span class="badge bg-success">Disponibile</span>
+                            {% else %}
+                                <span class="badge bg-danger">Completo</span>
+                            {% endif %}
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Azioni Rapide -->
+            <div class="detail-card card">
+                <div class="card-header">
+                    <h6 class="mb-0">
+                        <i class="bi bi-tools text-primary"></i>
+                        Azioni Rapide
+                    </h6>
+                </div>
+                <div class="card-body">
+                    <div class="d-grid gap-2">
+                        <a href="{% url 'prenotazioni:nuova-prenotazione' %}" class="btn btn-outline-primary">
+                            <i class="bi bi-plus-circle"></i> Nuova Prenotazione
+                        </a>
+                        <a href="{% url 'prenotazioni:calendario-prenotazioni' %}" class="btn btn-outline-info">
+                            <i class="bi bi-calendar"></i> Vedi Calendario
+                        </a>
+                        {% comment %}
+                        {% if user.is_authenticated %}
+                        <a href="{% url 'clienti:area-cliente' %}" class="btn btn-outline-secondary">
+                            <i class="bi bi-person"></i> Area Cliente
+                        </a>
+                        {% endif %}
+                        {% endcomment %}
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+function annullaPrenotazione() {
+    if (confirm('Sei sicuro di voler annullare questa prenotazione?')) {
+        // Implementa logica di annullamento
+        window.location.href = '{% url "prenotazioni:annulla-prenotazione" prenotazione.pk %}';
+    }
+}
+
+function modificaPrenotazione() {
+    // Implementa logica di modifica
+    alert('Funzione di modifica in sviluppo');
+}
+
+function stampaPrenotazione() {
+    window.print();
+}
+
+// Media query per stampa
+document.addEventListener('DOMContentLoaded', function() {
+    const style = document.createElement('style');
+    style.textContent = `
+        @media print {
+            .action-buttons, .btn, .breadcrumb { display: none !important; }
+            .detail-card { box-shadow: none !important; border: 1px solid #ddd !important; }
+            .container-fluid { max-width: 100% !important; }
+        }
+    `;
+    document.head.appendChild(style);
+});
+</script>
+{% endblock %}

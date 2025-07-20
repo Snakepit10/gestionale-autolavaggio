@@ -1,0 +1,177 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}Catalogo Prodotti e Servizi - Gestionale Autolavaggio{% endblock %}
+
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <h1><i class="bi bi-grid-3x3-gap"></i> Catalogo Prodotti e Servizi</h1>
+    <a href="{% url 'core:catalogo-create' %}" class="btn btn-primary">
+        <i class="bi bi-plus-circle"></i> Nuovo Prodotto/Servizio
+    </a>
+</div>
+
+{% if messages %}
+    {% for message in messages %}
+        <div class="alert alert-{{ message.tags }} alert-dismissible fade show" role="alert">
+            {{ message }}
+            <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+        </div>
+    {% endfor %}
+{% endif %}
+
+<!-- Filtri -->
+<div class="card mb-4">
+    <div class="card-body">
+        <div class="row g-3">
+            <div class="col-md-3">
+                <select class="form-select" id="filtro-tipo">
+                    <option value="">Tutti i Tipi</option>
+                    <option value="servizio">Solo Servizi</option>
+                    <option value="prodotto">Solo Prodotti</option>
+                </select>
+            </div>
+            <div class="col-md-3">
+                <select class="form-select" id="filtro-categoria">
+                    <option value="">Tutte le Categorie</option>
+                    <!-- Le categorie verranno popolate via JavaScript -->
+                </select>
+            </div>
+            <div class="col-md-3">
+                <select class="form-select" id="filtro-stato">
+                    <option value="">Tutti gli Stati</option>
+                    <option value="attivo">Solo Attivi</option>
+                    <option value="inattivo">Solo Inattivi</option>
+                </select>
+            </div>
+            <div class="col-md-3">
+                <input type="text" class="form-control" id="ricerca" placeholder="Cerca per nome...">
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="card">
+    <div class="card-body">
+        {% if servizi_prodotti %}
+            <div class="table-responsive">
+                <table class="table table-hover">
+                    <thead class="table-dark">
+                        <tr>
+                            <th>Nome</th>
+                            <th>Tipo</th>
+                            <th>Categoria</th>
+                            <th>Prezzo</th>
+                            <th>Durata</th>
+                            <th>Stato</th>
+                            <th class="text-center">Azioni</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for item in servizi_prodotti %}
+                        <tr data-tipo="{{ item.tipo }}" data-categoria="{{ item.categoria.nome }}" data-attivo="{{ item.attivo|yesno:'attivo,inattivo' }}">
+                            <td>
+                                <div class="d-flex align-items-center">
+                                    {% if item.tipo == 'servizio' %}
+                                        <i class="bi bi-gear text-primary me-2"></i>
+                                    {% else %}
+                                        <i class="bi bi-box text-success me-2"></i>
+                                    {% endif %}
+                                    <div>
+                                        <strong>{{ item.titolo }}</strong>
+                                        {% if item.descrizione %}
+                                            <br><small class="text-muted">{{ item.descrizione|truncatewords:8 }}</small>
+                                        {% endif %}
+                                    </div>
+                                </div>
+                            </td>
+                            <td>
+                                {% if item.tipo == 'servizio' %}
+                                    <span class="badge bg-primary">Servizio</span>
+                                {% else %}
+                                    <span class="badge bg-success">Prodotto</span>
+                                {% endif %}
+                            </td>
+                            <td>
+                                <span class="badge bg-secondary">{{ item.categoria.nome }}</span>
+                            </td>
+                            <td>
+                                <strong>€{{ item.prezzo }}</strong>
+                            </td>
+                            <td>
+                                {% if item.durata_minuti %}
+                                    {{ item.durata_minuti }} min
+                                {% else %}
+                                    -
+                                {% endif %}
+                            </td>
+                            <td>
+                                {% if item.attivo %}
+                                    <span class="badge bg-success">Attivo</span>
+                                {% else %}
+                                    <span class="badge bg-danger">Inattivo</span>
+                                {% endif %}
+                            </td>
+                            <td class="text-center">
+                                <div class="btn-group" role="group">
+                                    <a href="{% url 'core:catalogo-update' item.pk %}" 
+                                       class="btn btn-sm btn-outline-primary" title="Modifica">
+                                        <i class="bi bi-pencil"></i>
+                                    </a>
+                                    <a href="{% url 'core:catalogo-delete' item.pk %}" 
+                                       class="btn btn-sm btn-outline-danger" title="Elimina">
+                                        <i class="bi bi-trash"></i>
+                                    </a>
+                                </div>
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        {% else %}
+            <div class="text-center py-5">
+                <i class="bi bi-grid-3x3-gap display-1 text-muted"></i>
+                <h3 class="text-muted mt-3">Nessun Prodotto o Servizio</h3>
+                <p class="text-muted">Non ci sono ancora prodotti o servizi nel catalogo.</p>
+                <a href="{% url 'core:catalogo-create' %}" class="btn btn-primary">
+                    <i class="bi bi-plus-circle"></i> Aggiungi il Primo Elemento
+                </a>
+            </div>
+        {% endif %}
+    </div>
+</div>
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    // Filtri
+    const filtroTipo = document.getElementById('filtro-tipo');
+    const filtroCategoria = document.getElementById('filtro-categoria');
+    const filtroStato = document.getElementById('filtro-stato');
+    const ricerca = document.getElementById('ricerca');
+    const righe = document.querySelectorAll('tbody tr[data-tipo]');
+
+    function applicaFiltri() {
+        righe.forEach(riga => {
+            const tipo = riga.dataset.tipo;
+            const categoria = riga.dataset.categoria;
+            const attivo = riga.dataset.attivo;
+            const testo = riga.textContent.toLowerCase();
+
+            const mostra = 
+                (filtroTipo.value === '' || tipo === filtroTipo.value) &&
+                (filtroCategoria.value === '' || categoria === filtroCategoria.value) &&
+                (filtroStato.value === '' || attivo === filtroStato.value) &&
+                (ricerca.value === '' || testo.includes(ricerca.value.toLowerCase()));
+
+            riga.style.display = mostra ? '' : 'none';
+        });
+    }
+
+    filtroTipo.addEventListener('change', applicaFiltri);
+    filtroCategoria.addEventListener('change', applicaFiltri);
+    filtroStato.addEventListener('change', applicaFiltri);
+    ricerca.addEventListener('input', applicaFiltri);
+});
+</script>
+{% endblock %}

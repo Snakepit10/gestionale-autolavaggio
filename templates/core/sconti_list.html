@@ -1,0 +1,128 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}Gestione Sconti - Gestionale Autolavaggio{% endblock %}
+
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <h1><i class="bi bi-percent"></i> Gestione Sconti</h1>
+    <a href="{% url 'core:sconto-create' %}" class="btn btn-primary">
+        <i class="bi bi-plus-circle"></i> Nuovo Sconto
+    </a>
+</div>
+
+{% if messages %}
+    {% for message in messages %}
+        <div class="alert alert-{{ message.tags }} alert-dismissible fade show" role="alert">
+            {{ message }}
+            <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+        </div>
+    {% endfor %}
+{% endif %}
+
+<div class="card">
+    <div class="card-body">
+        {% if sconti %}
+            <div class="table-responsive">
+                <table class="table table-hover">
+                    <thead class="table-dark">
+                        <tr>
+                            <th>Nome</th>
+                            <th>Tipo</th>
+                            <th>Valore</th>
+                            <th>Validità</th>
+                            <th>Utilizzi</th>
+                            <th>Stato</th>
+                            <th class="text-center">Azioni</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for sconto in sconti %}
+                        <tr>
+                            <td>
+                                <div>
+                                    <strong>{{ sconto.nome }}</strong>
+                                    {% if sconto.codice %}
+                                        <br><small class="text-muted">Codice: <code>{{ sconto.codice }}</code></small>
+                                    {% endif %}
+                                </div>
+                            </td>
+                            <td>
+                                {% if sconto.tipo == 'percentuale' %}
+                                    <span class="badge bg-info">Percentuale</span>
+                                {% elif sconto.tipo == 'fisso' %}
+                                    <span class="badge bg-success">Fisso</span>
+                                {% else %}
+                                    <span class="badge bg-warning">{{ sconto.get_tipo_display }}</span>
+                                {% endif %}
+                            </td>
+                            <td>
+                                {% if sconto.tipo == 'percentuale' %}
+                                    <strong>{{ sconto.valore }}%</strong>
+                                {% else %}
+                                    <strong>€{{ sconto.valore }}</strong>
+                                {% endif %}
+                            </td>
+                            <td>
+                                <div>
+                                    {% if sconto.data_inizio %}
+                                        <small>Dal: {{ sconto.data_inizio|date:"d/m/Y" }}</small><br>
+                                    {% endif %}
+                                    {% if sconto.data_fine %}
+                                        <small>Al: {{ sconto.data_fine|date:"d/m/Y" }}</small>
+                                    {% else %}
+                                        <small class="text-muted">Senza scadenza</small>
+                                    {% endif %}
+                                </div>
+                            </td>
+                            <td>
+                                <div>
+                                    <span class="badge bg-secondary">{{ sconto.utilizzi_attuali|default:0 }}</span>
+                                    {% if sconto.utilizzi_massimi %}
+                                        / {{ sconto.utilizzi_massimi }}
+                                    {% endif %}
+                                </div>
+                            </td>
+                            <td>
+                                {% if sconto.attivo %}
+                                    {% if sconto.data_fine and sconto.data_fine < today %}
+                                        <span class="badge bg-warning">Scaduto</span>
+                                    {% elif sconto.utilizzi_massimi and sconto.utilizzi_attuali >= sconto.utilizzi_massimi %}
+                                        <span class="badge bg-warning">Esaurito</span>
+                                    {% else %}
+                                        <span class="badge bg-success">Attivo</span>
+                                    {% endif %}
+                                {% else %}
+                                    <span class="badge bg-danger">Disattivo</span>
+                                {% endif %}
+                            </td>
+                            <td class="text-center">
+                                <div class="btn-group" role="group">
+                                    <a href="{% url 'core:sconto-update' sconto.pk %}" 
+                                       class="btn btn-sm btn-outline-primary" title="Modifica">
+                                        <i class="bi bi-pencil"></i>
+                                    </a>
+                                    <a href="{% url 'core:sconto-delete' sconto.pk %}" 
+                                       class="btn btn-sm btn-outline-danger" title="Elimina">
+                                        <i class="bi bi-trash"></i>
+                                    </a>
+                                </div>
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        {% else %}
+            <div class="text-center py-5">
+                <i class="bi bi-percent display-1 text-muted"></i>
+                <h3 class="text-muted mt-3">Nessuno Sconto</h3>
+                <p class="text-muted">Non ci sono ancora sconti configurati.</p>
+                <a href="{% url 'core:sconto-create' %}" class="btn btn-primary">
+                    <i class="bi bi-plus-circle"></i> Crea il Primo Sconto
+                </a>
+            </div>
+        {% endif %}
+    </div>
+</div>
+{% endblock %}

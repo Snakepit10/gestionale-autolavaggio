@@ -1,0 +1,265 @@
+{% extends 'base.html' %}
+{% load static %}
+{% load crispy_forms_tags %}
+
+{% block title %}
+    {% if form.instance.pk %}Modifica Postazione{% else %}Nuova Postazione{% endif %} - Gestionale Autolavaggio
+{% endblock %}
+
+{% block content %}
+<div class="row justify-content-center">
+    <div class="col-lg-8">
+        <div class="card">
+            <div class="card-header d-flex justify-content-between align-items-center">
+                <h4 class="mb-0">
+                    <i class="bi bi-geo-alt"></i>
+                    {% if form.instance.pk %}
+                        Modifica Postazione: {{ form.instance.nome }}
+                    {% else %}
+                        Nuova Postazione
+                    {% endif %}
+                </h4>
+                <a href="{% url 'postazioni:postazioni-list' %}" class="btn btn-outline-secondary">
+                    <i class="bi bi-arrow-left"></i> Torna alla Lista
+                </a>
+            </div>
+            <div class="card-body">
+                <form method="post">
+                    {% csrf_token %}
+                    
+                    <!-- Informazioni Base -->
+                    <div class="row mb-4">
+                        <div class="col-12">
+                            <h5 class="border-bottom pb-2 mb-3">Informazioni Base</h5>
+                        </div>
+                        <div class="col-md-8">
+                            {{ form.nome|as_crispy_field }}
+                            {{ form.descrizione|as_crispy_field }}
+                        </div>
+                        <div class="col-md-4">
+                            {{ form.ordine_visualizzazione|as_crispy_field }}
+                            <div class="form-check form-switch">
+                                {{ form.attiva }}
+                                <label class="form-check-label" for="{{ form.attiva.id_for_label }}">
+                                    <i class="bi bi-power"></i> Postazione Attiva
+                                </label>
+                                <div class="form-text">La postazione riceverà nuovi ordini solo se attiva</div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Configurazione Stampante -->
+                    <div class="row mb-4">
+                        <div class="col-12">
+                            <h5 class="border-bottom pb-2 mb-3">Configurazione Stampante</h5>
+                        </div>
+                        <div class="col-md-6">
+                            {{ form.stampante_comande|as_crispy_field }}
+                        </div>
+                        <div class="col-md-6">
+                            <div class="alert alert-info">
+                                <i class="bi bi-info-circle"></i>
+                                <strong>Suggerimento:</strong> Configura una stampante per questa postazione 
+                                per ricevere automaticamente le comande degli ordini.
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Servizi Supportati -->
+                    <div class="row mb-4">
+                        <div class="col-12">
+                            <h5 class="border-bottom pb-2 mb-3">Servizi Supportati</h5>
+                            <p class="text-muted">Seleziona i servizi che questa postazione può erogare:</p>
+                        </div>
+                        <div class="col-12">
+                            {{ form.servizi|as_crispy_field }}
+                        </div>
+                    </div>
+                    
+                    <div class="d-flex justify-content-between">
+                        <a href="{% url 'postazioni:postazioni-list' %}" class="btn btn-secondary">
+                            <i class="bi bi-x-circle"></i> Annulla
+                        </a>
+                        <div>
+                            {% if form.instance.pk %}
+                                <a href="{% url 'postazioni:dashboard-postazione' form.instance.pk %}" 
+                                   class="btn btn-info me-2">
+                                    <i class="bi bi-speedometer2"></i> Vai alla Dashboard
+                                </a>
+                            {% endif %}
+                            <button type="submit" class="btn btn-primary">
+                                <i class="bi bi-check-circle"></i>
+                                {% if form.instance.pk %}Aggiorna{% else %}Crea{% endif %} Postazione
+                            </button>
+                        </div>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Card informazioni -->
+<div class="row justify-content-center mt-4">
+    <div class="col-lg-8">
+        <div class="card bg-light">
+            <div class="card-header">
+                <h6 class="mb-0">
+                    <i class="bi bi-info-circle"></i>
+                    Informazioni Postazioni
+                </h6>
+            </div>
+            <div class="card-body">
+                <div class="row">
+                    <div class="col-md-6">
+                        <h6>Funzionalità Postazioni:</h6>
+                        <ul class="small">
+                            <li><strong>Dashboard in tempo reale:</strong> Mostra ordini in coda e in lavorazione</li>
+                            <li><strong>Gestione stati:</strong> Permette di aggiornare lo stato degli ordini</li>
+                            <li><strong>Stampa comande:</strong> Stampa automatica delle comande su stampante dedicata</li>
+                            <li><strong>Statistiche:</strong> Monitoraggio performance e tempi di lavorazione</li>
+                        </ul>
+                    </div>
+                    <div class="col-md-6">
+                        <h6>Consigli per la Configurazione:</h6>
+                        <ul class="small">
+                            <li><strong>Nome:</strong> Usa nomi chiari (es: "Postazione Lavaggio", "Box Aspirazione")</li>
+                            <li><strong>Ordine:</strong> Imposta un ordine logico per la visualizzazione</li>
+                            <li><strong>Servizi:</strong> Assegna solo i servizi effettivamente erogabili</li>
+                            <li><strong>Stampante:</strong> Configura una stampante dedicata per le comande</li>
+                        </ul>
+                    </div>
+                </div>
+                
+                {% if form.instance.pk %}
+                <hr>
+                <div class="row">
+                    <div class="col-md-6">
+                        <h6>Statistiche Postazione:</h6>
+                        <ul class="small">
+                            <li>Ordini in coda: <strong>{{ form.instance.ordini_in_coda.count|default:0 }}</strong></li>
+                            <li>Servizi assegnati: <strong>{{ form.instance.servizi_supportati.count|default:0 }}</strong></li>
+                            <li>Stato: 
+                                {% if form.instance.attiva %}
+                                    <span class="text-success">Attiva</span>
+                                {% else %}
+                                    <span class="text-secondary">Inattiva</span>
+                                {% endif %}
+                            </li>
+                        </ul>
+                    </div>
+                    <div class="col-md-6">
+                        <h6>Collegamenti Rapidi:</h6>
+                        <div class="d-flex gap-2">
+                            <a href="{% url 'postazioni:dashboard-postazione' form.instance.pk %}" 
+                               class="btn btn-sm btn-outline-primary">
+                                <i class="bi bi-speedometer2"></i> Dashboard
+                            </a>
+                            {% if form.instance.stampante_comande %}
+                                <button class="btn btn-sm btn-outline-info" onclick="testStampante()">
+                                    <i class="bi bi-printer"></i> Test Stampa
+                                </button>
+                            {% endif %}
+                        </div>
+                    </div>
+                </div>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+// Validazione ordine visualizzazione
+document.getElementById('{{ form.ordine_visualizzazione.id_for_label }}').addEventListener('input', function() {
+    const valore = parseInt(this.value);
+    if (valore < 1) {
+        this.value = 1;
+    } else if (valore > 100) {
+        this.value = 100;
+    }
+});
+
+// Anteprima servizi selezionati
+document.querySelectorAll('input[name="servizi"]').forEach(checkbox => {
+    checkbox.addEventListener('change', aggiornaAnteprimaServizi);
+});
+
+function aggiornaAnteprimaServizi() {
+    const selezionati = document.querySelectorAll('input[name="servizi"]:checked');
+    const container = document.getElementById('anteprima-servizi');
+    
+    if (container) {
+        let html = '<strong>Servizi selezionati (' + selezionati.length + '):</strong><br>';
+        if (selezionati.length > 0) {
+            selezionati.forEach(checkbox => {
+                const label = checkbox.parentElement.textContent.trim();
+                html += '<span class="badge bg-light text-dark me-1">' + label + '</span>';
+            });
+        } else {
+            html += '<span class="text-muted">Nessun servizio selezionato</span>';
+        }
+        container.innerHTML = html;
+    }
+}
+
+// Aggiungi contenitore anteprima se non esiste
+document.addEventListener('DOMContentLoaded', function() {
+    const serviziField = document.querySelector('input[name="servizi"]');
+    if (serviziField) {
+        const container = document.createElement('div');
+        container.id = 'anteprima-servizi';
+        container.className = 'alert alert-light mt-2';
+        serviziField.closest('.form-group').appendChild(container);
+        aggiornaAnteprimaServizi();
+    }
+});
+
+{% if form.instance.pk and form.instance.stampante_comande %}
+function testStampante() {
+    fetch(`/postazioni/{{ form.instance.pk }}/test-stampante/`, {
+        method: 'POST',
+        headers: {
+            'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]').value
+        }
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            alert('Test di stampa inviato con successo');
+        } else {
+            alert('Errore nel test di stampa: ' + data.error);
+        }
+    });
+}
+{% endif %}
+
+// Salvataggio automatico bozza (ogni 30 secondi)
+let bozzaTimeout;
+document.querySelectorAll('input, textarea, select').forEach(field => {
+    field.addEventListener('input', function() {
+        clearTimeout(bozzaTimeout);
+        bozzaTimeout = setTimeout(salvaBozza, 30000);
+    });
+});
+
+function salvaBozza() {
+    const formData = new FormData(document.querySelector('form'));
+    formData.append('bozza', 'true');
+    
+    fetch(window.location.href, {
+        method: 'POST',
+        headers: {
+            'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]').value
+        },
+        body: formData
+    })
+    .then(response => {
+        if (response.ok) {
+            console.log('Bozza salvata automaticamente');
+        }
+    })
+    .catch(console.error);
+}
+</script>
+{% endblock %}

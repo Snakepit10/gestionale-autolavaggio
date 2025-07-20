@@ -1,0 +1,507 @@
+{% extends 'base.html' %}
+{% load static %}
+{% load crispy_forms_tags %}
+
+{% block title %}Configurazione Abbonamento - Accessi e Reset{% endblock %}
+
+{% block extra_css %}
+<style>
+.wizard-steps {
+    display: flex;
+    justify-content: space-between;
+    margin-bottom: 30px;
+    counter-reset: step;
+}
+
+.wizard-step {
+    flex: 1;
+    text-align: center;
+    position: relative;
+    counter-increment: step;
+}
+
+.wizard-step::before {
+    content: counter(step);
+    width: 40px;
+    height: 40px;
+    border-radius: 50%;
+    background: #6c757d;
+    color: white;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    margin: 0 auto 10px;
+    font-weight: bold;
+}
+
+.wizard-step.active::before {
+    background: #0d6efd;
+}
+
+.wizard-step.completed::before {
+    background: #28a745;
+    content: "✓";
+}
+
+.wizard-step:not(:last-child)::after {
+    content: '';
+    position: absolute;
+    top: 20px;
+    left: 60%;
+    right: -40%;
+    height: 2px;
+    background: #dee2e6;
+    z-index: -1;
+}
+
+.wizard-step.completed:not(:last-child)::after {
+    background: #28a745;
+}
+
+.form-section {
+    background: white;
+    border-radius: 10px;
+    padding: 30px;
+    box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+    margin-bottom: 20px;
+}
+
+.periodicita-option {
+    border: 2px solid #e9ecef;
+    border-radius: 10px;
+    padding: 20px;
+    margin-bottom: 15px;
+    cursor: pointer;
+    transition: all 0.3s ease;
+}
+
+.periodicita-option:hover {
+    border-color: #0d6efd;
+    box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+}
+
+.periodicita-option.selected {
+    border-color: #0d6efd;
+    background: #f8f9ff;
+}
+
+.periodicita-option input[type="radio"] {
+    display: none;
+}
+
+.periodicita-icon {
+    font-size: 2rem;
+    margin-bottom: 10px;
+}
+
+.preview-card {
+    background: linear-gradient(135deg, #0d6efd, #6610f2);
+    color: white;
+    border-radius: 15px;
+    padding: 25px;
+    text-align: center;
+}
+
+.help-section {
+    background: #f8f9fa;
+    border-radius: 10px;
+    padding: 20px;
+    margin-top: 20px;
+}
+
+.feature-card {
+    background: #f8f9fa;
+    border-radius: 10px;
+    padding: 20px;
+    margin-bottom: 20px;
+    border-left: 4px solid #0d6efd;
+}
+
+.switch-container {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+
+.preavviso-section {
+    margin-top: 20px;
+    padding: 20px;
+    background: #e3f2fd;
+    border-radius: 10px;
+    border-left: 4px solid #2196f3;
+}
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="container">
+    <div class="row">
+        <div class="col-lg-8 mx-auto">
+            <h1 class="text-center mb-4">
+                <i class="bi bi-magic"></i>
+                Wizard Configurazione Abbonamento
+            </h1>
+            
+            <!-- Steps Indicator -->
+            <div class="wizard-steps">
+                <div class="wizard-step completed">
+                    <div>Informazioni Base</div>
+                </div>
+                <div class="wizard-step completed">
+                    <div>Modalità Targa</div>
+                </div>
+                <div class="wizard-step active">
+                    <div>Accessi e Reset</div>
+                </div>
+                <div class="wizard-step">
+                    <div>Servizi Inclusi</div>
+                </div>
+            </div>
+
+            <form method="post">
+                {% csrf_token %}
+                {{ wizard.management_form }}
+                
+                <div class="form-section">
+                    <h3 class="mb-4">
+                        <i class="bi bi-arrow-clockwise text-primary"></i>
+                        Periodicità Reset Contatori
+                    </h3>
+                    
+                    <!-- Campo Django nascosto -->
+                    <div style="display: none;">
+                        {{ form.periodicita_reset }}
+                        {{ form.rinnovo_automatico }}
+                        {{ form.giorni_preavviso_scadenza }}
+                    </div>
+                    
+                    <p class="text-muted mb-4">
+                        Definisci ogni quanto tempo si azzerano i contatori dei servizi inclusi nell'abbonamento.
+                        Questo determina la frequenza di utilizzo dei servizi.
+                    </p>
+                    
+                    <div class="row">
+                        {% for value, label in form.periodicita_reset.field.choices %}
+                        <div class="col-md-{% if forloop.counter0|divisibleby:3 %}4{% else %}6{% endif %} mb-3">
+                            <div class="periodicita-option" onclick="selectPeriodicita('{{ value }}')">
+                                <input type="radio" name="periodicita_reset_display" value="{{ value }}" id="periodicita-display-{{ value }}"
+                                       {% if form.periodicita_reset.value == value %}checked{% endif %}>
+                                <div class="text-center">
+                                    <div class="periodicita-icon text-primary">
+                                        {% if value == 'giornaliero' %}
+                                            <i class="bi bi-calendar-day"></i>
+                                        {% elif value == 'settimanale' %}
+                                            <i class="bi bi-calendar-week"></i>
+                                        {% elif value == 'mensile' %}
+                                            <i class="bi bi-calendar-month"></i>
+                                        {% elif value == 'trimestrale' %}
+                                            <i class="bi bi-calendar3"></i>
+                                        {% elif value == 'semestrale' %}
+                                            <i class="bi bi-calendar-range"></i>
+                                        {% elif value == 'annuale' %}
+                                            <i class="bi bi-calendar-year"></i>
+                                        {% else %}
+                                            <i class="bi bi-calendar-check"></i>
+                                        {% endif %}
+                                    </div>
+                                    <h5>{{ label }}</h5>
+                                    <small class="text-muted">
+                                        {% if value == 'giornaliero' %}
+                                            I contatori si azzerano ogni giorno
+                                        {% elif value == 'settimanale' %}
+                                            I contatori si azzerano ogni settimana
+                                        {% elif value == 'mensile' %}
+                                            I contatori si azzerano ogni mese
+                                        {% elif value == 'trimestrale' %}
+                                            I contatori si azzerano ogni 3 mesi
+                                        {% elif value == 'semestrale' %}
+                                            I contatori si azzerano ogni 6 mesi
+                                        {% elif value == 'annuale' %}
+                                            I contatori si azzerano ogni anno
+                                        {% else %}
+                                            Reset personalizzato
+                                        {% endif %}
+                                    </small>
+                                </div>
+                            </div>
+                        </div>
+                        {% endfor %}
+                    </div>
+                </div>
+
+                <div class="form-section">
+                    <h3 class="mb-4">
+                        <i class="bi bi-arrow-repeat text-primary"></i>
+                        Rinnovo Automatico
+                    </h3>
+                    
+                    <div class="feature-card">
+                        <div class="switch-container">
+                            <div class="form-check form-switch">
+                                {{ form.rinnovo_automatico }}
+                                <label class="form-check-label" for="{{ form.rinnovo_automatico.id_for_label }}">
+                                    <strong>Attiva rinnovo automatico</strong>
+                                </label>
+                            </div>
+                        </div>
+                        <p class="text-muted mt-2 mb-0">
+                            Se attivato, l'abbonamento si rinnoverà automaticamente alla scadenza.
+                            Il cliente riceverà comunque un preavviso prima del rinnovo.
+                        </p>
+                    </div>
+                    
+                    <div class="preavviso-section">
+                        <h5 class="mb-3">
+                            <i class="bi bi-bell"></i>
+                            Preavviso Scadenza
+                        </h5>
+                        <div class="row">
+                            <div class="col-md-6">
+                                <label class="form-label">Giorni di preavviso</label>
+                                {{ form.giorni_preavviso_scadenza }}
+                                <div class="form-text">
+                                    Numero di giorni prima della scadenza per inviare il promemoria
+                                </div>
+                            </div>
+                            <div class="col-md-6">
+                                <div class="alert alert-info">
+                                    <i class="bi bi-info-circle"></i>
+                                    <strong>Suggerimento:</strong> 
+                                    7 giorni è il tempo ottimale per dare al cliente il tempo di decidere
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Riepilogo configurazione -->
+                {% if preview_data %}
+                <div class="form-section">
+                    <h4 class="mb-3">
+                        <i class="bi bi-eye text-success"></i>
+                        Riepilogo Configurazione
+                    </h4>
+                    
+                    <div class="row">
+                        <div class="col-md-8">
+                            <div class="card">
+                                <div class="card-body">
+                                    <h5 class="card-title">{{ preview_data.titolo }}</h5>
+                                    <p class="card-text">{{ preview_data.descrizione }}</p>
+                                    <div class="row">
+                                        <div class="col-md-6">
+                                            <p class="text-muted">
+                                                <strong>Prezzo:</strong> €{{ preview_data.prezzo }}<br>
+                                                <strong>Durata:</strong> {{ preview_data.get_durata_display }}<br>
+                                                <strong>Modalità Targa:</strong> {{ preview_data.get_modalita_targa_display }}
+                                                {% if preview_data.modalita_targa == 'variabile' %}
+                                                    (max {{ preview_data.numero_massimo_targhe }} targhe)
+                                                {% endif %}
+                                            </p>
+                                        </div>
+                                        <div class="col-md-6">
+                                            <div class="alert alert-info">
+                                                <i class="bi bi-info-circle"></i>
+                                                <strong>Ultimo passo:</strong> Selezione servizi inclusi
+                                                <br><small>Sceglieremo quali servizi includere nell'abbonamento.</small>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                {% endif %}
+
+                <!-- Navigazione -->
+                <div class="d-flex justify-content-between mt-4">
+                    <div>
+                        <button type="submit" name="wizard_goto_step" value="{{ wizard.steps.prev }}" class="btn btn-outline-secondary">
+                            <i class="bi bi-arrow-left"></i> Indietro
+                        </button>
+                    </div>
+                    <div>
+                        <button type="submit" class="btn btn-primary btn-lg">
+                            Avanti <i class="bi bi-arrow-right"></i>
+                        </button>
+                    </div>
+                </div>
+            </form>
+        </div>
+        
+        <!-- Sidebar con Preview -->
+        <div class="col-lg-4">
+            <div class="sticky-top" style="top: 20px;">
+                <div class="preview-card">
+                    <h4>{{ preview_data.titolo|default:"Abbonamento" }}</h4>
+                    <h2>€{{ preview_data.prezzo|default:"0.00" }}</h2>
+                    <p>{{ preview_data.get_durata_display|default:"Durata da definire" }}</p>
+                    <hr>
+                    <p id="preview-reset">
+                        <i class="bi bi-arrow-clockwise"></i>
+                        <span>Reset da definire</span>
+                    </p>
+                    <p id="preview-rinnovo">
+                        <i class="bi bi-arrow-repeat"></i>
+                        <span>Rinnovo da definire</span>
+                    </p>
+                </div>
+                
+                <div class="help-section">
+                    <h6><i class="bi bi-lightbulb"></i> Guida Reset e Rinnovo</h6>
+                    <div class="accordion" id="helpAccordion">
+                        <div class="accordion-item">
+                            <h2 class="accordion-header">
+                                <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#help-settimanale">
+                                    <i class="bi bi-calendar-week"></i> &nbsp; Reset Settimanale
+                                </button>
+                            </h2>
+                            <div id="help-settimanale" class="accordion-collapse collapse" data-bs-parent="#helpAccordion">
+                                <div class="accordion-body small">
+                                    <strong>Ideale per:</strong> Clienti che vengono spesso<br>
+                                    <strong>Esempio:</strong> 2 lavaggi a settimana<br>
+                                    <strong>Vantaggio:</strong> Utilizzo costante del servizio
+                                </div>
+                            </div>
+                        </div>
+                        <div class="accordion-item">
+                            <h2 class="accordion-header">
+                                <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#help-mensile">
+                                    <i class="bi bi-calendar-month"></i> &nbsp; Reset Mensile
+                                </button>
+                            </h2>
+                            <div id="help-mensile" class="accordion-collapse collapse" data-bs-parent="#helpAccordion">
+                                <div class="accordion-body small">
+                                    <strong>Ideale per:</strong> Uso moderato<br>
+                                    <strong>Esempio:</strong> 4 lavaggi al mese<br>
+                                    <strong>Vantaggio:</strong> Flessibilità nel periodo
+                                </div>
+                            </div>
+                        </div>
+                        <div class="accordion-item">
+                            <h2 class="accordion-header">
+                                <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#help-mai">
+                                    <i class="bi bi-infinity"></i> &nbsp; Senza Reset
+                                </button>
+                            </h2>
+                            <div id="help-mai" class="accordion-collapse collapse" data-bs-parent="#helpAccordion">
+                                <div class="accordion-body small">
+                                    <strong>Ideale per:</strong> Pacchetti prepagati<br>
+                                    <strong>Esempio:</strong> 10 lavaggi totali<br>
+                                    <strong>Vantaggio:</strong> Nessuna fretta di utilizzo
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="help-section">
+                    <h6><i class="bi bi-question-circle"></i> Domande Frequenti</h6>
+                    <div class="small">
+                        <p><strong>Q:</strong> Cosa succede se il cliente non usa tutti i servizi?</p>
+                        <p><strong>A:</strong> Con reset periodico si perdono, senza reset si accumulano.</p>
+                        
+                        <p><strong>Q:</strong> Il rinnovo automatico addebita subito?</p>
+                        <p><strong>A:</strong> Sì, ma solo dopo aver inviato il preavviso.</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+function selectPeriodicita(value) {
+    // Rimuovi selezioni precedenti
+    document.querySelectorAll('.periodicita-option').forEach(option => {
+        option.classList.remove('selected');
+    });
+    
+    // Seleziona nuovo display
+    document.querySelector(`input[name="periodicita_reset_display"][value="${value}"]`).checked = true;
+    document.querySelector(`input[name="periodicita_reset_display"][value="${value}"]`).closest('.periodicita-option').classList.add('selected');
+    
+    // Aggiorna il campo Django reale (con prefisso wizard)
+    const djangoRadio = document.querySelector(`input[name="accessi-periodicita_reset"][value="${value}"]`);
+    const djangoSelect = document.querySelector('select[name="accessi-periodicita_reset"]');
+    
+    if (djangoRadio) {
+        djangoRadio.checked = true;
+    } else if (djangoSelect) {
+        djangoSelect.value = value;
+    }
+    
+    updatePreview();
+}
+
+function updatePreview() {
+    const periodicita = document.querySelector('input[name="periodicita_reset_display"]:checked');
+    const rinnovo = document.querySelector('input[name="accessi-rinnovo_automatico"]');
+    
+    const previewReset = document.getElementById('preview-reset');
+    const previewRinnovo = document.getElementById('preview-rinnovo');
+    
+    if (periodicita) {
+        const periodicitaText = periodicita.closest('.periodicita-option').querySelector('h5').textContent;
+        const iconClass = periodicita.value === 'giornaliero' ? 'bi-calendar-day' : 
+                         periodicita.value === 'settimanale' ? 'bi-calendar-week' : 
+                         periodicita.value === 'mensile' ? 'bi-calendar-month' : 
+                         periodicita.value === 'trimestrale' ? 'bi-calendar3' : 
+                         periodicita.value === 'semestrale' ? 'bi-calendar-range' : 
+                         periodicita.value === 'annuale' ? 'bi-calendar-year' : 'bi-calendar-check';
+        
+        previewReset.innerHTML = `
+            <i class="bi ${iconClass}"></i>
+            <span>Reset ${periodicitaText.toLowerCase()}</span>
+        `;
+    }
+    
+    if (previewRinnovo) {
+        previewRinnovo.innerHTML = `
+            <i class="bi bi-arrow-repeat"></i>
+            <span>Rinnovo ${rinnovo && rinnovo.checked ? 'automatico' : 'manuale'}</span>
+        `;
+    }
+}
+
+// Setup event listeners
+document.addEventListener('DOMContentLoaded', function() {
+    // Inizializza selezione periodicità se presente - sincronizza con campo Django
+    const djangoPeriodicita = document.querySelector('input[name="accessi-periodicita_reset"]:checked') ||
+                             document.querySelector('select[name="accessi-periodicita_reset"]');
+    if (djangoPeriodicita && djangoPeriodicita.value) {
+        selectPeriodicita(djangoPeriodicita.value);
+    }
+    
+    // Listener per il checkbox rinnovo automatico
+    const rinnovoCheckbox = document.querySelector('input[name="accessi-rinnovo_automatico"]');
+    if (rinnovoCheckbox) {
+        rinnovoCheckbox.addEventListener('change', updatePreview);
+    }
+    
+    updatePreview();
+});
+
+// Validazione form
+document.querySelector('form').addEventListener('submit', function(e) {
+    const periodicita = document.querySelector('input[name="accessi-periodicita_reset"]:checked') ||
+                       document.querySelector('select[name="accessi-periodicita_reset"]');
+    const preavviso = document.querySelector('[name="accessi-giorni_preavviso_scadenza"]').value;
+    
+    const periodicitaValue = periodicita ? (periodicita.value || periodicita.selectedOptions?.[0]?.value) : null;
+    
+    if (!periodicitaValue) {
+        e.preventDefault();
+        alert('Seleziona una periodicità per il reset dei contatori');
+        return false;
+    }
+    
+    if (!preavviso || parseInt(preavviso) < 1 || parseInt(preavviso) > 30) {
+        e.preventDefault();
+        alert('Inserisci un numero di giorni di preavviso valido (1-30)');
+        return false;
+    }
+});
+</script>
+{% endblock %}

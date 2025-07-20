@@ -1,0 +1,274 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}Gestione Scorte - Gestionale Autolavaggio{% endblock %}
+
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <h1><i class="bi bi-boxes"></i> Gestione Scorte</h1>
+    <div>
+        <a href="{% url 'core:alert-scorte' %}" class="btn btn-warning me-2">
+            <i class="bi bi-exclamation-triangle"></i> Prodotti Sotto Scorta
+        </a>
+        <a href="{% url 'core:movimenti-scorte' %}" class="btn btn-info me-2">
+            <i class="bi bi-arrow-repeat"></i> Movimenti
+        </a>
+        <a href="{% url 'core:catalogo-create' %}" class="btn btn-primary">
+            <i class="bi bi-plus-circle"></i> Nuovo Prodotto
+        </a>
+    </div>
+</div>
+
+{% if messages %}
+    {% for message in messages %}
+        <div class="alert alert-{{ message.tags }} alert-dismissible fade show" role="alert">
+            {{ message }}
+            <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+        </div>
+    {% endfor %}
+{% endif %}
+
+<!-- Filtri -->
+<div class="card mb-4">
+    <div class="card-body">
+        <div class="row">
+            <div class="col-md-4">
+                <input type="text" id="filtro-nome" class="form-control" placeholder="Cerca per nome prodotto...">
+            </div>
+            <div class="col-md-3">
+                <select id="filtro-categoria" class="form-select">
+                    <option value="">Tutte le categorie</option>
+                    {% for categoria in categorie %}
+                        <option value="{{ categoria.nome }}">{{ categoria.nome }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div class="col-md-3">
+                <select id="filtro-stato" class="form-select">
+                    <option value="">Tutti gli stati</option>
+                    <option value="normale">Scorte Normali</option>
+                    <option value="basse">Scorte Basse</option>
+                    <option value="esaurite">Esaurite</option>
+                </select>
+            </div>
+            <div class="col-md-2">
+                <button type="button" class="btn btn-outline-secondary w-100" onclick="resetFiltri()">
+                    <i class="bi bi-arrow-clockwise"></i> Reset
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="card">
+    <div class="card-body">
+        {% if prodotti %}
+            <div class="table-responsive">
+                <table class="table table-hover" id="tabella-scorte">
+                    <thead class="table-dark">
+                        <tr>
+                            <th>Prodotto</th>
+                            <th>Categoria</th>
+                            <th>Scorte</th>
+                            <th>Prezzo</th>
+                            <th>Ultima Modifica</th>
+                            <th class="text-center">Azioni</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for prodotto in prodotti %}
+                        <tr data-categoria="{{ prodotto.categoria.nome|default:'' }}" 
+                            data-nome="{{ prodotto.titolo|lower }}">
+                            <td>
+                                <div class="d-flex align-items-center">
+                                    <i class="bi bi-box me-2 text-primary"></i>
+                                    <div>
+                                        <strong>{{ prodotto.titolo }}</strong>
+                                        {% if prodotto.descrizione %}
+                                            <br><small class="text-muted">{{ prodotto.descrizione|truncatewords:10 }}</small>
+                                        {% endif %}
+                                    </div>
+                                </div>
+                            </td>
+                            <td>
+                                {% if prodotto.categoria %}
+                                    <span class="badge bg-secondary">{{ prodotto.categoria.nome }}</span>
+                                {% else %}
+                                    <span class="text-muted">-</span>
+                                {% endif %}
+                            </td>
+                            <td>
+                                <div class="d-flex align-items-center">
+                                    {% if prodotto.quantita_disponibile <= 0 %}
+                                        <span class="badge bg-danger me-2">
+                                            <i class="bi bi-x-circle"></i> Esaurito
+                                        </span>
+                                    {% elif prodotto.quantita_disponibile <= prodotto.quantita_minima_alert %}
+                                        <span class="badge bg-warning me-2">
+                                            <i class="bi bi-exclamation-triangle"></i> Basse
+                                        </span>
+                                    {% else %}
+                                        <span class="badge bg-success me-2">
+                                            <i class="bi bi-check-circle"></i> OK
+                                        </span>
+                                    {% endif %}
+                                    <div>
+                                        <strong>{{ prodotto.quantita_disponibile|default:0 }}</strong>
+                                        <br><small class="text-muted">Min: {{ prodotto.quantita_minima_alert }}</small>
+                                    </div>
+                                </div>
+                            </td>
+                            <td>
+                                <strong>€{{ prodotto.prezzo }}</strong>
+                            </td>
+                            <td>
+                                {% if prodotto.updated_at %}
+                                    <small>{{ prodotto.updated_at|date:"d/m/Y H:i" }}</small>
+                                {% else %}
+                                    <small class="text-muted">-</small>
+                                {% endif %}
+                            </td>
+                            <td class="text-center">
+                                <div class="btn-group" role="group">
+                                    <button class="btn btn-sm btn-outline-success" 
+                                            onclick="aggiungiMovimento('{{ prodotto.pk }}', 'carico')"
+                                            title="Carico Scorte">
+                                        <i class="bi bi-plus-circle"></i>
+                                    </button>
+                                    <button class="btn btn-sm btn-outline-warning" 
+                                            onclick="aggiungiMovimento('{{ prodotto.pk }}', 'scarico')"
+                                            title="Scarico Scorte">
+                                        <i class="bi bi-dash-circle"></i>
+                                    </button>
+                                    <a href="{% url 'core:catalogo-update' prodotto.pk %}" 
+                                       class="btn btn-sm btn-outline-primary" title="Modifica">
+                                        <i class="bi bi-pencil"></i>
+                                    </a>
+                                </div>
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        {% else %}
+            <div class="text-center py-5">
+                <i class="bi bi-boxes display-1 text-muted"></i>
+                <h3 class="text-muted mt-3">Nessun Prodotto</h3>
+                <p class="text-muted">Non ci sono ancora prodotti nel magazzino.</p>
+                <a href="{% url 'core:catalogo-create' %}" class="btn btn-primary">
+                    <i class="bi bi-plus-circle"></i> Aggiungi il Primo Prodotto
+                </a>
+            </div>
+        {% endif %}
+    </div>
+</div>
+
+<!-- Modal Movimento Scorte -->
+<div class="modal fade" id="modalMovimento" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">
+                    <i class="bi bi-arrow-repeat"></i>
+                    <span id="titolo-movimento">Movimento Scorte</span>
+                </h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <form id="form-movimento" method="post" action="{% url 'core:movimento-scorte' %}">
+                <div class="modal-body">
+                    {% csrf_token %}
+                    <input type="hidden" id="prodotto-id" name="prodotto_id">
+                    <input type="hidden" id="tipo-movimento" name="tipo">
+                    
+                    <div class="mb-3">
+                        <label for="quantita" class="form-label">Quantità</label>
+                        <input type="number" class="form-control" id="quantita" name="quantita" min="1" required>
+                    </div>
+                    
+                    <div class="mb-3">
+                        <label for="nota" class="form-label">Nota</label>
+                        <textarea class="form-control" id="nota" name="nota" rows="3"></textarea>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">
+                        <i class="bi bi-x-circle"></i> Annulla
+                    </button>
+                    <button type="submit" class="btn btn-primary" id="btn-conferma-movimento">
+                        <i class="bi bi-check-circle"></i> Conferma
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<script>
+// Filtri
+document.getElementById('filtro-nome').addEventListener('input', applicaFiltri);
+document.getElementById('filtro-categoria').addEventListener('change', applicaFiltri);
+document.getElementById('filtro-stato').addEventListener('change', applicaFiltri);
+
+function applicaFiltri() {
+    const filtroNome = document.getElementById('filtro-nome').value.toLowerCase();
+    const filtroCategoria = document.getElementById('filtro-categoria').value;
+    const filtroStato = document.getElementById('filtro-stato').value;
+    const righe = document.querySelectorAll('#tabella-scorte tbody tr');
+    
+    righe.forEach(riga => {
+        const nome = riga.dataset.nome;
+        const categoria = riga.dataset.categoria;
+        const badgeStato = riga.querySelector('.badge');
+        
+        let mostra = true;
+        
+        // Filtro nome
+        if (filtroNome && !nome.includes(filtroNome)) {
+            mostra = false;
+        }
+        
+        // Filtro categoria
+        if (filtroCategoria && categoria !== filtroCategoria) {
+            mostra = false;
+        }
+        
+        // Filtro stato
+        if (filtroStato) {
+            const hasBadgeDanger = badgeStato.classList.contains('bg-danger');
+            const hasBadgeWarning = badgeStato.classList.contains('bg-warning');
+            const hasBadgeSuccess = badgeStato.classList.contains('bg-success');
+            
+            if (filtroStato === 'esaurite' && !hasBadgeDanger) mostra = false;
+            if (filtroStato === 'basse' && !hasBadgeWarning) mostra = false;
+            if (filtroStato === 'normale' && !hasBadgeSuccess) mostra = false;
+        }
+        
+        riga.style.display = mostra ? '' : 'none';
+    });
+}
+
+function resetFiltri() {
+    document.getElementById('filtro-nome').value = '';
+    document.getElementById('filtro-categoria').value = '';
+    document.getElementById('filtro-stato').value = '';
+    applicaFiltri();
+}
+
+// Gestione movimenti
+function aggiungiMovimento(prodottoId, tipo) {
+    document.getElementById('prodotto-id').value = prodottoId;
+    document.getElementById('tipo-movimento').value = tipo;
+    
+    const titolo = tipo === 'carico' ? 'Carico Scorte' : 'Scarico Scorte';
+    document.getElementById('titolo-movimento').textContent = titolo;
+    
+    const btnConferma = document.getElementById('btn-conferma-movimento');
+    btnConferma.className = tipo === 'carico' ? 'btn btn-success' : 'btn btn-warning';
+    btnConferma.innerHTML = `<i class="bi bi-check-circle"></i> Conferma ${titolo}`;
+    
+    const modal = new bootstrap.Modal(document.getElementById('modalMovimento'));
+    modal.show();
+}
+</script>
+{% endblock %}

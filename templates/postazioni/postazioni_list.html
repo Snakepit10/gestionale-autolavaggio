@@ -1,0 +1,287 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}Gestione Postazioni - Gestionale Autolavaggio{% endblock %}
+
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <h1><i class="bi bi-geo-alt"></i> Gestione Postazioni</h1>
+    <div>
+        <a href="{% url 'postazioni:postazione-create' %}" class="btn btn-primary">
+            <i class="bi bi-plus-circle"></i> Nuova Postazione
+        </a>
+    </div>
+</div>
+
+{% if messages %}
+    {% for message in messages %}
+        <div class="alert alert-{{ message.tags }} alert-dismissible fade show" role="alert">
+            {{ message }}
+            <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+        </div>
+    {% endfor %}
+{% endif %}
+
+<!-- Statistiche Generali -->
+<div class="row mb-4">
+    <div class="col-md-3">
+        <div class="card bg-primary text-white">
+            <div class="card-body text-center">
+                <i class="bi bi-geo-alt display-6"></i>
+                <h4>{{ postazioni|length }}</h4>
+                <small>Postazioni Totali</small>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-3">
+        <div class="card bg-success text-white">
+            <div class="card-body text-center">
+                <i class="bi bi-check-circle display-6"></i>
+                <h4>{{ postazioni_attive|default:0 }}</h4>
+                <small>Postazioni Attive</small>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-3">
+        <div class="card bg-warning text-white">
+            <div class="card-body text-center">
+                <i class="bi bi-clock display-6"></i>
+                <h4>{{ ordini_in_coda_totali|default:0 }}</h4>
+                <small>Ordini in Coda</small>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-3">
+        <div class="card bg-info text-white">
+            <div class="card-body text-center">
+                <i class="bi bi-activity display-6"></i>
+                <h4>{{ postazioni_in_lavorazione|default:0 }}</h4>
+                <small>In Lavorazione</small>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="card">
+    <div class="card-body">
+        {% if postazioni %}
+            <div class="row">
+                {% for postazione in postazioni %}
+                <div class="col-lg-6 col-xl-4 mb-4">
+                    <div class="card h-100 {% if not postazione.attiva %}border-secondary{% endif %}">
+                        <div class="card-header d-flex justify-content-between align-items-center">
+                            <h5 class="mb-0">
+                                <i class="bi bi-geo-alt"></i>
+                                {{ postazione.nome }}
+                            </h5>
+                            <div>
+                                {% if postazione.attiva %}
+                                    <span class="badge bg-success">Attiva</span>
+                                {% else %}
+                                    <span class="badge bg-secondary">Inattiva</span>
+                                {% endif %}
+                            </div>
+                        </div>
+                        <div class="card-body">
+                            {% if postazione.descrizione %}
+                                <p class="card-text text-muted small">{{ postazione.descrizione }}</p>
+                            {% endif %}
+                            
+                            <!-- Statistiche postazione -->
+                            <div class="row text-center mb-3">
+                                <div class="col-4">
+                                    <div class="border rounded p-2">
+                                        <h6 class="text-warning mb-1">{{ postazione.ordini_in_coda_count|default:0 }}</h6>
+                                        <small class="text-muted">In Coda</small>
+                                    </div>
+                                </div>
+                                <div class="col-4">
+                                    <div class="border rounded p-2">
+                                        <h6 class="text-info mb-1">{{ postazione.ordini_in_lavorazione|default:0 }}</h6>
+                                        <small class="text-muted">In Corso</small>
+                                    </div>
+                                </div>
+                                <div class="col-4">
+                                    <div class="border rounded p-2">
+                                        <h6 class="text-success mb-1">{{ postazione.completati_oggi|default:0 }}</h6>
+                                        <small class="text-muted">Oggi</small>
+                                    </div>
+                                </div>
+                            </div>
+                            
+                            <!-- Servizi supportati -->
+                            <div class="mb-3">
+                                <h6 class="text-muted mb-2">Servizi Supportati:</h6>
+                                {% if postazione.servizi_supportati.all %}
+                                    <div class="d-flex flex-wrap gap-1">
+                                        {% for servizio in postazione.servizi_supportati.all|slice:":3" %}
+                                            <span class="badge bg-light text-dark">{{ servizio.titolo }}</span>
+                                        {% endfor %}
+                                        {% if postazione.servizi_supportati.count > 3 %}
+                                            <span class="badge bg-secondary">+{{ postazione.servizi_supportati.count|add:"-3" }}</span>
+                                        {% endif %}
+                                    </div>
+                                {% else %}
+                                    <small class="text-muted">Nessun servizio assegnato</small>
+                                {% endif %}
+                            </div>
+                            
+                            <!-- Stampante -->
+                            {% if postazione.stampante_comande %}
+                                <div class="mb-3">
+                                    <small class="text-success">
+                                        <i class="bi bi-printer"></i>
+                                        Stampante: {{ postazione.stampante_comande.nome }}
+                                    </small>
+                                </div>
+                            {% else %}
+                                <div class="mb-3">
+                                    <small class="text-warning">
+                                        <i class="bi bi-printer"></i>
+                                        Nessuna stampante configurata
+                                    </small>
+                                </div>
+                            {% endif %}
+                        </div>
+                        <div class="card-footer bg-transparent">
+                            <div class="d-flex justify-content-between">
+                                <div class="btn-group" role="group">
+                                    <a href="{% url 'postazioni:dashboard-postazione' postazione.pk %}" 
+                                       class="btn btn-sm btn-primary" title="Dashboard">
+                                        <i class="bi bi-speedometer2"></i>
+                                    </a>
+                                    <a href="{% url 'postazioni:postazione-update' postazione.pk %}" 
+                                       class="btn btn-sm btn-outline-primary" title="Modifica">
+                                        <i class="bi bi-pencil"></i>
+                                    </a>
+                                </div>
+                                <div class="btn-group" role="group">
+                                    {% if postazione.attiva %}
+                                        <button class="btn btn-sm btn-outline-warning" 
+                                                onclick="togglePostazione('{{ postazione.pk }}', false)"
+                                                title="Disattiva">
+                                            <i class="bi bi-pause"></i>
+                                        </button>
+                                    {% else %}
+                                        <button class="btn btn-sm btn-outline-success" 
+                                                onclick="togglePostazione('{{ postazione.pk }}', true)"
+                                                title="Attiva">
+                                            <i class="bi bi-play"></i>
+                                        </button>
+                                    {% endif %}
+                                    <button class="btn btn-sm btn-outline-danger" 
+                                            onclick="confermaEliminazione('{{ postazione.nome }}', '{{ postazione.pk }}')"
+                                            title="Elimina">
+                                        <i class="bi bi-trash"></i>
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                {% endfor %}
+            </div>
+        {% else %}
+            <div class="text-center py-5">
+                <i class="bi bi-geo-alt display-1 text-muted"></i>
+                <h3 class="text-muted mt-3">Nessuna Postazione</h3>
+                <p class="text-muted">Non ci sono ancora postazioni configurate.</p>
+                <a href="{% url 'postazioni:postazione-create' %}" class="btn btn-primary">
+                    <i class="bi bi-plus-circle"></i> Crea la Prima Postazione
+                </a>
+            </div>
+        {% endif %}
+    </div>
+</div>
+
+<!-- Modal Conferma Eliminazione -->
+<div class="modal fade" id="modalConfermaEliminazione" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header bg-danger text-white">
+                <h5 class="modal-title">
+                    <i class="bi bi-exclamation-triangle"></i>
+                    Conferma Eliminazione
+                </h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <p>Sei sicuro di voler eliminare la postazione <strong id="nome-postazione"></strong>?</p>
+                <div class="alert alert-warning">
+                    <i class="bi bi-warning"></i>
+                    <strong>Attenzione!</strong> Eliminando questa postazione:
+                    <ul class="mb-0">
+                        <li>Tutti gli ordini in coda verranno persi</li>
+                        <li>I servizi non saranno più assegnati a questa postazione</li>
+                        <li>Lo storico lavorazioni rimarrà ma senza riferimento alla postazione</li>
+                    </ul>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">
+                    <i class="bi bi-x-circle"></i> Annulla
+                </button>
+                <a id="btn-conferma-eliminazione" href="#" class="btn btn-danger">
+                    <i class="bi bi-trash"></i> Elimina Postazione
+                </a>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+function confermaEliminazione(nome, pk) {
+    document.getElementById('nome-postazione').textContent = nome;
+    document.getElementById('btn-conferma-eliminazione').href = `/postazioni/${pk}/elimina/`;
+    
+    const modal = new bootstrap.Modal(document.getElementById('modalConfermaEliminazione'));
+    modal.show();
+}
+
+function togglePostazione(pk, attiva) {
+    const azione = attiva ? 'attivare' : 'disattivare';
+    if (!confirm(`Confermi di voler ${azione} questa postazione?`)) return;
+    
+    fetch(`/postazioni/${pk}/toggle/`, {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+            'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]').value
+        },
+        body: JSON.stringify({ attiva: attiva })
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            location.reload();
+        } else {
+            alert('Errore: ' + data.error);
+        }
+    });
+}
+
+// Auto-refresh ogni 30 secondi per aggiornare le statistiche
+setInterval(() => {
+    fetch(window.location.href, { headers: { 'X-Requested-With': 'XMLHttpRequest' } })
+        .then(response => response.text())
+        .then(html => {
+            // Aggiorna solo le statistiche senza reload completo
+            const parser = new DOMParser();
+            const doc = parser.parseFromString(html, 'text/html');
+            
+            // Aggiorna i contatori nelle card delle postazioni
+            document.querySelectorAll('.card').forEach((card, index) => {
+                const newCard = doc.querySelectorAll('.card')[index];
+                if (newCard) {
+                    const oldStats = card.querySelector('.row.text-center');
+                    const newStats = newCard.querySelector('.row.text-center');
+                    if (oldStats && newStats) {
+                        oldStats.innerHTML = newStats.innerHTML;
+                    }
+                }
+            });
+        })
+        .catch(console.error);
+}, 30000);
+</script>
+{% endblock %}

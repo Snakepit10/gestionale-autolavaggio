@@ -1,0 +1,623 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}Ordini Non Pagati - Gestionale Autolavaggio{% endblock %}
+
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <h1>
+        <i class="bi bi-exclamation-triangle text-warning"></i>
+        Ordini Non Pagati
+    </h1>
+    <div>
+        <button class="btn btn-outline-primary me-2" onclick="inviaPromemoria()">
+            <i class="bi bi-envelope"></i> Invia Promemoria
+        </button>
+        <a href="{% url 'ordini:ordini-list' %}" class="btn btn-outline-secondary">
+            <i class="bi bi-arrow-left"></i> Tutti gli Ordini
+        </a>
+    </div>
+</div>
+
+{% if messages %}
+    {% for message in messages %}
+        <div class="alert alert-{{ message.tags }} alert-dismissible fade show" role="alert">
+            {{ message }}
+            <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+        </div>
+    {% endfor %}
+{% endif %}
+
+<!-- Statistiche -->
+<div class="row mb-4">
+    <div class="col-md-3">
+        <div class="card bg-danger text-white">
+            <div class="card-body text-center">
+                <i class="bi bi-x-circle display-6"></i>
+                <h4>{{ totale_non_pagati|default:0 }}</h4>
+                <small>Ordini Non Pagati</small>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-3">
+        <div class="card bg-warning text-white">
+            <div class="card-body text-center">
+                <i class="bi bi-clock display-6"></i>
+                <h4>{{ totale_parziali|default:0 }}</h4>
+                <small>Pagamenti Parziali</small>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-3">
+        <div class="card bg-info text-white">
+            <div class="card-body text-center">
+                <i class="bi bi-calendar display-6"></i>
+                <h4>{{ totale_differiti|default:0 }}</h4>
+                <small>Pagamenti Differiti</small>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-3">
+        <div class="card bg-primary text-white">
+            <div class="card-body text-center">
+                <i class="bi bi-currency-euro display-6"></i>
+                <h4>€{{ importo_totale_crediti|default:0|floatformat:0 }}</h4>
+                <small>Crediti Totali</small>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Filtri -->
+<div class="card mb-4">
+    <div class="card-body">
+        <form method="get" class="row g-3">
+            <div class="col-md-3">
+                <label class="form-label">Stato Pagamento:</label>
+                <select name="stato_pagamento" class="form-select">
+                    <option value="">Tutti</option>
+                    <option value="non_pagato" {% if request.GET.stato_pagamento == 'non_pagato' %}selected{% endif %}>Non Pagato</option>
+                    <option value="parziale" {% if request.GET.stato_pagamento == 'parziale' %}selected{% endif %}>Parziale</option>
+                    <option value="differito" {% if request.GET.stato_pagamento == 'differito' %}selected{% endif %}>Differito</option>
+                </select>
+            </div>
+            <div class="col-md-3">
+                <label class="form-label">Data da:</label>
+                <input type="date" name="data_da" class="form-control" value="{{ request.GET.data_da }}">
+            </div>
+            <div class="col-md-3">
+                <label class="form-label">Data a:</label>
+                <input type="date" name="data_a" class="form-control" value="{{ request.GET.data_a }}">
+            </div>
+            <div class="col-md-3">
+                <label class="form-label">&nbsp;</label>
+                <div class="d-flex gap-2">
+                    <button type="submit" class="btn btn-primary">
+                        <i class="bi bi-search"></i> Filtra
+                    </button>
+                    <a href="{% url 'ordini:ordini-non-pagati' %}" class="btn btn-outline-secondary">
+                        <i class="bi bi-arrow-clockwise"></i>
+                    </a>
+                </div>
+            </div>
+        </form>
+    </div>
+</div>
+
+<div class="card">
+    <div class="card-body">
+        {% if ordini %}
+            <div class="table-responsive">
+                <table class="table table-hover">
+                    <thead class="table-dark">
+                        <tr>
+                            <th>
+                                <input type="checkbox" id="select-all" onchange="toggleSelectAll()">
+                            </th>
+                            <th>N° Ordine</th>
+                            <th>Data</th>
+                            <th>Cliente</th>
+                            <th>Totale</th>
+                            <th>Pagato</th>
+                            <th>Residuo</th>
+                            <th>Stato Pagamento</th>
+                            <th>Scadenza</th>
+                            <th>Giorni</th>
+                            <th class="text-center">Azioni</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for ordine in ordini %}
+                        <tr class="{% if ordine.giorni_scadenza < 0 %}table-danger{% elif ordine.giorni_scadenza <= 7 %}table-warning{% endif %}">
+                            <td>
+                                <input type="checkbox" class="ordine-checkbox" value="{{ ordine.pk }}">
+                            </td>
+                            <td>
+                                <a href="{% url 'ordini:ordine-detail' ordine.pk %}" 
+                                   class="text-decoration-none fw-bold">
+                                    #{{ ordine.numero_progressivo }}
+                                </a>
+                                {% if ordine.origine != 'operatore' %}
+                                    <br><small class="text-muted">
+                                        <i class="bi bi-globe"></i> {{ ordine.get_origine_display }}
+                                    </small>
+                                {% endif %}
+                            </td>
+                            <td>
+                                <div>
+                                    <strong>{{ ordine.data_ora|date:"d/m/Y" }}</strong>
+                                    <br><small class="text-muted">{{ ordine.data_ora|date:"H:i" }}</small>
+                                </div>
+                            </td>
+                            <td>
+                                {% if ordine.cliente %}
+                                    <div>
+                                        <strong>{{ ordine.cliente.nome_completo }}</strong>
+                                        <br><small class="text-muted">
+                                            <i class="bi bi-telephone"></i> {{ ordine.cliente.telefono }}
+                                        </small>
+                                        {% if ordine.cliente.email %}
+                                            <br><small class="text-muted">
+                                                <i class="bi bi-envelope"></i> {{ ordine.cliente.email }}
+                                            </small>
+                                        {% endif %}
+                                    </div>
+                                {% else %}
+                                    <span class="text-muted">
+                                        <i class="bi bi-person-x"></i> Anonimo
+                                    </span>
+                                {% endif %}
+                            </td>
+                            <td>
+                                <strong class="h6">€{{ ordine.totale_finale }}</strong>
+                                {% if ordine.importo_sconto > 0 %}
+                                    <br><small class="text-success">
+                                        <i class="bi bi-percent"></i> -€{{ ordine.importo_sconto }}
+                                    </small>
+                                {% endif %}
+                            </td>
+                            <td>
+                                {% if ordine.importo_pagato > 0 %}
+                                    <strong class="text-info">€{{ ordine.importo_pagato }}</strong>
+                                {% else %}
+                                    <span class="text-muted">€0.00</span>
+                                {% endif %}
+                            </td>
+                            <td>
+                                {% with residuo=ordine.totale_finale|floatformat:2|add:0|add:ordine.importo_pagato %}
+                                    <strong class="text-danger">€{{ residuo|stringformat:"+.2f"|slice:"1:" }}</strong>
+                                {% endwith %}
+                            </td>
+                            <td>
+                                {% if ordine.stato_pagamento == 'non_pagato' %}
+                                    <span class="badge bg-danger">
+                                        <i class="bi bi-x-circle"></i> Non Pagato
+                                    </span>
+                                {% elif ordine.stato_pagamento == 'parziale' %}
+                                    <span class="badge bg-warning">
+                                        <i class="bi bi-clock"></i> Parziale
+                                    </span>
+                                {% elif ordine.stato_pagamento == 'differito' %}
+                                    <span class="badge bg-info">
+                                        <i class="bi bi-calendar"></i> Differito
+                                    </span>
+                                {% endif %}
+                                {% if ordine.metodo_pagamento %}
+                                    <br><small class="text-muted">{{ ordine.metodo_pagamento|title }}</small>
+                                {% endif %}
+                            </td>
+                            <td>
+                                {% if ordine.data_scadenza_pagamento %}
+                                    <div>
+                                        <strong>{{ ordine.data_scadenza_pagamento|date:"d/m/Y" }}</strong>
+                                    </div>
+                                {% else %}
+                                    <span class="text-muted">Non impostata</span>
+                                {% endif %}
+                            </td>
+                            <td>
+                                {% if ordine.giorni_scadenza %}
+                                    {% if ordine.giorni_scadenza < 0 %}
+                                        <span class="badge bg-danger">
+                                            <i class="bi bi-exclamation-triangle"></i>
+                                            {{ ordine.giorni_scadenza|stringformat:"+d"|slice:"1:" }} giorni fa
+                                        </span>
+                                    {% elif ordine.giorni_scadenza <= 7 %}
+                                        <span class="badge bg-warning">
+                                            <i class="bi bi-clock"></i>
+                                            {{ ordine.giorni_scadenza }} giorni
+                                        </span>
+                                    {% else %}
+                                        <span class="badge bg-success">
+                                            {{ ordine.giorni_scadenza }} giorni
+                                        </span>
+                                    {% endif %}
+                                {% else %}
+                                    <span class="text-muted">-</span>
+                                {% endif %}
+                            </td>
+                            <td class="text-center">
+                                <div class="btn-group" role="group">
+                                    <button class="btn btn-sm btn-success" 
+                                            onclick="registraPagamento('{{ ordine.pk }}')"
+                                            title="Registra Pagamento">
+                                        <i class="bi bi-credit-card"></i>
+                                    </button>
+                                    <a href="{% url 'ordini:ordine-detail' ordine.pk %}" 
+                                       class="btn btn-sm btn-outline-primary" title="Dettagli">
+                                        <i class="bi bi-eye"></i>
+                                    </a>
+                                    {% if ordine.cliente and ordine.cliente.email %}
+                                        <button class="btn btn-sm btn-outline-info" 
+                                                onclick="inviaPromemoriaSingolo('{{ ordine.pk }}')"
+                                                title="Invia Promemoria">
+                                            <i class="bi bi-envelope"></i>
+                                        </button>
+                                    {% endif %}
+                                    <button class="btn btn-sm btn-outline-secondary" 
+                                            onclick="impostaScadenza('{{ ordine.pk }}')"
+                                            title="Imposta Scadenza">
+                                        <i class="bi bi-calendar"></i>
+                                    </button>
+                                </div>
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+            
+            <!-- Azioni di massa -->
+            <div class="border-top pt-3">
+                <div class="row align-items-center">
+                    <div class="col-md-6">
+                        <div class="d-flex align-items-center">
+                            <strong class="me-3">Azioni selezionate:</strong>
+                            <button class="btn btn-sm btn-warning me-2" onclick="inviaPromemoriaMassa()" disabled id="btn-promemoria-massa">
+                                <i class="bi bi-envelope"></i> Invia Promemoria
+                            </button>
+                            <button class="btn btn-sm btn-info" onclick="esportaSelezionati()" disabled id="btn-esporta">
+                                <i class="bi bi-download"></i> Esporta
+                            </button>
+                        </div>
+                    </div>
+                    <div class="col-md-6 text-end">
+                        <small class="text-muted">
+                            <span id="contatore-selezionati">0</span> ordini selezionati
+                        </small>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Paginazione -->
+            {% if is_paginated %}
+                <nav aria-label="Paginazione ordini" class="mt-4">
+                    <ul class="pagination justify-content-center">
+                        {% if page_obj.has_previous %}
+                            <li class="page-item">
+                                <a class="page-link" href="?page=1{% for key, value in request.GET.items %}{% if key != 'page' %}&{{ key }}={{ value }}{% endif %}{% endfor %}">&laquo; Prima</a>
+                            </li>
+                            <li class="page-item">
+                                <a class="page-link" href="?page={{ page_obj.previous_page_number }}{% for key, value in request.GET.items %}{% if key != 'page' %}&{{ key }}={{ value }}{% endif %}{% endfor %}">Precedente</a>
+                            </li>
+                        {% endif %}
+                        
+                        <li class="page-item active">
+                            <span class="page-link">
+                                Pagina {{ page_obj.number }} di {{ page_obj.paginator.num_pages }}
+                            </span>
+                        </li>
+                        
+                        {% if page_obj.has_next %}
+                            <li class="page-item">
+                                <a class="page-link" href="?page={{ page_obj.next_page_number }}{% for key, value in request.GET.items %}{% if key != 'page' %}&{{ key }}={{ value }}{% endif %}{% endfor %}">Successiva</a>
+                            </li>
+                            <li class="page-item">
+                                <a class="page-link" href="?page={{ page_obj.paginator.num_pages }}{% for key, value in request.GET.items %}{% if key != 'page' %}&{{ key }}={{ value }}{% endif %}{% endfor %}">Ultima &raquo;</a>
+                            </li>
+                        {% endif %}
+                    </ul>
+                </nav>
+            {% endif %}
+        {% else %}
+            <div class="text-center py-5">
+                <i class="bi bi-check-circle display-1 text-success"></i>
+                <h3 class="text-success mt-3">Ottimo!</h3>
+                <p class="text-muted">Non ci sono ordini non pagati.</p>
+                <a href="{% url 'ordini:ordini-list' %}" class="btn btn-primary">
+                    <i class="bi bi-list"></i> Vedi Tutti gli Ordini
+                </a>
+            </div>
+        {% endif %}
+    </div>
+</div>
+
+<!-- Modal Pagamento -->
+<div class="modal fade" id="modalPagamento" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">
+                    <i class="bi bi-credit-card"></i>
+                    Registra Pagamento
+                </h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <form id="form-pagamento">
+                <div class="modal-body">
+                    <input type="hidden" id="ordine-id-pagamento">
+                    
+                    <div class="alert alert-info" id="info-ordine-pagamento">
+                    </div>
+                    
+                    <div class="mb-3">
+                        <label class="form-label">Importo Pagamento:</label>
+                        <input type="number" class="form-control" id="importo-pagamento" 
+                               step="0.01" min="0" required>
+                    </div>
+                    
+                    <div class="mb-3">
+                        <label class="form-label">Metodo Pagamento:</label>
+                        <select class="form-select" id="metodo-pagamento" required>
+                            <option value="">Seleziona metodo</option>
+                            <option value="contanti">Contanti</option>
+                            <option value="carta">Carta di Credito/Debito</option>
+                            <option value="pos">POS</option>
+                            <option value="satispay">Satispay</option>
+                            <option value="bonifico">Bonifico</option>
+                        </select>
+                    </div>
+                    
+                    <div class="mb-3">
+                        <label class="form-label">Note:</label>
+                        <textarea class="form-control" id="note-pagamento" rows="2"></textarea>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">
+                        <i class="bi bi-x-circle"></i> Annulla
+                    </button>
+                    <button type="submit" class="btn btn-success">
+                        <i class="bi bi-check-circle"></i> Registra
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<!-- Modal Imposta Scadenza -->
+<div class="modal fade" id="modalScadenza" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">
+                    <i class="bi bi-calendar"></i>
+                    Imposta Scadenza Pagamento
+                </h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <form id="form-scadenza">
+                <div class="modal-body">
+                    <input type="hidden" id="ordine-id-scadenza">
+                    
+                    <div class="mb-3">
+                        <label class="form-label">Data Scadenza:</label>
+                        <input type="date" class="form-control" id="data-scadenza" required>
+                    </div>
+                    
+                    <div class="mb-3">
+                        <label class="form-label">Note:</label>
+                        <textarea class="form-control" id="note-scadenza" rows="2" 
+                                  placeholder="Es: Accordato pagamento differito..."></textarea>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">
+                        <i class="bi bi-x-circle"></i> Annulla
+                    </button>
+                    <button type="submit" class="btn btn-primary">
+                        <i class="bi bi-check-circle"></i> Imposta
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<script>
+// Gestione selezione multipla
+function toggleSelectAll() {
+    const selectAll = document.getElementById('select-all');
+    const checkboxes = document.querySelectorAll('.ordine-checkbox');
+    
+    checkboxes.forEach(checkbox => {
+        checkbox.checked = selectAll.checked;
+    });
+    
+    aggiornaContatori();
+}
+
+function aggiornaContatori() {
+    const selezionati = document.querySelectorAll('.ordine-checkbox:checked');
+    const contatore = document.getElementById('contatore-selezionati');
+    const btnPromemoria = document.getElementById('btn-promemoria-massa');
+    const btnEsporta = document.getElementById('btn-esporta');
+    
+    contatore.textContent = selezionati.length;
+    
+    if (selezionati.length > 0) {
+        btnPromemoria.disabled = false;
+        btnEsporta.disabled = false;
+    } else {
+        btnPromemoria.disabled = true;
+        btnEsporta.disabled = true;
+    }
+}
+
+// Aggiungi listener a tutte le checkbox
+document.querySelectorAll('.ordine-checkbox').forEach(checkbox => {
+    checkbox.addEventListener('change', aggiornaContatori);
+});
+
+// Registra pagamento
+function registraPagamento(ordineId) {
+    fetch(`/ordini/${ordineId}/dettaglio-json/`)
+        .then(response => response.json())
+        .then(data => {
+            document.getElementById('ordine-id-pagamento').value = ordineId;
+            
+            const residuo = data.totale_finale - data.importo_pagato;
+            document.getElementById('info-ordine-pagamento').innerHTML = `
+                Ordine: <strong>#${data.numero_progressivo}</strong><br>
+                Totale: <strong>€${data.totale_finale.toFixed(2)}</strong><br>
+                Già pagato: <strong>€${data.importo_pagato.toFixed(2)}</strong><br>
+                <hr class="my-2">
+                <strong>Da pagare: €${residuo.toFixed(2)}</strong>
+            `;
+            
+            document.getElementById('importo-pagamento').value = residuo.toFixed(2);
+            
+            const modal = new bootstrap.Modal(document.getElementById('modalPagamento'));
+            modal.show();
+        });
+}
+
+// Gestione form pagamento
+document.getElementById('form-pagamento').addEventListener('submit', function(e) {
+    e.preventDefault();
+    
+    const ordineId = document.getElementById('ordine-id-pagamento').value;
+    const importo = document.getElementById('importo-pagamento').value;
+    const metodo = document.getElementById('metodo-pagamento').value;
+    const note = document.getElementById('note-pagamento').value;
+    
+    fetch(`/ordini/${ordineId}/registra-pagamento/`, {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+            'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]').value
+        },
+        body: JSON.stringify({
+            importo: importo,
+            metodo_pagamento: metodo,
+            note: note
+        })
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            bootstrap.Modal.getInstance(document.getElementById('modalPagamento')).hide();
+            location.reload();
+        } else {
+            alert('Errore: ' + data.error);
+        }
+    });
+});
+
+// Imposta scadenza
+function impostaScadenza(ordineId) {
+    document.getElementById('ordine-id-scadenza').value = ordineId;
+    
+    // Imposta data di default a 30 giorni da oggi
+    const oggi = new Date();
+    oggi.setDate(oggi.getDate() + 30);
+    document.getElementById('data-scadenza').value = oggi.toISOString().split('T')[0];
+    
+    const modal = new bootstrap.Modal(document.getElementById('modalScadenza'));
+    modal.show();
+}
+
+// Gestione form scadenza
+document.getElementById('form-scadenza').addEventListener('submit', function(e) {
+    e.preventDefault();
+    
+    const ordineId = document.getElementById('ordine-id-scadenza').value;
+    const dataScadenza = document.getElementById('data-scadenza').value;
+    const note = document.getElementById('note-scadenza').value;
+    
+    fetch(`/ordini/${ordineId}/imposta-scadenza/`, {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+            'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]').value
+        },
+        body: JSON.stringify({
+            data_scadenza: dataScadenza,
+            note: note
+        })
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            bootstrap.Modal.getInstance(document.getElementById('modalScadenza')).hide();
+            location.reload();
+        } else {
+            alert('Errore: ' + data.error);
+        }
+    });
+});
+
+// Promemoria
+function inviaPromemoriaSingolo(ordineId) {
+    if (!confirm('Inviare promemoria di pagamento al cliente?')) return;
+    
+    fetch(`/ordini/${ordineId}/invia-promemoria/`, {
+        method: 'POST',
+        headers: {
+            'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]').value
+        }
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            alert('Promemoria inviato con successo');
+        } else {
+            alert('Errore: ' + data.error);
+        }
+    });
+}
+
+function inviaPromemoriaMassa() {
+    const selezionati = Array.from(document.querySelectorAll('.ordine-checkbox:checked'))
+                           .map(cb => cb.value);
+    
+    if (selezionati.length === 0) return;
+    
+    if (!confirm(`Inviare promemoria di pagamento per ${selezionati.length} ordini?`)) return;
+    
+    fetch('/ordini/invia-promemoria-massa/', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+            'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]').value
+        },
+        body: JSON.stringify({ ordini_ids: selezionati })
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            alert(`Promemoria inviati per ${data.inviati} ordini`);
+            location.reload();
+        } else {
+            alert('Errore: ' + data.error);
+        }
+    });
+}
+
+function esportaSelezionati() {
+    const selezionati = Array.from(document.querySelectorAll('.ordine-checkbox:checked'))
+                           .map(cb => cb.value);
+    
+    if (selezionati.length === 0) return;
+    
+    const params = new URLSearchParams({ ordini_ids: selezionati.join(',') });
+    window.open(`/ordini/esporta-non-pagati/?${params}`, '_blank');
+}
+
+// Auto-refresh ogni 5 minuti
+setInterval(() => {
+    location.reload();
+}, 300000);
+</script>
+{% endblock %}

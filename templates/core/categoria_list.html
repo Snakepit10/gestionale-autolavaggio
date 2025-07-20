@@ -1,0 +1,85 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}Gestione Categorie - Gestionale Autolavaggio{% endblock %}
+
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <h1><i class="bi bi-tags"></i> Gestione Categorie</h1>
+    <a href="{% url 'core:categoria-create' %}" class="btn btn-primary">
+        <i class="bi bi-plus-circle"></i> Nuova Categoria
+    </a>
+</div>
+
+{% if messages %}
+    {% for message in messages %}
+        <div class="alert alert-{{ message.tags }} alert-dismissible fade show" role="alert">
+            {{ message }}
+            <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+        </div>
+    {% endfor %}
+{% endif %}
+
+<div class="card">
+    <div class="card-body">
+        {% if categorie %}
+            <div class="table-responsive">
+                <table class="table table-hover">
+                    <thead class="table-dark">
+                        <tr>
+                            <th>Nome</th>
+                            <th>Descrizione</th>
+                            <th>Ordine</th>
+                            <th>Stato</th>
+                            <th class="text-center">Azioni</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for categoria in categorie %}
+                        <tr>
+                            <td>
+                                <strong>{{ categoria.nome }}</strong>
+                            </td>
+                            <td>
+                                {{ categoria.descrizione|truncatewords:10 }}
+                            </td>
+                            <td>
+                                <span class="badge bg-secondary">{{ categoria.ordine_visualizzazione }}</span>
+                            </td>
+                            <td>
+                                {% if categoria.attiva %}
+                                    <span class="badge bg-success">Attiva</span>
+                                {% else %}
+                                    <span class="badge bg-danger">Disattiva</span>
+                                {% endif %}
+                            </td>
+                            <td class="text-center">
+                                <div class="btn-group" role="group">
+                                    <a href="{% url 'core:categoria-update' categoria.pk %}" 
+                                       class="btn btn-sm btn-outline-primary" title="Modifica">
+                                        <i class="bi bi-pencil"></i>
+                                    </a>
+                                    <a href="{% url 'core:categoria-delete' categoria.pk %}" 
+                                       class="btn btn-sm btn-outline-danger" title="Elimina">
+                                        <i class="bi bi-trash"></i>
+                                    </a>
+                                </div>
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        {% else %}
+            <div class="text-center py-5">
+                <i class="bi bi-tags display-1 text-muted"></i>
+                <h3 class="text-muted mt-3">Nessuna Categoria</h3>
+                <p class="text-muted">Non ci sono ancora categorie create.</p>
+                <a href="{% url 'core:categoria-create' %}" class="btn btn-primary">
+                    <i class="bi bi-plus-circle"></i> Crea la Prima Categoria
+                </a>
+            </div>
+        {% endif %}
+    </div>
+</div>
+{% endblock %}

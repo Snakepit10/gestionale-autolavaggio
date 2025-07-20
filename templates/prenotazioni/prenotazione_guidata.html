@@ -1,0 +1,955 @@
+{% extends 'base.html' %}
+{% load static %}
+{% load crispy_forms_tags %}
+
+{% block title %}
+    {% if form.instance.pk %}
+        Modifica Prenotazione - Gestionale Autolavaggio
+    {% else %}
+        Nuova Prenotazione Guidata - Gestionale Autolavaggio
+    {% endif %}
+{% endblock %}
+
+{% block extra_css %}
+<style>
+.wizard-container {
+    background: white;
+    border-radius: 15px;
+    box-shadow: 0 5px 15px rgba(0,0,0,0.1);
+    overflow: hidden;
+}
+
+.wizard-header {
+    background: linear-gradient(135deg, #0d6efd, #6610f2);
+    color: white;
+    padding: 30px;
+    text-align: center;
+}
+
+.wizard-steps {
+    display: flex;
+    justify-content: space-between;
+    margin: 30px;
+    position: relative;
+}
+
+.wizard-steps::before {
+    content: '';
+    position: absolute;
+    top: 20px;
+    left: 40px;
+    right: 40px;
+    height: 2px;
+    background: #e9ecef;
+    z-index: 1;
+}
+
+.wizard-step {
+    background: white;
+    border: 2px solid #e9ecef;
+    border-radius: 50%;
+    width: 40px;
+    height: 40px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-weight: bold;
+    position: relative;
+    z-index: 2;
+    transition: all 0.3s ease;
+}
+
+.wizard-step.active {
+    background: #0d6efd;
+    border-color: #0d6efd;
+    color: white;
+}
+
+.wizard-step.completed {
+    background: #28a745;
+    border-color: #28a745;
+    color: white;
+}
+
+.wizard-content {
+    padding: 40px;
+    min-height: 500px;
+}
+
+.wizard-step-content {
+    display: none;
+}
+
+.wizard-step-content.active {
+    display: block;
+}
+
+.wizard-navigation {
+    padding: 20px 40px;
+    background: #f8f9fa;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.client-search-result {
+    border: 1px solid #dee2e6;
+    border-radius: 8px;
+    padding: 15px;
+    margin: 10px 0;
+    cursor: pointer;
+    transition: all 0.3s ease;
+}
+
+.client-search-result:hover {
+    border-color: #0d6efd;
+    background: #f8f9ff;
+}
+
+.client-search-result.selected {
+    border-color: #0d6efd;
+    background: #0d6efd;
+    color: white;
+}
+
+.service-card {
+    border: 1px solid #dee2e6;
+    border-radius: 12px;
+    padding: 20px;
+    text-align: center;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    height: 100%;
+}
+
+.service-card:hover {
+    border-color: #0d6efd;
+    transform: translateY(-2px);
+    box-shadow: 0 5px 15px rgba(0,0,0,0.1);
+}
+
+.service-card.selected {
+    border-color: #0d6efd;
+    background: #0d6efd;
+    color: white;
+}
+
+.service-icon {
+    width: 60px;
+    height: 60px;
+    background: linear-gradient(135deg, #0d6efd, #6610f2);
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    margin: 0 auto 15px;
+    color: white;
+    font-size: 1.5rem;
+}
+
+.service-card.selected .service-icon {
+    background: white;
+    color: #0d6efd;
+}
+
+.time-slot {
+    border: 2px solid #e9ecef;
+    border-radius: 8px;
+    padding: 12px;
+    margin: 5px;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    text-align: center;
+}
+
+.time-slot:hover {
+    border-color: #0d6efd;
+    background: #f8f9ff;
+}
+
+.time-slot.selected {
+    border-color: #0d6efd;
+    background: #0d6efd;
+    color: white;
+}
+
+.time-slot.unavailable {
+    opacity: 0.5;
+    cursor: not-allowed;
+    background: #f8f9fa;
+}
+
+.summary-card {
+    background: #f8f9fa;
+    border-radius: 12px;
+    padding: 25px;
+    margin-bottom: 20px;
+}
+
+.summary-item {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 10px 0;
+    border-bottom: 1px solid #dee2e6;
+}
+
+.summary-item:last-child {
+    border-bottom: none;
+}
+
+.step-labels {
+    display: flex;
+    justify-content: space-between;
+    margin: 10px 30px;
+}
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <div class="row justify-content-center">
+        <div class="col-12 col-xl-10">
+            <div class="wizard-container">
+                <!-- Header -->
+                <div class="wizard-header">
+                    <h1 class="h2 mb-3">
+                        <i class="bi bi-calendar-plus"></i>
+                        {% if form.instance.pk %}
+                            Modifica Prenotazione
+                        {% else %}
+                            Nuova Prenotazione Guidata
+                        {% endif %}
+                    </h1>
+                    <p class="lead mb-0">Segui i passaggi per creare una prenotazione completa</p>
+                </div>
+
+                <!-- Steps Indicator -->
+                <div class="wizard-steps">
+                    <div class="wizard-step active" id="step-1">1</div>
+                    <div class="wizard-step" id="step-2">2</div>
+                    <div class="wizard-step" id="step-3">3</div>
+                    <div class="wizard-step" id="step-4">4</div>
+                    <div class="wizard-step" id="step-5">5</div>
+                </div>
+
+                <div class="step-labels">
+                    <small class="text-muted">Cliente</small>
+                    <small class="text-muted">Servizi</small>
+                    <small class="text-muted">Data/Ora</small>
+                    <small class="text-muted">Dettagli</small>
+                    <small class="text-muted">Conferma</small>
+                </div>
+
+                <!-- Content -->
+                <div class="wizard-content">
+                    <form method="post" id="wizardForm">
+                        {% csrf_token %}
+                        {{ form.durata_stimata_minuti }}
+                        
+                        <!-- Campi nascosti per dati wizard -->
+                        <div id="hidden-services"></div>
+                        <input type="hidden" id="selected_date" name="data_prenotazione" value="">
+                        <input type="hidden" id="selected_time" name="ora_prenotazione" value="">
+                        <input type="hidden" id="cliente_id" name="cliente" value="">
+                        <input type="hidden" id="nome_cliente_hidden" name="nome_cliente" value="">
+                        <input type="hidden" id="telefono_cliente_hidden" name="telefono_cliente" value="">
+                        <input type="hidden" id="tipo_auto_hidden" name="tipo_auto" value="">
+                        <input type="hidden" id="note_cliente_hidden" name="note_cliente" value="">
+
+                        <!-- Step 1: Cliente -->
+                        <div class="wizard-step-content active" id="step-content-1">
+                            <h3 class="mb-4">
+                                <i class="bi bi-person-circle text-primary"></i>
+                                Seleziona o Crea Cliente
+                            </h3>
+                            
+                            <div class="row">
+                                <div class="col-md-6">
+                                    <div class="card h-100">
+                                        <div class="card-header">
+                                            <h6 class="mb-0">Cliente Esistente</h6>
+                                        </div>
+                                        <div class="card-body">
+                                            <div class="mb-3">
+                                                <input type="text" class="form-control" id="client-search" 
+                                                       placeholder="Cerca per nome, email o telefono...">
+                                            </div>
+                                            <div id="client-search-results">
+                                                <p class="text-muted text-center">Inizia a digitare per cercare un cliente</p>
+                                            </div>
+                                            <div class="mb-3">
+                                                <select class="form-select" id="id_cliente" name="cliente">
+                                                    <option value="">Seleziona cliente dalla lista completa...</option>
+                                                    {% for cliente in form.cliente.field.queryset %}
+                                                        <option value="{{ cliente.id }}">{{ cliente.nome }} - {{ cliente.email }}</option>
+                                                    {% endfor %}
+                                                </select>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                                
+                                <div class="col-md-6">
+                                    <div class="card h-100">
+                                        <div class="card-header">
+                                            <h6 class="mb-0">Nuovo Cliente</h6>
+                                        </div>
+                                        <div class="card-body">
+                                            <div class="mb-3">
+                                                {{ form.nome_cliente|as_crispy_field }}
+                                            </div>
+                                            <div class="mb-3">
+                                                {{ form.telefono_cliente|as_crispy_field }}
+                                            </div>
+                                            <div class="mb-3">
+                                                {{ form.tipo_auto|as_crispy_field }}
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Step 2: Servizi -->
+                        <div class="wizard-step-content" id="step-content-2">
+                            <h3 class="mb-4">
+                                <i class="bi bi-gear text-primary"></i>
+                                Seleziona Servizi
+                            </h3>
+                            
+                            <div class="row" id="services-container">
+                                {% for servizio in servizi_disponibili %}
+                                <div class="col-md-6 col-lg-4 mb-3">
+                                    <div class="service-card" 
+                                         onclick="toggleService({{ servizio.id }}, '{{ servizio.titolo|escapejs }}', {{ servizio.prezzo|floatformat:2 }}, {{ servizio.durata_minuti }})"
+                                         data-service-id="{{ servizio.id }}"
+                                         data-service-title="{{ servizio.titolo|escapejs }}"
+                                         data-service-price="{{ servizio.prezzo|floatformat:2 }}"
+                                         data-service-duration="{{ servizio.durata_minuti }}">
+                                        <div class="service-icon">
+                                            <i class="bi bi-droplet"></i>
+                                        </div>
+                                        <h6>{{ servizio.titolo }}</h6>
+                                        <p class="text-primary h5 mb-1">€{{ servizio.prezzo|floatformat:2 }}</p>
+                                        <small class="text-muted">{{ servizio.durata_minuti }} min</small>
+                                        {% if servizio.descrizione %}
+                                            <p class="small mt-2">{{ servizio.descrizione|truncatewords:8 }}</p>
+                                        {% endif %}
+                                    </div>
+                                </div>
+                                {% endfor %}
+                            </div>
+                        </div>
+
+                        <!-- Step 3: Data e Ora -->
+                        <div class="wizard-step-content" id="step-content-3">
+                            <h3 class="mb-4">
+                                <i class="bi bi-calendar-event text-primary"></i>
+                                Seleziona Data e Ora
+                            </h3>
+                            
+                            <div class="row">
+                                <div class="col-md-6">
+                                    <div class="card">
+                                        <div class="card-header">
+                                            <h6 class="mb-0">Data Prenotazione</h6>
+                                        </div>
+                                        <div class="card-body">
+                                            {{ form.data_prenotazione|as_crispy_field }}
+                                        </div>
+                                    </div>
+                                </div>
+                                
+                                <div class="col-md-6">
+                                    <div class="card">
+                                        <div class="card-header">
+                                            <h6 class="mb-0">Orari Disponibili</h6>
+                                        </div>
+                                        <div class="card-body">
+                                            <div id="available-slots">
+                                                <p class="text-muted text-center">Seleziona una data per vedere gli orari disponibili</p>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Step 4: Dettagli Aggiuntivi -->
+                        <div class="wizard-step-content" id="step-content-4">
+                            <h3 class="mb-4">
+                                <i class="bi bi-chat-text text-primary"></i>
+                                Note Aggiuntive
+                            </h3>
+                            
+                            <div class="row">
+                                <div class="col-md-8 mx-auto">
+                                    <div class="card">
+                                        <div class="card-header">
+                                            <h6 class="mb-0">Note per la Prenotazione</h6>
+                                        </div>
+                                        <div class="card-body">
+                                            {{ form.note_cliente|as_crispy_field }}
+                                            {% if form.instance.pk %}
+                                                {{ form.stato|as_crispy_field }}
+                                            {% endif %}
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Step 5: Conferma -->
+                        <div class="wizard-step-content" id="step-content-5">
+                            <h3 class="mb-4">
+                                <i class="bi bi-check-circle text-primary"></i>
+                                Conferma Prenotazione
+                            </h3>
+                            
+                            <div class="row">
+                                <div class="col-md-8">
+                                    <div class="summary-card">
+                                        <h5 class="mb-3">Riepilogo Prenotazione</h5>
+                                        
+                                        <div class="summary-item">
+                                            <strong>Cliente:</strong>
+                                            <span id="summary-client">-</span>
+                                        </div>
+                                        
+                                        <div class="summary-item">
+                                            <strong>Data e Ora:</strong>
+                                            <span id="summary-datetime">-</span>
+                                        </div>
+                                        
+                                        <div class="summary-item">
+                                            <strong>Servizi:</strong>
+                                            <div id="summary-services">-</div>
+                                        </div>
+                                        
+                                        <div class="summary-item">
+                                            <strong>Durata Totale:</strong>
+                                            <span id="summary-duration">-</span>
+                                        </div>
+                                        
+                                        <div class="summary-item">
+                                            <strong>Totale Stimato:</strong>
+                                            <span id="summary-total" class="h5 text-primary">€0.00</span>
+                                        </div>
+                                        
+                                        
+                                        <div class="summary-item" id="summary-notes-section" style="display: none;">
+                                            <strong>Note:</strong>
+                                            <span id="summary-notes">-</span>
+                                        </div>
+                                    </div>
+                                </div>
+                                
+                                <div class="col-md-4">
+                                    <div class="card">
+                                        <div class="card-header">
+                                            <h6 class="mb-0">Informazioni Slot</h6>
+                                        </div>
+                                        <div class="card-body">
+                                            <div id="slot-info">
+                                                <p class="text-muted">Informazioni slot non disponibili</p>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </form>
+                </div>
+
+                <!-- Navigation -->
+                <div class="wizard-navigation">
+                    <button type="button" class="btn btn-outline-secondary" id="prev-btn" 
+                            onclick="previousStep()" style="display: none;">
+                        <i class="bi bi-arrow-left"></i> Indietro
+                    </button>
+                    
+                    <div>
+                        <a href="{% url 'prenotazioni:prenotazioni' %}" class="btn btn-outline-secondary me-2">
+                            <i class="bi bi-x-circle"></i> Annulla
+                        </a>
+                        <button type="button" class="btn btn-primary" id="next-btn" 
+                                onclick="nextStep()" disabled>
+                            Avanti <i class="bi bi-arrow-right"></i>
+                        </button>
+                        <button type="button" class="btn btn-success" id="submit-btn" 
+                                style="display: none;" onclick="submitWizard()">
+                            <i class="bi bi-check-circle"></i> 
+                            {% if form.instance.pk %}Aggiorna{% else %}Crea{% endif %} Prenotazione
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+// Variabili globali per il wizard
+let currentStep = 1;
+let selectedClient = null;
+let selectedServices = [];
+let selectedDate = null;
+let selectedSlot = null;
+let totalPrice = 0;
+let totalDuration = 0;
+
+// Inizializzazione
+document.addEventListener('DOMContentLoaded', function() {
+    updateNavigation();
+    setupEventListeners();
+});
+
+function setupEventListeners() {
+    // Search clienti
+    const clientSearch = document.getElementById('client-search');
+    if (clientSearch) {
+        clientSearch.addEventListener('input', debounce(searchClients, 300));
+    }
+    
+    // Select cliente esistente
+    const clientSelect = document.getElementById('id_cliente');
+    if (clientSelect) {
+        clientSelect.addEventListener('change', function() {
+            if (this.value) {
+                selectExistingClient(this.value, this.options[this.selectedIndex].text);
+            }
+        });
+    }
+    
+    // Data prenotazione
+    const dataField = document.getElementById('id_data_prenotazione');
+    if (dataField) {
+        dataField.addEventListener('change', loadAvailableSlots);
+    }
+    
+    // Campi nuovo cliente
+    const nuoviCampiCliente = ['id_nome_cliente', 'id_telefono_cliente', 'id_tipo_auto'];
+    nuoviCampiCliente.forEach(fieldId => {
+        const field = document.getElementById(fieldId);
+        if (field) {
+            field.addEventListener('input', checkNewClientData);
+        }
+    });
+}
+
+function debounce(func, wait) {
+    let timeout;
+    return function executedFunction(...args) {
+        const later = () => {
+            clearTimeout(timeout);
+            func(...args);
+        };
+        clearTimeout(timeout);
+        timeout = setTimeout(later, wait);
+    };
+}
+
+function searchClients(event) {
+    const query = event.target.value;
+    const resultsContainer = document.getElementById('client-search-results');
+    
+    if (query.length < 2) {
+        resultsContainer.innerHTML = '<p class="text-muted text-center">Inizia a digitare per cercare un cliente</p>';
+        return;
+    }
+    
+    resultsContainer.innerHTML = '<p class="text-muted text-center">Cercando...</p>';
+    
+    // Chiamata AJAX reale per cercare i clienti
+    fetch(`{% url 'prenotazioni:cerca-clienti' %}?q=${encodeURIComponent(query)}`)
+        .then(response => response.json())
+        .then(data => {
+            if (data.clienti && data.clienti.length > 0) {
+                let html = '';
+                data.clienti.forEach(cliente => {
+                    html += `
+                        <div class="client-search-result" onclick="selectSearchResult(${cliente.id}, '${cliente.nome}', '${cliente.email}', '${cliente.telefono}')">
+                            <strong>${cliente.nome}</strong><br>
+                            <small class="text-muted">${cliente.email}${cliente.telefono ? ' - ' + cliente.telefono : ''}</small>
+                        </div>
+                    `;
+                });
+                resultsContainer.innerHTML = html;
+            } else {
+                resultsContainer.innerHTML = '<p class="text-muted text-center">Nessun cliente trovato</p>';
+            }
+        })
+        .catch(error => {
+            console.error('Errore nella ricerca clienti:', error);
+            resultsContainer.innerHTML = '<p class="text-muted text-center">Errore nella ricerca</p>';
+        });
+}
+
+function selectSearchResult(id, nome, email, telefono) {
+    selectedClient = { id, nome, email, telefono, type: 'existing' };
+    
+    // Evidenzia il risultato selezionato
+    document.querySelectorAll('.client-search-result').forEach(el => {
+        el.classList.remove('selected');
+    });
+    event.target.classList.add('selected');
+    
+    // Aggiorna select
+    const clientSelect = document.getElementById('id_cliente');
+    clientSelect.value = id;
+    
+    updateNavigation();
+}
+
+function selectExistingClient(id, text) {
+    const [nome, email] = text.split(' - ');
+    selectedClient = { id, nome, email, type: 'existing' };
+    updateNavigation();
+}
+
+function checkNewClientData() {
+    const nome = document.getElementById('id_nome_cliente').value.trim();
+    const telefono = document.getElementById('id_telefono_cliente').value.trim();
+    const tipoAuto = document.getElementById('id_tipo_auto').value.trim();
+    
+    if (nome) {  // Solo il nome è obbligatorio ora
+        selectedClient = { nome, telefono, tipoAuto, type: 'new' };
+        
+        // Deseleziona cliente esistente
+        document.getElementById('id_cliente').value = '';
+        document.querySelectorAll('.client-search-result').forEach(el => {
+            el.classList.remove('selected');
+        });
+        
+        console.log('Nuovo cliente selezionato:', selectedClient);
+    } else {
+        if (selectedClient && selectedClient.type === 'new') {
+            selectedClient = null;
+            console.log('Cliente nuovo deselezionato');
+        }
+    }
+    
+    updateNavigation();
+}
+
+function toggleService(id, title, price, duration) {
+    const serviceCard = event.target.closest('.service-card');
+    const existingIndex = selectedServices.findIndex(s => s.id === id);
+    
+    // Se i parametri non sono validi, usa i data attributes come backup
+    if (!id || !title || !price || !duration) {
+        id = parseInt(serviceCard.dataset.serviceId);
+        title = serviceCard.dataset.serviceTitle;
+        price = parseFloat(serviceCard.dataset.servicePrice);
+        duration = parseInt(serviceCard.dataset.serviceDuration);
+    }
+    
+    // Assicurati che i tipi siano corretti
+    id = parseInt(id);
+    price = parseFloat(price);
+    duration = parseInt(duration);
+    
+    console.log(`Toggle servizio: ID=${id}, Titolo='${title}', Prezzo=${price}, Durata=${duration}`);
+    
+    if (existingIndex > -1) {
+        // Rimuovi servizio
+        selectedServices.splice(existingIndex, 1);
+        serviceCard.classList.remove('selected');
+        console.log(`Servizio rimosso: ${title}`);
+    } else {
+        // Aggiungi servizio
+        selectedServices.push({ id, title, price, duration });
+        serviceCard.classList.add('selected');
+        console.log(`Servizio aggiunto: ${title} - €${price}`);
+    }
+    
+    updateTotals();
+    updateNavigation();
+    
+    console.log(`Totale attuale: €${totalPrice.toFixed(2)}, Durata: ${totalDuration} min`);
+}
+
+function updateTotals() {
+    totalPrice = selectedServices.reduce((sum, service) => sum + parseFloat(service.price), 0);
+    totalDuration = selectedServices.reduce((sum, service) => sum + parseInt(service.duration), 0);
+    
+    // Popola automaticamente il campo durata totale se esiste
+    const durataField = document.getElementById('id_durata_stimata_minuti');
+    if (durataField) {
+        durataField.value = totalDuration;
+    }
+}
+
+function loadAvailableSlots() {
+    const date = document.getElementById('id_data_prenotazione').value;
+    const slotsContainer = document.getElementById('available-slots');
+    
+    if (!date) {
+        slotsContainer.innerHTML = '<p class="text-muted text-center">Seleziona una data per vedere gli orari disponibili</p>';
+        return;
+    }
+    
+    selectedDate = date;
+    slotsContainer.innerHTML = '<p class="text-muted text-center">Caricando slot disponibili...</p>';
+    
+    // Chiamata AJAX per caricare slot reali
+    fetch(`{% url 'prenotazioni:slot-disponibili' %}?data=${date}`)
+        .then(response => response.json())
+        .then(data => {
+            if (data.slot && data.slot.length > 0) {
+                let html = '<div class="row">';
+                
+                data.slot.forEach(slot => {
+                    const isAvailable = slot.posti_disponibili > 0;
+                    const cssClass = isAvailable ? 'time-slot' : 'time-slot unavailable';
+                    const onclick = isAvailable ? `onclick="selectTimeSlot('${slot.ora_inizio}')"` : '';
+                    
+                    html += `
+                        <div class="col-6 col-md-4 mb-2">
+                            <div class="${cssClass}" ${onclick}>
+                                ${slot.ora_inizio}
+                                <br><small>${isAvailable ? slot.posti_disponibili + ' disponibili' : 'Completo'}</small>
+                            </div>
+                        </div>
+                    `;
+                });
+                
+                html += '</div>';
+                slotsContainer.innerHTML = html;
+            } else {
+                slotsContainer.innerHTML = '<p class="text-muted text-center">Nessun slot disponibile per questa data</p>';
+            }
+        })
+        .catch(error => {
+            console.error('Errore nel caricamento slot:', error);
+            // Fallback con slot fissi
+            const slots = ['09:00', '10:00', '11:00', '14:00', '15:00', '16:00'];
+            let html = '<div class="row">';
+            
+            slots.forEach(slot => {
+                html += `
+                    <div class="col-6 col-md-4 mb-2">
+                        <div class="time-slot" onclick="selectTimeSlot('${slot}')">
+                            ${slot}
+                        </div>
+                    </div>
+                `;
+            });
+            
+            html += '</div>';
+            slotsContainer.innerHTML = html;
+        });
+    
+    updateNavigation();
+}
+
+function selectTimeSlot(time) {
+    selectedSlot = time;
+    
+    // Aggiorna visualizzazione
+    document.querySelectorAll('.time-slot').forEach(slot => {
+        slot.classList.remove('selected');
+    });
+    event.target.classList.add('selected');
+    
+    updateNavigation();
+}
+
+function nextStep() {
+    if (currentStep < 5) {
+        // Nascondi step corrente
+        document.getElementById(`step-content-${currentStep}`).classList.remove('active');
+        document.getElementById(`step-${currentStep}`).classList.remove('active');
+        document.getElementById(`step-${currentStep}`).classList.add('completed');
+        
+        // Mostra prossimo step
+        currentStep++;
+        document.getElementById(`step-content-${currentStep}`).classList.add('active');
+        document.getElementById(`step-${currentStep}`).classList.add('active');
+        
+        // Se siamo all'ultimo step, aggiorna il riepilogo
+        if (currentStep === 5) {
+            updateSummary();
+        }
+        
+        updateNavigation();
+    }
+}
+
+function previousStep() {
+    if (currentStep > 1) {
+        // Nascondi step corrente
+        document.getElementById(`step-content-${currentStep}`).classList.remove('active');
+        document.getElementById(`step-${currentStep}`).classList.remove('active');
+        
+        // Mostra step precedente
+        currentStep--;
+        document.getElementById(`step-content-${currentStep}`).classList.add('active');
+        document.getElementById(`step-${currentStep}`).classList.remove('completed');
+        document.getElementById(`step-${currentStep}`).classList.add('active');
+        
+        updateNavigation();
+    }
+}
+
+function updateNavigation() {
+    const prevBtn = document.getElementById('prev-btn');
+    const nextBtn = document.getElementById('next-btn');
+    const submitBtn = document.getElementById('submit-btn');
+    
+    // Mostra/nascondi pulsante indietro
+    prevBtn.style.display = currentStep > 1 ? 'block' : 'none';
+    
+    if (currentStep === 5) {
+        // Ultimo step - mostra submit
+        nextBtn.style.display = 'none';
+        submitBtn.style.display = 'block';
+    } else {
+        nextBtn.style.display = 'block';
+        submitBtn.style.display = 'none';
+        
+        // Controlla se può procedere
+        let canProceed = false;
+        switch(currentStep) {
+            case 1:
+                canProceed = selectedClient !== null;
+                break;
+            case 2:
+                canProceed = selectedServices.length > 0;
+                break;
+            case 3:
+                canProceed = selectedDate !== null && selectedSlot !== null;
+                break;
+            case 4:
+                canProceed = true; // Step opzionale
+                break;
+        }
+        nextBtn.disabled = !canProceed;
+    }
+}
+
+function updateSummary() {
+    // Cliente
+    if (selectedClient) {
+        document.getElementById('summary-client').textContent = 
+            `${selectedClient.nome} ${selectedClient.email ? '(' + selectedClient.email + ')' : ''}`;
+    }
+    
+    // Data e ora
+    if (selectedDate && selectedSlot) {
+        const dateObj = new Date(selectedDate);
+        const formattedDate = dateObj.toLocaleDateString('it-IT');
+        document.getElementById('summary-datetime').textContent = 
+            `${formattedDate} alle ${selectedSlot}`;
+    }
+    
+    // Servizi
+    if (selectedServices.length > 0) {
+        let servicesHtml = '<ul class="mb-0">';
+        selectedServices.forEach(service => {
+            servicesHtml += `<li>${service.title} - €${service.price}</li>`;
+        });
+        servicesHtml += '</ul>';
+        document.getElementById('summary-services').innerHTML = servicesHtml;
+    }
+    
+    // Durata e totale
+    document.getElementById('summary-duration').textContent = `${totalDuration} minuti`;
+    document.getElementById('summary-total').textContent = `€${totalPrice.toFixed(2)}`;
+    
+    // Note (opzionale)
+    const note = document.getElementById('id_note_cliente').value;
+    if (note) {
+        document.getElementById('summary-notes').textContent = note;
+        document.getElementById('summary-notes-section').style.display = 'flex';
+    }
+    
+    // Popola i campi nascosti per il submit
+    populateHiddenFields();
+}
+
+function populateHiddenFields() {
+    // Servizi selezionati (crea input separati per ogni servizio)
+    const hiddenServicesContainer = document.getElementById('hidden-services');
+    hiddenServicesContainer.innerHTML = ''; // Pulisci container
+    
+    selectedServices.forEach(service => {
+        const input = document.createElement('input');
+        input.type = 'hidden';
+        input.name = 'servizi_selezionati';
+        input.value = service.id;
+        hiddenServicesContainer.appendChild(input);
+    });
+    
+    // Data e ora
+    if (selectedDate) {
+        document.getElementById('selected_date').value = selectedDate;
+    }
+    if (selectedSlot) {
+        document.getElementById('selected_time').value = selectedSlot;
+    }
+    
+    // Durata totale
+    document.getElementById('id_durata_stimata_minuti').value = totalDuration;
+    
+    // Dati cliente
+    if (selectedClient) {
+        if (selectedClient.type === 'existing') {
+            // Cliente esistente - popola solo cliente_id e svuota gli altri campi
+            document.getElementById('cliente_id').value = selectedClient.id;
+            document.getElementById('nome_cliente_hidden').value = '';
+            document.getElementById('telefono_cliente_hidden').value = '';
+            document.getElementById('tipo_auto_hidden').value = selectedClient.tipoAuto || '';
+        } else {
+            // Nuovo cliente - popola i dati del nuovo cliente e svuota cliente_id
+            document.getElementById('cliente_id').value = '';
+            document.getElementById('nome_cliente_hidden').value = selectedClient.nome;
+            document.getElementById('telefono_cliente_hidden').value = selectedClient.telefono || '';
+            document.getElementById('tipo_auto_hidden').value = selectedClient.tipoAuto || '';
+        }
+    } else {
+        // Nessun cliente selezionato - svuota tutti i campi
+        document.getElementById('cliente_id').value = '';
+        document.getElementById('nome_cliente_hidden').value = '';
+        document.getElementById('telefono_cliente_hidden').value = '';
+        document.getElementById('tipo_auto_hidden').value = '';
+    }
+    
+    // Note
+    const note = document.getElementById('id_note_cliente').value;
+    if (note) {
+        document.getElementById('note_cliente_hidden').value = note;
+    }
+}
+
+function submitWizard() {
+    // Assicurati che tutti i campi nascosti siano popolati
+    populateHiddenFields();
+    
+    // Debug: mostra i valori dei campi nascosti
+    console.log('Servizi selezionati:', selectedServices.map(s => s.id));
+    console.log('Data:', document.getElementById('selected_date').value);
+    console.log('Ora:', document.getElementById('selected_time').value);
+    console.log('Durata:', document.getElementById('id_durata_stimata_minuti').value);
+    console.log('Nome cliente:', document.getElementById('nome_cliente_hidden').value);
+    
+    // Verifica che tutti i dati necessari siano presenti
+    if (!selectedClient) {
+        alert('Errore: Cliente non selezionato');
+        return;
+    }
+    if (!selectedServices.length) {
+        alert('Errore: Nessun servizio selezionato');
+        return;
+    }
+    if (!selectedDate || !selectedSlot) {
+        alert('Errore: Data o ora non selezionate');
+        return;
+    }
+    
+    // Submit del form
+    document.getElementById('wizardForm').submit();
+}
+</script>
+{% endblock %}

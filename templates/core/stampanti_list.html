@@ -1,0 +1,158 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}Gestione Stampanti - Gestionale Autolavaggio{% endblock %}
+
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <h1><i class="bi bi-printer"></i> Gestione Stampanti</h1>
+    <a href="{% url 'core:stampante-create' %}" class="btn btn-primary">
+        <i class="bi bi-plus-circle"></i> Nuova Stampante
+    </a>
+</div>
+
+{% if messages %}
+    {% for message in messages %}
+        <div class="alert alert-{{ message.tags }} alert-dismissible fade show" role="alert">
+            {{ message }}
+            <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+        </div>
+    {% endfor %}
+{% endif %}
+
+<div class="card">
+    <div class="card-body">
+        {% if stampanti %}
+            <div class="table-responsive">
+                <table class="table table-hover">
+                    <thead class="table-dark">
+                        <tr>
+                            <th>Nome</th>
+                            <th>Indirizzo IP</th>
+                            <th>Tipo</th>
+                            <th>Stato</th>
+                            <th>Ultima Connessione</th>
+                            <th class="text-center">Azioni</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for stampante in stampanti %}
+                        <tr>
+                            <td>
+                                <div class="d-flex align-items-center">
+                                    <i class="bi bi-printer me-2 text-primary"></i>
+                                    <div>
+                                        <strong>{{ stampante.nome }}</strong>
+                                        {% if stampante.descrizione %}
+                                            <br><small class="text-muted">{{ stampante.descrizione|truncatewords:8 }}</small>
+                                        {% endif %}
+                                    </div>
+                                </div>
+                            </td>
+                            <td>
+                                <code>{{ stampante.indirizzo_ip }}:{{ stampante.porta }}</code>
+                            </td>
+                            <td>
+                                {% if stampante.tipo == 'termica' %}
+                                    <span class="badge bg-info">Termica</span>
+                                {% elif stampante.tipo == 'laser' %}
+                                    <span class="badge bg-success">Laser</span>
+                                {% elif stampante.tipo == 'inkjet' %}
+                                    <span class="badge bg-warning">Inkjet</span>
+                                {% else %}
+                                    <span class="badge bg-secondary">{{ stampante.get_tipo_display }}</span>
+                                {% endif %}
+                            </td>
+                            <td>
+                                {% if stampante.attiva %}
+                                    <span class="badge bg-success">
+                                        <i class="bi bi-circle-fill"></i> Online
+                                    </span>
+                                {% else %}
+                                    <span class="badge bg-danger">
+                                        <i class="bi bi-circle-fill"></i> Offline
+                                    </span>
+                                {% endif %}
+                            </td>
+                            <td>
+                                {% if stampante.ultimo_test %}
+                                    <small>{{ stampante.ultimo_test|date:"d/m/Y H:i" }}</small>
+                                {% else %}
+                                    <small class="text-muted">Mai testata</small>
+                                {% endif %}
+                            </td>
+                            <td class="text-center">
+                                <div class="btn-group" role="group">
+                                    <a href="{% url 'core:test-stampante' stampante.pk %}" 
+                                       class="btn btn-sm btn-outline-info" title="Test Stampa">
+                                        <i class="bi bi-play-circle"></i>
+                                    </a>
+                                    <a href="{% url 'core:stampante-update' stampante.pk %}" 
+                                       class="btn btn-sm btn-outline-primary" title="Modifica">
+                                        <i class="bi bi-pencil"></i>
+                                    </a>
+                                    <button class="btn btn-sm btn-outline-danger" 
+                                            onclick="confermaEliminazione('{{ stampante.nome }}', '{{ stampante.pk }}')"
+                                            title="Elimina">
+                                        <i class="bi bi-trash"></i>
+                                    </button>
+                                </div>
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        {% else %}
+            <div class="text-center py-5">
+                <i class="bi bi-printer display-1 text-muted"></i>
+                <h3 class="text-muted mt-3">Nessuna Stampante</h3>
+                <p class="text-muted">Non ci sono ancora stampanti configurate.</p>
+                <a href="{% url 'core:stampante-create' %}" class="btn btn-primary">
+                    <i class="bi bi-plus-circle"></i> Configura la Prima Stampante
+                </a>
+            </div>
+        {% endif %}
+    </div>
+</div>
+
+<!-- Modal Conferma Eliminazione -->
+<div class="modal fade" id="modalConfermaEliminazione" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header bg-danger text-white">
+                <h5 class="modal-title">
+                    <i class="bi bi-exclamation-triangle"></i>
+                    Conferma Eliminazione
+                </h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <p>Sei sicuro di voler eliminare la stampante <strong id="nome-stampante"></strong>?</p>
+                <div class="alert alert-warning">
+                    <i class="bi bi-warning"></i>
+                    Questa operazione non può essere annullata.
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">
+                    <i class="bi bi-x-circle"></i> Annulla
+                </button>
+                <a id="btn-conferma-eliminazione" href="#" class="btn btn-danger">
+                    <i class="bi bi-trash"></i> Elimina Stampante
+                </a>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+function confermaEliminazione(nome, pk) {
+    document.getElementById('nome-stampante').textContent = nome;
+    document.getElementById('btn-conferma-eliminazione').href = '/stampanti/' + pk + '/elimina/';
+    
+    const modal = new bootstrap.Modal(document.getElementById('modalConfermaEliminazione'));
+    modal.show();
+}
+</script>
+{% endblock %}

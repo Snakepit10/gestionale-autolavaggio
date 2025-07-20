@@ -1,0 +1,431 @@
+{% extends 'base.html' %}
+{% load static %}
+{% load crispy_forms_tags %}
+
+{% block title %}Configurazione Abbonamento - Modalità Targa{% endblock %}
+
+{% block extra_css %}
+<style>
+.wizard-steps {
+    display: flex;
+    justify-content: space-between;
+    margin-bottom: 30px;
+    counter-reset: step;
+}
+
+.wizard-step {
+    flex: 1;
+    text-align: center;
+    position: relative;
+    counter-increment: step;
+}
+
+.wizard-step::before {
+    content: counter(step);
+    width: 40px;
+    height: 40px;
+    border-radius: 50%;
+    background: #6c757d;
+    color: white;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    margin: 0 auto 10px;
+    font-weight: bold;
+}
+
+.wizard-step.active::before {
+    background: #0d6efd;
+}
+
+.wizard-step.completed::before {
+    background: #28a745;
+    content: "✓";
+}
+
+.wizard-step:not(:last-child)::after {
+    content: '';
+    position: absolute;
+    top: 20px;
+    left: 60%;
+    right: -40%;
+    height: 2px;
+    background: #dee2e6;
+    z-index: -1;
+}
+
+.wizard-step.completed:not(:last-child)::after {
+    background: #28a745;
+}
+
+.form-section {
+    background: white;
+    border-radius: 10px;
+    padding: 30px;
+    box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+    margin-bottom: 20px;
+}
+
+.modalita-option {
+    border: 2px solid #e9ecef;
+    border-radius: 10px;
+    padding: 20px;
+    margin-bottom: 15px;
+    cursor: pointer;
+    transition: all 0.3s ease;
+}
+
+.modalita-option:hover {
+    border-color: #0d6efd;
+    box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+}
+
+.modalita-option.selected {
+    border-color: #0d6efd;
+    background: #f8f9ff;
+}
+
+.modalita-option input[type="radio"] {
+    display: none;
+}
+
+.modalita-icon {
+    font-size: 2rem;
+    margin-bottom: 10px;
+}
+
+.preview-card {
+    background: linear-gradient(135deg, #0d6efd, #6610f2);
+    color: white;
+    border-radius: 15px;
+    padding: 25px;
+    text-align: center;
+}
+
+.help-section {
+    background: #f8f9fa;
+    border-radius: 10px;
+    padding: 20px;
+    margin-top: 20px;
+}
+
+.numero-targhe-section {
+    display: none;
+    margin-top: 20px;
+    padding: 20px;
+    background: #f8f9fa;
+    border-radius: 10px;
+}
+
+.numero-targhe-section.show {
+    display: block;
+}
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="container">
+    <div class="row">
+        <div class="col-lg-8 mx-auto">
+            <h1 class="text-center mb-4">
+                <i class="bi bi-magic"></i>
+                Wizard Configurazione Abbonamento
+            </h1>
+            
+            <!-- Steps Indicator -->
+            <div class="wizard-steps">
+                <div class="wizard-step completed">
+                    <div>Informazioni Base</div>
+                </div>
+                <div class="wizard-step active">
+                    <div>Modalità Targa</div>
+                </div>
+                <div class="wizard-step">
+                    <div>Accessi e Reset</div>
+                </div>
+                <div class="wizard-step">
+                    <div>Servizi Inclusi</div>
+                </div>
+            </div>
+
+            <form method="post">
+                {% csrf_token %}
+                {{ wizard.management_form }}
+                
+                <div class="form-section">
+                    <h3 class="mb-4">
+                        <i class="bi bi-car-front text-primary"></i>
+                        Modalità Gestione Targa
+                    </h3>
+                    
+                    <p class="text-muted mb-4">
+                        Scegli come gestire le targhe per questo abbonamento. 
+                        Questa impostazione determina quante e quali targhe possono essere associate.
+                    </p>
+                    
+                    <!-- Campo Django nascosto -->
+                    <div style="display: none;">
+                        {{ form.modalita_targa }}
+                    </div>
+                    
+                    <div class="row">
+                        {% for value, label in form.modalita_targa.field.choices %}
+                        <div class="col-md-4 mb-3">
+                            <div class="modalita-option" onclick="selectModalita('{{ value }}')">
+                                <input type="radio" name="modalita_targa_display" value="{{ value }}" id="modalita-display-{{ value }}"
+                                       {% if form.modalita_targa.value == value %}checked{% endif %}>
+                                <div class="text-center">
+                                    <div class="modalita-icon text-primary">
+                                        {% if value == 'singola' %}
+                                            <i class="bi bi-lock"></i>
+                                        {% elif value == 'multipla' %}
+                                            <i class="bi bi-arrow-repeat"></i>
+                                        {% elif value == 'libera' %}
+                                            <i class="bi bi-unlock"></i>
+                                        {% endif %}
+                                    </div>
+                                    <h5>{{ label }}</h5>
+                                    <small class="text-muted">
+                                        {% if value == 'singola' %}
+                                            La targa viene scelta al momento dell'acquisto e non può essere modificata
+                                        {% elif value == 'multipla' %}
+                                            Il cliente può cambiare la targa durante il periodo dell'abbonamento
+                                        {% elif value == 'libera' %}
+                                            L'abbonamento non è legato a una targa specifica
+                                        {% endif %}
+                                    </small>
+                                </div>
+                            </div>
+                        </div>
+                        {% endfor %}
+                    </div>
+                    
+                    <!-- Sezione numero massimo targhe -->
+                    <div class="numero-targhe-section" id="numero-targhe-section">
+                        <h5 class="mb-3">
+                            <i class="bi bi-collection"></i>
+                            Numero Massimo Targhe
+                        </h5>
+                        <div class="row">
+                            <div class="col-md-6">
+                                <label class="form-label">Targhe consentite</label>
+                                {{ form.numero_massimo_targhe }}
+                                <div class="form-text">
+                                    Numero massimo di targhe che possono essere associate a questo abbonamento
+                                </div>
+                            </div>
+                            <div class="col-md-6">
+                                <div class="alert alert-info">
+                                    <i class="bi bi-info-circle"></i>
+                                    <strong>Suggerimento:</strong> 
+                                    <span id="suggerimento-targhe">
+                                        Seleziona una modalità targa per vedere i suggerimenti
+                                    </span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Riepilogo configurazione -->
+                {% if preview_data %}
+                <div class="form-section">
+                    <h4 class="mb-3">
+                        <i class="bi bi-eye text-success"></i>
+                        Riepilogo Configurazione
+                    </h4>
+                    
+                    <div class="row">
+                        <div class="col-md-6">
+                            <div class="card">
+                                <div class="card-body">
+                                    <h5 class="card-title">{{ preview_data.titolo }}</h5>
+                                    <p class="card-text">{{ preview_data.descrizione }}</p>
+                                    <p class="text-muted">
+                                        <strong>Prezzo:</strong> €{{ preview_data.prezzo }}<br>
+                                        <strong>Durata:</strong> {{ preview_data.get_durata_display }}
+                                    </p>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="alert alert-info">
+                                <i class="bi bi-info-circle"></i>
+                                <strong>Prossimo passo:</strong> Configurazione accessi e reset periodici
+                                <br><small>Definiremo la frequenza di reset dei contatori servizi.</small>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                {% endif %}
+
+                <!-- Navigazione -->
+                <div class="d-flex justify-content-between mt-4">
+                    <div>
+                        <button type="submit" name="wizard_goto_step" value="{{ wizard.steps.prev }}" class="btn btn-outline-secondary">
+                            <i class="bi bi-arrow-left"></i> Indietro
+                        </button>
+                    </div>
+                    <div>
+                        <button type="submit" class="btn btn-primary btn-lg">
+                            Avanti <i class="bi bi-arrow-right"></i>
+                        </button>
+                    </div>
+                </div>
+            </form>
+        </div>
+        
+        <!-- Sidebar con Preview -->
+        <div class="col-lg-4">
+            <div class="sticky-top" style="top: 20px;">
+                <div class="preview-card">
+                    <h4>{{ preview_data.titolo|default:"Abbonamento" }}</h4>
+                    <h2>€{{ preview_data.prezzo|default:"0.00" }}</h2>
+                    <p>{{ preview_data.get_durata_display|default:"Durata da definire" }}</p>
+                    <hr>
+                    <p id="preview-modalita">
+                        <i class="bi bi-car-front"></i>
+                        <span>Modalità targa da selezionare</span>
+                    </p>
+                </div>
+                
+                <div class="help-section">
+                    <h6><i class="bi bi-lightbulb"></i> Guida Modalità Targa</h6>
+                    <div class="accordion" id="helpAccordion">
+                        <div class="accordion-item">
+                            <h2 class="accordion-header">
+                                <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#help-fissa">
+                                    <i class="bi bi-lock"></i> &nbsp; Targa Fissa
+                                </button>
+                            </h2>
+                            <div id="help-fissa" class="accordion-collapse collapse" data-bs-parent="#helpAccordion">
+                                <div class="accordion-body small">
+                                    <strong>Quando usarla:</strong> Per clienti con un'auto principale<br>
+                                    <strong>Vantaggi:</strong> Controllo totale, no abusi<br>
+                                    <strong>Svantaggi:</strong> Meno flessibilità per il cliente
+                                </div>
+                            </div>
+                        </div>
+                        <div class="accordion-item">
+                            <h2 class="accordion-header">
+                                <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#help-variabile">
+                                    <i class="bi bi-arrow-repeat"></i> &nbsp; Targa Variabile
+                                </button>
+                            </h2>
+                            <div id="help-variabile" class="accordion-collapse collapse" data-bs-parent="#helpAccordion">
+                                <div class="accordion-body small">
+                                    <strong>Quando usarla:</strong> Per famiglie con più auto<br>
+                                    <strong>Vantaggi:</strong> Flessibilità controllata<br>
+                                    <strong>Limiti:</strong> Controllo sul numero massimo di targhe
+                                </div>
+                            </div>
+                        </div>
+                        <div class="accordion-item">
+                            <h2 class="accordion-header">
+                                <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#help-libera">
+                                    <i class="bi bi-unlock"></i> &nbsp; Targa Libera
+                                </button>
+                            </h2>
+                            <div id="help-libera" class="accordion-collapse collapse" data-bs-parent="#helpAccordion">
+                                <div class="accordion-body small">
+                                    <strong>Quando usarla:</strong> Per servizi non legati alla targa<br>
+                                    <strong>Vantaggi:</strong> Massima flessibilità<br>
+                                    <strong>Controlli:</strong> Identificazione tramite codice cliente
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+function selectModalita(value) {
+    // Rimuovi selezioni precedenti
+    document.querySelectorAll('.modalita-option').forEach(option => {
+        option.classList.remove('selected');
+    });
+    
+    // Seleziona nuovo display
+    document.querySelector(`input[name="modalita_targa_display"][value="${value}"]`).checked = true;
+    document.querySelector(`input[name="modalita_targa_display"][value="${value}"]`).closest('.modalita-option').classList.add('selected');
+    
+    // Aggiorna il campo Django reale (con prefisso wizard)
+    const djangoRadio = document.querySelector(`input[name="targa-modalita_targa"][value="${value}"]`);
+    
+    if (djangoRadio) {
+        djangoRadio.checked = true;
+    }
+    
+    // Mostra/nascondi sezione numero targhe
+    const numeroTargheSection = document.getElementById('numero-targhe-section');
+    const suggerimentoTarghe = document.getElementById('suggerimento-targhe');
+    
+    if (value === 'multipla') {
+        numeroTargheSection.classList.add('show');
+        suggerimentoTarghe.textContent = 'Per targhe multiple, consigliamo 2-3 targhe per famiglie normali';
+    } else {
+        numeroTargheSection.classList.remove('show');
+        if (value === 'singola') {
+            suggerimentoTarghe.textContent = 'Una sola targa singola per abbonamento';
+        } else if (value === 'libera') {
+            suggerimentoTarghe.textContent = 'Nessuna limitazione di targa';
+        }
+    }
+    
+    updatePreview();
+}
+
+function updatePreview() {
+    const modalita = document.querySelector('input[name="modalita_targa_display"]:checked');
+    const previewModalita = document.getElementById('preview-modalita');
+    
+    if (modalita) {
+        const modalitaText = modalita.closest('.modalita-option').querySelector('h5').textContent;
+        const iconClass = modalita.value === 'singola' ? 'bi-lock' : 
+                         modalita.value === 'multipla' ? 'bi-arrow-repeat' : 'bi-unlock';
+        
+        previewModalita.innerHTML = `
+            <i class="bi ${iconClass}"></i>
+            <span>${modalitaText}</span>
+        `;
+    }
+}
+
+// Setup event listeners
+document.addEventListener('DOMContentLoaded', function() {
+    // Inizializza selezione modalità se presente - sincronizza con campo Django
+    const djangoField = document.querySelector('input[name="targa-modalita_targa"]:checked');
+    if (djangoField && djangoField.value) {
+        selectModalita(djangoField.value);
+    }
+    
+    updatePreview();
+});
+
+// Validazione form
+document.querySelector('form').addEventListener('submit', function(e) {
+    const modalita = document.querySelector('input[name="targa-modalita_targa"]:checked');
+    const numeroTarghe = document.querySelector('[name="targa-numero_massimo_targhe"]').value;
+    
+    const modalitaValue = modalita ? modalita.value : null;
+    
+    if (!modalitaValue) {
+        e.preventDefault();
+        alert('Seleziona una modalità di gestione targa prima di continuare');
+        return false;
+    }
+    
+    // Validazione numero targhe per modalità multipla
+    if (modalitaValue === 'multipla') {
+        if (!numeroTarghe || parseInt(numeroTarghe) < 1) {
+            e.preventDefault();
+            alert('Specifica il numero massimo di targhe per la modalità multipla');
+            return false;
+        }
+    }
+});
+</script>
+{% endblock %}

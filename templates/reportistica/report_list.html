@@ -1,0 +1,514 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}Report Disponibili{% endblock %}
+
+{% block extra_css %}
+<style>
+.report-card {
+    border: none;
+    border-radius: 15px;
+    box-shadow: 0 4px 15px rgba(0,0,0,0.1);
+    transition: all 0.3s ease;
+    margin-bottom: 20px;
+}
+
+.report-card:hover {
+    transform: translateY(-5px);
+    box-shadow: 0 8px 25px rgba(0,0,0,0.15);
+}
+
+.report-header {
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    color: white;
+    border-radius: 15px 15px 0 0;
+    padding: 20px;
+}
+
+.report-body {
+    padding: 20px;
+}
+
+.report-type-badge {
+    position: absolute;
+    top: 15px;
+    right: 15px;
+    padding: 5px 12px;
+    border-radius: 20px;
+    font-size: 0.75rem;
+    font-weight: 600;
+}
+
+.report-vendite {
+    background: rgba(40, 167, 69, 0.2);
+    color: #28a745;
+}
+
+.report-clienti {
+    background: rgba(0, 123, 255, 0.2);
+    color: #007bff;
+}
+
+.report-servizi {
+    background: rgba(255, 193, 7, 0.2);
+    color: #ffc107;
+}
+
+.report-postazioni {
+    background: rgba(108, 117, 125, 0.2);
+    color: #6c757d;
+}
+
+.report-actions {
+    display: flex;
+    gap: 10px;
+    margin-top: 15px;
+}
+
+.quick-report-section {
+    background: white;
+    border-radius: 15px;
+    padding: 25px;
+    box-shadow: 0 2px 15px rgba(0,0,0,0.1);
+    margin-bottom: 30px;
+}
+
+.quick-filters {
+    background: #f8f9fa;
+    border-radius: 10px;
+    padding: 20px;
+    margin-bottom: 20px;
+}
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <!-- Header -->
+    <div class="row mb-4">
+        <div class="col-12">
+            <div class="d-flex justify-content-between align-items-center">
+                <div>
+                    <h2>
+                        <i class="bi bi-file-text me-2"></i>
+                        Report Disponibili
+                    </h2>
+                    <p class="text-muted mb-0">Genera e gestisci i tuoi report personalizzati</p>
+                </div>
+                <div>
+                    <!-- <a href="{% url 'reportistica:dashboard' %}" class="btn btn-outline-primary me-2">
+                        <i class="bi bi-graph-up me-1"></i>
+                        Dashboard
+                    </a> -->
+                    <button class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#quickReportModal">
+                        <i class="bi bi-plus-circle me-1"></i>
+                        Genera Report Rapido
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Generazione Report Rapida -->
+    <div class="quick-report-section">
+        <h4 class="mb-3">
+            <i class="bi bi-lightning me-2"></i>
+            Generazione Rapida
+        </h4>
+        
+        <div class="quick-filters">
+            <!-- <form method="post" action="{% url 'reportistica:genera-report' 1 %}" id="quick-report-form"> -->
+            <form method="post" action="#" id="quick-report-form">
+                {% csrf_token %}
+                <div class="row">
+                    <div class="col-md-3">
+                        <label class="form-label">Tipo Report</label>
+                        <select class="form-select" name="tipo_report" required>
+                            <option value="">Seleziona...</option>
+                            <option value="vendite">Report Vendite</option>
+                            <option value="clienti">Report Clienti</option>
+                            <option value="servizi">Report Servizi</option>
+                        </select>
+                    </div>
+                    <div class="col-md-3">
+                        <label class="form-label">Periodo</label>
+                        <select class="form-select" name="periodo" onchange="toggleDateFields(this)">
+                            <option value="oggi">Oggi</option>
+                            <option value="settimana">Settimana corrente</option>
+                            <option value="mese" selected>Mese corrente</option>
+                            <option value="personalizzato">Periodo personalizzato</option>
+                        </select>
+                    </div>
+                    <div class="col-md-2" id="data-inizio-field" style="display: none;">
+                        <label class="form-label">Data Inizio</label>
+                        <input type="date" class="form-control" name="data_inizio">
+                    </div>
+                    <div class="col-md-2" id="data-fine-field" style="display: none;">
+                        <label class="form-label">Data Fine</label>
+                        <input type="date" class="form-control" name="data_fine">
+                    </div>
+                    <div class="col-md-2">
+                        <label class="form-label">Formato</label>
+                        <select class="form-select" name="formato">
+                            <option value="pdf">PDF</option>
+                            <option value="excel">Excel</option>
+                            <option value="csv">CSV</option>
+                        </select>
+                    </div>
+                    <div class="col-md-2">
+                        <label class="form-label">&nbsp;</label>
+                        <button type="submit" class="btn btn-success d-block w-100">
+                            <i class="bi bi-download me-1"></i>
+                            Genera
+                        </button>
+                    </div>
+                </div>
+            </form>
+        </div>
+    </div>
+    
+    <!-- Lista Report Personalizzati -->
+    <div class="row">
+        <div class="col-12">
+            <h4 class="mb-3">
+                <i class="bi bi-bookmark me-2"></i>
+                Report Salvati
+            </h4>
+        </div>
+    </div>
+    
+    <div class="row">
+        {% for report in reports %}
+        <div class="col-xl-4 col-lg-6 col-md-6">
+            <div class="card report-card">
+                <div class="report-header position-relative">
+                    <span class="report-type-badge report-{{ report.tipo }}">
+                        {{ report.get_tipo_display }}
+                    </span>
+                    <h5 class="mb-1">{{ report.nome }}</h5>
+                    <small class="opacity-75">
+                        Creato da {{ report.creato_da.get_full_name|default:report.creato_da.username }}
+                    </small>
+                </div>
+                
+                <div class="report-body">
+                    <p class="text-muted mb-3">
+                        {{ report.descrizione|default:"Nessuna descrizione disponibile" }}
+                    </p>
+                    
+                    <div class="d-flex justify-content-between align-items-center mb-3">
+                        <small class="text-muted">
+                            <i class="bi bi-clock me-1"></i>
+                            {{ report.data_creazione|date:"d/m/Y" }}
+                        </small>
+                        <small class="text-muted">
+                            <i class="bi bi-file-text me-1"></i>
+                            {{ report.formato_default|upper }}
+                        </small>
+                    </div>
+                    
+                    {% if report.invio_automatico %}
+                    <div class="alert alert-info alert-sm mb-3">
+                        <i class="bi bi-clock me-1"></i>
+                        Invio automatico: {{ report.get_frequenza_invio_display }}
+                    </div>
+                    {% endif %}
+                    
+                    <div class="report-actions">
+                        <button class="btn btn-primary btn-sm flex-fill" 
+                                onclick="generateReport({{ report.id }})">
+                            <i class="bi bi-play me-1"></i>
+                            Genera
+                        </button>
+                        <!-- <a href="{% url 'reportistica:report-detail' report.pk %}" 
+                           class="btn btn-outline-secondary btn-sm">
+                            <i class="bi bi-eye"></i>
+                        </a> -->
+                        {% if report.creato_da == user %}
+                        <button class="btn btn-outline-danger btn-sm" 
+                                onclick="deleteReport({{ report.id }})">
+                            <i class="bi bi-trash"></i>
+                        </button>
+                        {% endif %}
+                    </div>
+                </div>
+            </div>
+        </div>
+        {% empty %}
+        <div class="col-12">
+            <div class="text-center py-5">
+                <i class="bi bi-file-text display-1 text-muted mb-3"></i>
+                <h4 class="text-muted">Nessun report disponibile</h4>
+                <p class="text-muted">Crea il tuo primo report personalizzato per iniziare</p>
+                <button class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#createReportModal">
+                    <i class="bi bi-plus-circle me-1"></i>
+                    Crea Nuovo Report
+                </button>
+            </div>
+        </div>
+        {% endfor %}
+    </div>
+    
+    <!-- Paginazione -->
+    {% if is_paginated %}
+    <div class="row">
+        <div class="col-12">
+            <nav aria-label="Paginazione report">
+                <ul class="pagination justify-content-center">
+                    {% if page_obj.has_previous %}
+                    <li class="page-item">
+                        <a class="page-link" href="?page={{ page_obj.previous_page_number }}">
+                            <i class="bi bi-chevron-left"></i>
+                        </a>
+                    </li>
+                    {% endif %}
+                    
+                    {% for num in page_obj.paginator.page_range %}
+                    {% if page_obj.number == num %}
+                    <li class="page-item active">
+                        <span class="page-link">{{ num }}</span>
+                    </li>
+                    {% else %}
+                    <li class="page-item">
+                        <a class="page-link" href="?page={{ num }}">{{ num }}</a>
+                    </li>
+                    {% endif %}
+                    {% endfor %}
+                    
+                    {% if page_obj.has_next %}
+                    <li class="page-item">
+                        <a class="page-link" href="?page={{ page_obj.next_page_number }}">
+                            <i class="bi bi-chevron-right"></i>
+                        </a>
+                    </li>
+                    {% endif %}
+                </ul>
+            </nav>
+        </div>
+    </div>
+    {% endif %}
+</div>
+
+<!-- Modal Generazione Report -->
+<div class="modal fade" id="generateReportModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Genera Report</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <form id="generate-form">
+                    <div class="mb-3">
+                        <label class="form-label">Periodo</label>
+                        <select class="form-select" name="periodo" onchange="toggleModalDateFields(this)">
+                            <option value="settimana">Settimana corrente</option>
+                            <option value="mese" selected>Mese corrente</option>
+                            <option value="trimestre">Trimestre corrente</option>
+                            <option value="personalizzato">Periodo personalizzato</option>
+                        </select>
+                    </div>
+                    
+                    <div class="row" id="modal-date-fields" style="display: none;">
+                        <div class="col-6">
+                            <label class="form-label">Data Inizio</label>
+                            <input type="date" class="form-control" name="data_inizio">
+                        </div>
+                        <div class="col-6">
+                            <label class="form-label">Data Fine</label>
+                            <input type="date" class="form-control" name="data_fine">
+                        </div>
+                    </div>
+                    
+                    <div class="mb-3">
+                        <label class="form-label">Formato</label>
+                        <select class="form-select" name="formato">
+                            <option value="pdf">PDF</option>
+                            <option value="excel">Excel</option>
+                            <option value="csv">CSV</option>
+                        </select>
+                    </div>
+                </form>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Annulla</button>
+                <button type="button" class="btn btn-primary" onclick="submitGeneration()">
+                    <i class="bi bi-download me-1"></i>
+                    Genera Report
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+let currentReportId = null;
+
+function toggleDateFields(select) {
+    const inizio = document.getElementById('data-inizio-field');
+    const fine = document.getElementById('data-fine-field');
+    
+    if (select.value === 'personalizzato') {
+        inizio.style.display = 'block';
+        fine.style.display = 'block';
+        inizio.querySelector('input').required = true;
+        fine.querySelector('input').required = true;
+    } else {
+        inizio.style.display = 'none';
+        fine.style.display = 'none';
+        inizio.querySelector('input').required = false;
+        fine.querySelector('input').required = false;
+    }
+}
+
+function toggleModalDateFields(select) {
+    const dateFields = document.getElementById('modal-date-fields');
+    
+    if (select.value === 'personalizzato') {
+        dateFields.style.display = 'block';
+        dateFields.querySelectorAll('input').forEach(input => input.required = true);
+    } else {
+        dateFields.style.display = 'none';
+        dateFields.querySelectorAll('input').forEach(input => input.required = false);
+    }
+}
+
+function generateReport(reportId) {
+    currentReportId = reportId;
+    const modal = new bootstrap.Modal(document.getElementById('generateReportModal'));
+    modal.show();
+}
+
+function submitGeneration() {
+    if (!currentReportId) return;
+    
+    const form = document.getElementById('generate-form');
+    const formData = new FormData(form);
+    
+    // Mostra loading
+    const submitBtn = event.target;
+    const originalText = submitBtn.innerHTML;
+    submitBtn.innerHTML = '<span class="spinner-border spinner-border-sm me-1"></span>Generando...';
+    submitBtn.disabled = true;
+    
+    // Invia richiesta
+    fetch(`/reportistica/report/${currentReportId}/genera/`, {
+        method: 'POST',
+        body: formData,
+        headers: {
+            'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]').value
+        }
+    })
+    .then(response => {
+        if (response.ok) {
+            // Se è un file, scarica
+            const contentType = response.headers.get('content-type');
+            if (contentType && (contentType.includes('pdf') || contentType.includes('excel') || contentType.includes('csv'))) {
+                return response.blob().then(blob => {
+                    const url = window.URL.createObjectURL(blob);
+                    const a = document.createElement('a');
+                    a.href = url;
+                    a.download = `report_${currentReportId}_${new Date().toISOString().split('T')[0]}`;
+                    a.click();
+                    window.URL.revokeObjectURL(url);
+                });
+            }
+        } else {
+            throw new Error('Errore nella generazione del report');
+        }
+    })
+    .catch(error => {
+        console.error('Errore:', error);
+        showToast('Errore nella generazione del report', 'error');
+    })
+    .finally(() => {
+        // Ripristina pulsante
+        submitBtn.innerHTML = originalText;
+        submitBtn.disabled = false;
+        
+        // Chiudi modal
+        bootstrap.Modal.getInstance(document.getElementById('generateReportModal')).hide();
+    });
+}
+
+function deleteReport(reportId) {
+    if (confirm('Sei sicuro di voler eliminare questo report?')) {
+        // Implementa eliminazione
+        fetch(`/reportistica/report/${reportId}/delete/`, {
+            method: 'DELETE',
+            headers: {
+                'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]').value
+            }
+        })
+        .then(response => {
+            if (response.ok) {
+                location.reload();
+            } else {
+                throw new Error('Errore nell\'eliminazione');
+            }
+        })
+        .catch(error => {
+            console.error('Errore:', error);
+            showToast('Errore nell\'eliminazione del report', 'error');
+        });
+    }
+}
+
+function showToast(message, type = 'info') {
+    const toastHtml = `
+        <div class="toast align-items-center text-white bg-${type} border-0" role="alert">
+            <div class="d-flex">
+                <div class="toast-body">${message}</div>
+                <button type="button" class="btn-close btn-close-white me-2 m-auto" data-bs-dismiss="toast"></button>
+            </div>
+        </div>
+    `;
+    
+    let toastContainer = document.querySelector('.toast-container');
+    if (!toastContainer) {
+        toastContainer = document.createElement('div');
+        toastContainer.className = 'toast-container position-fixed bottom-0 end-0 p-3';
+        document.body.appendChild(toastContainer);
+    }
+    
+    toastContainer.insertAdjacentHTML('beforeend', toastHtml);
+    
+    const toastElement = toastContainer.lastElementChild;
+    const toast = new bootstrap.Toast(toastElement);
+    toast.show();
+    
+    toastElement.addEventListener('hidden.bs.toast', () => {
+        toastElement.remove();
+    });
+}
+
+// Imposta date di default per i campi data
+document.addEventListener('DOMContentLoaded', function() {
+    const oggi = new Date();
+    const primoDelMese = new Date(oggi.getFullYear(), oggi.getMonth(), 1);
+    
+    document.querySelectorAll('input[name="data_inizio"]').forEach(input => {
+        input.value = primoDelMese.toISOString().split('T')[0];
+    });
+    
+    document.querySelectorAll('input[name="data_fine"]').forEach(input => {
+        input.value = oggi.toISOString().split('T')[0];
+    });
+});
+
+// Gestione form quick report
+document.getElementById('quick-report-form').addEventListener('submit', function(e) {
+    const tipoReport = this.querySelector('[name="tipo_report"]').value;
+    if (!tipoReport) {
+        e.preventDefault();
+        showToast('Seleziona un tipo di report', 'warning');
+        return;
+    }
+    
+    // Aggiorna l'action del form con l'ID corretto
+    this.action = this.action.replace('/1/', `/${tipoReport === 'vendite' ? '1' : tipoReport === 'clienti' ? '2' : '3'}/`);
+});
+</script>
+{% endblock %}

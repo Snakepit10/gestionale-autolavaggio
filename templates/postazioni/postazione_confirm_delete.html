@@ -1,0 +1,153 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}Elimina Postazione - Gestionale Autolavaggio{% endblock %}
+
+{% block content %}
+<div class="row justify-content-center">
+    <div class="col-lg-6">
+        <div class="card border-danger">
+            <div class="card-header bg-danger text-white">
+                <h4 class="mb-0">
+                    <i class="bi bi-exclamation-triangle"></i>
+                    Conferma Eliminazione Postazione
+                </h4>
+            </div>
+            <div class="card-body">
+                <div class="alert alert-warning">
+                    <i class="bi bi-warning"></i>
+                    <strong>Attenzione!</strong> Questa operazione non può essere annullata.
+                </div>
+                
+                <div class="d-flex align-items-center mb-4">
+                    <i class="bi bi-geo-alt text-primary me-3 fs-1"></i>
+                    <div>
+                        <h5>{{ object.nome }}</h5>
+                        <p class="mb-0">
+                            {% if object.attiva %}
+                                <span class="badge bg-success">Postazione Attiva</span>
+                            {% else %}
+                                <span class="badge bg-secondary">Postazione Inattiva</span>
+                            {% endif %}
+                            {% if object.ordine_visualizzazione %}
+                                <br><small class="text-muted">Ordine: {{ object.ordine_visualizzazione }}</small>
+                            {% endif %}
+                        </p>
+                    </div>
+                </div>
+                
+                {% if object.descrizione %}
+                <div class="mb-3">
+                    <small class="text-muted">Descrizione:</small><br>
+                    <strong>{{ object.descrizione }}</strong>
+                </div>
+                {% endif %}
+                
+                <!-- Servizi assegnati -->
+                {% if object.servizi_supportati.all %}
+                <div class="mb-3">
+                    <small class="text-muted">Servizi Supportati:</small><br>
+                    <div class="d-flex flex-wrap gap-1">
+                        {% for servizio in object.servizi_supportati.all %}
+                            <span class="badge bg-light text-dark">{{ servizio.titolo }}</span>
+                        {% endfor %}
+                    </div>
+                </div>
+                {% endif %}
+                
+                <!-- Stampante configurata -->
+                {% if object.stampante_comande %}
+                <div class="mb-3">
+                    <small class="text-muted">Stampante Comande:</small><br>
+                    <strong><i class="bi bi-printer"></i> {{ object.stampante_comande.nome }}</strong>
+                </div>
+                {% endif %}
+                
+                <!-- Dati correlati che verranno eliminati -->
+                <div class="alert alert-danger">
+                    <h6><i class="bi bi-exclamation-circle"></i> Dati che verranno eliminati:</h6>
+                    <ul class="mb-0">
+                        <li><strong>{{ ordini_in_coda|default:0 }}</strong> ordini attualmente in coda</li>
+                        <li><strong>{{ ordini_in_lavorazione|default:0 }}</strong> ordini in lavorazione</li>
+                        <li>Associazione con <strong>{{ object.servizi_supportati.count }}</strong> servizi</li>
+                        <li>Configurazione stampante (se presente)</li>
+                        <li>Storico statistiche della postazione</li>
+                    </ul>
+                </div>
+                
+                {% if ordini_in_coda > 0 or ordini_in_lavorazione > 0 %}
+                    <div class="alert alert-warning">
+                        <i class="bi bi-info-circle"></i>
+                        <strong>Suggerimento:</strong> Ci sono ordini attivi per questa postazione.
+                        Considera di:
+                        <ul class="mb-0">
+                            <li>Completare prima tutti gli ordini in lavorazione</li>
+                            <li>Riassegnare gli ordini in coda ad altre postazioni</li>
+                            <li>Oppure disattivare temporaneamente la postazione invece di eliminarla</li>
+                        </ul>
+                    </div>
+                {% endif %}
+                
+                <p class="text-center mt-4">
+                    <strong>Sei sicuro di voler eliminare definitivamente questa postazione?</strong>
+                </p>
+                
+                <form method="post">
+                    {% csrf_token %}
+                    <div class="d-flex justify-content-between">
+                        <a href="{% url 'postazioni:postazioni-list' %}" class="btn btn-secondary">
+                            <i class="bi bi-arrow-left"></i> Annulla
+                        </a>
+                        <div>
+                            {% if object.attiva %}
+                                <a href="{% url 'postazioni:postazione-update' object.pk %}" 
+                                   class="btn btn-warning me-2">
+                                    <i class="bi bi-pause"></i> Disattiva Invece
+                                </a>
+                            {% endif %}
+                            <button type="submit" class="btn btn-danger">
+                                <i class="bi bi-trash"></i> Elimina Postazione Definitivamente
+                            </button>
+                        </div>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Informazioni aggiuntive -->
+<div class="row justify-content-center mt-4">
+    <div class="col-lg-6">
+        <div class="card bg-light">
+            <div class="card-header">
+                <h6 class="mb-0">
+                    <i class="bi bi-info-circle"></i>
+                    Conseguenze dell'Eliminazione
+                </h6>
+            </div>
+            <div class="card-body">
+                <div class="row">
+                    <div class="col-md-6">
+                        <h6>Cosa Succede:</h6>
+                        <ul class="small">
+                            <li>La postazione viene rimossa dal sistema</li>
+                            <li>Gli ordini in coda vengono cancellati</li>
+                            <li>I servizi perdono l'associazione con questa postazione</li>
+                            <li>Le statistiche storiche vengono mantenute ma senza riferimento</li>
+                        </ul>
+                    </div>
+                    <div class="col-md-6">
+                        <h6>Alternative Raccomandate:</h6>
+                        <ul class="small">
+                            <li><strong>Disattivazione:</strong> Ferma nuovi ordini ma mantiene i dati</li>
+                            <li><strong>Riassegnazione:</strong> Sposta gli ordini in coda ad altre postazioni</li>
+                            <li><strong>Archiviazione:</strong> Rinomina con prefisso "ARCHIVIATA_"</li>
+                        </ul>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

@@ -1,0 +1,1647 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}Dashboard {{ postazione.nome }} - Gestionale Autolavaggio{% endblock %}
+
+{% block extra_css %}
+<style>
+.dashboard-container {
+    height: calc(100vh - 100px);
+    overflow: hidden;
+    max-width: 100%;
+    width: 100%;
+}
+
+.coda-ordini {
+    height: 70%;
+    overflow-y: auto;
+    border: 1px solid #dee2e6;
+    border-radius: 8px;
+    padding: 15px;
+    background: white;
+}
+
+.statistiche-panel {
+    height: 28%;
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    border-radius: 8px;
+    color: white;
+    padding: 20px;
+    margin-top: 2%;
+}
+
+/* Kanban Board Styles */
+.kanban-board {
+    display: flex;
+    gap: 24px;
+    height: calc(100vh - 240px);
+    overflow-x: auto;
+    padding: 10px 0;
+    width: 100%;
+}
+
+.kanban-column {
+    flex: 1;
+    min-width: 450px;
+    max-width: none;
+    background: #f8f9fa;
+    border-radius: 8px;
+    display: flex;
+    flex-direction: column;
+}
+
+.kanban-header {
+    padding: 12px 16px;
+    border-radius: 8px 8px 0 0;
+    color: white;
+    font-weight: bold;
+}
+
+.kanban-header.in-attesa {
+    background: linear-gradient(135deg, #17a2b8, #138496);
+}
+
+.kanban-header.in-lavorazione {
+    background: linear-gradient(135deg, #ffc107, #e0a800);
+    color: #212529;
+}
+
+.kanban-header.completato {
+    background: linear-gradient(135deg, #28a745, #20c997);
+}
+
+.kanban-cards {
+    flex: 1;
+    padding: 12px;
+    overflow-y: auto;
+    min-height: 200px;
+}
+
+.kanban-card {
+    background: white;
+    border: 1px solid #e9ecef;
+    border-radius: 8px;
+    margin-bottom: 10px;
+    box-shadow: 0 2px 6px rgba(0,0,0,0.06);
+    transition: all 0.3s ease;
+    cursor: move;
+    overflow: hidden;
+}
+
+.kanban-card:hover {
+    box-shadow: 0 8px 25px rgba(0,0,0,0.15);
+    transform: translateY(-3px);
+}
+
+.kanban-card.processing {
+    border-left: 4px solid #ffc107;
+    background: linear-gradient(135deg, #fff9e6 0%, #ffffff 100%);
+    animation: pulse 2s infinite;
+}
+
+.kanban-card.completed {
+    border-left: 4px solid #28a745;
+    background: linear-gradient(135deg, #f0f9f0 0%, #ffffff 100%);
+}
+
+.kanban-card .card-header {
+    background: transparent;
+    border-bottom: 1px solid #f0f0f0;
+    padding: 12px 16px 8px;
+    font-size: 0.9rem;
+}
+
+.kanban-card .card-body {
+    padding: 8px 16px 12px;
+}
+
+.kanban-card .card-actions {
+    padding: 8px 16px 12px;
+    background: #fafafa;
+    border-top: 1px solid #f0f0f0;
+}
+
+.kanban-card .service-info strong {
+    color: #2c3e50;
+    font-size: 0.95rem;
+}
+
+.kanban-card .timer-display {
+    background: #e3f2fd;
+    color: #1976d2;
+    padding: 4px 8px;
+    border-radius: 20px;
+    font-size: 0.8rem;
+    font-weight: 600;
+    min-width: 50px;
+    text-align: center;
+}
+
+.kanban-card.processing .timer-display {
+    background: #fff3cd;
+    color: #856404;
+}
+
+.kanban-card .badge {
+    font-size: 0.7rem;
+    padding: 4px 8px;
+}
+
+.kanban-card .note {
+    background: #f8f9fa;
+    padding: 8px;
+    border-radius: 6px;
+    border-left: 3px solid #dee2e6;
+}
+
+.kanban-card .btn-sm {
+    padding: 4px 8px;
+    font-size: 0.8rem;
+    border-radius: 6px;
+}
+
+.kanban-card .card-actions .btn {
+    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+}
+
+.kanban-card .card-actions .btn:hover {
+    transform: translateY(-1px);
+    box-shadow: 0 4px 8px rgba(0,0,0,0.15);
+}
+
+@keyframes pulse {
+    0% { transform: scale(1); }
+    50% { transform: scale(1.02); }
+    100% { transform: scale(1); }
+}
+
+.kanban-card .fw-bold {
+    color: #495057;
+    font-size: 0.9rem;
+}
+
+.kanban-card .text-muted {
+    color: #6c757d !important;
+    font-size: 0.8rem;
+}
+
+/* Stile per badge status */
+.kanban-card .badge.bg-success {
+    background: linear-gradient(135deg, #28a745, #20c997) !important;
+}
+
+.kanban-card .badge.bg-secondary {
+    background: linear-gradient(135deg, #6c757d, #495057) !important;
+}
+
+/* Miglioramento per card in attesa */
+.kanban-card:not(.processing):not(.completed) {
+    border-left: 4px solid #17a2b8;
+    background: linear-gradient(135deg, #e8f4fd 0%, #ffffff 100%);
+}
+
+/* Effetto glow per card in lavorazione */
+.kanban-card.processing {
+    box-shadow: 0 4px 12px rgba(255, 193, 7, 0.3);
+}
+
+/* Stile per durata stimata */
+.kanban-card .text-muted.mt-1 {
+    background: #f8f9fa;
+    padding: 2px 6px;
+    border-radius: 4px;
+    display: inline-block;
+    font-size: 0.75rem;
+    font-weight: 500;
+}
+
+/* Stile per numero ordine evidenziato */
+.kanban-card .order-number {
+    background: linear-gradient(135deg, #007bff, #0056b3);
+    color: white;
+    padding: 8px 16px;
+    border-radius: 25px;
+    font-weight: 800;
+    font-size: 1.1rem;
+    text-shadow: 0 2px 4px rgba(0,0,0,0.3);
+    box-shadow: 0 3px 6px rgba(0,123,255,0.4);
+    letter-spacing: 1px;
+    min-width: 50px;
+    text-align: center;
+}
+
+/* Stile per tipo consegna */
+.kanban-card .delivery-type {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 32px;
+    height: 32px;
+    border-radius: 50%;
+    background: rgba(255,255,255,0.95);
+    box-shadow: 0 3px 6px rgba(0,0,0,0.15);
+    border: 2px solid rgba(0,0,0,0.05);
+}
+
+.kanban-card .delivery-type i {
+    font-size: 1.1rem;
+    font-weight: 600;
+}
+
+/* Varianti colore numero ordine per stato */
+.kanban-card.processing .order-number {
+    background: linear-gradient(135deg, #ffc107, #e0a800);
+    color: #212529;
+    box-shadow: 0 2px 4px rgba(255,193,7,0.3);
+}
+
+.kanban-card.completed .order-number {
+    background: linear-gradient(135deg, #28a745, #20c997);
+    color: white;
+    box-shadow: 0 3px 6px rgba(40,167,69,0.4);
+}
+
+/* Stile per informazioni ordine enfatizzate */
+.kanban-card .order-info {
+    background: linear-gradient(135deg, #f8f9fa, #e9ecef);
+    padding: 8px 12px;
+    border-radius: 8px;
+    margin-top: 4px;
+    border-left: 3px solid #007bff;
+}
+
+.kanban-card .order-time {
+    font-weight: 700;
+    color: #495057;
+    font-size: 0.9rem;
+    text-shadow: 0 1px 2px rgba(0,0,0,0.1);
+}
+
+.kanban-card .customer-name {
+    font-weight: 600;
+    color: #212529;
+    font-size: 0.85rem;
+    margin-top: 2px;
+    text-transform: capitalize;
+}
+
+.kanban-card .customer-name.anonymous {
+    color: #6c757d;
+    font-style: italic;
+    font-weight: 500;
+}
+
+/* Varianti colore border per stato */
+.kanban-card.processing .order-info {
+    border-left-color: #ffc107;
+}
+
+.kanban-card.completed .order-info {
+    border-left-color: #28a745;
+}
+
+.kanban-card .card-body {
+    padding: 8px 12px;
+    font-size: 0.9rem;
+}
+
+.kanban-card .card-actions {
+    padding: 8px 12px 10px 12px;
+    border-top: 1px solid #f1f3f4;
+}
+
+.service-info strong {
+    font-size: 0.9rem;
+    color: #495057;
+}
+
+.note {
+    background: #f8f9fa;
+    border-radius: 4px;
+    padding: 4px 8px;
+}
+
+@keyframes pulse {
+    0%, 100% { border-left-color: #ffc107; }
+    50% { border-left-color: #ff8c00; }
+}
+
+/* Drag and Drop */
+.kanban-card.dragging {
+    opacity: 0.5;
+    transform: rotate(5deg);
+}
+
+.kanban-column.drag-over {
+    background: #e3f2fd;
+}
+
+/* Orologio Centrato */
+.clock-container-center {
+    background: linear-gradient(135deg, #f8f9fa, #e9ecef);
+    border-radius: 12px;
+    padding: 12px 20px;
+    border: 2px solid #dee2e6;
+    box-shadow: 0 4px 8px rgba(0,0,0,0.1);
+    text-align: center;
+}
+
+.clock-display-center {
+    line-height: 1.2;
+}
+
+.current-time-center {
+    font-size: 1.6rem;
+    font-weight: 700;
+    color: #212529;
+    font-family: 'Courier New', monospace;
+    text-shadow: 0 1px 2px rgba(0,0,0,0.1);
+}
+
+.current-date-center {
+    font-size: 1rem;
+    color: #495057;
+    font-weight: 600;
+    margin-top: 2px;
+}
+
+/* Stats Cards - Versione compatta */
+.stat-card {
+    border-radius: 6px;
+    padding: 8px;
+    color: white;
+    display: flex;
+    align-items: center;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+    transition: all 0.3s ease;
+    min-height: 45px;
+}
+
+.stat-card:hover {
+    transform: translateY(-1px);
+    box-shadow: 0 4px 8px rgba(0,0,0,0.15);
+}
+
+.stat-icon {
+    font-size: 1.3rem;
+    margin-right: 10px;
+    opacity: 0.8;
+}
+
+.stat-content {
+    flex: 1;
+}
+
+.stat-number {
+    font-size: 1.2rem;
+    font-weight: bold;
+    line-height: 1;
+    margin-bottom: 1px;
+}
+
+.stat-label {
+    font-size: 0.7rem;
+    opacity: 0.9;
+    text-transform: uppercase;
+    letter-spacing: 0.3px;
+    line-height: 1.1;
+}
+
+.timer-display {
+    font-family: 'Courier New', monospace;
+    font-size: 1.5em;
+    font-weight: bold;
+    color: #ffc107;
+}
+
+.btn-stato {
+    min-width: 120px;
+    margin: 2px;
+}
+
+.stats-item {
+    text-align: center;
+    padding: 10px;
+}
+
+.stats-number {
+    font-size: 2rem;
+    font-weight: bold;
+    margin-bottom: 5px;
+}
+
+.stats-label {
+    font-size: 0.9rem;
+    opacity: 0.9;
+}
+
+.scheduled-delivery {
+    background: linear-gradient(135deg, #e3f2fd 0%, #ffffff 100%);
+    border-left: 3px solid #2196f3;
+}
+
+.scheduled-time {
+    color: #1976d2;
+    font-weight: 600;
+}
+
+.urgent-delivery {
+    animation: urgentPulse 2s ease-in-out infinite;
+    border: 2px solid #dc3545;
+}
+
+.kanban-card.urgent-delivery {
+    border: 2px solid #dc3545 !important;
+    animation: urgentPulse 2s ease-in-out infinite;
+}
+
+@keyframes urgentPulse {
+    0% {
+        box-shadow: 0 0 0 0 rgba(220, 53, 69, 0.7);
+        background-color: rgba(220, 53, 69, 0.1);
+    }
+    50% {
+        box-shadow: 0 0 0 15px rgba(220, 53, 69, 0);
+        background-color: rgba(220, 53, 69, 0.3);
+    }
+    100% {
+        box-shadow: 0 0 0 0 rgba(220, 53, 69, 0);
+        background-color: rgba(220, 53, 69, 0.1);
+    }
+}
+
+.alert-nuovo-ordine {
+    position: fixed;
+    top: 20px;
+    right: 20px;
+    z-index: 1050;
+    min-width: 300px;
+}
+
+.pulse {
+    animation: pulse 2s infinite;
+}
+
+@keyframes pulse {
+    0% { transform: scale(1); }
+    50% { transform: scale(1.05); }
+    100% { transform: scale(1); }
+}
+
+@media (max-width: 768px) {
+    .dashboard-container {
+        height: auto;
+    }
+    
+    .coda-ordini, .statistiche-panel {
+        height: auto;
+        margin-bottom: 20px;
+    }
+}
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <div class="row dashboard-container">
+        <div class="col-12">
+        <div class="d-flex justify-content-between align-items-center mb-3">
+            <div class="d-flex align-items-center">
+                <h2 class="mb-0">
+                    <i class="bi bi-diagram-3"></i> {{ postazione.nome }}
+                    <span class="badge bg-primary ms-2" id="coda-count">{{ ordini_in_coda|length }}</span>
+                </h2>
+            </div>
+            <div class="clock-container-center">
+                <div class="clock-display-center">
+                    <div class="current-time-center" id="current-time">--:--:--</div>
+                    <div class="current-date-center" id="current-date">--/--/----</div>
+                </div>
+            </div>
+            <div class="btn-group">
+                <button class="btn btn-outline-primary" onclick="aggiornaOrdini()">
+                    <i class="bi bi-arrow-clockwise"></i> Aggiorna
+                </button>
+                <button class="btn btn-outline-success" onclick="toggleAutoRefresh()">
+                    <i class="bi bi-play-circle" id="auto-refresh-icon"></i>
+                    <span id="auto-refresh-text">Auto</span>
+                </button>
+                <button class="btn btn-outline-info" onclick="mostraStatistiche()">
+                    <i class="bi bi-bar-chart"></i> Stats
+                </button>
+            </div>
+        </div>
+    </div>
+    
+    <div class="col-12">
+        <!-- Stats Cards Row -->
+        <div class="row mb-3">
+            <div class="col-md-4">
+                <div class="stat-card bg-primary">
+                    <div class="stat-icon">
+                        <i class="bi bi-list-task"></i>
+                    </div>
+                    <div class="stat-content">
+                        <div class="stat-number" id="in-coda">0</div>
+                        <div class="stat-label">In Coda</div>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-4">
+                <div class="stat-card bg-success">
+                    <div class="stat-icon">
+                        <i class="bi bi-calendar-check"></i>
+                    </div>
+                    <div class="stat-content">
+                        <div class="stat-number" id="prenotazioni-oggi">0</div>
+                        <div class="stat-label">Prenotazioni</div>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-4">
+                <div class="stat-card bg-warning">
+                    <div class="stat-icon">
+                        <i class="bi bi-lightning"></i>
+                    </div>
+                    <div class="stat-content">
+                        <div class="stat-number" id="immediati-coda">0</div>
+                        <div class="stat-label">Consegna Immediata</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="coda-ordini">
+            <div class="d-flex justify-content-between align-items-center mb-3">
+                <h5><i class="bi bi-kanban"></i> Dashboard Operativa</h5>
+                <div class="btn-group btn-group-sm">
+                    <button class="btn btn-outline-secondary" onclick="aggiornaOrdini()" title="Aggiorna">
+                        <i class="bi bi-arrow-clockwise"></i>
+                    </button>
+                </div>
+            </div>
+            
+            <!-- Trello-style Board -->
+            <div id="ordini-container" class="kanban-board">
+                <!-- Colonna In Attesa -->
+                <div class="kanban-column">
+                    <div class="kanban-header in-attesa">
+                        <h6 class="mb-0">
+                            <i class="bi bi-clock"></i> In Attesa
+                            <span class="badge bg-light text-dark ms-2" id="count-in-attesa">0</span>
+                        </h6>
+                    </div>
+                    <div class="kanban-cards" id="column-in-attesa">
+                        {% for item in ordini_in_coda %}
+                        {% if item.stato == 'in_attesa' %}
+                        <div class="kanban-card {% if item.ordine.tipo_consegna == 'programmata' %}scheduled-delivery{% endif %}" data-item-id="{{ item.id }}" data-ordine-id="{{ item.ordine.id }}" draggable="true">
+                            <div class="card-header">
+                                <div class="d-flex justify-content-between align-items-center">
+                                    <div class="d-flex align-items-center">
+                                        <span class="order-number">#{{ item.ordine.numero_progressivo|slice:"-2:" }}</span>
+                                        {% if item.ordine.tipo_consegna == 'programmata' %}
+                                            <span class="delivery-type ms-2">
+                                                <i class="bi bi-clock text-info" title="Consegna Programmata"></i>
+                                            </span>
+                                        {% endif %}
+                                    </div>
+                                    <div class="service-info text-end">
+                                        <strong>{{ item.servizio_prodotto.titolo }}</strong>
+                                        {% if item.quantita > 1 %}
+                                            <span class="badge bg-secondary ms-1">x{{ item.quantita }}</span>
+                                        {% endif %}
+                                    </div>
+                                </div>
+                                <div class="order-info">
+                                    <div class="order-details mb-2">
+                                        <div class="mb-1">
+                                            {% if item.ordine.tipo_consegna == 'programmata' and item.ordine.ora_consegna_richiesta %}
+                                                <i class="bi bi-alarm me-1"></i>
+                                                <small class="text-muted">Consegna richiesta:</small>
+                                                <span class="scheduled-time">{{ item.ordine.ora_consegna_richiesta|date:"H:i" }}</span>
+                                            {% else %}
+                                                <i class="bi bi-lightning me-1"></i>
+                                                <small class="text-muted">Consegna richiesta:</small>
+                                                <span class="text-warning fw-bold">Immediata</span>
+                                            {% endif %}
+                                        </div>
+                                    </div>
+                                    <div class="customer-name{% if not item.ordine.cliente %} anonymous{% endif %}">
+                                        <i class="bi bi-person me-1"></i>
+                                        {% if item.ordine.cliente %}{{ item.ordine.cliente|truncatechars:18 }}{% else %}Cliente Anonimo{% endif %}
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="card-body">
+                                {% if item.ordine.nota %}
+                                <div class="note">
+                                    <div class="text-muted">
+                                        <i class="bi bi-chat-quote me-1"></i> {{ item.ordine.nota|truncatechars:50 }}
+                                    </div>
+                                </div>
+                                {% endif %}
+                            </div>
+                            <div class="card-actions">
+                                <button class="btn btn-warning btn-sm w-100" onclick="cambiaStato({{ item.id }}, 'in_lavorazione')">
+                                    <i class="bi bi-play-circle"></i> Inizia
+                                </button>
+                            </div>
+                        </div>
+                        {% endif %}
+                        {% endfor %}
+                    </div>
+                </div>
+
+                <!-- Colonna In Lavorazione -->
+                <div class="kanban-column">
+                    <div class="kanban-header in-lavorazione">
+                        <h6 class="mb-0">
+                            <i class="bi bi-gear"></i> In Lavorazione
+                            <span class="badge bg-light text-dark ms-2" id="count-in-lavorazione">0</span>
+                        </h6>
+                    </div>
+                    <div class="kanban-cards" id="column-in-lavorazione">
+                        {% for item in ordini_in_coda %}
+                        {% if item.stato == 'in_lavorazione' %}
+                        <div class="kanban-card processing {% if item.ordine.tipo_consegna == 'programmata' %}scheduled-delivery{% endif %}" data-item-id="{{ item.id }}" data-ordine-id="{{ item.ordine.id }}" draggable="true">
+                            <div class="card-header">
+                                <div class="d-flex justify-content-between align-items-center">
+                                    <div class="d-flex align-items-center">
+                                        <span class="order-number">#{{ item.ordine.numero_progressivo|slice:"-2:" }}</span>
+                                        {% if item.ordine.tipo_consegna == 'programmata' %}
+                                            <span class="delivery-type ms-2">
+                                                <i class="bi bi-clock text-info" title="Consegna Programmata"></i>
+                                            </span>
+                                        {% endif %}
+                                    </div>
+                                    {% if item.inizio_lavorazione %}
+                                    <div class="timer-display" data-inizio="{{ item.inizio_lavorazione|date:'c' }}">
+                                        00:00
+                                    </div>
+                                    {% endif %}
+                                </div>
+                                <div class="order-info">
+                                    <div class="order-details mb-2">
+                                        <div class="mb-1">
+                                            {% if item.ordine.tipo_consegna == 'programmata' and item.ordine.ora_consegna_richiesta %}
+                                                <i class="bi bi-alarm me-1"></i>
+                                                <small class="text-muted">Consegna richiesta:</small>
+                                                <span class="scheduled-time">{{ item.ordine.ora_consegna_richiesta|date:"H:i" }}</span>
+                                            {% else %}
+                                                <i class="bi bi-lightning me-1"></i>
+                                                <small class="text-muted">Consegna richiesta:</small>
+                                                <span class="text-warning fw-bold">Immediata</span>
+                                            {% endif %}
+                                        </div>
+                                    </div>
+                                    <div class="customer-name{% if not item.ordine.cliente %} anonymous{% endif %}">
+                                        <i class="bi bi-person me-1"></i>
+                                        {% if item.ordine.cliente %}{{ item.ordine.cliente|truncatechars:18 }}{% else %}Cliente Anonimo{% endif %}
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="card-body">
+                                {% if item.ordine.nota %}
+                                <div class="note">
+                                    <div class="text-muted">
+                                        <i class="bi bi-chat-quote me-1"></i> {{ item.ordine.nota|truncatechars:50 }}
+                                    </div>
+                                </div>
+                                {% endif %}
+                            </div>
+                            <div class="card-actions">
+                                <button class="btn btn-secondary btn-sm me-1" onclick="cambiaStato({{ item.id }}, 'in_attesa')">
+                                    <i class="bi bi-pause-circle"></i>
+                                </button>
+                                <button class="btn btn-success btn-sm" onclick="cambiaStato({{ item.id }}, 'completato')">
+                                    <i class="bi bi-check-circle"></i> Completa
+                                </button>
+                            </div>
+                        </div>
+                        {% endif %}
+                        {% endfor %}
+                    </div>
+                </div>
+
+                <!-- Colonna Completato -->
+                <div class="kanban-column">
+                    <div class="kanban-header completato">
+                        <h6 class="mb-0">
+                            <i class="bi bi-check-circle"></i> Completato
+                            <span class="badge bg-light text-dark ms-2" id="count-completato">0</span>
+                        </h6>
+                    </div>
+                    <div class="kanban-cards" id="column-completato">
+                        {% for item in ordini_in_coda %}
+                        {% if item.stato == 'completato' %}
+                        <div class="kanban-card completed {% if item.ordine.tipo_consegna == 'programmata' %}scheduled-delivery{% endif %}" data-item-id="{{ item.id }}" data-ordine-id="{{ item.ordine.id }}">
+                            <div class="card-header">
+                                <div class="d-flex justify-content-between align-items-center">
+                                    <div class="d-flex align-items-center">
+                                        <span class="order-number">#{{ item.ordine.numero_progressivo|slice:"-2:" }}</span>
+                                        {% if item.ordine.tipo_consegna == 'programmata' %}
+                                            <span class="delivery-type ms-2">
+                                                <i class="bi bi-clock text-info" title="Consegna Programmata"></i>
+                                            </span>
+                                        {% endif %}
+                                    </div>
+                                    {% if item.fine_lavorazione %}
+                                    <small class="text-success">{{ item.fine_lavorazione|date:"H:i" }}</small>
+                                    {% endif %}
+                                </div>
+                                <div class="order-info">
+                                    <div class="order-details mb-2">
+                                        <div class="mb-1">
+                                            {% if item.ordine.tipo_consegna == 'programmata' and item.ordine.ora_consegna_richiesta %}
+                                                <i class="bi bi-alarm me-1"></i>
+                                                <small class="text-muted">Consegna richiesta:</small>
+                                                <span class="scheduled-time">{{ item.ordine.ora_consegna_richiesta|date:"H:i" }}</span>
+                                            {% else %}
+                                                <i class="bi bi-lightning me-1"></i>
+                                                <small class="text-muted">Consegna richiesta:</small>
+                                                <span class="text-warning fw-bold">Immediata</span>
+                                            {% endif %}
+                                        </div>
+                                    </div>
+                                    <div class="customer-name{% if not item.ordine.cliente %} anonymous{% endif %}">
+                                        <i class="bi bi-person me-1"></i>
+                                        {% if item.ordine.cliente %}{{ item.ordine.cliente|truncatechars:18 }}{% else %}Cliente Anonimo{% endif %}
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="card-body">
+                                <div class="service-info">
+                                    <strong>{{ item.servizio_prodotto.titolo }}</strong>
+                                    {% if item.quantita > 1 %}
+                                        <span class="badge bg-secondary ms-1">x{{ item.quantita }}</span>
+                                    {% endif %}
+                                    {% if item.durata_lavorazione %}
+                                    <div class="text-success mt-1">{{ item.durata_lavorazione|floatformat:0 }} min effettivi</div>
+                                    {% endif %}
+                                </div>
+                            </div>
+                            <div class="card-actions">
+                                <span class="badge bg-success w-100">
+                                    <i class="bi bi-check-circle"></i> Completato
+                                </span>
+                            </div>
+                        </div>
+                        {% endif %}
+                        {% endfor %}
+                    </div>
+                </div>
+            </div>
+
+            <!-- Empty State -->
+            {% if not ordini_in_coda %}
+            <div class="text-center text-muted py-5" id="no-ordini">
+                <i class="bi bi-inbox display-4"></i>
+                <p class="mt-3">Nessun ordine in coda</p>
+                <p class="small">I nuovi ordini appariranno automaticamente qui</p>
+            </div>
+            {% endif %}
+        </div>
+    </div>
+</div>
+
+<!-- Alert nuovo ordine -->
+<div id="alert-nuovo-ordine" class="alert alert-success alert-nuovo-ordine d-none" role="alert">
+    <div class="d-flex align-items-center">
+        <i class="bi bi-bell-fill me-2"></i>
+        <div>
+            <strong>Nuovo Ordine!</strong>
+            <div id="nuovo-ordine-dettagli"></div>
+        </div>
+        <button type="button" class="btn-close ms-auto" onclick="chiudiAlertNuovoOrdine()"></button>
+    </div>
+</div>
+
+<!-- Modal Statistiche Dettagliate -->
+<div class="modal fade" id="modalStatistiche" tabindex="-1">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Statistiche Dettagliate - {{ postazione.nome }}</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <canvas id="chartStatistiche" width="400" height="200"></canvas>
+            </div>
+        </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+// Variabili globali
+let autoRefreshEnabled = false;
+let autoRefreshInterval;
+let webSocket;
+let timers = {};
+
+// Assicurati che AutolavaggioJS esista e abbia tutti i metodi necessari
+if (typeof AutolavaggioJS === 'undefined') {
+    window.AutolavaggioJS = {};
+}
+
+// Aggiungi i metodi mancanti
+if (!AutolavaggioJS.showLoading) {
+    AutolavaggioJS.showLoading = function(btn) {
+        btn.disabled = true;
+        btn.innerHTML = '<i class="bi bi-hourglass-split"></i> Caricamento...';
+    };
+}
+
+if (!AutolavaggioJS.hideLoading) {
+    AutolavaggioJS.hideLoading = function(btn, originalText) {
+        btn.disabled = false;
+        btn.innerHTML = originalText;
+    };
+}
+
+if (!AutolavaggioJS.showToast) {
+    AutolavaggioJS.showToast = function(message, type) {
+        alert(message);
+    };
+}
+
+if (!AutolavaggioJS.getCookie) {
+    AutolavaggioJS.getCookie = function(name) {
+        let cookieValue = null;
+        if (document.cookie && document.cookie !== '') {
+            const cookies = document.cookie.split(';');
+            for (let i = 0; i < cookies.length; i++) {
+                const cookie = cookies[i].trim();
+                if (cookie.substring(0, name.length + 1) === (name + '=')) {
+                    cookieValue = decodeURIComponent(cookie.substring(name.length + 1));
+                    break;
+                }
+            }
+        }
+        return cookieValue;
+    };
+}
+
+// Inizializzazione
+document.addEventListener('DOMContentLoaded', function() {
+    // Sincronizza con l'ora del server
+    sincronizzaConServer();
+    
+    inizializzaWebSocket();
+    inizializzaTimers();
+    aggiornaContatori();
+    
+    // Avvia l'orologio
+    aggiornaClock();
+    setInterval(aggiornaClock, 1000);
+    
+    // Auto refresh ogni 10 secondi se non ci sono WebSocket
+    if (!webSocket) {
+        setInterval(aggiornaOrdini, 10000);
+    }
+    
+    // Controlla urgenza ogni minuto
+    setInterval(aggiornaProssimaConsegnaProgrammata, 60000);
+    
+    // Sincronizza l'ora del server ogni 5 minuti
+    setInterval(sincronizzaConServer, 300000);
+    
+    // Debug: log initial counts
+    const counts = {
+        inAttesa: document.querySelectorAll('#column-in-attesa .kanban-card').length,
+        inLavorazione: document.querySelectorAll('#column-in-lavorazione .kanban-card').length,
+        completato: document.querySelectorAll('#column-completato .kanban-card').length
+    };
+    console.log('✅ Dashboard operativa caricata - Contatori:', counts);
+});
+
+// WebSocket per aggiornamenti real-time
+function inizializzaWebSocket() {
+    const wsProtocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+    const wsUrl = `${wsProtocol}//${window.location.host}/ws/postazione/{{ postazione.id }}/`;
+    
+    try {
+        webSocket = new WebSocket(wsUrl);
+        
+        webSocket.onopen = function() {
+            console.log('WebSocket connesso per postazione {{ postazione.id }}');
+            document.querySelector('.badge.bg-primary').classList.add('pulse');
+        };
+        
+        webSocket.onmessage = function(event) {
+            const data = JSON.parse(event.data);
+            handleWebSocketMessage(data);
+        };
+        
+        webSocket.onclose = function() {
+            console.log('WebSocket disconnesso, tentativo riconnessione...');
+            setTimeout(inizializzaWebSocket, 3000);
+        };
+        
+        webSocket.onerror = function(error) {
+            console.error('Errore WebSocket:', error);
+        };
+    } catch (error) {
+        console.warn('WebSocket non supportato, uso polling');
+        webSocket = null;
+    }
+}
+
+function handleWebSocketMessage(data) {
+    switch (data.type) {
+        case 'nuovo_ordine':
+            mostraAlertNuovoOrdine(data.ordine);
+            aggiornaOrdini();
+            riproduciSuonoNotifica();
+            break;
+            
+        case 'item_status_update':
+            aggiornaStatoItem(data.item_id, data.stato);
+            break;
+            
+        case 'order_status_update':
+            console.log(`Ordine ${data.numero_progressivo} cambiato da ${data.vecchio_stato} a ${data.nuovo_stato}`);
+            gestisciCambioStatoOrdine(data);
+            break;
+            
+        default:
+            console.log('Messaggio WebSocket non gestito:', data);
+    }
+}
+
+// Gestione cambio stato ordine da altre interfacce
+function gestisciCambioStatoOrdine(data) {
+    const ordineId = data.ordine_id;
+    const nuovoStato = data.nuovo_stato;
+    
+    // Trova tutte le card di questo ordine
+    const cards = document.querySelectorAll(`[data-ordine-id="${ordineId}"]`);
+    
+    if (cards.length === 0) {
+        console.log(`Nessuna card trovata per ordine ${ordineId}`);
+        return;
+    }
+    
+    // Gestisci il cambio di stato a livello di ordine
+    cards.forEach(card => {
+        const itemId = card.dataset.itemId;
+        
+        switch (nuovoStato) {
+            case 'completato':
+                // Se l'ordine è completato, completa tutti gli item
+                if (card.closest('#column-in-lavorazione') || card.closest('#column-in-attesa')) {
+                    cambiaStatoCard(card, 'completato');
+                    console.log(`Item ${itemId} completato automaticamente per ordine completato`);
+                }
+                break;
+                
+            case 'annullato':
+                // Se l'ordine è annullato, rimuovi tutte le card
+                console.log(`Rimuovendo card per ordine annullato ${ordineId}`);
+                card.style.transition = 'all 0.5s ease';
+                card.style.opacity = '0';
+                card.style.transform = 'translateY(-20px)';
+                setTimeout(() => {
+                    card.remove();
+                    aggiornaContatori();
+                }, 500);
+                break;
+                
+            case 'in_lavorazione':
+                // Se l'ordine va in lavorazione, lascia gli item come sono
+                console.log(`Ordine ${ordineId} in lavorazione - nessun cambio item necessario`);
+                break;
+                
+            default:
+                console.log(`Stato ordine ${nuovoStato} non gestito per dashboard postazione`);
+        }
+    });
+    
+    // Mostra notifica
+    AutolavaggioJS.showToast(
+        `Ordine #${data.numero_progressivo} ${nuovoStato.replace('_', ' ')}`, 
+        nuovoStato === 'completato' ? 'success' : 'info'
+    );
+}
+
+// Cambia stato di una card specifica
+function cambiaStatoCard(card, nuovoStato) {
+    const colonnaDestinazione = document.getElementById(`column-${nuovoStato.replace('_', '-')}`);
+    if (!colonnaDestinazione) {
+        console.error(`Colonna per stato ${nuovoStato} non trovata`);
+        return;
+    }
+    
+    // Aggiorna classi CSS
+    card.classList.remove('processing', 'completed');
+    if (nuovoStato === 'in_lavorazione') {
+        card.classList.add('processing');
+    } else if (nuovoStato === 'completato') {
+        card.classList.add('completed');
+    }
+    
+    // Sposta la card nella colonna giusta
+    card.style.transition = 'all 0.5s ease';
+    card.style.transform = 'scale(0.9)';
+    
+    setTimeout(() => {
+        colonnaDestinazione.appendChild(card);
+        card.style.transform = 'scale(1)';
+        
+        // Aggiorna bottoni
+        const itemId = card.dataset.itemId;
+        aggiornaBottoniStato(card, nuovoStato, itemId);
+        
+        // Gestisci timer
+        if (nuovoStato === 'in_lavorazione') {
+            aggiungiTimer(card, itemId);
+        } else {
+            fermaTimer(itemId);
+            rimuoviTimer(card);
+        }
+        
+        // Se completato, mantieni nella colonna completato
+        if (nuovoStato === 'completato') {
+            card.classList.add('completed');
+            card.classList.remove('processing');
+        }
+        
+        aggiornaContatori();
+    }, 250);
+}
+
+// Gestione timer
+function inizializzaTimers() {
+    document.querySelectorAll('.timer-display').forEach(timer => {
+        const inizio = new Date(timer.dataset.inizio);
+        const itemId = timer.closest('.kanban-card').dataset.itemId;
+        
+        timers[itemId] = setInterval(() => {
+            const ora = new Date();
+            const diff = Math.floor((ora - inizio) / 1000);
+            const minuti = Math.floor(diff / 60);
+            const secondi = diff % 60;
+            
+            timer.textContent = `${minuti.toString().padStart(2, '0')}:${secondi.toString().padStart(2, '0')}`;
+            
+            // Cambia colore se supera tempo previsto
+            if (minuti > 30) { // Soglia configurabile
+                timer.style.color = '#dc3545';
+            }
+        }, 1000);
+    });
+}
+
+function fermaTimer(itemId) {
+    if (timers[itemId]) {
+        clearInterval(timers[itemId]);
+        delete timers[itemId];
+    }
+}
+
+// Cambio stato item
+function cambiaStato(itemId, nuovoStato) {
+    const card = document.querySelector(`[data-item-id="${itemId}"]`);
+    const btn = event.target.closest('button');
+    const originalText = btn.innerHTML;
+    
+    AutolavaggioJS.showLoading(btn);
+    
+    // URL da chiamare
+    const url = `/postazioni/{{ postazione.id }}/item/${itemId}/aggiorna-stato/`;
+    
+    // Ottieni CSRF token
+    const csrfToken = AutolavaggioJS.getCookie('csrftoken') || '{{ csrf_token }}';
+    
+    // Invia via WebSocket se disponibile
+    if (webSocket && webSocket.readyState === WebSocket.OPEN) {
+        webSocket.send(JSON.stringify({
+            type: 'aggiorna_stato_item',
+            item_id: itemId,
+            stato: nuovoStato,
+            timestamp: new Date().toISOString()
+        }));
+    }
+    
+    // Fallback AJAX
+    fetch(url, {
+        method: 'POST',
+        headers: {
+            'X-CSRFToken': csrfToken,
+            'Content-Type': 'application/x-www-form-urlencoded',
+        },
+        body: `stato=${nuovoStato}`
+    })
+    .then(response => {
+        if (!response.ok) {
+            throw new Error(`HTTP error! status: ${response.status}`);
+        }
+        return response.json();
+    })
+    .then(data => {
+        if (data.success) {
+            aggiornaStatoItem(itemId, nuovoStato);
+            AutolavaggioJS.showToast(`Stato aggiornato: ${data.stato_display}`, 'success');
+        } else {
+            AutolavaggioJS.showToast(data.error || 'Errore aggiornamento stato', 'error');
+        }
+    })
+    .catch(error => {
+        console.error('Errore:', error);
+        AutolavaggioJS.showToast('Errore di connessione: ' + error.message, 'error');
+    })
+    .finally(() => {
+        AutolavaggioJS.hideLoading(btn, originalText);
+    });
+}
+
+function aggiornaStatoItem(itemId, nuovoStato) {
+    const card = document.querySelector(`[data-item-id="${itemId}"]`);
+    if (!card) return;
+    
+    // Sposta la card nella colonna corretta
+    spostaCardInColonna(card, nuovoStato);
+    
+    // Aggiorna classi CSS per il nuovo stile Kanban
+    let cardClass = 'kanban-card';
+    if (nuovoStato === 'in_lavorazione') cardClass += ' processing';
+    if (nuovoStato === 'completato') cardClass += ' completed';
+    card.className = cardClass;
+    
+    // Aggiorna contenuto della card
+    aggiornaContenutoCard(card, nuovoStato, itemId);
+    
+    // Gestisci timer
+    if (nuovoStato === 'in_lavorazione') {
+        aggiungiTimer(card, itemId);
+    } else {
+        fermaTimer(itemId);
+        rimuoviTimer(card);
+    }
+    
+    // Se completato, mantieni nella colonna completato
+    if (nuovoStato === 'completato') {
+        card.classList.add('completed');
+        card.classList.remove('processing');
+    }
+    
+    // Aggiorna la card della prossima consegna programmata
+    aggiornaProssimaConsegnaProgrammata();
+}
+
+function aggiornaBottoniStato(card, stato, itemId) {
+    const buttonsContainer = card.querySelector('.card-actions');
+    
+    let html = '';
+    switch (stato) {
+        case 'in_attesa':
+            html = `
+                <button class="btn btn-warning btn-sm w-100" onclick="cambiaStato(${itemId}, 'in_lavorazione')">
+                    <i class="bi bi-play-circle"></i> Inizia
+                </button>
+            `;
+            break;
+            
+        case 'in_lavorazione':
+            html = `
+                <button class="btn btn-secondary btn-sm me-1" onclick="cambiaStato(${itemId}, 'in_attesa')">
+                    <i class="bi bi-pause-circle"></i>
+                </button>
+                <button class="btn btn-success btn-sm" onclick="cambiaStato(${itemId}, 'completato')">
+                    <i class="bi bi-check-circle"></i> Completa
+                </button>
+            `;
+            break;
+            
+        case 'completato':
+            html = `
+                <span class="badge bg-success w-100">
+                    <i class="bi bi-check-circle"></i> Completato
+                </span>
+            `;
+            break;
+    }
+    
+    buttonsContainer.innerHTML = html;
+}
+
+function aggiungiTimer(card, itemId) {
+    const cardHeader = card.querySelector('.card-header .d-flex');
+    const timerDiv = document.createElement('div');
+    timerDiv.className = 'timer-display';
+    timerDiv.textContent = '00:00';
+    
+    // Imposta l'ora di inizio come ora corrente
+    const oraInizio = new Date();
+    timerDiv.dataset.inizio = oraInizio.toISOString();
+    
+    cardHeader.appendChild(timerDiv);
+    
+    // Avvia timer
+    timers[itemId] = setInterval(() => {
+        const ora = new Date();
+        const inizio = new Date(timerDiv.dataset.inizio);
+        const diff = Math.floor((ora - inizio) / 1000);
+        const minuti = Math.floor(diff / 60);
+        const secondi = diff % 60;
+        
+        timerDiv.textContent = `${minuti.toString().padStart(2, '0')}:${secondi.toString().padStart(2, '0')}`;
+        
+        // Cambia colore se supera tempo previsto
+        if (minuti > 30) { // Soglia configurabile
+            timerDiv.style.color = '#dc3545';
+        }
+    }, 1000);
+}
+
+function rimuoviTimer(card) {
+    const timer = card.querySelector('.timer-display');
+    if (timer) {
+        timer.remove();
+    }
+}
+
+// Nuove funzioni per Kanban Board
+function spostaCardInColonna(card, nuovoStato) {
+    const colonnaDestinazione = document.getElementById(`column-${nuovoStato.replace('_', '-')}`);
+    if (colonnaDestinazione) {
+        // Aggiungi animazione di movimento
+        card.style.transition = 'all 0.5s ease';
+        card.style.transform = 'scale(0.9)';
+        
+        setTimeout(() => {
+            colonnaDestinazione.appendChild(card);
+            card.style.transform = 'scale(1)';
+            aggiornaContatori();
+        }, 250);
+    }
+}
+
+function aggiornaContenutoCard(card, stato, itemId) {
+    const actionsContainer = card.querySelector('.card-actions');
+    
+    let html = '';
+    switch (stato) {
+        case 'in_attesa':
+            html = `<button class="btn btn-warning btn-sm w-100" onclick="cambiaStato(${itemId}, 'in_lavorazione')">
+                        <i class="bi bi-play-circle"></i> Inizia
+                    </button>`;
+            break;
+        case 'in_lavorazione':
+            html = `<button class="btn btn-secondary btn-sm me-1" onclick="cambiaStato(${itemId}, 'in_attesa')">
+                        <i class="bi bi-pause-circle"></i>
+                    </button>
+                    <button class="btn btn-success btn-sm" onclick="cambiaStato(${itemId}, 'completato')">
+                        <i class="bi bi-check-circle"></i> Completa
+                    </button>`;
+            break;
+        case 'completato':
+            html = `<span class="badge bg-success w-100">
+                        <i class="bi bi-check-circle"></i> Completato
+                    </span>`;
+            break;
+    }
+    
+    actionsContainer.innerHTML = html;
+}
+
+// Aggiornamento ordini
+function aggiornaOrdini() {
+    console.log('aggiornaOrdini() chiamato');
+    
+    fetch(window.location.href)
+    .then(response => {
+        console.log('Response ricevuta:', response.status);
+        return response.text();
+    })
+    .then(html => {
+        console.log('HTML ricevuto, lunghezza:', html.length);
+        const parser = new DOMParser();
+        const newDoc = parser.parseFromString(html, 'text/html');
+        const newContainer = newDoc.getElementById('ordini-container');
+        
+        if (!newContainer) {
+            console.error('Elemento ordini-container non trovato nella risposta');
+            return;
+        }
+        
+        console.log('Nuovo contenuto trovato, aggiornamento...');
+        const currentContainer = document.getElementById('ordini-container');
+        
+        if (!currentContainer) {
+            console.error('Elemento ordini-container non trovato nella pagina corrente');
+            return;
+        }
+        
+        currentContainer.innerHTML = newContainer.innerHTML;
+        
+        // Reinizializza timer
+        Object.values(timers).forEach(timer => clearInterval(timer));
+        timers = {};
+        inizializzaTimers();
+        
+        aggiornaContatori();
+        
+        console.log('Aggiornamento completato');
+        AutolavaggioJS.showToast('Ordini aggiornati', 'info');
+    })
+    .catch(error => {
+        console.error('Errore aggiornamento:', error);
+        AutolavaggioJS.showToast('Errore aggiornamento ordini', 'error');
+    });
+}
+
+function aggiornaContatori() {
+    // Conta le card in ogni colonna
+    const inAttesa = document.querySelectorAll('#column-in-attesa .kanban-card').length;
+    const inLavorazione = document.querySelectorAll('#column-in-lavorazione .kanban-card').length;
+    const completato = document.querySelectorAll('#column-completato .kanban-card').length;
+    
+    // Aggiorna i badge dei contatori nelle colonne
+    document.getElementById('count-in-attesa').textContent = inAttesa;
+    document.getElementById('count-in-lavorazione').textContent = inLavorazione;
+    document.getElementById('count-completato').textContent = completato;
+    
+    // Aggiorna contatori nelle stats cards in alto
+    const totaleInCoda = inAttesa + inLavorazione;
+    if (document.getElementById('in-coda')) {
+        document.getElementById('in-coda').textContent = totaleInCoda;
+    }
+    
+    // Conta ordini con consegna immediata
+    const immediati = document.querySelectorAll('#column-in-attesa .kanban-card:not(.scheduled-delivery)').length;
+    if (document.getElementById('immediati-coda')) {
+        document.getElementById('immediati-coda').textContent = immediati;
+    }
+    
+    // Trova prossima consegna programmata
+    aggiornaProssimaConsegnaProgrammata();
+}
+
+function aggiornaProssimaConsegnaProgrammata() {
+    // Trova tutte le card con consegna programmata
+    const cardProgrammate = document.querySelectorAll('#column-in-attesa .kanban-card.scheduled-delivery');
+    
+    // Prima rimuovi la classe urgent-delivery da tutte le card
+    cardProgrammate.forEach(card => {
+        card.classList.remove('urgent-delivery');
+    });
+    
+    // Poi applica la classe urgent-delivery solo alle card in scadenza
+    cardProgrammate.forEach(card => {
+        const orarioElement = card.querySelector('.scheduled-time');
+        const orario = orarioElement ? orarioElement.textContent : '';
+        
+        // Calcola se mancano 60 minuti o meno
+        const isUrgent = calcolaSeUrgente(orario);
+        
+        if (isUrgent) {
+            card.classList.add('urgent-delivery');
+        }
+    });
+}
+
+// Variabile globale per l'offset del server
+let serverTimeOffset = 0;
+
+function sincronizzaConServer() {
+    fetch('/postazioni/ora-server/')
+        .then(response => response.json())
+        .then(data => {
+            const serverTime = new Date(data.timestamp);
+            const localTime = new Date();
+            serverTimeOffset = serverTime.getTime() - localTime.getTime();
+            
+            console.log('Sincronizzazione orario:', {
+                server: serverTime.toLocaleString('it-IT'),
+                local: localTime.toLocaleString('it-IT'),
+                offset: serverTimeOffset / 1000 / 60 + ' minuti'
+            });
+        })
+        .catch(error => {
+            console.error('Errore sincronizzazione ora server:', error);
+            serverTimeOffset = 0;
+        });
+}
+
+function getServerTime() {
+    return new Date(Date.now() + serverTimeOffset);
+}
+
+function calcolaSeUrgente(orarioStr) {
+    if (!orarioStr || orarioStr === 'Orario non specificato') return false;
+    
+    try {
+        // Estrai solo l'orario (es. "14:30" da "🔔 14:30")
+        const orarioMatch = orarioStr.match(/(\d{1,2}):(\d{2})/);
+        if (!orarioMatch) return false;
+        
+        const ore = parseInt(orarioMatch[1]);
+        const minuti = parseInt(orarioMatch[2]);
+        
+        // Usa l'ora del server sincronizzata
+        const oraCorrente = getServerTime();
+        const orarioProgrammato = new Date(oraCorrente.getFullYear(), oraCorrente.getMonth(), oraCorrente.getDate(), ore, minuti);
+        
+        // Se l'orario è già passato, considera domani
+        if (orarioProgrammato < oraCorrente) {
+            orarioProgrammato.setDate(orarioProgrammato.getDate() + 1);
+        }
+        
+        // Calcola la differenza in minuti
+        const differenzaMs = orarioProgrammato - oraCorrente;
+        const differenzaMinuti = differenzaMs / (1000 * 60);
+        
+        // Debug: mostra i calcoli
+        console.log('Calcolo urgenza:', {
+            orarioStr: orarioStr,
+            orarioProgrammato: orarioProgrammato.toLocaleString('it-IT'),
+            oraCorrente: oraCorrente.toLocaleString('it-IT'),
+            differenzaMinuti: Math.round(differenzaMinuti),
+            isUrgent: differenzaMinuti <= 60 && differenzaMinuti > 0
+        });
+        
+        // Urgente se mancano 60 minuti o meno
+        return differenzaMinuti <= 60 && differenzaMinuti > 0;
+        
+    } catch (error) {
+        console.error('Errore nel calcolo urgenza:', error);
+        return false;
+    }
+}
+
+// Auto refresh
+function toggleAutoRefresh() {
+    autoRefreshEnabled = !autoRefreshEnabled;
+    const icon = document.getElementById('auto-refresh-icon');
+    const text = document.getElementById('auto-refresh-text');
+    
+    if (autoRefreshEnabled) {
+        icon.className = 'bi bi-pause-circle';
+        text.textContent = 'Stop';
+        autoRefreshInterval = setInterval(aggiornaOrdini, 10000);
+        AutolavaggioJS.showToast('Auto-refresh attivato', 'info');
+    } else {
+        icon.className = 'bi bi-play-circle';
+        text.textContent = 'Auto';
+        clearInterval(autoRefreshInterval);
+        AutolavaggioJS.showToast('Auto-refresh disattivato', 'info');
+    }
+}
+
+// Alert nuovo ordine
+function mostraAlertNuovoOrdine(ordine) {
+    const alert = document.getElementById('alert-nuovo-ordine');
+    const dettagli = document.getElementById('nuovo-ordine-dettagli');
+    
+    dettagli.innerHTML = `
+        Ordine #${ordine.numero_progressivo}<br>
+        Cliente: ${ordine.cliente || 'Anonimo'}<br>
+        Servizi: ${ordine.items.map(item => item.servizio).join(', ')}
+    `;
+    
+    alert.classList.remove('d-none');
+    alert.classList.add('pulse');
+    
+    // Auto-hide dopo 10 secondi
+    setTimeout(() => {
+        chiudiAlertNuovoOrdine();
+    }, 10000);
+}
+
+function chiudiAlertNuovoOrdine() {
+    const alert = document.getElementById('alert-nuovo-ordine');
+    alert.classList.add('d-none');
+    alert.classList.remove('pulse');
+}
+
+function riproduciSuonoNotifica() {
+    // Suono notifica (se supportato)
+    try {
+        const audio = new Audio('/static/sounds/notification.mp3');
+        audio.volume = 0.5;
+        audio.play().catch(e => console.log('Audio non riproducibile:', e));
+    } catch (error) {
+        console.log('Audio non supportato');
+    }
+}
+
+// Orologio
+function aggiornaClock() {
+    const now = getServerTime();
+    const timeElement = document.getElementById('current-time');
+    const dateElement = document.getElementById('current-date');
+    
+    if (timeElement && dateElement) {
+        const timeString = now.toLocaleTimeString('it-IT', { 
+            hour: '2-digit', 
+            minute: '2-digit',
+            second: '2-digit'
+        });
+        const dateString = now.toLocaleDateString('it-IT', { 
+            day: '2-digit', 
+            month: '2-digit', 
+            year: 'numeric'
+        });
+        
+        timeElement.textContent = timeString;
+        dateElement.textContent = dateString;
+    }
+}
+
+// Statistiche
+function mostraStatistiche() {
+    const modal = new bootstrap.Modal(document.getElementById('modalStatistiche'));
+    modal.show();
+    
+    // Carica dati statistiche
+    fetch(`/api/postazioni/{{ postazione.id }}/statistiche/`)
+    .then(response => response.json())
+    .then(data => {
+        disegnaGraficoStatistiche(data);
+    })
+    .catch(error => console.error('Errore caricamento statistiche:', error));
+}
+
+function disegnaGraficoStatistiche(data) {
+    const ctx = document.getElementById('chartStatistiche').getContext('2d');
+    
+    new Chart(ctx, {
+        type: 'line',
+        data: {
+            labels: data.labels || ['Lun', 'Mar', 'Mer', 'Gio', 'Ven', 'Sab', 'Dom'],
+            datasets: [{
+                label: 'Ordini Completati',
+                data: data.ordini || [12, 19, 15, 17, 14, 18, 16],
+                borderColor: '#007bff',
+                backgroundColor: 'rgba(0, 123, 255, 0.1)',
+                tension: 0.4
+            }, {
+                label: 'Tempo Medio (min)',
+                data: data.tempi || [25, 28, 22, 30, 26, 24, 27],
+                borderColor: '#28a745',
+                backgroundColor: 'rgba(40, 167, 69, 0.1)',
+                tension: 0.4,
+                yAxisID: 'y1'
+            }]
+        },
+        options: {
+            responsive: true,
+            interaction: {
+                mode: 'index',
+                intersect: false,
+            },
+            scales: {
+                y: {
+                    type: 'linear',
+                    display: true,
+                    position: 'left',
+                },
+                y1: {
+                    type: 'linear',
+                    display: true,
+                    position: 'right',
+                    grid: {
+                        drawOnChartArea: false,
+                    },
+                }
+            }
+        }
+    });
+}
+
+// Keyboard shortcuts
+document.addEventListener('keydown', function(e) {
+    // F5 - Aggiorna
+    if (e.key === 'F5') {
+        e.preventDefault();
+        aggiornaOrdini();
+    }
+    
+    // F6 - Toggle auto refresh
+    if (e.key === 'F6') {
+        e.preventDefault();
+        toggleAutoRefresh();
+    }
+    
+    // F7 - Statistiche
+    if (e.key === 'F7') {
+        e.preventDefault();
+        mostraStatistiche();
+    }
+});
+
+// Cleanup quando si chiude la pagina
+window.addEventListener('beforeunload', function() {
+    Object.values(timers).forEach(timer => clearInterval(timer));
+    if (webSocket) {
+        webSocket.close();
+    }
+    if (autoRefreshInterval) {
+        clearInterval(autoRefreshInterval);
+    }
+});
+</script>
+{% endblock %}

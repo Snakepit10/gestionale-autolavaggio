@@ -1,0 +1,826 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}Verifica Accesso Abbonamento - Gestionale Autolavaggio{% endblock %}
+
+{% block extra_css %}
+<style>
+.scanner-container {
+    background: #f8f9fa;
+    border-radius: 15px;
+    padding: 30px;
+    text-align: center;
+    margin-bottom: 30px;
+}
+
+.qr-scanner {
+    width: 100%;
+    max-width: 300px;
+    height: 300px;
+    margin: 0 auto;
+    border: 3px dashed #6c757d;
+    border-radius: 10px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: white;
+    position: relative;
+}
+
+.qr-scanner.active {
+    border-color: #0d6efd;
+    border-style: solid;
+}
+
+.access-result {
+    padding: 20px;
+    border-radius: 10px;
+    margin-top: 20px;
+}
+
+.access-result.success {
+    background: linear-gradient(135deg, #28a745, #20c997);
+    color: white;
+}
+
+.access-result.error {
+    background: linear-gradient(135deg, #dc3545, #fd7e14);
+    color: white;
+}
+
+.access-result.warning {
+    background: linear-gradient(135deg, #ffc107, #fd7e14);
+    color: #212529;
+}
+
+.service-selection {
+    background: white;
+    border: 2px solid #e9ecef;
+    border-radius: 10px;
+    padding: 20px;
+    margin-bottom: 15px;
+    cursor: pointer;
+    transition: all 0.3s ease;
+}
+
+.service-selection:hover {
+    border-color: #0d6efd;
+    transform: translateY(-2px);
+    box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+}
+
+.service-selection.selected {
+    border-color: #0d6efd;
+    background: #f8f9ff;
+}
+
+.manual-entry {
+    background: white;
+    border: 1px solid #dee2e6;
+    border-radius: 10px;
+    padding: 20px;
+}
+
+.license-plate-input {
+    font-family: 'Courier New', monospace;
+    font-size: 1.2em;
+    text-align: center;
+    text-transform: uppercase;
+    letter-spacing: 2px;
+    border: 2px solid #dee2e6;
+    border-radius: 8px;
+    padding: 12px;
+}
+
+.license-plate-input:focus {
+    border-color: #0d6efd;
+    box-shadow: 0 0 0 0.2rem rgba(13, 110, 253, 0.25);
+}
+
+.access-history {
+    max-height: 400px;
+    overflow-y: auto;
+}
+
+.access-item {
+    background: white;
+    border: 1px solid #e9ecef;
+    border-radius: 8px;
+    padding: 15px;
+    margin-bottom: 10px;
+    transition: all 0.3s ease;
+}
+
+.access-item:hover {
+    box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+}
+
+.access-item.success {
+    border-left: 4px solid #28a745;
+}
+
+.access-item.denied {
+    border-left: 4px solid #dc3545;
+}
+
+.status-indicator {
+    position: absolute;
+    top: 10px;
+    right: 10px;
+    width: 12px;
+    height: 12px;
+    border-radius: 50%;
+    background: #28a745;
+    box-shadow: 0 0 10px rgba(40, 167, 69, 0.5);
+    animation: pulse 2s infinite;
+}
+
+@keyframes pulse {
+    0% { transform: scale(0.95); box-shadow: 0 0 0 0 rgba(40, 167, 69, 0.7); }
+    70% { transform: scale(1); box-shadow: 0 0 0 10px rgba(40, 167, 69, 0); }
+    100% { transform: scale(0.95); box-shadow: 0 0 0 0 rgba(40, 167, 69, 0); }
+}
+
+.countdown {
+    font-size: 2rem;
+    font-weight: bold;
+    color: #0d6efd;
+}
+
+.scanner-overlay {
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: rgba(0,0,0,0.8);
+    border-radius: 10px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: white;
+}
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <div class="row">
+        <!-- Colonna principale -->
+        <div class="col-lg-8">
+            <div class="d-flex justify-content-between align-items-center mb-4">
+                <h1><i class="bi bi-qr-code-scan"></i> Verifica Accesso Abbonamento</h1>
+                <div>
+                    <button class="btn btn-outline-info me-2" onclick="toggleAutoMode()">
+                        <i class="bi bi-arrow-repeat"></i> <span id="auto-mode-text">Auto Mode: OFF</span>
+                    </button>
+                    <a href="{% url 'abbonamenti:abbonamenti-list' %}" class="btn btn-outline-secondary">
+                        <i class="bi bi-arrow-left"></i> Torna agli Abbonamenti
+                    </a>
+                </div>
+            </div>
+
+            <!-- Scanner QR -->
+            <div class="card mb-4">
+                <div class="card-header d-flex justify-content-between align-items-center">
+                    <h5 class="mb-0">
+                        <i class="bi bi-camera"></i>
+                        Scanner QR Code
+                    </h5>
+                    <div class="status-indicator" id="scanner-status"></div>
+                </div>
+                <div class="card-body">
+                    <div class="scanner-container">
+                        <div class="qr-scanner" id="qr-scanner">
+                            <div class="scanner-overlay" id="scanner-overlay">
+                                <div class="text-center">
+                                    <i class="bi bi-camera display-1 mb-3"></i>
+                                    <h5>Clicca per Avviare Scanner</h5>
+                                    <p>Inquadra il QR code dell'abbonamento</p>
+                                    <button class="btn btn-primary" onclick="avviaScanner()">
+                                        <i class="bi bi-play-circle"></i> Avvia Scanner
+                                    </button>
+                                </div>
+                            </div>
+                            <video id="qr-video" style="width: 100%; height: 100%; object-fit: cover; display: none;"></video>
+                        </div>
+                        
+                        <div class="mt-3">
+                            <div class="row">
+                                <div class="col-md-6">
+                                    <button class="btn btn-success w-100" onclick="avviaScanner()" id="start-scanner-btn">
+                                        <i class="bi bi-play-circle"></i> Avvia Scanner
+                                    </button>
+                                </div>
+                                <div class="col-md-6">
+                                    <button class="btn btn-danger w-100" onclick="fermaScanner()" id="stop-scanner-btn" style="display: none;">
+                                        <i class="bi bi-stop-circle"></i> Ferma Scanner
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Inserimento Manuale -->
+            <div class="card mb-4">
+                <div class="card-header">
+                    <h5 class="mb-0">
+                        <i class="bi bi-keyboard"></i>
+                        Inserimento Manuale
+                    </h5>
+                </div>
+                <div class="card-body">
+                    <form id="manual-form" class="manual-entry">
+                        <div class="row">
+                            <div class="col-md-6">
+                                <label class="form-label">Codice Abbonamento:</label>
+                                <input type="text" class="form-control" id="codice-manuale" 
+                                       placeholder="Inserisci codice abbonamento" maxlength="8">
+                            </div>
+                            <div class="col-md-6">
+                                <label class="form-label">Targa (opzionale):</label>
+                                <input type="text" class="form-control license-plate-input" id="targa-manuale" 
+                                       placeholder="AB123CD" maxlength="8">
+                            </div>
+                        </div>
+                        <div class="row mt-3">
+                            <div class="col-12">
+                                <button type="submit" class="btn btn-primary">
+                                    <i class="bi bi-search"></i> Verifica Abbonamento
+                                </button>
+                                <button type="button" class="btn btn-outline-secondary ms-2" onclick="pulisciCampi()">
+                                    <i class="bi bi-arrow-clockwise"></i> Pulisci
+                                </button>
+                            </div>
+                        </div>
+                    </form>
+                </div>
+            </div>
+
+            <!-- Risultato Verifica -->
+            <div id="access-result-container" style="display: none;">
+                <!-- Contenuto dinamico -->
+            </div>
+        </div>
+
+        <!-- Sidebar -->
+        <div class="col-lg-4">
+            <!-- Statistiche Tempo Reale -->
+            <div class="card mb-4">
+                <div class="card-header">
+                    <h6 class="mb-0">
+                        <i class="bi bi-graph-up"></i>
+                        Statistiche Oggi
+                    </h6>
+                </div>
+                <div class="card-body">
+                    <div class="row text-center">
+                        <div class="col-6">
+                            <div class="border rounded p-2 mb-2">
+                                <h4 class="text-success mb-0" id="accessi-oggi">0</h4>
+                                <small class="text-muted">Accessi Autorizzati</small>
+                            </div>
+                        </div>
+                        <div class="col-6">
+                            <div class="border rounded p-2 mb-2">
+                                <h4 class="text-danger mb-0" id="accessi-negati">0</h4>
+                                <small class="text-muted">Accessi Negati</small>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="row text-center">
+                        <div class="col-6">
+                            <div class="border rounded p-2">
+                                <h5 class="text-primary mb-0" id="abbonamenti-attivi">0</h5>
+                                <small class="text-muted">Abbonamenti Attivi</small>
+                            </div>
+                        </div>
+                        <div class="col-6">
+                            <div class="border rounded p-2">
+                                <h5 class="text-warning mb-0" id="in-scadenza">0</h5>
+                                <small class="text-muted">In Scadenza</small>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Servizi Disponibili -->
+            <div class="card mb-4">
+                <div class="card-header">
+                    <h6 class="mb-0">
+                        <i class="bi bi-list-check"></i>
+                        Servizi Disponibili
+                    </h6>
+                </div>
+                <div class="card-body">
+                    <div id="servizi-container">
+                        <!-- Caricati via JavaScript -->
+                    </div>
+                </div>
+            </div>
+
+            <!-- Ultimi Accessi -->
+            <div class="card">
+                <div class="card-header d-flex justify-content-between align-items-center">
+                    <h6 class="mb-0">
+                        <i class="bi bi-clock-history"></i>
+                        Ultimi Accessi
+                    </h6>
+                    <button class="btn btn-sm btn-outline-primary" onclick="aggiornaStorico()">
+                        <i class="bi bi-arrow-clockwise"></i>
+                    </button>
+                </div>
+                <div class="card-body">
+                    <div class="access-history" id="access-history">
+                        <!-- Caricato via JavaScript -->
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Modal Selezione Servizio -->
+<div class="modal fade" id="modalServizio" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">
+                    <i class="bi bi-list-check"></i>
+                    Seleziona Servizio
+                </h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <div id="servizi-modal-container">
+                    <!-- Servizi dell'abbonamento -->
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">
+                    <i class="bi bi-x-circle"></i> Annulla
+                </button>
+                <button type="button" class="btn btn-primary" onclick="confermaAccesso()" id="conferma-accesso-btn" disabled>
+                    <i class="bi bi-check-circle"></i> Conferma Accesso
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script src="https://unpkg.com/jsqr@1.4.0/dist/jsQR.js"></script>
+<script>
+let scanner = null;
+let isScanning = false;
+let autoMode = false;
+let currentAbbonamento = null;
+let selectedServizio = null;
+let accessHistory = [];
+
+// Inizializzazione
+document.addEventListener('DOMContentLoaded', function() {
+    caricaStatistiche();
+    caricaServizi();
+    caricaStorico();
+    setupEventListeners();
+    
+    // Aggiorna automaticamente ogni 30 secondi
+    setInterval(() => {
+        caricaStatistiche();
+        if (!isScanning) {
+            caricaStorico();
+        }
+    }, 30000);
+});
+
+function setupEventListeners() {
+    // Form inserimento manuale
+    document.getElementById('manual-form').addEventListener('submit', function(e) {
+        e.preventDefault();
+        const codice = document.getElementById('codice-manuale').value.trim();
+        if (codice) {
+            verificaAbbonamento(codice);
+        }
+    });
+    
+    // Auto-completion targa
+    document.getElementById('targa-manuale').addEventListener('input', function() {
+        this.value = this.value.toUpperCase().replace(/[^A-Z0-9]/g, '');
+    });
+    
+    // Codice abbonamento
+    document.getElementById('codice-manuale').addEventListener('input', function() {
+        this.value = this.value.toUpperCase().replace(/[^A-Z0-9]/g, '');
+    });
+}
+
+async function avviaScanner() {
+    try {
+        const video = document.getElementById('qr-video');
+        const overlay = document.getElementById('scanner-overlay');
+        const startBtn = document.getElementById('start-scanner-btn');
+        const stopBtn = document.getElementById('stop-scanner-btn');
+        
+        const stream = await navigator.mediaDevices.getUserMedia({
+            video: { facingMode: 'environment' }
+        });
+        
+        video.srcObject = stream;
+        video.style.display = 'block';
+        overlay.style.display = 'none';
+        
+        startBtn.style.display = 'none';
+        stopBtn.style.display = 'block';
+        
+        document.querySelector('.qr-scanner').classList.add('active');
+        isScanning = true;
+        
+        video.addEventListener('loadedmetadata', () => {
+            video.play();
+            scanQRCode();
+        });
+        
+    } catch (error) {
+        alert('Errore nell\'accesso alla camera: ' + error.message);
+    }
+}
+
+function fermaScanner() {
+    const video = document.getElementById('qr-video');
+    const overlay = document.getElementById('scanner-overlay');
+    const startBtn = document.getElementById('start-scanner-btn');
+    const stopBtn = document.getElementById('stop-scanner-btn');
+    
+    if (video.srcObject) {
+        video.srcObject.getTracks().forEach(track => track.stop());
+    }
+    
+    video.style.display = 'none';
+    overlay.style.display = 'flex';
+    
+    startBtn.style.display = 'block';
+    stopBtn.style.display = 'none';
+    
+    document.querySelector('.qr-scanner').classList.remove('active');
+    isScanning = false;
+}
+
+function scanQRCode() {
+    if (!isScanning) return;
+    
+    const video = document.getElementById('qr-video');
+    const canvas = document.createElement('canvas');
+    const context = canvas.getContext('2d');
+    
+    if (video.readyState === video.HAVE_ENOUGH_DATA) {
+        canvas.height = video.videoHeight;
+        canvas.width = video.videoWidth;
+        context.drawImage(video, 0, 0, canvas.width, canvas.height);
+        
+        const imageData = context.getImageData(0, 0, canvas.width, canvas.height);
+        const code = jsQR(imageData.data, imageData.width, imageData.height);
+        
+        if (code) {
+            // QR Code trovato
+            const codiceAbbonamento = code.data;
+            fermaScanner();
+            verificaAbbonamento(codiceAbbonamento);
+            
+            if (!autoMode) return;
+        }
+    }
+    
+    requestAnimationFrame(scanQRCode);
+}
+
+function verificaAbbonamento(codice) {
+    // Mostra loading
+    mostraRisultato('loading', 'Verifica in corso...', '');
+    
+    fetch(`/abbonamenti/verifica/${codice}/`)
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                currentAbbonamento = data.abbonamento;
+                mostraDettagliAbbonamento(data.abbonamento);
+            } else {
+                mostraRisultato('error', 'Abbonamento Non Valido', data.error);
+            }
+        })
+        .catch(error => {
+            mostraRisultato('error', 'Errore di Connessione', 'Impossibile verificare l\'abbonamento');
+        });
+}
+
+function mostraDettagliAbbonamento(abbonamento) {
+    let statusClass = 'success';
+    let statusIcon = 'bi-check-circle';
+    let statusTitle = 'Abbonamento Valido';
+    let statusMessage = '';
+    
+    if (abbonamento.stato !== 'attivo') {
+        statusClass = 'error';
+        statusIcon = 'bi-x-circle';
+        statusTitle = 'Abbonamento Non Attivo';
+        statusMessage = `Stato: ${abbonamento.stato}`;
+    } else if (abbonamento.scaduto) {
+        statusClass = 'error';
+        statusIcon = 'bi-calendar-x';
+        statusTitle = 'Abbonamento Scaduto';
+        statusMessage = `Scaduto il ${abbonamento.data_scadenza}`;
+    } else {
+        statusMessage = `Cliente: ${abbonamento.cliente.nome}`;
+    }
+    
+    const servizi = abbonamento.servizi_disponibili || [];
+    let serviziHtml = '';
+    
+    if (servizi.length > 0) {
+        serviziHtml = `
+            <div class="mt-3">
+                <h6>Servizi Disponibili:</h6>
+                <div class="row">
+                    ${servizi.map(servizio => `
+                        <div class="col-md-6 mb-2">
+                            <div class="service-selection" onclick="selezionaServizio('${servizio.id}', '${servizio.nome}')">
+                                <div class="d-flex justify-content-between align-items-center">
+                                    <div>
+                                        <h6 class="mb-1">${servizio.nome}</h6>
+                                        <small class="text-muted">${servizio.disponibili}/${servizio.totali} disponibili</small>
+                                    </div>
+                                    <div class="progress" style="width: 60px; height: 6px;">
+                                        <div class="progress-bar ${servizio.percentuale >= 80 ? 'bg-danger' : servizio.percentuale >= 60 ? 'bg-warning' : 'bg-success'}" 
+                                             style="width: ${servizio.percentuale}%"></div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    `).join('')}
+                </div>
+                <div class="mt-3">
+                    <button class="btn btn-success" onclick="mostraModalServizio()">
+                        <i class="bi bi-play-circle"></i> Seleziona Servizio per Accesso
+                    </button>
+                </div>
+            </div>
+        `;
+    }
+    
+    const html = `
+        <div class="access-result ${statusClass}">
+            <div class="d-flex align-items-center mb-3">
+                <i class="bi ${statusIcon} display-6 me-3"></i>
+                <div>
+                    <h4>${statusTitle}</h4>
+                    <p class="mb-0">${statusMessage}</p>
+                </div>
+            </div>
+            
+            <div class="row">
+                <div class="col-md-6">
+                    <h6>Dettagli Abbonamento:</h6>
+                    <ul class="list-unstyled">
+                        <li><strong>Codice:</strong> ${abbonamento.codice}</li>
+                        <li><strong>Configurazione:</strong> ${abbonamento.configurazione}</li>
+                        <li><strong>Scadenza:</strong> ${abbonamento.data_scadenza}</li>
+                        <li><strong>Stato:</strong> <span class="badge bg-${abbonamento.stato === 'attivo' ? 'success' : 'danger'}">${abbonamento.stato}</span></li>
+                    </ul>
+                </div>
+                <div class="col-md-6">
+                    <h6>Cliente:</h6>
+                    <ul class="list-unstyled">
+                        <li><strong>Nome:</strong> ${abbonamento.cliente.nome}</li>
+                        <li><strong>Email:</strong> ${abbonamento.cliente.email}</li>
+                        <li><strong>Telefono:</strong> ${abbonamento.cliente.telefono}</li>
+                    </ul>
+                </div>
+            </div>
+            
+            ${serviziHtml}
+            
+            <div class="mt-3 text-end">
+                <button class="btn btn-outline-light" onclick="pulisciRisultato()">
+                    <i class="bi bi-arrow-clockwise"></i> Nuova Verifica
+                </button>
+            </div>
+        </div>
+    `;
+    
+    mostraRisultato('custom', '', '', html);
+}
+
+function mostraRisultato(tipo, titolo, messaggio, htmlCustom = '') {
+    const container = document.getElementById('access-result-container');
+    
+    if (htmlCustom) {
+        container.innerHTML = htmlCustom;
+    } else {
+        let iconClass = '';
+        let resultClass = '';
+        
+        switch (tipo) {
+            case 'success':
+                iconClass = 'bi-check-circle';
+                resultClass = 'success';
+                break;
+            case 'error':
+                iconClass = 'bi-x-circle';
+                resultClass = 'error';
+                break;
+            case 'warning':
+                iconClass = 'bi-exclamation-triangle';
+                resultClass = 'warning';
+                break;
+            case 'loading':
+                iconClass = 'bi-hourglass-split';
+                resultClass = 'warning';
+                break;
+        }
+        
+        container.innerHTML = `
+            <div class="access-result ${resultClass}">
+                <div class="text-center">
+                    <i class="bi ${iconClass} display-1 mb-3"></i>
+                    <h3>${titolo}</h3>
+                    <p>${messaggio}</p>
+                    ${tipo !== 'loading' ? `
+                        <button class="btn btn-outline-light" onclick="pulisciRisultato()">
+                            <i class="bi bi-arrow-clockwise"></i> Nuova Verifica
+                        </button>
+                    ` : ''}
+                </div>
+            </div>
+        `;
+    }
+    
+    container.style.display = 'block';
+}
+
+function pulisciRisultato() {
+    document.getElementById('access-result-container').style.display = 'none';
+    currentAbbonamento = null;
+    selectedServizio = null;
+    
+    if (autoMode && !isScanning) {
+        avviaScanner();
+    }
+}
+
+function pulisciCampi() {
+    document.getElementById('codice-manuale').value = '';
+    document.getElementById('targa-manuale').value = '';
+    pulisciRisultato();
+}
+
+function mostraModalServizio() {
+    if (!currentAbbonamento || !currentAbbonamento.servizi_disponibili) return;
+    
+    const container = document.getElementById('servizi-modal-container');
+    const servizi = currentAbbonamento.servizi_disponibili;
+    
+    container.innerHTML = servizi.map(servizio => `
+        <div class="service-selection" onclick="selezionaServizioModal('${servizio.id}', '${servizio.nome}')">
+            <div class="d-flex justify-content-between align-items-center">
+                <div>
+                    <h6 class="mb-1">${servizio.nome}</h6>
+                    <small class="text-muted">${servizio.disponibili}/${servizio.totali} utilizzi disponibili</small>
+                </div>
+                <div>
+                    <div class="progress" style="width: 80px; height: 8px;">
+                        <div class="progress-bar ${servizio.percentuale >= 80 ? 'bg-danger' : servizio.percentuale >= 60 ? 'bg-warning' : 'bg-success'}" 
+                             style="width: ${servizio.percentuale}%"></div>
+                    </div>
+                    <small class="text-muted">${servizio.percentuale}%</small>
+                </div>
+            </div>
+        </div>
+    `).join('');
+    
+    const modal = new bootstrap.Modal(document.getElementById('modalServizio'));
+    modal.show();
+}
+
+function selezionaServizioModal(servizioId, servizioNome) {
+    // Rimuovi selezioni precedenti
+    document.querySelectorAll('#servizi-modal-container .service-selection').forEach(el => {
+        el.classList.remove('selected');
+    });
+    
+    // Seleziona servizio
+    event.currentTarget.classList.add('selected');
+    selectedServizio = { id: servizioId, nome: servizioNome };
+    
+    document.getElementById('conferma-accesso-btn').disabled = false;
+}
+
+function confermaAccesso() {
+    if (!currentAbbonamento || !selectedServizio) return;
+    
+    const targa = document.getElementById('targa-manuale').value.trim();
+    
+    fetch(`/abbonamenti/registra-accesso/${currentAbbonamento.codice}/`, {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+            'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]').value
+        },
+        body: JSON.stringify({
+            servizio_id: selectedServizio.id,
+            targa: targa,
+            metodo: 'manuale',
+            crea_ordine: true
+        })
+    })
+    .then(response => response.json())
+    .then(data => {
+        bootstrap.Modal.getInstance(document.getElementById('modalServizio')).hide();
+        
+        if (data.autorizzato) {
+            mostraRisultato('success', 'Accesso Autorizzato', 
+                `Servizio: ${selectedServizio.nome}${targa ? ` - Targa: ${targa}` : ''}`);
+            aggiornaStatistiche();
+            aggiornaStorico();
+        } else {
+            mostraRisultato('error', 'Accesso Negato', data.motivo);
+        }
+    })
+    .catch(error => {
+        mostraRisultato('error', 'Errore', 'Impossibile registrare l\'accesso');
+    });
+}
+
+function toggleAutoMode() {
+    autoMode = !autoMode;
+    const text = document.getElementById('auto-mode-text');
+    text.textContent = `Auto Mode: ${autoMode ? 'ON' : 'OFF'}`;
+    
+    if (autoMode && !isScanning) {
+        avviaScanner();
+    }
+}
+
+function caricaStatistiche() {
+    fetch('/abbonamenti/api/statistiche-oggi/')
+        .then(response => response.json())
+        .then(data => {
+            document.getElementById('accessi-oggi').textContent = data.accessi_oggi || 0;
+            document.getElementById('accessi-negati').textContent = data.accessi_negati || 0;
+            document.getElementById('abbonamenti-attivi').textContent = data.abbonamenti_attivi || 0;
+            document.getElementById('in-scadenza').textContent = data.in_scadenza || 0;
+        });
+}
+
+function caricaServizi() {
+    fetch('/core/api/servizi/')
+        .then(response => response.json())
+        .then(data => {
+            const container = document.getElementById('servizi-container');
+            container.innerHTML = data.servizi.map(servizio => `
+                <div class="d-flex justify-content-between align-items-center mb-2 p-2 border rounded">
+                    <span>${servizio.titolo}</span>
+                    <span class="badge bg-primary">€${servizio.prezzo}</span>
+                </div>
+            `).join('');
+        });
+}
+
+function caricaStorico() {
+    fetch('/abbonamenti/api/ultimi-accessi/')
+        .then(response => response.json())
+        .then(data => {
+            const container = document.getElementById('access-history');
+            if (data.accessi && data.accessi.length > 0) {
+                container.innerHTML = data.accessi.map(accesso => `
+                    <div class="access-item ${accesso.autorizzato ? 'success' : 'denied'}">
+                        <div class="d-flex justify-content-between align-items-start">
+                            <div>
+                                <h6 class="mb-1">${accesso.cliente}</h6>
+                                <small class="text-muted">
+                                    ${accesso.servizio} • ${accesso.data_ora}
+                                    ${accesso.targa ? ` • ${accesso.targa}` : ''}
+                                </small>
+                            </div>
+                            <span class="badge bg-${accesso.autorizzato ? 'success' : 'danger'}">
+                                ${accesso.autorizzato ? 'OK' : 'NO'}
+                            </span>
+                        </div>
+                    </div>
+                `).join('');
+            } else {
+                container.innerHTML = '<p class="text-muted text-center">Nessun accesso registrato oggi</p>';
+            }
+        });
+}
+
+function aggiornaStorico() {
+    caricaStorico();
+}
+
+function aggiornaStatistiche() {
+    caricaStatistiche();
+}
+</script>
+{% endblock %}

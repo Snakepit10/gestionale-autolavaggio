@@ -1,0 +1,405 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}Storico Cliente: {{ cliente.nome_completo }} - Gestionale Autolavaggio{% endblock %}
+
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <h1>
+        {% if cliente.tipo == 'privato' %}
+            <i class="bi bi-person"></i>
+        {% else %}
+            <i class="bi bi-building"></i>
+        {% endif %}
+        {{ cliente.nome_completo }}
+    </h1>
+    <div>
+        {% if cliente.user %}
+            <a href="{% url 'clienti:invia-credenziali' cliente.pk %}" class="btn btn-outline-info me-2">
+                <i class="bi bi-key"></i> Invia Credenziali
+            </a>
+        {% endif %}
+        <a href="{% url 'clienti:cliente-update' cliente.pk %}" class="btn btn-outline-primary me-2">
+            <i class="bi bi-pencil"></i> Modifica
+        </a>
+        <a href="{% url 'clienti:clienti-list' %}" class="btn btn-outline-secondary">
+            <i class="bi bi-arrow-left"></i> Torna alla Lista
+        </a>
+    </div>
+</div>
+
+{% if messages %}
+    {% for message in messages %}
+        <div class="alert alert-{{ message.tags }} alert-dismissible fade show" role="alert">
+            {{ message }}
+            <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+        </div>
+    {% endfor %}
+{% endif %}
+
+<!-- Informazioni Cliente -->
+<div class="row mb-4">
+    <div class="col-lg-8">
+        <div class="card">
+            <div class="card-header">
+                <h5 class="mb-0">
+                    <i class="bi bi-person-badge"></i>
+                    Informazioni Cliente
+                </h5>
+            </div>
+            <div class="card-body">
+                <div class="row">
+                    <div class="col-md-6">
+                        <table class="table table-borderless">
+                            <tr>
+                                <td><strong>Tipo:</strong></td>
+                                <td>
+                                    {% if cliente.tipo == 'privato' %}
+                                        <span class="badge bg-primary">Privato</span>
+                                    {% else %}
+                                        <span class="badge bg-success">Azienda</span>
+                                    {% endif %}
+                                </td>
+                            </tr>
+                            <tr>
+                                <td><strong>Email:</strong></td>
+                                <td>{{ cliente.email }}</td>
+                            </tr>
+                            <tr>
+                                <td><strong>Telefono:</strong></td>
+                                <td>{{ cliente.telefono }}</td>
+                            </tr>
+                            {% if cliente.indirizzo %}
+                            <tr>
+                                <td><strong>Indirizzo:</strong></td>
+                                <td>
+                                    {{ cliente.indirizzo }}<br>
+                                    {{ cliente.cap }} {{ cliente.citta }}
+                                </td>
+                            </tr>
+                            {% endif %}
+                        </table>
+                    </div>
+                    <div class="col-md-6">
+                        <table class="table table-borderless">
+                            {% if cliente.tipo == 'privato' %}
+                                {% if cliente.codice_fiscale %}
+                                <tr>
+                                    <td><strong>Codice Fiscale:</strong></td>
+                                    <td>{{ cliente.codice_fiscale }}</td>
+                                </tr>
+                                {% endif %}
+                            {% else %}
+                                {% if cliente.partita_iva %}
+                                <tr>
+                                    <td><strong>Partita IVA:</strong></td>
+                                    <td>{{ cliente.partita_iva }}</td>
+                                </tr>
+                                {% endif %}
+                                {% if cliente.codice_sdi %}
+                                <tr>
+                                    <td><strong>Codice SDI:</strong></td>
+                                    <td>{{ cliente.codice_sdi }}</td>
+                                </tr>
+                                {% endif %}
+                                {% if cliente.pec %}
+                                <tr>
+                                    <td><strong>PEC:</strong></td>
+                                    <td>{{ cliente.pec }}</td>
+                                </tr>
+                                {% endif %}
+                            {% endif %}
+                            <tr>
+                                <td><strong>Registrazione:</strong></td>
+                                <td>{{ cliente.data_registrazione|date:"d/m/Y H:i" }}</td>
+                            </tr>
+                            <tr>
+                                <td><strong>Account Online:</strong></td>
+                                <td>
+                                    {% if cliente.user %}
+                                        <span class="badge bg-success">
+                                            <i class="bi bi-check-circle"></i> Attivo
+                                        </span>
+                                        <br><small>Username: {{ cliente.user.username }}</small>
+                                    {% else %}
+                                        <span class="badge bg-secondary">Non attivo</span>
+                                    {% endif %}
+                                </td>
+                            </tr>
+                            <tr>
+                                <td><strong>Marketing:</strong></td>
+                                <td>
+                                    {% if cliente.consenso_marketing %}
+                                        <span class="badge bg-success">
+                                            <i class="bi bi-check-circle"></i> Consenso
+                                        </span>
+                                    {% else %}
+                                        <span class="badge bg-secondary">No consenso</span>
+                                    {% endif %}
+                                </td>
+                            </tr>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Statistiche -->
+    <div class="col-lg-4">
+        <div class="card bg-primary text-white mb-3">
+            <div class="card-body text-center">
+                <i class="bi bi-receipt display-6"></i>
+                <h4>{{ statistiche.ordini_totali }}</h4>
+                <small>Ordini Totali</small>
+            </div>
+        </div>
+        <div class="card bg-success text-white mb-3">
+            <div class="card-body text-center">
+                <i class="bi bi-currency-euro display-6"></i>
+                <h4>€{{ statistiche.spesa_totale|floatformat:2 }}</h4>
+                <small>Spesa Totale</small>
+            </div>
+        </div>
+        <div class="card bg-info text-white">
+            <div class="card-body text-center">
+                <i class="bi bi-graph-up display-6"></i>
+                <h4>€{{ statistiche.spesa_media|floatformat:2 }}</h4>
+                <small>Spesa Media</small>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Punti Fedeltà -->
+<div class="row mb-4">
+    <div class="col-lg-6">
+        <div class="card">
+            <div class="card-header d-flex justify-content-between align-items-center">
+                <h5 class="mb-0">
+                    <i class="bi bi-star"></i>
+                    Punti Fedeltà
+                </h5>
+                <button class="btn btn-sm btn-outline-primary" onclick="showGestisciPunti()">
+                    <i class="bi bi-gear"></i> Gestisci
+                </button>
+            </div>
+            <div class="card-body">
+                <div class="row text-center">
+                    <div class="col-4">
+                        <h4 class="text-primary">{{ punti_fedelta.punti_totali }}</h4>
+                        <small>Totali</small>
+                    </div>
+                    <div class="col-4">
+                        <h4 class="text-warning">{{ punti_fedelta.punti_utilizzati }}</h4>
+                        <small>Utilizzati</small>
+                    </div>
+                    <div class="col-4">
+                        <h4 class="text-success">{{ punti_fedelta.punti_disponibili }}</h4>
+                        <small>Disponibili</small>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Ultimi Movimenti Punti -->
+    <div class="col-lg-6">
+        <div class="card">
+            <div class="card-header">
+                <h5 class="mb-0">
+                    <i class="bi bi-clock-history"></i>
+                    Ultimi Movimenti Punti
+                </h5>
+            </div>
+            <div class="card-body">
+                {% if movimenti_punti %}
+                    <div class="list-group list-group-flush">
+                        {% for movimento in movimenti_punti %}
+                        <div class="list-group-item d-flex justify-content-between align-items-center">
+                            <div>
+                                <strong>{{ movimento.descrizione }}</strong>
+                                <br><small class="text-muted">{{ movimento.data_movimento|date:"d/m/Y H:i" }}</small>
+                            </div>
+                            <div class="text-end">
+                                {% if movimento.punti > 0 %}
+                                    <span class="text-success">+{{ movimento.punti }}</span>
+                                {% else %}
+                                    <span class="text-danger">{{ movimento.punti }}</span>
+                                {% endif %}
+                            </div>
+                        </div>
+                        {% endfor %}
+                    </div>
+                {% else %}
+                    <p class="text-muted text-center">Nessun movimento punti</p>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Ultimi Ordini -->
+<div class="card mb-4">
+    <div class="card-header d-flex justify-content-between align-items-center">
+        <h5 class="mb-0">
+            <i class="bi bi-receipt"></i>
+            Ultimi Ordini
+        </h5>
+        {% if statistiche.ultimo_ordine %}
+            <small class="text-muted">
+                Ultimo ordine: {{ statistiche.ultimo_ordine.data_ora|date:"d/m/Y H:i" }}
+            </small>
+        {% endif %}
+    </div>
+    <div class="card-body">
+        {% if ordini %}
+            <div class="table-responsive">
+                <table class="table table-hover">
+                    <thead class="table-light">
+                        <tr>
+                            <th>Data/Ora</th>
+                            <th>Numero</th>
+                            <th>Servizi</th>
+                            <th>Totale</th>
+                            <th>Stato</th>
+                            <th>Azioni</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for ordine in ordini %}
+                        <tr>
+                            <td>{{ ordine.data_ora|date:"d/m/Y H:i" }}</td>
+                            <td>
+                                <a href="{% url 'ordini:ordine-detail' ordine.pk %}" class="text-decoration-none">
+                                    #{{ ordine.numero_ordine }}
+                                </a>
+                            </td>
+                            <td>
+                                {% for dettaglio in ordine.dettagli.all|slice:":3" %}
+                                    <span class="badge bg-secondary me-1">{{ dettaglio.servizio.titolo }}</span>
+                                {% endfor %}
+                                {% if ordine.dettagli.count > 3 %}
+                                    <span class="text-muted">+{{ ordine.dettagli.count|add:"-3" }} altri</span>
+                                {% endif %}
+                            </td>
+                            <td><strong>€{{ ordine.totale_finale|floatformat:2 }}</strong></td>
+                            <td>
+                                {% if ordine.stato == 'completato' %}
+                                    <span class="badge bg-success">Completato</span>
+                                {% elif ordine.stato == 'in_corso' %}
+                                    <span class="badge bg-warning">In Corso</span>
+                                {% elif ordine.stato == 'in_attesa' %}
+                                    <span class="badge bg-info">In Attesa</span>
+                                {% else %}
+                                    <span class="badge bg-secondary">{{ ordine.get_stato_display }}</span>
+                                {% endif %}
+                            </td>
+                            <td>
+                                <a href="{% url 'ordini:ordine-detail' ordine.pk %}" 
+                                   class="btn btn-sm btn-outline-primary">
+                                    <i class="bi bi-eye"></i>
+                                </a>
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        {% else %}
+            <p class="text-muted text-center">Nessun ordine per questo cliente</p>
+        {% endif %}
+    </div>
+</div>
+
+<!-- Abbonamenti Attivi -->
+{% if abbonamenti_attivi %}
+<div class="card">
+    <div class="card-header">
+        <h5 class="mb-0">
+            <i class="bi bi-card-checklist"></i>
+            Abbonamenti Attivi
+        </h5>
+    </div>
+    <div class="card-body">
+        <div class="row">
+            {% for abbonamento in abbonamenti_attivi %}
+            <div class="col-md-6 mb-3">
+                <div class="card border-success">
+                    <div class="card-body">
+                        <h6>{{ abbonamento.configurazione.nome }}</h6>
+                        <p class="mb-1">
+                            <strong>Codice:</strong> {{ abbonamento.codice_accesso }}<br>
+                            <strong>Scadenza:</strong> {{ abbonamento.data_scadenza|date:"d/m/Y" }}<br>
+                            <strong>Utilizzi:</strong> {{ abbonamento.utilizzi_rimasti }}/{{ abbonamento.configurazione.numero_utilizzi }}
+                        </p>
+                        <div class="progress" style="height: 8px;">
+                            <div class="progress-bar bg-success" style="width: {{ abbonamento.percentuale_utilizzo }}%"></div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            {% endfor %}
+        </div>
+    </div>
+</div>
+{% endif %}
+
+<!-- Modal Gestisci Punti -->
+<div class="modal fade" id="modalGestisciPunti" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">
+                    <i class="bi bi-star"></i>
+                    Gestisci Punti Fedeltà
+                </h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <form method="post" action="{% url 'clienti:gestisci-punti' cliente.pk %}">
+                <div class="modal-body">
+                    {% csrf_token %}
+                    <div class="alert alert-info">
+                        <strong>Punti disponibili:</strong> {{ punti_fedelta.punti_disponibili }}
+                    </div>
+                    
+                    <div class="mb-3">
+                        <label for="azione" class="form-label">Azione</label>
+                        <select class="form-select" id="azione" name="azione" required>
+                            <option value="">Seleziona azione</option>
+                            <option value="aggiungi">Aggiungi Punti</option>
+                            <option value="sottrai">Sottrai Punti</option>
+                        </select>
+                    </div>
+                    
+                    <div class="mb-3">
+                        <label for="punti" class="form-label">Numero Punti</label>
+                        <input type="number" class="form-control" id="punti" name="punti" min="1" required>
+                    </div>
+                    
+                    <div class="mb-3">
+                        <label for="descrizione" class="form-label">Descrizione</label>
+                        <textarea class="form-control" id="descrizione" name="descrizione" rows="2"
+                                  placeholder="Motivo del movimento punti..."></textarea>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">
+                        <i class="bi bi-x-circle"></i> Annulla
+                    </button>
+                    <button type="submit" class="btn btn-primary">
+                        <i class="bi bi-check-circle"></i> Conferma
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<script>
+function showGestisciPunti() {
+    const modal = new bootstrap.Modal(document.getElementById('modalGestisciPunti'));
+    modal.show();
+}
+</script>
+{% endblock %}

@@ -1,0 +1,952 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}Calendario Prenotazioni - Gestionale Autolavaggio{% endblock %}
+
+{% block extra_css %}
+<style>
+.calendar-container {
+    background: white;
+    border-radius: 15px;
+    box-shadow: 0 5px 15px rgba(0,0,0,0.1);
+    padding: 20px;
+    margin-bottom: 20px;
+}
+
+.calendar-grid {
+    display: grid;
+    grid-template-columns: repeat(7, 1fr);
+    gap: 10px;
+    margin-top: 20px;
+}
+
+.calendar-header {
+    background: linear-gradient(135deg, #0d6efd, #6610f2);
+    color: white;
+    border-radius: 10px;
+    padding: 20px;
+    text-align: center;
+    margin-bottom: 20px;
+}
+
+.day-header {
+    text-align: center;
+    font-weight: bold;
+    padding: 10px;
+    background: #f8f9fa;
+    border-radius: 5px;
+    color: #6c757d;
+}
+
+.calendar-day {
+    aspect-ratio: 1;
+    border: 2px solid #e9ecef;
+    border-radius: 10px;
+    padding: 8px;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    position: relative;
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+    min-height: 80px;
+}
+
+.calendar-day:hover {
+    border-color: #0d6efd;
+    transform: translateY(-2px);
+    box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+}
+
+.calendar-day.today {
+    border-color: #0d6efd;
+    background: #f8f9ff;
+}
+
+.calendar-day.selected {
+    background: #0d6efd;
+    color: white;
+    border-color: #0d6efd;
+}
+
+.calendar-day.unavailable {
+    background: #f8f9fa;
+    color: #6c757d;
+    cursor: not-allowed;
+    opacity: 0.6;
+}
+
+.calendar-day.closed {
+    background: #ffe6e6;
+    color: #dc3545;
+    cursor: not-allowed;
+}
+
+.calendar-day.other-month {
+    opacity: 0.3;
+    pointer-events: none;
+}
+
+.day-number {
+    font-weight: bold;
+    font-size: 1.1em;
+}
+
+.availability-indicator {
+    margin-top: auto;
+}
+
+.slots-available {
+    font-size: 0.7em;
+    padding: 2px 6px;
+    border-radius: 10px;
+    text-align: center;
+}
+
+.slots-high {
+    background: #d4edda;
+    color: #155724;
+}
+
+.slots-medium {
+    background: #fff3cd;
+    color: #856404;
+}
+
+.slots-low {
+    background: #f8d7da;
+    color: #721c24;
+}
+
+.month-navigation {
+    display: flex;
+    justify-content: between;
+    align-items: center;
+    margin-bottom: 20px;
+}
+
+.nav-button {
+    background: none;
+    border: 2px solid #0d6efd;
+    color: #0d6efd;
+    border-radius: 50%;
+    width: 40px;
+    height: 40px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    transition: all 0.3s ease;
+}
+
+.nav-button:hover {
+    background: #0d6efd;
+    color: white;
+}
+
+.month-year {
+    font-size: 1.2em;
+    font-weight: bold;
+    color: #0d6efd;
+    margin: 0 20px;
+}
+
+.day-detail-panel {
+    background: white;
+    border-radius: 15px;
+    box-shadow: 0 5px 15px rgba(0,0,0,0.1);
+    padding: 20px;
+    position: sticky;
+    top: 20px;
+}
+
+.slot-item {
+    background: #f8f9fa;
+    border-radius: 8px;
+    padding: 12px;
+    margin-bottom: 8px;
+    border-left: 4px solid #0d6efd;
+    transition: all 0.3s ease;
+}
+
+.slot-item:hover {
+    background: #e9ecef;
+    transform: translateX(5px);
+}
+
+.slot-item.full {
+    border-left-color: #dc3545;
+    opacity: 0.7;
+}
+
+.slot-item.low {
+    border-left-color: #ffc107;
+}
+
+.legend {
+    display: flex;
+    justify-content: center;
+    gap: 20px;
+    margin-top: 20px;
+    flex-wrap: wrap;
+}
+
+.legend-item {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 0.9em;
+}
+
+.legend-color {
+    width: 16px;
+    height: 16px;
+    border-radius: 4px;
+}
+
+.booking-summary {
+    background: #f8f9fa;
+    border-radius: 10px;
+    padding: 15px;
+    margin-bottom: 20px;
+}
+
+.quick-filters {
+    display: flex;
+    gap: 10px;
+    margin-bottom: 20px;
+    flex-wrap: wrap;
+}
+
+.filter-btn {
+    padding: 8px 16px;
+    border: 2px solid #e9ecef;
+    background: white;
+    border-radius: 20px;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    font-size: 0.9em;
+}
+
+.filter-btn.active {
+    background: #0d6efd;
+    border-color: #0d6efd;
+    color: white;
+}
+
+.calendar-loading {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    height: 200px;
+}
+
+.availability-heatmap {
+    display: grid;
+    grid-template-columns: repeat(24, 1fr);
+    gap: 2px;
+    margin: 10px 0;
+}
+
+.hour-cell {
+    height: 20px;
+    border-radius: 2px;
+    position: relative;
+}
+
+.hour-cell.available {
+    background: #28a745;
+}
+
+.hour-cell.limited {
+    background: #ffc107;
+}
+
+.hour-cell.full {
+    background: #dc3545;
+}
+
+.hour-cell.closed {
+    background: #6c757d;
+}
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <!-- Header -->
+    <div class="calendar-header">
+        <h1 class="display-5 mb-2">
+            <i class="bi bi-calendar-week"></i>
+            Calendario Prenotazioni
+        </h1>
+        <p class="lead mb-0">Scegli la data e l'orario perfetti per te</p>
+    </div>
+
+    {% if messages %}
+        {% for message in messages %}
+            <div class="alert alert-{{ message.tags }} alert-dismissible fade show" role="alert">
+                {{ message }}
+                <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+            </div>
+        {% endfor %}
+    {% endif %}
+
+    <!-- Filtri Rapidi -->
+    <div class="quick-filters">
+        <button class="filter-btn active" onclick="setFilter('all')">Tutti i Giorni</button>
+        <button class="filter-btn" onclick="setFilter('available')">Solo Disponibili</button>
+        <button class="filter-btn" onclick="setFilter('weekend')">Weekend</button>
+        <button class="filter-btn" onclick="setFilter('weekday')">Giorni Feriali</button>
+    </div>
+
+    <div class="row">
+        <!-- Calendario -->
+        <div class="col-lg-8">
+            <div class="calendar-container">
+                <!-- Navigazione Mese -->
+                <div class="month-navigation">
+                    <button class="nav-button" onclick="previousMonth()">
+                        <i class="bi bi-chevron-left"></i>
+                    </button>
+                    <div class="month-year" id="current-month-year">
+                        Loading...
+                    </div>
+                    <button class="nav-button" onclick="nextMonth()">
+                        <i class="bi bi-chevron-right"></i>
+                    </button>
+                    <div class="ms-auto">
+                        <button class="btn btn-outline-primary btn-sm me-2" onclick="goToToday()">
+                            <i class="bi bi-calendar-day"></i> Oggi
+                        </button>
+                        <select class="form-select form-select-sm d-inline-block w-auto" 
+                                id="month-selector" onchange="goToMonth()">
+                            <!-- Opzioni caricate via JS -->
+                        </select>
+                        <select class="form-select form-select-sm d-inline-block w-auto ms-2" 
+                                id="year-selector" onchange="goToMonth()">
+                            <!-- Opzioni caricate via JS -->
+                        </select>
+                    </div>
+                </div>
+
+                <!-- Griglia Calendario -->
+                <div class="calendar-loading" id="calendar-loading">
+                    <div class="spinner-border text-primary" role="status">
+                        <span class="visually-hidden">Caricamento...</span>
+                    </div>
+                </div>
+
+                <div id="calendar-content" style="display: none;">
+                    <!-- Headers giorni settimana -->
+                    <div class="calendar-grid">
+                        <div class="day-header">Lun</div>
+                        <div class="day-header">Mar</div>
+                        <div class="day-header">Mer</div>
+                        <div class="day-header">Gio</div>
+                        <div class="day-header">Ven</div>
+                        <div class="day-header">Sab</div>
+                        <div class="day-header">Dom</div>
+                    </div>
+
+                    <!-- Giorni del mese -->
+                    <div class="calendar-grid" id="calendar-days">
+                        <!-- Generato via JavaScript -->
+                    </div>
+                </div>
+
+                <!-- Legenda -->
+                <div class="legend">
+                    <div class="legend-item">
+                        <div class="legend-color slots-high"></div>
+                        <span>Molti slot disponibili</span>
+                    </div>
+                    <div class="legend-item">
+                        <div class="legend-color slots-medium"></div>
+                        <span>Pochi slot disponibili</span>
+                    </div>
+                    <div class="legend-item">
+                        <div class="legend-color slots-low"></div>
+                        <span>Slot limitati</span>
+                    </div>
+                    <div class="legend-item">
+                        <div class="legend-color" style="background: #f8f9fa; border: 2px solid #6c757d;"></div>
+                        <span>Chiuso</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Pannello Dettagli Giorno -->
+        <div class="col-lg-4">
+            <div class="day-detail-panel">
+                <div id="no-day-selected">
+                    <div class="text-center py-4">
+                        <i class="bi bi-calendar display-6 text-muted"></i>
+                        <h5 class="text-muted mt-2">Seleziona una Data</h5>
+                        <p class="text-muted">Clicca su un giorno per vedere gli orari disponibili</p>
+                    </div>
+                </div>
+
+                <div id="day-details" style="display: none;">
+                    <div class="d-flex justify-content-between align-items-center mb-3">
+                        <h5 class="mb-0" id="selected-date-title">Data Selezionata</h5>
+                        <button class="btn btn-sm btn-outline-secondary" onclick="clearSelection()">
+                            <i class="bi bi-x"></i>
+                        </button>
+                    </div>
+
+                    <!-- Heatmap Oraria -->
+                    <div class="mb-3">
+                        <h6 class="mb-2">Disponibilità Oraria</h6>
+                        <div class="d-flex justify-content-between small text-muted mb-1">
+                            <span>08:00</span>
+                            <span>14:00</span>
+                            <span>20:00</span>
+                        </div>
+                        <div class="availability-heatmap" id="hourly-heatmap">
+                            <!-- Generato via JavaScript -->
+                        </div>
+                        <div class="small text-muted mt-1">
+                            <span class="me-3">🟢 Disponibile</span>
+                            <span class="me-3">🟡 Limitato</span>
+                            <span class="me-3">🔴 Completo</span>
+                            <span>⚫ Chiuso</span>
+                        </div>
+                    </div>
+
+                    <!-- Lista Slot -->
+                    <div class="mb-3">
+                        <h6 class="mb-2">Slot Disponibili</h6>
+                        <div id="available-slots-list">
+                            <!-- Generato via JavaScript -->
+                        </div>
+                    </div>
+
+                    <!-- Azioni -->
+                    <div class="d-grid gap-2">
+                        <a href="#" class="btn btn-primary" id="book-now-btn" style="display: none;">
+                            <i class="bi bi-plus-circle"></i> Prenota Ora
+                        </a>
+                        <a href="{% url 'prenotazioni:prenotazioni' %}" class="btn btn-outline-primary">
+                            <i class="bi bi-arrow-left"></i> Torna alle Prenotazioni
+                        </a>
+                    </div>
+                </div>
+
+                <!-- Riepilogo Selezione -->
+                <div class="booking-summary" id="booking-summary" style="display: none;">
+                    <h6><i class="bi bi-bookmark"></i> Prenotazione in Corso</h6>
+                    <div id="booking-summary-content">
+                        <!-- Contenuto dinamico -->
+                    </div>
+                    <div class="d-grid gap-2 mt-3">
+                        <button class="btn btn-success" onclick="proceedToBooking()">
+                            <i class="bi bi-arrow-right"></i> Completa Prenotazione
+                        </button>
+                        <button class="btn btn-outline-secondary btn-sm" onclick="clearBookingSummary()">
+                            Cancella Selezione
+                        </button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Statistiche Rapide -->
+            <div class="card mt-4">
+                <div class="card-header">
+                    <h6 class="mb-0">
+                        <i class="bi bi-graph-up"></i>
+                        Statistiche Veloci
+                    </h6>
+                </div>
+                <div class="card-body">
+                    <div class="row text-center">
+                        <div class="col-6">
+                            <h5 class="text-primary mb-0" id="stats-available-today">-</h5>
+                            <small class="text-muted">Slot oggi</small>
+                        </div>
+                        <div class="col-6">
+                            <h5 class="text-success mb-0" id="stats-next-free">-</h5>
+                            <small class="text-muted">Prossimo libero</small>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Modal Prenotazione Rapida -->
+<div class="modal fade" id="quickBookingModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">
+                    <i class="bi bi-lightning-charge"></i>
+                    Prenotazione Rapida
+                </h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <div id="quick-booking-content">
+                    <!-- Contenuto dinamico -->
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">
+                    <i class="bi bi-x-circle"></i> Chiudi
+                </button>
+                <button type="button" class="btn btn-primary" onclick="confirmQuickBooking()">
+                    <i class="bi bi-check-circle"></i> Conferma
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+let currentDate = new Date();
+let selectedDate = null;
+let selectedSlot = null;
+let calendarData = {};
+let currentFilter = 'all';
+
+// Inizializzazione
+document.addEventListener('DOMContentLoaded', function() {
+    initializeCalendar();
+    loadCalendarData();
+    setupSelectors();
+    loadStats();
+});
+
+function initializeCalendar() {
+    updateMonthYear();
+    generateCalendar();
+}
+
+function setupSelectors() {
+    const monthSelector = document.getElementById('month-selector');
+    const yearSelector = document.getElementById('year-selector');
+    
+    // Popola selettore mesi
+    const mesi = [
+        'Gennaio', 'Febbraio', 'Marzo', 'Aprile', 'Maggio', 'Giugno',
+        'Luglio', 'Agosto', 'Settembre', 'Ottobre', 'Novembre', 'Dicembre'
+    ];
+    
+    mesi.forEach((mese, index) => {
+        const option = document.createElement('option');
+        option.value = index;
+        option.textContent = mese;
+        monthSelector.appendChild(option);
+    });
+    
+    // Popola selettore anni (anno corrente +/- 2)
+    const currentYear = new Date().getFullYear();
+    for (let year = currentYear - 1; year <= currentYear + 2; year++) {
+        const option = document.createElement('option');
+        option.value = year;
+        option.textContent = year;
+        yearSelector.appendChild(option);
+    }
+    
+    // Imposta valori correnti
+    monthSelector.value = currentDate.getMonth();
+    yearSelector.value = currentDate.getFullYear();
+}
+
+function updateMonthYear() {
+    const options = { month: 'long', year: 'numeric' };
+    document.getElementById('current-month-year').textContent = 
+        currentDate.toLocaleDateString('it-IT', options);
+}
+
+function generateCalendar() {
+    const container = document.getElementById('calendar-days');
+    container.innerHTML = '';
+    
+    const year = currentDate.getFullYear();
+    const month = currentDate.getMonth();
+    
+    // Primo giorno del mese
+    const firstDay = new Date(year, month, 1);
+    const lastDay = new Date(year, month + 1, 0);
+    
+    // Giorni da mostrare prima del primo del mese
+    const startDate = new Date(firstDay);
+    startDate.setDate(startDate.getDate() - (firstDay.getDay() || 7) + 1);
+    
+    // Genera 42 giorni (6 settimane)
+    for (let i = 0; i < 42; i++) {
+        const date = new Date(startDate);
+        date.setDate(startDate.getDate() + i);
+        
+        const dayElement = createDayElement(date, month);
+        container.appendChild(dayElement);
+    }
+    
+    // Applica filtro corrente
+    applyFilter(currentFilter);
+}
+
+function createDayElement(date, currentMonth) {
+    const dayDiv = document.createElement('div');
+    dayDiv.className = 'calendar-day';
+    
+    const isCurrentMonth = date.getMonth() === currentMonth;
+    const isToday = date.toDateString() === new Date().toDateString();
+    const isPast = date < new Date().setHours(0, 0, 0, 0);
+    
+    if (!isCurrentMonth) {
+        dayDiv.classList.add('other-month');
+    }
+    
+    if (isToday) {
+        dayDiv.classList.add('today');
+    }
+    
+    if (isPast) {
+        dayDiv.classList.add('unavailable');
+    }
+    
+    const dateString = date.toISOString().split('T')[0];
+    dayDiv.dataset.date = dateString;
+    
+    dayDiv.innerHTML = `
+        <div class="day-number">${date.getDate()}</div>
+        <div class="availability-indicator">
+            <div class="slots-available slots-high" id="indicator-${dateString}">
+                Caricamento...
+            </div>
+        </div>
+    `;
+    
+    dayDiv.addEventListener('click', () => selectDate(date));
+    
+    return dayDiv;
+}
+
+function loadCalendarData() {
+    const year = currentDate.getFullYear();
+    const month = currentDate.getMonth() + 1;
+    
+    document.getElementById('calendar-loading').style.display = 'flex';
+    document.getElementById('calendar-content').style.display = 'none';
+    
+    fetch(`/prenotazioni/api/calendario-mese/?year=${year}&month=${month}`)
+        .then(response => response.json())
+        .then(data => {
+            calendarData = data;
+            updateCalendarAvailability();
+            document.getElementById('calendar-loading').style.display = 'none';
+            document.getElementById('calendar-content').style.display = 'block';
+        })
+        .catch(error => {
+            console.error('Errore nel caricamento calendario:', error);
+            document.getElementById('calendar-loading').style.display = 'none';
+            document.getElementById('calendar-content').style.display = 'block';
+        });
+}
+
+function updateCalendarAvailability() {
+    Object.keys(calendarData).forEach(dateString => {
+        const dayData = calendarData[dateString];
+        const indicator = document.getElementById(`indicator-${dateString}`);
+        
+        if (!indicator) return;
+        
+        const dayElement = indicator.closest('.calendar-day');
+        
+        if (dayData.chiuso) {
+            indicator.textContent = 'Chiuso';
+            indicator.className = 'slots-available';
+            indicator.style.background = '#f8f9fa';
+            indicator.style.color = '#6c757d';
+            dayElement.classList.add('closed');
+        } else if (dayData.slot_disponibili === 0) {
+            indicator.textContent = 'Completo';
+            indicator.className = 'slots-available slots-low';
+            dayElement.classList.add('unavailable');
+        } else if (dayData.slot_disponibili <= 2) {
+            indicator.textContent = `${dayData.slot_disponibili} slot`;
+            indicator.className = 'slots-available slots-low';
+        } else if (dayData.slot_disponibili <= 5) {
+            indicator.textContent = `${dayData.slot_disponibili} slot`;
+            indicator.className = 'slots-available slots-medium';
+        } else {
+            indicator.textContent = `${dayData.slot_disponibili} slot`;
+            indicator.className = 'slots-available slots-high';
+        }
+    });
+}
+
+function selectDate(date) {
+    const dateString = date.toISOString().split('T')[0];
+    const dayData = calendarData[dateString];
+    
+    // Rimuovi selezione precedente
+    document.querySelectorAll('.calendar-day.selected').forEach(day => {
+        day.classList.remove('selected');
+    });
+    
+    // Seleziona nuovo giorno
+    const dayElement = document.querySelector(`[data-date="${dateString}"]`);
+    if (dayElement && !dayElement.classList.contains('unavailable') && !dayElement.classList.contains('closed')) {
+        dayElement.classList.add('selected');
+        selectedDate = date;
+        showDayDetails(date, dayData);
+    }
+}
+
+function showDayDetails(date, dayData) {
+    document.getElementById('no-day-selected').style.display = 'none';
+    document.getElementById('day-details').style.display = 'block';
+    
+    const title = document.getElementById('selected-date-title');
+    title.textContent = date.toLocaleDateString('it-IT', { 
+        weekday: 'long', 
+        year: 'numeric', 
+        month: 'long', 
+        day: 'numeric' 
+    });
+    
+    // Genera heatmap oraria
+    generateHourlyHeatmap(dayData);
+    
+    // Carica slot dettagliati
+    loadDaySlots(date.toISOString().split('T')[0]);
+}
+
+function generateHourlyHeatmap(dayData) {
+    const container = document.getElementById('hourly-heatmap');
+    container.innerHTML = '';
+    
+    for (let hour = 8; hour < 20; hour++) {
+        const cell = document.createElement('div');
+        cell.className = 'hour-cell';
+        
+        // Simula disponibilità per ora (da sostituire con dati reali)
+        const availability = Math.random();
+        if (availability > 0.7) {
+            cell.classList.add('available');
+        } else if (availability > 0.3) {
+            cell.classList.add('limited');
+        } else {
+            cell.classList.add('full');
+        }
+        
+        cell.title = `${hour}:00 - ${hour+1}:00`;
+        container.appendChild(cell);
+    }
+}
+
+function loadDaySlots(dateString) {
+    fetch(`/prenotazioni/api/slot-disponibili/?data=${dateString}`)
+        .then(response => response.json())
+        .then(data => {
+            displaySlots(data.slot);
+        })
+        .catch(error => {
+            console.error('Errore nel caricamento slot:', error);
+        });
+}
+
+function displaySlots(slots) {
+    const container = document.getElementById('available-slots-list');
+    const bookBtn = document.getElementById('book-now-btn');
+    
+    if (slots.length === 0) {
+        container.innerHTML = `
+            <div class="text-center py-3">
+                <i class="bi bi-calendar-x text-muted"></i>
+                <p class="text-muted mb-0">Nessun slot disponibile</p>
+            </div>
+        `;
+        bookBtn.style.display = 'none';
+        return;
+    }
+    
+    container.innerHTML = '';
+    let hasAvailable = false;
+    
+    slots.forEach(slot => {
+        const isAvailable = slot.posti_disponibili > 0;
+        if (isAvailable) hasAvailable = true;
+        
+        const slotDiv = document.createElement('div');
+        slotDiv.className = `slot-item ${isAvailable ? '' : 'full'}`;
+        slotDiv.innerHTML = `
+            <div class="d-flex justify-content-between align-items-center">
+                <div>
+                    <strong>${slot.ora_inizio} - ${slot.ora_fine}</strong>
+                    ${isAvailable ? 
+                        `<small class="d-block text-muted">${slot.posti_disponibili} posti disponibili</small>` :
+                        `<small class="d-block text-danger">Completo</small>`
+                    }
+                </div>
+                <div>
+                    ${isAvailable ? 
+                        `<button class="btn btn-sm btn-primary" onclick="selectSlot('${slot.id}', '${slot.ora_inizio}', '${slot.ora_fine}')">
+                            Seleziona
+                        </button>` :
+                        `<span class="badge bg-secondary">Completo</span>`
+                    }
+                </div>
+            </div>
+        `;
+        
+        container.appendChild(slotDiv);
+    });
+    
+    bookBtn.style.display = hasAvailable ? 'block' : 'none';
+    if (hasAvailable) {
+        bookBtn.href = `{% url 'prenotazioni:nuova-prenotazione' %}?data=${selectedDate.toISOString().split('T')[0]}`;
+    }
+}
+
+function selectSlot(slotId, startTime, endTime) {
+    selectedSlot = { id: slotId, start: startTime, end: endTime };
+    
+    const summary = document.getElementById('booking-summary');
+    const content = document.getElementById('booking-summary-content');
+    
+    content.innerHTML = `
+        <div class="d-flex justify-content-between mb-2">
+            <span>Data:</span>
+            <strong>${selectedDate.toLocaleDateString('it-IT')}</strong>
+        </div>
+        <div class="d-flex justify-content-between">
+            <span>Orario:</span>
+            <strong>${startTime} - ${endTime}</strong>
+        </div>
+    `;
+    
+    summary.style.display = 'block';
+}
+
+function proceedToBooking() {
+    if (!selectedDate || !selectedSlot) {
+        alert('Seleziona data e orario');
+        return;
+    }
+    
+    const params = new URLSearchParams({
+        data: selectedDate.toISOString().split('T')[0],
+        slot: selectedSlot.id
+    });
+    
+    window.location.href = `{% url 'prenotazioni:nuova-prenotazione' %}?${params.toString()}`;
+}
+
+function clearSelection() {
+    document.querySelectorAll('.calendar-day.selected').forEach(day => {
+        day.classList.remove('selected');
+    });
+    
+    document.getElementById('day-details').style.display = 'none';
+    document.getElementById('no-day-selected').style.display = 'block';
+    
+    selectedDate = null;
+    clearBookingSummary();
+}
+
+function clearBookingSummary() {
+    document.getElementById('booking-summary').style.display = 'none';
+    selectedSlot = null;
+}
+
+function previousMonth() {
+    currentDate.setMonth(currentDate.getMonth() - 1);
+    updateMonthYear();
+    updateSelectors();
+    generateCalendar();
+    loadCalendarData();
+}
+
+function nextMonth() {
+    currentDate.setMonth(currentDate.getMonth() + 1);
+    updateMonthYear();
+    updateSelectors();
+    generateCalendar();
+    loadCalendarData();
+}
+
+function goToToday() {
+    currentDate = new Date();
+    updateMonthYear();
+    updateSelectors();
+    generateCalendar();
+    loadCalendarData();
+}
+
+function goToMonth() {
+    const month = parseInt(document.getElementById('month-selector').value);
+    const year = parseInt(document.getElementById('year-selector').value);
+    
+    currentDate = new Date(year, month, 1);
+    updateMonthYear();
+    generateCalendar();
+    loadCalendarData();
+}
+
+function updateSelectors() {
+    document.getElementById('month-selector').value = currentDate.getMonth();
+    document.getElementById('year-selector').value = currentDate.getFullYear();
+}
+
+function setFilter(filter) {
+    // Aggiorna pulsanti
+    document.querySelectorAll('.filter-btn').forEach(btn => {
+        btn.classList.remove('active');
+    });
+    event.currentTarget.classList.add('active');
+    
+    currentFilter = filter;
+    applyFilter(filter);
+}
+
+function applyFilter(filter) {
+    const days = document.querySelectorAll('.calendar-day');
+    
+    days.forEach(day => {
+        const date = new Date(day.dataset.date);
+        const dayOfWeek = date.getDay();
+        let show = true;
+        
+        switch (filter) {
+            case 'available':
+                show = !day.classList.contains('unavailable') && !day.classList.contains('closed');
+                break;
+            case 'weekend':
+                show = dayOfWeek === 0 || dayOfWeek === 6; // Domenica o Sabato
+                break;
+            case 'weekday':
+                show = dayOfWeek >= 1 && dayOfWeek <= 5; // Lunedì-Venerdì
+                break;
+            default:
+                show = true;
+        }
+        
+        day.style.opacity = show ? '1' : '0.3';
+        day.style.pointerEvents = show ? 'auto' : 'none';
+    });
+}
+
+function loadStats() {
+    fetch('/prenotazioni/api/statistiche-calendario/')
+        .then(response => response.json())
+        .then(data => {
+            document.getElementById('stats-available-today').textContent = data.slot_oggi || '0';
+            document.getElementById('stats-next-free').textContent = data.prossimo_libero || 'N/A';
+        });
+}
+
+// Auto-refresh ogni 2 minuti
+setInterval(() => {
+    if (!document.hidden) {
+        loadCalendarData();
+        loadStats();
+    }
+}, 120000);
+</script>
+{% endblock %}

@@ -1,0 +1,608 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}Dettaglio Abbonamento - Gestionale Autolavaggio{% endblock %}
+
+{% block extra_css %}
+<style>
+.usage-progress {
+    height: 8px;
+}
+
+.access-timeline {
+    position: relative;
+    padding-left: 30px;
+}
+
+.access-timeline::before {
+    content: '';
+    position: absolute;
+    left: 15px;
+    top: 0;
+    bottom: 0;
+    width: 2px;
+    background: #dee2e6;
+}
+
+.access-item {
+    position: relative;
+    margin-bottom: 20px;
+}
+
+.access-item::before {
+    content: '';
+    position: absolute;
+    left: -22px;
+    top: 5px;
+    width: 10px;
+    height: 10px;
+    border-radius: 50%;
+    background: #28a745;
+    border: 2px solid white;
+    box-shadow: 0 0 0 2px #28a745;
+}
+
+.access-item.denied::before {
+    background: #dc3545;
+    box-shadow: 0 0 0 2px #dc3545;
+}
+
+.qr-code-container {
+    text-align: center;
+    padding: 20px;
+    background: #f8f9fa;
+    border-radius: 10px;
+}
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <h1>
+        <i class="bi bi-credit-card"></i> 
+        Abbonamento {{ abbonamento.codice_accesso }}
+    </h1>
+    <div>
+        <button class="btn btn-outline-info me-2" onclick="stampaQR()">
+            <i class="bi bi-qr-code"></i> Stampa QR
+        </button>
+        {% if abbonamento.stato == 'attivo' %}
+            <button class="btn btn-warning me-2" onclick="sospendiAbbonamento()">
+                <i class="bi bi-pause"></i> Sospendi
+            </button>
+        {% elif abbonamento.stato == 'sospeso' %}
+            <button class="btn btn-success me-2" onclick="riattivaAbbonamento()">
+                <i class="bi bi-play"></i> Riattiva
+            </button>
+        {% elif abbonamento.stato == 'scaduto' %}
+            <a href="{% url 'abbonamenti:rinnova-abbonamento' abbonamento.pk %}" class="btn btn-info me-2">
+                <i class="bi bi-arrow-repeat"></i> Rinnova
+            </a>
+        {% endif %}
+        <a href="{% url 'abbonamenti:abbonamenti-list' %}" class="btn btn-outline-secondary">
+            <i class="bi bi-arrow-left"></i> Torna alla Lista
+        </a>
+    </div>
+</div>
+
+{% if messages %}
+    {% for message in messages %}
+        <div class="alert alert-{{ message.tags }} alert-dismissible fade show" role="alert">
+            {{ message }}
+            <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+        </div>
+    {% endfor %}
+{% endif %}
+
+<div class="row">
+    <!-- Informazioni Generali -->
+    <div class="col-lg-8">
+        <div class="card mb-4">
+            <div class="card-header d-flex justify-content-between align-items-center">
+                <h5 class="mb-0">
+                    <i class="bi bi-info-circle"></i>
+                    Informazioni Generali
+                </h5>
+                <div>
+                    {% if abbonamento.stato == 'attivo' %}
+                        <span class="badge bg-success">
+                            <i class="bi bi-check-circle"></i> Attivo
+                        </span>
+                    {% elif abbonamento.stato == 'sospeso' %}
+                        <span class="badge bg-warning">
+                            <i class="bi bi-pause-circle"></i> Sospeso
+                        </span>
+                    {% elif abbonamento.stato == 'scaduto' %}
+                        <span class="badge bg-danger">
+                            <i class="bi bi-x-circle"></i> Scaduto
+                        </span>
+                    {% elif abbonamento.stato == 'cancellato' %}
+                        <span class="badge bg-secondary">
+                            <i class="bi bi-trash"></i> Cancellato
+                        </span>
+                    {% endif %}
+                </div>
+            </div>
+            <div class="card-body">
+                <div class="row">
+                    <div class="col-md-6">
+                        <table class="table table-borderless">
+                            <tr>
+                                <td><strong>Cliente:</strong></td>
+                                <td>
+                                    <a href="{% url 'clienti:storico-cliente' abbonamento.cliente.pk %}" 
+                                       class="text-decoration-none">
+                                        {{ abbonamento.cliente.nome_completo }}
+                                    </a>
+                                    <br><small class="text-muted">{{ abbonamento.cliente.email }}</small>
+                                    <br><small class="text-muted">{{ abbonamento.cliente.telefono }}</small>
+                                </td>
+                            </tr>
+                            <tr>
+                                <td><strong>Configurazione:</strong></td>
+                                <td>
+                                    {{ abbonamento.configurazione.titolo }}
+                                    <br><small class="text-muted">€{{ abbonamento.configurazione.prezzo }} - {{ abbonamento.configurazione.get_durata_display }}</small>
+                                </td>
+                            </tr>
+                            <tr>
+                                <td><strong>Codice Accesso:</strong></td>
+                                <td>
+                                    <code class="bg-light p-1">{{ abbonamento.codice_accesso }}</code>
+                                    {% if abbonamento.codice_nfc %}
+                                        <br><small class="text-muted">
+                                            <i class="bi bi-credit-card"></i> NFC: {{ abbonamento.codice_nfc }}
+                                        </small>
+                                    {% endif %}
+                                </td>
+                            </tr>
+                        </table>
+                    </div>
+                    <div class="col-md-6">
+                        <table class="table table-borderless">
+                            <tr>
+                                <td><strong>Data Attivazione:</strong></td>
+                                <td>{{ abbonamento.data_attivazione|date:"d/m/Y" }}</td>
+                            </tr>
+                            <tr>
+                                <td><strong>Data Scadenza:</strong></td>
+                                <td>
+                                    {{ abbonamento.data_scadenza|date:"d/m/Y" }}
+                                    {% if abbonamento.stato == 'attivo' %}
+                                        {% if abbonamento.giorni_rimanenti <= 0 %}
+                                            <br><span class="badge bg-danger">Scaduto</span>
+                                        {% elif abbonamento.giorni_rimanenti <= 7 %}
+                                            <br><span class="badge bg-warning">{{ abbonamento.giorni_rimanenti }} giorni</span>
+                                        {% else %}
+                                            <br><small class="text-muted">{{ abbonamento.giorni_rimanenti }} giorni</small>
+                                        {% endif %}
+                                    {% endif %}
+                                </td>
+                            </tr>
+                            <tr>
+                                <td><strong>Ultimo Accesso:</strong></td>
+                                <td>
+                                    {% if abbonamento.data_ultimo_accesso %}
+                                        {{ abbonamento.data_ultimo_accesso|date:"d/m/Y H:i" }}
+                                    {% else %}
+                                        <span class="text-muted">Mai utilizzato</span>
+                                    {% endif %}
+                                </td>
+                            </tr>
+                            {% if abbonamento.ordine_acquisto %}
+                            <tr>
+                                <td><strong>Ordine Acquisto:</strong></td>
+                                <td>
+                                    <a href="{% url 'ordini:ordine-detail' abbonamento.ordine_acquisto.pk %}" 
+                                       class="text-decoration-none">
+                                        #{{ abbonamento.ordine_acquisto.numero_progressivo }}
+                                    </a>
+                                    <br><span class="badge bg-{{ abbonamento.ordine_acquisto.stato_pagamento|yesno:'success,warning' }}">
+                                        {{ abbonamento.ordine_acquisto.get_stato_pagamento_display }}
+                                    </span>
+                                </td>
+                            </tr>
+                            {% endif %}
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Contatori Utilizzo -->
+        <div class="card mb-4">
+            <div class="card-header">
+                <h5 class="mb-0">
+                    <i class="bi bi-graph-up"></i>
+                    Utilizzo Servizi
+                </h5>
+            </div>
+            <div class="card-body">
+                {% if contatori_servizi %}
+                    <div class="row">
+                        {% for contatore in contatori_servizi %}
+                        <div class="col-md-6 mb-3">
+                            <div class="border rounded p-3">
+                                <div class="d-flex justify-content-between align-items-center mb-2">
+                                    <h6 class="mb-0">{{ contatore.servizio.titolo }}</h6>
+                                    <span class="badge bg-primary">
+                                        {{ contatore.utilizzati }}/{{ contatore.inclusi }}
+                                    </span>
+                                </div>
+                                <div class="progress usage-progress mb-2">
+                                    {% widthratio contatore.utilizzati contatore.inclusi 100 as percentuale %}
+                                    <div class="progress-bar {% if percentuale >= 90 %}bg-danger{% elif percentuale >= 70 %}bg-warning{% else %}bg-success{% endif %}" 
+                                         style="width: {{ percentuale }}%"></div>
+                                </div>
+                                <div class="d-flex justify-content-between">
+                                    <small class="text-muted">Disponibili: {{ contatore.disponibili }}</small>
+                                    {% if contatore.disponibili <= 0 %}
+                                        <small class="text-danger">Esauriti</small>
+                                    {% elif contatore.disponibili <= 2 %}
+                                        <small class="text-warning">In esaurimento</small>
+                                    {% endif %}
+                                </div>
+                            </div>
+                        </div>
+                        {% endfor %}
+                    </div>
+                {% else %}
+                    <div class="text-center py-3">
+                        <i class="bi bi-graph-up display-6 text-muted"></i>
+                        <h6 class="text-muted mt-2">Nessun servizio configurato</h6>
+                    </div>
+                {% endif %}
+            </div>
+        </div>
+
+        <!-- Targhe Autorizzate -->
+        {% if abbonamento.configurazione.modalita_targa != 'libera' %}
+        <div class="card mb-4">
+            <div class="card-header d-flex justify-content-between align-items-center">
+                <h5 class="mb-0">
+                    <i class="bi bi-car-front"></i>
+                    Targhe Autorizzate
+                </h5>
+                <button class="btn btn-sm btn-outline-primary" onclick="aggiungiTarga()">
+                    <i class="bi bi-plus"></i> Aggiungi Targa
+                </button>
+            </div>
+            <div class="card-body">
+                {% if targhe %}
+                    <div class="row">
+                        {% for targa in targhe %}
+                        <div class="col-md-4 mb-2">
+                            <div class="d-flex justify-content-between align-items-center border rounded p-2">
+                                <span class="fw-bold">{{ targa.targa }}</span>
+                                <div>
+                                    {% if targa.attiva %}
+                                        <span class="badge bg-success me-1">Attiva</span>
+                                    {% else %}
+                                        <span class="badge bg-secondary me-1">Inattiva</span>
+                                    {% endif %}
+                                    <button class="btn btn-sm btn-outline-danger" 
+                                            onclick="rimuoviTarga('{{ targa.pk }}')">
+                                        <i class="bi bi-trash"></i>
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                        {% endfor %}
+                    </div>
+                {% else %}
+                    <div class="text-center py-3">
+                        <i class="bi bi-car-front display-6 text-muted"></i>
+                        <h6 class="text-muted mt-2">Nessuna targa configurata</h6>
+                        <button class="btn btn-primary" onclick="aggiungiTarga()">
+                            <i class="bi bi-plus"></i> Aggiungi Prima Targa
+                        </button>
+                    </div>
+                {% endif %}
+            </div>
+        </div>
+        {% endif %}
+
+        <!-- Storico Accessi -->
+        <div class="card">
+            <div class="card-header d-flex justify-content-between align-items-center">
+                <h5 class="mb-0">
+                    <i class="bi bi-clock-history"></i>
+                    Storico Accessi
+                </h5>
+                <small class="text-muted">Ultimi 10 accessi</small>
+            </div>
+            <div class="card-body">
+                {% if ultimi_accessi %}
+                    <div class="access-timeline">
+                        {% for accesso in ultimi_accessi %}
+                        <div class="access-item {% if not accesso.autorizzato %}denied{% endif %}">
+                            <div class="d-flex justify-content-between align-items-start">
+                                <div>
+                                    <h6 class="mb-1">{{ accesso.servizio.titolo }}</h6>
+                                    <small class="text-muted">
+                                        {{ accesso.data_ora|date:"d/m/Y H:i" }}
+                                        {% if accesso.targa_utilizzata %}
+                                            • Targa: {{ accesso.targa_utilizzata }}
+                                        {% endif %}
+                                        {% if accesso.postazione %}
+                                            • {{ accesso.postazione.nome }}
+                                        {% endif %}
+                                    </small>
+                                    {% if not accesso.autorizzato and accesso.motivo_rifiuto %}
+                                        <br><small class="text-danger">{{ accesso.motivo_rifiuto }}</small>
+                                    {% endif %}
+                                </div>
+                                <div>
+                                    {% if accesso.autorizzato %}
+                                        <span class="badge bg-success">Autorizzato</span>
+                                    {% else %}
+                                        <span class="badge bg-danger">Rifiutato</span>
+                                    {% endif %}
+                                </div>
+                            </div>
+                        </div>
+                        {% endfor %}
+                    </div>
+                {% else %}
+                    <div class="text-center py-4">
+                        <i class="bi bi-clock-history display-6 text-muted"></i>
+                        <h6 class="text-muted mt-2">Nessun accesso registrato</h6>
+                        <p class="text-muted">L'abbonamento non è ancora stato utilizzato</p>
+                    </div>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+
+    <!-- Sidebar -->
+    <div class="col-lg-4">
+        <!-- QR Code -->
+        <div class="card mb-4">
+            <div class="card-header">
+                <h6 class="mb-0">
+                    <i class="bi bi-qr-code"></i>
+                    Codice QR Accesso
+                </h6>
+            </div>
+            <div class="card-body">
+                <div class="qr-code-container">
+                    <div id="qrcode" style="display: flex; justify-content: center;"></div>
+                    <p class="text-muted mt-2 mb-0">{{ abbonamento.codice_accesso }}</p>
+                </div>
+                <div class="d-grid gap-2 mt-3">
+                    <button class="btn btn-outline-primary" onclick="stampaQR()">
+                        <i class="bi bi-printer"></i> Stampa QR Code
+                    </button>
+                    <button class="btn btn-outline-secondary" onclick="scaricaQR()">
+                        <i class="bi bi-download"></i> Scarica Immagine
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Azioni Rapide -->
+        <div class="card mb-4">
+            <div class="card-header">
+                <h6 class="mb-0">
+                    <i class="bi bi-lightning"></i>
+                    Azioni Rapide
+                </h6>
+            </div>
+            <div class="card-body">
+                <div class="d-grid gap-2">
+                    {% if abbonamento.stato == 'attivo' %}
+                        <button class="btn btn-warning" onclick="sospendiAbbonamento()">
+                            <i class="bi bi-pause"></i> Sospendi Abbonamento
+                        </button>
+                    {% elif abbonamento.stato == 'sospeso' %}
+                        <button class="btn btn-success" onclick="riattivaAbbonamento()">
+                            <i class="bi bi-play"></i> Riattiva Abbonamento
+                        </button>
+                    {% elif abbonamento.stato == 'scaduto' %}
+                        <a href="{% url 'abbonamenti:rinnova-abbonamento' abbonamento.pk %}" 
+                           class="btn btn-info">
+                            <i class="bi bi-arrow-repeat"></i> Rinnova Abbonamento
+                        </a>
+                    {% endif %}
+                    
+                    <button class="btn btn-outline-primary" onclick="inviaPromemoria()">
+                        <i class="bi bi-envelope"></i> Invia Promemoria
+                    </button>
+                    
+                    <a href="{% url 'clienti:storico-cliente' abbonamento.cliente.pk %}" 
+                       class="btn btn-outline-info">
+                        <i class="bi bi-person"></i> Vai al Cliente
+                    </a>
+                    
+                    {% if abbonamento.ordine_acquisto %}
+                        <a href="{% url 'ordini:ordine-detail' abbonamento.ordine_acquisto.pk %}" 
+                           class="btn btn-outline-secondary">
+                            <i class="bi bi-receipt"></i> Vedi Ordine
+                        </a>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+
+        <!-- Informazioni Aggiuntive -->
+        <div class="card">
+            <div class="card-header">
+                <h6 class="mb-0">
+                    <i class="bi bi-info"></i>
+                    Informazioni Aggiuntive
+                </h6>
+            </div>
+            <div class="card-body">
+                <div class="row text-center">
+                    <div class="col-6">
+                        <div class="border rounded p-2 mb-2">
+                            <h6 class="text-primary mb-0">{{ abbonamento.giorni_rimanenti|default:0 }}</h6>
+                            <small class="text-muted">Giorni rimanenti</small>
+                        </div>
+                    </div>
+                    <div class="col-6">
+                        <div class="border rounded p-2 mb-2">
+                            <h6 class="text-success mb-0">{{ ultimi_accessi|length }}</h6>
+                            <small class="text-muted">Accessi totali</small>
+                        </div>
+                    </div>
+                </div>
+                
+                {% if abbonamento.configurazione.modalita_targa != 'libera' %}
+                <div class="mt-3">
+                    <small class="text-muted">Modalità Targa:</small><br>
+                    {% if abbonamento.configurazione.modalita_targa == 'fissa' %}
+                        <span class="badge bg-warning">
+                            <i class="bi bi-lock"></i> Fissa
+                        </span>
+                    {% elif abbonamento.configurazione.modalita_targa == 'variabile' %}
+                        <span class="badge bg-info">
+                            <i class="bi bi-arrow-repeat"></i> Variabile
+                        </span>
+                    {% endif %}
+                </div>
+                {% endif %}
+                
+                {% if abbonamento.configurazione.rinnovo_automatico %}
+                <div class="mt-2">
+                    <span class="badge bg-success">
+                        <i class="bi bi-arrow-repeat"></i> Rinnovo Automatico
+                    </span>
+                </div>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Modal Aggiungi Targa -->
+<div class="modal fade" id="modalAggiungiTarga" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">
+                    <i class="bi bi-car-front"></i>
+                    Aggiungi Targa
+                </h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <form id="form-aggiungi-targa">
+                <div class="modal-body">
+                    <div class="mb-3">
+                        <label class="form-label">Targa:</label>
+                        <input type="text" class="form-control" id="nuova-targa" 
+                               placeholder="ES: AB123CD" maxlength="8" required>
+                        <div class="form-text">Inserisci la targa senza spazi</div>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">
+                        <i class="bi bi-x-circle"></i> Annulla
+                    </button>
+                    <button type="submit" class="btn btn-primary">
+                        <i class="bi bi-plus-circle"></i> Aggiungi Targa
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/qrcode@1.5.3/build/qrcode.min.js"></script>
+<script>
+// Genera QR Code
+document.addEventListener('DOMContentLoaded', function() {
+    const canvas = document.createElement('canvas');
+    QRCode.toCanvas(canvas, '{{ abbonamento.codice_accesso }}', {
+        width: 200,
+        height: 200,
+        color: {
+            dark: '#000000',
+            light: '#FFFFFF'
+        }
+    });
+    document.getElementById('qrcode').appendChild(canvas);
+});
+
+function stampaQR() {
+    // TODO: Implementare stampa QR
+    alert('Funzione stampa QR non ancora implementata');
+}
+
+function scaricaQR() {
+    const canvas = document.querySelector('#qrcode canvas');
+    const link = document.createElement('a');
+    link.download = `abbonamento-${abbonamento.codice_accesso}.png`;
+    link.href = canvas.toDataURL();
+    link.click();
+}
+
+function sospendiAbbonamento() {
+    if (!confirm('Confermi di voler sospendere questo abbonamento?')) return;
+    
+    // TODO: Implementare sospensione abbonamento
+    alert('Funzione sospensione non ancora implementata');
+    return;
+    /*
+    fetch(`{% url "abbonamenti:sospendi-abbonamento" abbonamento.pk %}`, {
+        method: 'POST',
+        headers: {
+            'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]').value
+        }
+    })
+    .then(response => {
+        if (response.ok) {
+            location.reload();
+        } else {
+            alert('Errore nella sospensione');
+        }
+    });
+    */
+}
+
+function riattivaAbbonamento() {
+    if (!confirm('Confermi di voler riattivare questo abbonamento?')) return;
+    
+    // TODO: Implementare riattivazione abbonamento
+    alert('Funzione riattivazione non ancora implementata');
+}
+
+function aggiungiTarga() {
+    const modal = new bootstrap.Modal(document.getElementById('modalAggiungiTarga'));
+    modal.show();
+}
+
+function rimuoviTarga(targaId) {
+    if (!confirm('Confermi di voler rimuovere questa targa?')) return;
+    
+    // TODO: Implementare rimozione targa
+    alert('Funzione rimozione targa non ancora implementata');
+}
+
+function inviaPromemoria() {
+    if (!confirm('Confermi di voler inviare un promemoria al cliente?')) return;
+    
+    // TODO: Implementare invio promemoria
+    alert('Funzione invio promemoria non ancora implementata');
+}
+
+// Form aggiungi targa
+const formAggiungiTarga = document.getElementById('form-aggiungi-targa');
+if (formAggiungiTarga) {
+    formAggiungiTarga.addEventListener('submit', function(e) {
+        e.preventDefault();
+        
+        // TODO: Implementare aggiunta targa
+        alert('Funzione aggiunta targa non ancora implementata');
+    });
+}
+
+// Formattazione automatica targa
+const nuovaTarga = document.getElementById('nuova-targa');
+if (nuovaTarga) {
+    nuovaTarga.addEventListener('input', function() {
+        this.value = this.value.toUpperCase().replace(/[^A-Z0-9]/g, '');
+    });
+}
+</script>
+{% endblock %}

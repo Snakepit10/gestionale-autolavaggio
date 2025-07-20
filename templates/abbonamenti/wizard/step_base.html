@@ -1,0 +1,353 @@
+{% extends 'base.html' %}
+{% load static %}
+{% load crispy_forms_tags %}
+
+{% block title %}Configurazione Abbonamento - Informazioni Base{% endblock %}
+
+{% block extra_css %}
+<style>
+.wizard-steps {
+    display: flex;
+    justify-content: space-between;
+    margin-bottom: 30px;
+    counter-reset: step;
+}
+
+.wizard-step {
+    flex: 1;
+    text-align: center;
+    position: relative;
+    counter-increment: step;
+}
+
+.wizard-step::before {
+    content: counter(step);
+    width: 40px;
+    height: 40px;
+    border-radius: 50%;
+    background: #6c757d;
+    color: white;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    margin: 0 auto 10px;
+    font-weight: bold;
+}
+
+.wizard-step.active::before {
+    background: #0d6efd;
+}
+
+.wizard-step.completed::before {
+    background: #28a745;
+    content: "✓";
+}
+
+.wizard-step:not(:last-child)::after {
+    content: '';
+    position: absolute;
+    top: 20px;
+    left: 60%;
+    right: -40%;
+    height: 2px;
+    background: #dee2e6;
+    z-index: -1;
+}
+
+.wizard-step.completed:not(:last-child)::after {
+    background: #28a745;
+}
+
+.form-section {
+    background: white;
+    border-radius: 10px;
+    padding: 30px;
+    box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+    margin-bottom: 20px;
+}
+
+.price-input {
+    font-size: 1.2em;
+    font-weight: bold;
+}
+
+.duration-options {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+    gap: 15px;
+    margin-top: 15px;
+}
+
+.duration-card {
+    border: 2px solid #e9ecef;
+    border-radius: 10px;
+    padding: 20px;
+    text-align: center;
+    cursor: pointer;
+    transition: all 0.3s ease;
+}
+
+.duration-card:hover {
+    border-color: #0d6efd;
+    transform: translateY(-2px);
+    box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+}
+
+.duration-card.selected {
+    border-color: #0d6efd;
+    background: #f8f9ff;
+}
+
+.duration-card input[type="radio"] {
+    display: none;
+}
+
+.preview-card {
+    background: linear-gradient(135deg, #0d6efd, #6610f2);
+    color: white;
+    border-radius: 15px;
+    padding: 25px;
+    text-align: center;
+}
+
+.help-section {
+    background: #f8f9fa;
+    border-radius: 10px;
+    padding: 20px;
+    margin-top: 20px;
+}
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="container">
+    <div class="row">
+        <div class="col-lg-8 mx-auto">
+            <h1 class="text-center mb-4">
+                <i class="bi bi-magic"></i>
+                Wizard Configurazione Abbonamento
+            </h1>
+            
+            <!-- Steps Indicator -->
+            <div class="wizard-steps">
+                <div class="wizard-step active">
+                    <div>Informazioni Base</div>
+                </div>
+                <div class="wizard-step">
+                    <div>Modalità Targa</div>
+                </div>
+                <div class="wizard-step">
+                    <div>Accessi e Reset</div>
+                </div>
+                <div class="wizard-step">
+                    <div>Servizi Inclusi</div>
+                </div>
+            </div>
+
+            <form method="post">
+                {% csrf_token %}
+                {{ wizard.management_form }}
+                
+                <div class="form-section">
+                    <h3 class="mb-4">
+                        <i class="bi bi-info-circle text-primary"></i>
+                        Informazioni di Base
+                    </h3>
+                    
+                    
+                    <div class="row">
+                        <div class="col-md-6">
+                            <div class="mb-3">
+                                <label class="form-label">Titolo Abbonamento *</label>
+                                {{ form.titolo|as_crispy_field }}
+                                <div class="form-text">Scegli un nome accattivante per questo tipo di abbonamento</div>
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="mb-3">
+                                <label class="form-label">Prezzo (€) *</label>
+                                <div class="input-group">
+                                    <span class="input-group-text">€</span>
+                                    {{ form.prezzo }}
+                                </div>
+                                <div class="form-text">Prezzo di vendita dell'abbonamento</div>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="mb-3">
+                        <label class="form-label">Descrizione</label>
+                        {{ form.descrizione|as_crispy_field }}
+                        <div class="form-text">Descrizione dettagliata che apparirà ai clienti</div>
+                    </div>
+                    
+                    <div class="mb-4">
+                        <label class="form-label">Durata Abbonamento *</label>
+                        
+                        <!-- Campo Django nascosto -->
+                        <div style="display: none;">
+                            {{ form.durata }}
+                        </div>
+                        
+                        <div class="duration-options">
+                            {% for value, label in form.durata.field.choices %}
+                            <div class="duration-card" onclick="selectDuration('{{ value }}')">
+                                <input type="radio" name="durata_display" value="{{ value }}" id="durata-display-{{ value }}"
+                                       {% if form.durata.value == value %}checked{% endif %}>
+                                <h5 class="mb-2">{{ label }}</h5>
+                                <small class="text-muted">
+                                    {% if value == '1_mese' %}
+                                        Perfetto per test e clienti occasionali
+                                    {% elif value == '3_mesi' %}
+                                        Ideale per clienti regolari
+                                    {% elif value == '6_mesi' %}
+                                        Ottimo rapporto qualità-prezzo
+                                    {% elif value == '12_mesi' %}
+                                        Massimo risparmio per clienti fedeli
+                                    {% endif %}
+                                </small>
+                            </div>
+                            {% endfor %}
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Status dell'abbonamento -->
+                <div class="form-section">
+                    <h4 class="mb-3">
+                        <i class="bi bi-check-circle text-success"></i>
+                        Stato
+                    </h4>
+                    
+                    <div class="alert alert-info">
+                        <i class="bi bi-info-circle"></i>
+                        <strong>Prossimo passo:</strong> Configurazione modalità targa
+                        <br><small>Potrai definire le opzioni avanzate nei passi successivi del wizard.</small>
+                    </div>
+                </div>
+
+                <!-- Navigazione -->
+                <div class="d-flex justify-content-between mt-4">
+                    <div>
+                        <a href="{% url 'abbonamenti:config-abbonamenti-list' %}" class="btn btn-outline-secondary">
+                            <i class="bi bi-x-circle"></i> Annulla
+                        </a>
+                    </div>
+                    <div>
+                        <button type="submit" class="btn btn-primary btn-lg">
+                            Avanti <i class="bi bi-arrow-right"></i>
+                        </button>
+                    </div>
+                </div>
+            </form>
+        </div>
+        
+        <!-- Sidebar con Preview -->
+        <div class="col-lg-4">
+            <div class="sticky-top" style="top: 20px;">
+                <div class="preview-card">
+                    <h4 id="preview-titolo">Inserisci un titolo</h4>
+                    <h2 id="preview-prezzo">€0.00</h2>
+                    <p id="preview-durata">Seleziona durata</p>
+                </div>
+                
+                <div class="help-section">
+                    <h6><i class="bi bi-lightbulb"></i> Suggerimenti</h6>
+                    <ul class="small">
+                        <li><strong>Titolo:</strong> Usa nomi chiari come "Lavaggio Premium" o "Pacchetto Mensile"</li>
+                        <li><strong>Prezzo:</strong> Considera uno sconto rispetto ai singoli servizi</li>
+                        <li><strong>Durata:</strong> Gli abbonamenti più lunghi hanno maggiore fidelizzazione</li>
+                        <li><strong>Rinnovo:</strong> Il rinnovo automatico migliora la retention</li>
+                    </ul>
+                </div>
+                
+                <div class="mt-3">
+                    <h6>Cosa faremo nei prossimi step:</h6>
+                    <div class="small">
+                        <div class="d-flex align-items-center mb-2">
+                            <span class="badge bg-primary me-2">2</span>
+                            <span>Configurazione modalità targa</span>
+                        </div>
+                        <div class="d-flex align-items-center mb-2">
+                            <span class="badge bg-primary me-2">3</span>
+                            <span>Impostazione accessi e reset periodici</span>
+                        </div>
+                        <div class="d-flex align-items-center">
+                            <span class="badge bg-primary me-2">4</span>
+                            <span>Selezione servizi inclusi</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+function selectDuration(value) {
+    // Rimuovi selezioni precedenti
+    document.querySelectorAll('.duration-card').forEach(card => {
+        card.classList.remove('selected');
+    });
+    
+    // Seleziona nuovo display
+    document.querySelector(`input[name="durata_display"][value="${value}"]`).checked = true;
+    document.querySelector(`input[name="durata_display"][value="${value}"]`).closest('.duration-card').classList.add('selected');
+    
+    // Aggiorna il campo Django reale
+    document.querySelector('select[name="durata"]').value = value;
+    
+    updatePreview();
+}
+
+function updatePreview() {
+    // Aggiorna preview in tempo reale
+    const titolo = document.querySelector('[name="titolo"]').value || 'Inserisci un titolo';
+    const prezzo = document.querySelector('[name="prezzo"]').value || '0.00';
+    const durata = document.querySelector('input[name="durata_display"]:checked');
+    
+    document.getElementById('preview-titolo').textContent = titolo;
+    document.getElementById('preview-prezzo').textContent = `€${parseFloat(prezzo || 0).toFixed(2)}`;
+    
+    if (durata) {
+        document.getElementById('preview-durata').textContent = durata.closest('.duration-card').querySelector('h5').textContent;
+    }
+}
+
+// Setup event listeners
+document.addEventListener('DOMContentLoaded', function() {
+    // Aggiorna preview quando cambiano i campi
+    document.querySelector('[name="titolo"]').addEventListener('input', updatePreview);
+    document.querySelector('[name="prezzo"]').addEventListener('input', updatePreview);
+    
+    // Inizializza selezione durata se presente - sincronizza con campo Django
+    const djangoSelect = document.querySelector('select[name="durata"]');
+    if (djangoSelect && djangoSelect.value) {
+        selectDuration(djangoSelect.value);
+    }
+    
+    updatePreview();
+});
+
+// Validazione form
+document.querySelector('form').addEventListener('submit', function(e) {
+    const titolo = document.querySelector('[name="titolo"]').value.trim();
+    const prezzo = document.querySelector('[name="prezzo"]').value;
+    const durata = document.querySelector('select[name="durata"]').value;
+    
+    
+    if (!titolo || !prezzo || !durata) {
+        e.preventDefault();
+        alert('Compila tutti i campi obbligatori prima di continuare');
+        return false;
+    }
+    
+    if (parseFloat(prezzo) <= 0) {
+        e.preventDefault();
+        alert('Il prezzo deve essere maggiore di zero');
+        return false;
+    }
+    
+});
+</script>
+{% endblock %}
