@@ -43,7 +43,16 @@ class PrenotazioneForm(forms.ModelForm):
     nome_cliente = forms.CharField(
         max_length=100,
         required=False,
-        help_text="Nome completo (obbligatorio se non è cliente registrato)"
+        help_text="Nome (obbligatorio se non è cliente registrato)"
+    )
+    cognome_cliente = forms.CharField(
+        max_length=100,
+        required=False,
+        help_text="Cognome (obbligatorio se non è cliente registrato)"
+    )
+    email_cliente = forms.EmailField(
+        required=False,
+        help_text="Email (opzionale)"
     )
     telefono_cliente = forms.CharField(
         max_length=20,
@@ -84,10 +93,15 @@ class PrenotazioneForm(forms.ModelForm):
     
     
     # Note
-    note_cliente = forms.CharField(
+    nota_cliente = forms.CharField(
         widget=forms.Textarea(attrs={'rows': 3}),
         required=False,
-        help_text="Note aggiuntive per la prenotazione"
+        help_text="Note del cliente per la prenotazione"
+    )
+    nota_interna = forms.CharField(
+        widget=forms.Textarea(attrs={'rows': 3}),
+        required=False,
+        help_text="Note interne (non visibili al cliente)"
     )
     
     # Stato (solo in modifica)
@@ -108,7 +122,7 @@ class PrenotazioneForm(forms.ModelForm):
         from apps.clienti.models import Cliente
         from apps.core.models import ServizioProdotto, Postazione
         
-        self.fields['cliente'].queryset = Cliente.objects.all().order_by('nome', 'ragione_sociale')
+        self.fields['cliente'].queryset = Cliente.objects.all().order_by('cognome', 'ragione_sociale', 'nome')
         self.fields['servizi_selezionati'].queryset = ServizioProdotto.objects.filter(
             tipo='servizio',
             attivo=True
@@ -122,7 +136,21 @@ class PrenotazioneForm(forms.ModelForm):
         if self.instance.pk:
             if hasattr(self.instance, 'cliente') and self.instance.cliente:
                 self.initial['cliente'] = self.instance.cliente
-            # Altri campi andrebbero popolati dal modello esteso
+            
+            # Popola i campi con i dati esistenti
+            if hasattr(self.instance, 'slot') and self.instance.slot:
+                self.initial['data_prenotazione'] = self.instance.slot.data
+                self.initial['ora_prenotazione'] = self.instance.slot.ora_inizio
+            
+            self.initial['tipo_auto'] = self.instance.tipo_auto or ''
+            self.initial['nota_cliente'] = self.instance.nota_cliente or ''
+            self.initial['nota_interna'] = self.instance.nota_interna or ''
+            self.initial['stato'] = self.instance.stato
+            self.initial['durata_stimata_minuti'] = self.instance.durata_stimata_minuti
+            
+            # Popola servizi selezionati
+            if self.instance.servizi.exists():
+                self.initial['servizi_selezionati'] = list(self.instance.servizi.all())
         
         self.helper = FormHelper()
         self.helper.form_method = 'post'
@@ -132,6 +160,8 @@ class PrenotazioneForm(forms.ModelForm):
         cleaned_data = super().clean()
         cliente = cleaned_data.get('cliente')
         nome_cliente = cleaned_data.get('nome_cliente')
+        cognome_cliente = cleaned_data.get('cognome_cliente')
+        email_cliente = cleaned_data.get('email_cliente')
         telefono_cliente = cleaned_data.get('telefono_cliente')
         tipo_auto = cleaned_data.get('tipo_auto')
         servizi_selezionati = cleaned_data.get('servizi_selezionati')
@@ -140,7 +170,11 @@ class PrenotazioneForm(forms.ModelForm):
         if not cliente:
             if not nome_cliente:
                 raise forms.ValidationError(
-                    'Se non selezioni un cliente registrato, devi fornire almeno il nome.'
+                    'Se non selezioni un cliente registrato, devi fornire il nome.'
+                )
+            if not cognome_cliente:
+                raise forms.ValidationError(
+                    'Se non selezioni un cliente registrato, devi fornire il cognome.'
                 )
         
         # Validazione servizi

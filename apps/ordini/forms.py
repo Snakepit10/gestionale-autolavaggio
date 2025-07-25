@@ -24,7 +24,7 @@ class OrdineForm(forms.ModelForm):
         self.helper.form_method = 'post'
         
         # Personalizza queryset cliente
-        self.fields['cliente'].queryset = Cliente.objects.all().order_by('nome', 'ragione_sociale')
+        self.fields['cliente'].queryset = Cliente.objects.all().order_by('cognome', 'ragione_sociale', 'nome')
         self.fields['cliente'].empty_label = "Seleziona cliente (opzionale)"
 
 

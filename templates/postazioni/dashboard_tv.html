@@ -192,11 +192,17 @@
         }
         
         .col-services {
-            width: 25%;
+            width: 26%;
             font-size: 1.1rem;
             text-align: left;
             line-height: 1.4;
             color: #bdc3c7;
+        }
+        
+        .col-payment {
+            width: 8%;
+            font-size: 1rem;
+            text-align: center;
         }
         
         .order-notes {
@@ -274,6 +280,32 @@
             background: linear-gradient(135deg, #27ae60 0%, #229954 100%);
             color: #ffffff;
             box-shadow: 0 2px 8px rgba(39, 174, 96, 0.4);
+        }
+        
+        .payment-dot {
+            width: 20px;
+            height: 20px;
+            border-radius: 50%;
+            display: inline-block;
+            margin: 0 auto;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.3);
+            border: 2px solid rgba(255,255,255,0.3);
+        }
+        
+        .payment-pagato {
+            background: linear-gradient(135deg, #27ae60 0%, #229954 100%);
+        }
+        
+        .payment-non-pagato {
+            background: linear-gradient(135deg, #e74c3c 0%, #c0392b 100%);
+        }
+        
+        .payment-parziale {
+            background: linear-gradient(135deg, #f39c12 0%, #e67e22 100%);
+        }
+        
+        .payment-differito {
+            background: linear-gradient(135deg, #3498db 0%, #2980b9 100%);
         }
         
         .delivery-immediate {
@@ -453,6 +485,9 @@
                         <th class="table-header col-services">
                             SERVIZI
                         </th>
+                        <th class="table-header col-payment">
+                            PAGAMENTO
+                        </th>
                         <th class="table-header col-status">
                             STATO
                         </th>
@@ -463,7 +498,7 @@
                 </thead>
                 <tbody id="ordersTableBody">
                     <tr class="table-row">
-                        <td class="table-cell" colspan="6">
+                        <td class="table-cell" colspan="7">
                             <div class="no-orders">
                                 <div class="loading-spinner"></div>
                                 Caricamento ordini...
@@ -571,10 +606,12 @@
                 minute: '2-digit' 
             });
             
-            // Consegna - mostra "Immediata" se è immediata, altrimenti l'ora
+            // Consegna - mostra "Immediata" se è immediata, per programmata mostra ora richiesta
             let deliveryText = '';
             if (ordine.tipo_consegna === 'immediata') {
                 deliveryText = '<span class="delivery-immediate">Immediata</span>';
+            } else if (ordine.tipo_consegna === 'programmata') {
+                deliveryText = ordine.ora_consegna_richiesta || ordine.ora_consegna_prevista || ordine.data_ora;
             } else {
                 deliveryText = ordine.ora_consegna_prevista || ordine.data_ora;
             }
@@ -610,6 +647,25 @@
                 ${waitingTimeHtml}
             `;
             
+            // Stato del pagamento
+            let paymentClass = '';
+            switch(ordine.stato_pagamento) {
+                case 'pagato':
+                    paymentClass = 'payment-pagato';
+                    break;
+                case 'non_pagato':
+                    paymentClass = 'payment-non-pagato';
+                    break;
+                case 'parziale':
+                    paymentClass = 'payment-parziale';
+                    break;
+                case 'differito':
+                    paymentClass = 'payment-differito';
+                    break;
+                default:
+                    paymentClass = 'payment-non-pagato';
+            }
+
             row.innerHTML = `
                 <td class="table-cell col-order-number">
                     ${lastTwoDigits}
@@ -622,6 +678,9 @@
                 </td>
                 <td class="table-cell col-services">
                     ${serviziConNote}
+                </td>
+                <td class="table-cell col-payment">
+                    <div class="payment-dot ${paymentClass}"></div>
                 </td>
                 <td class="table-cell col-status">
                     <span class="status-badge ${statusClass}">
@@ -664,7 +723,7 @@
                 const row = document.createElement('tr');
                 row.className = 'table-row';
                 row.innerHTML = `
-                    <td class="table-cell" colspan="6">
+                    <td class="table-cell" colspan="7">
                         <div class="no-orders">
                             <i class="bi bi-check-circle"></i>
                             Nessun ordine in lavorazione
@@ -705,7 +764,7 @@
                 const tbody = document.getElementById('ordersTableBody');
                 tbody.innerHTML = `
                     <tr class="table-row">
-                        <td class="table-cell" colspan="6">
+                        <td class="table-cell" colspan="7">
                             <div class="no-orders">
                                 <i class="bi bi-exclamation-triangle"></i>
                                 Errore di connessione

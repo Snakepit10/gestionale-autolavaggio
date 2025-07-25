@@ -20,6 +20,14 @@ class HomeView(TemplateView):  # Temporaneamente rimosso LoginRequiredMixin
     
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
+        from datetime import date, datetime, timedelta
+        from django.db.models import Sum, Count, Q
+        from apps.ordini.models import Ordine
+        from apps.clienti.models import Cliente
+        
+        oggi = date.today()
+        inizio_oggi = datetime.combine(oggi, datetime.min.time())
+        fine_oggi = datetime.combine(oggi, datetime.max.time())
         
         # Statistiche dashboard
         context['prodotti_scorta_bassa'] = ServizioProdotto.objects.filter(
@@ -28,6 +36,63 @@ class HomeView(TemplateView):  # Temporaneamente rimosso LoginRequiredMixin
         ).extra(
             where=["quantita_disponibile <= quantita_minima_alert"]
         ).count()
+        
+        # Ordini di oggi
+        ordini_oggi = Ordine.objects.filter(
+            data_ora__range=[inizio_oggi, fine_oggi]
+        )
+        context['ordini_oggi'] = ordini_oggi.count()
+        
+        # Incasso di oggi
+        incasso_oggi = ordini_oggi.filter(
+            stato_pagamento='pagato'
+        ).aggregate(totale=Sum('totale_finale'))['totale'] or 0
+        context['incasso_oggi'] = incasso_oggi
+        
+        # Ordini in lavorazione
+        context['ordini_in_lavorazione'] = Ordine.objects.filter(
+            stato='in_lavorazione'
+        ).count()
+        
+        # Totale clienti
+        context['clienti_totali'] = Cliente.objects.count()
+        
+        # Ultimi 5 ordini
+        context['ordini_recenti'] = Ordine.objects.select_related(
+            'cliente'
+        ).order_by('-data_ora')[:5]
+        
+        # Stato postazioni (se disponibile)
+        try:
+            from apps.postazioni.models import Postazione
+            postazioni = Postazione.objects.all()
+            context['postazioni'] = postazioni
+            context['postazioni_attive'] = postazioni.filter(attiva=True).count()
+            context['postazioni_totali'] = postazioni.count()
+        except:
+            context['postazioni'] = []
+            context['postazioni_attive'] = 0
+            context['postazioni_totali'] = 0
+        
+        # Statistiche settimanali per il grafico
+        sette_giorni_fa = oggi - timedelta(days=7)
+        ordini_settimana = []
+        for i in range(7):
+            giorno = sette_giorni_fa + timedelta(days=i)
+            inizio_giorno = datetime.combine(giorno, datetime.min.time())
+            fine_giorno = datetime.combine(giorno, datetime.max.time())
+            
+            count = Ordine.objects.filter(
+                data_ora__range=[inizio_giorno, fine_giorno]
+            ).count()
+            
+            ordini_settimana.append({
+                'giorno': giorno.strftime('%d/%m'),
+                'count': count
+            })
+        
+        import json
+        context['ordini_settimana'] = json.dumps(ordini_settimana)
         
         return context
 
@@ -72,12 +137,17 @@ class CatalogoListView(LoginRequiredMixin, ListView):
         # Filtri
         categoria = self.request.GET.get('categoria')
         tipo = self.request.GET.get('tipo')
+        stato = self.request.GET.get('stato')
         search = self.request.GET.get('search')
         
         if categoria:
-            queryset = queryset.filter(categoria_id=categoria)
+            queryset = queryset.filter(categoria__nome=categoria)
         if tipo:
             queryset = queryset.filter(tipo=tipo)
+        if stato == 'attivo':
+            queryset = queryset.filter(attivo=True)
+        elif stato == 'inattivo':
+            queryset = queryset.filter(attivo=False)
         if search:
             queryset = queryset.filter(titolo__icontains=search)
         
@@ -212,3 +282,24 @@ def test_stampante(request, pk):
         messages.error(request, f'Errore durante il test: {str(e)}')
     
     return JsonResponse({'success': result == 0})
+
+
+@login_required
+def servizi_json(request):
+    """API JSON per elenco servizi attivi"""
+    servizi = ServizioProdotto.objects.filter(
+        tipo='servizio',
+        attivo=True
+    ).order_by('titolo')
+    
+    servizi_data = []
+    for servizio in servizi:
+        servizi_data.append({
+            'id': servizio.id,
+            'titolo': servizio.titolo,
+            'prezzo': float(servizio.prezzo),
+            'durata_minuti': servizio.durata_minuti or 0,
+            'categoria': servizio.categoria.nome if servizio.categoria else None
+        })
+    
+    return JsonResponse({'servizi': servizi_data})

@@ -344,16 +344,18 @@ function duplicaSlot(slotId) {
             'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]').value
         }
     })
-    .then(response => {
-        if (response.ok) {
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            alert('✅ ' + (data.message || 'Slot duplicato con successo'));
             location.reload();
         } else {
-            alert('Errore nella duplicazione dello slot');
+            alert('❌ Errore: ' + (data.error || 'Impossibile duplicare lo slot'));
         }
     })
     .catch(error => {
         console.error('Errore:', error);
-        alert('Errore nella duplicazione dello slot');
+        alert('❌ Errore nella duplicazione dello slot');
     });
 }
 

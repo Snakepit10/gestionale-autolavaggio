@@ -253,9 +253,10 @@
                         <input type="hidden" id="selected_time" name="ora_prenotazione" value="">
                         <input type="hidden" id="cliente_id" name="cliente" value="">
                         <input type="hidden" id="nome_cliente_hidden" name="nome_cliente" value="">
+                        <input type="hidden" id="cognome_cliente_hidden" name="cognome_cliente" value="">
                         <input type="hidden" id="telefono_cliente_hidden" name="telefono_cliente" value="">
                         <input type="hidden" id="tipo_auto_hidden" name="tipo_auto" value="">
-                        <input type="hidden" id="note_cliente_hidden" name="note_cliente" value="">
+                        <input type="hidden" id="nota_cliente_hidden" name="nota_cliente" value="">
 
                         <!-- Step 1: Cliente -->
                         <div class="wizard-step-content active" id="step-content-1">
@@ -282,7 +283,9 @@
                                                 <select class="form-select" id="id_cliente" name="cliente">
                                                     <option value="">Seleziona cliente dalla lista completa...</option>
                                                     {% for cliente in form.cliente.field.queryset %}
-                                                        <option value="{{ cliente.id }}">{{ cliente.nome }} - {{ cliente.email }}</option>
+                                                        <option value="{{ cliente.id }}">
+                                                            {{ cliente.nome_completo }} ({{ cliente.get_tipo_display }}) - {{ cliente.telefono|default:"N/A" }}
+                                                        </option>
                                                     {% endfor %}
                                                 </select>
                                             </div>
@@ -296,8 +299,17 @@
                                             <h6 class="mb-0">Nuovo Cliente</h6>
                                         </div>
                                         <div class="card-body">
-                                            <div class="mb-3">
-                                                {{ form.nome_cliente|as_crispy_field }}
+                                            <div class="row">
+                                                <div class="col-md-6">
+                                                    <div class="mb-3">
+                                                        {{ form.nome_cliente|as_crispy_field }}
+                                                    </div>
+                                                </div>
+                                                <div class="col-md-6">
+                                                    <div class="mb-3">
+                                                        {{ form.cognome_cliente|as_crispy_field }}
+                                                    </div>
+                                                </div>
                                             </div>
                                             <div class="mb-3">
                                                 {{ form.telefono_cliente|as_crispy_field }}
@@ -390,7 +402,7 @@
                                             <h6 class="mb-0">Note per la Prenotazione</h6>
                                         </div>
                                         <div class="card-body">
-                                            {{ form.note_cliente|as_crispy_field }}
+                                            {{ form.nota_cliente|as_crispy_field }}
                                             {% if form.instance.pk %}
                                                 {{ form.stato|as_crispy_field }}
                                             {% endif %}
@@ -569,9 +581,13 @@ function searchClients(event) {
                 let html = '';
                 data.clienti.forEach(cliente => {
                     html += `
-                        <div class="client-search-result" onclick="selectSearchResult(${cliente.id}, '${cliente.nome}', '${cliente.email}', '${cliente.telefono}')">
-                            <strong>${cliente.nome}</strong><br>
-                            <small class="text-muted">${cliente.email}${cliente.telefono ? ' - ' + cliente.telefono : ''}</small>
+                        <div class="client-search-result" onclick="selectSearchResult(${cliente.id}, '${cliente.nome_completo}', '${cliente.tipo_display}', '${cliente.telefono}')">
+                            <strong>${cliente.nome_completo}</strong>
+                            <span class="badge bg-${cliente.tipo === 'privato' ? 'primary' : 'success'} ms-2">${cliente.tipo_display}</span>
+                            <br>
+                            <small class="text-muted">
+                                <i class="bi bi-telephone"></i> ${cliente.telefono || 'N/A'}
+                            </small>
                         </div>
                     `;
                 });
@@ -586,8 +602,8 @@ function searchClients(event) {
         });
 }
 
-function selectSearchResult(id, nome, email, telefono) {
-    selectedClient = { id, nome, email, telefono, type: 'existing' };
+function selectSearchResult(id, nomeCompleto, tipo, telefono) {
+    selectedClient = { id, nome: nomeCompleto, tipo, telefono, type: 'existing' };
     
     // Evidenzia il risultato selezionato
     document.querySelectorAll('.client-search-result').forEach(el => {
@@ -610,11 +626,12 @@ function selectExistingClient(id, text) {
 
 function checkNewClientData() {
     const nome = document.getElementById('id_nome_cliente').value.trim();
+    const cognome = document.getElementById('id_cognome_cliente').value.trim();
     const telefono = document.getElementById('id_telefono_cliente').value.trim();
     const tipoAuto = document.getElementById('id_tipo_auto').value.trim();
     
-    if (nome) {  // Solo il nome è obbligatorio ora
-        selectedClient = { nome, telefono, tipoAuto, type: 'new' };
+    if (nome && cognome) {  // Nome e cognome sono entrambi obbligatori
+        selectedClient = { nome, cognome, telefono, tipoAuto, type: 'new' };
         
         // Deseleziona cliente esistente
         document.getElementById('id_cliente').value = '';
@@ -717,6 +734,13 @@ function loadAvailableSlots() {
                 
                 html += '</div>';
                 slotsContainer.innerHTML = html;
+                
+                // Se c'è un orario preselezionato dal calendario, selezionalo automaticamente
+                {% if ora_preselezionata %}
+                    setTimeout(function() {
+                        selectTimeSlot('{{ ora_preselezionata }}');
+                    }, 100);
+                {% endif %}
             } else {
                 slotsContainer.innerHTML = '<p class="text-muted text-center">Nessun slot disponibile per questa data</p>';
             }
@@ -832,8 +856,13 @@ function updateNavigation() {
 function updateSummary() {
     // Cliente
     if (selectedClient) {
-        document.getElementById('summary-client').textContent = 
-            `${selectedClient.nome} ${selectedClient.email ? '(' + selectedClient.email + ')' : ''}`;
+        let clientText = '';
+        if (selectedClient.type === 'new') {
+            clientText = `${selectedClient.nome} ${selectedClient.cognome || ''}`;
+        } else {
+            clientText = `${selectedClient.nome} ${selectedClient.email ? '(' + selectedClient.email + ')' : ''}`;
+        }
+        document.getElementById('summary-client').textContent = clientText.trim();
     }
     
     // Data e ora
@@ -859,10 +888,13 @@ function updateSummary() {
     document.getElementById('summary-total').textContent = `€${totalPrice.toFixed(2)}`;
     
     // Note (opzionale)
-    const note = document.getElementById('id_note_cliente').value;
-    if (note) {
-        document.getElementById('summary-notes').textContent = note;
-        document.getElementById('summary-notes-section').style.display = 'flex';
+    const noteElement = document.getElementById('id_nota_cliente');
+    if (noteElement) {
+        const note = noteElement.value;
+        if (note) {
+            document.getElementById('summary-notes').textContent = note;
+            document.getElementById('summary-notes-section').style.display = 'flex';
+        }
     }
     
     // Popola i campi nascosti per il submit
@@ -899,12 +931,14 @@ function populateHiddenFields() {
             // Cliente esistente - popola solo cliente_id e svuota gli altri campi
             document.getElementById('cliente_id').value = selectedClient.id;
             document.getElementById('nome_cliente_hidden').value = '';
+            document.getElementById('cognome_cliente_hidden').value = '';
             document.getElementById('telefono_cliente_hidden').value = '';
             document.getElementById('tipo_auto_hidden').value = selectedClient.tipoAuto || '';
         } else {
             // Nuovo cliente - popola i dati del nuovo cliente e svuota cliente_id
             document.getElementById('cliente_id').value = '';
-            document.getElementById('nome_cliente_hidden').value = selectedClient.nome;
+            document.getElementById('nome_cliente_hidden').value = selectedClient.nome || '';
+            document.getElementById('cognome_cliente_hidden').value = selectedClient.cognome || '';
             document.getElementById('telefono_cliente_hidden').value = selectedClient.telefono || '';
             document.getElementById('tipo_auto_hidden').value = selectedClient.tipoAuto || '';
         }
@@ -912,14 +946,16 @@ function populateHiddenFields() {
         // Nessun cliente selezionato - svuota tutti i campi
         document.getElementById('cliente_id').value = '';
         document.getElementById('nome_cliente_hidden').value = '';
+        document.getElementById('cognome_cliente_hidden').value = '';
         document.getElementById('telefono_cliente_hidden').value = '';
         document.getElementById('tipo_auto_hidden').value = '';
     }
     
     // Note
-    const note = document.getElementById('id_note_cliente').value;
-    if (note) {
-        document.getElementById('note_cliente_hidden').value = note;
+    const noteElement = document.getElementById('id_nota_cliente');
+    if (noteElement) {
+        const note = noteElement.value;
+        document.getElementById('nota_cliente_hidden').value = note || '';
     }
 }
 
@@ -933,6 +969,7 @@ function submitWizard() {
     console.log('Ora:', document.getElementById('selected_time').value);
     console.log('Durata:', document.getElementById('id_durata_stimata_minuti').value);
     console.log('Nome cliente:', document.getElementById('nome_cliente_hidden').value);
+    console.log('Cognome cliente:', document.getElementById('cognome_cliente_hidden').value);
     
     // Verifica che tutti i dati necessari siano presenti
     if (!selectedClient) {
@@ -951,5 +988,42 @@ function submitWizard() {
     // Submit del form
     document.getElementById('wizardForm').submit();
 }
+
+// Inizializzazione con parametri dal calendario
+document.addEventListener('DOMContentLoaded', function() {
+    {% if data_preselezionata and ora_preselezionata %}
+        // Precompila data e ora dallo slot selezionato nel calendario
+        const dataPreselezionata = '{{ data_preselezionata }}';
+        const oraPreselezionata = '{{ ora_preselezionata }}';
+        
+        // Imposta i campi hidden
+        document.getElementById('selected_date').value = dataPreselezionata;
+        document.getElementById('selected_time').value = oraPreselezionata;
+        
+        // Converte la data dal formato yyyy-mm-dd al formato per il calendario
+        const dateParts = dataPreselezionata.split('-');
+        if (dateParts.length === 3) {
+            selectedDate = new Date(dateParts[0], dateParts[1] - 1, dateParts[2]);
+            
+            // Aggiorna il calendario
+            generateCalendar();
+            
+            // Carica automaticamente gli slot per la data preselezionata
+            loadTimeSlots(dataPreselezionata);
+            
+            // Avanza automaticamente al step 2 (selezione orario)
+            setTimeout(function() {
+                nextStep();
+                
+                // Dopo aver avanzato, se c'è un orario preselezionato, avanza anche al step 3
+                {% if ora_preselezionata %}
+                    setTimeout(function() {
+                        nextStep();
+                    }, 800);
+                {% endif %}
+            }, 1000);
+        }
+    {% endif %}
+});
 </script>
 {% endblock %}

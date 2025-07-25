@@ -75,7 +75,7 @@
                 <i class="bi bi-play"></i> Riattiva
             </button>
         {% elif abbonamento.stato == 'scaduto' %}
-            <a href="{% url 'abbonamenti:rinnova-abbonamento' abbonamento.pk %}" class="btn btn-info me-2">
+            <a href="{% url 'abbonamenti:rinnova-abbonamento' abbonamento.codice_accesso %}" class="btn btn-info me-2">
                 <i class="bi bi-arrow-repeat"></i> Rinnova
             </a>
         {% endif %}
@@ -302,6 +302,77 @@
         </div>
         {% endif %}
 
+        <!-- Verifica e Registra Accesso -->
+        <div class="card mb-4">
+            <div class="card-header">
+                <h5 class="mb-0">
+                    <i class="bi bi-check-circle"></i>
+                    Verifica e Registra Accesso
+                </h5>
+            </div>
+            <div class="card-body">
+                <form id="form-verifica-accesso">
+                    {% csrf_token %}
+                    <div class="row">
+                        <div class="col-md-4">
+                            <div class="mb-3">
+                                <label class="form-label">Codice Abbonamento:</label>
+                                <input type="text" class="form-control" id="codice-abbonamento" 
+                                       value="{{ abbonamento.codice_accesso }}" readonly>
+                            </div>
+                        </div>
+                        <div class="col-md-4">
+                            <div class="mb-3">
+                                <label class="form-label">Targa {% if abbonamento.configurazione.modalita_targa != 'libera' %}(richiesta){% else %}(opzionale){% endif %}:</label>
+                                <input type="text" class="form-control" id="targa-accesso" 
+                                       placeholder="ES: AB123CD" maxlength="8"
+                                       {% if abbonamento.configurazione.modalita_targa != 'libera' %}required{% endif %}>
+                                {% if targhe %}
+                                    <div class="form-text">
+                                        Targhe autorizzate: 
+                                        {% for targa in targhe %}
+                                            <span class="badge bg-secondary me-1" style="cursor: pointer;" 
+                                                  onclick="document.getElementById('targa-accesso').value='{{ targa.targa }}'">
+                                                {{ targa.targa }}
+                                            </span>
+                                        {% endfor %}
+                                    </div>
+                                {% endif %}
+                            </div>
+                        </div>
+                        <div class="col-md-4">
+                            <div class="mb-3">
+                                <label class="form-label">Servizio:</label>
+                                <select class="form-select" id="servizio-accesso" required>
+                                    <option value="">Seleziona servizio...</option>
+                                    {% for contatore in contatori_servizi %}
+                                        <option value="{{ contatore.servizio.id }}">
+                                            {{ contatore.servizio.titolo }} ({{ contatore.disponibili }} disponibili)
+                                        </option>
+                                    {% endfor %}
+                                </select>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="row">
+                        <div class="col-md-6">
+                            <button type="submit" class="btn btn-primary w-100">
+                                <i class="bi bi-check-circle"></i> Verifica Accesso
+                            </button>
+                        </div>
+                        <div class="col-md-6">
+                            <button type="button" class="btn btn-success w-100" id="btn-registra-accesso" style="display: none;">
+                                <i class="bi bi-plus-circle"></i> Registra Accesso
+                            </button>
+                        </div>
+                    </div>
+                </form>
+                <div id="result-verifica" class="mt-3" style="display: none;">
+                    <!-- Risultato verifica verrà mostrato qui -->
+                </div>
+            </div>
+        </div>
+
         <!-- Storico Accessi -->
         <div class="card">
             <div class="card-header d-flex justify-content-between align-items-center">
@@ -399,7 +470,7 @@
                             <i class="bi bi-play"></i> Riattiva Abbonamento
                         </button>
                     {% elif abbonamento.stato == 'scaduto' %}
-                        <a href="{% url 'abbonamenti:rinnova-abbonamento' abbonamento.pk %}" 
+                        <a href="{% url 'abbonamenti:rinnova-abbonamento' abbonamento.codice_accesso %}" 
                            class="btn btn-info">
                             <i class="bi bi-arrow-repeat"></i> Rinnova Abbonamento
                         </a>
@@ -603,6 +674,135 @@ if (nuovaTarga) {
     nuovaTarga.addEventListener('input', function() {
         this.value = this.value.toUpperCase().replace(/[^A-Z0-9]/g, '');
     });
+}
+
+// Formattazione automatica targa accesso
+const targaAccesso = document.getElementById('targa-accesso');
+if (targaAccesso) {
+    targaAccesso.addEventListener('input', function() {
+        this.value = this.value.toUpperCase().replace(/[^A-Z0-9]/g, '');
+    });
+}
+
+// Form verifica accesso
+const formVerificaAccesso = document.getElementById('form-verifica-accesso');
+if (formVerificaAccesso) {
+    formVerificaAccesso.addEventListener('submit', function(e) {
+        e.preventDefault();
+        
+        const codice = document.getElementById('codice-abbonamento').value;
+        const targa = document.getElementById('targa-accesso').value;
+        const servizioId = document.getElementById('servizio-accesso').value;
+        
+        if (!servizioId) {
+            alert('Seleziona un servizio');
+            return;
+        }
+        
+        // Chiama API per verifica accesso
+        fetch(`{% url 'abbonamenti:verifica-abbonamento-json' abbonamento.codice_accesso %}`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]').value || getCookie('csrftoken')
+            },
+            body: JSON.stringify({
+                targa: targa,
+                servizio_id: servizioId
+            })
+        })
+        .then(response => response.json())
+        .then(data => {
+            mostrarRisultatoVerifica(data);
+        })
+        .catch(error => {
+            console.error('Errore:', error);
+            alert('Errore nella verifica accesso');
+        });
+    });
+}
+
+// Registra accesso
+document.getElementById('btn-registra-accesso').addEventListener('click', function() {
+    const codice = document.getElementById('codice-abbonamento').value;
+    const targa = document.getElementById('targa-accesso').value;
+    const servizioId = document.getElementById('servizio-accesso').value;
+    
+    if (!confirm('Confermi di voler registrare questo accesso?')) return;
+    
+    fetch(`{% url 'abbonamenti:registra-accesso' abbonamento.codice_accesso %}`, {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+            'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]').value || getCookie('csrftoken')
+        },
+        body: JSON.stringify({
+            targa: targa,
+            servizio_id: servizioId,
+            metodo_verifica: 'codice'
+        })
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            alert('Accesso registrato con successo!');
+            location.reload(); // Ricarica per aggiornare i contatori
+        } else {
+            alert('Errore nella registrazione: ' + data.error);
+        }
+    })
+    .catch(error => {
+        console.error('Errore:', error);
+        alert('Errore nella registrazione accesso');
+    });
+});
+
+function mostrarRisultatoVerifica(data) {
+    const resultDiv = document.getElementById('result-verifica');
+    const btnRegistra = document.getElementById('btn-registra-accesso');
+    
+    let html = '<div class="alert ';
+    if (data.autorizzato) {
+        html += 'alert-success" role="alert">';
+        html += '<i class="bi bi-check-circle"></i> <strong>Accesso Autorizzato</strong>';
+        btnRegistra.style.display = 'block';
+    } else {
+        html += 'alert-danger" role="alert">';
+        html += '<i class="bi bi-x-circle"></i> <strong>Accesso Negato</strong>';
+        html += '<br>Motivo: ' + data.motivo_rifiuto;
+        btnRegistra.style.display = 'none';
+    }
+    
+    if (data.servizio) {
+        html += '<br>Servizio: ' + data.servizio.titolo;
+    }
+    if (data.targa) {
+        html += '<br>Targa: ' + data.targa;
+    }
+    if (data.contatore) {
+        html += '<br>Utilizzi rimasti: ' + (data.contatore.limite - data.contatore.utilizzati);
+    }
+    
+    html += '</div>';
+    
+    resultDiv.innerHTML = html;
+    resultDiv.style.display = 'block';
+}
+
+// Utility function per CSRF token
+function getCookie(name) {
+    let cookieValue = null;
+    if (document.cookie && document.cookie !== '') {
+        const cookies = document.cookie.split(';');
+        for (let i = 0; i < cookies.length; i++) {
+            const cookie = cookies[i].trim();
+            if (cookie.substring(0, name.length + 1) === (name + '=')) {
+                cookieValue = decodeURIComponent(cookie.substring(name.length + 1));
+                break;
+            }
+        }
+    }
+    return cookieValue;
 }
 </script>
 {% endblock %}

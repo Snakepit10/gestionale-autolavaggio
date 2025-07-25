@@ -227,6 +227,10 @@
                     <i class="bi bi-list-check"></i> 
                     Prenotazioni da Fare Check-in ({{ prenotazioni.count }})
                 </h5>
+                <!-- Debug info -->
+                <div class="alert alert-info" style="font-size: 0.8em;">
+                    Debug: Oggetto prenotazioni: {{ prenotazioni }} | Count: {{ prenotazioni.count }} | È lista: {{ prenotazioni|length }}
+                </div>
                 <button class="btn btn-outline-primary" onclick="location.reload()">
                     <i class="bi bi-arrow-clockwise"></i> Aggiorna
                 </button>

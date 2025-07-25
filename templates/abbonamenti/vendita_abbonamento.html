@@ -125,13 +125,13 @@
                                         
                                         <!-- Modalità targa -->
                                         <div class="mt-3">
-                                            {% if config.modalita_targa == 'fissa' %}
+                                            {% if config.modalita_targa == 'singola' %}
                                                 <span class="badge bg-warning">
-                                                    <i class="bi bi-lock"></i> Targa Fissa
+                                                    <i class="bi bi-lock"></i> Targa Singola
                                                 </span>
-                                            {% elif config.modalita_targa == 'variabile' %}
+                                            {% elif config.modalita_targa == 'multipla' %}
                                                 <span class="badge bg-info">
-                                                    <i class="bi bi-arrow-repeat"></i> Targa Variabile
+                                                    <i class="bi bi-arrow-repeat"></i> Targhe Multiple
                                                 </span>
                                             {% else %}
                                                 <span class="badge bg-success">
@@ -149,7 +149,7 @@
                             <i class="bi bi-exclamation-triangle display-1 text-warning"></i>
                             <h3 class="text-warning mt-3">Nessuna Configurazione Disponibile</h3>
                             <p class="text-muted">Non ci sono configurazioni di abbonamento attive per la vendita.</p>
-                            <a href="{% url 'abbonamenti:wizard-configurazione' %}" class="btn btn-primary">
+                            <a href="{% url 'abbonamenti:config-abbonamento-wizard' %}" class="btn btn-primary">
                                 <i class="bi bi-plus-circle"></i> Crea Configurazione
                             </a>
                         </div>
@@ -199,36 +199,85 @@
                         <!-- Nuovo Cliente -->
                         <div class="tab-pane fade" id="tab-nuovo-cliente">
                             <form id="form-nuovo-cliente">
+                                <!-- Tipo Cliente -->
                                 <div class="row">
                                     <div class="col-md-6">
                                         <div class="mb-3">
-                                            <label class="form-label">Tipo Cliente:</label>
-                                            <select class="form-select" name="tipo" required>
+                                            <label class="form-label">Tipo Cliente *</label>
+                                            <select class="form-select" name="tipo" id="tipo-cliente" onchange="toggleCampiTipo()" required>
                                                 <option value="privato">Privato</option>
                                                 <option value="azienda">Azienda</option>
                                             </select>
                                         </div>
                                     </div>
                                 </div>
-                                <div class="row">
-                                    <div class="col-md-6">
-                                        <div class="mb-3">
-                                            <label class="form-label">Nome *</label>
-                                            <input type="text" class="form-control" name="nome" required>
+                                
+                                <!-- Campi Privato -->
+                                <div id="campi-privato">
+                                    <div class="row">
+                                        <div class="col-md-6">
+                                            <div class="mb-3">
+                                                <label class="form-label">Nome *</label>
+                                                <input type="text" class="form-control" name="nome" id="nome-privato">
+                                            </div>
+                                        </div>
+                                        <div class="col-md-6">
+                                            <div class="mb-3">
+                                                <label class="form-label">Cognome *</label>
+                                                <input type="text" class="form-control" name="cognome" id="cognome-privato">
+                                            </div>
                                         </div>
                                     </div>
-                                    <div class="col-md-6">
-                                        <div class="mb-3">
-                                            <label class="form-label">Cognome *</label>
-                                            <input type="text" class="form-control" name="cognome" required>
+                                    <div class="row">
+                                        <div class="col-md-6">
+                                            <div class="mb-3">
+                                                <label class="form-label">Codice Fiscale</label>
+                                                <input type="text" class="form-control" name="codice_fiscale" maxlength="16" style="text-transform: uppercase;">
+                                            </div>
                                         </div>
                                     </div>
                                 </div>
+                                
+                                <!-- Campi Azienda -->
+                                <div id="campi-azienda" style="display: none;">
+                                    <div class="row">
+                                        <div class="col-md-8">
+                                            <div class="mb-3">
+                                                <label class="form-label">Ragione Sociale *</label>
+                                                <input type="text" class="form-control" name="ragione_sociale" id="ragione-sociale">
+                                            </div>
+                                        </div>
+                                        <div class="col-md-4">
+                                            <div class="mb-3">
+                                                <label class="form-label">Partita IVA *</label>
+                                                <input type="text" class="form-control" name="partita_iva" id="partita-iva" maxlength="11">
+                                            </div>
+                                        </div>
+                                    </div>
+                                    <div class="row">
+                                        <div class="col-md-6">
+                                            <div class="mb-3">
+                                                <label class="form-label">Codice SDI</label>
+                                                <input type="text" class="form-control" name="codice_sdi" maxlength="7" style="text-transform: uppercase;">
+                                                <div class="form-text">Per fatturazione elettronica</div>
+                                            </div>
+                                        </div>
+                                        <div class="col-md-6">
+                                            <div class="mb-3">
+                                                <label class="form-label">PEC</label>
+                                                <input type="email" class="form-control" name="pec">
+                                                <div class="form-text">Alternativa al Codice SDI</div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                                
+                                <!-- Campi Comuni -->
                                 <div class="row">
                                     <div class="col-md-6">
                                         <div class="mb-3">
-                                            <label class="form-label">Email *</label>
-                                            <input type="email" class="form-control" name="email" required>
+                                            <label class="form-label">Email</label>
+                                            <input type="email" class="form-control" name="email">
                                         </div>
                                     </div>
                                     <div class="col-md-6">
@@ -236,6 +285,38 @@
                                             <label class="form-label">Telefono *</label>
                                             <input type="tel" class="form-control" name="telefono" required>
                                         </div>
+                                    </div>
+                                </div>
+                                
+                                <!-- Indirizzo -->
+                                <div class="row">
+                                    <div class="col-md-8">
+                                        <div class="mb-3">
+                                            <label class="form-label">Indirizzo</label>
+                                            <input type="text" class="form-control" name="indirizzo">
+                                        </div>
+                                    </div>
+                                    <div class="col-md-4">
+                                        <div class="mb-3">
+                                            <label class="form-label">CAP</label>
+                                            <input type="text" class="form-control" name="cap" maxlength="5">
+                                        </div>
+                                    </div>
+                                </div>
+                                <div class="row">
+                                    <div class="col-md-6">
+                                        <div class="mb-3">
+                                            <label class="form-label">Città</label>
+                                            <input type="text" class="form-control" name="citta">
+                                        </div>
+                                    </div>
+                                </div>
+                                
+                                <div class="row">
+                                    <div class="col-12">
+                                        <button type="button" class="btn btn-success" onclick="creaCliente()">
+                                            <i class="bi bi-person-plus"></i> Crea Cliente
+                                        </button>
                                     </div>
                                 </div>
                             </form>
@@ -418,8 +499,25 @@ function aggiornaRiepilogoConfigurazione() {
 // Gestione navigazione steps
 function stepSuccessivo() {
     if (currentStep < 4) {
+        // Se siamo nello step 2 e il tab nuovo cliente è attivo, crea il cliente prima di procedere
+        if (currentStep === 2) {
+            const tabNuovoCliente = document.getElementById('tab-nuovo-cliente');
+            const isTabActive = tabNuovoCliente && tabNuovoCliente.classList.contains('active');
+            
+            if (isTabActive && !clienteSelezionato) {
+                creaCliente();
+                return; // La funzione creaCliente() chiamerà stepSuccessivo() dopo aver creato il cliente
+            }
+        }
+        
         document.getElementById(`step-${getStepName(currentStep)}`).style.display = 'none';
         currentStep++;
+        
+        // Salta lo step targhe se la modalità è libera
+        if (currentStep === 3 && configurazioneSelezionata && configurazioneSelezionata.modalita_targa === 'libera') {
+            currentStep++; // Salta direttamente al pagamento
+        }
+        
         document.getElementById(`step-${getStepName(currentStep)}`).style.display = 'block';
         
         aggiornaNavigazione();
@@ -437,6 +535,12 @@ function stepPrecedente() {
     if (currentStep > 1) {
         document.getElementById(`step-${getStepName(currentStep)}`).style.display = 'none';
         currentStep--;
+        
+        // Salta lo step targhe se la modalità è libera (quando si torna indietro dal pagamento)
+        if (currentStep === 3 && configurazioneSelezionata && configurazioneSelezionata.modalita_targa === 'libera') {
+            currentStep--; // Torna direttamente al cliente
+        }
+        
         document.getElementById(`step-${getStepName(currentStep)}`).style.display = 'block';
         
         aggiornaNavigazione();
@@ -467,11 +571,24 @@ function aggiornaNavigazione() {
 
 function aggiornaIndicatoriStep() {
     document.querySelectorAll('.step-indicator li').forEach((li, index) => {
-        li.classList.remove('active', 'completed');
-        if (index + 1 < currentStep) {
+        li.classList.remove('active', 'completed', 'skipped');
+        
+        const stepNumber = index + 1;
+        const isTargheStep = stepNumber === 3;
+        const isLibera = configurazioneSelezionata && configurazioneSelezionata.modalita_targa === 'libera';
+        
+        if (isTargheStep && isLibera) {
+            // Step targhe saltato per modalità libera
             li.classList.add('completed');
-        } else if (index + 1 === currentStep) {
+            li.style.opacity = '0.5';
+        } else if (stepNumber < currentStep) {
+            li.classList.add('completed');
+            li.style.opacity = '1';
+        } else if (stepNumber === currentStep) {
             li.classList.add('active');
+            li.style.opacity = '1';
+        } else {
+            li.style.opacity = '1';
         }
     });
 }
@@ -556,6 +673,109 @@ function aggiornaRiepilogoCliente() {
     riepilogo.style.display = 'block';
 }
 
+// Toggle campi cliente per tipo
+function toggleCampiTipo() {
+    const tipo = document.getElementById('tipo-cliente').value;
+    const campiPrivato = document.getElementById('campi-privato');
+    const campiAzienda = document.getElementById('campi-azienda');
+    
+    if (tipo === 'privato') {
+        campiPrivato.style.display = 'block';
+        campiAzienda.style.display = 'none';
+        
+        // Imposta campi required per privato
+        document.getElementById('nome-privato').required = true;
+        document.getElementById('cognome-privato').required = true;
+        document.getElementById('ragione-sociale').required = false;
+        document.getElementById('partita-iva').required = false;
+    } else {
+        campiPrivato.style.display = 'none';
+        campiAzienda.style.display = 'block';
+        
+        // Imposta campi required per azienda
+        document.getElementById('nome-privato').required = false;
+        document.getElementById('cognome-privato').required = false;
+        document.getElementById('ragione-sociale').required = true;
+        document.getElementById('partita-iva').required = true;
+    }
+    
+    // Rivalidate form dopo il cambio
+    validaFormNuovoCliente();
+}
+
+// Creazione nuovo cliente
+function creaCliente() {
+    const form = document.getElementById('form-nuovo-cliente');
+    const formData = new FormData(form);
+    
+    // Validazione form
+    if (!form.checkValidity()) {
+        form.reportValidity();
+        return;
+    }
+    
+    // Prepara dati cliente
+    const clienteData = {
+        tipo: formData.get('tipo'),
+        nome: formData.get('nome') || '',
+        cognome: formData.get('cognome') || '',
+        ragione_sociale: formData.get('ragione_sociale') || '',
+        email: formData.get('email') || '',
+        telefono: formData.get('telefono'),
+        indirizzo: formData.get('indirizzo') || '',
+        cap: formData.get('cap') || '',
+        citta: formData.get('citta') || '',
+        codice_fiscale: formData.get('codice_fiscale') || '',
+        partita_iva: formData.get('partita_iva') || '',
+        codice_sdi: formData.get('codice_sdi') || '',
+        pec: formData.get('pec') || ''
+    };
+    
+    // Crea cliente via AJAX
+    fetch('/clienti/crea-ajax/', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+            'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]').value
+        },
+        body: JSON.stringify(clienteData)
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            // Cliente creato con successo
+            const nomeCompleto = data.cliente.tipo === 'privato' 
+                ? `${data.cliente.nome} ${data.cliente.cognome}`.trim()
+                : data.cliente.ragione_sociale;
+                
+            clienteSelezionato = {
+                id: data.cliente.id,
+                nome: nomeCompleto,
+                email: data.cliente.email || 'Non specificata',
+                telefono: data.cliente.telefono
+            };
+            
+            document.getElementById('cliente-id').value = data.cliente.id;
+            aggiornaRiepilogoCliente();
+            document.getElementById('btn-successivo').disabled = false;
+            
+            // Mostra messaggio di successo
+            alert('Cliente creato con successo!');
+            
+            // Procede automaticamente al passo successivo se chiamato da stepSuccessivo
+            setTimeout(() => {
+                stepSuccessivo();
+            }, 500);
+        } else {
+            alert('Errore nella creazione del cliente: ' + (data.error || 'Errore sconosciuto'));
+        }
+    })
+    .catch(error => {
+        console.error('Errore:', error);
+        alert('Errore nella comunicazione con il server');
+    });
+}
+
 // Configurazione targhe
 function configuraTarghe() {
     const content = document.getElementById('configurazione-targhe-content');
@@ -619,10 +839,12 @@ function validateTarghe() {
     const inputs = document.querySelectorAll('.targa-input');
     targheConfigurate = [];
     let valid = true;
+    let hasRequiredTarga = false;
     
     inputs.forEach(input => {
         const targa = input.value.trim().toUpperCase();
         if (targa) {
+            hasRequiredTarga = true;
             if (targa.length >= 6 && targa.length <= 8) {
                 targheConfigurate.push(targa);
                 input.classList.remove('is-invalid');
@@ -632,12 +854,20 @@ function validateTarghe() {
                 input.classList.remove('is-valid');
                 input.classList.add('is-invalid');
             }
-        } else if (inputs.length === 1) {
-            valid = false;
         }
     });
     
-    document.getElementById('btn-successivo').disabled = !valid || targheConfigurate.length === 0;
+    // For modalita_targa 'fissa' or 'variabile', require at least one targa
+    // For modalita_targa 'libera', this validation function won't be called
+    const requiresTarga = configurazioneSelezionata.modalita_targa === 'fissa' || 
+                         configurazioneSelezionata.modalita_targa === 'variabile';
+    
+    if (requiresTarga) {
+        document.getElementById('btn-successivo').disabled = !valid || !hasRequiredTarga;
+    } else {
+        // This should not be called for 'libera' mode, but just in case
+        document.getElementById('btn-successivo').disabled = !valid;
+    }
     
     if (targheConfigurate.length > 0) {
         aggiornaRiepilogoTarghe();
@@ -754,10 +984,54 @@ function completaVendita() {
     }
 }
 
+// Validazione form nuovo cliente
+function validaFormNuovoCliente() {
+    const form = document.getElementById('form-nuovo-cliente');
+    const inputs = form.querySelectorAll('input[required], select[required]');
+    let valid = true;
+    
+    inputs.forEach(input => {
+        if (!input.value.trim()) {
+            valid = false;
+        }
+    });
+    
+    // Se il tab nuovo cliente è attivo e il form è valido, abilita il pulsante successivo
+    const tabNuovoCliente = document.getElementById('tab-nuovo-cliente');
+    const isTabActive = tabNuovoCliente && tabNuovoCliente.classList.contains('active');
+    
+    if (isTabActive && currentStep === 2) {
+        document.getElementById('btn-successivo').disabled = !valid;
+    }
+}
+
 // Inizializzazione
 document.addEventListener('DOMContentLoaded', function() {
     aggiornaNavigazione();
     aggiornaIndicatoriStep();
+    
+    // Aggiungi listener per validazione form nuovo cliente
+    const formNuovoCliente = document.getElementById('form-nuovo-cliente');
+    if (formNuovoCliente) {
+        const inputs = formNuovoCliente.querySelectorAll('input, select');
+        inputs.forEach(input => {
+            input.addEventListener('input', validaFormNuovoCliente);
+            input.addEventListener('change', validaFormNuovoCliente);
+        });
+    }
+    
+    // Listener per cambio tab
+    const tabButtons = document.querySelectorAll('[data-bs-toggle="tab"]');
+    tabButtons.forEach(button => {
+        button.addEventListener('shown.bs.tab', function() {
+            if (currentStep === 2) {
+                validaFormNuovoCliente();
+            }
+        });
+    });
+    
+    // Inizializza la visualizzazione dei campi cliente
+    toggleCampiTipo();
 });
 </script>
 {% endblock %}

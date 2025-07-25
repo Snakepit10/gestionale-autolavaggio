@@ -283,26 +283,72 @@
                                         </div>
                                         
                                         <div class="quantita-section" id="quantita-{{ servizio_id }}">
-                                            <label class="form-label">
-                                                <i class="bi bi-123"></i>
-                                                Quantità per periodo
-                                            </label>
-                                            <div class="quantita-controls">
-                                                <button type="button" class="quantita-btn" onclick="changeQuantita('{{ servizio_id }}', -1)">
-                                                    <i class="bi bi-dash"></i>
-                                                </button>
-                                                {% for qfield in form %}
-                                                    {% if qfield.name == 'servizio_'|add:servizio_id|add:'_quantita' %}
-                                                        {{ qfield }}
-                                                    {% endif %}
-                                                {% endfor %}
-                                                <button type="button" class="quantita-btn" onclick="changeQuantita('{{ servizio_id }}', 1)">
-                                                    <i class="bi bi-plus"></i>
-                                                </button>
+                                            <div class="row">
+                                                <div class="col-md-12 mb-3">
+                                                    <label class="form-label">
+                                                        <i class="bi bi-123"></i>
+                                                        Accessi per periodo di reset
+                                                    </label>
+                                                    <div class="quantita-controls">
+                                                        <button type="button" class="quantita-btn" onclick="changeQuantita('{{ servizio_id }}', -1)">
+                                                            <i class="bi bi-dash"></i>
+                                                        </button>
+                                                        {% for qfield in form %}
+                                                            {% if qfield.name == 'servizio_'|add:servizio_id|add:'_quantita' %}
+                                                                {{ qfield }}
+                                                            {% endif %}
+                                                        {% endfor %}
+                                                        <button type="button" class="quantita-btn" onclick="changeQuantita('{{ servizio_id }}', 1)">
+                                                            <i class="bi bi-plus"></i>
+                                                        </button>
+                                                    </div>
+                                                    <small class="text-muted">
+                                                        Accessi disponibili ogni {{ preview_data.get_periodicita_reset_display|default:"periodo" }}
+                                                    </small>
+                                                </div>
+                                                
+                                                <div class="col-md-6 mb-3">
+                                                    <label class="form-label">
+                                                        <i class="bi bi-calendar-range"></i>
+                                                        Limite totale abbonamento
+                                                    </label>
+                                                    {% for field in form %}
+                                                        {% if field.name == 'servizio_'|add:servizio_id|add:'_totali' %}
+                                                            {{ field }}
+                                                        {% endif %}
+                                                    {% endfor %}
+                                                    <small class="text-muted">
+                                                        Limite massimo per tutta la durata (opzionale)
+                                                    </small>
+                                                </div>
+                                                
+                                                <div class="col-md-6 mb-3">
+                                                    <label class="form-label">
+                                                        <i class="bi bi-clock"></i>
+                                                        Accessi sotto-periodo
+                                                    </label>
+                                                    <div class="d-flex gap-2">
+                                                        {% for field in form %}
+                                                            {% if field.name == 'servizio_'|add:servizio_id|add:'_sottoperiodo_accessi' %}
+                                                                {{ field }}
+                                                            {% endif %}
+                                                        {% endfor %}
+                                                        {% for field in form %}
+                                                            {% if field.name == 'servizio_'|add:servizio_id|add:'_sottoperiodo_tipo' %}
+                                                                {{ field }}
+                                                            {% endif %}
+                                                        {% endfor %}
+                                                    </div>
+                                                    <small class="text-muted">
+                                                        Limite aggiuntivo per sotto-periodo (opzionale)
+                                                    </small>
+                                                </div>
                                             </div>
-                                            <small class="text-muted">
-                                                Numero di volte che questo servizio può essere utilizzato
-                                            </small>
+                                            
+                                            <div class="alert alert-info alert-sm mt-2">
+                                                <i class="bi bi-info-circle"></i>
+                                                <strong>Esempio:</strong> 4 accessi/mese, max 1/settimana per spazzole, 1 totale per lavaggio completo
+                                            </div>
                                         </div>
                                     </div>
                                 </div>
@@ -526,14 +572,38 @@ document.addEventListener('DOMContentLoaded', function() {
         }
     });
     
-    // Aggiungi listener per i campi quantità
+    // Aggiungi listener per i campi quantità e nuovi campi
     document.querySelectorAll('input[name$="_quantita"]').forEach(input => {
         input.addEventListener('change', updateSummary);
+    });
+    
+    // Aggiungi listener per i campi totali
+    document.querySelectorAll('input[name*="_totali"]').forEach(input => {
+        input.addEventListener('change', updateSummary);
+    });
+    
+    // Aggiungi listener per i campi sotto-periodo
+    document.querySelectorAll('input[name*="_sottoperiodo_accessi"]').forEach(input => {
+        input.addEventListener('change', updateSummary);
+    });
+    
+    // Aggiungi listener per il tipo sotto-periodo
+    document.querySelectorAll('select[name*="_sottoperiodo_tipo"]').forEach(select => {
+        select.addEventListener('change', updateSummary);
     });
     
     // Aggiungi classe CSS per gli input quantità
     document.querySelectorAll('input[name$="_quantita"]').forEach(input => {
         input.classList.add('quantita-input', 'form-control');
+    });
+    
+    // Aggiungi classi CSS per i nuovi campi
+    document.querySelectorAll('input[name*="_totali"], input[name*="_sottoperiodo_accessi"]').forEach(input => {
+        input.classList.add('form-control', 'form-control-sm');
+    });
+    
+    document.querySelectorAll('select[name*="_sottoperiodo_tipo"]').forEach(select => {
+        select.classList.add('form-select', 'form-select-sm');
     });
     
     updateSummary();
@@ -549,22 +619,53 @@ document.getElementById('servizi-form').addEventListener('submit', function(e) {
         return false;
     }
     
-    // Verifica che ogni servizio selezionato abbia una quantità valida
-    let quantitaValida = true;
+    // Verifica che ogni servizio selezionato abbia una quantità valida e valida i nuovi campi
+    let validationError = null;
     serviziSelezionati.forEach(checkbox => {
         const servizioId = checkbox.name.match(/servizio_(\d+)_incluso/)[1];
         const quantitaInput = document.querySelector(`input[name="servizio_${servizioId}_quantita"]`);
+        const totaliInput = document.querySelector(`input[name="servizio_${servizioId}_totali"]`);
+        const sottoperiodoAccessiInput = document.querySelector(`input[name="servizio_${servizioId}_sottoperiodo_accessi"]`);
+        const sottoperiodoTipoSelect = document.querySelector(`select[name="servizio_${servizioId}_sottoperiodo_tipo"]`);
+        
         const quantita = parseInt(quantitaInput.value) || 0;
+        const totali = parseInt(totaliInput.value) || 0;
+        const sottoperiodoAccessi = parseInt(sottoperiodoAccessiInput.value) || 0;
+        const sottoperiodoTipo = sottoperiodoTipoSelect.value;
         
         if (quantita < 1) {
-            quantitaValida = false;
+            validationError = 'Ogni servizio selezionato deve avere una quantità di almeno 1';
+        }
+        
+        // Se specificato sotto-periodo accessi, deve avere anche il tipo
+        if (sottoperiodoAccessi > 0 && !sottoperiodoTipo) {
+            validationError = 'Se specifichi accessi per sotto-periodo, devi selezionare anche il tipo di periodo';
+        }
+        
+        // Se specificato tipo sotto-periodo, deve avere anche gli accessi
+        if (sottoperiodoTipo && sottoperiodoAccessi === 0) {
+            validationError = 'Se selezioni un tipo di sotto-periodo, devi specificare anche il numero di accessi';
+        }
+        
+        // Il limite totale non può essere inferiore al limite per periodo
+        if (totali > 0 && totali < quantita) {
+            validationError = 'Il limite totale non può essere inferiore al limite per periodo';
         }
     });
     
-    if (!quantitaValida) {
+    if (validationError) {
         e.preventDefault();
-        alert('Ogni servizio selezionato deve avere una quantità di almeno 1');
+        alert(validationError);
         return false;
+    }
+    
+    // Debug: mostra i valori che verranno inviati
+    console.log('Form data da inviare:');
+    const formData = new FormData(this);
+    for (let [key, value] of formData.entries()) {
+        if (key.includes('servizio_')) {
+            console.log(`${key}: ${value}`);
+        }
     }
 });
 </script>

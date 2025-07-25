@@ -378,6 +378,11 @@ def dashboard_tv_data(request):
             ora_consegna_str = ordine.data_ora.strftime('%H:%M')
             ora_consegna_completa = ordine.data_ora.isoformat()
         
+        # Ora consegna richiesta
+        ora_consegna_richiesta_str = ''
+        if ordine.ora_consegna_richiesta:
+            ora_consegna_richiesta_str = ordine.ora_consegna_richiesta.strftime('%H:%M')
+        
         ordine_data = {
             'id': ordine.id,
             'numero_progressivo': ordine.numero_progressivo,
@@ -385,10 +390,12 @@ def dashboard_tv_data(request):
             'tipo_auto': ordine.tipo_auto if ordine.tipo_auto else '',
             'stato': ordine.stato,
             'stato_display': ordine.get_stato_display(),
+            'stato_pagamento': ordine.stato_pagamento,
             'data_ora': ordine.data_ora.strftime('%H:%M'),
             'data_ora_completa': ordine.data_ora.isoformat(),
             'ora_consegna_prevista': ora_consegna_str,
             'ora_consegna_prevista_completa': ora_consegna_completa,
+            'ora_consegna_richiesta': ora_consegna_richiesta_str,
             'tipo_consegna': ordine.tipo_consegna,
             'totale_finale': str(ordine.totale_finale),
             'nota': ordine.nota,

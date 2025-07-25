@@ -4,198 +4,480 @@
 
 {% block title %}
     {% if form.instance.pk %}
-        Modifica Prenotazione - Gestionale Autolavaggio
+        Modifica Prenotazione {{ form.instance.codice_prenotazione }} - Gestionale Autolavaggio
     {% else %}
         Nuova Prenotazione - Gestionale Autolavaggio
     {% endif %}
 {% endblock %}
 
+{% block extra_css %}
+<style>
+.booking-card {
+    border: none;
+    border-radius: 15px;
+    box-shadow: 0 4px 20px rgba(0,0,0,0.08);
+    margin-bottom: 25px;
+    transition: all 0.3s ease;
+}
+
+.booking-card:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 8px 25px rgba(0,0,0,0.12);
+}
+
+.section-header {
+    background: linear-gradient(135deg, #0d6efd, #6610f2);
+    color: white;
+    padding: 15px 20px;
+    border-radius: 15px 15px 0 0;
+    margin: 0;
+    font-weight: 600;
+}
+
+.section-header i {
+    margin-right: 8px;
+    font-size: 1.1em;
+}
+
+.section-content {
+    padding: 25px;
+}
+
+.form-section {
+    background: #f8f9ff;
+    border-radius: 10px;
+    padding: 20px;
+    margin-bottom: 20px;
+    border-left: 4px solid #0d6efd;
+}
+
+.form-section h6 {
+    color: #0d6efd;
+    font-weight: 600;
+    margin-bottom: 15px;
+    display: flex;
+    align-items: center;
+}
+
+.form-section h6 i {
+    margin-right: 8px;
+    font-size: 1.1em;
+}
+
+.sidebar-card {
+    background: white;
+    border-radius: 15px;
+    box-shadow: 0 4px 15px rgba(0,0,0,0.08);
+    overflow: hidden;
+    margin-bottom: 20px;
+}
+
+.sidebar-header {
+    background: linear-gradient(135deg, #28a745, #20c997);
+    color: white;
+    padding: 15px 20px;
+    font-weight: 600;
+}
+
+.sidebar-content {
+    padding: 20px;
+}
+
+.status-badge {
+    padding: 8px 15px;
+    border-radius: 20px;
+    font-size: 0.85rem;
+    font-weight: 600;
+}
+
+.btn-action {
+    padding: 12px 25px;
+    border-radius: 25px;
+    font-weight: 600;
+    transition: all 0.3s ease;
+    border: none;
+}
+
+.btn-action:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 4px 15px rgba(0,0,0,0.2);
+}
+
+.alert-custom {
+    border-radius: 10px;
+    border: none;
+    padding: 15px 20px;
+}
+
+.breadcrumb-custom {
+    background: linear-gradient(135deg, #f8f9fa, #e9ecef);
+    border-radius: 10px;
+    padding: 15px 20px;
+    margin-bottom: 25px;
+}
+
+.field-group {
+    background: white;
+    border-radius: 8px;
+    padding: 15px;
+    margin-bottom: 15px;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.04);
+}
+
+@media (max-width: 768px) {
+    .sidebar-card {
+        position: static;
+        margin-top: 20px;
+    }
+    
+    .section-content {
+        padding: 20px 15px;
+    }
+}
+</style>
+{% endblock %}
+
 {% block content %}
-<div class="d-flex justify-content-between align-items-center mb-4">
-    <h1>
-        <i class="bi bi-calendar-plus"></i>
-        {% if form.instance.pk %}
-            Modifica Prenotazione
-        {% else %}
-            Nuova Prenotazione
-        {% endif %}
-    </h1>
-    <div>
-        {% if form.instance.pk %}
-            <a href="{% url 'prenotazioni:dettaglio-prenotazione' form.instance.pk %}" class="btn btn-outline-info me-2">
-                <i class="bi bi-eye"></i> Visualizza
-            </a>
-        {% endif %}
-        <a href="{% url 'prenotazioni:prenotazioni' %}" class="btn btn-outline-secondary">
-            <i class="bi bi-arrow-left"></i> Torna alla Lista
-        </a>
-    </div>
-</div>
-
-{% if messages %}
-    {% for message in messages %}
-        <div class="alert alert-{{ message.tags }} alert-dismissible fade show" role="alert">
-            {{ message }}
-            <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+<div class="container-fluid">
+    <!-- Breadcrumb e Header -->
+    <div class="breadcrumb-custom">
+        <nav aria-label="breadcrumb">
+            <ol class="breadcrumb mb-2">
+                <li class="breadcrumb-item">
+                    <a href="{% url 'core:home' %}"><i class="bi bi-house"></i> Home</a>
+                </li>
+                <li class="breadcrumb-item">
+                    <a href="{% url 'prenotazioni:prenotazioni' %}">Prenotazioni</a>
+                </li>
+                <li class="breadcrumb-item active">
+                    {% if form.instance.pk %}
+                        Modifica {{ form.instance.codice_prenotazione }}
+                    {% else %}
+                        Nuova Prenotazione
+                    {% endif %}
+                </li>
+            </ol>
+        </nav>
+        
+        <div class="d-flex justify-content-between align-items-center">
+            <div>
+                <h1 class="h3 mb-1">
+                    <i class="bi bi-{% if form.instance.pk %}pencil-square{% else %}calendar-plus{% endif %} text-primary"></i>
+                    {% if form.instance.pk %}
+                        Modifica Prenotazione
+                    {% else %}
+                        Nuova Prenotazione
+                    {% endif %}
+                </h1>
+                {% if form.instance.pk %}
+                    <small class="text-muted">Codice: {{ form.instance.codice_prenotazione }}</small>
+                {% endif %}
+            </div>
+            
+            <div class="d-flex gap-2">
+                {% if form.instance.pk %}
+                    <a href="{% url 'prenotazioni:dettaglio-prenotazione' form.instance.pk %}" 
+                       class="btn btn-outline-info btn-sm">
+                        <i class="bi bi-eye"></i> Visualizza
+                    </a>
+                {% endif %}
+                <a href="{% url 'prenotazioni:prenotazioni' %}" 
+                   class="btn btn-outline-secondary btn-sm">
+                    <i class="bi bi-arrow-left"></i> Indietro
+                </a>
+            </div>
         </div>
-    {% endfor %}
-{% endif %}
+    </div>
 
-<div class="row">
-    <div class="col-lg-8">
-        <div class="card">
-            <div class="card-header">
-                <h5 class="mb-0">
+    <!-- Messages -->
+    {% if messages %}
+        {% for message in messages %}
+            <div class="alert alert-{{ message.tags }} alert-custom alert-dismissible fade show" role="alert">
+                <i class="bi bi-{% if message.tags == 'success' %}check-circle{% elif message.tags == 'error' %}exclamation-triangle{% else %}info-circle{% endif %}"></i>
+                {{ message }}
+                <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+            </div>
+        {% endfor %}
+    {% endif %}
+
+    <div class="row">
+        <!-- Form principale -->
+        <div class="col-lg-8">
+            <div class="booking-card">
+                <div class="section-header">
                     <i class="bi bi-form-select"></i>
                     Dati Prenotazione
-                </h5>
-            </div>
-            <div class="card-body">
-                <form method="post" id="prenotazioneForm">
-                    {% csrf_token %}
-                    
-                    <!-- Informazioni Cliente -->
-                    <div class="row mb-4">
-                        <div class="col-12">
-                            <h6 class="border-bottom pb-2 mb-3">
-                                <i class="bi bi-person"></i> Informazioni Cliente
+                </div>
+                
+                <div class="section-content">
+                    <form method="post" id="prenotazioneForm">
+                        {% csrf_token %}
+                        
+                        <!-- Sezione Cliente -->
+                        <div class="form-section">
+                            <h6>
+                                <i class="bi bi-person-circle"></i>
+                                Informazioni Cliente
                             </h6>
+                            
+                            <div class="row">
+                                <div class="col-12 mb-3">
+                                    {{ form.cliente|as_crispy_field }}
+                                </div>
+                            </div>
+                            
+                            <div class="row">
+                                <div class="col-md-6">
+                                    <div class="field-group">
+                                        {{ form.nome_cliente|as_crispy_field }}
+                                    </div>
+                                </div>
+                                <div class="col-md-6">
+                                    <div class="field-group">
+                                        {{ form.cognome_cliente|as_crispy_field }}
+                                    </div>
+                                </div>
+                            </div>
+                            
+                            <div class="row">
+                                <div class="col-md-6">
+                                    <div class="field-group">
+                                        {{ form.email_cliente|as_crispy_field }}
+                                    </div>
+                                </div>
+                                <div class="col-md-6">
+                                    <div class="field-group">
+                                        {{ form.telefono_cliente|as_crispy_field }}
+                                    </div>
+                                </div>
+                            </div>
                         </div>
-                        <div class="col-md-6">
-                            {{ form.cliente|as_crispy_field }}
-                        </div>
-                        <div class="col-md-6">
-                            {{ form.nome_cliente|as_crispy_field }}
-                        </div>
-                        <div class="col-md-6">
-                            {{ form.email_cliente|as_crispy_field }}
-                        </div>
-                        <div class="col-md-6">
-                            {{ form.telefono_cliente|as_crispy_field }}
-                        </div>
-                    </div>
 
-                    <!-- Dettagli Prenotazione -->
-                    <div class="row mb-4">
-                        <div class="col-12">
-                            <h6 class="border-bottom pb-2 mb-3">
-                                <i class="bi bi-calendar-event"></i> Dettagli Prenotazione
+                        <!-- Sezione Data e Ora -->
+                        <div class="form-section">
+                            <h6>
+                                <i class="bi bi-calendar-event"></i>
+                                Data e Orario
                             </h6>
+                            
+                            <div class="row">
+                                <div class="col-md-6">
+                                    <div class="field-group">
+                                        {{ form.data_prenotazione|as_crispy_field }}
+                                    </div>
+                                </div>
+                                <div class="col-md-6">
+                                    <div class="field-group">
+                                        {{ form.ora_prenotazione|as_crispy_field }}
+                                    </div>
+                                </div>
+                            </div>
+                            
+                            <div class="row">
+                                <div class="col-md-6">
+                                    <div class="field-group">
+                                        {{ form.tipo_auto|as_crispy_field }}
+                                    </div>
+                                </div>
+                                <div class="col-md-6">
+                                    <div class="field-group">
+                                        {{ form.durata_stimata_minuti|as_crispy_field }}
+                                    </div>
+                                </div>
+                            </div>
                         </div>
-                        <div class="col-md-4">
-                            {{ form.data_prenotazione|as_crispy_field }}
-                        </div>
-                        <div class="col-md-4">
-                            {{ form.ora_prenotazione|as_crispy_field }}
-                        </div>
-                    </div>
 
-                    <!-- Servizi -->
-                    <div class="row mb-4">
-                        <div class="col-12">
-                            <h6 class="border-bottom pb-2 mb-3">
-                                <i class="bi bi-gear"></i> Servizi Richiesti
+                        <!-- Sezione Servizi -->
+                        <div class="form-section">
+                            <h6>
+                                <i class="bi bi-gear-fill"></i>
+                                Servizi Richiesti
                             </h6>
-                            {{ form.servizi_selezionati|as_crispy_field }}
+                            
+                            <div class="field-group">
+                                {{ form.servizi_selezionati|as_crispy_field }}
+                            </div>
                         </div>
-                    </div>
 
-
-                    <!-- Note e Stato -->
-                    <div class="row mb-4">
-                        <div class="col-12">
-                            <h6 class="border-bottom pb-2 mb-3">
-                                <i class="bi bi-chat-text"></i> Note e Stato
+                        <!-- Sezione Note -->
+                        <div class="form-section">
+                            <h6>
+                                <i class="bi bi-chat-dots"></i>
+                                Note e Informazioni
                             </h6>
+                            
+                            <div class="row">
+                                <div class="col-md-6">
+                                    <div class="field-group">
+                                        {{ form.nota_cliente|as_crispy_field }}
+                                    </div>
+                                </div>
+                                <div class="col-md-6">
+                                    <div class="field-group">
+                                        {{ form.nota_interna|as_crispy_field }}
+                                    </div>
+                                </div>
+                            </div>
                         </div>
-                        <div class="col-md-8">
-                            {{ form.note_cliente|as_crispy_field }}
-                        </div>
-                        <div class="col-md-4">
-                            {% if form.instance.pk %}
-                                {{ form.stato|as_crispy_field }}
-                            {% endif %}
-                        </div>
-                    </div>
 
-                    <div class="row">
-                        <div class="col-12">
-                            <div class="d-flex justify-content-between">
-                                <button type="submit" class="btn btn-primary">
-                                    <i class="bi bi-check-circle"></i>
-                                    {% if form.instance.pk %}
-                                        Aggiorna Prenotazione
-                                    {% else %}
-                                        Crea Prenotazione
-                                    {% endif %}
-                                </button>
-                                <button type="button" class="btn btn-outline-warning" onclick="calcolaTotale()">
+                        <!-- Sezione Stato (solo in modifica) -->
+                        {% if form.instance.pk %}
+                        <div class="form-section">
+                            <h6>
+                                <i class="bi bi-flag-fill"></i>
+                                Stato Prenotazione
+                            </h6>
+                            
+                            <div class="row">
+                                <div class="col-md-6">
+                                    <div class="field-group">
+                                        {{ form.stato|as_crispy_field }}
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        {% endif %}
+
+                        <!-- Pulsanti Azione -->
+                        <div class="d-flex justify-content-between align-items-center pt-3">
+                            <button type="submit" class="btn btn-primary btn-action">
+                                <i class="bi bi-{% if form.instance.pk %}check-circle{% else %}plus-circle{% endif %}"></i>
+                                {% if form.instance.pk %}
+                                    Aggiorna Prenotazione
+                                {% else %}
+                                    Crea Prenotazione
+                                {% endif %}
+                            </button>
+                            
+                            <div class="d-flex gap-2">
+                                <button type="button" class="btn btn-outline-info btn-action" onclick="calcolaTotale()">
                                     <i class="bi bi-calculator"></i> Calcola Totale
+                                </button>
+                                <button type="button" class="btn btn-outline-warning btn-action" onclick="verificaDisponibilita()">
+                                    <i class="bi bi-clock"></i> Verifica Disponibilità
                                 </button>
                             </div>
                         </div>
-                    </div>
-                </form>
-            </div>
-        </div>
-    </div>
-
-    <div class="col-lg-4">
-        <!-- Riepilogo Prenotazione -->
-        <div class="card mb-3">
-            <div class="card-header">
-                <h6 class="mb-0">
-                    <i class="bi bi-receipt"></i>
-                    Riepilogo
-                </h6>
-            </div>
-            <div class="card-body">
-                <div id="riepilogo-content">
-                    {% if form.instance.pk %}
-                        <div class="mb-2">
-                            <strong>Codice:</strong> {{ form.instance.codice_prenotazione }}
-                        </div>
-                        <div class="mb-2">
-                            <strong>Data:</strong> {{ form.instance.data_prenotazione|date:"d/m/Y" }}
-                        </div>
-                        <div class="mb-2">
-                            <strong>Ora:</strong> {{ form.instance.ora_prenotazione|time:"H:i" }}
-                        </div>
-                        <div class="mb-2">
-                            <strong>Stato:</strong>
-                            {% if form.instance.stato == 'confermata' %}
-                                <span class="badge bg-success">Confermata</span>
-                            {% elif form.instance.stato == 'in_attesa' %}
-                                <span class="badge bg-warning">In Attesa</span>
-                            {% elif form.instance.stato == 'completata' %}
-                                <span class="badge bg-primary">Completata</span>
-                            {% elif form.instance.stato == 'cancellata' %}
-                                <span class="badge bg-danger">Cancellata</span>
-                            {% endif %}
-                        </div>
-                        <hr>
-                        <div class="mb-2">
-                            <strong>Totale Stimato:</strong>
-                            <span class="h5 text-primary">€{{ form.instance.totale_stimato|floatformat:2 }}</span>
-                        </div>
-                    {% else %}
-                        <p class="text-muted">Il riepilogo apparirà dopo aver selezionato i servizi.</p>
-                    {% endif %}
+                    </form>
                 </div>
             </div>
         </div>
 
-        <!-- Disponibilità Slot -->
-        <div class="card">
-            <div class="card-header">
-                <h6 class="mb-0">
-                    <i class="bi bi-clock"></i>
-                    Disponibilità
-                </h6>
+        <!-- Sidebar -->
+        <div class="col-lg-4">
+            <!-- Riepilogo Prenotazione -->
+            <div class="sidebar-card">
+                <div class="sidebar-header">
+                    <i class="bi bi-receipt"></i>
+                    Riepilogo Prenotazione
+                </div>
+                <div class="sidebar-content">
+                    <div id="riepilogo-content">
+                        {% if form.instance.pk %}
+                            <div class="d-flex justify-content-between align-items-center mb-3">
+                                <strong>Codice:</strong>
+                                <span class="badge bg-primary">{{ form.instance.codice_prenotazione }}</span>
+                            </div>
+                            
+                            <div class="d-flex justify-content-between align-items-center mb-3">
+                                <strong>Data:</strong>
+                                <span>{{ form.instance.slot.data|date:"d/m/Y" }}</span>
+                            </div>
+                            
+                            <div class="d-flex justify-content-between align-items-center mb-3">
+                                <strong>Ora:</strong>
+                                <span>{{ form.instance.slot.ora_inizio|time:"H:i" }}</span>
+                            </div>
+                            
+                            <div class="d-flex justify-content-between align-items-center mb-3">
+                                <strong>Cliente:</strong>
+                                <span>{{ form.instance.cliente.nome_completo|default:"Cliente ospite" }}</span>
+                            </div>
+                            
+                            <div class="d-flex justify-content-between align-items-center mb-3">
+                                <strong>Stato:</strong>
+                                {% if form.instance.stato == 'confermata' %}
+                                    <span class="status-badge bg-success">Confermata</span>
+                                {% elif form.instance.stato == 'in_attesa' %}
+                                    <span class="status-badge bg-warning">In Attesa</span>
+                                {% elif form.instance.stato == 'completata' %}
+                                    <span class="status-badge bg-primary">Completata</span>
+                                {% elif form.instance.stato == 'annullata' %}
+                                    <span class="status-badge bg-danger">Annullata</span>
+                                {% endif %}
+                            </div>
+                            
+                            <hr class="my-3">
+                            
+                            <div class="d-flex justify-content-between align-items-center">
+                                <strong>Servizi:</strong>
+                                <span class="h6 text-primary mb-0">{{ form.instance.servizi.count }}</span>
+                            </div>
+                            
+                            {% if form.instance.durata_stimata_minuti %}
+                            <div class="d-flex justify-content-between align-items-center mt-2">
+                                <strong>Durata:</strong>
+                                <span>{{ form.instance.durata_stimata_minuti }} min</span>
+                            </div>
+                            {% endif %}
+                        {% else %}
+                            <div class="text-center text-muted py-4">
+                                <i class="bi bi-info-circle display-4 mb-3"></i>
+                                <p>Il riepilogo apparirà dopo aver compilato i campi della prenotazione.</p>
+                            </div>
+                        {% endif %}
+                    </div>
+                </div>
             </div>
-            <div class="card-body">
-                <div id="disponibilita-content">
-                    <p class="text-muted">Seleziona una data per vedere gli slot disponibili.</p>
+
+            <!-- Stato Disponibilità -->
+            <div class="sidebar-card">
+                <div class="sidebar-header">
+                    <i class="bi bi-clock-history"></i>
+                    Disponibilità Slot
+                </div>
+                <div class="sidebar-content">
+                    <div id="disponibilita-content">
+                        <div class="text-center text-muted py-3">
+                            <i class="bi bi-calendar-check display-5 mb-2"></i>
+                            <p class="mb-0">Seleziona data e ora per verificare la disponibilità</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Collegamenti Rapidi -->
+            <div class="sidebar-card">
+                <div class="sidebar-header">
+                    <i class="bi bi-lightning-fill"></i>
+                    Azioni Rapide
+                </div>
+                <div class="sidebar-content">
+                    <div class="d-grid gap-2">
+                        <a href="{% url 'prenotazioni:calendario-prenotazioni' %}" 
+                           class="btn btn-outline-primary btn-sm">
+                            <i class="bi bi-calendar3"></i> Visualizza Calendario
+                        </a>
+                        
+                        {% if form.instance.pk %}
+                            <a href="{% url 'prenotazioni:dettaglio-prenotazione' form.instance.pk %}" 
+                               class="btn btn-outline-info btn-sm">
+                                <i class="bi bi-eye-fill"></i> Visualizza Dettagli
+                            </a>
+                            
+                            {% if form.instance.can_be_cancelled %}
+                                <button type="button" class="btn btn-outline-danger btn-sm" 
+                                        onclick="annullaPrenotazione()">
+                                    <i class="bi bi-x-circle"></i> Annulla Prenotazione
+                                </button>
+                            {% endif %}
+                        {% endif %}
+                        
+                        <a href="{% url 'prenotazioni:nuova-prenotazione' %}" 
+                           class="btn btn-outline-success btn-sm">
+                            <i class="bi bi-plus-circle"></i> Nuova Prenotazione
+                        </a>
+                    </div>
                 </div>
             </div>
         </div>
@@ -212,93 +494,178 @@ function calcolaTotale() {
         return;
     }
 
-    // Simulazione calcolo totale (da implementare con AJAX)
+    // Aggiorna il riepilogo
     let totale = 0;
+    let durataStimata = 0;
+    let serviziNomi = [];
+    
     serviziSelezionati.forEach(servizio => {
-        // Qui dovremmo fare una chiamata AJAX per ottenere il prezzo
+        const option = servizio.closest('label');
+        if (option) {
+            serviziNomi.push(option.textContent.trim());
+        }
         totale += parseFloat(servizio.dataset.prezzo || 0);
+        durataStimata += parseFloat(servizio.dataset.durata || 0);
     });
 
     document.getElementById('riepilogo-content').innerHTML = `
-        <div class="mb-2">
-            <strong>Servizi Selezionati:</strong> ${serviziSelezionati.length}
+        <div class="d-flex justify-content-between align-items-center mb-3">
+            <strong>Servizi Selezionati:</strong>
+            <span class="badge bg-info">${serviziSelezionati.length}</span>
         </div>
-        <hr>
-        <div class="mb-2">
+        
+        <div class="mb-3">
+            <strong>Servizi:</strong>
+            <ul class="list-unstyled mt-2">
+                ${serviziNomi.map(nome => `<li><i class="bi bi-check-circle text-success"></i> ${nome}</li>`).join('')}
+            </ul>
+        </div>
+        
+        <hr class="my-3">
+        
+        <div class="d-flex justify-content-between align-items-center mb-2">
+            <strong>Durata Stimata:</strong>
+            <span>${durataStimata} minuti</span>
+        </div>
+        
+        <div class="d-flex justify-content-between align-items-center">
             <strong>Totale Stimato:</strong>
-            <span class="h5 text-primary">€${totale.toFixed(2)}</span>
+            <span class="h5 text-success mb-0">€${totale.toFixed(2)}</span>
         </div>
     `;
+    
+    // Aggiorna anche il campo durata nascosto se esiste
+    const durataField = document.getElementById('id_durata_stimata_minuti');
+    if (durataField) {
+        durataField.value = durataStimata;
+    }
 }
 
-// Controlla disponibilità quando cambia la data
-document.addEventListener('DOMContentLoaded', function() {
-    const dataField = document.getElementById('id_data_prenotazione');
-    const oraField = document.getElementById('id_ora_prenotazione');
-    
-    if (dataField) {
-        dataField.addEventListener('change', function() {
-            verificaDisponibilita();
-        });
-    }
-    
-    if (oraField) {
-        oraField.addEventListener('change', function() {
-            verificaDisponibilita();
-        });
-    }
-});
-
+// Verifica disponibilità slot
 function verificaDisponibilita() {
-    const data = document.getElementById('id_data_prenotazione').value;
-    const ora = document.getElementById('id_ora_prenotazione').value;
+    const dataInput = document.getElementById('id_data_prenotazione');
+    const oraInput = document.getElementById('id_ora_prenotazione');
     
-    if (!data) return;
+    if (!dataInput || !dataInput.value) {
+        const container = document.getElementById('disponibilita-content');
+        container.innerHTML = `
+            <div class="text-center text-muted py-3">
+                <i class="bi bi-calendar-check display-5 mb-2"></i>
+                <p class="mb-0">Seleziona data e ora per verificare la disponibilità</p>
+            </div>
+        `;
+        return;
+    }
     
-    // Chiamata AJAX per verificare disponibilità
-    fetch(`{% url 'prenotazioni:slot-disponibili' %}?data=${data}&ora=${ora}`)
+    let dataFormatted = dataInput.value;
+    
+    // Converti formato data da DD/MM/YYYY a YYYY-MM-DD se necessario
+    if (dataInput.value.includes('/')) {
+        const parts = dataInput.value.split('/');
+        if (parts.length === 3) {
+            dataFormatted = `${parts[2]}-${parts[1].padStart(2, '0')}-${parts[0].padStart(2, '0')}`;
+        }
+    }
+    
+    const container = document.getElementById('disponibilita-content');
+    container.innerHTML = `
+        <div class="text-center py-3">
+            <div class="spinner-border text-primary" role="status">
+                <span class="visually-hidden">Caricamento...</span>
+            </div>
+            <p class="mt-2 mb-0">Verifica disponibilità...</p>
+        </div>
+    `;
+    
+    // Chiamata AJAX reale per verificare gli slot
+    fetch(`{% url 'prenotazioni:slot-disponibili' %}?data=${encodeURIComponent(dataFormatted)}`)
         .then(response => response.json())
         .then(data => {
-            const container = document.getElementById('disponibilita-content');
-            
-            if (data.disponibile) {
-                container.innerHTML = `
-                    <div class="alert alert-success">
-                        <i class="bi bi-check-circle"></i>
-                        Slot disponibile
-                    </div>
-                    <small class="text-muted">
-                        Posti liberi: ${data.posti_liberi}/${data.max_posti}
-                    </small>
-                `;
+            if (data.slot && data.slot.length > 0) {
+                let html = '<div class="mb-3"><strong>Slot Disponibili:</strong></div>';
+                
+                data.slot.forEach(slot => {
+                    const isAvailable = slot.posti_disponibili > 0;
+                    const percentuale = (slot.posti_disponibili / slot.max_prenotazioni) * 100;
+                    const colorClass = percentuale > 50 ? 'success' : percentuale > 20 ? 'warning' : 'danger';
+                    
+                    html += `
+                        <div class="mb-3 p-3 border rounded ${isAvailable ? 'border-success' : 'border-danger'}">
+                            <div class="d-flex justify-content-between align-items-center mb-2">
+                                <strong>${slot.ora_inizio}</strong>
+                                <span class="badge bg-${isAvailable ? 'success' : 'danger'}">
+                                    ${isAvailable ? slot.posti_disponibili + ' disponibili' : 'Completo'}
+                                </span>
+                            </div>
+                            <div class="progress" style="height: 8px;">
+                                <div class="progress-bar bg-${colorClass}" style="width: ${percentuale}%"></div>
+                            </div>
+                            <small class="text-muted">${slot.posti_disponibili}/${slot.max_prenotazioni} posti</small>
+                        </div>
+                    `;
+                });
+                
+                container.innerHTML = html;
             } else {
                 container.innerHTML = `
-                    <div class="alert alert-warning">
-                        <i class="bi bi-exclamation-triangle"></i>
-                        Slot non disponibile
+                    <div class="alert alert-warning alert-custom">
+                        <i class="bi bi-exclamation-triangle-fill"></i>
+                        <strong>Nessun slot disponibile per questa data</strong>
                     </div>
-                    <small class="text-muted">
-                        Scegli un altro orario
-                    </small>
+                    <p class="text-muted mb-0">Scegli un altro orario o data</p>
                 `;
             }
         })
         .catch(error => {
-            console.error('Errore nella verifica disponibilità:', error);
+            console.error('Errore nel caricamento slot:', error);
+            container.innerHTML = `
+                <div class="alert alert-danger alert-custom">
+                    <i class="bi bi-exclamation-triangle-fill"></i>
+                    <strong>Errore nel caricamento</strong>
+                </div>
+                <p class="text-muted mb-0">Riprova tra qualche momento</p>
+            `;
         });
 }
 
-// Aggiorna automaticamente i campi cliente quando viene selezionato
+// Event listeners
 document.addEventListener('DOMContentLoaded', function() {
+    // Auto-verifica disponibilità quando cambiano data/ora
+    const dataField = document.getElementById('id_data_prenotazione');
+    const oraField = document.getElementById('id_ora_prenotazione');
+    
+    if (dataField) {
+        dataField.addEventListener('change', verificaDisponibilita);
+    }
+    
+    if (oraField) {
+        oraField.addEventListener('change', verificaDisponibilita);
+    }
+    
+    // Auto-calcolo quando cambiano i servizi
+    const serviziCheckboxes = document.querySelectorAll('input[name="servizi_selezionati"]');
+    serviziCheckboxes.forEach(checkbox => {
+        checkbox.addEventListener('change', calcolaTotale);
+    });
+    
+    // Popolamento automatico dati cliente
     const clienteField = document.getElementById('id_cliente');
     if (clienteField) {
         clienteField.addEventListener('change', function() {
             if (this.value) {
-                // Qui dovremmo fare una chiamata AJAX per ottenere i dati del cliente
-                // e popolare automaticamente nome, email, telefono
+                // Qui implementare chiamata AJAX per popolare automaticamente i campi cliente
+                console.log('Cliente selezionato:', this.value);
             }
         });
     }
 });
+
+// Funzione per annullare prenotazione
+function annullaPrenotazione() {
+    if (confirm('Sei sicuro di voler annullare questa prenotazione?')) {
+        // Implementare logica di annullamento
+        console.log('Annullamento prenotazione...');
+    }
+}
 </script>
 {% endblock %}

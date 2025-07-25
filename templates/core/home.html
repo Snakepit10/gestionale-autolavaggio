@@ -18,7 +18,7 @@
         <div class="card stats-card bg-primary">
             <div class="card-body text-center">
                 <i class="bi bi-cart-check display-4 mb-3"></i>
-                <h3 id="ordini-oggi">-</h3>
+                <h3 id="ordini-oggi">{{ ordini_oggi }}</h3>
                 <p>Ordini Oggi</p>
             </div>
         </div>
@@ -28,7 +28,7 @@
         <div class="card stats-card bg-success">
             <div class="card-body text-center">
                 <i class="bi bi-cash-stack display-4 mb-3"></i>
-                <h3 id="incasso-oggi">-</h3>
+                <h3 id="incasso-oggi">€{{ incasso_oggi|floatformat:2 }}</h3>
                 <p>Incasso Oggi</p>
             </div>
         </div>
@@ -38,7 +38,7 @@
         <div class="card stats-card bg-warning">
             <div class="card-body text-center">
                 <i class="bi bi-clock display-4 mb-3"></i>
-                <h3 id="ordini-in-lavorazione">-</h3>
+                <h3 id="ordini-in-lavorazione">{{ ordini_in_lavorazione }}</h3>
                 <p>In Lavorazione</p>
             </div>
         </div>
@@ -48,7 +48,7 @@
         <div class="card stats-card bg-info">
             <div class="card-body text-center">
                 <i class="bi bi-people display-4 mb-3"></i>
-                <h3 id="clienti-totali">-</h3>
+                <h3 id="clienti-totali">{{ clienti_totali }}</h3>
                 <p>Clienti Totali</p>
             </div>
         </div>
@@ -133,11 +133,51 @@
             </div>
             <div class="card-body">
                 <div id="ultimi-ordini">
-                    <div class="text-center">
-                        <div class="spinner-border" role="status">
-                            <span class="visually-hidden">Caricamento...</span>
+                    {% if ordini_recenti %}
+                        {% for ordine in ordini_recenti %}
+                        <div class="d-flex justify-content-between align-items-center mb-2 pb-2 border-bottom">
+                            <div>
+                                <strong>#{{ ordine.id }}</strong>
+                                {% if ordine.cliente %}
+                                    - {{ ordine.cliente.nome }} {{ ordine.cliente.cognome }}
+                                {% else %}
+                                    - Cliente generico
+                                {% endif %}
+                                <br>
+                                <small class="text-muted">{{ ordine.data_ora|date:"d/m/Y H:i" }}</small>
+                            </div>
+                            <div class="text-end">
+                                <span class="badge 
+                                    {% if ordine.stato == 'completato' %}bg-success
+                                    {% elif ordine.stato == 'in_lavorazione' %}bg-warning
+                                    {% elif ordine.stato == 'in_attesa' %}bg-info
+                                    {% elif ordine.stato == 'annullato' %}bg-danger
+                                    {% else %}bg-secondary
+                                    {% endif %}">
+                                    {{ ordine.get_stato_display }}
+                                </span>
+                                {% if ordine.stato_pagamento %}
+                                    <br>
+                                    <small class="badge 
+                                        {% if ordine.stato_pagamento == 'pagato' %}bg-success
+                                        {% elif ordine.stato_pagamento == 'parziale' %}bg-warning  
+                                        {% elif ordine.stato_pagamento == 'non_pagato' %}bg-danger
+                                        {% else %}bg-secondary
+                                        {% endif %}">
+                                        {{ ordine.get_stato_pagamento_display }}
+                                    </small>
+                                {% endif %}
+                                <br>
+                                <strong>€{{ ordine.totale_finale|floatformat:2 }}</strong>
+                            </div>
                         </div>
-                    </div>
+                        {% endfor %}
+                    {% else %}
+                        <div class="text-center text-muted">
+                            <i class="bi bi-inbox display-4"></i>
+                            <p>Nessun ordine recente</p>
+                        </div>
+                    {% endif %}
                 </div>
             </div>
         </div>
@@ -152,11 +192,47 @@
             </div>
             <div class="card-body">
                 <div id="stato-postazioni">
-                    <div class="text-center">
-                        <div class="spinner-border" role="status">
-                            <span class="visually-hidden">Caricamento...</span>
+                    {% if postazioni %}
+                        <div class="row mb-3">
+                            <div class="col-6 text-center">
+                                <h4 class="text-success">{{ postazioni_attive }}</h4>
+                                <small class="text-muted">Attive</small>
+                            </div>
+                            <div class="col-6 text-center">
+                                <h4 class="text-muted">{{ postazioni_totali }}</h4>
+                                <small class="text-muted">Totali</small>
+                            </div>
                         </div>
-                    </div>
+                        
+                        {% for postazione in postazioni %}
+                        <div class="d-flex justify-content-between align-items-center mb-2 pb-2 border-bottom">
+                            <div>
+                                <strong>{{ postazione.nome }}</strong>
+                                <br>
+                                <small class="text-muted">{{ postazione.descrizione|default:"Nessuna descrizione" }}</small>
+                            </div>
+                            <div>
+                                {% if postazione.attiva %}
+                                    <span class="badge bg-success">
+                                        <i class="bi bi-check-circle"></i> Attiva
+                                    </span>
+                                {% else %}
+                                    <span class="badge bg-secondary">
+                                        <i class="bi bi-x-circle"></i> Inattiva
+                                    </span>
+                                {% endif %}
+                            </div>
+                        </div>
+                        {% endfor %}
+                    {% else %}
+                        <div class="text-center text-muted">
+                            <i class="bi bi-diagram-3 display-4"></i>
+                            <p>Nessuna postazione configurata</p>
+                            <a href="{% url 'postazioni:postazione-create' %}" class="btn btn-primary btn-sm">
+                                Crea la prima postazione
+                            </a>
+                        </div>
+                    {% endif %}
                 </div>
             </div>
         </div>
@@ -179,156 +255,89 @@
 {% endblock %}
 
 {% block extra_js %}
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 <script>
 document.addEventListener('DOMContentLoaded', function() {
-    // Carica statistiche dashboard
-    caricaStatistiche();
-    
-    // Carica ultimi ordini
-    caricaUltimiOrdini();
-    
-    // Carica stato postazioni
-    caricaStatoPostazioni();
-    
-    // Carica grafico
-    caricaGraficoOrdini();
-    
-    // Aggiorna ogni 30 secondi
-    setInterval(function() {
-        caricaStatistiche();
-        caricaUltimiOrdini();
-        caricaStatoPostazioni();
-    }, 30000);
+    // Inizializza il grafico degli ordini settimanali
+    initGraficoOrdini();
 });
 
-function caricaStatistiche() {
-    fetch('/api/dashboard/stats/')
-    .then(response => response.json())
-    .then(data => {
-        document.getElementById('ordini-oggi').textContent = data.ordini_oggi || '0';
-        document.getElementById('incasso-oggi').textContent = AutolavaggioJS.formatCurrency(data.incasso_oggi || 0);
-        document.getElementById('ordini-in-lavorazione').textContent = data.ordini_in_lavorazione || '0';
-        document.getElementById('clienti-totali').textContent = data.clienti_totali || '0';
-    })
-    .catch(error => console.error('Errore caricamento statistiche:', error));
-}
-
-function caricaUltimiOrdini() {
-    fetch('/api/ordini/ultimi/')
-    .then(response => response.json())
-    .then(data => {
-        const container = document.getElementById('ultimi-ordini');
-        container.innerHTML = '';
-        
-        if (data.ordini.length === 0) {
-            container.innerHTML = '<p class="text-muted">Nessun ordine recente</p>';
-            return;
-        }
-        
-        data.ordini.forEach(ordine => {
-            const row = document.createElement('div');
-            row.className = 'border-bottom py-2';
-            row.innerHTML = `
-                <div class="d-flex justify-content-between align-items-center">
-                    <div>
-                        <strong>#${ordine.numero_progressivo}</strong><br>
-                        <small class="text-muted">${ordine.cliente || 'Anonimo'}</small>
-                    </div>
-                    <div class="text-end">
-                        <span class="badge status-${ordine.stato}">${ordine.stato_display}</span><br>
-                        <small class="text-muted">${AutolavaggioJS.formatCurrency(ordine.totale_finale)}</small>
-                    </div>
-                </div>
-            `;
-            container.appendChild(row);
-        });
-    })
-    .catch(error => console.error('Errore caricamento ordini:', error));
-}
-
-function caricaStatoPostazioni() {
-    fetch('/api/postazioni/stato/')
-    .then(response => response.json())
-    .then(data => {
-        const container = document.getElementById('stato-postazioni');
-        container.innerHTML = '';
-        
-        if (data.postazioni.length === 0) {
-            container.innerHTML = '<p class="text-muted">Nessuna postazione configurata</p>';
-            return;
-        }
-        
-        data.postazioni.forEach(postazione => {
-            const row = document.createElement('div');
-            row.className = 'border-bottom py-2';
-            row.innerHTML = `
-                <div class="d-flex justify-content-between align-items-center">
-                    <div>
-                        <strong>${postazione.nome}</strong><br>
-                        <small class="text-muted">${postazione.ordini_in_coda} in coda</small>
-                    </div>
-                    <div class="text-end">
-                        <span class="badge ${postazione.ordini_in_coda > 0 ? 'bg-warning' : 'bg-success'}">
-                            ${postazione.ordini_in_coda > 0 ? 'Occupata' : 'Libera'}
-                        </span>
-                    </div>
-                </div>
-            `;
-            container.appendChild(row);
-        });
-    })
-    .catch(error => console.error('Errore caricamento postazioni:', error));
-}
-
-function caricaGraficoOrdini() {
-    fetch('/api/dashboard/chart-ordini/')
-    .then(response => response.json())
-    .then(data => {
-        const ctx = document.getElementById('chartOrdiniSettimanali').getContext('2d');
-        new Chart(ctx, {
-            type: 'line',
-            data: {
-                labels: data.labels,
-                datasets: [{
-                    label: 'Ordini',
-                    data: data.ordini,
-                    borderColor: '#0066cc',
-                    backgroundColor: 'rgba(0, 102, 204, 0.1)',
-                    tension: 0.1
-                }, {
-                    label: 'Incassi (€)',
-                    data: data.incassi,
-                    borderColor: '#28a745',
-                    backgroundColor: 'rgba(40, 167, 69, 0.1)',
-                    tension: 0.1,
-                    yAxisID: 'y1'
-                }]
-            },
-            options: {
-                responsive: true,
-                interaction: {
-                    mode: 'index',
-                    intersect: false,
-                },
-                scales: {
-                    y: {
-                        type: 'linear',
-                        display: true,
-                        position: 'left',
+function initGraficoOrdini() {
+    const ctx = document.getElementById('chartOrdiniSettimanali').getContext('2d');
+    
+    // Dati dal server
+    const ordiniData = {{ ordini_settimana|safe }};
+    const labels = ordiniData.map(item => item.giorno);
+    const data = ordiniData.map(item => item.count);
+    
+    new Chart(ctx, {
+        type: 'line',
+        data: {
+            labels: labels,
+            datasets: [{
+                label: 'Ordini',
+                data: data,
+                borderColor: 'rgb(13, 110, 253)',
+                backgroundColor: 'rgba(13, 110, 253, 0.1)',
+                borderWidth: 3,
+                fill: true,
+                tension: 0.4,
+                pointBackgroundColor: 'rgb(13, 110, 253)',
+                pointBorderColor: '#fff',
+                pointBorderWidth: 2,
+                pointRadius: 5,
+                pointHoverRadius: 7
+            }]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            scales: {
+                y: {
+                    beginAtZero: true,
+                    ticks: {
+                        stepSize: 1
                     },
-                    y1: {
-                        type: 'linear',
-                        display: true,
-                        position: 'right',
-                        grid: {
-                            drawOnChartArea: false,
-                        },
+                    grid: {
+                        color: 'rgba(0, 0, 0, 0.1)'
+                    }
+                },
+                x: {
+                    grid: {
+                        color: 'rgba(0, 0, 0, 0.1)'
                     }
                 }
+            },
+            plugins: {
+                legend: {
+                    display: true,
+                    position: 'top',
+                    labels: {
+                        boxWidth: 12,
+                        font: {
+                            size: 12
+                        }
+                    }
+                },
+                tooltip: {
+                    backgroundColor: 'rgba(0, 0, 0, 0.8)',
+                    titleColor: '#fff',
+                    bodyColor: '#fff',
+                    borderColor: 'rgb(13, 110, 253)',
+                    borderWidth: 1,
+                    callbacks: {
+                        label: function(context) {
+                            return context.parsed.y + ' ordini';
+                        }
+                    }
+                }
+            },
+            interaction: {
+                intersect: false,
+                mode: 'index'
             }
-        });
-    })
-    .catch(error => console.error('Errore caricamento grafico:', error));
+        }
+    });
 }
 </script>
 {% endblock %}

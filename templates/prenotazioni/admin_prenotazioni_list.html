@@ -169,31 +169,42 @@
                         {% for prenotazione in prenotazioni %}
                         <tr>
                             <td>
-                                <strong>{{ prenotazione.data_prenotazione|date:"d/m/Y" }}</strong><br>
-                                <small class="text-muted">{{ prenotazione.ora_prenotazione|time:"H:i" }}</small>
+                                <strong>{{ prenotazione.slot.data|date:"d/m/Y" }}</strong><br>
+                                <small class="text-muted">{{ prenotazione.slot.ora_inizio|time:"H:i" }}</small>
                             </td>
                             <td>
                                 {% if prenotazione.cliente %}
-                                    <a href="{% url 'clienti:storico-cliente' prenotazione.cliente.pk %}" 
-                                       class="text-decoration-none">
-                                        {{ prenotazione.cliente.nome_completo }}
+                                    <a href="#" class="text-decoration-none">
+                                        {% if prenotazione.cliente.nome %}
+                                            {{ prenotazione.cliente.nome }} {{ prenotazione.cliente.cognome|default:"" }}
+                                        {% else %}
+                                            {{ prenotazione.cliente.ragione_sociale }}
+                                        {% endif %}
                                     </a>
-                                    <br><small class="text-muted">{{ prenotazione.cliente.email }}</small>
+                                    {% if prenotazione.cliente.telefono %}
+                                        <br><small class="text-muted"><i class="bi bi-telephone me-1"></i>{{ prenotazione.cliente.telefono }}</small>
+                                    {% endif %}
+                                    {% if prenotazione.tipo_auto %}
+                                        <br><small class="text-info"><i class="bi bi-car-front me-1"></i>{{ prenotazione.tipo_auto }}</small>
+                                    {% endif %}
                                 {% else %}
-                                    <strong>{{ prenotazione.nome_cliente }}</strong>
-                                    <br><small class="text-muted">{{ prenotazione.email_cliente }}</small>
+                                    <strong>Cliente Ospite</strong>
+                                    <br><small class="text-muted">{{ prenotazione.codice_prenotazione }}</small>
+                                    {% if prenotazione.tipo_auto %}
+                                        <br><small class="text-info"><i class="bi bi-car-front me-1"></i>{{ prenotazione.tipo_auto }}</small>
+                                    {% endif %}
                                 {% endif %}
                             </td>
                             <td>
-                                {% for servizio in prenotazione.servizi_selezionati.all %}
+                                {% for servizio in prenotazione.servizi.all %}
                                     <span class="badge bg-secondary me-1">{{ servizio.titolo }}</span>
                                 {% endfor %}
                             </td>
                             <td>
-                                {% if prenotazione.postazione_preferita %}
-                                    <span class="badge bg-info">{{ prenotazione.postazione_preferita.nome }}</span>
+                                {% if prenotazione.ordine and prenotazione.ordine.postazione_corrente %}
+                                    <span class="badge bg-info">{{ prenotazione.ordine.postazione_corrente.nome }}</span>
                                 {% else %}
-                                    <span class="text-muted">Qualsiasi</span>
+                                    <span class="text-muted">Non assegnata</span>
                                 {% endif %}
                             </td>
                             <td>
@@ -358,18 +369,48 @@ function cancellaPrenotazione(id) {
 
 document.getElementById('btnConfermaAzione').addEventListener('click', function() {
     if (azioneCorrente && prenotazioneId) {
-        const form = document.createElement('form');
-        form.method = 'POST';
-        form.action = `{% url 'prenotazioni:prenotazioni-admin' %}${prenotazioneId}/${azioneCorrente}/`;
-        
-        const csrfToken = document.createElement('input');
-        csrfToken.type = 'hidden';
-        csrfToken.name = 'csrfmiddlewaretoken';
-        csrfToken.value = '{{ csrf_token }}';
-        form.appendChild(csrfToken);
-        
-        document.body.appendChild(form);
-        form.submit();
+        if (azioneCorrente === 'cancella') {
+            // Usa AJAX per la cancellazione
+            fetch(`{% url 'prenotazioni:prenotazioni-admin' %}${prenotazioneId}/${azioneCorrente}/`, {
+                method: 'POST',
+                headers: {
+                    'X-CSRFToken': '{{ csrf_token }}',
+                    'Content-Type': 'application/json',
+                },
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    // Chiudi il modal
+                    const modal = bootstrap.Modal.getInstance(document.getElementById('modalConfermaAzione'));
+                    modal.hide();
+                    
+                    // Mostra messaggio di successo e ricarica la pagina
+                    alert('✅ ' + data.message);
+                    location.reload();
+                } else {
+                    alert('❌ Errore: ' + (data.error || 'Operazione fallita'));
+                }
+            })
+            .catch(error => {
+                console.error('Errore:', error);
+                alert('❌ Errore nella cancellazione della prenotazione');
+            });
+        } else {
+            // Per altre azioni usa il form normale
+            const form = document.createElement('form');
+            form.method = 'POST';
+            form.action = `{% url 'prenotazioni:prenotazioni-admin' %}${prenotazioneId}/${azioneCorrente}/`;
+            
+            const csrfToken = document.createElement('input');
+            csrfToken.type = 'hidden';
+            csrfToken.name = 'csrfmiddlewaretoken';
+            csrfToken.value = '{{ csrf_token }}';
+            form.appendChild(csrfToken);
+            
+            document.body.appendChild(form);
+            form.submit();
+        }
     }
 });
 

@@ -14,7 +14,7 @@
                 <h4 class="mb-0">
                     <i class="bi bi-percent"></i>
                     {% if form.instance.pk %}
-                        Modifica Sconto: {{ form.instance.nome }}
+                        Modifica Sconto: {{ form.instance.titolo }}
                     {% else %}
                         Nuovo Sconto
                     {% endif %}
@@ -30,110 +30,95 @@
                     <!-- Informazioni Base -->
                     <div class="row mb-4">
                         <div class="col-12">
-                            <h5 class="border-bottom pb-2 mb-3">Informazioni Base</h5>
-                        </div>
-                        <div class="col-md-8">
-                            {{ form.nome|as_crispy_field }}
-                        </div>
-                        <div class="col-md-4">
-                            {{ form.codice|as_crispy_field }}
+                            <h5 class="border-bottom pb-2 mb-3">
+                                <i class="bi bi-info-circle"></i> Informazioni Base
+                            </h5>
                         </div>
                         <div class="col-12">
-                            {{ form.descrizione|as_crispy_field }}
+                            {{ form.titolo|as_crispy_field }}
                         </div>
                     </div>
 
                     <!-- Tipo e Valore -->
                     <div class="row mb-4">
                         <div class="col-12">
-                            <h5 class="border-bottom pb-2 mb-3">Tipo e Valore</h5>
+                            <h5 class="border-bottom pb-2 mb-3">
+                                <i class="bi bi-calculator"></i> Configurazione Sconto
+                            </h5>
                         </div>
                         <div class="col-md-6">
-                            {{ form.tipo|as_crispy_field }}
+                            {{ form.tipo_sconto|as_crispy_field }}
                         </div>
                         <div class="col-md-6">
                             <div id="valore-field">
                                 {{ form.valore|as_crispy_field }}
                             </div>
                         </div>
-                        <div class="col-md-6">
-                            {{ form.importo_minimo|as_crispy_field }}
-                        </div>
-                        <div class="col-md-6">
-                            {{ form.sconto_massimo|as_crispy_field }}
+                        <div class="col-12">
+                            <div class="alert alert-info">
+                                <i class="bi bi-lightbulb"></i>
+                                <strong>Nota:</strong> Se selezioni "Percentuale", inserisci un valore da 1 a 100. 
+                                Se selezioni "Importo fisso", inserisci l'importo in euro.
+                            </div>
                         </div>
                     </div>
 
-                    <!-- Validità -->
+                    <!-- Stato -->
                     <div class="row mb-4">
                         <div class="col-12">
-                            <h5 class="border-bottom pb-2 mb-3">Periodo di Validità</h5>
+                            <h5 class="border-bottom pb-2 mb-3">
+                                <i class="bi bi-toggle-on"></i> Stato
+                            </h5>
                         </div>
-                        <div class="col-md-6">
-                            {{ form.data_inizio|as_crispy_field }}
-                        </div>
-                        <div class="col-md-6">
-                            {{ form.data_fine|as_crispy_field }}
-                        </div>
-                    </div>
-
-                    <!-- Limitazioni -->
-                    <div class="row mb-4">
                         <div class="col-12">
-                            <h5 class="border-bottom pb-2 mb-3">Limitazioni d'Uso</h5>
-                        </div>
-                        <div class="col-md-6">
-                            {{ form.utilizzi_massimi|as_crispy_field }}
-                        </div>
-                        <div class="col-md-6">
-                            {{ form.utilizzi_per_cliente|as_crispy_field }}
-                        </div>
-                    </div>
-
-                    <!-- Applicabilità -->
-                    <div class="row mb-4">
-                        <div class="col-12">
-                            <h5 class="border-bottom pb-2 mb-3">Applicabilità</h5>
-                        </div>
-                        <div class="col-md-6">
-                            {{ form.categorie_applicabili|as_crispy_field }}
-                        </div>
-                        <div class="col-md-6">
-                            {{ form.servizi_applicabili|as_crispy_field }}
-                        </div>
-                    </div>
-
-                    <!-- Opzioni -->
-                    <div class="row mb-4">
-                        <div class="col-12">
-                            <h5 class="border-bottom pb-2 mb-3">Opzioni</h5>
-                        </div>
-                        <div class="col-md-4">
                             <div class="form-check form-switch">
                                 {{ form.attivo }}
                                 <label class="form-check-label" for="{{ form.attivo.id_for_label }}">
-                                    Sconto Attivo
-                                </label>
-                            </div>
-                        </div>
-                        <div class="col-md-4">
-                            <div class="form-check form-switch">
-                                {{ form.cumulabile }}
-                                <label class="form-check-label" for="{{ form.cumulabile.id_for_label }}">
-                                    Cumulabile con Altri Sconti
-                                </label>
-                            </div>
-                        </div>
-                        <div class="col-md-4">
-                            <div class="form-check form-switch">
-                                {{ form.solo_primo_acquisto }}
-                                <label class="form-check-label" for="{{ form.solo_primo_acquisto.id_for_label }}">
-                                    Solo Primo Acquisto
+                                    <strong>Sconto Attivo</strong>
+                                    <small class="d-block text-muted">
+                                        Solo gli sconti attivi possono essere applicati agli ordini
+                                    </small>
                                 </label>
                             </div>
                         </div>
                     </div>
                     
+                    <!-- Anteprima -->
+                    {% if form.instance.pk %}
+                    <div class="row mb-4">
+                        <div class="col-12">
+                            <div class="card bg-light">
+                                <div class="card-body">
+                                    <h6 class="card-title">
+                                        <i class="bi bi-eye"></i> Anteprima Sconto
+                                    </h6>
+                                    <div class="d-flex justify-content-between align-items-center">
+                                        <div>
+                                            <strong>{{ form.instance.titolo }}</strong>
+                                            <br>
+                                            <small class="text-muted">
+                                                {% if form.instance.tipo_sconto == 'percentuale' %}
+                                                    Sconto del {{ form.instance.valore }}%
+                                                {% else %}
+                                                    Sconto di €{{ form.instance.valore }}
+                                                {% endif %}
+                                            </small>
+                                        </div>
+                                        <div class="text-end">
+                                            {% if form.instance.attivo %}
+                                                <span class="badge bg-success">Attivo</span>
+                                            {% else %}
+                                                <span class="badge bg-secondary">Inattivo</span>
+                                            {% endif %}
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    {% endif %}
+                    
+                    <!-- Bottoni -->
                     <div class="d-flex justify-content-between">
                         <a href="{% url 'core:sconti-list' %}" class="btn btn-secondary">
                             <i class="bi bi-x-circle"></i> Annulla
@@ -151,14 +136,34 @@
 
 <script>
 document.addEventListener('DOMContentLoaded', function() {
-    const tipoField = document.getElementById('{{ form.tipo.id_for_label }}');
+    const tipoField = document.getElementById('{{ form.tipo_sconto.id_for_label }}');
     const valoreField = document.querySelector('#valore-field label');
+    const valoreInput = document.getElementById('{{ form.valore.id_for_label }}');
 
     function aggiornaSimbolo() {
-        if (tipoField.value === 'percentuale') {
-            valoreField.textContent = valoreField.textContent.replace('€', '%');
+        if (!tipoField || !valoreField) return;
+        
+        const tipoValue = tipoField.value;
+        const currentLabel = valoreField.textContent;
+        
+        if (tipoValue === 'percentuale') {
+            // Cambia label e placeholder per percentuale
+            valoreField.innerHTML = currentLabel.replace('€', '%').replace('Importo', 'Percentuale');
+            if (valoreInput) {
+                valoreInput.placeholder = 'Es: 15 (per 15%)';
+                valoreInput.setAttribute('max', '100');
+                valoreInput.setAttribute('min', '1');
+                valoreInput.setAttribute('step', '1');
+            }
         } else {
-            valoreField.textContent = valoreField.textContent.replace('%', '€');
+            // Cambia label e placeholder per importo fisso
+            valoreField.innerHTML = currentLabel.replace('%', '€').replace('Percentuale', 'Importo');
+            if (valoreInput) {
+                valoreInput.placeholder = 'Es: 5.50';
+                valoreInput.removeAttribute('max');
+                valoreInput.setAttribute('min', '0.01');
+                valoreInput.setAttribute('step', '0.01');
+            }
         }
     }
 

@@ -16,8 +16,168 @@
 .calendar-grid {
     display: grid;
     grid-template-columns: repeat(7, 1fr);
-    gap: 10px;
+    gap: 15px;
     margin-top: 20px;
+}
+
+.week-view-container {
+    background: white;
+    border-radius: 15px;
+    box-shadow: 0 5px 15px rgba(0,0,0,0.1);
+    padding: 20px;
+    margin-bottom: 20px;
+}
+
+.week-day-column {
+    background: #f8f9fa;
+    border-radius: 10px;
+    padding: 15px;
+    min-height: 500px;
+    border: 2px solid #e9ecef;
+    transition: all 0.3s ease;
+}
+
+.week-day-column.today {
+    border-color: #0d6efd;
+    background: #f8f9ff;
+}
+
+.week-day-column.closed {
+    background: #ffe6e6;
+    border-color: #dc3545;
+    opacity: 0.7;
+}
+
+.day-header-week {
+    text-align: center;
+    font-weight: bold;
+    font-size: 1.1rem;
+    padding: 10px 0;
+    border-bottom: 2px solid #dee2e6;
+    margin-bottom: 15px;
+    color: #495057;
+}
+
+.day-header-week.today {
+    color: #0d6efd;
+    background: linear-gradient(135deg, #e7f3ff, #f8f9ff);
+    border-radius: 8px;
+    border-bottom-color: #0d6efd;
+}
+
+.slot-card {
+    background: white;
+    border-radius: 8px;
+    padding: 10px;
+    margin-bottom: 8px;
+    border-left: 4px solid #28a745;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+    transition: all 0.3s ease;
+    cursor: pointer;
+}
+
+.slot-card:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 4px 8px rgba(0,0,0,0.15);
+}
+
+.slot-card.full {
+    border-left-color: #dc3545;
+    background: #ffeaea;
+}
+
+.slot-card.limited {
+    border-left-color: #ffc107;
+    background: #fffbf0;
+}
+
+.slot-time {
+    font-weight: bold;
+    font-size: 0.9rem;
+    color: #495057;
+    margin-bottom: 5px;
+}
+
+.slot-availability {
+    font-size: 0.8rem;
+    color: #6c757d;
+    margin-bottom: 8px;
+}
+
+.slot-booking {
+    background: #e3f2fd;
+    border-radius: 6px;
+    padding: 6px 8px;
+    margin-bottom: 4px;
+    border-left: 3px solid #2196f3;
+    font-size: 0.8rem;
+}
+
+.slot-booking:last-child {
+    margin-bottom: 0;
+}
+
+.booking-customer {
+    font-weight: 600;
+    color: #1976d2;
+    margin-bottom: 2px;
+}
+
+.booking-details {
+    color: #666;
+    font-size: 0.75rem;
+}
+
+.booking-car {
+    color: #444;
+    font-weight: 500;
+}
+
+.booking-services {
+    color: #666;
+    font-style: italic;
+}
+
+.slot-booking-link {
+    display: block;
+    color: inherit;
+    transition: all 0.2s ease;
+}
+
+.slot-booking-link:hover {
+    color: inherit;
+    transform: scale(1.02);
+}
+
+.slot-booking-link .slot-booking {
+    transition: all 0.2s ease;
+    border-radius: 4px;
+    padding: 4px;
+}
+
+.slot-booking-link:hover .slot-booking {
+    background-color: rgba(13, 110, 253, 0.1);
+    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+}
+
+.empty-day {
+    text-align: center;
+    color: #6c757d;
+    font-style: italic;
+    padding: 40px 10px;
+}
+
+.week-navigation {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 20px;
+}
+
+.week-range {
+    font-size: 1.3rem;
+    font-weight: bold;
+    color: #0d6efd;
 }
 
 .calendar-header {
@@ -300,78 +460,84 @@
         <button class="filter-btn" onclick="setFilter('weekday')">Giorni Feriali</button>
     </div>
 
+    <!-- Vista Settimanale -->
+    <div class="week-view-container">
+        <!-- Navigazione Settimana -->
+        <div class="week-navigation">
+            <button class="nav-button" onclick="previousWeek()">
+                <i class="bi bi-chevron-left"></i>
+            </button>
+            <div class="week-range" id="current-week-range">
+                Caricamento...
+            </div>
+            <button class="nav-button" onclick="nextWeek()">
+                <i class="bi bi-chevron-right"></i>
+            </button>
+            <div class="ms-auto">
+                <button class="btn btn-outline-primary btn-sm me-2" onclick="goToCurrentWeek()">
+                    <i class="bi bi-calendar-week"></i> Questa Settimana
+                </button>
+                <button class="btn btn-outline-secondary btn-sm" onclick="refreshWeek()">
+                    <i class="bi bi-arrow-clockwise"></i> Aggiorna
+                </button>
+            </div>
+        </div>
+
+        <!-- Griglia Settimana -->
+        <div class="calendar-loading" id="week-loading">
+            <div class="spinner-border text-primary" role="status">
+                <span class="visually-hidden">Caricamento...</span>
+            </div>
+        </div>
+
+        <div id="week-content" style="display: none;">
+            <div class="calendar-grid" id="week-grid">
+                <!-- Generato via JavaScript -->
+            </div>
+        </div>
+
+        <!-- Legenda -->
+        <div class="legend">
+            <div class="legend-item">
+                <div class="legend-color" style="background: #28a745;"></div>
+                <span>Slot disponibili</span>
+            </div>
+            <div class="legend-item">
+                <div class="legend-color" style="background: #ffc107;"></div>
+                <span>Pochi posti</span>
+            </div>
+            <div class="legend-item">
+                <div class="legend-color" style="background: #dc3545;"></div>
+                <span>Completo</span>
+            </div>
+            <div class="legend-item">
+                <div class="legend-color" style="background: #2196f3;"></div>
+                <span>Prenotazione esistente</span>
+            </div>
+        </div>
+    </div>
+
     <div class="row">
-        <!-- Calendario -->
+        <!-- Pannello Azioni Rapide -->
         <div class="col-lg-8">
-            <div class="calendar-container">
-                <!-- Navigazione Mese -->
-                <div class="month-navigation">
-                    <button class="nav-button" onclick="previousMonth()">
-                        <i class="bi bi-chevron-left"></i>
-                    </button>
-                    <div class="month-year" id="current-month-year">
-                        Loading...
-                    </div>
-                    <button class="nav-button" onclick="nextMonth()">
-                        <i class="bi bi-chevron-right"></i>
-                    </button>
-                    <div class="ms-auto">
-                        <button class="btn btn-outline-primary btn-sm me-2" onclick="goToToday()">
-                            <i class="bi bi-calendar-day"></i> Oggi
+            <div class="card">
+                <div class="card-header">
+                    <h6 class="mb-0">
+                        <i class="bi bi-lightning"></i>
+                        Azioni Rapide
+                    </h6>
+                </div>
+                <div class="card-body">
+                    <div class="d-grid gap-2 d-md-flex">
+                        <a href="{% url 'prenotazioni:nuova-prenotazione' %}" class="btn btn-primary">
+                            <i class="bi bi-plus-circle"></i> Nuova Prenotazione
+                        </a>
+                        <a href="{% url 'prenotazioni:prenotazioni' %}" class="btn btn-outline-primary">
+                            <i class="bi bi-list"></i> Lista Prenotazioni
+                        </a>
+                        <button class="btn btn-outline-info" onclick="printWeek()">
+                            <i class="bi bi-printer"></i> Stampa Settimana
                         </button>
-                        <select class="form-select form-select-sm d-inline-block w-auto" 
-                                id="month-selector" onchange="goToMonth()">
-                            <!-- Opzioni caricate via JS -->
-                        </select>
-                        <select class="form-select form-select-sm d-inline-block w-auto ms-2" 
-                                id="year-selector" onchange="goToMonth()">
-                            <!-- Opzioni caricate via JS -->
-                        </select>
-                    </div>
-                </div>
-
-                <!-- Griglia Calendario -->
-                <div class="calendar-loading" id="calendar-loading">
-                    <div class="spinner-border text-primary" role="status">
-                        <span class="visually-hidden">Caricamento...</span>
-                    </div>
-                </div>
-
-                <div id="calendar-content" style="display: none;">
-                    <!-- Headers giorni settimana -->
-                    <div class="calendar-grid">
-                        <div class="day-header">Lun</div>
-                        <div class="day-header">Mar</div>
-                        <div class="day-header">Mer</div>
-                        <div class="day-header">Gio</div>
-                        <div class="day-header">Ven</div>
-                        <div class="day-header">Sab</div>
-                        <div class="day-header">Dom</div>
-                    </div>
-
-                    <!-- Giorni del mese -->
-                    <div class="calendar-grid" id="calendar-days">
-                        <!-- Generato via JavaScript -->
-                    </div>
-                </div>
-
-                <!-- Legenda -->
-                <div class="legend">
-                    <div class="legend-item">
-                        <div class="legend-color slots-high"></div>
-                        <span>Molti slot disponibili</span>
-                    </div>
-                    <div class="legend-item">
-                        <div class="legend-color slots-medium"></div>
-                        <span>Pochi slot disponibili</span>
-                    </div>
-                    <div class="legend-item">
-                        <div class="legend-color slots-low"></div>
-                        <span>Slot limitati</span>
-                    </div>
-                    <div class="legend-item">
-                        <div class="legend-color" style="background: #f8f9fa; border: 2px solid #6c757d;"></div>
-                        <span>Chiuso</span>
                     </div>
                 </div>
             </div>
@@ -505,88 +671,99 @@
 </div>
 
 <script>
-let currentDate = new Date();
-let selectedDate = null;
+let currentWeekStart = new Date();
 let selectedSlot = null;
-let calendarData = {};
+let weekData = {};
 let currentFilter = 'all';
+
+// Calcola l'inizio della settimana (lunedì)
+function getWeekStart(date) {
+    const d = new Date(date);
+    const day = d.getDay();
+    const diff = d.getDate() - day + (day === 0 ? -6 : 1); // Adjust when day is sunday
+    return new Date(d.setDate(diff));
+}
 
 // Inizializzazione
 document.addEventListener('DOMContentLoaded', function() {
-    initializeCalendar();
-    loadCalendarData();
-    setupSelectors();
+    currentWeekStart = getWeekStart(new Date());
+    initializeWeekView();
+    loadWeekData();
     loadStats();
 });
 
-function initializeCalendar() {
-    updateMonthYear();
-    generateCalendar();
+function initializeWeekView() {
+    updateWeekRange();
+    generateWeekView();
 }
 
-function setupSelectors() {
-    const monthSelector = document.getElementById('month-selector');
-    const yearSelector = document.getElementById('year-selector');
+function updateWeekRange() {
+    const endWeek = new Date(currentWeekStart);
+    endWeek.setDate(endWeek.getDate() + 6);
     
-    // Popola selettore mesi
-    const mesi = [
-        'Gennaio', 'Febbraio', 'Marzo', 'Aprile', 'Maggio', 'Giugno',
-        'Luglio', 'Agosto', 'Settembre', 'Ottobre', 'Novembre', 'Dicembre'
-    ];
-    
-    mesi.forEach((mese, index) => {
-        const option = document.createElement('option');
-        option.value = index;
-        option.textContent = mese;
-        monthSelector.appendChild(option);
+    const startStr = currentWeekStart.toLocaleDateString('it-IT', { 
+        day: 'numeric', 
+        month: 'short' 
+    });
+    const endStr = endWeek.toLocaleDateString('it-IT', { 
+        day: 'numeric', 
+        month: 'short', 
+        year: 'numeric' 
     });
     
-    // Popola selettore anni (anno corrente +/- 2)
-    const currentYear = new Date().getFullYear();
-    for (let year = currentYear - 1; year <= currentYear + 2; year++) {
-        const option = document.createElement('option');
-        option.value = year;
-        option.textContent = year;
-        yearSelector.appendChild(option);
-    }
-    
-    // Imposta valori correnti
-    monthSelector.value = currentDate.getMonth();
-    yearSelector.value = currentDate.getFullYear();
+    document.getElementById('current-week-range').textContent = `${startStr} - ${endStr}`;
 }
 
-function updateMonthYear() {
-    const options = { month: 'long', year: 'numeric' };
-    document.getElementById('current-month-year').textContent = 
-        currentDate.toLocaleDateString('it-IT', options);
-}
-
-function generateCalendar() {
-    const container = document.getElementById('calendar-days');
+function generateWeekView() {
+    const container = document.getElementById('week-grid');
     container.innerHTML = '';
     
-    const year = currentDate.getFullYear();
-    const month = currentDate.getMonth();
+    const giorni = ['Lunedì', 'Martedì', 'Mercoledì', 'Giovedì', 'Venerdì', 'Sabato', 'Domenica'];
     
-    // Primo giorno del mese
-    const firstDay = new Date(year, month, 1);
-    const lastDay = new Date(year, month + 1, 0);
-    
-    // Giorni da mostrare prima del primo del mese
-    const startDate = new Date(firstDay);
-    startDate.setDate(startDate.getDate() - (firstDay.getDay() || 7) + 1);
-    
-    // Genera 42 giorni (6 settimane)
-    for (let i = 0; i < 42; i++) {
-        const date = new Date(startDate);
-        date.setDate(startDate.getDate() + i);
+    for (let i = 0; i < 7; i++) {
+        const currentDay = new Date(currentWeekStart);
+        currentDay.setDate(currentWeekStart.getDate() + i);
         
-        const dayElement = createDayElement(date, month);
-        container.appendChild(dayElement);
+        const dayColumn = createDayColumn(currentDay, giorni[i]);
+        container.appendChild(dayColumn);
     }
     
     // Applica filtro corrente
     applyFilter(currentFilter);
+}
+
+function createDayColumn(date, dayName) {
+    const column = document.createElement('div');
+    const today = new Date();
+    const isToday = date.toDateString() === today.toDateString();
+    const isPast = date < today.setHours(0, 0, 0, 0);
+    
+    column.className = `week-day-column ${isToday ? 'today' : ''}`;
+    column.dataset.date = date.toISOString().split('T')[0];
+    
+    const header = document.createElement('div');
+    header.className = `day-header-week ${isToday ? 'today' : ''}`;
+    header.innerHTML = `
+        <div>${dayName}</div>
+        <div style="font-size: 0.9rem; font-weight: normal;">${date.getDate()}/${date.getMonth() + 1}</div>
+    `;
+    
+    column.appendChild(header);
+    
+    // Container per gli slot
+    const slotsContainer = document.createElement('div');
+    slotsContainer.className = 'slots-container';
+    slotsContainer.id = `slots-${date.toISOString().split('T')[0]}`;
+    
+    if (isPast) {
+        slotsContainer.innerHTML = '<div class="empty-day">Giorno passato</div>';
+    } else {
+        slotsContainer.innerHTML = '<div class="empty-day">Caricamento...</div>';
+    }
+    
+    column.appendChild(slotsContainer);
+    
+    return column;
 }
 
 function createDayElement(date, currentMonth) {
@@ -626,58 +803,112 @@ function createDayElement(date, currentMonth) {
     return dayDiv;
 }
 
-function loadCalendarData() {
-    const year = currentDate.getFullYear();
-    const month = currentDate.getMonth() + 1;
+function loadWeekData() {
+    document.getElementById('week-loading').style.display = 'flex';
+    document.getElementById('week-content').style.display = 'none';
     
-    document.getElementById('calendar-loading').style.display = 'flex';
-    document.getElementById('calendar-content').style.display = 'none';
+    const dataParam = currentWeekStart.toISOString().split('T')[0];
     
-    fetch(`/prenotazioni/api/calendario-mese/?year=${year}&month=${month}`)
+    fetch(`/prenotazioni/api/calendario-settimana/?data=${dataParam}`)
         .then(response => response.json())
         .then(data => {
-            calendarData = data;
-            updateCalendarAvailability();
-            document.getElementById('calendar-loading').style.display = 'none';
-            document.getElementById('calendar-content').style.display = 'block';
+            weekData = data;
+            updateWeekView();
+            document.getElementById('week-loading').style.display = 'none';
+            document.getElementById('week-content').style.display = 'block';
         })
         .catch(error => {
-            console.error('Errore nel caricamento calendario:', error);
-            document.getElementById('calendar-loading').style.display = 'none';
-            document.getElementById('calendar-content').style.display = 'block';
+            console.error('Errore nel caricamento settimana:', error);
+            document.getElementById('week-loading').style.display = 'none';
+            document.getElementById('week-content').style.display = 'block';
         });
 }
 
-function updateCalendarAvailability() {
-    Object.keys(calendarData).forEach(dateString => {
-        const dayData = calendarData[dateString];
-        const indicator = document.getElementById(`indicator-${dateString}`);
+function updateWeekView() {
+    if (!weekData.giorni) return;
+    
+    weekData.giorni.forEach(giorno => {
+        const container = document.getElementById(`slots-${giorno.data}`);
+        const dayColumn = container.closest('.week-day-column');
         
-        if (!indicator) return;
+        if (!container) return;
         
-        const dayElement = indicator.closest('.calendar-day');
-        
-        if (dayData.chiuso) {
-            indicator.textContent = 'Chiuso';
-            indicator.className = 'slots-available';
-            indicator.style.background = '#f8f9fa';
-            indicator.style.color = '#6c757d';
-            dayElement.classList.add('closed');
-        } else if (dayData.slot_disponibili === 0) {
-            indicator.textContent = 'Completo';
-            indicator.className = 'slots-available slots-low';
-            dayElement.classList.add('unavailable');
-        } else if (dayData.slot_disponibili <= 2) {
-            indicator.textContent = `${dayData.slot_disponibili} slot`;
-            indicator.className = 'slots-available slots-low';
-        } else if (dayData.slot_disponibili <= 5) {
-            indicator.textContent = `${dayData.slot_disponibili} slot`;
-            indicator.className = 'slots-available slots-medium';
-        } else {
-            indicator.textContent = `${dayData.slot_disponibili} slot`;
-            indicator.className = 'slots-available slots-high';
+        // Aggiorna stile della colonna
+        if (giorno.chiuso) {
+            dayColumn.classList.add('closed');
+            container.innerHTML = '<div class="empty-day">🚫 Chiuso</div>';
+            return;
         }
+        
+        // Genera slot per questo giorno
+        if (giorno.slot.length === 0) {
+            container.innerHTML = '<div class="empty-day">Nessun slot disponibile</div>';
+            return;
+        }
+        
+        container.innerHTML = '';
+        giorno.slot.forEach(slot => {
+            const slotCard = createSlotCard(slot, giorno.data);
+            container.appendChild(slotCard);
+        });
     });
+}
+
+function createSlotCard(slot, date) {
+    const card = document.createElement('div');
+    let cardClass = 'slot-card';
+    
+    if (slot.posti_disponibili === 0) {
+        cardClass += ' full';
+    } else if (slot.posti_disponibili <= 1) {
+        cardClass += ' limited';
+    }
+    
+    card.className = cardClass;
+    card.dataset.slotId = slot.id;
+    card.dataset.date = date;
+    
+    // Contenuto della card
+    let cardContent = `
+        <div class="slot-time">${slot.ora_inizio} - ${slot.ora_fine}</div>
+        <div class="slot-availability">
+            ${slot.posti_disponibili > 0 ? 
+                `${slot.posti_disponibili} di ${slot.max_prenotazioni} posti liberi` :
+                'Completo'
+            }
+        </div>
+    `;
+    
+    // Aggiungi prenotazioni esistenti
+    if (slot.prenotazioni && slot.prenotazioni.length > 0) {
+        slot.prenotazioni.forEach(prenotazione => {
+            cardContent += `
+                <a href="/prenotazioni/${prenotazione.id}/" class="slot-booking-link text-decoration-none">
+                    <div class="slot-booking">
+                        <div class="booking-customer">${prenotazione.cliente_nome}</div>
+                        <div class="booking-details">
+                            ${prenotazione.tipo_auto ? `<div class="booking-car">🚗 ${prenotazione.tipo_auto}</div>` : ''}
+                            <div class="booking-services">${prenotazione.servizi.join(', ')}</div>
+                            ${prenotazione.nota ? `<div class="booking-note">💬 ${prenotazione.nota}</div>` : ''}
+                        </div>
+                    </div>
+                </a>
+            `;
+        });
+    }
+    
+    // Bottone per prenotare se disponibile
+    if (slot.is_disponibile && slot.posti_disponibili > 0) {
+        cardContent += `
+            <button class="btn btn-sm btn-success mt-2 w-100" onclick="prenotaSlot('${slot.id}', '${date}', '${slot.ora_inizio}', '${slot.ora_fine}')">
+                <i class="bi bi-plus-circle"></i> Prenota
+            </button>
+        `;
+    }
+    
+    card.innerHTML = cardContent;
+    
+    return card;
 }
 
 function selectDate(date) {
@@ -855,43 +1086,47 @@ function clearBookingSummary() {
     selectedSlot = null;
 }
 
-function previousMonth() {
-    currentDate.setMonth(currentDate.getMonth() - 1);
-    updateMonthYear();
-    updateSelectors();
-    generateCalendar();
-    loadCalendarData();
+// Funzioni di navigazione settimana
+function previousWeek() {
+    currentWeekStart.setDate(currentWeekStart.getDate() - 7);
+    updateWeekRange();
+    generateWeekView();
+    loadWeekData();
 }
 
-function nextMonth() {
-    currentDate.setMonth(currentDate.getMonth() + 1);
-    updateMonthYear();
-    updateSelectors();
-    generateCalendar();
-    loadCalendarData();
+function nextWeek() {
+    currentWeekStart.setDate(currentWeekStart.getDate() + 7);
+    updateWeekRange();
+    generateWeekView();
+    loadWeekData();
 }
 
-function goToToday() {
-    currentDate = new Date();
-    updateMonthYear();
-    updateSelectors();
-    generateCalendar();
-    loadCalendarData();
+function goToCurrentWeek() {
+    currentWeekStart = getWeekStart(new Date());
+    updateWeekRange();
+    generateWeekView();
+    loadWeekData();
 }
 
-function goToMonth() {
-    const month = parseInt(document.getElementById('month-selector').value);
-    const year = parseInt(document.getElementById('year-selector').value);
+function refreshWeek() {
+    generateWeekView();
+    loadWeekData();
+}
+
+// Funzione per prenotare uno slot
+function prenotaSlot(slotId, date, oraInizio, oraFine) {
+    const params = new URLSearchParams({
+        data: date,
+        slot: slotId,
+        ora: oraInizio
+    });
     
-    currentDate = new Date(year, month, 1);
-    updateMonthYear();
-    generateCalendar();
-    loadCalendarData();
+    window.location.href = `{% url 'prenotazioni:nuova-prenotazione' %}?${params.toString()}`;
 }
 
-function updateSelectors() {
-    document.getElementById('month-selector').value = currentDate.getMonth();
-    document.getElementById('year-selector').value = currentDate.getFullYear();
+// Funzione per stampare la settimana
+function printWeek() {
+    window.print();
 }
 
 function setFilter(filter) {
@@ -906,16 +1141,20 @@ function setFilter(filter) {
 }
 
 function applyFilter(filter) {
-    const days = document.querySelectorAll('.calendar-day');
+    const columns = document.querySelectorAll('.week-day-column');
     
-    days.forEach(day => {
-        const date = new Date(day.dataset.date);
+    columns.forEach(column => {
+        const date = new Date(column.dataset.date);
         const dayOfWeek = date.getDay();
         let show = true;
         
         switch (filter) {
             case 'available':
-                show = !day.classList.contains('unavailable') && !day.classList.contains('closed');
+                // Mostra solo giorni con slot disponibili
+                const slotsContainer = column.querySelector('.slots-container');
+                const hasAvailableSlots = slotsContainer && 
+                    slotsContainer.querySelectorAll('.slot-card:not(.full)').length > 0;
+                show = hasAvailableSlots && !column.classList.contains('closed');
                 break;
             case 'weekend':
                 show = dayOfWeek === 0 || dayOfWeek === 6; // Domenica o Sabato
@@ -927,8 +1166,8 @@ function applyFilter(filter) {
                 show = true;
         }
         
-        day.style.opacity = show ? '1' : '0.3';
-        day.style.pointerEvents = show ? 'auto' : 'none';
+        column.style.opacity = show ? '1' : '0.3';
+        column.style.pointerEvents = show ? 'auto' : 'none';
     });
 }
 
@@ -944,7 +1183,7 @@ function loadStats() {
 // Auto-refresh ogni 2 minuti
 setInterval(() => {
     if (!document.hidden) {
-        loadCalendarData();
+        loadWeekData();
         loadStats();
     }
 }, 120000);

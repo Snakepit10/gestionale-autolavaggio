@@ -3,6 +3,7 @@
 
 {% block title %}Catalogo Prodotti e Servizi - Gestionale Autolavaggio{% endblock %}
 
+
 {% block content %}
 <div class="d-flex justify-content-between align-items-center mb-4">
     <h1><i class="bi bi-grid-3x3-gap"></i> Catalogo Prodotti e Servizi</h1>
@@ -23,37 +24,60 @@
 <!-- Filtri -->
 <div class="card mb-4">
     <div class="card-body">
-        <div class="row g-3">
+        <form method="get" class="row g-3">
             <div class="col-md-3">
-                <select class="form-select" id="filtro-tipo">
+                <select class="form-select" name="tipo" id="filtro-tipo">
                     <option value="">Tutti i Tipi</option>
-                    <option value="servizio">Solo Servizi</option>
-                    <option value="prodotto">Solo Prodotti</option>
+                    <option value="servizio" {% if request.GET.tipo == 'servizio' %}selected{% endif %}>Solo Servizi</option>
+                    <option value="prodotto" {% if request.GET.tipo == 'prodotto' %}selected{% endif %}>Solo Prodotti</option>
                 </select>
             </div>
             <div class="col-md-3">
-                <select class="form-select" id="filtro-categoria">
+                <select class="form-select" name="categoria" id="filtro-categoria">
                     <option value="">Tutte le Categorie</option>
-                    <!-- Le categorie verranno popolate via JavaScript -->
+                    {% for categoria in categorie %}
+                        <option value="{{ categoria.nome }}" {% if request.GET.categoria == categoria.nome %}selected{% endif %}>{{ categoria.nome }}</option>
+                    {% endfor %}
                 </select>
             </div>
             <div class="col-md-3">
-                <select class="form-select" id="filtro-stato">
+                <select class="form-select" name="stato" id="filtro-stato">
                     <option value="">Tutti gli Stati</option>
-                    <option value="attivo">Solo Attivi</option>
-                    <option value="inattivo">Solo Inattivi</option>
+                    <option value="attivo" {% if request.GET.stato == 'attivo' %}selected{% endif %}>Solo Attivi</option>
+                    <option value="inattivo" {% if request.GET.stato == 'inattivo' %}selected{% endif %}>Solo Inattivi</option>
                 </select>
             </div>
             <div class="col-md-3">
-                <input type="text" class="form-control" id="ricerca" placeholder="Cerca per nome...">
+                <div class="input-group">
+                    <input type="text" class="form-control" name="search" id="ricerca" 
+                           placeholder="Cerca per nome..." value="{{ request.GET.search }}">
+                    <button type="submit" class="btn btn-primary">
+                        <i class="bi bi-search"></i> Filtra
+                    </button>
+                </div>
             </div>
-        </div>
+        </form>
     </div>
 </div>
 
 <div class="card">
     <div class="card-body">
         {% if servizi_prodotti %}
+            <!-- Informazioni sui risultati -->
+            <div class="d-flex justify-content-between align-items-center mb-3">
+                <small class="text-muted">
+                    {% if is_paginated %}
+                        Mostrando {{ page_obj.start_index }}-{{ page_obj.end_index }} di {{ page_obj.paginator.count }} elementi
+                    {% else %}
+                        {{ servizi_prodotti|length }} elementi totali
+                    {% endif %}
+                </small>
+                {% if request.GET %}
+                    <a href="{% url 'core:catalogo-list' %}" class="btn btn-sm btn-outline-secondary">
+                        <i class="bi bi-x-circle"></i> Rimuovi Filtri
+                    </a>
+                {% endif %}
+            </div>
             <div class="table-responsive">
                 <table class="table table-hover">
                     <thead class="table-dark">
@@ -129,6 +153,37 @@
                     </tbody>
                 </table>
             </div>
+            
+            <!-- Paginazione -->
+            {% if is_paginated %}
+                <nav aria-label="Paginazione catalogo" class="mt-4">
+                    <ul class="pagination justify-content-center">
+                        {% if page_obj.has_previous %}
+                            <li class="page-item">
+                                <a class="page-link" href="?page=1{% for key, value in request.GET.items %}{% if key != 'page' %}&{{ key }}={{ value }}{% endif %}{% endfor %}">&laquo; Prima</a>
+                            </li>
+                            <li class="page-item">
+                                <a class="page-link" href="?page={{ page_obj.previous_page_number }}{% for key, value in request.GET.items %}{% if key != 'page' %}&{{ key }}={{ value }}{% endif %}{% endfor %}">Precedente</a>
+                            </li>
+                        {% endif %}
+                        
+                        <li class="page-item active">
+                            <span class="page-link">
+                                Pagina {{ page_obj.number }} di {{ page_obj.paginator.num_pages }}
+                            </span>
+                        </li>
+                        
+                        {% if page_obj.has_next %}
+                            <li class="page-item">
+                                <a class="page-link" href="?page={{ page_obj.next_page_number }}{% for key, value in request.GET.items %}{% if key != 'page' %}&{{ key }}={{ value }}{% endif %}{% endfor %}">Successiva</a>
+                            </li>
+                            <li class="page-item">
+                                <a class="page-link" href="?page={{ page_obj.paginator.num_pages }}{% for key, value in request.GET.items %}{% if key != 'page' %}&{{ key }}={{ value }}{% endif %}{% endfor %}">Ultima &raquo;</a>
+                            </li>
+                        {% endif %}
+                    </ul>
+                </nav>
+            {% endif %}
         {% else %}
             <div class="text-center py-5">
                 <i class="bi bi-grid-3x3-gap display-1 text-muted"></i>
@@ -144,34 +199,28 @@
 
 <script>
 document.addEventListener('DOMContentLoaded', function() {
-    // Filtri
+    // Auto-submit del form quando cambiano i filtri
+    const form = document.querySelector('form[method="get"]');
     const filtroTipo = document.getElementById('filtro-tipo');
     const filtroCategoria = document.getElementById('filtro-categoria');
     const filtroStato = document.getElementById('filtro-stato');
     const ricerca = document.getElementById('ricerca');
-    const righe = document.querySelectorAll('tbody tr[data-tipo]');
 
-    function applicaFiltri() {
-        righe.forEach(riga => {
-            const tipo = riga.dataset.tipo;
-            const categoria = riga.dataset.categoria;
-            const attivo = riga.dataset.attivo;
-            const testo = riga.textContent.toLowerCase();
-
-            const mostra = 
-                (filtroTipo.value === '' || tipo === filtroTipo.value) &&
-                (filtroCategoria.value === '' || categoria === filtroCategoria.value) &&
-                (filtroStato.value === '' || attivo === filtroStato.value) &&
-                (ricerca.value === '' || testo.includes(ricerca.value.toLowerCase()));
-
-            riga.style.display = mostra ? '' : 'none';
+    // Auto-submit per i select
+    [filtroTipo, filtroCategoria, filtroStato].forEach(select => {
+        select.addEventListener('change', function() {
+            form.submit();
         });
-    }
+    });
 
-    filtroTipo.addEventListener('change', applicaFiltri);
-    filtroCategoria.addEventListener('change', applicaFiltri);
-    filtroStato.addEventListener('change', applicaFiltri);
-    ricerca.addEventListener('input', applicaFiltri);
+    // Auto-submit per la ricerca con debounce
+    let searchTimeout;
+    ricerca.addEventListener('input', function() {
+        clearTimeout(searchTimeout);
+        searchTimeout = setTimeout(() => {
+            form.submit();
+        }, 500);
+    });
 });
 </script>
 {% endblock %}

@@ -27,7 +27,8 @@ class ConfigurazioneSlot(models.Model):
     attivo = models.BooleanField(default=True)
     
     class Meta:
-        unique_together = ['giorno_settimana', 'ora_inizio']
+        # Rimosso unique_together per permettere slot multipli nello stesso orario
+        # unique_together = ['giorno_settimana', 'ora_inizio'] 
         verbose_name_plural = "Configurazioni Slot"
         ordering = ['giorno_settimana', 'ora_inizio']
     
@@ -143,10 +144,24 @@ class Prenotazione(models.Model):
             self.codice_prenotazione = self.genera_codice_prenotazione()
         if not self.durata_stimata_minuti:
             self.durata_stimata_minuti = self.calcola_durata_stimata()
+        
+        # Salva prima l'oggetto
         super().save(*args, **kwargs)
         
-        # Aggiorna i contatori dello slot
-        self.slot.aggiorna_contatori()
+        # Aggiorna i contatori dello slot sempre dopo il salvataggio
+        if hasattr(self, 'slot') and self.slot:
+            self.slot.aggiorna_contatori()
+    
+    def delete(self, *args, **kwargs):
+        # Memorizza lo slot prima di eliminare la prenotazione
+        slot = self.slot if hasattr(self, 'slot') else None
+        
+        # Elimina la prenotazione
+        super().delete(*args, **kwargs)
+        
+        # Aggiorna i contatori dello slot dopo l'eliminazione
+        if slot:
+            slot.aggiorna_contatori()
     
     def genera_codice_prenotazione(self):
         """Genera un codice univoco di 8 caratteri"""
@@ -198,16 +213,34 @@ class Prenotazione(models.Model):
         # Calcola il totale
         totale = sum(servizio.prezzo for servizio in self.servizi.all())
         
+        # Calcola ora consegna richiesta basata su puntualità del check-in
+        from datetime import datetime, timedelta
+        from django.utils import timezone
+        
+        ora_inizio_datetime = datetime.combine(self.slot.data, self.slot.ora_inizio)
+        ora_inizio_aware = timezone.make_aware(ora_inizio_datetime)
+        ora_checkin = timezone.now()
+        
+        # Se il cliente è in ritardo (check-in dopo l'ora di inizio), usa ora attuale
+        if ora_checkin > ora_inizio_aware:
+            ora_base = ora_checkin
+        else:
+            # Se il cliente è puntuale, usa l'ora di inizio originale
+            ora_base = ora_inizio_aware
+            
+        ora_consegna_richiesta = ora_base + timedelta(minutes=self.durata_stimata_minuti)
+        
         # Crea l'ordine
         ordine = Ordine.objects.create(
             cliente=self.cliente,
             origine='prenotazione',
-            tipo_consegna='immediata',
+            tipo_consegna='programmata',
+            ora_consegna_richiesta=ora_consegna_richiesta.time(),
             ora_consegna_prevista=self.data_ora_prenotazione,
             totale=totale,
             totale_finale=totale,
             stato_pagamento='non_pagato',
-            nota=f'Da prenotazione del {self.slot.data.strftime("%d/%m/%Y")} alle {self.slot.ora_inizio.strftime("%H:%M")}',
+            nota=f'{self.cliente.nome} prenotato alle {self.slot.ora_inizio.strftime("%H:%M")}',
             tipo_auto=self.tipo_auto,
             operatore=operatore
         )
@@ -244,18 +277,14 @@ class Prenotazione(models.Model):
             self.stato = 'annullata'
             if motivo:
                 self.nota_interna = f"Annullata: {motivo}"
-            self.save()
-            
-            # Aggiorna i contatori dello slot
-            self.slot.aggiorna_contatori()
+            self.save()  # Il metodo save() si occuperà di aggiornare i contatori
             return True
         return False
     
     def segna_no_show(self):
         """Segna la prenotazione come no-show"""
         self.stato = 'no_show'
-        self.save()
-        self.slot.aggiorna_contatori()
+        self.save()  # Il metodo save() si occuperà di aggiornare i contatori
 
 
 class CalendarioPersonalizzato(models.Model):

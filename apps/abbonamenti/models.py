@@ -100,14 +100,38 @@ class ServizioInclusoAbbonamento(models.Model):
         related_name='servizi_inclusi'
     )
     servizio = models.ForeignKey('core.ServizioProdotto', on_delete=models.CASCADE)
-    quantita_inclusa = models.IntegerField(help_text="Numero accessi per periodo")
+    quantita_inclusa = models.IntegerField(help_text="Numero accessi per periodo di reset")
+    accessi_totali_periodo = models.IntegerField(
+        help_text="Limite totale accessi nell'intero periodo dell'abbonamento",
+        null=True, 
+        blank=True
+    )
+    accessi_per_sottoperiodo = models.IntegerField(
+        help_text="Limite accessi per sotto-periodo (es. settimanale se reset è mensile)",
+        null=True,
+        blank=True
+    )
+    tipo_sottoperiodo = models.CharField(
+        max_length=20,
+        choices=[
+            ('giornaliero', 'Giornaliero'),
+            ('settimanale', 'Settimanale'),
+            ('mensile', 'Mensile'),
+        ],
+        null=True,
+        blank=True,
+        help_text="Tipo di sotto-periodo per il limite aggiuntivo"
+    )
     
     class Meta:
         unique_together = ['configurazione', 'servizio']
         verbose_name_plural = "Servizi Inclusi Abbonamento"
     
     def __str__(self):
-        return f"{self.servizio.titolo} x{self.quantita_inclusa}"
+        base = f"{self.servizio.titolo} x{self.quantita_inclusa}"
+        if self.accessi_per_sottoperiodo:
+            base += f" ({self.accessi_per_sottoperiodo}/{self.get_tipo_sottoperiodo_display()})"
+        return base
 
 
 class ConfigurazioneAccessiGiorno(models.Model):
@@ -217,6 +241,14 @@ class Abbonamento(models.Model):
             return max(0, delta.days)
         return 0
     
+    @property
+    def giorni_alla_scadenza(self):
+        """Giorni alla scadenza (può essere negativo se scaduto)"""
+        if self.data_scadenza:
+            delta = self.data_scadenza - date.today()
+            return delta.days
+        return 0
+    
     def get_contatore_corrente(self, servizio):
         """Ottiene il contatore attuale per un servizio"""
         contatore, created = ContatoreAccessiAbbonamento.objects.get_or_create(
@@ -250,6 +282,43 @@ class Abbonamento(models.Model):
         
         return oggi
     
+    def get_inizio_sottoperiodo(self, tipo_sottoperiodo):
+        """Calcola l'inizio del sotto-periodo per i limiti aggiuntivi"""
+        oggi = date.today()
+        
+        if tipo_sottoperiodo == 'giornaliero':
+            return oggi
+        elif tipo_sottoperiodo == 'settimanale':
+            # Lunedì della settimana corrente
+            return oggi - timedelta(days=oggi.weekday())
+        elif tipo_sottoperiodo == 'mensile':
+            return oggi.replace(day=1)
+        
+        return oggi
+    
+    @property
+    def contatori_attuali(self):
+        """Restituisce i contatori attuali per tutti i servizi inclusi"""
+        contatori = []
+        for servizio_incluso in self.configurazione.servizi_inclusi.all():
+            contatore = self.get_contatore_corrente(servizio_incluso.servizio)
+            utilizzati = contatore.accessi_effettuati if contatore else 0
+            totali = servizio_incluso.quantita_inclusa
+            
+            # Calcola percentuale, assicurandosi che non superi 100%
+            if totali > 0:
+                percentuale = min((utilizzati / totali * 100), 100)
+            else:
+                percentuale = 0
+            
+            contatori.append({
+                'servizio': servizio_incluso.servizio,
+                'utilizzati': utilizzati,
+                'totali': totali,
+                'percentuale': round(percentuale, 1)
+            })
+        return contatori
+    
     def verifica_accesso_disponibile(self, servizio, targa=None):
         """
         Verifica se l'accesso è disponibile per il servizio richiesto
@@ -277,10 +346,36 @@ class Abbonamento(models.Model):
             if not self.targhe.filter(targa=targa, attiva=True).exists():
                 return False, "Targa non autorizzata"
         
-        # 5. Verifica limiti accessi
+        # 5. Verifica limite totale dell'abbonamento (se configurato)
+        if servizio_incluso.accessi_totali_periodo:
+            accessi_totali = AccessoAbbonamento.objects.filter(
+                abbonamento=self,
+                servizio=servizio,
+                autorizzato=True,
+                data_ora__date__gte=self.data_attivazione
+            ).count()
+            
+            if accessi_totali >= servizio_incluso.accessi_totali_periodo:
+                return False, "Limite totale accessi dell'abbonamento raggiunto"
+        
+        # 6. Verifica limiti accessi per periodo
         contatore = self.get_contatore_corrente(servizio)
         if contatore.accessi_effettuati >= servizio_incluso.quantita_inclusa:
             return False, "Limite accessi raggiunto per il periodo"
+        
+        # 7. Verifica limite sotto-periodo (se configurato)
+        if servizio_incluso.accessi_per_sottoperiodo and servizio_incluso.tipo_sottoperiodo:
+            inizio_sottoperiodo = self.get_inizio_sottoperiodo(servizio_incluso.tipo_sottoperiodo)
+            accessi_sottoperiodo = AccessoAbbonamento.objects.filter(
+                abbonamento=self,
+                servizio=servizio,
+                autorizzato=True,
+                data_ora__date__gte=inizio_sottoperiodo
+            ).count()
+            
+            if accessi_sottoperiodo >= servizio_incluso.accessi_per_sottoperiodo:
+                periodo_display = servizio_incluso.get_tipo_sottoperiodo_display()
+                return False, f"Limite {periodo_display.lower()} raggiunto"
         
         # 6. Verifica accessi giornalieri (se configurati)
         oggi = date.today()

@@ -130,6 +130,11 @@
                     </span>
                 </div>
                 <div class="action-buttons">
+                    {% if user.is_staff and prenotazione.stato == 'confermata' and not prenotazione.ordine %}
+                        <button type="button" class="btn btn-success" onclick="checkinPrenotazione()">
+                            <i class="bi bi-check-circle-fill"></i> Check-in
+                        </button>
+                    {% endif %}
                     {% if prenotazione.can_be_cancelled %}
                         <button type="button" class="btn btn-outline-warning" onclick="modificaPrenotazione()">
                             <i class="bi bi-pencil"></i> Modifica
@@ -316,7 +321,13 @@
                         </div>
                         <div>
                             <strong>Confermata</strong>
-                            <br><small class="text-muted">In attesa di servizio</small>
+                            <br><small class="text-muted">
+                                {% if not prenotazione.ordine %}
+                                    Pronta per check-in
+                                {% else %}
+                                    In attesa di servizio
+                                {% endif %}
+                            </small>
                         </div>
                     </div>
                     {% elif prenotazione.stato == 'in_corso' %}
@@ -441,6 +452,13 @@
     </div>
 </div>
 
+<!-- Form nascosto per check-in -->
+{% if user.is_staff and prenotazione.stato == 'confermata' and not prenotazione.ordine %}
+<form id="checkin-form" method="post" action="{% url 'prenotazioni:checkin-prenotazione' prenotazione.pk %}" style="display: none;">
+    {% csrf_token %}
+</form>
+{% endif %}
+
 <script>
 function annullaPrenotazione() {
     if (confirm('Sei sicuro di voler annullare questa prenotazione?')) {
@@ -450,12 +468,18 @@ function annullaPrenotazione() {
 }
 
 function modificaPrenotazione() {
-    // Implementa logica di modifica
-    alert('Funzione di modifica in sviluppo');
+    // Redirect alla pagina di modifica prenotazione
+    window.location.href = "{% url 'prenotazioni:modifica-prenotazione' prenotazione.pk %}";
 }
 
 function stampaPrenotazione() {
     window.print();
+}
+
+function checkinPrenotazione() {
+    if (confirm('Confermi il check-in per questa prenotazione?\n\nVerrà creato automaticamente un ordine con i servizi prenotati.')) {
+        document.getElementById('checkin-form').submit();
+    }
 }
 
 // Media query per stampa

@@ -18,6 +18,7 @@ urlpatterns = [
     
     # AJAX e utility
     path('cerca/', views.cerca_cliente, name='cerca-cliente'),
+    path('crea-ajax/', views.crea_cliente_ajax, name='crea-cliente-ajax'),
     path('admin/<int:pk>/invia-credenziali/', views.invia_credenziali_cliente, name='invia-credenziali'),
     path('admin/<int:pk>/gestisci-punti/', views.gestisci_punti_fedelta, name='gestisci-punti'),
     

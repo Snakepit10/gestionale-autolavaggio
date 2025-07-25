@@ -48,7 +48,7 @@ class ClientiListView(LoginRequiredMixin, ListView):
         if tipo:
             queryset = queryset.filter(tipo=tipo)
         
-        return queryset.order_by('-data_registrazione')
+        return queryset.order_by('cognome', 'ragione_sociale', 'nome')
     
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
@@ -180,17 +180,28 @@ class StoricoClienteView(LoginRequiredMixin, DetailView):
 def cerca_cliente(request):
     """AJAX endpoint per ricerca clienti"""
     term = request.GET.get('term', '')
+    tipo = request.GET.get('tipo', '')
     
-    if len(term) < 2:
+    if len(term) < 2 and not tipo:
         return JsonResponse({'results': []})
     
-    clienti = Cliente.objects.filter(
-        Q(nome__icontains=term) |
-        Q(cognome__icontains=term) |
-        Q(ragione_sociale__icontains=term) |
-        Q(email__icontains=term) |
-        Q(telefono__icontains=term)
-    )[:10]
+    query = Q()
+    
+    if term and len(term) >= 2:
+        query |= (
+            Q(nome__icontains=term) |
+            Q(cognome__icontains=term) |
+            Q(ragione_sociale__icontains=term) |
+            Q(email__icontains=term) |
+            Q(telefono__icontains=term)
+        )
+    
+    clienti = Cliente.objects.filter(query)
+    
+    if tipo:
+        clienti = clienti.filter(tipo=tipo)
+    
+    clienti = clienti[:10]
     
     results = []
     for cliente in clienti:
@@ -203,6 +214,80 @@ def cerca_cliente(request):
         })
     
     return JsonResponse({'results': results})
+
+
+@login_required
+def crea_cliente_ajax(request):
+    """AJAX endpoint per creare un nuovo cliente"""
+    if request.method != 'POST':
+        return JsonResponse({'success': False, 'error': 'Metodo non permesso'})
+    
+    try:
+        data = json.loads(request.body)
+        
+        # Validazione dati richiesti
+        if not data.get('telefono'):
+            return JsonResponse({'success': False, 'error': 'Campo telefono obbligatorio'})
+        
+        tipo = data.get('tipo', 'privato')
+        
+        if tipo == 'privato':
+            # Per privati: nome e cognome obbligatori
+            if not data.get('nome') or not data.get('cognome'):
+                return JsonResponse({'success': False, 'error': 'Nome e cognome obbligatori per clienti privati'})
+        else:
+            # Per aziende: ragione sociale e partita IVA obbligatorie
+            if not data.get('ragione_sociale'):
+                return JsonResponse({'success': False, 'error': 'Ragione sociale obbligatoria per le aziende'})
+            if not data.get('partita_iva'):
+                return JsonResponse({'success': False, 'error': 'Partita IVA obbligatoria per le aziende'})
+        
+        # Controlla se email già esiste (solo se fornita)
+        email = data.get('email', '').strip()
+        if email and Cliente.objects.filter(email=email).exists():
+            return JsonResponse({'success': False, 'error': 'Email già esistente'})
+        
+        # Crea il cliente
+        cliente = Cliente.objects.create(
+            tipo=tipo,
+            nome=data.get('nome', '').strip(),
+            cognome=data.get('cognome', '').strip(),
+            ragione_sociale=data.get('ragione_sociale', '').strip(),
+            email=email if email else None,  # None se email vuota per evitare problemi con unique=True
+            telefono=data.get('telefono', '').strip(),
+            indirizzo=data.get('indirizzo', '').strip(),
+            cap=data.get('cap', '').strip(),
+            citta=data.get('citta', '').strip(),
+            codice_fiscale=data.get('codice_fiscale', '').strip().upper(),
+            partita_iva=data.get('partita_iva', '').strip(),
+            codice_sdi=data.get('codice_sdi', '').strip().upper(),
+            pec=data.get('pec', '').strip()
+        )
+        
+        return JsonResponse({
+            'success': True,
+            'cliente': {
+                'id': cliente.id,
+                'nome': cliente.nome,
+                'cognome': cliente.cognome,
+                'ragione_sociale': cliente.ragione_sociale,
+                'email': cliente.email,
+                'telefono': cliente.telefono,
+                'tipo': cliente.tipo,
+                'indirizzo': cliente.indirizzo,
+                'cap': cliente.cap,
+                'citta': cliente.citta,
+                'codice_fiscale': cliente.codice_fiscale,
+                'partita_iva': cliente.partita_iva,
+                'codice_sdi': cliente.codice_sdi,
+                'pec': cliente.pec
+            }
+        })
+        
+    except json.JSONDecodeError:
+        return JsonResponse({'success': False, 'error': 'Dati JSON non validi'})
+    except Exception as e:
+        return JsonResponse({'success': False, 'error': str(e)})
 
 
 @login_required

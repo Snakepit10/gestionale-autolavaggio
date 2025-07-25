@@ -164,6 +164,7 @@
 {% endblock %}
 
 {% block content %}
+{% csrf_token %}
 <div class="container-fluid">
     <div class="row">
         <!-- Colonna principale -->
@@ -500,7 +501,7 @@ function verificaAbbonamento(codice) {
     // Mostra loading
     mostraRisultato('loading', 'Verifica in corso...', '');
     
-    fetch(`/abbonamenti/verifica/${codice}/`)
+    fetch(`/abbonamenti/api/verifica/${codice}/`)
         .then(response => response.json())
         .then(data => {
             if (data.success) {
@@ -703,6 +704,12 @@ function mostraModalServizio() {
     modal.show();
 }
 
+function selezionaServizio(servizioId, servizioNome) {
+    // Funzione per selezione servizio nella vista principale
+    selectedServizio = { id: servizioId, nome: servizioNome };
+    console.log('Servizio selezionato:', selectedServizio);
+}
+
 function selezionaServizioModal(servizioId, servizioNome) {
     // Rimuovi selezioni precedenti
     document.querySelectorAll('#servizi-modal-container .service-selection').forEach(el => {
@@ -721,7 +728,7 @@ function confermaAccesso() {
     
     const targa = document.getElementById('targa-manuale').value.trim();
     
-    fetch(`/abbonamenti/registra-accesso/${currentAbbonamento.codice}/`, {
+    fetch(`/abbonamenti/verifica/${currentAbbonamento.codice}/registra-accesso/`, {
         method: 'POST',
         headers: {
             'Content-Type': 'application/json',
@@ -736,15 +743,29 @@ function confermaAccesso() {
     })
     .then(response => response.json())
     .then(data => {
-        bootstrap.Modal.getInstance(document.getElementById('modalServizio')).hide();
+        console.log('Risposta registrazione accesso:', data);
         
-        if (data.autorizzato) {
+        // Chiudi modal in modo sicuro
+        try {
+            const modalElement = document.getElementById('modalServizio');
+            const modalInstance = bootstrap.Modal.getInstance(modalElement);
+            if (modalInstance) {
+                modalInstance.hide();
+            }
+        } catch (e) {
+            console.warn('Errore chiusura modal:', e);
+        }
+        
+        // Controlla esplicitamente il valore autorizzato
+        console.log('data.autorizzato:', data.autorizzato, typeof data.autorizzato);
+        
+        if (data.autorizzato === true) {
             mostraRisultato('success', 'Accesso Autorizzato', 
                 `Servizio: ${selectedServizio.nome}${targa ? ` - Targa: ${targa}` : ''}`);
             aggiornaStatistiche();
             aggiornaStorico();
         } else {
-            mostraRisultato('error', 'Accesso Negato', data.motivo);
+            mostraRisultato('error', 'Accesso Negato', data.motivo || 'Motivo non specificato');
         }
     })
     .catch(error => {
@@ -775,15 +796,29 @@ function caricaStatistiche() {
 
 function caricaServizi() {
     fetch('/core/api/servizi/')
-        .then(response => response.json())
+        .then(response => {
+            if (!response.ok) {
+                throw new Error('API servizi non disponibile');
+            }
+            return response.json();
+        })
         .then(data => {
             const container = document.getElementById('servizi-container');
-            container.innerHTML = data.servizi.map(servizio => `
-                <div class="d-flex justify-content-between align-items-center mb-2 p-2 border rounded">
-                    <span>${servizio.titolo}</span>
-                    <span class="badge bg-primary">€${servizio.prezzo}</span>
-                </div>
-            `).join('');
+            if (data.servizi && data.servizi.length > 0) {
+                container.innerHTML = data.servizi.map(servizio => `
+                    <div class="d-flex justify-content-between align-items-center mb-2 p-2 border rounded">
+                        <span>${servizio.titolo}</span>
+                        <span class="badge bg-primary">€${servizio.prezzo}</span>
+                    </div>
+                `).join('');
+            } else {
+                container.innerHTML = '<p class="text-muted">Nessun servizio disponibile</p>';
+            }
+        })
+        .catch(error => {
+            console.warn('Errore caricamento servizi:', error);
+            document.getElementById('servizi-container').innerHTML = 
+                '<p class="text-muted">Servizi non disponibili</p>';
         });
 }
 

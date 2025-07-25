@@ -161,16 +161,57 @@ class WizardConfigurazioneServiziForm(forms.Form):
                 help_text=f"Durata: {servizio.durata_minuti} min - Prezzo: €{servizio.prezzo}"
             )
             
-            # Campo quantità
+            # Campo quantità per periodo di reset
             self.fields[f'servizio_{servizio.id}_quantita'] = forms.IntegerField(
                 min_value=1,
                 max_value=100,
                 initial=1,
                 required=False,
-                label="Quantità per periodo",
+                label="Accessi per periodo reset",
                 widget=forms.NumberInput(attrs={
                     'class': 'form-control form-control-sm',
                     'style': 'width: 80px; display: inline-block;'
+                })
+            )
+            
+            # Campo accessi totali dell'abbonamento
+            self.fields[f'servizio_{servizio.id}_totali'] = forms.IntegerField(
+                min_value=1,
+                max_value=1000,
+                required=False,
+                label="Accessi totali abbonamento",
+                widget=forms.NumberInput(attrs={
+                    'class': 'form-control form-control-sm',
+                    'style': 'width: 80px; display: inline-block;'
+                }),
+                help_text="Limite totale per tutta la durata (opzionale)"
+            )
+            
+            # Campo accessi per sotto-periodo
+            self.fields[f'servizio_{servizio.id}_sottoperiodo_accessi'] = forms.IntegerField(
+                min_value=1,
+                max_value=100,
+                required=False,
+                label="Accessi per sotto-periodo",
+                widget=forms.NumberInput(attrs={
+                    'class': 'form-control form-control-sm',
+                    'style': 'width: 80px; display: inline-block;'
+                }),
+                help_text="Limite aggiuntivo per sotto-periodo (opzionale)"
+            )
+            
+            # Tipo di sotto-periodo
+            self.fields[f'servizio_{servizio.id}_sottoperiodo_tipo'] = forms.ChoiceField(
+                choices=[('', '--- Seleziona ---')] + [
+                    ('giornaliero', 'Giornaliero'),
+                    ('settimanale', 'Settimanale'),
+                    ('mensile', 'Mensile'),
+                ],
+                required=False,
+                label="Tipo sotto-periodo",
+                widget=forms.Select(attrs={
+                    'class': 'form-select form-select-sm',
+                    'style': 'width: 130px; display: inline-block;'
                 })
             )
     
@@ -185,15 +226,41 @@ class WizardConfigurazioneServiziForm(forms.Form):
             if field_name.endswith('_incluso') and value:
                 servizi_selezionati = True
                 servizio_id = field_name.split('_')[1]
+                
+                # Campi base
                 quantita_field = f'servizio_{servizio_id}_quantita'
                 quantita = cleaned_data.get(quantita_field, 1)
                 
+                # Nuovi campi per limiti
+                totali_field = f'servizio_{servizio_id}_totali'
+                sottoperiodo_accessi_field = f'servizio_{servizio_id}_sottoperiodo_accessi'
+                sottoperiodo_tipo_field = f'servizio_{servizio_id}_sottoperiodo_tipo'
+                
+                accessi_totali = cleaned_data.get(totali_field)
+                accessi_sottoperiodo = cleaned_data.get(sottoperiodo_accessi_field)
+                tipo_sottoperiodo = cleaned_data.get(sottoperiodo_tipo_field)
+                
+                # Validazioni
                 if quantita < 1:
                     raise forms.ValidationError(f'La quantità deve essere almeno 1 per il servizio selezionato')
                 
+                # Se è specificato un sotto-periodo, deve avere sia accessi che tipo
+                if accessi_sottoperiodo and not tipo_sottoperiodo:
+                    raise forms.ValidationError(f'Specifica il tipo di sotto-periodo per gli accessi limitati')
+                
+                if tipo_sottoperiodo and not accessi_sottoperiodo:
+                    raise forms.ValidationError(f'Specifica il numero di accessi per il sotto-periodo')
+                
+                # I limiti non possono essere superiori al limite del periodo principale
+                if accessi_totali and accessi_totali < quantita:
+                    raise forms.ValidationError(f'Il limite totale non può essere inferiore al limite per periodo')
+                
                 servizi_inclusi.append({
                     'servizio_id': int(servizio_id),
-                    'quantita': quantita
+                    'quantita': quantita,
+                    'accessi_totali_periodo': accessi_totali,
+                    'accessi_per_sottoperiodo': accessi_sottoperiodo,
+                    'tipo_sottoperiodo': tipo_sottoperiodo if tipo_sottoperiodo else None
                 })
         
         if not servizi_selezionati:

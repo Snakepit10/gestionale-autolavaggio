@@ -141,6 +141,16 @@
                                 <td><strong>Tipo Consegna:</strong></td>
                                 <td>{{ ordine.get_tipo_consegna_display }}</td>
                             </tr>
+                            <tr>
+                                <td><strong>Tipo Auto:</strong></td>
+                                <td>
+                                    {% if ordine.tipo_auto %}
+                                        <i class="bi bi-car-front"></i> {{ ordine.tipo_auto }}
+                                    {% else %}
+                                        <span class="text-muted">Non specificato</span>
+                                    {% endif %}
+                                </td>
+                            </tr>
                             {% if ordine.tempo_attesa_minuti %}
                             <tr>
                                 <td><strong>Tempo Attesa:</strong></td>

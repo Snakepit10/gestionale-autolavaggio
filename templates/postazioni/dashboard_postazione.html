@@ -291,6 +291,18 @@
     font-weight: 500;
 }
 
+.kanban-card .car-type {
+    font-size: 0.8rem;
+    color: #6c757d;
+    font-weight: 500;
+    margin-top: 3px;
+}
+
+.kanban-card .car-type i {
+    color: #007bff;
+    opacity: 0.8;
+}
+
 /* Varianti colore border per stato */
 .kanban-card.processing .order-info {
     border-left-color: #ffc107;
@@ -630,6 +642,12 @@
                                         <i class="bi bi-person me-1"></i>
                                         {% if item.ordine.cliente %}{{ item.ordine.cliente|truncatechars:18 }}{% else %}Cliente Anonimo{% endif %}
                                     </div>
+                                    {% if item.ordine.tipo_auto %}
+                                    <div class="car-type mt-1">
+                                        <i class="bi bi-car-front me-1"></i>
+                                        <small class="text-muted">{{ item.ordine.tipo_auto|truncatechars:25 }}</small>
+                                    </div>
+                                    {% endif %}
                                 </div>
                             </div>
                             <div class="card-body">
@@ -698,6 +716,12 @@
                                         <i class="bi bi-person me-1"></i>
                                         {% if item.ordine.cliente %}{{ item.ordine.cliente|truncatechars:18 }}{% else %}Cliente Anonimo{% endif %}
                                     </div>
+                                    {% if item.ordine.tipo_auto %}
+                                    <div class="car-type mt-1">
+                                        <i class="bi bi-car-front me-1"></i>
+                                        <small class="text-muted">{{ item.ordine.tipo_auto|truncatechars:25 }}</small>
+                                    </div>
+                                    {% endif %}
                                 </div>
                             </div>
                             <div class="card-body">
@@ -767,6 +791,12 @@
                                         <i class="bi bi-person me-1"></i>
                                         {% if item.ordine.cliente %}{{ item.ordine.cliente|truncatechars:18 }}{% else %}Cliente Anonimo{% endif %}
                                     </div>
+                                    {% if item.ordine.tipo_auto %}
+                                    <div class="car-type mt-1">
+                                        <i class="bi bi-car-front me-1"></i>
+                                        <small class="text-muted">{{ item.ordine.tipo_auto|truncatechars:25 }}</small>
+                                    </div>
+                                    {% endif %}
                                 </div>
                             </div>
                             <div class="card-body">

@@ -1,6 +1,7 @@
 from django.shortcuts import render, get_object_or_404, redirect
 from django.contrib.auth.mixins import LoginRequiredMixin
 from django.contrib.auth.decorators import login_required
+from django.views.decorators.http import require_http_methods
 from django.views.generic import (
     ListView, CreateView, UpdateView, DeleteView, DetailView, TemplateView
 )
@@ -125,13 +126,32 @@ class NuovaPrenotazioneView(TemplateView):
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
         
-        # Aggiungi servizi disponibili per il template
-        from apps.core.models import ServizioProdotto
-        context['servizi_disponibili'] = ServizioProdotto.objects.filter(attivo=True)
+        # Aggiungi servizi disponibili per il template (solo categoria "Servito")
+        from apps.core.models import ServizioProdotto, Categoria
+        servito_categoria = Categoria.objects.filter(nome='Servito').first()
+        if servito_categoria:
+            context['servizi_disponibili'] = ServizioProdotto.objects.filter(
+                attivo=True,
+                categoria=servito_categoria
+            )
+        else:
+            context['servizi_disponibili'] = ServizioProdotto.objects.filter(attivo=True)
         
         # Aggiungi un form vuoto per il CSRF token
         from .forms import PrenotazioneForm
         context['form'] = PrenotazioneForm()
+        
+        # Cattura parametri dal calendario per precompilare data/ora
+        data_param = self.request.GET.get('data')
+        slot_param = self.request.GET.get('slot')
+        ora_param = self.request.GET.get('ora')
+        
+        if data_param:
+            context['data_preselezionata'] = data_param
+        if slot_param:
+            context['slot_preselezionato'] = slot_param
+        if ora_param:
+            context['ora_preselezionata'] = ora_param
         
         return context
     
@@ -152,6 +172,7 @@ class NuovaPrenotazioneView(TemplateView):
             # Dati cliente
             cliente_id = request.POST.get('cliente', '').strip()
             nome_cliente = request.POST.get('nome_cliente', '').strip()
+            cognome_cliente = request.POST.get('cognome_cliente', '').strip()
             telefono_cliente = request.POST.get('telefono_cliente', '').strip()
             tipo_auto = request.POST.get('tipo_auto', '').strip()
             note_cliente = request.POST.get('note_cliente', '').strip()
@@ -162,8 +183,10 @@ class NuovaPrenotazioneView(TemplateView):
             print(f"Durata: '{durata_stimata}'")
             print(f"Cliente ID: '{cliente_id}'")
             print(f"Nome cliente: '{nome_cliente}'")
+            print(f"Cognome cliente: '{cognome_cliente}'")
             print(f"Telefono: '{telefono_cliente}'")
             print(f"Tipo auto: '{tipo_auto}'")
+            print(f"Note: '{note_cliente}'")
             
             # Validazione dati essenziali
             if not servizi_ids:
@@ -186,6 +209,7 @@ class NuovaPrenotazioneView(TemplateView):
                 durata_stimata=durata_stimata,
                 cliente_id=cliente_id,
                 nome_cliente=nome_cliente,
+                cognome_cliente=cognome_cliente,
                 telefono_cliente=telefono_cliente,
                 tipo_auto=tipo_auto,
                 note_cliente=note_cliente
@@ -204,7 +228,7 @@ class NuovaPrenotazioneView(TemplateView):
             return self.get(request, *args, **kwargs)
     
     def crea_prenotazione(self, servizi_ids, data_prenotazione, ora_prenotazione, durata_stimata, 
-                         cliente_id, nome_cliente, telefono_cliente, tipo_auto, note_cliente):
+                         cliente_id, nome_cliente, cognome_cliente, telefono_cliente, tipo_auto, note_cliente):
         """Crea effettivamente la prenotazione con i dati forniti"""
         from .models import SlotPrenotazione, Prenotazione
         from apps.clienti.models import Cliente
@@ -243,7 +267,7 @@ class NuovaPrenotazioneView(TemplateView):
                 print(f"Slot: {slot} (creato: {created})")
                 
                 # 3. Gestisce il cliente
-                cliente = self.gestisci_cliente(cliente_id, nome_cliente, telefono_cliente, tipo_auto)
+                cliente = self.gestisci_cliente(cliente_id, nome_cliente, cognome_cliente, telefono_cliente, tipo_auto)
                 if not cliente:
                     return None
                     
@@ -273,6 +297,11 @@ class NuovaPrenotazioneView(TemplateView):
                 prenotazione.servizi.set(servizi)
                 print(f"Servizi assegnati: {[s.titolo for s in servizi]}")
                 
+                # 7. Forza aggiornamento contatori dopo assegnazione servizi
+                if hasattr(prenotazione, 'slot') and prenotazione.slot:
+                    prenotazione.slot.aggiorna_contatori()
+                    print(f"Contatori slot aggiornati: {prenotazione.slot.prenotazioni_attuali}/{prenotazione.slot.max_prenotazioni}")
+                
                 messages.success(
                     self.request, 
                     f'Prenotazione creata con successo! Codice: {prenotazione.codice_prenotazione}'
@@ -287,7 +316,7 @@ class NuovaPrenotazioneView(TemplateView):
             messages.error(self.request, f'Errore nella creazione della prenotazione: {str(e)}')
             return None
     
-    def gestisci_cliente(self, cliente_id, nome_cliente, telefono_cliente, tipo_auto):
+    def gestisci_cliente(self, cliente_id, nome_cliente, cognome_cliente, telefono_cliente, tipo_auto):
         """Gestisce la selezione/creazione del cliente"""
         from apps.clienti.models import Cliente
         from django.db import IntegrityError
@@ -310,12 +339,13 @@ class NuovaPrenotazioneView(TemplateView):
                 cliente = Cliente.objects.create(
                     tipo='privato',
                     nome=nome_cliente,
+                    cognome=cognome_cliente,
                     email=email_finale,
                     telefono=telefono_cliente or '',
                     consenso_marketing=False
                 )
                 
-                print(f"Nuovo cliente creato: {cliente.nome}")
+                print(f"Nuovo cliente creato: {cliente.nome_completo}")
                 return cliente
                 
             else:
@@ -433,8 +463,9 @@ class NuovaPrenotazioneClassicaView(CreateView):
         # Assegna i servizi
         prenotazione.servizi.set(servizi)
         
-        # Aggiorna contatori slot
-        slot.aggiorna_contatori()
+        # Forza aggiornamento contatori dopo assegnazione servizi
+        if hasattr(prenotazione, 'slot') and prenotazione.slot:
+            prenotazione.slot.aggiorna_contatori()
         
         self.object = prenotazione
         
@@ -531,7 +562,12 @@ def prenotazione_rapida_api(request):
                 prenotazione.cliente = cliente_utente
             except Cliente.DoesNotExist:
                 # Se non esiste un cliente, usa i dati forniti o crea uno nuovo
-                nome_cliente = request.POST.get('nome_cliente') or request.user.get_full_name() or request.user.username
+                nome_completo = request.POST.get('nome_cliente') or request.user.get_full_name() or request.user.username
+                # Dividi nome completo in nome e cognome
+                parti_nome = nome_completo.split(' ', 1)
+                nome_cliente = parti_nome[0]
+                cognome_cliente = parti_nome[1] if len(parti_nome) > 1 else ''
+                
                 email_cliente = request.POST.get('email_cliente') or request.user.email
                 telefono_cliente = request.POST.get('telefono_cliente', '')
                 
@@ -539,6 +575,7 @@ def prenotazione_rapida_api(request):
                 cliente = Cliente.objects.create(
                     tipo='privato',
                     nome=nome_cliente,
+                    cognome=cognome_cliente,
                     email=email_cliente,
                     telefono=telefono_cliente,
                     consenso_marketing=False
@@ -547,11 +584,12 @@ def prenotazione_rapida_api(request):
         else:
             # Crea cliente ospite
             nome_cliente = request.POST.get('nome_cliente', '')
+            cognome_cliente = request.POST.get('cognome_cliente', '')
             email_cliente = request.POST.get('email_cliente', '')
             telefono_cliente = request.POST.get('telefono_cliente', '')
             
-            if not nome_cliente:
-                return JsonResponse({'error': 'Nome cliente richiesto'}, status=400)
+            if not nome_cliente or not cognome_cliente:
+                return JsonResponse({'error': 'Nome e cognome cliente richiesti'}, status=400)
             
             # Verifica se esiste già un cliente con questa email
             if email_cliente:
@@ -564,6 +602,7 @@ def prenotazione_rapida_api(request):
                         cliente = Cliente.objects.create(
                             tipo='privato',
                             nome=nome_cliente,
+                            cognome=cognome_cliente,
                             email=email_cliente,
                             telefono=telefono_cliente,
                             consenso_marketing=False
@@ -577,6 +616,7 @@ def prenotazione_rapida_api(request):
                 cliente = Cliente.objects.create(
                     tipo='privato',
                     nome=nome_cliente,
+                    cognome=cognome_cliente,
                     email=email_temp,
                     telefono=telefono_cliente,
                     consenso_marketing=False
@@ -589,8 +629,9 @@ def prenotazione_rapida_api(request):
         # Assegna i servizi
         prenotazione.servizi.add(servizio)
         
-        # Aggiorna contatori slot
-        slot.aggiorna_contatori()
+        # Forza aggiornamento contatori dopo assegnazione servizi
+        if hasattr(prenotazione, 'slot') and prenotazione.slot:
+            prenotazione.slot.aggiorna_contatori()
         
         return JsonResponse({
             'success': True,
@@ -615,19 +656,30 @@ def cerca_clienti_api(request):
     from apps.clienti.models import Cliente
     from django.db.models import Q
     
-    # Cerca clienti per nome, email o telefono
+    # Cerca clienti per nome, cognome, ragione sociale, email o telefono
     clienti = Cliente.objects.filter(
         Q(nome__icontains=query) |
+        Q(cognome__icontains=query) |
+        Q(ragione_sociale__icontains=query) |
         Q(email__icontains=query) |
         Q(telefono__icontains=query)
-    ).order_by('nome')[:10]  # Limita a 10 risultati
+    ).order_by('cognome', 'ragione_sociale', 'nome')[:10]  # Ordine: cognome/ragione sociale, poi nome
     
     clienti_data = []
     for cliente in clienti:
+        # Formato nome completo basato sul tipo cliente
+        if cliente.tipo == 'privato':
+            nome_completo = f"{cliente.nome} {cliente.cognome}".strip()
+            tipo_display = "Privato"
+        else:
+            nome_completo = cliente.ragione_sociale or ""
+            tipo_display = "Azienda"
+        
         clienti_data.append({
             'id': cliente.id,
-            'nome': cliente.nome,
-            'email': cliente.email,
+            'nome_completo': nome_completo,
+            'tipo': cliente.tipo,
+            'tipo_display': tipo_display,
             'telefono': cliente.telefono or '',
         })
     
@@ -684,6 +736,261 @@ def slot_disponibili_api(request):
     return JsonResponse({'slot': slot_data})
 
 
+def calendario_mese_api(request):
+    """API per ottenere dati del calendario per un mese"""
+    try:
+        year = int(request.GET.get('year', timezone.now().year))
+        month = int(request.GET.get('month', timezone.now().month))
+    except (ValueError, TypeError):
+        return JsonResponse({'error': 'Anno o mese non validi'}, status=400)
+    
+    # Primo e ultimo giorno del mese
+    primo_giorno = date(year, month, 1)
+    if month == 12:
+        ultimo_giorno = date(year + 1, 1, 1) - timedelta(days=1)
+    else:
+        ultimo_giorno = date(year, month + 1, 1) - timedelta(days=1)
+    
+    # Espandi per includere settimane complete
+    giorni_da_includere = primo_giorno - timedelta(days=primo_giorno.weekday())
+    fine_periodo = ultimo_giorno + timedelta(days=6-ultimo_giorno.weekday())
+    
+    calendario_data = {}
+    
+    # Itera su tutti i giorni del periodo
+    giorno_corrente = giorni_da_includere
+    while giorno_corrente <= fine_periodo:
+        # Verifica giorni speciali
+        giorno_speciale = CalendarioPersonalizzato.objects.filter(data=giorno_corrente).first()
+        
+        if giorno_speciale and giorno_speciale.chiuso:
+            calendario_data[giorno_corrente.isoformat()] = {
+                'data': giorno_corrente.isoformat(),
+                'chiuso': True,
+                'slot_disponibili': 0,
+                'note': giorno_speciale.note
+            }
+        else:
+            # Conta slot disponibili per questo giorno
+            slot_count = SlotPrenotazione.objects.filter(
+                data=giorno_corrente,
+                disponibile=True
+            ).annotate(
+                posti_liberi=F('max_prenotazioni') - F('prenotazioni_attuali')
+            ).filter(posti_liberi__gt=0).count()
+            
+            calendario_data[giorno_corrente.isoformat()] = {
+                'data': giorno_corrente.isoformat(),
+                'chiuso': False,
+                'slot_disponibili': slot_count,
+                'note': giorno_speciale.note if giorno_speciale else ''
+            }
+        
+        giorno_corrente += timedelta(days=1)
+    
+    return JsonResponse(calendario_data)
+
+
+def calendario_settimana_api(request):
+    """API per ottenere dati del calendario per una settimana"""
+    try:
+        # Data di riferimento (default: oggi)
+        data_str = request.GET.get('data', timezone.now().date().isoformat())
+        data_riferimento = datetime.strptime(data_str, '%Y-%m-%d').date()
+    except ValueError:
+        return JsonResponse({'error': 'Formato data non valido'}, status=400)
+    
+    # Calcola l'inizio della settimana (lunedì)
+    inizio_settimana = data_riferimento - timedelta(days=data_riferimento.weekday())
+    
+    # Genera slot per tutta la settimana se non esistono
+    for i in range(7):
+        giorno = inizio_settimana + timedelta(days=i)
+        giorno_settimana = giorno.weekday()
+        
+        # Trova le configurazioni per questo giorno
+        configurazioni = ConfigurazioneSlot.objects.filter(
+            giorno_settimana=giorno_settimana,
+            attivo=True
+        )
+        
+        # Crea slot se non esistono
+        for config in configurazioni:
+            config.genera_slot_per_data(giorno)
+    
+    # Costruisce la struttura dati per la settimana
+    settimana_data = {
+        'inizio_settimana': inizio_settimana.isoformat(),
+        'giorni': []
+    }
+    
+    giorni_nomi = ['Lunedì', 'Martedì', 'Mercoledì', 'Giovedì', 'Venerdì', 'Sabato', 'Domenica']
+    
+    for i in range(7):
+        giorno = inizio_settimana + timedelta(days=i)
+        
+        # Verifica giorni speciali
+        giorno_speciale = CalendarioPersonalizzato.objects.filter(data=giorno).first()
+        
+        # Ottieni tutti gli slot per questo giorno
+        slot_giorno = SlotPrenotazione.objects.filter(
+            data=giorno,
+            disponibile=True
+        ).order_by('ora_inizio')
+        
+        slot_data = []
+        for slot in slot_giorno:
+            # Ottieni prenotazioni per questo slot
+            prenotazioni = slot.prenotazioni.filter(stato='confermata').select_related('cliente')
+            
+            slot_info = {
+                'id': slot.id,
+                'ora_inizio': slot.ora_inizio.strftime('%H:%M'),
+                'ora_fine': slot.ora_fine.strftime('%H:%M'),
+                'max_prenotazioni': slot.max_prenotazioni,
+                'prenotazioni_attuali': slot.prenotazioni_attuali,
+                'posti_disponibili': slot.posti_disponibili,
+                'is_disponibile': slot.is_disponibile,
+                'prenotazioni': []
+            }
+            
+            # Aggiungi dettagli prenotazioni
+            for prenotazione in prenotazioni:
+                slot_info['prenotazioni'].append({
+                    'id': prenotazione.id,
+                    'codice': prenotazione.codice_prenotazione,
+                    'cliente_nome': prenotazione.cliente.nome if prenotazione.cliente else 'Cliente Anonimo',
+                    'tipo_auto': prenotazione.tipo_auto or '',
+                    'servizi': [s.titolo for s in prenotazione.servizi.all()],
+                    'nota': prenotazione.nota_cliente or '',
+                    'durata_stimata': prenotazione.durata_stimata_minuti
+                })
+            
+            slot_data.append(slot_info)
+        
+        giorno_info = {
+            'data': giorno.isoformat(),
+            'nome_giorno': giorni_nomi[i],
+            'numero_giorno': giorno.day,
+            'is_oggi': giorno == timezone.now().date(),
+            'is_passato': giorno < timezone.now().date(),
+            'chiuso': giorno_speciale.chiuso if giorno_speciale else False,
+            'note': giorno_speciale.note if giorno_speciale else '',
+            'slot': slot_data,
+            'totale_slot': len(slot_data),
+            'slot_disponibili': len([s for s in slot_data if s['posti_disponibili'] > 0])
+        }
+        
+        settimana_data['giorni'].append(giorno_info)
+    
+    return JsonResponse(settimana_data)
+
+
+def statistiche_calendario_api(request):
+    """API per statistiche rapide del calendario"""
+    oggi = timezone.now().date()
+    
+    # Slot disponibili oggi
+    slot_oggi = SlotPrenotazione.objects.filter(
+        data=oggi,
+        disponibile=True
+    ).annotate(
+        posti_liberi=F('max_prenotazioni') - F('prenotazioni_attuali')
+    ).filter(posti_liberi__gt=0).count()
+    
+    # Prossimo slot libero nei prossimi 7 giorni
+    prossimo_libero = None
+    for i in range(1, 8):
+        data_futura = oggi + timedelta(days=i)
+        slot_liberi = SlotPrenotazione.objects.filter(
+            data=data_futura,
+            disponibile=True
+        ).annotate(
+            posti_liberi=F('max_prenotazioni') - F('prenotazioni_attuali')
+        ).filter(posti_liberi__gt=0).order_by('ora_inizio').first()
+        
+        if slot_liberi:
+            giorni_nomi = ['Lun', 'Mar', 'Mer', 'Gio', 'Ven', 'Sab', 'Dom']
+            giorno_settimana = giorni_nomi[data_futura.weekday()]
+            if i == 1:
+                prossimo_libero = f"Domani {slot_liberi.ora_inizio.strftime('%H:%M')}"
+            elif i == 2:
+                prossimo_libero = f"Dopodomani {slot_liberi.ora_inizio.strftime('%H:%M')}"
+            else:
+                prossimo_libero = f"{giorno_settimana} {slot_liberi.ora_inizio.strftime('%H:%M')}"
+            break
+    
+    return JsonResponse({
+        'slot_oggi': slot_oggi,
+        'prossimo_libero': prossimo_libero or 'N/A'
+    })
+
+
+@login_required
+def duplica_configurazione_slot(request, pk):
+    """Duplica una configurazione slot"""
+    if request.method != 'POST':
+        return JsonResponse({'error': 'Metodo non supportato'}, status=405)
+    
+    try:
+        slot_originale = get_object_or_404(ConfigurazioneSlot, pk=pk)
+        
+        # Crea una copia esatta (ora che non c'è più il vincolo unique)
+        nuovo_slot = ConfigurazioneSlot.objects.create(
+            giorno_settimana=slot_originale.giorno_settimana,
+            ora_inizio=slot_originale.ora_inizio,
+            ora_fine=slot_originale.ora_fine,
+            durata_slot_minuti=slot_originale.durata_slot_minuti,
+            max_prenotazioni_per_slot=slot_originale.max_prenotazioni_per_slot,
+            attivo=slot_originale.attivo
+        )
+        
+        # Copia i servizi ammessi
+        nuovo_slot.servizi_ammessi.set(slot_originale.servizi_ammessi.all())
+        
+        return JsonResponse({
+            'success': True,
+            'message': f'Slot duplicato con successo per {nuovo_slot.get_giorno_settimana_display()} alle {nuovo_slot.ora_inizio.strftime("%H:%M")}'
+        })
+        
+    except Exception as e:
+        return JsonResponse({'error': str(e)}, status=500)
+
+
+@login_required
+def elimina_configurazione_slot(request, pk):
+    """Elimina una configurazione slot"""
+    if request.method != 'DELETE':
+        return JsonResponse({'error': 'Metodo non supportato'}, status=405)
+    
+    try:
+        slot = get_object_or_404(ConfigurazioneSlot, pk=pk)
+        
+        # Verifica se ci sono prenotazioni associate
+        from django.db import models
+        prenotazioni_future = SlotPrenotazione.objects.filter(
+            data__gte=timezone.now().date(),
+            ora_inizio=slot.ora_inizio,
+            prenotazioni__isnull=False
+        ).exists()
+        
+        if prenotazioni_future:
+            return JsonResponse({
+                'error': 'Impossibile eliminare: ci sono prenotazioni future associate a questo slot'
+            }, status=400)
+        
+        slot_info = f"{slot.get_giorno_settimana_display()} {slot.ora_inizio.strftime('%H:%M')}"
+        slot.delete()
+        
+        return JsonResponse({
+            'success': True,
+            'message': f'Slot {slot_info} eliminato con successo'
+        })
+        
+    except Exception as e:
+        return JsonResponse({'error': str(e)}, status=500)
+
+
 # Admin Prenotazioni
 class PrenotazioniAdminListView(LoginRequiredMixin, ListView):
     model = Prenotazione
@@ -719,12 +1026,11 @@ class CheckinPrenotazioniView(LoginRequiredMixin, ListView):
     def get_queryset(self):
         from datetime import datetime, timedelta
         
-        # Mostra solo prenotazioni confermate per oggi e i prossimi giorni
+        # Mostra prenotazioni per oggi e i prossimi giorni (confermate e in attesa)
         queryset = Prenotazione.objects.filter(
-            stato='confermata',
-            slot__data__gte=date.today(),
-            slot__data__lte=date.today() + timedelta(days=1),  # Oggi e domani
-            ordine__isnull=True  # Non ancora convertite in ordini
+            stato__in=['confermata', 'in_attesa'],  
+            slot__data__gte=date.today() - timedelta(days=1),  # Da ieri
+            slot__data__lte=date.today() + timedelta(days=3)   # Fino a 3 giorni avanti
         ).select_related('cliente', 'slot').prefetch_related('servizi')
         
         # Filtri opzionali
@@ -744,7 +1050,21 @@ class CheckinPrenotazioniView(LoginRequiredMixin, ListView):
                 Q(cliente__email__icontains=cliente_filtro)
             )
         
-        return queryset.order_by('slot__data', 'slot__ora_inizio')
+        # Debug: stampa informazioni sulla query
+        final_queryset = queryset.order_by('slot__data', 'slot__ora_inizio')
+        print(f"=== DEBUG CHECKIN PRENOTAZIONI ===")
+        print(f"Data oggi: {date.today()}")
+        print(f"Data domani: {date.today() + timedelta(days=1)}")
+        print(f"Query SQL: {final_queryset.query}")
+        print(f"Prenotazioni trovate: {final_queryset.count()}")
+        
+        # Mostra tutte le prenotazioni esistenti per debug
+        tutte_prenotazioni = Prenotazione.objects.all()
+        print(f"Totale prenotazioni nel DB: {tutte_prenotazioni.count()}")
+        for p in tutte_prenotazioni[:5]:  # Mostra solo le prime 5
+            print(f"  - ID: {p.id}, Stato: {p.stato}, Data: {p.slot.data if p.slot else 'N/A'}, Ordine: {'Sì' if p.ordine else 'No'}")
+        
+        return final_queryset
     
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
@@ -949,21 +1269,138 @@ class ModificaPrenotazioneView(LoginRequiredMixin, UpdateView):
     form_class = PrenotazioneForm
     template_name = 'prenotazioni/prenotazione_form.html'
     
+    def get_initial(self):
+        initial = super().get_initial()
+        prenotazione = self.get_object()
+        
+        # Popola i campi del form con i dati della prenotazione esistente
+        if prenotazione.slot:
+            # Assicurati che la data sia nel formato corretto per input type="date" 
+            initial['data_prenotazione'] = prenotazione.slot.data.isoformat() if prenotazione.slot.data else None
+            initial['ora_prenotazione'] = prenotazione.slot.ora_inizio
+        
+        initial['cliente'] = prenotazione.cliente
+        initial['servizi_selezionati'] = prenotazione.servizi.all()
+        initial['durata_stimata_minuti'] = prenotazione.durata_stimata_minuti
+        initial['note_cliente'] = prenotazione.nota_cliente
+        initial['stato'] = prenotazione.stato
+        initial['tipo_auto'] = prenotazione.tipo_auto
+        
+        return initial
+    
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
         context['servizi_disponibili'] = ServizioProdotto.objects.filter(
             tipo='servizio', 
             attivo=True
         )
-        context['clienti'] = Cliente.objects.filter(attivo=True)
+        context['clienti'] = Cliente.objects.all()
         return context
     
     def form_valid(self, form):
-        messages.success(
-            self.request,
-            f'Prenotazione {form.instance.codice_prenotazione} aggiornata con successo!'
-        )
-        return super().form_valid(form)
+        try:
+            # Ottieni la prenotazione esistente
+            prenotazione = self.object
+            
+            # Estrai i dati dal form
+            cliente = form.cleaned_data.get('cliente')
+            nome_cliente = form.cleaned_data.get('nome_cliente')
+            cognome_cliente = form.cleaned_data.get('cognome_cliente')
+            telefono_cliente = form.cleaned_data.get('telefono_cliente')
+            email_cliente = form.cleaned_data.get('email_cliente')
+            tipo_auto = form.cleaned_data.get('tipo_auto')
+            servizi_selezionati = form.cleaned_data.get('servizi_selezionati')
+            data_prenotazione = form.cleaned_data.get('data_prenotazione')
+            ora_prenotazione = form.cleaned_data.get('ora_prenotazione')
+            durata_stimata_minuti = form.cleaned_data.get('durata_stimata_minuti')
+            nota_cliente = form.cleaned_data.get('nota_cliente')
+            nota_interna = form.cleaned_data.get('nota_interna')
+            stato = form.cleaned_data.get('stato')
+            
+            from django.db import transaction
+            
+            with transaction.atomic():
+                # 1. Gestisci il cliente
+                if cliente:
+                    prenotazione.cliente = cliente
+                elif nome_cliente and cognome_cliente:
+                    # Crea nuovo cliente temporaneo se necessario
+                    from apps.clienti.models import Cliente
+                    import time as time_module
+                    
+                    email_finale = email_cliente or f"temp_{int(time_module.time())}@prenotazione.local"
+                    cliente_obj = Cliente.objects.create(
+                        tipo='privato',
+                        nome=nome_cliente,
+                        cognome=cognome_cliente,
+                        email=email_finale,
+                        telefono=telefono_cliente or '',
+                        consenso_marketing=False
+                    )
+                    prenotazione.cliente = cliente_obj
+                
+                # 2. Gestisci slot se data/ora è cambiata
+                if data_prenotazione and ora_prenotazione:
+                    slot_corrente = prenotazione.slot
+                    
+                    # Controlla se data/ora sono cambiate
+                    if (slot_corrente.data != data_prenotazione or 
+                        slot_corrente.ora_inizio != ora_prenotazione):
+                        
+                        from .models import SlotPrenotazione
+                        from datetime import time
+                        
+                        # Trova o crea nuovo slot
+                        if isinstance(ora_prenotazione, str):
+                            ora_obj = time.fromisoformat(ora_prenotazione)
+                        else:
+                            ora_obj = ora_prenotazione
+                            
+                        nuovo_slot, created = SlotPrenotazione.objects.get_or_create(
+                            data=data_prenotazione,
+                            ora_inizio=ora_obj,
+                            defaults={
+                                'ora_fine': time(hour=(ora_obj.hour + 1) % 24, minute=ora_obj.minute),
+                                'max_prenotazioni': 10,
+                                'is_available': True
+                            }
+                        )
+                        
+                        # Aggiorna la prenotazione con il nuovo slot
+                        prenotazione.slot = nuovo_slot
+                        
+                        # Aggiorna i contatori di entrambi gli slot
+                        slot_corrente.aggiorna_contatori()
+                        nuovo_slot.aggiorna_contatori()
+                
+                # 3. Aggiorna gli altri campi
+                if tipo_auto is not None:
+                    prenotazione.tipo_auto = tipo_auto
+                if nota_cliente is not None:
+                    prenotazione.nota_cliente = nota_cliente
+                if nota_interna is not None:
+                    prenotazione.nota_interna = nota_interna
+                if stato:
+                    prenotazione.stato = stato
+                if durata_stimata_minuti:
+                    prenotazione.durata_stimata_minuti = durata_stimata_minuti
+                
+                # 4. Salva la prenotazione
+                prenotazione.save()
+                
+                # 5. Aggiorna i servizi
+                if servizi_selezionati:
+                    prenotazione.servizi.set(servizi_selezionati)
+            
+            messages.success(
+                self.request,
+                f'Prenotazione {prenotazione.codice_prenotazione} aggiornata con successo!'
+            )
+            return super().form_valid(form)
+            
+        except Exception as e:
+            messages.error(self.request, f'Errore durante l\'aggiornamento: {str(e)}')
+            return self.form_invalid(form)
     
     def get_success_url(self):
         return reverse_lazy('prenotazioni:dettaglio-prenotazione', kwargs={'pk': self.object.pk})
@@ -985,3 +1422,39 @@ class EliminaPrenotazioneView(LoginRequiredMixin, DeleteView):
         )
         
         return super().delete(request, *args, **kwargs)
+
+
+@login_required
+@require_http_methods(["POST"])
+def cancella_prenotazione(request, pk):
+    """Vista AJAX per cancellare una prenotazione dalla vista admin"""
+    try:
+        prenotazione = get_object_or_404(Prenotazione, pk=pk)
+        
+        # Verifica che la prenotazione possa essere cancellata
+        if prenotazione.stato not in ['in_attesa', 'confermata']:
+            return JsonResponse({
+                'success': False,
+                'error': 'Impossibile cancellare una prenotazione già completata o annullata.'
+            })
+        
+        # Annulla la prenotazione
+        motivo = "Cancellata dall'operatore"
+        success = prenotazione.annulla(motivo)
+        
+        if success:
+            return JsonResponse({
+                'success': True,
+                'message': f'Prenotazione {prenotazione.codice_prenotazione} cancellata con successo.'
+            })
+        else:
+            return JsonResponse({
+                'success': False,
+                'error': 'Impossibile cancellare la prenotazione.'
+            })
+            
+    except Exception as e:
+        return JsonResponse({
+            'success': False,
+            'error': f'Errore durante la cancellazione: {str(e)}'
+        })

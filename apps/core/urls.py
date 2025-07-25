@@ -34,4 +34,7 @@ urlpatterns = [
     path('scorte/', views.ScorteListView.as_view(), name='scorte-list'),
     path('scorte/movimenti/', views.MovimentiScorteView.as_view(), name='movimenti-scorte'),
     path('scorte/alert/', views.ProdottiSottoScortaView.as_view(), name='alert-scorte'),
+    
+    # API
+    path('api/servizi/', views.servizi_json, name='servizi-json'),
 ]

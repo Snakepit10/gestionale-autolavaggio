@@ -113,6 +113,7 @@
                             <th>N° Ordine</th>
                             <th>Data/Ora</th>
                             <th>Cliente</th>
+                            <th>Tipo Auto</th>
                             <th>Servizi</th>
                             <th>Totale</th>
                             <th>Pagamento</th>
@@ -153,6 +154,18 @@
                                 {% else %}
                                     <span class="text-muted">
                                         <i class="bi bi-person-x"></i> Cliente anonimo
+                                    </span>
+                                {% endif %}
+                            </td>
+                            <td>
+                                {% if ordine.tipo_auto %}
+                                    <div class="d-flex align-items-center">
+                                        <i class="bi bi-car-front me-1"></i>
+                                        <small>{{ ordine.tipo_auto }}</small>
+                                    </div>
+                                {% else %}
+                                    <span class="text-muted">
+                                        <i class="bi bi-dash"></i> Non specificato
                                     </span>
                                 {% endif %}
                             </td>

@@ -1,5 +1,6 @@
 {% extends 'base.html' %}
 {% load static %}
+{% load abbonamenti_filters %}
 
 {% block title %}Abbonamenti in Scadenza - Gestionale Autolavaggio{% endblock %}
 
@@ -218,7 +219,7 @@
                                 <td>
                                     <div class="text-center">
                                         {% if giorni <= 0 %}
-                                            <div class="days-counter text-danger">{{ giorni|abs }}</div>
+                                            <div class="days-counter text-danger">{{ giorni|abs_value|floatformat:0 }}</div>
                                             <small class="text-danger">giorni fa</small>
                                         {% else %}
                                             <div class="days-counter {% if giorni <= 3 %}text-warning{% elif giorni <= 7 %}text-info{% endif %}">{{ giorni }}</div>
@@ -402,7 +403,7 @@
                     </div>
                     <div class="text-end">
                         {% if giorni <= 0 %}
-                            <span class="badge bg-danger">Scaduto {{ giorni|abs }} giorni fa</span>
+                            <span class="badge bg-danger">Scaduto {{ giorni|abs_value }} giorni fa</span>
                         {% else %}
                             <span class="badge bg-warning">{{ giorni }} giorni</span>
                         {% endif %}
