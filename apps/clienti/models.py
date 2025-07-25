@@ -11,7 +11,7 @@ class Cliente(models.Model):
     
     # Dati comuni
     tipo = models.CharField(max_length=20, choices=TIPO_CHOICES)
-    email = models.EmailField(unique=True)
+    email = models.EmailField(blank=True, null=True, unique=True)
     telefono = models.CharField(max_length=20)
     indirizzo = models.TextField(blank=True)
     cap = models.CharField(max_length=10, blank=True)
@@ -33,18 +33,32 @@ class Cliente(models.Model):
     consenso_marketing = models.BooleanField(default=False)
     data_registrazione = models.DateTimeField(auto_now_add=True)
     
+    def save(self, *args, **kwargs):
+        # Applica title case ai campi di testo
+        if self.nome:
+            self.nome = self.nome.title()
+        if self.cognome:
+            self.cognome = self.cognome.title()
+        if self.ragione_sociale:
+            self.ragione_sociale = self.ragione_sociale.title()
+        if self.citta:
+            self.citta = self.citta.title()
+        if self.indirizzo:
+            self.indirizzo = self.indirizzo.title()
+        super().save(*args, **kwargs)
+    
     class Meta:
         verbose_name_plural = "Clienti"
     
     def __str__(self):
         if self.tipo == 'privato':
-            return f"{self.nome} {self.cognome}"
+            return f"{self.cognome} {self.nome}".strip()
         return self.ragione_sociale
     
     @property
     def nome_completo(self):
         if self.tipo == 'privato':
-            return f"{self.nome} {self.cognome}".strip()
+            return f"{self.cognome} {self.nome}".strip()
         return self.ragione_sociale
     
     def get_ordini_totali(self):

@@ -36,12 +36,64 @@
     cursor: pointer;
     transition: all 0.3s ease;
     border: 2px solid transparent;
+    position: relative;
+    overflow: hidden;
 }
 
 .item-card:hover {
-    transform: translateY(-2px);
-    box-shadow: 0 4px 8px rgba(0,0,0,0.15);
-    border-color: var(--primary-color);
+    transform: translateY(-3px);
+    box-shadow: 0 8px 20px rgba(0,0,0,0.2);
+    border-color: #007bff;
+}
+
+.item-card.selected {
+    border-color: #28a745 !important;
+    background: linear-gradient(135deg, #28a745, #20c997);
+    color: white;
+    transform: translateY(-3px);
+    box-shadow: 0 8px 25px rgba(40, 167, 69, 0.4);
+}
+
+.item-card.selected .card-title,
+.item-card.selected .text-primary,
+.item-card.selected .text-muted {
+    color: white !important;
+}
+
+.item-card.adding {
+    animation: pulseAdd 0.6s ease;
+}
+
+@keyframes pulseAdd {
+    0% { transform: translateY(-3px) scale(1); }
+    50% { transform: translateY(-3px) scale(1.05); border-color: #ffc107; box-shadow: 0 0 20px rgba(255, 193, 7, 0.6); }
+    100% { transform: translateY(-3px) scale(1); }
+}
+
+.item-card::after {
+    content: '';
+    position: absolute;
+    top: 8px;
+    right: 8px;
+    background: #28a745;
+    color: white;
+    border-radius: 50%;
+    width: 24px;
+    height: 24px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    opacity: 0;
+    transform: scale(0);
+    transition: all 0.3s ease;
+    z-index: 10;
+    font-family: 'bootstrap-icons';
+}
+
+.item-card.selected::after {
+    content: '\F26A';
+    opacity: 1;
+    transform: scale(1);
 }
 
 .item-card.servizio {
@@ -180,6 +232,31 @@
 .item-card[data-categoria="9"] { background-color: rgba(225, 112, 85, 0.1); border-color: #e17055; }
 .item-card[data-categoria="10"] { background-color: rgba(116, 185, 255, 0.1); border-color: #74b9ff; }
 
+/* Sezioni categoria */
+.categoria-sezione {
+    border-left: 4px solid transparent;
+    padding-left: 8px;
+    margin-bottom: 1.5rem;
+}
+
+.categoria-sezione[data-categoria="1"] { border-left-color: #ff6b6b; }
+.categoria-sezione[data-categoria="2"] { border-left-color: #4ecdc4; }
+.categoria-sezione[data-categoria="3"] { border-left-color: #45b7d1; }
+.categoria-sezione[data-categoria="4"] { border-left-color: #f9ca24; }
+.categoria-sezione[data-categoria="5"] { border-left-color: #f0932b; }
+.categoria-sezione[data-categoria="6"] { border-left-color: #6c5ce7; }
+.categoria-sezione[data-categoria="7"] { border-left-color: #fd79a8; }
+.categoria-sezione[data-categoria="8"] { border-left-color: #00b894; }
+.categoria-sezione[data-categoria="9"] { border-left-color: #e17055; }
+.categoria-sezione[data-categoria="10"] { border-left-color: #74b9ff; }
+
+.categoria-header {
+    min-width: 120px;
+    text-align: center;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+}
+
+
 @media (max-width: 768px) {
     .cassa-container {
         height: auto;
@@ -211,23 +288,38 @@
             </div>
         </div>
         
-        <!-- Griglia Servizi/Prodotti -->
-        <div class="row g-2" id="catalogo-grid">
-            {% for item in servizi_prodotti %}
-            <div class="col-sm-6 col-md-4 col-lg-3 catalogo-item" data-categoria="{{ item.categoria.id }}">
-                <div class="card item-card {{ item.tipo }}" data-id="{{ item.id }}" data-categoria="{{ item.categoria.id }}" onclick="aggiungiAlCarrello({{ item.id }})">
-                    <div class="card-body text-center p-2">
-                        <h6 class="card-title mb-1">{{ item.titolo }}</h6>
-                        <p class="card-text text-muted small mb-1">{{ item.categoria.nome }}</p>
-                        <p class="text-primary fw-bold mb-0">€{{ item.prezzo }}</p>
-                        {% if item.tipo == 'servizio' %}
-                            <small class="text-muted">{{ item.durata_minuti }} min</small>
-                        {% elif item.scorta_bassa %}
-                            <small class="text-danger"><i class="bi bi-exclamation-triangle"></i> Scorta bassa</small>
-                        {% endif %}
+        <!-- Catalogo organizzato per categoria -->
+        <div id="catalogo-grid">
+            {% regroup servizi_prodotti by categoria as categorie_raggruppate %}
+            {% for categoria_group in categorie_raggruppate %}
+                <div class="categoria-sezione mb-4" data-categoria="{{ categoria_group.grouper.id }}">
+                    <!-- Intestazione categoria -->
+                    <div class="d-flex align-items-center mb-3">
+                        <div class="categoria-header p-2 rounded me-3 categoria-color-{{ categoria_group.grouper.id }}" style="color: white;">
+                            <h6 class="mb-0 fw-bold">{{ categoria_group.grouper.nome }}</h6>
+                        </div>
+                        <small class="text-muted">{{ categoria_group.list|length }} elementi</small>
+                    </div>
+                    
+                    <!-- Card della categoria -->
+                    <div class="row g-1 mb-3">
+                        {% for item in categoria_group.list %}
+                        <div class="col-sm-6 col-md-4 col-lg-3 catalogo-item" data-categoria="{{ item.categoria.id }}">
+                            <div class="card item-card {{ item.tipo }}" data-id="{{ item.id }}" data-categoria="{{ item.categoria.id }}" onclick="aggiungiAlCarrello({{ item.id }})">
+                                <div class="card-body text-center p-2">
+                                    <h6 class="card-title mb-1">{{ item.titolo }}</h6>
+                                    <div class="text-primary fw-bold small">€{{ item.prezzo }}</div>
+                                    {% if item.tipo == 'servizio' %}
+                                        <small class="text-muted d-block" style="font-size: 0.7rem;">{{ item.durata_minuti }}min</small>
+                                    {% elif item.scorta_bassa %}
+                                        <small class="text-danger d-block" style="font-size: 0.7rem;"><i class="bi bi-exclamation-triangle"></i></small>
+                                    {% endif %}
+                                </div>
+                            </div>
+                        </div>
+                        {% endfor %}
                     </div>
                 </div>
-            </div>
             {% endfor %}
         </div>
     </div>
@@ -473,9 +565,18 @@
                 <div class="tab-content" id="clienteTabContent">
                     <!-- Tab Cerca Cliente -->
                     <div class="tab-pane fade show active" id="cerca" role="tabpanel">
-                        <div class="mb-3">
-                            <input type="text" class="form-control" id="cerca-cliente" 
-                                   placeholder="Cerca per nome, email, telefono...">
+                        <div class="row mb-3">
+                            <div class="col-md-8">
+                                <input type="text" class="form-control" id="cerca-cliente" 
+                                       placeholder="Cerca per nome, email, telefono...">
+                            </div>
+                            <div class="col-md-4">
+                                <select class="form-select" id="filtro-tipo-cliente">
+                                    <option value="">Tutti i tipi</option>
+                                    <option value="privato">Privati</option>
+                                    <option value="azienda">Aziende</option>
+                                </select>
+                            </div>
                         </div>
                         <div id="risultati-ricerca"></div>
                     </div>
@@ -483,32 +584,67 @@
                     <!-- Tab Nuovo Cliente -->
                     <div class="tab-pane fade" id="nuovo" role="tabpanel">
                         <form id="form-nuovo-cliente">
-                            <div class="row">
-                                <div class="col-md-6">
-                                    <div class="mb-3">
-                                        <label class="form-label">Nome *</label>
-                                        <input type="text" class="form-control" name="nome" required>
+                            <!-- Tipo Cliente -->
+                            <div class="mb-3">
+                                <label class="form-label">Tipo Cliente *</label>
+                                <select class="form-select" name="tipo" id="tipo-nuovo-cliente" onchange="toggleNuovoClienteFields()" required>
+                                    <option value="">Seleziona tipo...</option>
+                                    <option value="privato">Privato</option>
+                                    <option value="azienda">Azienda</option>
+                                </select>
+                            </div>
+
+                            <!-- Campi Privato -->
+                            <div id="campi-privato" style="display: none;">
+                                <div class="row">
+                                    <div class="col-md-4">
+                                        <div class="mb-3">
+                                            <label class="form-label">Nome *</label>
+                                            <input type="text" class="form-control" name="nome" id="nome-privato">
+                                        </div>
                                     </div>
-                                </div>
-                                <div class="col-md-6">
-                                    <div class="mb-3">
-                                        <label class="form-label">Cognome *</label>
-                                        <input type="text" class="form-control" name="cognome" required>
+                                    <div class="col-md-4">
+                                        <div class="mb-3">
+                                            <label class="form-label">Cognome *</label>
+                                            <input type="text" class="form-control" name="cognome" id="cognome-privato">
+                                        </div>
+                                    </div>
+                                    <div class="col-md-4">
+                                        <div class="mb-3">
+                                            <label class="form-label">Telefono *</label>
+                                            <input type="tel" class="form-control" name="telefono" id="telefono-privato">
+                                        </div>
                                     </div>
                                 </div>
                             </div>
-                            <div class="row">
-                                <div class="col-md-6">
-                                    <div class="mb-3">
-                                        <label class="form-label">Telefono *</label>
-                                        <input type="tel" class="form-control" name="telefono" required>
+
+                            <!-- Campi Azienda -->
+                            <div id="campi-azienda" style="display: none;">
+                                <div class="mb-3">
+                                    <label class="form-label">Ragione Sociale *</label>
+                                    <input type="text" class="form-control" name="ragione_sociale" id="ragione-sociale">
+                                </div>
+                                <div class="row">
+                                    <div class="col-md-6">
+                                        <div class="mb-3">
+                                            <label class="form-label">Partita IVA *</label>
+                                            <input type="text" class="form-control" name="partita_iva" id="partita-iva" maxlength="11">
+                                        </div>
+                                    </div>
+                                    <div class="col-md-6">
+                                        <div class="mb-3">
+                                            <label class="form-label">Codice SDI</label>
+                                            <input type="text" class="form-control" name="codice_sdi" maxlength="7">
+                                        </div>
                                     </div>
                                 </div>
-                                <div class="col-md-6">
-                                    <div class="mb-3">
-                                        <label class="form-label">Email</label>
-                                        <input type="email" class="form-control" name="email">
-                                    </div>
+                                <div class="mb-3">
+                                    <label class="form-label">Indirizzo</label>
+                                    <input type="text" class="form-control" name="indirizzo">
+                                </div>
+                                <div class="mb-3">
+                                    <label class="form-label">Telefono *</label>
+                                    <input type="tel" class="form-control" name="telefono" id="telefono-azienda">
                                 </div>
                             </div>
                         </form>
@@ -604,17 +740,51 @@ function configuraCategorieFilter() {
 }
 
 function filtraPerCategoria(categoriaId) {
-    document.querySelectorAll('.catalogo-item').forEach(item => {
-        if (categoriaId === 'all' || item.dataset.categoria === categoriaId) {
-            item.style.display = 'block';
-        } else {
-            item.style.display = 'none';
+    if (categoriaId === 'all') {
+        // Mostra tutte le sezioni
+        document.querySelectorAll('.categoria-sezione').forEach(sezione => {
+            sezione.style.display = 'block';
+        });
+    } else {
+        // Mostra solo la sezione della categoria selezionata
+        document.querySelectorAll('.categoria-sezione').forEach(sezione => {
+            if (sezione.dataset.categoria === categoriaId) {
+                sezione.style.display = 'block';
+            } else {
+                sezione.style.display = 'none';
+            }
+        });
+    }
+}
+
+// Sincronizza lo stato selected delle card con il contenuto del carrello
+function sincronizzaStatoSelected() {
+    // Rimuovi selected da tutte le card
+    document.querySelectorAll('.item-card').forEach(card => {
+        card.classList.remove('selected');
+    });
+    
+    // Aggiungi selected alle card che sono nel carrello
+    Object.keys(carrello).forEach(servizioId => {
+        const card = document.querySelector(`[data-id="${servizioId}"]`);
+        if (card) {
+            card.classList.add('selected');
         }
     });
 }
 
 // Gestione carrello
 function aggiungiAlCarrello(servizioId) {
+    // Aggiungi effetto visivo alla card
+    const card = event.currentTarget;
+    card.classList.add('adding');
+    
+    // Rimuovi l'effetto dopo l'animazione e mantieni selected
+    setTimeout(() => {
+        card.classList.remove('adding');
+        card.classList.add('selected');
+    }, 600);
+    
     AutolavaggioJS.fetchWithCSRF('/ordini/api/aggiungi-carrello/', {
         method: 'POST',
         body: JSON.stringify({
@@ -636,6 +806,25 @@ function aggiungiAlCarrello(servizioId) {
         console.error('Errore:', error);
         AutolavaggioJS.showToast('Errore di connessione', 'error');
     });
+    
+    // Feedback sonoro leggero se disponibile
+    try {
+        const audioContext = new (window.AudioContext || window.webkitAudioContext)();
+        const oscillator = audioContext.createOscillator();
+        const gainNode = audioContext.createGain();
+        
+        oscillator.connect(gainNode);
+        gainNode.connect(audioContext.destination);
+        
+        oscillator.frequency.setValueAtTime(800, audioContext.currentTime);
+        gainNode.gain.setValueAtTime(0.1, audioContext.currentTime);
+        gainNode.gain.exponentialRampToValueAtTime(0.01, audioContext.currentTime + 0.1);
+        
+        oscillator.start(audioContext.currentTime);
+        oscillator.stop(audioContext.currentTime + 0.1);
+    } catch (e) {
+        // Ignore se l'audio non è supportato  
+    }
 }
 
 function rimuoviDalCarrello(servizioId) {
@@ -648,6 +837,14 @@ function rimuoviDalCarrello(servizioId) {
     .then(response => response.json())
     .then(data => {
         if (data.success) {
+            // Rimuovi lo stato selected dalla card corrispondente se non è più nel carrello
+            if (!data.carrello[servizioId]) {
+                const card = document.querySelector(`[data-id="${servizioId}"]`);
+                if (card) {
+                    card.classList.remove('selected');
+                }
+            }
+            
             carrello = data.carrello;
             aggiornaCarrello();
             // Messaggio rimosso per non disturbare l'utente
@@ -692,6 +889,11 @@ function svuotaCarrello() {
     if (Object.keys(carrello).length === 0) return;
     
     if (confirm('Svuotare il carrello?')) {
+        // Rimuovi lo stato selected da tutte le card
+        document.querySelectorAll('.item-card.selected').forEach(card => {
+            card.classList.remove('selected');
+        });
+        
         // Chiama API per pulire la sessione
         AutolavaggioJS.fetchWithCSRF('/ordini/api/rimuovi-carrello/', {
             method: 'POST',
@@ -722,6 +924,9 @@ function svuotaCarrello() {
 function aggiornaCarrello() {
     const container = document.getElementById('carrello-items');
     const btnCompleta = document.getElementById('btn-completa-ordine');
+    
+    // Sincronizza lo stato selected delle card con il carrello
+    sincronizzaStatoSelected();
     
     if (Object.keys(carrello).length === 0) {
         container.innerHTML = `
@@ -901,26 +1106,66 @@ function mostraModalCliente() {
 
 function configuraCercaCliente() {
     const input = document.getElementById('cerca-cliente');
+    const filtroTipo = document.getElementById('filtro-tipo-cliente');
     let timeout;
     
-    input.addEventListener('input', function() {
+    function eseguiRicerca() {
         clearTimeout(timeout);
-        const term = this.value.trim();
+        const term = input.value.trim();
+        const tipo = filtroTipo.value;
         
-        if (term.length < 2) {
+        if (term.length < 2 && !tipo) {
             document.getElementById('risultati-ricerca').innerHTML = '';
             return;
         }
         
         timeout = setTimeout(() => {
-            fetch(`/clienti/cerca/?term=${encodeURIComponent(term)}`)
+            let url = `/clienti/cerca/?term=${encodeURIComponent(term)}`;
+            if (tipo) {
+                url += `&tipo=${tipo}`;
+            }
+            
+            fetch(url)
             .then(response => response.json())
             .then(data => {
                 mostraRisultatiRicerca(data.results);
             })
             .catch(error => console.error('Errore ricerca:', error));
         }, 300);
-    });
+    }
+    
+    input.addEventListener('input', eseguiRicerca);
+    filtroTipo.addEventListener('change', eseguiRicerca);
+}
+
+function toggleNuovoClienteFields() {
+    const tipo = document.getElementById('tipo-nuovo-cliente').value;
+    const campiPrivato = document.getElementById('campi-privato');
+    const campiAzienda = document.getElementById('campi-azienda');
+    
+    // Nascondi tutti i campi
+    campiPrivato.style.display = 'none';
+    campiAzienda.style.display = 'none';
+    
+    // Rimuovi required da tutti i campi specifici
+    document.getElementById('nome-privato').required = false;
+    document.getElementById('cognome-privato').required = false;
+    document.getElementById('telefono-privato').required = false;
+    document.getElementById('ragione-sociale').required = false;
+    document.getElementById('partita-iva').required = false;
+    document.getElementById('telefono-azienda').required = false;
+    
+    if (tipo === 'privato') {
+        campiPrivato.style.display = 'block';
+        document.getElementById('nome-privato').required = true;
+        document.getElementById('cognome-privato').required = true;
+        document.getElementById('telefono-privato').required = true;
+    } else if (tipo === 'azienda') {
+        campiAzienda.style.display = 'block';
+        document.getElementById('ragione-sociale').required = true;
+        document.getElementById('partita-iva').required = true;
+        document.getElementById('telefono-azienda').required = true;
+    }
 }
 
 function mostraRisultatiRicerca(risultati) {
@@ -969,13 +1214,24 @@ function selezionaCliente() {
             return;
         }
         
+        const tipo = formData.get('tipo');
+        
         clienteSelezionato = {
             nuovo: true,
-            nome: formData.get('nome'),
-            cognome: formData.get('cognome'),
-            telefono: formData.get('telefono'),
-            email: formData.get('email')
+            tipo: tipo
         };
+        
+        if (tipo === 'privato') {
+            clienteSelezionato.nome = formData.get('nome');
+            clienteSelezionato.cognome = formData.get('cognome');
+            clienteSelezionato.telefono = formData.get('telefono');
+        } else if (tipo === 'azienda') {
+            clienteSelezionato.ragione_sociale = formData.get('ragione_sociale');
+            clienteSelezionato.partita_iva = formData.get('partita_iva');
+            clienteSelezionato.codice_sdi = formData.get('codice_sdi');
+            clienteSelezionato.indirizzo = formData.get('indirizzo');
+            clienteSelezionato.telefono = formData.get('telefono');
+        }
         
         bootstrap.Modal.getInstance(document.getElementById('modalCliente')).hide();
         mostraClienteSelezionato();
@@ -989,7 +1245,11 @@ function mostraClienteSelezionato() {
     if (clienteSelezionato) {
         let nomeCompleto;
         if (clienteSelezionato.nuovo) {
-            nomeCompleto = `${clienteSelezionato.nome} ${clienteSelezionato.cognome}`;
+            if (clienteSelezionato.tipo === 'privato') {
+                nomeCompleto = `${clienteSelezionato.nome} ${clienteSelezionato.cognome}`;
+            } else if (clienteSelezionato.tipo === 'azienda') {
+                nomeCompleto = clienteSelezionato.ragione_sociale;
+            }
         } else {
             nomeCompleto = clienteSelezionato.nome;
         }

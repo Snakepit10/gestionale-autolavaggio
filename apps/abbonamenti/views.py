@@ -109,7 +109,10 @@ class WizardConfigurazioneAbbonamento(LoginRequiredMixin, SessionWizardView):
             ServizioInclusoAbbonamento.objects.create(
                 configurazione=configurazione,
                 servizio_id=servizio_data['servizio_id'],
-                quantita_inclusa=servizio_data['quantita']
+                quantita_inclusa=servizio_data['quantita'],
+                accessi_totali_periodo=servizio_data.get('accessi_totali_periodo'),
+                accessi_per_sottoperiodo=servizio_data.get('accessi_per_sottoperiodo'),
+                tipo_sottoperiodo=servizio_data.get('tipo_sottoperiodo')
             )
         
         # Genera termini e condizioni
@@ -138,6 +141,12 @@ class ConfigurazioneAbbonamentoUpdateView(LoginRequiredMixin, UpdateView):
     form_class = ConfigurazioneAbbonamentoForm
     template_name = 'abbonamenti/configurazione_form.html'
     success_url = reverse_lazy('abbonamenti:config-abbonamenti-list')
+
+
+class ConfigurazioneAbbonamentoDetailView(LoginRequiredMixin, DetailView):
+    model = ConfigurazioneAbbonamento
+    template_name = 'abbonamenti/configurazione_detail.html'
+    context_object_name = 'configurazione'
 
 
 class ConfigurazioneAbbonamentoDeleteView(LoginRequiredMixin, DeleteView):
@@ -266,7 +275,7 @@ class VenditaAbbonamentoView(LoginRequiredMixin, TemplateView):
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
         context['configurazioni'] = ConfigurazioneAbbonamento.objects.filter(attiva=True)
-        context['clienti'] = Cliente.objects.all().order_by('nome', 'ragione_sociale')
+        context['clienti'] = Cliente.objects.all().order_by('cognome', 'ragione_sociale', 'nome')
         return context
     
     @transaction.atomic
@@ -333,7 +342,7 @@ class VenditaAbbonamentoView(LoginRequiredMixin, TemplateView):
                 f'Abbonamento {abbonamento.codice_accesso} creato per {cliente}!'
             )
             
-            return redirect('abbonamenti:dettaglio-abbonamento', pk=abbonamento.pk)
+            return redirect('abbonamenti:dettaglio-abbonamento', codice=abbonamento.codice_accesso)
             
         except Exception as e:
             import traceback
@@ -347,6 +356,10 @@ class DettaglioAbbonamentoView(LoginRequiredMixin, DetailView):
     model = Abbonamento
     template_name = 'abbonamenti/dettaglio_abbonamento.html'
     context_object_name = 'abbonamento'
+    
+    def get_object(self, queryset=None):
+        codice = self.kwargs.get('codice')
+        return get_object_or_404(Abbonamento, codice_accesso=codice)
     
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
@@ -438,7 +451,12 @@ def registra_accesso_abbonamento(request, codice):
     
     try:
         data = json.loads(request.body)
-        abbonamento = get_object_or_404(Abbonamento, codice_nfc=codice)
+        
+        # Cerca prima per codice_accesso, poi per codice_nfc
+        try:
+            abbonamento = Abbonamento.objects.get(codice_accesso=codice)
+        except Abbonamento.DoesNotExist:
+            abbonamento = get_object_or_404(Abbonamento, codice_nfc=codice)
         
         servizio_id = data.get('servizio_id')
         servizio = get_object_or_404(ServizioProdotto, id=servizio_id)
@@ -448,6 +466,11 @@ def registra_accesso_abbonamento(request, codice):
         
         # Verifica disponibilità
         autorizzato, motivo = abbonamento.verifica_accesso_disponibile(servizio, targa)
+        
+        # Debug logging
+        print(f"Debug accesso - Codice: {codice}, Servizio: {servizio.titolo}, Targa: {targa}")
+        print(f"Abbonamento stato: {abbonamento.stato}, Scadenza: {abbonamento.data_scadenza}")
+        print(f"Autorizzato: {autorizzato}, Motivo: {motivo}")
         
         # Registra accesso
         accesso = AccessoAbbonamento.objects.create(
@@ -492,27 +515,8 @@ def registra_accesso_abbonamento(request, codice):
                     postazione_assegnata=servizio.postazioni.first()
                 )
                 
-                # Notifica dashboard postazione
-                from channels.layers import get_channel_layer
-                from asgiref.sync import async_to_sync
-                
-                channel_layer = get_channel_layer()
-                if channel_layer and ordine.items.first().postazione_assegnata:
-                    async_to_sync(channel_layer.group_send)(
-                        f'postazione_{ordine.items.first().postazione_assegnata.id}',
-                        {
-                            'type': 'nuovo_ordine',
-                            'ordine': {
-                                'id': ordine.id,
-                                'numero_progressivo': ordine.numero_progressivo,
-                                'cliente': str(ordine.cliente),
-                                'items': [{
-                                    'servizio': servizio.titolo,
-                                    'quantita': 1
-                                }]
-                            }
-                        }
-                    )
+                # TODO: Notifica dashboard postazione (quando channels sarà installato)
+                # Commento temporaneo per evitare errore "No module named 'channels'"
         
         return JsonResponse({
             'autorizzato': autorizzato,
@@ -528,13 +532,13 @@ def registra_accesso_abbonamento(request, codice):
 
 
 @login_required
-def rinnova_abbonamento(request, pk):
+def rinnova_abbonamento(request, codice):
     """Rinnova un abbonamento scaduto"""
-    abbonamento = get_object_or_404(Abbonamento, pk=pk)
+    abbonamento = get_object_or_404(Abbonamento, codice_accesso=codice)
     
     if abbonamento.stato != 'scaduto':
         messages.error(request, 'Solo gli abbonamenti scaduti possono essere rinnovati')
-        return redirect('abbonamenti:dettaglio-abbonamento', pk=pk)
+        return redirect('abbonamenti:dettaglio-abbonamento', codice=codice)
     
     try:
         with transaction.atomic():
@@ -571,17 +575,240 @@ def rinnova_abbonamento(request, pk):
                 f'Abbonamento rinnovato! Nuovo codice: {nuovo_abbonamento.codice_accesso}'
             )
             
-            return redirect('abbonamenti:dettaglio-abbonamento', pk=nuovo_abbonamento.pk)
+            return redirect('abbonamenti:dettaglio-abbonamento', codice=nuovo_abbonamento.codice_accesso)
             
     except Exception as e:
         messages.error(request, f'Errore nel rinnovo: {str(e)}')
-        return redirect('abbonamenti:dettaglio-abbonamento', pk=pk)
+        return redirect('abbonamenti:dettaglio-abbonamento', codice=codice)
+
+
+# API JSON Endpoints per verifica accesso
+@csrf_exempt
+def verifica_abbonamento_json(request, codice):
+    """API JSON per verificare abbonamento via codice"""
+    try:
+        # Cerca prima per codice_accesso, poi per codice_nfc
+        try:
+            abbonamento = Abbonamento.objects.get(codice_accesso=codice)
+        except Abbonamento.DoesNotExist:
+            try:
+                abbonamento = Abbonamento.objects.get(codice_nfc=codice)
+            except Abbonamento.DoesNotExist:
+                return JsonResponse({
+                    'success': False,
+                    'error': f'Abbonamento con codice "{codice}" non trovato'
+                })
+        
+        # Servizi disponibili con contatori
+        servizi_disponibili = []
+        for servizio_incluso in abbonamento.configurazione.servizi_inclusi.all():
+            contatore = abbonamento.get_contatore_corrente(servizio_incluso.servizio)
+            disponibili = servizio_incluso.quantita_inclusa - contatore.accessi_effettuati
+            percentuale_usata = (contatore.accessi_effettuati / servizio_incluso.quantita_inclusa) * 100 if servizio_incluso.quantita_inclusa > 0 else 0
+            
+            servizi_disponibili.append({
+                'id': servizio_incluso.servizio.id,
+                'nome': servizio_incluso.servizio.titolo,
+                'totali': servizio_incluso.quantita_inclusa,
+                'utilizzati': contatore.accessi_effettuati,
+                'disponibili': disponibili,
+                'percentuale': round(percentuale_usata, 1)
+            })
+        
+        # Targhe autorizzate
+        targhe_autorizzate = []
+        if abbonamento.configurazione.modalita_targa != 'libera':
+            targhe_autorizzate = [targa.targa for targa in abbonamento.targhe.filter(attiva=True)]
+        
+        data = {
+            'success': True,
+            'abbonamento': {
+                'codice': abbonamento.codice_nfc,
+                'stato': abbonamento.stato,
+                'configurazione': abbonamento.configurazione.titolo,
+                'data_scadenza': abbonamento.data_scadenza.strftime('%d/%m/%Y'),
+                'scaduto': abbonamento.data_scadenza < date.today(),
+                'cliente': {
+                    'nome': str(abbonamento.cliente),
+                    'email': abbonamento.cliente.email or 'Non specificata',
+                    'telefono': abbonamento.cliente.telefono
+                },
+                'servizi_disponibili': servizi_disponibili,
+                'targhe_autorizzate': targhe_autorizzate,
+                'modalita_targa': abbonamento.configurazione.modalita_targa
+            }
+        }
+        
+        return JsonResponse(data)
+        
+    except Exception as e:
+        return JsonResponse({
+            'success': False,
+            'error': f'Abbonamento non trovato o non valido: {str(e)}'
+        })
 
 
 @login_required
-def sospendi_abbonamento(request, pk):
+def statistiche_oggi_json(request):
+    """API JSON per statistiche di oggi"""
+    oggi = date.today()
+    inizio_oggi = datetime.combine(oggi, datetime.min.time())
+    fine_oggi = datetime.combine(oggi, datetime.max.time())
+    
+    # Statistiche accessi
+    accessi_oggi = AccessoAbbonamento.objects.filter(
+        data_ora__range=[inizio_oggi, fine_oggi]
+    )
+    
+    accessi_autorizzati = accessi_oggi.filter(autorizzato=True).count()
+    accessi_negati = accessi_oggi.filter(autorizzato=False).count()
+    
+    # Statistiche abbonamenti
+    abbonamenti_attivi = Abbonamento.objects.filter(stato='attivo').count()
+    abbonamenti_in_scadenza = Abbonamento.objects.filter(
+        stato='attivo',
+        data_scadenza__lte=oggi + timedelta(days=7)
+    ).count()
+    
+    data = {
+        'accessi_oggi': accessi_autorizzati,
+        'accessi_negati': accessi_negati,
+        'abbonamenti_attivi': abbonamenti_attivi,
+        'in_scadenza': abbonamenti_in_scadenza
+    }
+    
+    return JsonResponse(data)
+
+
+@login_required
+def ultimi_accessi_json(request):
+    """API JSON per ultimi accessi"""
+    oggi = date.today()
+    inizio_oggi = datetime.combine(oggi, datetime.min.time())
+    fine_oggi = datetime.combine(oggi, datetime.max.time())
+    
+    accessi = AccessoAbbonamento.objects.filter(
+        data_ora__range=[inizio_oggi, fine_oggi]
+    ).select_related(
+        'abbonamento__cliente', 
+        'servizio'
+    ).order_by('-data_ora')[:20]
+    
+    accessi_data = []
+    for accesso in accessi:
+        accessi_data.append({
+            'cliente': str(accesso.abbonamento.cliente),
+            'servizio': accesso.servizio.titolo,
+            'data_ora': accesso.data_ora.strftime('%H:%M'),
+            'targa': accesso.targa_utilizzata,
+            'autorizzato': accesso.autorizzato,
+            'motivo': accesso.motivo_rifiuto if not accesso.autorizzato else None
+        })
+    
+    return JsonResponse({'accessi': accessi_data})
+
+
+@login_required
+def debug_abbonamenti_json(request):
+    """API di debug per vedere abbonamenti esistenti - RIMUOVI IN PRODUZIONE"""
+    abbonamenti = Abbonamento.objects.all()[:10]  # Solo i primi 10
+    
+    abbonamenti_data = []
+    for abbonamento in abbonamenti:
+        abbonamenti_data.append({
+            'id': abbonamento.id,
+            'codice_accesso': abbonamento.codice_accesso,
+            'codice_nfc': abbonamento.codice_nfc,
+            'cliente': str(abbonamento.cliente),
+            'configurazione': abbonamento.configurazione.titolo,
+            'stato': abbonamento.stato,
+            'data_scadenza': abbonamento.data_scadenza.strftime('%Y-%m-%d')
+        })
+    
+    return JsonResponse({'abbonamenti': abbonamenti_data, 'totale': Abbonamento.objects.count()})
+
+
+@login_required
+def debug_abbonamento_dettagli_json(request, codice):
+    """API di debug per dettagli specifici abbonamento - RIMUOVI IN PRODUZIONE"""
+    try:
+        # Cerca prima per codice_accesso, poi per codice_nfc
+        try:
+            abbonamento = Abbonamento.objects.get(codice_accesso=codice)
+        except Abbonamento.DoesNotExist:
+            try:
+                abbonamento = Abbonamento.objects.get(codice_nfc=codice)
+            except Abbonamento.DoesNotExist:
+                return JsonResponse({'error': f'Abbonamento "{codice}" non trovato'})
+        
+        # Ottieni tutti i servizi inclusi con i contatori
+        servizi_dettagli = []
+        for servizio_incluso in abbonamento.configurazione.servizi_inclusi.all():
+            contatore = abbonamento.get_contatore_corrente(servizio_incluso.servizio)
+            
+            # Test di verifica accesso per ogni servizio
+            autorizzato, motivo = abbonamento.verifica_accesso_disponibile(servizio_incluso.servizio)
+            
+            servizi_dettagli.append({
+                'servizio': servizio_incluso.servizio.titolo,
+                'servizio_id': servizio_incluso.servizio.id,
+                'quantita_inclusa': servizio_incluso.quantita_inclusa,
+                'accessi_effettuati': contatore.accessi_effettuati,
+                'disponibili': servizio_incluso.quantita_inclusa - contatore.accessi_effettuati,
+                'accessi_totali_periodo': servizio_incluso.accessi_totali_periodo,
+                'accessi_per_sottoperiodo': servizio_incluso.accessi_per_sottoperiodo,
+                'tipo_sottoperiodo': servizio_incluso.tipo_sottoperiodo,
+                'test_accesso_autorizzato': autorizzato,
+                'test_accesso_motivo': motivo
+            })
+        
+        # Targhe autorizzate
+        targhe = []
+        for targa in abbonamento.targhe.filter(attiva=True):
+            targhe.append({
+                'targa': targa.targa,
+                'attiva': targa.attiva
+            })
+        
+        # Ultimi accessi
+        ultimi_accessi = []
+        for accesso in abbonamento.accessi.order_by('-data_ora')[:5]:
+            ultimi_accessi.append({
+                'data_ora': accesso.data_ora.strftime('%Y-%m-%d %H:%M:%S'),
+                'servizio': accesso.servizio.titolo,
+                'autorizzato': accesso.autorizzato,
+                'motivo_rifiuto': accesso.motivo_rifiuto,
+                'targa': accesso.targa_utilizzata
+            })
+        
+        data = {
+            'abbonamento': {
+                'id': abbonamento.id,
+                'codice_accesso': abbonamento.codice_accesso,
+                'codice_nfc': abbonamento.codice_nfc,
+                'cliente': str(abbonamento.cliente),
+                'configurazione': abbonamento.configurazione.titolo,
+                'stato': abbonamento.stato,
+                'data_attivazione': abbonamento.data_attivazione.strftime('%Y-%m-%d'),
+                'data_scadenza': abbonamento.data_scadenza.strftime('%Y-%m-%d'),
+                'scaduto': abbonamento.data_scadenza < date.today(),
+                'modalita_targa': abbonamento.configurazione.modalita_targa
+            },
+            'servizi': servizi_dettagli,
+            'targhe': targhe,
+            'ultimi_accessi': ultimi_accessi
+        }
+        
+        return JsonResponse(data)
+        
+    except Exception as e:
+        return JsonResponse({'error': str(e)})
+
+
+@login_required
+def sospendi_abbonamento(request, codice):
     """Sospende temporaneamente un abbonamento"""
-    abbonamento = get_object_or_404(Abbonamento, pk=pk)
+    abbonamento = get_object_or_404(Abbonamento, codice_accesso=codice)
     
     if request.method == 'POST':
         motivo = request.POST.get('motivo', '')
@@ -595,4 +822,4 @@ def sospendi_abbonamento(request, pk):
         else:
             messages.error(request, 'Solo abbonamenti attivi possono essere sospesi')
     
-    return redirect('abbonamenti:dettaglio-abbonamento', pk=pk)
+    return redirect('abbonamenti:dettaglio-abbonamento', codice=codice)

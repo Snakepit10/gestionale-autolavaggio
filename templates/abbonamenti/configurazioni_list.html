@@ -65,117 +65,101 @@
 <div class="card">
     <div class="card-body">
         {% if configurazioni %}
-            <div class="row">
-                {% for config in configurazioni %}
-                <div class="col-lg-6 col-xl-4 mb-4">
-                    <div class="card h-100 {% if not config.attiva %}border-secondary{% endif %}">
-                        <div class="card-header d-flex justify-content-between align-items-center">
-                            <h5 class="mb-0">{{ config.titolo }}</h5>
-                            <div>
-                                {% if config.attiva %}
-                                    <span class="badge bg-success">Attiva</span>
-                                {% else %}
-                                    <span class="badge bg-secondary">Inattiva</span>
-                                {% endif %}
-                            </div>
-                        </div>
-                        <div class="card-body">
-                            {% if config.descrizione %}
-                                <p class="card-text text-muted small">{{ config.descrizione|truncatewords:15 }}</p>
-                            {% endif %}
-                            
-                            <!-- Informazioni principali -->
-                            <div class="row mb-3">
-                                <div class="col-6">
-                                    <div class="text-center border rounded p-2">
-                                        <h4 class="text-primary mb-1">€{{ config.prezzo }}</h4>
-                                        <small class="text-muted">Prezzo</small>
-                                    </div>
+            <div class="table-responsive">
+                <table class="table table-hover">
+                    <thead class="table-light">
+                        <tr>
+                            <th>Configurazione</th>
+                            <th>Prezzo</th>
+                            <th>Durata</th>
+                            <th>Modalità Targa</th>
+                            <th>Servizi</th>
+                            <th>Attivi</th>
+                            <th>Totali</th>
+                            <th>Ricavo</th>
+                            <th>Stato</th>
+                            <th>Azioni</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for config in configurazioni %}
+                        <tr {% if not config.attiva %}class="table-secondary"{% endif %}>
+                            <td>
+                                <div>
+                                    <strong>{{ config.titolo }}</strong>
+                                    {% if config.descrizione %}
+                                        <br><small class="text-muted">{{ config.descrizione|truncatewords:8 }}</small>
+                                    {% endif %}
                                 </div>
-                                <div class="col-6">
-                                    <div class="text-center border rounded p-2">
-                                        <h6 class="text-info mb-1">{{ config.get_durata_display }}</h6>
-                                        <small class="text-muted">Durata</small>
-                                    </div>
-                                </div>
-                            </div>
-                            
-                            <!-- Modalità Targa -->
-                            <div class="mb-3">
-                                <small class="text-muted">Modalità Targa:</small><br>
-                                {% if config.modalita_targa == 'fissa' %}
+                            </td>
+                            <td>
+                                <span class="fw-bold text-primary">€{{ config.prezzo }}</span>
+                            </td>
+                            <td>
+                                <span class="text-info">{{ config.get_durata_display }}</span>
+                            </td>
+                            <td>
+                                {% if config.modalita_targa == 'singola' %}
                                     <span class="badge bg-warning">
-                                        <i class="bi bi-lock"></i> Fissa
+                                        <i class="bi bi-lock"></i> Singola
                                     </span>
-                                    <small class="text-muted">(max {{ config.numero_massimo_targhe }})</small>
-                                {% elif config.modalita_targa == 'variabile' %}
+                                {% elif config.modalita_targa == 'multipla' %}
                                     <span class="badge bg-info">
-                                        <i class="bi bi-arrow-repeat"></i> Variabile
+                                        <i class="bi bi-layers"></i> Multiple
                                     </span>
+                                    <br><small class="text-muted">Max {{ config.numero_massimo_targhe }}</small>
                                 {% else %}
                                     <span class="badge bg-success">
                                         <i class="bi bi-unlock"></i> Libera
                                     </span>
                                 {% endif %}
-                            </div>
-                            
-                            <!-- Servizi inclusi -->
-                            <div class="mb-3">
-                                <small class="text-muted">Servizi Inclusi:</small><br>
+                            </td>
+                            <td>
                                 {% if config.servizi_inclusi.all %}
-                                    {% for servizio_incluso in config.servizi_inclusi.all|slice:":2" %}
-                                        <div class="d-flex justify-content-between align-items-center mb-1">
-                                            <span class="badge bg-light text-dark">{{ servizio_incluso.servizio.titolo }}</span>
-                                            <small class="fw-bold">x{{ servizio_incluso.quantita_inclusa }}</small>
-                                        </div>
-                                    {% endfor %}
-                                    {% if config.servizi_inclusi.count > 2 %}
-                                        <small class="text-muted">+{{ config.servizi_inclusi.count|add:"-2" }} altri servizi</small>
-                                    {% endif %}
+                                    <div class="d-flex flex-column">
+                                        {% for servizio_incluso in config.servizi_inclusi.all|slice:":3" %}
+                                            <small class="badge bg-light text-dark mb-1">
+                                                {{ servizio_incluso.servizio.nome }} x{{ servizio_incluso.quantita_inclusa }}
+                                            </small>
+                                        {% endfor %}
+                                        {% if config.servizi_inclusi.count > 3 %}
+                                            <small class="text-muted">+{{ config.servizi_inclusi.count|add:"-3" }} altri</small>
+                                        {% endif %}
+                                    </div>
                                 {% else %}
-                                    <small class="text-muted">Nessun servizio configurato</small>
+                                    <small class="text-muted">Nessuno</small>
                                 {% endif %}
-                            </div>
-                            
-                            <!-- Statistiche -->
-                            <div class="row text-center">
-                                <div class="col-4">
-                                    <div class="border rounded p-1">
-                                        <h6 class="text-success mb-0">{{ config.abbonamenti_attivi|default:0 }}</h6>
-                                        <small class="text-muted">Attivi</small>
-                                    </div>
-                                </div>
-                                <div class="col-4">
-                                    <div class="border rounded p-1">
-                                        <h6 class="text-info mb-0">{{ config.abbonamenti_totali|default:0 }}</h6>
-                                        <small class="text-muted">Totali</small>
-                                    </div>
-                                </div>
-                                <div class="col-4">
-                                    <div class="border rounded p-1">
-                                        <h6 class="text-warning mb-0">€{{ config.ricavo_totale|default:0|floatformat:0 }}</h6>
-                                        <small class="text-muted">Ricavo</small>
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
-                        <div class="card-footer bg-transparent">
-                            <div class="d-flex justify-content-between">
+                            </td>
+                            <td>
+                                <span class="badge bg-success">{{ config.abbonamenti_attivi|default:0 }}</span>
+                            </td>
+                            <td>
+                                <span class="badge bg-info">{{ config.abbonamenti_totali|default:0 }}</span>
+                            </td>
+                            <td>
+                                <span class="fw-bold text-warning">€{{ config.ricavo_totale|default:0|floatformat:0 }}</span>
+                            </td>
+                            <td>
+                                {% if config.attiva %}
+                                    <span class="badge bg-success">Attiva</span>
+                                {% else %}
+                                    <span class="badge bg-secondary">Inattiva</span>
+                                {% endif %}
+                            </td>
+                            <td>
                                 <div class="btn-group" role="group">
                                     <a href="{% url 'abbonamenti:vendita-abbonamento' %}?config={{ config.pk }}" 
                                        class="btn btn-sm btn-success" title="Vendi">
                                         <i class="bi bi-cart-plus"></i>
                                     </a>
+                                    <a href="{% url 'abbonamenti:config-abbonamento-detail' config.pk %}" 
+                                       class="btn btn-sm btn-outline-info" title="Dettagli">
+                                        <i class="bi bi-eye"></i>
+                                    </a>
                                     <a href="{% url 'abbonamenti:config-abbonamento-update' config.pk %}" 
                                        class="btn btn-sm btn-outline-primary" title="Modifica">
                                         <i class="bi bi-pencil"></i>
                                     </a>
-                                    <button class="btn btn-sm btn-outline-info" 
-                                            onclick="mostraDettagli('{{ config.pk }}')" title="Dettagli">
-                                        <i class="bi bi-eye"></i>
-                                    </button>
-                                </div>
-                                <div class="btn-group" role="group">
                                     <button class="btn btn-sm btn-outline-secondary" 
                                             onclick="clonaConfigurazione('{{ config.pk }}')" title="Clona">
                                         <i class="bi bi-files"></i>
@@ -192,11 +176,11 @@
                                         </button>
                                     {% endif %}
                                 </div>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-                {% endfor %}
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
             </div>
         {% else %}
             <div class="text-center py-5">

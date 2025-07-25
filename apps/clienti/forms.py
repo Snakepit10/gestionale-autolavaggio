@@ -70,9 +70,29 @@ class ClienteForm(forms.ModelForm):
     
     def clean_email(self):
         email = self.cleaned_data.get('email')
-        if Cliente.objects.filter(email=email).exclude(pk=self.instance.pk).exists():
+        if email and Cliente.objects.filter(email=email).exclude(pk=self.instance.pk).exists():
             raise forms.ValidationError('Esiste già un cliente con questa email')
         return email
+    
+    def clean_nome(self):
+        nome = self.cleaned_data.get('nome')
+        return nome.title() if nome else ''
+    
+    def clean_cognome(self):
+        cognome = self.cleaned_data.get('cognome')
+        return cognome.title() if cognome else ''
+    
+    def clean_ragione_sociale(self):
+        ragione_sociale = self.cleaned_data.get('ragione_sociale')
+        return ragione_sociale.title() if ragione_sociale else ''
+    
+    def clean_citta(self):
+        citta = self.cleaned_data.get('citta')
+        return citta.title() if citta else ''
+    
+    def clean_indirizzo(self):
+        indirizzo = self.cleaned_data.get('indirizzo')
+        return indirizzo.title() if indirizzo else ''
     
     def clean_codice_fiscale(self):
         codice_fiscale = self.cleaned_data.get('codice_fiscale')
@@ -171,6 +191,14 @@ class ClienteQuickForm(forms.Form):
                 css_class='col-md-6'
             )
         )
+    
+    def clean_nome(self):
+        nome = self.cleaned_data.get('nome')
+        return nome.title() if nome else ''
+    
+    def clean_cognome(self):
+        cognome = self.cleaned_data.get('cognome')
+        return cognome.title() if cognome else ''
     
     def save(self):
         """Crea un nuovo cliente con i dati essenziali"""

@@ -48,7 +48,7 @@
     <div class="col-md-4">
         <div class="card bg-success text-white">
             <div class="card-body text-center">
-                <i class="bi bi-building display-6"></i>
+                <i class="bi bi-briefcase display-6"></i>
                 <h4>{{ clienti_aziende }}</h4>
                 <small>Aziende</small>
             </div>
@@ -108,7 +108,7 @@
                                     {% if cliente.tipo == 'privato' %}
                                         <i class="bi bi-person me-2 text-primary"></i>
                                     {% else %}
-                                        <i class="bi bi-building me-2 text-success"></i>
+                                        <i class="bi bi-briefcase me-2 text-success"></i>
                                     {% endif %}
                                     <div>
                                         <strong>{{ cliente.nome_completo }}</strong>
@@ -257,7 +257,7 @@
 <script>
 function confermaEliminazione(nome, pk) {
     document.getElementById('nome-cliente').textContent = nome;
-    document.getElementById('btn-conferma-eliminazione').href = `/clienti/${pk}/elimina/`;
+    document.getElementById('btn-conferma-eliminazione').href = `/clienti/admin/${pk}/elimina/`;
     
     const modal = new bootstrap.Modal(document.getElementById('modalConfermaEliminazione'));
     modal.show();

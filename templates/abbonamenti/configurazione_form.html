@@ -211,24 +211,24 @@
                 <div class="card-body">
                     <div class="row">
                         <div class="col-md-4">
-                            <div class="card targa-mode-card" onclick="selectTargaMode('fissa')">
+                            <div class="card targa-mode-card" onclick="selectTargaMode('singola')">
                                 <div class="card-body text-center">
                                     <i class="bi bi-lock display-6 text-warning"></i>
-                                    <h6 class="mt-2">Targa Fissa</h6>
-                                    <p class="small text-muted">Il cliente deve registrare le targhe autorizzate</p>
-                                    <input type="radio" name="modalita_targa" value="fissa" id="targa-fissa" 
-                                           {% if form.modalita_targa.value == 'fissa' %}checked{% endif %} style="display: none;">
+                                    <h6 class="mt-2">Targa Singola</h6>
+                                    <p class="small text-muted">Il cliente deve registrare una sola targa autorizzata</p>
+                                    <input type="radio" name="modalita_targa" value="singola" id="targa-singola" 
+                                           {% if form.modalita_targa.value == 'singola' %}checked{% endif %} style="display: none;">
                                 </div>
                             </div>
                         </div>
                         <div class="col-md-4">
-                            <div class="card targa-mode-card" onclick="selectTargaMode('variabile')">
+                            <div class="card targa-mode-card" onclick="selectTargaMode('multipla')">
                                 <div class="card-body text-center">
-                                    <i class="bi bi-arrow-repeat display-6 text-info"></i>
-                                    <h6 class="mt-2">Targa Variabile</h6>
-                                    <p class="small text-muted">Il cliente può cambiare targa ma una alla volta</p>
-                                    <input type="radio" name="modalita_targa" value="variabile" id="targa-variabile" 
-                                           {% if form.modalita_targa.value == 'variabile' %}checked{% endif %} style="display: none;">
+                                    <i class="bi bi-layers display-6 text-info"></i>
+                                    <h6 class="mt-2">Targhe Multiple</h6>
+                                    <p class="small text-muted">Il cliente può registrare più targhe autorizzate</p>
+                                    <input type="radio" name="modalita_targa" value="multipla" id="targa-multipla" 
+                                           {% if form.modalita_targa.value == 'multipla' %}checked{% endif %} style="display: none;">
                                 </div>
                             </div>
                         </div>
@@ -236,7 +236,7 @@
                             <div class="card targa-mode-card" onclick="selectTargaMode('libera')">
                                 <div class="card-body text-center">
                                     <i class="bi bi-unlock display-6 text-success"></i>
-                                    <h6 class="mt-2">Targa Libera</h6>
+                                    <h6 class="mt-2">Senza Vincoli</h6>
                                     <p class="small text-muted">Qualsiasi targa può utilizzare l'abbonamento</p>
                                     <input type="radio" name="modalita_targa" value="libera" id="targa-libera" 
                                            {% if form.modalita_targa.value == 'libera' %}checked{% endif %} style="display: none;">
@@ -416,17 +416,36 @@ let serviziSelezionati = new Map();
 // Carica servizi disponibili
 document.addEventListener('DOMContentLoaded', function() {
     caricaServizi();
+    caricaServiziEsistenti();
     aggiornaPreview();
     setupEventListeners();
     updateTargaModeVisibility();
 });
 
+function caricaServiziEsistenti() {
+    {% if form.instance.pk %}
+        // Carica i servizi inclusi esistenti
+        {% for servizio_incluso in form.instance.servizi_inclusi.all %}
+            serviziSelezionati.set('{{ servizio_incluso.servizio.id }}', {{ servizio_incluso.quantita_inclusa }});
+        {% endfor %}
+        
+        // Renderizza dopo un breve delay per assicurarsi che i servizi disponibili siano caricati
+        setTimeout(() => {
+            renderServizi();
+            aggiornaPreview();
+        }, 100);
+    {% endif %}
+}
+
 function caricaServizi() {
-    fetch('/core/api/servizi/')
+    fetch('/api/servizi/')
         .then(response => response.json())
         .then(data => {
             serviziDisponibili = data.servizi;
             renderServizi();
+        })
+        .catch(error => {
+            console.error('Errore nel caricamento servizi:', error);
         });
 }
 
@@ -547,7 +566,7 @@ function updateTargaModeVisibility() {
     const mode = document.querySelector('input[name="modalita_targa"]:checked')?.value;
     const container = document.getElementById('numero-targhe-container');
     
-    if (mode === 'fissa') {
+    if (mode === 'multipla') {
         container.style.display = 'block';
     } else {
         container.style.display = 'none';
@@ -601,20 +620,20 @@ function aggiornaPreview() {
         let text = '';
         
         switch(targaMode.value) {
-            case 'fissa':
+            case 'singola':
                 badgeClass = 'bg-warning';
                 icon = 'bi-lock';
-                text = 'Targa Fissa';
+                text = 'Targa Singola';
                 break;
-            case 'variabile':
+            case 'multipla':
                 badgeClass = 'bg-info';
-                icon = 'bi-arrow-repeat';
-                text = 'Targa Variabile';
+                icon = 'bi-layers';
+                text = 'Targhe Multiple';
                 break;
             case 'libera':
                 badgeClass = 'bg-success';
                 icon = 'bi-unlock';
-                text = 'Targa Libera';
+                text = 'Senza Vincoli';
                 break;
         }
         

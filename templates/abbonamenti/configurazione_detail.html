@@ -1,0 +1,157 @@
+{% extends "base.html" %}
+{% load static %}
+
+{% block title %}Dettagli Configurazione - {{ configurazione.titolo }}{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <div class="row">
+        <div class="col-12">
+            <div class="d-flex justify-content-between align-items-center mb-4">
+                <h2><i class="bi bi-card-list"></i> Dettagli Configurazione</h2>
+                <div>
+                    <a href="{% url 'abbonamenti:config-abbonamento-update' configurazione.pk %}" class="btn btn-warning">
+                        <i class="bi bi-pencil"></i> Modifica
+                    </a>
+                    <a href="{% url 'abbonamenti:config-abbonamenti-list' %}" class="btn btn-secondary">
+                        <i class="bi bi-arrow-left"></i> Torna alla Lista
+                    </a>
+                </div>
+            </div>
+
+            <div class="row">
+                <div class="col-md-8">
+                    <div class="card">
+                        <div class="card-header">
+                            <h5><i class="bi bi-info-circle"></i> Informazioni Generali</h5>
+                        </div>
+                        <div class="card-body">
+                            <div class="row">
+                                <div class="col-md-6">
+                                    <p><strong>Titolo:</strong> {{ configurazione.titolo }}</p>
+                                    <p><strong>Descrizione:</strong> {{ configurazione.descrizione|default:"Non specificata" }}</p>
+                                    <p><strong>Prezzo:</strong> €{{ configurazione.prezzo }}</p>
+                                    <p><strong>Durata:</strong> {{ configurazione.get_durata_display }} ({{ configurazione.giorni_durata }} giorni)</p>
+                                </div>
+                                <div class="col-md-6">
+                                    <p><strong>Modalità Targa:</strong> 
+                                        {% if configurazione.modalita_targa == 'singola' %}
+                                            <span class="badge bg-warning"><i class="bi bi-lock"></i> Targa Singola</span>
+                                        {% elif configurazione.modalita_targa == 'multipla' %}
+                                            <span class="badge bg-info"><i class="bi bi-layers"></i> Targhe Multiple</span>
+                                            <small class="text-muted">(max {{ configurazione.numero_massimo_targhe }})</small>
+                                        {% else %}
+                                            <span class="badge bg-success"><i class="bi bi-unlock"></i> Senza Vincoli</span>
+                                        {% endif %}
+                                    </p>
+                                    <p><strong>Reset Periodicità:</strong> {{ configurazione.get_periodicita_reset_display }}</p>
+                                    <p><strong>Rinnovo Automatico:</strong> 
+                                        {% if configurazione.rinnovo_automatico %}
+                                            <span class="badge bg-success">Attivo</span>
+                                            <small class="text-muted">({{ configurazione.giorni_preavviso_scadenza }} giorni preavviso)</small>
+                                        {% else %}
+                                            <span class="badge bg-secondary">Non attivo</span>
+                                        {% endif %}
+                                    </p>
+                                    <p><strong>Attiva:</strong> 
+                                        {% if configurazione.attiva %}
+                                            <span class="badge bg-success">Sì</span>
+                                        {% else %}
+                                            <span class="badge bg-danger">No</span>
+                                        {% endif %}
+                                    </p>
+                                    <p><strong>Visibile Online:</strong> 
+                                        {% if configurazione.visibile_online %}
+                                            <span class="badge bg-success">Sì</span>
+                                        {% else %}
+                                            <span class="badge bg-secondary">No</span>
+                                        {% endif %}
+                                    </p>
+                                    <p><strong>Data Creazione:</strong> {{ configurazione.data_creazione|date:"d/m/Y H:i" }}</p>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="card mt-4">
+                        <div class="card-header">
+                            <h5><i class="bi bi-list-check"></i> Servizi Inclusi</h5>
+                        </div>
+                        <div class="card-body">
+                            {% if configurazione.servizi_inclusi.exists %}
+                                <div class="table-responsive">
+                                    <table class="table table-striped">
+                                        <thead>
+                                            <tr>
+                                                <th>Servizio</th>
+                                                <th>Quantità Inclusa</th>
+                                                <th>Categoria</th>
+                                                <th>Prezzo Unitario</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody>
+                                            {% for servizio_incluso in configurazione.servizi_inclusi.all %}
+                                            <tr>
+                                                <td>{{ servizio_incluso.servizio.titolo }}</td>
+                                                <td>{{ servizio_incluso.quantita_inclusa }}</td>
+                                                <td>{{ servizio_incluso.servizio.categoria.nome }}</td>
+                                                <td>€{{ servizio_incluso.servizio.prezzo }}</td>
+                                            </tr>
+                                            {% endfor %}
+                                        </tbody>
+                                    </table>
+                                </div>
+                            {% else %}
+                                <p class="text-muted">Nessun servizio incluso in questa configurazione.</p>
+                            {% endif %}
+                        </div>
+                    </div>
+                </div>
+
+                <div class="col-md-4">
+                    <div class="card">
+                        <div class="card-header">
+                            <h5><i class="bi bi-graph-up"></i> Statistiche</h5>
+                        </div>
+                        <div class="card-body">
+                            <p><strong>Abbonamenti Venduti:</strong> {{ configurazione.abbonamento_set.count }}</p>
+                            <p><strong>Abbonamenti Attivi:</strong> {{ configurazione.abbonamento_set.filter.count }}</p>
+                            <hr>
+                            <h6>Azioni</h6>
+                            <div class="d-grid gap-2">
+                                <a href="{% url 'abbonamenti:clona-configurazione' configurazione.pk %}" class="btn btn-info btn-sm">
+                                    <i class="bi bi-files"></i> Clona Configurazione
+                                </a>
+                                <a href="{% url 'abbonamenti:vendita-abbonamento' %}?configurazione={{ configurazione.pk }}" class="btn btn-success btn-sm">
+                                    <i class="bi bi-plus-circle"></i> Vendi Abbonamento
+                                </a>
+                            </div>
+                        </div>
+                    </div>
+
+                    {% if configurazione.abbonamento_set.exists %}
+                    <div class="card mt-3">
+                        <div class="card-header">
+                            <h5><i class="bi bi-people"></i> Ultimi Abbonamenti</h5>
+                        </div>
+                        <div class="card-body">
+                            {% for abbonamento in configurazione.abbonamento_set.all|slice:":5" %}
+                            <div class="d-flex justify-content-between align-items-center mb-2">
+                                <div>
+                                    <small><strong>{{ abbonamento.cliente.nome_completo }}</strong></small><br>
+                                    <small class="text-muted">{{ abbonamento.data_inizio|date:"d/m/Y" }}</small>
+                                </div>
+                                <a href="{% url 'abbonamenti:dettaglio-abbonamento' abbonamento.codice_accesso %}" class="btn btn-sm btn-outline-primary">
+                                    <i class="bi bi-eye"></i>
+                                </a>
+                            </div>
+                            {% endfor %}
+                        </div>
+                    </div>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
