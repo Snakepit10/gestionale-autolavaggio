@@ -16,6 +16,12 @@ DEBUG = True
 # Host consentiti - tutti per development
 ALLOWED_HOSTS = ['*']
 
+# CSRF trusted origins for Railway
+CSRF_TRUSTED_ORIGINS = [
+    'https://gestionale-autolavaggio-production.up.railway.app',
+    'http://gestionale-autolavaggio-production.up.railway.app',
+]
+
 # Applicazioni Django
 INSTALLED_APPS = [
     'django.contrib.admin',
