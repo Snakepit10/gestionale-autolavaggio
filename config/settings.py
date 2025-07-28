@@ -78,12 +78,15 @@ TEMPLATES = [
 # WSGI application
 WSGI_APPLICATION = 'config.wsgi.application'
 
-# Database - SQLite per semplicità
+# Database configuration
+import os
+import dj_database_url
+
+# Use PostgreSQL on Railway, SQLite locally
 DATABASES = {
-    'default': {
-        'ENGINE': 'django.db.backends.sqlite3',
-        'NAME': BASE_DIR / 'db.sqlite3',
-    }
+    'default': dj_database_url.config(
+        default=f'sqlite:///{BASE_DIR / "db.sqlite3"}'
+    )
 }
 
 # Validazione password
