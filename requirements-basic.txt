@@ -1,0 +1,25 @@
+# Dipendenze minime per far funzionare il sistema
+Django>=4.2,<5.0
+django-crispy-forms>=2.0
+crispy-bootstrap5>=0.7
+
+# Per il database (opzionale - Django usa SQLite di default)
+# psycopg2-binary>=2.9  # PostgreSQL
+# mysqlclient>=2.1      # MySQL
+
+# Per le funzioni base (opzionali ma consigliate)
+Pillow>=9.0             # Per gestione immagini
+python-decouple>=3.6    # Per variabili ambiente
+django-extensions>=3.2  # Utilità development
+
+# Per reportistica (opzionali)
+reportlab>=3.6          # PDF
+openpyxl>=3.0          # Excel
+
+# Per real-time features (opzionali)
+# channels>=4.0
+# channels-redis>=4.0
+# redis>=4.0
+
+# Per API REST (opzionali)
+# djangorestframework>=3.14

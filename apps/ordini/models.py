@@ -199,6 +199,26 @@ class ItemOrdine(models.Model):
             ordine.stato = 'completato'
             ordine.save()
     
+    def ricalcola_postazione(self):
+        """
+        Ricalcola e aggiorna l'assegnazione della postazione basandosi sulla configurazione attuale del servizio.
+        Utile quando la configurazione delle postazioni del servizio viene modificata.
+        """
+        if self.servizio_prodotto.tipo == 'servizio':
+            postazioni_disponibili = self.servizio_prodotto.postazioni.filter(attiva=True)
+            if postazioni_disponibili.exists():
+                # Assegna alla postazione con meno carico
+                nuova_postazione = min(
+                    postazioni_disponibili,
+                    key=lambda p: p.get_ordini_in_coda().count()
+                )
+                if self.postazione_assegnata != nuova_postazione:
+                    vecchia_postazione = self.postazione_assegnata
+                    self.postazione_assegnata = nuova_postazione
+                    self.save()
+                    return f"Item {self.id} spostato da {vecchia_postazione} a {nuova_postazione}"
+        return "Nessun cambiamento necessario"
+    
     def save(self, *args, **kwargs):
         # Auto-assegna postazione se è un servizio
         if not self.postazione_assegnata and self.servizio_prodotto.tipo == 'servizio':

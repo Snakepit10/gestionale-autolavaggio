@@ -45,7 +45,8 @@ class Postazione(models.Model):
         
         return ItemOrdine.objects.filter(
             postazione_assegnata=self,
-            stato__in=['in_attesa', 'in_lavorazione']
+            stato__in=['in_attesa', 'in_lavorazione'],
+            ordine__stato__in=['in_attesa', 'in_lavorazione']  # Escludi anche ordini completati/annullati
         ).select_related('ordine', 'servizio_prodotto').order_by('ordine__numero_progressivo')
     
     def get_tempo_medio_servizio(self, servizio):

@@ -65,8 +65,46 @@
         
         .main-container {
             height: calc(100vh - 80px);
-            overflow-y: auto;
+            overflow-y: hidden; /* Nasconde scrollbar durante autoscroll */
             padding: 15px;
+            scroll-behavior: smooth;
+        }
+        
+        /* Mostra scrollbar quando autoscroll è disabilitato */
+        .main-container:not(.autoscroll-active) {
+            overflow-y: auto;
+        }
+        
+        /* Stili per l'autoscroll */
+        .autoscroll-enabled .main-container {
+            overflow-y: hidden;
+        }
+        
+        .autoscroll-enabled .orders-table-container {
+            animation: autoscroll-content var(--scroll-duration) linear infinite;
+        }
+        
+        @keyframes autoscroll-content {
+            0% {
+                transform: translateY(0);
+            }
+            50% {
+                transform: translateY(var(--scroll-distance, -50vh));
+            }
+            100% {
+                transform: translateY(0);
+            }
+        }
+        
+        /* Pausa l'animazione quando l'utente interagisce */
+        .autoscroll-paused .orders-table-container {
+            animation-play-state: paused;
+        }
+        
+        /* Stili per i controlli autoscroll */
+        .autoscroll-controls select option {
+            background: #2c3e50;
+            color: white;
         }
         
         
@@ -453,6 +491,60 @@
             .col-services { font-size: 1.2rem; }
             .status-badge { font-size: 1.2rem; }
         }
+        
+        /* Animazioni per nuovi ordini */
+        .new-order-flash {
+            animation: newOrderFlash 3s ease-in-out;
+        }
+        
+        @keyframes newOrderFlash {
+            0%, 100% { 
+                background: rgba(15, 52, 96, 0.8);
+                transform: scale(1);
+            }
+            25% { 
+                background: rgba(46, 204, 113, 0.9);
+                transform: scale(1.02);
+                box-shadow: 0 0 20px rgba(46, 204, 113, 0.6);
+            }
+            50% { 
+                background: rgba(15, 52, 96, 0.8);
+                transform: scale(1);
+            }
+            75% { 
+                background: rgba(46, 204, 113, 0.9);
+                transform: scale(1.02);
+                box-shadow: 0 0 20px rgba(46, 204, 113, 0.6);
+            }
+        }
+        
+        /* Notifica nuovo ordine */
+        .new-order-notification {
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            background: linear-gradient(135deg, #2ecc71, #27ae60);
+            color: white;
+            padding: 15px 25px;
+            border-radius: 10px;
+            box-shadow: 0 8px 25px rgba(46, 204, 113, 0.4);
+            z-index: 1000;
+            font-size: 1.1rem;
+            font-weight: 600;
+            opacity: 0;
+            transform: translateX(100%);
+            transition: all 0.5s ease;
+        }
+        
+        .new-order-notification.show {
+            opacity: 1;
+            transform: translateX(0);
+        }
+        
+        .new-order-notification i {
+            margin-right: 8px;
+            font-size: 1.2rem;
+        }
     </style>
 </head>
 <body>
@@ -460,12 +552,37 @@
         <i class="bi bi-wifi"></i> Connesso
     </div>
     
+    <!-- Notifica nuovo ordine -->
+    <div class="new-order-notification" id="newOrderNotification">
+        <i class="bi bi-bell-fill"></i>
+        <span id="newOrderMessage">Nuovo ordine ricevuto!</span>
+    </div>
+    
+    <!-- Pulsante test notifica (nascosto, attivabile con Ctrl+Shift+T) -->
+    <div style="position: fixed; bottom: 10px; left: 10px; opacity: 0.1; z-index: 999;">
+        <button id="testNotificationBtn" style="background: transparent; border: none; color: rgba(255,255,255,0.1); font-size: 10px;">Test</button>
+    </div>
+    
     <div class="dashboard-header">
         <h1 class="dashboard-title">
             <i class="bi bi-car-front-fill"></i>
             Dashboard Ordini
         </h1>
-        <div class="dashboard-clock" id="currentTime">--:--:--</div>
+        <div class="d-flex align-items-center gap-3">
+            <!-- Controlli Autoscroll -->
+            <div class="autoscroll-controls" style="display: flex; align-items: center; gap: 10px; font-size: 0.9rem;">
+                <button id="autoscrollToggle" class="btn btn-sm btn-outline-light" style="border-radius: 20px; padding: 5px 15px;">
+                    <i class="bi bi-play-fill"></i> Auto Scroll
+                </button>
+                <select id="scrollSpeed" class="form-select form-select-sm" style="width: 120px; border-radius: 15px; background: rgba(255,255,255,0.1); color: white; border: 1px solid rgba(255,255,255,0.3);">
+                    <option value="60">Lento (60s)</option>
+                    <option value="45" selected>Medio (45s)</option>
+                    <option value="30">Veloce (30s)</option>
+                    <option value="20">Molto Veloce (20s)</option>
+                </select>
+            </div>
+            <div class="dashboard-clock" id="currentTime">--:--:--</div>
+        </div>
     </div>
     
     <div class="main-container">
@@ -516,6 +633,8 @@
     <script>
         let lastUpdate = null;
         let updateInterval = null;
+        let lastOrderIds = new Set(); // Tracking degli ordini esistenti
+        let notificationSound = null;
         
         // Aggiorna l'orologio header
         function updateClock() {
@@ -532,6 +651,88 @@
         // Aggiorna ogni secondo
         setInterval(updateClock, 1000);
         updateClock();
+        
+        // Inizializza suono di notifica
+        function initNotificationSound() {
+            try {
+                // Crea un suono sintetico usando Web Audio API
+                const audioContext = new (window.AudioContext || window.webkitAudioContext)();
+                
+                notificationSound = function() {
+                    // Crea una sequenza di beep
+                    const beeps = [
+                        { freq: 800, duration: 0.2 },
+                        { freq: 1000, duration: 0.2 },
+                        { freq: 1200, duration: 0.3 }
+                    ];
+                    
+                    let startTime = audioContext.currentTime;
+                    
+                    beeps.forEach((beep, index) => {
+                        const oscillator = audioContext.createOscillator();
+                        const gainNode = audioContext.createGain();
+                        
+                        oscillator.connect(gainNode);
+                        gainNode.connect(audioContext.destination);
+                        
+                        oscillator.frequency.setValueAtTime(beep.freq, startTime);
+                        gainNode.gain.setValueAtTime(0, startTime);
+                        gainNode.gain.linearRampToValueAtTime(0.3, startTime + 0.01);
+                        gainNode.gain.exponentialRampToValueAtTime(0.01, startTime + beep.duration);
+                        
+                        oscillator.start(startTime);
+                        oscillator.stop(startTime + beep.duration);
+                        
+                        startTime += beep.duration + 0.1; // Pausa tra i beep
+                    });
+                };
+            } catch (error) {
+                console.log('Audio non supportato:', error);
+                notificationSound = null;
+            }
+        }
+        
+        // Mostra notifica per nuovo ordine
+        function showNewOrderNotification(ordine) {
+            const notification = document.getElementById('newOrderNotification');
+            const message = document.getElementById('newOrderMessage');
+            
+            // Personalizza il messaggio
+            const orderNumber = ordine.numero_progressivo.slice(-2);
+            message.textContent = `Nuovo Ordine #${orderNumber} - ${ordine.cliente || 'Cliente Anonimo'}`;
+            
+            // Mostra la notifica
+            notification.classList.add('show');
+            
+            // Riproduci suono se disponibile
+            if (notificationSound) {
+                try {
+                    notificationSound();
+                } catch (error) {
+                    console.log('Errore riproduzione suono:', error);
+                }
+            }
+            
+            // Nascondi dopo 5 secondi
+            setTimeout(() => {
+                notification.classList.remove('show');
+            }, 5000);
+        }
+        
+        // Aggiungi animazione flash alla riga del nuovo ordine
+        function flashNewOrderRow(ordineId) {
+            // Aspetta un momento per permettere al DOM di aggiornarsi
+            setTimeout(() => {
+                const row = document.querySelector(`[data-order-id="${ordineId}"]`);
+                if (row) {
+                    row.classList.add('new-order-flash');
+                    // Rimuovi la classe dopo l'animazione
+                    setTimeout(() => {
+                        row.classList.remove('new-order-flash');
+                    }, 3000);
+                }
+            }, 100);
+        }
         
         // Rimuovi riferimenti alla sezione orders-title
         // setInterval(updateDateTime, 10000);
@@ -562,12 +763,26 @@
                 return false;
             }
             
+            // Se non c'è ora consegna richiesta, non può essere urgente
+            if (!ordine.ora_consegna_richiesta) {
+                return false;
+            }
+            
             // Usa il timestamp del server se disponibile, altrimenti usa l'ora locale
             const now = serverTimestamp ? new Date(serverTimestamp) : new Date();
-            const deliveryTime = new Date(ordine.ora_consegna_prevista_completa);
+            
+            // Calcola l'orario di consegna richiesta per oggi
+            const [ore, minuti] = ordine.ora_consegna_richiesta.split(':');
+            const deliveryTime = new Date(now.getFullYear(), now.getMonth(), now.getDate(), parseInt(ore), parseInt(minuti));
+            
+            // Se l'orario è già passato oggi, considera domani
+            if (deliveryTime < now) {
+                deliveryTime.setDate(deliveryTime.getDate() + 1);
+            }
+            
             const timeDiff = (deliveryTime - now) / (1000 * 60); // Differenza in minuti
             
-            console.log(`Ordine ${ordine.numero_progressivo}: tipo=${ordine.tipo_consegna}, stato=${ordine.stato}, timeDiff=${timeDiff} minuti`);
+            console.log(`Ordine ${ordine.numero_progressivo}: tipo=${ordine.tipo_consegna}, stato=${ordine.stato}, ora_richiesta=${ordine.ora_consegna_richiesta}, timeDiff=${Math.round(timeDiff)} minuti`);
             
             return timeDiff > 0 && timeDiff < 60; // Meno di 1 ora
         }
@@ -716,6 +931,25 @@
                     return a.numero_progressivo.localeCompare(b.numero_progressivo);
                 });
             
+            // Rileva nuovi ordini
+            const currentOrderIds = new Set(ordiniAttivi.map(o => o.id));
+            
+            // Se non è il primo caricamento, controlla per nuovi ordini
+            if (lastOrderIds.size > 0) {
+                ordiniAttivi.forEach(ordine => {
+                    if (!lastOrderIds.has(ordine.id)) {
+                        console.log(`Nuovo ordine rilevato: ${ordine.numero_progressivo}`);
+                        showNewOrderNotification(ordine);
+                        
+                        // Programma l'animazione flash per dopo che il DOM è aggiornato
+                        setTimeout(() => flashNewOrderRow(ordine.id), 200);
+                    }
+                });
+            }
+            
+            // Aggiorna il set degli ordini tracciati
+            lastOrderIds = currentOrderIds;
+            
             // Pulisci la tabella
             tbody.innerHTML = '';
             
@@ -775,6 +1009,35 @@
             }
         }
         
+        // Inizializza il suono di notifica al primo caricamento o primo click
+        initNotificationSound();
+        
+        // Fallback per browser che richiedono interazione utente per l'audio
+        document.addEventListener('click', function() {
+            if (!notificationSound) {
+                initNotificationSound();
+            }
+        }, { once: true });
+        
+        // Test notifica (Ctrl+Shift+T o click su pulsante test)
+        document.addEventListener('keydown', function(e) {
+            if (e.ctrlKey && e.shiftKey && e.key === 'T') {
+                testNotification();
+            }
+        });
+        
+        document.getElementById('testNotificationBtn').addEventListener('click', testNotification);
+        
+        function testNotification() {
+            const fakeOrder = {
+                id: 999,
+                numero_progressivo: '20250725-TEST',
+                cliente: 'Test Cliente'
+            };
+            showNewOrderNotification(fakeOrder);
+            flashNewOrderRow(999);
+        }
+        
         // Carica i dati immediatamente
         loadData();
         
@@ -795,6 +1058,115 @@
                 }
             }
         });
+        
+        // === AUTOSCROLL FUNCTIONALITY ===
+        let autoscrollEnabled = false;
+        let autoscrollSpeed = 45; // secondi
+        let userInteractionTimeout = null;
+        
+        // Inizializza controlli autoscroll
+        function initAutoscroll() {
+            const toggleBtn = document.getElementById('autoscrollToggle');
+            const speedSelect = document.getElementById('scrollSpeed');
+            const body = document.body;
+            
+            // Toggle autoscroll
+            toggleBtn.addEventListener('click', function() {
+                autoscrollEnabled = !autoscrollEnabled;
+                updateAutoscrollState();
+            });
+            
+            // Cambio velocità
+            speedSelect.addEventListener('change', function() {
+                autoscrollSpeed = parseInt(this.value);
+                if (autoscrollEnabled) {
+                    updateAutoscrollAnimation();
+                }
+            });
+            
+            // Pausa autoscroll con interazioni utente
+            const interactionEvents = ['mousedown', 'mousemove', 'keydown', 'touchstart', 'wheel'];
+            interactionEvents.forEach(event => {
+                document.addEventListener(event, handleUserInteraction);
+            });
+            
+            // Riprendi autoscroll dopo un periodo di inattività
+            function handleUserInteraction() {
+                if (!autoscrollEnabled) return;
+                
+                body.classList.add('autoscroll-paused');
+                
+                // Reset timer di inattività
+                clearTimeout(userInteractionTimeout);
+                userInteractionTimeout = setTimeout(() => {
+                    body.classList.remove('autoscroll-paused');
+                }, 5000); // Riprende dopo 5 secondi di inattività
+            }
+        }
+        
+        function updateAutoscrollState() {
+            const toggleBtn = document.getElementById('autoscrollToggle');
+            const body = document.body;
+            
+            if (autoscrollEnabled) {
+                body.classList.add('autoscroll-enabled');
+                toggleBtn.innerHTML = '<i class="bi bi-pause-fill"></i> Pausa';
+                toggleBtn.classList.remove('btn-outline-light');
+                toggleBtn.classList.add('btn-light');
+                updateAutoscrollAnimation();
+            } else {
+                body.classList.remove('autoscroll-enabled', 'autoscroll-paused');
+                toggleBtn.innerHTML = '<i class="bi bi-play-fill"></i> Auto Scroll';
+                toggleBtn.classList.remove('btn-light');
+                toggleBtn.classList.add('btn-outline-light');
+            }
+        }
+        
+        function updateAutoscrollAnimation() {
+            const body = document.body;
+            const container = document.querySelector('.main-container');
+            const tableContainer = document.querySelector('.orders-table-container');
+            
+            if (!container || !tableContainer) return;
+            
+            const containerHeight = container.clientHeight - 30; // Togli padding
+            const contentHeight = tableContainer.scrollHeight;
+            
+            // Solo se il contenuto è più alto della vista
+            if (contentHeight > containerHeight) {
+                // Calcola la distanza reale di scroll
+                const scrollDistance = Math.max(0, contentHeight - containerHeight);
+                const duration = autoscrollSpeed;
+                
+                // Aggiorna la variabile CSS per l'animazione
+                body.style.setProperty('--scroll-duration', `${duration}s`);
+                body.style.setProperty('--scroll-distance', `-${scrollDistance}px`);
+                
+                // Riavvia l'animazione
+                body.classList.remove('autoscroll-enabled');
+                void body.offsetWidth; // Forza reflow
+                body.classList.add('autoscroll-enabled');
+            } else {
+                // Se il contenuto entra in una schermata, disabilita autoscroll temporaneamente
+                body.classList.remove('autoscroll-enabled');
+            }
+        }
+        
+        // Aggiorna autoscroll quando cambia il contenuto
+        const originalUpdateTable = updateTable;
+        updateTable = function(data) {
+            originalUpdateTable(data);
+            
+            // Aggiorna autoscroll dopo il rendering
+            setTimeout(() => {
+                if (autoscrollEnabled) {
+                    updateAutoscrollAnimation();
+                }
+            }, 100);
+        };
+        
+        // Inizializza autoscroll
+        initAutoscroll();
         
         // Ricarica automatica ogni ora per evitare memory leak
         setTimeout(function() {

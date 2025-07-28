@@ -1,0 +1,304 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}Accesso Clienti - Gestionale Autolavaggio{% endblock %}
+
+{% block extra_css %}
+<style>
+.client-login-container {
+    min-height: 100vh;
+    background: linear-gradient(135deg, #4facfe 0%, #00f2fe 100%);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 1rem;
+}
+
+.client-login-card {
+    background: white;
+    border-radius: 20px;
+    box-shadow: 0 20px 40px rgba(0, 0, 0, 0.1);
+    padding: 2.5rem;
+    width: 100%;
+    max-width: 450px;
+    position: relative;
+    overflow: hidden;
+}
+
+.client-login-card::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    height: 5px;
+    background: linear-gradient(90deg, #4facfe 0%, #00f2fe 100%);
+}
+
+.client-header {
+    text-align: center;
+    margin-bottom: 2rem;
+}
+
+.client-header .logo {
+    width: 80px;
+    height: 80px;
+    background: linear-gradient(135deg, #4facfe 0%, #00f2fe 100%);
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    margin: 0 auto 1rem;
+    color: white;
+    font-size: 2rem;
+}
+
+.client-header h2 {
+    color: #333;
+    margin-bottom: 0.5rem;
+    font-weight: 600;
+}
+
+.client-header p {
+    color: #666;
+    font-size: 0.95rem;
+}
+
+.form-floating {
+    margin-bottom: 1rem;
+}
+
+.form-floating > .form-control {
+    border: 2px solid #e9ecef;
+    border-radius: 12px;
+    height: calc(3.5rem + 2px);
+    padding: 1rem 0.75rem;
+    font-size: 1rem;
+    transition: all 0.3s ease;
+}
+
+.form-floating > .form-control:focus {
+    border-color: #4facfe;
+    box-shadow: 0 0 0 0.2rem rgba(79, 172, 254, 0.25);
+}
+
+.form-floating > label {
+    padding: 1rem 0.75rem;
+    color: #666;
+    font-weight: 500;
+}
+
+.btn-client-login {
+    background: linear-gradient(135deg, #4facfe 0%, #00f2fe 100%);
+    border: none;
+    border-radius: 12px;
+    padding: 1rem;
+    font-weight: 600;
+    color: white;
+    width: 100%;
+    font-size: 1.1rem;
+    transition: all 0.3s ease;
+    margin-top: 1rem;
+}
+
+.btn-client-login:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 10px 30px rgba(79, 172, 254, 0.4);
+    color: white;
+}
+
+.divider {
+    text-align: center;
+    margin: 2rem 0;
+    position: relative;
+}
+
+.divider::before {
+    content: '';
+    position: absolute;
+    top: 50%;
+    left: 0;
+    right: 0;
+    height: 1px;
+    background: #e9ecef;
+}
+
+.divider span {
+    background: white;
+    padding: 0 1rem;
+    color: #666;
+    font-size: 0.9rem;
+}
+
+.register-section {
+    text-align: center;
+    padding: 1.5rem;
+    background: #f8f9fa;
+    border-radius: 15px;
+    margin-top: 1.5rem;
+}
+
+.register-section h5 {
+    color: #333;
+    margin-bottom: 0.5rem;
+}
+
+.register-section p {
+    color: #666;
+    margin-bottom: 1rem;
+    font-size: 0.9rem;
+}
+
+.btn-register {
+    background: transparent;
+    border: 2px solid #4facfe;
+    border-radius: 10px;
+    color: #4facfe;
+    padding: 0.5rem 1.5rem;
+    font-weight: 600;
+    transition: all 0.3s ease;
+}
+
+.btn-register:hover {
+    background: #4facfe;
+    color: white;
+    transform: translateY(-1px);
+}
+
+.alert-custom {
+    border-radius: 12px;
+    border: none;
+    padding: 1rem;
+    margin-bottom: 1.5rem;
+}
+
+.benefits {
+    margin-top: 1rem;
+}
+
+.benefit-item {
+    display: flex;
+    align-items: center;
+    margin-bottom: 0.5rem;
+    font-size: 0.9rem;
+    color: #666;
+}
+
+.benefit-item i {
+    color: #4facfe;
+    margin-right: 0.5rem;
+    width: 16px;
+}
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="client-login-container">
+    <div class="client-login-card">
+        <div class="client-header">
+            <div class="logo">
+                <i class="bi bi-car-front"></i>
+            </div>
+            <h2>Area Clienti</h2>
+            <p>Accedi al tuo account per gestire i tuoi servizi</p>
+        </div>
+
+        {% if messages %}
+            {% for message in messages %}
+                <div class="alert alert-{{ message.tags }} alert-custom alert-dismissible fade show" role="alert">
+                    <i class="bi bi-{% if message.tags == 'error' %}exclamation-triangle{% else %}check-circle{% endif %} me-2"></i>
+                    {{ message }}
+                    <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+                </div>
+            {% endfor %}
+        {% endif %}
+
+        <form method="post">
+            {% csrf_token %}
+            
+            <div class="form-floating">
+                <input type="email" class="form-control" id="email" name="email" 
+                       placeholder="nome@esempio.com" required>
+                <label for="email">
+                    <i class="bi bi-envelope me-2"></i>Email
+                </label>
+            </div>
+
+            <div class="form-floating">
+                <input type="password" class="form-control" id="password" name="password" 
+                       placeholder="Password" required>
+                <label for="password">
+                    <i class="bi bi-lock me-2"></i>Password
+                </label>
+            </div>
+
+            <div class="form-check mb-3">
+                <input type="checkbox" class="form-check-input" id="remember_me" name="remember_me">
+                <label class="form-check-label" for="remember_me">
+                    Ricordami per 30 giorni
+                </label>
+            </div>
+
+            <button type="submit" class="btn btn-client-login">
+                <i class="bi bi-box-arrow-in-right me-2"></i>
+                Accedi al mio account
+            </button>
+        </form>
+
+        <div class="text-center mt-3">
+            <a href="#" class="text-decoration-none" onclick="alert('Controlla la tua email per le istruzioni di recupero')">
+                <i class="bi bi-question-circle me-1"></i>
+                Password dimenticata?
+            </a>
+        </div>
+
+        <div class="divider">
+            <span>oppure</span>
+        </div>
+
+        <div class="register-section">
+            <h5>Nuovo Cliente?</h5>
+            <p>Registrati per accedere ai nostri servizi online</p>
+            
+            <div class="benefits">
+                <div class="benefit-item">
+                    <i class="bi bi-check-circle-fill"></i>
+                    <span>Prenota i tuoi lavaggi online</span>
+                </div>
+                <div class="benefit-item">
+                    <i class="bi bi-check-circle-fill"></i>
+                    <span>Gestisci i tuoi abbonamenti</span>
+                </div>
+                <div class="benefit-item">
+                    <i class="bi bi-check-circle-fill"></i>
+                    <span>Accumula punti fedeltà</span>
+                </div>
+                <div class="benefit-item">
+                    <i class="bi bi-check-circle-fill"></i>
+                    <span>Storico servizi e fatture</span>
+                </div>
+            </div>
+
+            <button type="button" class="btn btn-register mt-3" onclick="window.location.href='{% url 'clients:register' %}'">
+                <i class="bi bi-person-plus me-2"></i>
+                Registrati Gratuitamente
+            </button>
+        </div>
+    </div>
+</div>
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    // Auto-focus sul primo campo
+    document.getElementById('email').focus();
+    
+    // Enter key navigation
+    document.getElementById('email').addEventListener('keypress', function(e) {
+        if (e.key === 'Enter') {
+            e.preventDefault();
+            document.getElementById('password').focus();
+        }
+    });
+});
+</script>
+{% endblock %}

@@ -31,6 +31,7 @@ INSTALLED_APPS = [
     'formtools',
     
     # App del gestionale autolavaggio (core essenziali)
+    'apps.auth_system',
     'apps.core',
     'apps.clienti',
     'apps.ordini',
@@ -49,6 +50,7 @@ MIDDLEWARE = [
     'django.middleware.common.CommonMiddleware',
     'django.middleware.csrf.CsrfViewMiddleware',
     'django.contrib.auth.middleware.AuthenticationMiddleware',
+    'apps.auth_system.middleware.AuthenticationMiddleware',
     'django.contrib.messages.middleware.MessageMiddleware',
     'django.middleware.clickjacking.XFrameOptionsMiddleware',
 ]
@@ -116,5 +118,16 @@ DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 # Crispy Forms
 CRISPY_ALLOWED_TEMPLATE_PACKS = "bootstrap5"
 CRISPY_TEMPLATE_PACK = "bootstrap5"
+
+# Authentication settings
+LOGIN_URL = '/auth/operatori/login/'
+LOGIN_REDIRECT_URL = '/'
+LOGOUT_REDIRECT_URL = '/auth/operatori/login/'
+
+# Session settings
+SESSION_COOKIE_AGE = 1209600  # 2 settimane
+SESSION_EXPIRE_AT_BROWSER_CLOSE = False
+SESSION_COOKIE_HTTPONLY = True
+SESSION_COOKIE_SECURE = False  # True in produzione con HTTPS
 
 # --- FINE CONFIGURAZIONE ---

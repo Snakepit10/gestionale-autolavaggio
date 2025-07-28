@@ -15,6 +15,11 @@
             <i class="bi bi-printer"></i> Stampa
         </button>
         {% if ordine.stato != 'completato' and ordine.stato != 'annullato' %}
+            <button class="btn btn-outline-primary me-2" onclick="mostraModalModifica()">
+                <i class="bi bi-pencil"></i> Modifica
+            </button>
+        {% endif %}
+        {% if ordine.stato != 'completato' and ordine.stato != 'annullato' %}
             <div class="btn-group me-2">
                 <button class="btn btn-outline-warning dropdown-toggle" data-bs-toggle="dropdown">
                     <i class="bi bi-gear"></i> Cambia Stato
@@ -792,5 +797,163 @@ window.addEventListener('beforeunload', function() {
         webSocket.close();
     }
 });
+
+// Funzione per mostrare il modal di modifica
+function mostraModalModifica() {
+    const modal = new bootstrap.Modal(document.getElementById('modalModifica'));
+    
+    // Precompila i campi con i valori attuali
+    document.getElementById('cliente-select').value = "{{ ordine.cliente.id|default:'' }}";
+    document.getElementById('tipo-consegna-select').value = "{{ ordine.tipo_consegna }}";
+    document.getElementById('ora-consegna-input').value = "{{ ordine.ora_consegna_richiesta|time:'H:i'|default:'' }}";
+    document.getElementById('tipo-auto-input').value = "{{ ordine.tipo_auto|default_if_none:'' }}";
+    
+    // Mostra/nascondi campo ora in base al tipo consegna
+    toggleOraConsegnaModifica();
+    
+    modal.show();
+}
+
+function toggleOraConsegnaModifica() {
+    const tipoConsegna = document.getElementById('tipo-consegna-select').value;
+    const oraGroup = document.getElementById('ora-consegna-group');
+    const oraInput = document.getElementById('ora-consegna-input');
+    
+    if (tipoConsegna === 'programmata') {
+        oraGroup.style.display = 'block';
+        oraInput.required = true;
+    } else {
+        oraGroup.style.display = 'none';
+        oraInput.required = false;
+        oraInput.value = '';
+    }
+}
+
+function salvaModifiche() {
+    const form = document.getElementById('form-modifica-ordine');
+    const formData = new FormData(form);
+    
+    if (!form.checkValidity()) {
+        form.reportValidity();
+        return;
+    }
+    
+    // Converti FormData in oggetto JSON
+    const data = {};
+    formData.forEach((value, key) => {
+        if (value.trim()) {
+            data[key] = value;
+        }
+    });
+    
+    fetch(`{% url 'ordini:modifica-ordine' ordine.pk %}`, {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+            'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]').value
+        },
+        body: JSON.stringify(data)
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            // Mostra messaggio di successo
+            const alertDiv = document.createElement('div');
+            alertDiv.className = 'alert alert-success alert-dismissible fade show';
+            alertDiv.innerHTML = `
+                ${data.message}
+                <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+            `;
+            
+            // Inserisce l'alert dopo il titolo
+            const titleDiv = document.querySelector('.d-flex.justify-content-between');
+            titleDiv.insertAdjacentElement('afterend', alertDiv);
+            
+            // Chiude il modal e ricarica la pagina
+            const modal = bootstrap.Modal.getInstance(document.getElementById('modalModifica'));
+            modal.hide();
+            
+            setTimeout(() => {
+                location.reload();
+            }, 1000);
+        } else {
+            alert('Errore: ' + data.error);
+        }
+    })
+    .catch(error => {
+        console.error('Errore:', error);
+        alert('Errore durante la modifica dell\'ordine');
+    });
+}
 </script>
+
+<!-- Modal Modifica Ordine -->
+<div class="modal fade" id="modalModifica" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">
+                    <i class="bi bi-pencil"></i>
+                    Modifica Ordine #{{ ordine.numero_progressivo }}
+                </h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <form id="form-modifica-ordine">
+                    {% csrf_token %}
+                    
+                    <!-- Cliente -->
+                    <div class="mb-3">
+                        <label for="cliente-select" class="form-label">Cliente</label>
+                        <select class="form-select" id="cliente-select" name="cliente_id">
+                            <option value="">Nessun cliente (anonimo)</option>
+                            {% for cliente in clienti %}
+                                <option value="{{ cliente.id }}" 
+                                    {% if ordine.cliente and ordine.cliente.id == cliente.id %}selected{% endif %}>
+                                    {{ cliente.nome_completo }}
+                                </option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                    
+                    <!-- Tipo Consegna -->
+                    <div class="mb-3">
+                        <label for="tipo-consegna-select" class="form-label">Tipo Consegna</label>
+                        <select class="form-select" id="tipo-consegna-select" name="tipo_consegna" onchange="toggleOraConsegnaModifica()" required>
+                            <option value="immediata" {% if ordine.tipo_consegna == 'immediata' %}selected{% endif %}>
+                                Consegna Immediata
+                            </option>
+                            <option value="programmata" {% if ordine.tipo_consegna == 'programmata' %}selected{% endif %}>
+                                Consegna Programmata
+                            </option>
+                        </select>
+                    </div>
+                    
+                    <!-- Ora Consegna (mostrato solo se programmata) -->
+                    <div class="mb-3" id="ora-consegna-group" 
+                         style="display: {% if ordine.tipo_consegna == 'programmata' %}block{% else %}none{% endif %};">
+                        <label for="ora-consegna-input" class="form-label">Ora Consegna</label>
+                        <input type="time" class="form-control" id="ora-consegna-input" name="ora_consegna_richiesta"
+                               value="{{ ordine.ora_consegna_richiesta|time:'H:i'|default:'' }}">
+                    </div>
+                    
+                    <!-- Tipo Auto -->
+                    <div class="mb-3">
+                        <label for="tipo-auto-input" class="form-label">Tipo Auto</label>
+                        <input type="text" class="form-control" id="tipo-auto-input" name="tipo_auto" 
+                               value="{{ ordine.tipo_auto|default_if_none:'' }}" placeholder="es. Fiat 500 bianca, BMW X3 nera...">
+                    </div>
+                    
+                </form>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Annulla</button>
+                <button type="button" class="btn btn-primary" onclick="salvaModifiche()">
+                    <i class="bi bi-check-lg"></i> Salva Modifiche
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
 {% endblock %}

@@ -11,7 +11,7 @@ class Cliente(models.Model):
     
     # Dati comuni
     tipo = models.CharField(max_length=20, choices=TIPO_CHOICES)
-    email = models.EmailField(blank=True, null=True, unique=True)
+    email = models.EmailField(blank=True, null=True)
     telefono = models.CharField(max_length=20)
     indirizzo = models.TextField(blank=True)
     cap = models.CharField(max_length=10, blank=True)

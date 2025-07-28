@@ -597,22 +597,30 @@
                             <!-- Campi Privato -->
                             <div id="campi-privato" style="display: none;">
                                 <div class="row">
-                                    <div class="col-md-4">
+                                    <div class="col-md-6">
                                         <div class="mb-3">
                                             <label class="form-label">Nome *</label>
                                             <input type="text" class="form-control" name="nome" id="nome-privato">
                                         </div>
                                     </div>
-                                    <div class="col-md-4">
+                                    <div class="col-md-6">
                                         <div class="mb-3">
                                             <label class="form-label">Cognome *</label>
                                             <input type="text" class="form-control" name="cognome" id="cognome-privato">
                                         </div>
                                     </div>
-                                    <div class="col-md-4">
+                                </div>
+                                <div class="row">
+                                    <div class="col-md-6">
                                         <div class="mb-3">
                                             <label class="form-label">Telefono *</label>
                                             <input type="tel" class="form-control" name="telefono" id="telefono-privato">
+                                        </div>
+                                    </div>
+                                    <div class="col-md-6">
+                                        <div class="mb-3">
+                                            <label class="form-label">Email (facoltativo)</label>
+                                            <input type="email" class="form-control" name="email" id="email-privato" placeholder="indirizzo@email.com">
                                         </div>
                                     </div>
                                 </div>
@@ -642,9 +650,19 @@
                                     <label class="form-label">Indirizzo</label>
                                     <input type="text" class="form-control" name="indirizzo">
                                 </div>
-                                <div class="mb-3">
-                                    <label class="form-label">Telefono *</label>
-                                    <input type="tel" class="form-control" name="telefono" id="telefono-azienda">
+                                <div class="row">
+                                    <div class="col-md-6">
+                                        <div class="mb-3">
+                                            <label class="form-label">Telefono *</label>
+                                            <input type="tel" class="form-control" name="telefono" id="telefono-azienda">
+                                        </div>
+                                    </div>
+                                    <div class="col-md-6">
+                                        <div class="mb-3">
+                                            <label class="form-label">Email (facoltativo)</label>
+                                            <input type="email" class="form-control" name="email" id="email-azienda" placeholder="indirizzo@email.com">
+                                        </div>
+                                    </div>
                                 </div>
                             </div>
                         </form>
@@ -1225,12 +1243,14 @@ function selezionaCliente() {
             clienteSelezionato.nome = formData.get('nome');
             clienteSelezionato.cognome = formData.get('cognome');
             clienteSelezionato.telefono = formData.get('telefono');
+            clienteSelezionato.email = formData.get('email');
         } else if (tipo === 'azienda') {
             clienteSelezionato.ragione_sociale = formData.get('ragione_sociale');
             clienteSelezionato.partita_iva = formData.get('partita_iva');
             clienteSelezionato.codice_sdi = formData.get('codice_sdi');
             clienteSelezionato.indirizzo = formData.get('indirizzo');
             clienteSelezionato.telefono = formData.get('telefono');
+            clienteSelezionato.email = formData.get('email');
         }
         
         bootstrap.Modal.getInstance(document.getElementById('modalCliente')).hide();

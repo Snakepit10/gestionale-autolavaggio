@@ -1,0 +1,516 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}Dashboard Cliente - Gestionale Autolavaggio{% endblock %}
+
+{% block extra_css %}
+<style>
+.client-dashboard {
+    background: linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%);
+    min-height: 100vh;
+    padding: 2rem 0;
+}
+
+.dashboard-header {
+    background: white;
+    border-radius: 15px;
+    padding: 2rem;
+    margin-bottom: 2rem;
+    box-shadow: 0 5px 15px rgba(0,0,0,0.08);
+}
+
+.welcome-section {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 1rem;
+}
+
+.welcome-text h2 {
+    color: #333;
+    margin-bottom: 0.5rem;
+}
+
+.welcome-text p {
+    color: #666;
+    margin: 0;
+}
+
+.user-avatar {
+    width: 60px;
+    height: 60px;
+    background: linear-gradient(135deg, #4facfe 0%, #00f2fe 100%);
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: white;
+    font-size: 1.5rem;
+    font-weight: bold;
+}
+
+.quick-stats {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+    gap: 1rem;
+    margin-top: 1.5rem;
+}
+
+.stat-card {
+    background: #f8f9fa;
+    border-radius: 12px;
+    padding: 1rem;
+    text-align: center;
+}
+
+.stat-card i {
+    font-size: 2rem;
+    margin-bottom: 0.5rem;
+}
+
+.stat-card h4 {
+    margin: 0;
+    color: #333;
+}
+
+.stat-card p {
+    margin: 0;
+    color: #666;
+    font-size: 0.9rem;
+}
+
+.dashboard-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+    gap: 2rem;
+}
+
+.dashboard-card {
+    background: white;
+    border-radius: 15px;
+    padding: 1.5rem;
+    box-shadow: 0 5px 15px rgba(0,0,0,0.08);
+    transition: transform 0.3s ease;
+}
+
+.dashboard-card:hover {
+    transform: translateY(-5px);
+}
+
+.card-header {
+    display: flex;
+    align-items: center;
+    margin-bottom: 1rem;
+}
+
+.card-header i {
+    font-size: 1.5rem;
+    margin-right: 0.75rem;
+    padding: 0.5rem;
+    border-radius: 10px;
+    color: white;
+}
+
+.card-header h5 {
+    margin: 0;
+    color: #333;
+}
+
+.action-buttons {
+    display: flex;
+    gap: 0.5rem;
+    margin-top: 1rem;
+}
+
+.btn-action {
+    flex: 1;
+    padding: 0.75rem;
+    border-radius: 10px;
+    font-weight: 600;
+    transition: all 0.3s ease;
+    border: none;
+    text-decoration: none;
+    text-align: center;
+    display: inline-block;
+}
+
+.btn-primary-action {
+    background: linear-gradient(135deg, #4facfe 0%, #00f2fe 100%);
+    color: white;
+}
+
+.btn-primary-action:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 5px 15px rgba(79, 172, 254, 0.4);
+    color: white;
+}
+
+.btn-secondary-action {
+    background: #f8f9fa;
+    color: #666;
+    border: 2px solid #e9ecef;
+}
+
+.btn-secondary-action:hover {
+    background: #e9ecef;
+    color: #333;
+}
+
+.service-item {
+    display: flex;
+    justify-content: between;
+    align-items: center;
+    padding: 0.75rem 0;
+    border-bottom: 1px solid #f0f0f0;
+}
+
+.service-item:last-child {
+    border-bottom: none;
+}
+
+.service-info h6 {
+    margin: 0;
+    color: #333;
+}
+
+.service-info small {
+    color: #666;
+}
+
+.service-badge {
+    padding: 0.25rem 0.75rem;
+    border-radius: 20px;
+    font-size: 0.8rem;
+    font-weight: 600;
+}
+
+.badge-active {
+    background: #d4edda;
+    color: #155724;
+}
+
+.badge-expired {
+    background: #f8d7da;
+    color: #721c24;
+}
+
+.badge-pending {
+    background: #fff3cd;
+    color: #856404;
+}
+
+.notification-badge {
+    position: absolute;
+    top: -5px;
+    right: -5px;
+    background: #dc3545;
+    color: white;
+    border-radius: 50%;
+    width: 20px;
+    height: 20px;
+    font-size: 0.7rem;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.activity-item {
+    display: flex;
+    align-items: start;
+    padding: 1rem 0;
+    border-bottom: 1px solid #f0f0f0;
+}
+
+.activity-item:last-child {
+    border-bottom: none;
+}
+
+.activity-icon {
+    width: 40px;
+    height: 40px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    margin-right: 1rem;
+    font-size: 0.9rem;
+    color: white;
+}
+
+.activity-content h6 {
+    margin: 0 0 0.25rem 0;
+    color: #333;
+    font-size: 0.9rem;
+}
+
+.activity-content small {
+    color: #666;
+}
+
+.points-display {
+    text-align: center;
+    padding: 1.5rem;
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    border-radius: 15px;
+    color: white;
+    margin-bottom: 1rem;
+}
+
+.points-display h3 {
+    margin: 0;
+    font-size: 2.5rem;
+    font-weight: bold;
+}
+
+.points-display p {
+    margin: 0;
+    opacity: 0.9;
+}
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="client-dashboard">
+    <div class="container">
+        <!-- Header Dashboard -->
+        <div class="dashboard-header">
+            <div class="welcome-section">
+                <div class="welcome-text">
+                    <h2>Ciao, {{ user.first_name|default:user.username }}!</h2>
+                    <p class="text-muted">Benvenuto nella tua area personale</p>
+                </div>
+                <div class="user-avatar">
+                    {{ user.first_name.0|default:user.username.0|upper }}
+                </div>
+            </div>
+
+            <!-- Quick Stats -->
+            <div class="quick-stats">
+                <div class="stat-card">
+                    <i class="bi bi-calendar-check text-success"></i>
+                    <h4>{{ prenotazioni_attive|default:0 }}</h4>
+                    <p>Prenotazioni Attive</p>
+                </div>
+                <div class="stat-card">
+                    <i class="bi bi-credit-card text-primary"></i>
+                    <h4>{{ abbonamenti_attivi|default:0 }}</h4>
+                    <p>Abbonamenti Attivi</p>
+                </div>
+                <div class="stat-card">
+                    <i class="bi bi-star-fill text-warning"></i>
+                    <h4>{{ punti_fedelta|default:0 }}</h4>
+                    <p>Punti Fedeltà</p>
+                </div>
+                <div class="stat-card">
+                    <i class="bi bi-graph-up text-info"></i>
+                    <h4>{{ servizi_totali|default:0 }}</h4>
+                    <p>Servizi Utilizzati</p>
+                </div>
+            </div>
+        </div>
+
+        <!-- Dashboard Grid -->
+        <div class="dashboard-grid">
+            <!-- Prenotazioni -->
+            <div class="dashboard-card">
+                <div class="card-header">
+                    <i class="bi bi-calendar-week" style="background: #28a745;"></i>
+                    <h5>Le Tue Prenotazioni</h5>
+                </div>
+                
+                {% if prenotazioni_prossime %}
+                    {% for prenotazione in prenotazioni_prossime|slice:":3" %}
+                    <div class="service-item">
+                        <div class="service-info">
+                            <h6>{{ prenotazione.servizio.nome }}</h6>
+                            <small>{{ prenotazione.data_ora|date:"d/m/Y H:i" }}</small>
+                        </div>
+                        <span class="service-badge badge-active">Confermata</span>
+                    </div>
+                    {% endfor %}
+                {% else %}
+                    <p class="text-muted text-center py-3">
+                        <i class="bi bi-calendar-x display-6 d-block mb-2"></i>
+                        Nessuna prenotazione attiva
+                    </p>
+                {% endif %}
+
+                <div class="action-buttons">
+                    <a href="{% url 'prenotazioni:prenota' %}" class="btn-action btn-primary-action">
+                        <i class="bi bi-plus-circle me-1"></i>Prenota Ora
+                    </a>
+                    <a href="{% url 'prenotazioni:my-bookings' %}" class="btn-action btn-secondary-action">
+                        <i class="bi bi-list me-1"></i>Storico
+                    </a>
+                </div>
+            </div>
+
+            <!-- Abbonamenti -->
+            <div class="dashboard-card">
+                <div class="card-header">
+                    <i class="bi bi-credit-card" style="background: #007bff;"></i>
+                    <h5>I Tuoi Abbonamenti</h5>
+                </div>
+
+                {% if abbonamenti %}
+                    {% for abbonamento in abbonamenti|slice:":3" %}
+                    <div class="service-item">
+                        <div class="service-info">
+                            <h6>{{ abbonamento.configurazione.titolo }}</h6>
+                            <small>Scade il {{ abbonamento.data_scadenza|date:"d/m/Y" }}</small>
+                        </div>
+                        <span class="service-badge {% if abbonamento.is_active %}badge-active{% else %}badge-expired{% endif %}">
+                            {% if abbonamento.is_active %}Attivo{% else %}Scaduto{% endif %}
+                        </span>
+                    </div>
+                    {% endfor %}
+                {% else %}
+                    <p class="text-muted text-center py-3">
+                        <i class="bi bi-credit-card-2-front display-6 d-block mb-2"></i>
+                        Nessun abbonamento attivo
+                    </p>
+                {% endif %}
+
+                <div class="action-buttons">
+                    <a href="{% url 'abbonamenti:shop' %}" class="btn-action btn-primary-action">
+                        <i class="bi bi-cart-plus me-1"></i>Acquista
+                    </a>
+                    <a href="{% url 'abbonamenti:my-subscriptions' %}" class="btn-action btn-secondary-action">
+                        <i class="bi bi-eye me-1"></i>Gestisci
+                    </a>
+                </div>
+            </div>
+
+            <!-- Punti Fedeltà -->
+            <div class="dashboard-card">
+                <div class="card-header">
+                    <i class="bi bi-star-fill" style="background: #ffc107;"></i>
+                    <h5>Punti Fedeltà</h5>
+                </div>
+
+                <div class="points-display">
+                    <h3>{{ cliente.punti_fedelta.punti_disponibili|default:0 }}</h3>
+                    <p>Punti Disponibili</p>
+                </div>
+
+                {% if ultimi_movimenti_punti %}
+                    <small class="text-muted">Ultimi movimenti:</small>
+                    {% for movimento in ultimi_movimenti_punti|slice:":2" %}
+                    <div class="service-item">
+                        <div class="service-info">
+                            <h6>{{ movimento.descrizione }}</h6>
+                            <small>{{ movimento.data_movimento|date:"d/m/Y" }}</small>
+                        </div>
+                        <span class="fw-bold {% if movimento.punti > 0 %}text-success{% else %}text-danger{% endif %}">
+                            {% if movimento.punti > 0 %}+{% endif %}{{ movimento.punti }}
+                        </span>
+                    </div>
+                    {% endfor %}
+                {% endif %}
+
+                <div class="action-buttons">
+                    <a href="{% url 'clienti:loyalty-shop' %}" class="btn-action btn-primary-action">
+                        <i class="bi bi-gift me-1"></i>Usa Punti
+                    </a>
+                    <a href="{% url 'clienti:loyalty-history' %}" class="btn-action btn-secondary-action">
+                        <i class="bi bi-clock-history me-1"></i>Storico
+                    </a>
+                </div>
+            </div>
+
+            <!-- Attività Recente -->
+            <div class="dashboard-card">
+                <div class="card-header">
+                    <i class="bi bi-clock-history" style="background: #6f42c1;"></i>
+                    <h5>Attività Recente</h5>
+                </div>
+
+                {% if attivita_recente %}
+                    {% for attivita in attivita_recente|slice:":4" %}
+                    <div class="activity-item">
+                        <div class="activity-icon" style="background: {{ attivita.color }};">
+                            <i class="bi bi-{{ attivita.icon }}"></i>
+                        </div>
+                        <div class="activity-content">
+                            <h6>{{ attivita.descrizione }}</h6>
+                            <small>{{ attivita.data|date:"d/m/Y H:i" }}</small>
+                        </div>
+                    </div>
+                    {% endfor %}
+                {% else %}
+                    <p class="text-muted text-center py-3">
+                        <i class="bi bi-activity display-6 d-block mb-2"></i>
+                        Nessuna attività recente
+                    </p>
+                {% endif %}
+
+                <div class="action-buttons">
+                    <a href="{% url 'clienti:activity-log' %}" class="btn-action btn-secondary-action">
+                        <i class="bi bi-list-ul me-1"></i>Vedi Tutto
+                    </a>
+                </div>
+            </div>
+
+            <!-- Quick Actions -->
+            <div class="dashboard-card">
+                <div class="card-header">
+                    <i class="bi bi-lightning-fill" style="background: #dc3545;"></i>
+                    <h5>Azioni Rapide</h5>
+                </div>
+
+                <div class="d-grid gap-2">
+                    <a href="{% url 'prenotazioni:prenota' %}" class="btn btn-outline-primary">
+                        <i class="bi bi-calendar-plus me-2"></i>Prenota Servizio
+                    </a>
+                    <a href="{% url 'abbonamenti:shop' %}" class="btn btn-outline-success">
+                        <i class="bi bi-credit-card me-2"></i>Acquista Abbonamento
+                    </a>
+                    <a href="{% url 'clienti:profile' %}" class="btn btn-outline-info">
+                        <i class="bi bi-person-gear me-2"></i>Modifica Profilo
+                    </a>
+                    <a href="{% url 'clienti:support' %}" class="btn btn-outline-warning">
+                        <i class="bi bi-headset me-2"></i>Assistenza
+                    </a>
+                </div>
+            </div>
+
+            <!-- Notifiche -->
+            <div class="dashboard-card">
+                <div class="card-header">
+                    <i class="bi bi-bell-fill" style="background: #fd7e14; position: relative;">
+                        {% if notifiche_non_lette > 0 %}
+                        <span class="notification-badge">{{ notifiche_non_lette }}</span>
+                        {% endif %}
+                    </i>
+                    <h5>Notifiche</h5>
+                </div>
+
+                {% if notifiche %}
+                    {% for notifica in notifiche|slice:":3" %}
+                    <div class="activity-item">
+                        <div class="activity-icon" style="background: {% if notifica.tipo == 'info' %}#17a2b8{% elif notifica.tipo == 'warning' %}#ffc107{% else %}#28a745{% endif %};">
+                            <i class="bi bi-{% if notifica.tipo == 'info' %}info-circle{% elif notifica.tipo == 'warning' %}exclamation-triangle{% else %}check-circle{% endif %}"></i>
+                        </div>
+                        <div class="activity-content">
+                            <h6>{{ notifica.titolo }}</h6>
+                            <small>{{ notifica.data_creazione|date:"d/m/Y H:i" }}</small>
+                        </div>
+                    </div>
+                    {% endfor %}
+                {% else %}
+                    <p class="text-muted text-center py-3">
+                        <i class="bi bi-bell-slash display-6 d-block mb-2"></i>
+                        Nessuna notifica
+                    </p>
+                {% endif %}
+
+                <div class="action-buttons">
+                    <a href="{% url 'clienti:notifications' %}" class="btn-action btn-secondary-action">
+                        <i class="bi bi-bell me-1"></i>Vedi Tutte
+                    </a>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

@@ -279,13 +279,42 @@ def completa_ordine(request):
         
         # Crea nuovo cliente se richiesto
         if data.get('nuovo_cliente'):
-            cliente_form = ClienteQuickForm(data.get('nuovo_cliente'))
-            if cliente_form.is_valid():
-                cliente = cliente_form.save()
+            nuovo_cliente_data = data.get('nuovo_cliente')
+            tipo_cliente = nuovo_cliente_data.get('tipo')
+            
+            if tipo_cliente == 'privato':
+                # Usa ClienteQuickForm per clienti privati
+                cliente_form = ClienteQuickForm(nuovo_cliente_data)
+                if cliente_form.is_valid():
+                    cliente = cliente_form.save()
+                else:
+                    return JsonResponse({
+                        'error': 'Dati cliente non validi',
+                        'form_errors': cliente_form.errors
+                    }, status=400)
+            elif tipo_cliente == 'azienda':
+                # Crea cliente azienda manualmente
+                try:
+                    email = nuovo_cliente_data.get('email')
+                    if not email or email.strip() == '':
+                        email = None
+                    
+                    cliente = Cliente.objects.create(
+                        tipo='azienda',
+                        ragione_sociale=nuovo_cliente_data.get('ragione_sociale', ''),
+                        partita_iva=nuovo_cliente_data.get('partita_iva', ''),
+                        codice_sdi=nuovo_cliente_data.get('codice_sdi', ''),
+                        indirizzo=nuovo_cliente_data.get('indirizzo', ''),
+                        telefono=nuovo_cliente_data.get('telefono', ''),
+                        email=email,
+                    )
+                except Exception as e:
+                    return JsonResponse({
+                        'error': f'Errore nella creazione del cliente azienda: {str(e)}'
+                    }, status=400)
             else:
                 return JsonResponse({
-                    'error': 'Dati cliente non validi',
-                    'form_errors': cliente_form.errors
+                    'error': 'Tipo cliente non valido'
                 }, status=400)
         
         # Calcola totali
@@ -506,6 +535,9 @@ class OrdineDetailView(LoginRequiredMixin, DetailView):
         # Form per nuovo pagamento
         context['pagamento_form'] = PagamentoForm()
         
+        # Lista clienti per il modal di modifica
+        context['clienti'] = Cliente.objects.all().order_by('cognome', 'nome', 'ragione_sociale')
+        
         return context
 
 
@@ -655,6 +687,21 @@ def cambia_stato_ordine(request, pk):
             vecchio_stato = ordine.stato
             ordine.stato = nuovo_stato
             ordine.save()
+            
+            # Aggiorna automaticamente lo stato degli item quando necessario
+            if nuovo_stato == 'completato':
+                # Se l'ordine è completato, completa tutti gli item
+                for item in ordine.items.all():
+                    if item.stato != 'completato':
+                        item.stato = 'completato'
+                        if not item.fine_lavorazione:
+                            item.fine_lavorazione = timezone.now()
+                        item.save()
+                        print(f"Item {item.id} automaticamente completato per ordine completato")
+            elif nuovo_stato == 'annullato':
+                # Se l'ordine è annullato, potremmo voler gestire gli item diversamente
+                # Per ora li lasciamo come sono, ma potremmo aggiungere logica specifica
+                pass
             
             # Log dell'operazione
             print(f"Ordine {ordine.numero_progressivo} cambiato da {vecchio_stato} a {nuovo_stato} da {request.user}")
@@ -816,3 +863,125 @@ def _valida_transizione_stato_pagamento(stato_attuale, nuovo_stato, ordine):
         return True
     
     return False
+
+
+@login_required
+@transaction.atomic
+def modifica_ordine(request, pk):
+    """Modifica i dati di un ordine (cliente, tipo consegna, tipo auto)"""
+    ordine = get_object_or_404(Ordine, pk=pk)
+    
+    # Verifica che l'ordine sia modificabile
+    if ordine.stato in ['completato', 'annullato']:
+        return JsonResponse({
+            'success': False,
+            'error': 'Non è possibile modificare un ordine completato o annullato'
+        }, status=400)
+    
+    if request.method == 'POST':
+        try:
+            data = json.loads(request.body)
+            
+            # Traccia i cambiamenti
+            cambiamenti = []
+            
+            # Modifica cliente
+            cliente_id = data.get('cliente_id')
+            if cliente_id:
+                try:
+                    nuovo_cliente = Cliente.objects.get(id=cliente_id)
+                    if ordine.cliente != nuovo_cliente:
+                        vecchio_cliente = ordine.cliente.nome_completo if ordine.cliente else "Anonimo"
+                        ordine.cliente = nuovo_cliente
+                        cambiamenti.append(f"Cliente: {vecchio_cliente} → {nuovo_cliente.nome_completo}")
+                except Cliente.DoesNotExist:
+                    return JsonResponse({
+                        'success': False,
+                        'error': 'Cliente non trovato'
+                    }, status=400)
+            else:
+                # Cliente vuoto = ordine anonimo
+                if ordine.cliente:
+                    vecchio_cliente = ordine.cliente.nome_completo
+                    ordine.cliente = None
+                    cambiamenti.append(f"Cliente: {vecchio_cliente} → Anonimo")
+            
+            # Modifica tipo consegna
+            tipo_consegna = data.get('tipo_consegna')
+            if tipo_consegna and tipo_consegna in dict(Ordine.TIPO_CONSEGNA_CHOICES):
+                # Gestisci ora consegna in base al tipo (prima del cambio tipo)
+                ora_consegna = data.get('ora_consegna_richiesta')
+                
+                if tipo_consegna == 'programmata' and not ora_consegna:
+                    # Se cambia a programmata ma non ha fornito ora, errore
+                    return JsonResponse({
+                        'success': False,
+                        'error': 'Ora consegna richiesta è obbligatoria per consegna programmata'
+                    }, status=400)
+                
+                # Ora gestisci il cambio di tipo consegna
+                if ordine.tipo_consegna != tipo_consegna:
+                    vecchio_tipo = ordine.get_tipo_consegna_display()
+                    ordine.tipo_consegna = tipo_consegna
+                    cambiamenti.append(f"Tipo consegna: {vecchio_tipo} → {ordine.get_tipo_consegna_display()}")
+                
+                # Gestisci l'ora consegna
+                if tipo_consegna == 'immediata':
+                    if ordine.ora_consegna_richiesta:
+                        ordine.ora_consegna_richiesta = None
+                        cambiamenti.append("Ora consegna rimossa (consegna immediata)")
+                elif tipo_consegna == 'programmata' and ora_consegna:
+                    from datetime import datetime
+                    try:
+                        # Converte la stringa ora in oggetto time
+                        ora_obj = datetime.strptime(ora_consegna, '%H:%M').time()
+                        if ordine.ora_consegna_richiesta != ora_obj:
+                            vecchia_ora = ordine.ora_consegna_richiesta.strftime('%H:%M') if ordine.ora_consegna_richiesta else "Non specificata"
+                            ordine.ora_consegna_richiesta = ora_obj
+                            cambiamenti.append(f"Ora consegna: {vecchia_ora} → {ora_consegna}")
+                    except ValueError:
+                        return JsonResponse({
+                            'success': False,
+                            'error': 'Formato ora non valido'
+                        }, status=400)
+            
+            # Modifica tipo auto
+            tipo_auto = data.get('tipo_auto', '').strip()
+            if ordine.tipo_auto != tipo_auto:
+                vecchio_tipo_auto = ordine.tipo_auto or "Non specificato"
+                ordine.tipo_auto = tipo_auto
+                nuovo_tipo_auto = tipo_auto or "Non specificato"
+                cambiamenti.append(f"Tipo auto: {vecchio_tipo_auto} → {nuovo_tipo_auto}")
+            
+            # Salva solo se ci sono stati cambiamenti
+            if cambiamenti:
+                ordine.save()
+                
+                # Log dell'operazione
+                print(f"Ordine {ordine.numero_progressivo} modificato da {request.user}: {', '.join(cambiamenti)}")
+                
+                return JsonResponse({
+                    'success': True,
+                    'message': f'Ordine modificato con successo. Cambiamenti: {", ".join(cambiamenti)}'
+                })
+            else:
+                return JsonResponse({
+                    'success': True,
+                    'message': 'Nessuna modifica apportata'
+                })
+                
+        except json.JSONDecodeError:
+            return JsonResponse({
+                'success': False,
+                'error': 'Dati JSON non validi'
+            }, status=400)
+        except Exception as e:
+            return JsonResponse({
+                'success': False,
+                'error': f'Errore durante la modifica: {str(e)}'
+            }, status=500)
+    
+    return JsonResponse({
+        'success': False,
+        'error': 'Metodo non consentito'
+    }, status=405)

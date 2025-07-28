@@ -1,0 +1,107 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}Logout - Gestionale Autolavaggio{% endblock %}
+
+{% block extra_css %}
+<style>
+.logout-container {
+    min-height: 100vh;
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 1rem;
+}
+
+.logout-card {
+    background: white;
+    border-radius: 15px;
+    box-shadow: 0 15px 35px rgba(0, 0, 0, 0.1);
+    padding: 2rem;
+    width: 100%;
+    max-width: 400px;
+    text-align: center;
+}
+
+.logout-icon {
+    width: 80px;
+    height: 80px;
+    background: linear-gradient(135deg, #ff6b6b, #feca57);
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    margin: 0 auto 1.5rem;
+    color: white;
+    font-size: 2rem;
+}
+
+.logout-card h2 {
+    color: #333;
+    margin-bottom: 1rem;
+}
+
+.logout-card p {
+    color: #666;
+    margin-bottom: 2rem;
+}
+
+.btn-logout {
+    background: linear-gradient(135deg, #ff6b6b, #ee5a24);
+    border: none;
+    border-radius: 10px;
+    padding: 0.75rem 2rem;
+    font-weight: 600;
+    color: white;
+    margin-right: 1rem;
+    transition: all 0.3s ease;
+}
+
+.btn-logout:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 8px 25px rgba(255, 107, 107, 0.3);
+    color: white;
+}
+
+.btn-cancel {
+    background: #f8f9fa;
+    border: 2px solid #e9ecef;
+    border-radius: 10px;
+    padding: 0.75rem 2rem;
+    font-weight: 600;
+    color: #666;
+    transition: all 0.3s ease;
+}
+
+.btn-cancel:hover {
+    background: #e9ecef;
+    color: #333;
+}
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="logout-container">
+    <div class="logout-card">
+        <div class="logout-icon">
+            <i class="bi bi-box-arrow-right"></i>
+        </div>
+        
+        <h2>Conferma Logout</h2>
+        <p>Sei sicuro di voler terminare la sessione?</p>
+        
+        <form method="post">
+            {% csrf_token %}
+            <button type="submit" class="btn btn-logout">
+                <i class="bi bi-check-circle me-2"></i>
+                Sì, esci
+            </button>
+            <a href="javascript:history.back()" class="btn btn-cancel">
+                <i class="bi bi-x-circle me-2"></i>
+                Annulla
+            </a>
+        </form>
+    </div>
+</div>
+{% endblock %}

@@ -70,9 +70,11 @@ class ClienteForm(forms.ModelForm):
     
     def clean_email(self):
         email = self.cleaned_data.get('email')
-        if email and Cliente.objects.filter(email=email).exclude(pk=self.instance.pk).exists():
-            raise forms.ValidationError('Esiste già un cliente con questa email')
-        return email
+        # Converti stringa vuota in None per consistenza
+        if not email or email.strip() == '':
+            return None
+            
+        return email.strip()
     
     def clean_nome(self):
         nome = self.cleaned_data.get('nome')
@@ -170,10 +172,10 @@ class ClienteSearchForm(forms.Form):
 
 class ClienteQuickForm(forms.Form):
     """Form veloce per creazione cliente durante ordine"""
-    nome = forms.CharField(max_length=100)
-    cognome = forms.CharField(max_length=100)
-    telefono = forms.CharField(max_length=20)
-    email = forms.EmailField(required=False)
+    nome = forms.CharField(max_length=100, label='Nome')
+    cognome = forms.CharField(max_length=100, label='Cognome')
+    telefono = forms.CharField(max_length=20, label='Telefono')
+    email = forms.EmailField(required=False, label='Email (facoltativo)')
     
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
@@ -181,13 +183,13 @@ class ClienteQuickForm(forms.Form):
         self.helper.form_method = 'post'
         self.helper.layout = Layout(
             Div(
-                Field('nome'),
-                Field('cognome'),
+                Field('nome', placeholder='Nome'),
+                Field('cognome', placeholder='Cognome'),
                 css_class='col-md-6'
             ),
             Div(
-                Field('telefono'),
-                Field('email'),
+                Field('telefono', placeholder='Numero di telefono'),
+                Field('email', placeholder='indirizzo@email.com'),
                 css_class='col-md-6'
             )
         )
@@ -200,12 +202,25 @@ class ClienteQuickForm(forms.Form):
         cognome = self.cleaned_data.get('cognome')
         return cognome.title() if cognome else ''
     
+    def clean_email(self):
+        email = self.cleaned_data.get('email')
+        # Converti stringa vuota in None per consistenza
+        if not email or email.strip() == '':
+            return None
+        
+        return email.strip()
+    
     def save(self):
         """Crea un nuovo cliente con i dati essenziali"""
+        email = self.cleaned_data.get('email')
+        # Assicurati che l'email vuota sia None, non stringa vuota
+        if not email or email.strip() == '':
+            email = None
+            
         return Cliente.objects.create(
             tipo='privato',
             nome=self.cleaned_data['nome'],
             cognome=self.cleaned_data['cognome'],
             telefono=self.cleaned_data['telefono'],
-            email=self.cleaned_data.get('email', ''),
+            email=email,
         )
