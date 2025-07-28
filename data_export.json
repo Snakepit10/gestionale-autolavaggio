@@ -1,0 +1,1462 @@
+[
+{
+  "model": "auth.user",
+  "fields": {
+    "password": "pbkdf2_sha256$600000$uiKrEOXHmx5KE4BGF8iTJz$vd+Te8dOAPg70L4cQvhUSJz3aJ/AKkhd62MWIzanVvQ=",
+    "last_login": "2025-07-25T06:36:27.040Z",
+    "is_superuser": true,
+    "username": "daniele",
+    "first_name": "",
+    "last_name": "",
+    "email": "danielelombardo12@gmail.com",
+    "is_staff": true,
+    "is_active": true,
+    "date_joined": "2025-07-13T16:46:06.068Z",
+    "groups": [],
+    "user_permissions": []
+  }
+},
+{
+  "model": "auth.user",
+  "fields": {
+    "password": "pbkdf2_sha256$600000$eZFm9AMUpuDvdyXc8IOXEq$s+C2U3CPR+JHABGw5Uv92PZmJUyQn64ariUcDBuqfsA=",
+    "last_login": null,
+    "is_superuser": true,
+    "username": "admin",
+    "first_name": "",
+    "last_name": "",
+    "email": "admin@admin.com",
+    "is_staff": true,
+    "is_active": true,
+    "date_joined": "2025-07-13T17:18:47.421Z",
+    "groups": [],
+    "user_permissions": []
+  }
+},
+{
+  "model": "auth.user",
+  "fields": {
+    "password": "!qb70EBdvf1L0DUyGHjiO0NoVw1KWbJzSbqC18VDE",
+    "last_login": null,
+    "is_superuser": false,
+    "username": "danielelombardo12",
+    "first_name": "",
+    "last_name": "",
+    "email": "danielelombardo12@gmail.com",
+    "is_staff": false,
+    "is_active": true,
+    "date_joined": "2025-07-13T18:07:58.267Z",
+    "groups": [],
+    "user_permissions": []
+  }
+},
+{
+  "model": "auth.user",
+  "fields": {
+    "password": "!SVCV73t8Xr70HbkoIFjztawwmfXBH8Pf0MRqKVDM",
+    "last_login": null,
+    "is_superuser": false,
+    "username": "daniele.lombardo",
+    "first_name": "Daniele",
+    "last_name": "Lombardo",
+    "email": "pivodsfgsd@gmail.com",
+    "is_staff": false,
+    "is_active": true,
+    "date_joined": "2025-07-14T08:20:13.838Z",
+    "groups": [],
+    "user_permissions": []
+  }
+},
+{
+  "model": "auth.user",
+  "fields": {
+    "password": "pbkdf2_sha256$600000$wzJ3Ypjz4EXp7Q3KQCktGQ$7UQRbZgDxh18S8GL8fnyYEq94NoOlwar7rqddlQmc18=",
+    "last_login": null,
+    "is_superuser": false,
+    "username": "Kimberly",
+    "first_name": "",
+    "last_name": "",
+    "email": "",
+    "is_staff": false,
+    "is_active": true,
+    "date_joined": "2025-07-25T06:40:04.035Z",
+    "groups": [],
+    "user_permissions": []
+  }
+},
+{
+  "model": "sessions.session",
+  "pk": "44fc8sj2iy3qjkqr4hmjmcoa96qf6smf",
+  "fields": {
+    "session_data": ".eJxVjMsOgyAURP-FdUO8cIHqsvt-g7m8iq2RBHRl_Pdi4qJdzsyZs7ORtjWNWw1lnDwbGLDbb2fJfcJyDv5Nyytzl5e1TJafCL_Wyp_Zh_lxsX-CRDW1d3TegLQognCmww5jL62MEXVAMEoRGkAhpI-RLJDSmpTsQGl1bwH6JnVUSpjnzIb9OL76jzv6:1ugNwN:IwUPOyQ64Wak74UjXgJ-Lg8Ltc6ASoEAEFVj6Zgv1pE",
+    "expire_date": "2025-08-11T13:30:55.164Z"
+  }
+},
+{
+  "model": "sessions.session",
+  "pk": "h45ly3ex9drf9d10gedgitgkqssc0p5g",
+  "fields": {
+    "session_data": ".eJxVjDsOwjAQRO_iGllee9cmlPScwVr_cAA5UpxUiLuTSCmgnHlv5i08r0v1a8-zH5O4CBCn3y5wfOa2g_Tgdp9knNoyj0Huijxol7cp5df1cP8OKve6rUtMDkxAnXV0ChWWwQRTCtqM4IgYHaDWJpXCAZisZTIKyNJ5CzCIzxfXKzcE:1ucdTJ:EOJF3RuVVAChz0wBCVHcYDLt51mQBeIX7tPJpLCo474",
+    "expire_date": "2025-08-01T05:17:25.522Z"
+  }
+},
+{
+  "model": "sessions.session",
+  "pk": "hx77pcze8xj09p9l8oa1wl5ryfy47xk2",
+  "fields": {
+    "session_data": ".eJxVjsFuwyAQRH8l2rOFjAG78bE99xusBZaaxDIu4B4c-d8LUg7JZaWdmTeaB0y453naE8XJWxiBQ_OqaTR3Wqthb7j-BGbCmqPXrEbY003sO1haPp_Zt4IZ01xoZ-zAhZYddWZoZSvdVWjhnOxJ8kEplAOXXSesc6g5qr5HJVquevVRHn4tpQZjpGUJMD5AiHrrYCEayD6HqsNX3JMJOYcLXbYFU_ZmpoJukY6jBBRrG_jdcS0EwsgrulWwLP3zhw9wnuc_Sv9Zhg:1ufFCl:Lt3umk2e0ghdgOlexy0FKZrPqt69-NYuLIES40Xsx04",
+    "expire_date": "2025-08-08T09:59:07.947Z"
+  }
+},
+{
+  "model": "sessions.session",
+  "pk": "k1vqrbq8hs908qehpk4ru8rjhm7go58g",
+  "fields": {
+    "session_data": ".eJxVjDsOwjAQRO_iGllee9cmlPScwVr_cAA5UpxUiLuTSCmgnHlv5i08r0v1a8-zH5O4CBCn3y5wfOa2g_Tgdp9knNoyj0Huijxol7cp5df1cP8OKve6rUtMDkxAnXV0ChWWwQRTCtqM4IgYHaDWJpXCAZisZTIKyNJ5CzCIzxfXKzcE:1ufGPK:fhU-ABjHtDLOR11owbClxIv92sNr3rwX9rIYhGjmnGQ",
+    "expire_date": "2025-08-08T11:16:10.919Z"
+  }
+},
+{
+  "model": "sessions.session",
+  "pk": "ku9l00jhe8heyehsf3j7k2ebuq9krtqk",
+  "fields": {
+    "session_data": ".eJxVjDsOwjAQRO_iGllee9cmlPScwVr_cAA5UpxUiLuTSCmgnHlv5i08r0v1a8-zH5O4CBCn3y5wfOa2g_Tgdp9knNoyj0Huijxol7cp5df1cP8OKve6rUtMDkxAnXV0ChWWwQRTCtqM4IgYHaDWJpXCAZisZTIKyNJ5CzCIzxfXKzcE:1ubfbX:xIFpknq1vPxx5TbRgj7tawFOPupPs7UHAs1hxEMcAow",
+    "expire_date": "2025-07-29T13:21:55.551Z"
+  }
+},
+{
+  "model": "sessions.session",
+  "pk": "wg4ksoyhyz8o1a8oolzp5975dg7el7cq",
+  "fields": {
+    "session_data": ".eJxVjDsOwjAQRO_iGllee9cmlPScwVr_cAA5UpxUiLuTSCmgnHlv5i08r0v1a8-zH5O4CBCn3y5wfOa2g_Tgdp9knNoyj0Huijxol7cp5df1cP8OKve6rUtMDkxAnXV0ChWWwQRTCtqM4IgYHaDWJpXCAZisZTIKyNJ5CzCIzxfXKzcE:1ufKJq:rSXnfA7BOEbXRscu7kVuN7Cqu5tWqirsVtByLc5srvY",
+    "expire_date": "2025-08-08T15:26:46.289Z"
+  }
+},
+{
+  "model": "sessions.session",
+  "pk": "wujcn9j1kmzhpawp19iwsy4s96ejani8",
+  "fields": {
+    "session_data": ".eJxVjksOgyAQhu_CujEioNVl9z0DGWRQ-oAGMG003r2YmqZdTb75HzMLkTClUU4Rg7SadISSw-9OQX9Ftwn6Am7wRe9dClYVm6XY1Vicvcbbaff-FYwQx5w2vW4oU7zCqm9KXnLTMsWM4TVy2ggBvKG8qpg2BhQFUdcgWElFLY4ZaJtLn3aGoOU-8h_GDlOA2XqHEpTyDu7okifdQmLCR76qIGJObiQ1JMjSuqOxN4wfxlcK8NXX9Q3sBF5N:1ubfTM:5aJ-DR2QAa2Go3I_WdO6WYFl5WBHJ3SgL9P672LiTFA",
+    "expire_date": "2025-07-29T13:13:28.419Z"
+  }
+},
+{
+  "model": "core.categoria",
+  "pk": 1,
+  "fields": {
+    "nome": "Servito",
+    "descrizione": "",
+    "ordine_visualizzazione": 0,
+    "attiva": true
+  }
+},
+{
+  "model": "core.categoria",
+  "pk": 2,
+  "fields": {
+    "nome": "Prelavaggio ed Extra",
+    "descrizione": "",
+    "ordine_visualizzazione": 1,
+    "attiva": true
+  }
+},
+{
+  "model": "core.categoria",
+  "pk": 3,
+  "fields": {
+    "nome": "Spazzole",
+    "descrizione": "",
+    "ordine_visualizzazione": 2,
+    "attiva": true
+  }
+},
+{
+  "model": "core.categoria",
+  "pk": 4,
+  "fields": {
+    "nome": "Mezzi Pesanti",
+    "descrizione": "",
+    "ordine_visualizzazione": 3,
+    "attiva": true
+  }
+},
+{
+  "model": "core.categoria",
+  "pk": 5,
+  "fields": {
+    "nome": "Prodotti",
+    "descrizione": "",
+    "ordine_visualizzazione": 5,
+    "attiva": true
+  }
+},
+{
+  "model": "core.categoria",
+  "pk": 6,
+  "fields": {
+    "nome": "Delivery",
+    "descrizione": "",
+    "ordine_visualizzazione": 4,
+    "attiva": true
+  }
+},
+{
+  "model": "core.postazione",
+  "pk": 2,
+  "fields": {
+    "nome": "Spazzole",
+    "descrizione": "",
+    "attiva": true,
+    "ordine_visualizzazione": 0,
+    "stampante_comande": null
+  }
+},
+{
+  "model": "core.postazione",
+  "pk": 3,
+  "fields": {
+    "nome": "Interni",
+    "descrizione": "",
+    "attiva": true,
+    "ordine_visualizzazione": 0,
+    "stampante_comande": 1
+  }
+},
+{
+  "model": "core.postazione",
+  "pk": 5,
+  "fields": {
+    "nome": "Prelavaggio",
+    "descrizione": "",
+    "attiva": true,
+    "ordine_visualizzazione": 0,
+    "stampante_comande": null
+  }
+},
+{
+  "model": "core.servizioprodotto",
+  "pk": 1,
+  "fields": {
+    "titolo": "Lavaggio Completo - Media",
+    "tipo": "servizio",
+    "prezzo": "22.00",
+    "categoria": 1,
+    "descrizione": ".",
+    "durata_minuti": 40,
+    "quantita_disponibile": -1,
+    "quantita_minima_alert": 0,
+    "codice_prodotto": "",
+    "attivo": true,
+    "creato_il": "2025-07-13T17:44:05.206Z",
+    "aggiornato_il": "2025-07-25T06:58:39.646Z",
+    "postazioni": [
+      3
+    ]
+  }
+},
+{
+  "model": "core.servizioprodotto",
+  "pk": 2,
+  "fields": {
+    "titolo": "Acqua e Schiuma",
+    "tipo": "servizio",
+    "prezzo": "2.00",
+    "categoria": 2,
+    "descrizione": ".",
+    "durata_minuti": 5,
+    "quantita_disponibile": -1,
+    "quantita_minima_alert": 0,
+    "codice_prodotto": "",
+    "attivo": true,
+    "creato_il": "2025-07-14T13:42:29.156Z",
+    "aggiornato_il": "2025-07-14T13:42:29.156Z",
+    "postazioni": [
+      5
+    ]
+  }
+},
+{
+  "model": "core.servizioprodotto",
+  "pk": 3,
+  "fields": {
+    "titolo": "Prodotto Moscerini",
+    "tipo": "servizio",
+    "prezzo": "1.00",
+    "categoria": 2,
+    "descrizione": ".",
+    "durata_minuti": 0,
+    "quantita_disponibile": -1,
+    "quantita_minima_alert": 0,
+    "codice_prodotto": "",
+    "attivo": true,
+    "creato_il": "2025-07-14T13:58:25.880Z",
+    "aggiornato_il": "2025-07-14T13:58:25.880Z",
+    "postazioni": [
+      5
+    ]
+  }
+},
+{
+  "model": "core.servizioprodotto",
+  "pk": 4,
+  "fields": {
+    "titolo": "Lav. esterno manuale - Grande",
+    "tipo": "servizio",
+    "prezzo": "14.00",
+    "categoria": 1,
+    "descrizione": "Auto grande",
+    "durata_minuti": 15,
+    "quantita_disponibile": -1,
+    "quantita_minima_alert": 0,
+    "codice_prodotto": "",
+    "attivo": true,
+    "creato_il": "2025-07-15T18:33:01.627Z",
+    "aggiornato_il": "2025-07-15T18:46:58.004Z",
+    "postazioni": [
+      3
+    ]
+  }
+},
+{
+  "model": "core.servizioprodotto",
+  "pk": 5,
+  "fields": {
+    "titolo": "Lav. esterno manuale - piccola",
+    "tipo": "servizio",
+    "prezzo": "12.00",
+    "categoria": 1,
+    "descrizione": "Auto piccola",
+    "durata_minuti": 15,
+    "quantita_disponibile": -1,
+    "quantita_minima_alert": 0,
+    "codice_prodotto": "",
+    "attivo": true,
+    "creato_il": "2025-07-15T18:33:26.531Z",
+    "aggiornato_il": "2025-07-15T18:44:36.976Z",
+    "postazioni": [
+      3
+    ]
+  }
+},
+{
+  "model": "core.servizioprodotto",
+  "pk": 6,
+  "fields": {
+    "titolo": "Lav. esterno manuale - media",
+    "tipo": "servizio",
+    "prezzo": "13.00",
+    "categoria": 1,
+    "descrizione": "Auto grande",
+    "durata_minuti": 20,
+    "quantita_disponibile": -1,
+    "quantita_minima_alert": 0,
+    "codice_prodotto": "",
+    "attivo": true,
+    "creato_il": "2025-07-15T18:33:51.278Z",
+    "aggiornato_il": "2025-07-15T18:46:08.832Z",
+    "postazioni": [
+      3
+    ]
+  }
+},
+{
+  "model": "core.servizioprodotto",
+  "pk": 7,
+  "fields": {
+    "titolo": "Camion - solo esterno",
+    "tipo": "servizio",
+    "prezzo": "20.00",
+    "categoria": 4,
+    "descrizione": "Tipo Daily non troppo sporco",
+    "durata_minuti": 30,
+    "quantita_disponibile": -1,
+    "quantita_minima_alert": 0,
+    "codice_prodotto": "",
+    "attivo": true,
+    "creato_il": "2025-07-15T18:35:33.737Z",
+    "aggiornato_il": "2025-07-15T18:41:05.382Z",
+    "postazioni": [
+      5
+    ]
+  }
+},
+{
+  "model": "core.servizioprodotto",
+  "pk": 8,
+  "fields": {
+    "titolo": "Fango eccessivo",
+    "tipo": "servizio",
+    "prezzo": "1.00",
+    "categoria": 2,
+    "descrizione": "Rimozione fango eccessivo",
+    "durata_minuti": 1,
+    "quantita_disponibile": -1,
+    "quantita_minima_alert": 0,
+    "codice_prodotto": "",
+    "attivo": true,
+    "creato_il": "2025-07-15T18:49:19.679Z",
+    "aggiornato_il": "2025-07-15T18:50:53.986Z",
+    "postazioni": [
+      5
+    ]
+  }
+},
+{
+  "model": "core.servizioprodotto",
+  "pk": 9,
+  "fields": {
+    "titolo": "Super Dryer",
+    "tipo": "prodotto",
+    "prezzo": "20.00",
+    "categoria": 5,
+    "descrizione": "Panno viola grande Mafra",
+    "durata_minuti": 0,
+    "quantita_disponibile": 5,
+    "quantita_minima_alert": 3,
+    "codice_prodotto": "",
+    "attivo": true,
+    "creato_il": "2025-07-21T16:28:13.941Z",
+    "aggiornato_il": "2025-07-21T16:35:17.871Z",
+    "postazioni": []
+  }
+},
+{
+  "model": "core.servizioprodotto",
+  "pk": 10,
+  "fields": {
+    "titolo": "Pulicasco",
+    "tipo": "prodotto",
+    "prezzo": "4.50",
+    "categoria": 5,
+    "descrizione": "Pulitore per interni casco",
+    "durata_minuti": 0,
+    "quantita_disponibile": 2,
+    "quantita_minima_alert": 1,
+    "codice_prodotto": "",
+    "attivo": true,
+    "creato_il": "2025-07-21T16:29:08.162Z",
+    "aggiornato_il": "2025-07-21T16:29:08.162Z",
+    "postazioni": []
+  }
+},
+{
+  "model": "core.servizioprodotto",
+  "pk": 11,
+  "fields": {
+    "titolo": "Condom Wash",
+    "tipo": "prodotto",
+    "prezzo": "14.00",
+    "categoria": 5,
+    "descrizione": "Spugna avvolgi spazzola lancia self-service",
+    "durata_minuti": 0,
+    "quantita_disponibile": 11,
+    "quantita_minima_alert": 2,
+    "codice_prodotto": "",
+    "attivo": true,
+    "creato_il": "2025-07-21T16:31:19.388Z",
+    "aggiornato_il": "2025-07-21T16:35:05.628Z",
+    "postazioni": []
+  }
+},
+{
+  "model": "core.servizioprodotto",
+  "pk": 12,
+  "fields": {
+    "titolo": "Deo Cube",
+    "tipo": "prodotto",
+    "prezzo": "4.00",
+    "categoria": 5,
+    "descrizione": "Profumo auto Mafra",
+    "durata_minuti": 0,
+    "quantita_disponibile": 23,
+    "quantita_minima_alert": 5,
+    "codice_prodotto": "",
+    "attivo": true,
+    "creato_il": "2025-07-21T16:32:37.791Z",
+    "aggiornato_il": "2025-07-21T16:32:37.791Z",
+    "postazioni": []
+  }
+},
+{
+  "model": "core.servizioprodotto",
+  "pk": 13,
+  "fields": {
+    "titolo": "Pulimax",
+    "tipo": "prodotto",
+    "prezzo": "10.00",
+    "categoria": 5,
+    "descrizione": "Prodotto pulizia interni auto",
+    "durata_minuti": 0,
+    "quantita_disponibile": 2,
+    "quantita_minima_alert": 1,
+    "codice_prodotto": "",
+    "attivo": true,
+    "creato_il": "2025-07-21T16:34:18.581Z",
+    "aggiornato_il": "2025-07-21T16:34:18.581Z",
+    "postazioni": []
+  }
+},
+{
+  "model": "core.servizioprodotto",
+  "pk": 14,
+  "fields": {
+    "titolo": "Guanto Double Face",
+    "tipo": "prodotto",
+    "prezzo": "0.00",
+    "categoria": 5,
+    "descrizione": "Guanto per la pulizia degli esterni",
+    "durata_minuti": 0,
+    "quantita_disponibile": 2,
+    "quantita_minima_alert": 1,
+    "codice_prodotto": "",
+    "attivo": true,
+    "creato_il": "2025-07-21T16:36:33.483Z",
+    "aggiornato_il": "2025-07-21T16:36:33.483Z",
+    "postazioni": []
+  }
+},
+{
+  "model": "core.servizioprodotto",
+  "pk": 15,
+  "fields": {
+    "titolo": "Pulisint",
+    "tipo": "prodotto",
+    "prezzo": "10.00",
+    "categoria": 5,
+    "descrizione": "Panno auto",
+    "durata_minuti": 0,
+    "quantita_disponibile": 3,
+    "quantita_minima_alert": 1,
+    "codice_prodotto": "",
+    "attivo": true,
+    "creato_il": "2025-07-21T16:37:48.138Z",
+    "aggiornato_il": "2025-07-21T16:37:48.138Z",
+    "postazioni": []
+  }
+},
+{
+  "model": "core.servizioprodotto",
+  "pk": 16,
+  "fields": {
+    "titolo": "Killer Pulimoscerini",
+    "tipo": "prodotto",
+    "prezzo": "3.00",
+    "categoria": 5,
+    "descrizione": "Prodotto tergicristalli per la rimozione dei moscerini",
+    "durata_minuti": 0,
+    "quantita_disponibile": 3,
+    "quantita_minima_alert": 1,
+    "codice_prodotto": "",
+    "attivo": true,
+    "creato_il": "2025-07-21T16:38:45.907Z",
+    "aggiornato_il": "2025-07-21T16:38:45.907Z",
+    "postazioni": []
+  }
+},
+{
+  "model": "core.servizioprodotto",
+  "pk": 17,
+  "fields": {
+    "titolo": "Killer (spruzzino)",
+    "tipo": "prodotto",
+    "prezzo": "8.00",
+    "categoria": 5,
+    "descrizione": "Prodotto per la rimozione degli insetti",
+    "durata_minuti": 0,
+    "quantita_disponibile": 6,
+    "quantita_minima_alert": 2,
+    "codice_prodotto": "",
+    "attivo": true,
+    "creato_il": "2025-07-21T16:39:51.581Z",
+    "aggiornato_il": "2025-07-21T16:39:51.581Z",
+    "postazioni": []
+  }
+},
+{
+  "model": "core.servizioprodotto",
+  "pk": 18,
+  "fields": {
+    "titolo": "Trattamento Pelle 3 in 1",
+    "tipo": "prodotto",
+    "prezzo": "10.00",
+    "categoria": 5,
+    "descrizione": "Spruzzino per trattamento pelle",
+    "durata_minuti": 0,
+    "quantita_disponibile": 3,
+    "quantita_minima_alert": 1,
+    "codice_prodotto": "",
+    "attivo": true,
+    "creato_il": "2025-07-21T16:40:36.510Z",
+    "aggiornato_il": "2025-07-21T16:40:36.510Z",
+    "postazioni": []
+  }
+},
+{
+  "model": "core.servizioprodotto",
+  "pk": 19,
+  "fields": {
+    "titolo": "Trattamento tessuti",
+    "tipo": "prodotto",
+    "prezzo": "10.00",
+    "categoria": 5,
+    "descrizione": "Prodotto per il trattamento tessuti 3 in 1",
+    "durata_minuti": 0,
+    "quantita_disponibile": 1,
+    "quantita_minima_alert": 1,
+    "codice_prodotto": "",
+    "attivo": true,
+    "creato_il": "2025-07-21T16:42:08.949Z",
+    "aggiornato_il": "2025-07-21T16:42:08.949Z",
+    "postazioni": []
+  }
+},
+{
+  "model": "core.servizioprodotto",
+  "pk": 20,
+  "fields": {
+    "titolo": "HP 12",
+    "tipo": "prodotto",
+    "prezzo": "0.00",
+    "categoria": 5,
+    "descrizione": "Sgrassante multiuso",
+    "durata_minuti": 0,
+    "quantita_disponibile": 2,
+    "quantita_minima_alert": 1,
+    "codice_prodotto": "",
+    "attivo": true,
+    "creato_il": "2025-07-21T16:43:12.857Z",
+    "aggiornato_il": "2025-07-21T16:43:12.857Z",
+    "postazioni": []
+  }
+},
+{
+  "model": "core.servizioprodotto",
+  "pk": 21,
+  "fields": {
+    "titolo": "Glass clean & shine",
+    "tipo": "prodotto",
+    "prezzo": "8.00",
+    "categoria": 5,
+    "descrizione": "Pulitore vetri con effetto brillante",
+    "durata_minuti": 0,
+    "quantita_disponibile": 3,
+    "quantita_minima_alert": 1,
+    "codice_prodotto": "",
+    "attivo": true,
+    "creato_il": "2025-07-21T16:44:15.612Z",
+    "aggiornato_il": "2025-07-21T16:44:15.612Z",
+    "postazioni": []
+  }
+},
+{
+  "model": "core.servizioprodotto",
+  "pk": 22,
+  "fields": {
+    "titolo": "Extreme black",
+    "tipo": "prodotto",
+    "prezzo": "0.00",
+    "categoria": 5,
+    "descrizione": "Prodotto nero gomme",
+    "durata_minuti": 0,
+    "quantita_disponibile": 1,
+    "quantita_minima_alert": 1,
+    "codice_prodotto": "",
+    "attivo": true,
+    "creato_il": "2025-07-21T16:45:23.062Z",
+    "aggiornato_il": "2025-07-21T16:45:23.062Z",
+    "postazioni": []
+  }
+},
+{
+  "model": "core.servizioprodotto",
+  "pk": 23,
+  "fields": {
+    "titolo": "Fallout",
+    "tipo": "prodotto",
+    "prezzo": "0.00",
+    "categoria": 5,
+    "descrizione": "Decontaminante rapido cerchi e carrozzerie",
+    "durata_minuti": 0,
+    "quantita_disponibile": 2,
+    "quantita_minima_alert": 1,
+    "codice_prodotto": "",
+    "attivo": true,
+    "creato_il": "2025-07-21T16:47:02.918Z",
+    "aggiornato_il": "2025-07-21T16:47:02.918Z",
+    "postazioni": []
+  }
+},
+{
+  "model": "core.servizioprodotto",
+  "pk": 24,
+  "fields": {
+    "titolo": "Fast cleaner",
+    "tipo": "prodotto",
+    "prezzo": "0.00",
+    "categoria": 5,
+    "descrizione": "Prodotto per la pulizia degli esterni",
+    "durata_minuti": 0,
+    "quantita_disponibile": 2,
+    "quantita_minima_alert": 1,
+    "codice_prodotto": "",
+    "attivo": true,
+    "creato_il": "2025-07-21T16:48:38.821Z",
+    "aggiornato_il": "2025-07-21T16:48:38.821Z",
+    "postazioni": []
+  }
+},
+{
+  "model": "core.servizioprodotto",
+  "pk": 25,
+  "fields": {
+    "titolo": "Glass cleaner plus",
+    "tipo": "prodotto",
+    "prezzo": "0.00",
+    "categoria": 5,
+    "descrizione": "Pulizia vetri",
+    "durata_minuti": 0,
+    "quantita_disponibile": 2,
+    "quantita_minima_alert": 1,
+    "codice_prodotto": "",
+    "attivo": true,
+    "creato_il": "2025-07-21T16:50:08.585Z",
+    "aggiornato_il": "2025-07-21T16:50:08.585Z",
+    "postazioni": []
+  }
+},
+{
+  "model": "core.servizioprodotto",
+  "pk": 26,
+  "fields": {
+    "titolo": "DeoCar",
+    "tipo": "prodotto",
+    "prezzo": "3.00",
+    "categoria": 5,
+    "descrizione": "Profumino in boccetta",
+    "durata_minuti": 0,
+    "quantita_disponibile": 30,
+    "quantita_minima_alert": 5,
+    "codice_prodotto": "",
+    "attivo": true,
+    "creato_il": "2025-07-21T16:51:35.239Z",
+    "aggiornato_il": "2025-07-21T16:51:35.239Z",
+    "postazioni": []
+  }
+},
+{
+  "model": "core.servizioprodotto",
+  "pk": 27,
+  "fields": {
+    "titolo": "Smacchiatura - Prezzo a sedile",
+    "tipo": "servizio",
+    "prezzo": "10.00",
+    "categoria": 1,
+    "descrizione": "Smacchiatura di un solo sedile",
+    "durata_minuti": 10,
+    "quantita_disponibile": -1,
+    "quantita_minima_alert": 0,
+    "codice_prodotto": "",
+    "attivo": true,
+    "creato_il": "2025-07-21T16:55:59.113Z",
+    "aggiornato_il": "2025-07-21T16:55:59.113Z",
+    "postazioni": [
+      3
+    ]
+  }
+},
+{
+  "model": "core.servizioprodotto",
+  "pk": 28,
+  "fields": {
+    "titolo": "Smacchiatura sedili (n.5)",
+    "tipo": "servizio",
+    "prezzo": "50.00",
+    "categoria": 1,
+    "descrizione": "Smacchiatura completa di 5 sedili",
+    "durata_minuti": 40,
+    "quantita_disponibile": -1,
+    "quantita_minima_alert": 0,
+    "codice_prodotto": "",
+    "attivo": true,
+    "creato_il": "2025-07-21T16:57:25.598Z",
+    "aggiornato_il": "2025-07-21T16:58:20.843Z",
+    "postazioni": [
+      3
+    ]
+  }
+},
+{
+  "model": "core.servizioprodotto",
+  "pk": 29,
+  "fields": {
+    "titolo": "Programma base spazzole",
+    "tipo": "servizio",
+    "prezzo": "10.00",
+    "categoria": 3,
+    "descrizione": "Lavaggio con spazzole con programma base: Shampoo, emoliente, lavaggio ruote in alta pressione, spazzole, ceratura ed asciugatura meccanica",
+    "durata_minuti": 8,
+    "quantita_disponibile": -1,
+    "quantita_minima_alert": 0,
+    "codice_prodotto": "",
+    "attivo": true,
+    "creato_il": "2025-07-22T06:34:53.618Z",
+    "aggiornato_il": "2025-07-25T05:55:11.408Z",
+    "postazioni": [
+      2
+    ]
+  }
+},
+{
+  "model": "core.servizioprodotto",
+  "pk": 30,
+  "fields": {
+    "titolo": "Nero gomme",
+    "tipo": "servizio",
+    "prezzo": "2.00",
+    "categoria": 2,
+    "descrizione": "Ruote e passaruote",
+    "durata_minuti": 0,
+    "quantita_disponibile": -1,
+    "quantita_minima_alert": 0,
+    "codice_prodotto": "",
+    "attivo": true,
+    "creato_il": "2025-07-22T16:19:24.932Z",
+    "aggiornato_il": "2025-07-22T16:20:38.500Z",
+    "postazioni": [
+      5
+    ]
+  }
+},
+{
+  "model": "core.servizioprodotto",
+  "pk": 31,
+  "fields": {
+    "titolo": "Prodotto Cerchi",
+    "tipo": "servizio",
+    "prezzo": "1.00",
+    "categoria": 2,
+    "descrizione": "lavaggio cerchi",
+    "durata_minuti": 0,
+    "quantita_disponibile": -1,
+    "quantita_minima_alert": 0,
+    "codice_prodotto": "",
+    "attivo": true,
+    "creato_il": "2025-07-22T16:20:15.415Z",
+    "aggiornato_il": "2025-07-22T16:20:15.415Z",
+    "postazioni": [
+      5
+    ]
+  }
+},
+{
+  "model": "core.servizioprodotto",
+  "pk": 32,
+  "fields": {
+    "titolo": "Vetri",
+    "tipo": "servizio",
+    "prezzo": "5.00",
+    "categoria": 2,
+    "descrizione": "Pulizia interno ed esterno dei vetri",
+    "durata_minuti": 0,
+    "quantita_disponibile": -1,
+    "quantita_minima_alert": 0,
+    "codice_prodotto": "",
+    "attivo": true,
+    "creato_il": "2025-07-22T16:21:22.666Z",
+    "aggiornato_il": "2025-07-22T16:21:22.666Z",
+    "postazioni": [
+      5
+    ]
+  }
+},
+{
+  "model": "core.servizioprodotto",
+  "pk": 33,
+  "fields": {
+    "titolo": "Cruscotto e plastiche",
+    "tipo": "servizio",
+    "prezzo": "5.00",
+    "categoria": 1,
+    "descrizione": "Pulizia del cruscotto e dei pannelli",
+    "durata_minuti": 10,
+    "quantita_disponibile": -1,
+    "quantita_minima_alert": 0,
+    "codice_prodotto": "",
+    "attivo": true,
+    "creato_il": "2025-07-22T16:22:18.150Z",
+    "aggiornato_il": "2025-07-22T16:22:18.150Z",
+    "postazioni": [
+      3
+    ]
+  }
+},
+{
+  "model": "core.servizioprodotto",
+  "pk": 34,
+  "fields": {
+    "titolo": "Aspirazione",
+    "tipo": "servizio",
+    "prezzo": "5.00",
+    "categoria": 1,
+    "descrizione": "Aspirazione di tutta la moquette e dei tappeti",
+    "durata_minuti": 10,
+    "quantita_disponibile": -1,
+    "quantita_minima_alert": 0,
+    "codice_prodotto": "",
+    "attivo": true,
+    "creato_il": "2025-07-22T16:22:56.833Z",
+    "aggiornato_il": "2025-07-22T16:22:56.833Z",
+    "postazioni": [
+      3
+    ]
+  }
+},
+{
+  "model": "core.servizioprodotto",
+  "pk": 35,
+  "fields": {
+    "titolo": "Asciugatura portiere e cofano",
+    "tipo": "servizio",
+    "prezzo": "2.00",
+    "categoria": 2,
+    "descrizione": "Asciugatura portiere e cofano",
+    "durata_minuti": 5,
+    "quantita_disponibile": -1,
+    "quantita_minima_alert": 0,
+    "codice_prodotto": "",
+    "attivo": true,
+    "creato_il": "2025-07-22T16:23:58.617Z",
+    "aggiornato_il": "2025-07-22T16:23:58.617Z",
+    "postazioni": [
+      5
+    ]
+  }
+},
+{
+  "model": "core.servizioprodotto",
+  "pk": 36,
+  "fields": {
+    "titolo": "Pulizia solo degli interni",
+    "tipo": "servizio",
+    "prezzo": "15.00",
+    "categoria": 1,
+    "descrizione": "lavaggio completo degli interni",
+    "durata_minuti": 40,
+    "quantita_disponibile": -1,
+    "quantita_minima_alert": 0,
+    "codice_prodotto": "",
+    "attivo": true,
+    "creato_il": "2025-07-22T16:25:04.968Z",
+    "aggiornato_il": "2025-07-22T16:25:04.968Z",
+    "postazioni": [
+      3
+    ]
+  }
+},
+{
+  "model": "core.servizioprodotto",
+  "pk": 37,
+  "fields": {
+    "titolo": "Polish per abbonati",
+    "tipo": "servizio",
+    "prezzo": "3.00",
+    "categoria": 3,
+    "descrizione": "Implemento di programma per gli abbonati",
+    "durata_minuti": 0,
+    "quantita_disponibile": -1,
+    "quantita_minima_alert": 0,
+    "codice_prodotto": "",
+    "attivo": true,
+    "creato_il": "2025-07-22T16:33:33.537Z",
+    "aggiornato_il": "2025-07-22T16:33:33.537Z",
+    "postazioni": [
+      2
+    ]
+  }
+},
+{
+  "model": "core.servizioprodotto",
+  "pk": 38,
+  "fields": {
+    "titolo": "Ritiro e consegna a domicilio (Tariffa fissa)",
+    "tipo": "servizio",
+    "prezzo": "3.00",
+    "categoria": 6,
+    "descrizione": "Ritiro e consegna del veicolo",
+    "durata_minuti": 0,
+    "quantita_disponibile": -1,
+    "quantita_minima_alert": 0,
+    "codice_prodotto": "",
+    "attivo": true,
+    "creato_il": "2025-07-22T17:23:09.062Z",
+    "aggiornato_il": "2025-07-22T17:30:54.555Z",
+    "postazioni": []
+  }
+},
+{
+  "model": "core.servizioprodotto",
+  "pk": 39,
+  "fields": {
+    "titolo": "Ritiro e consegna a domicilio (Costo al KM)",
+    "tipo": "servizio",
+    "prezzo": "0.60",
+    "categoria": 6,
+    "descrizione": "costo al km",
+    "durata_minuti": 0,
+    "quantita_disponibile": -1,
+    "quantita_minima_alert": 0,
+    "codice_prodotto": "",
+    "attivo": true,
+    "creato_il": "2025-07-22T17:23:51.878Z",
+    "aggiornato_il": "2025-07-22T17:30:45.303Z",
+    "postazioni": []
+  }
+},
+{
+  "model": "core.servizioprodotto",
+  "pk": 40,
+  "fields": {
+    "titolo": "Lavaggio motore",
+    "tipo": "servizio",
+    "prezzo": "5.00",
+    "categoria": 1,
+    "descrizione": "lavaggio motore con lancia",
+    "durata_minuti": 5,
+    "quantita_disponibile": -1,
+    "quantita_minima_alert": 0,
+    "codice_prodotto": "",
+    "attivo": true,
+    "creato_il": "2025-07-22T18:03:41.503Z",
+    "aggiornato_il": "2025-07-22T18:03:41.503Z",
+    "postazioni": [
+      3
+    ]
+  }
+},
+{
+  "model": "core.servizioprodotto",
+  "pk": 41,
+  "fields": {
+    "titolo": "Mezzo tipo Daily con lavaggio cabina",
+    "tipo": "servizio",
+    "prezzo": "35.00",
+    "categoria": 4,
+    "descrizione": "Mezzo tipo Daily - lavaggio completo con cassone aperto",
+    "durata_minuti": 50,
+    "quantita_disponibile": -1,
+    "quantita_minima_alert": 0,
+    "codice_prodotto": "",
+    "attivo": true,
+    "creato_il": "2025-07-22T18:06:14.823Z",
+    "aggiornato_il": "2025-07-22T18:10:42.916Z",
+    "postazioni": [
+      3
+    ]
+  }
+},
+{
+  "model": "core.servizioprodotto",
+  "pk": 42,
+  "fields": {
+    "titolo": "Centina - int. ed est.",
+    "tipo": "servizio",
+    "prezzo": "10.00",
+    "categoria": 4,
+    "descrizione": "Lavaggio interno ed esterno del cassone",
+    "durata_minuti": 30,
+    "quantita_disponibile": -1,
+    "quantita_minima_alert": 0,
+    "codice_prodotto": "",
+    "attivo": true,
+    "creato_il": "2025-07-22T18:08:51.979Z",
+    "aggiornato_il": "2025-07-22T18:08:51.979Z",
+    "postazioni": [
+      3
+    ]
+  }
+},
+{
+  "model": "core.servizioprodotto",
+  "pk": 43,
+  "fields": {
+    "titolo": "Sporco eccessivo",
+    "tipo": "servizio",
+    "prezzo": "1.00",
+    "categoria": 4,
+    "descrizione": "Inserire la quantità fino al raggiungimento del prezzo preventivato",
+    "durata_minuti": 0,
+    "quantita_disponibile": -1,
+    "quantita_minima_alert": 0,
+    "codice_prodotto": "",
+    "attivo": true,
+    "creato_il": "2025-07-22T18:13:06.918Z",
+    "aggiornato_il": "2025-07-22T18:13:06.918Z",
+    "postazioni": [
+      3
+    ]
+  }
+},
+{
+  "model": "core.servizioprodotto",
+  "pk": 44,
+  "fields": {
+    "titolo": "Mezzo tipo Daily - solo esterno",
+    "tipo": "servizio",
+    "prezzo": "18.00",
+    "categoria": 4,
+    "descrizione": "Mezzo tipo Daily - solo esterno",
+    "durata_minuti": 15,
+    "quantita_disponibile": -1,
+    "quantita_minima_alert": 0,
+    "codice_prodotto": "",
+    "attivo": true,
+    "creato_il": "2025-07-22T18:15:44.087Z",
+    "aggiornato_il": "2025-07-22T18:15:44.087Z",
+    "postazioni": [
+      3
+    ]
+  }
+},
+{
+  "model": "core.servizioprodotto",
+  "pk": 45,
+  "fields": {
+    "titolo": "Lavaggio completo - Piccola",
+    "tipo": "servizio",
+    "prezzo": "20.00",
+    "categoria": 1,
+    "descrizione": "Utilitarie",
+    "durata_minuti": 40,
+    "quantita_disponibile": -1,
+    "quantita_minima_alert": 0,
+    "codice_prodotto": "",
+    "attivo": true,
+    "creato_il": "2025-07-23T16:18:08.400Z",
+    "aggiornato_il": "2025-07-25T06:06:25.230Z",
+    "postazioni": [
+      3
+    ]
+  }
+},
+{
+  "model": "core.servizioprodotto",
+  "pk": 46,
+  "fields": {
+    "titolo": "Sporco eccessivo",
+    "tipo": "servizio",
+    "prezzo": "1.00",
+    "categoria": 1,
+    "descrizione": "Maggiorazione dovuta alle condizioni del veicolo e dal tempo dedicato",
+    "durata_minuti": 0,
+    "quantita_disponibile": -1,
+    "quantita_minima_alert": 0,
+    "codice_prodotto": "",
+    "attivo": true,
+    "creato_il": "2025-07-25T06:02:34.246Z",
+    "aggiornato_il": "2025-07-25T06:02:34.246Z",
+    "postazioni": [
+      3
+    ]
+  }
+},
+{
+  "model": "core.servizioprodotto",
+  "pk": 47,
+  "fields": {
+    "titolo": "Lavaggio completo - Grande",
+    "tipo": "servizio",
+    "prezzo": "25.00",
+    "categoria": 1,
+    "descrizione": "Veicoli maggiore di 5 posti, SUV di grosse dimensioni, Pick-UP",
+    "durata_minuti": 45,
+    "quantita_disponibile": -1,
+    "quantita_minima_alert": 0,
+    "codice_prodotto": "",
+    "attivo": true,
+    "creato_il": "2025-07-25T06:07:32.066Z",
+    "aggiornato_il": "2025-07-25T06:07:32.066Z",
+    "postazioni": [
+      3
+    ]
+  }
+},
+{
+  "model": "core.sconto",
+  "pk": 1,
+  "fields": {
+    "titolo": "Happy hour 20%",
+    "tipo_sconto": "percentuale",
+    "valore": "20.00",
+    "attivo": true
+  }
+},
+{
+  "model": "core.stampanterete",
+  "pk": 1,
+  "fields": {
+    "nome": "EPSON",
+    "tipo": "comanda",
+    "indirizzo_ip": "192.168.1.80",
+    "porta": 9100,
+    "modello": "EPSON TM88II",
+    "larghezza_carta": 80,
+    "attiva": true,
+    "predefinita": false
+  }
+},
+{
+  "model": "core.movimentoscorte",
+  "pk": 1,
+  "fields": {
+    "prodotto": 12,
+    "tipo": "scarico",
+    "quantita": -2,
+    "quantita_prima": 29,
+    "quantita_dopo": 27,
+    "riferimento_ordine": null,
+    "nota": "Vendita - Ordine 20250725-0009",
+    "operatore": [
+      "daniele"
+    ],
+    "data_movimento": "2025-07-25T10:34:06.075Z"
+  }
+},
+{
+  "model": "core.movimentoscorte",
+  "pk": 2,
+  "fields": {
+    "prodotto": 12,
+    "tipo": "scarico",
+    "quantita": -2,
+    "quantita_prima": 27,
+    "quantita_dopo": 25,
+    "riferimento_ordine": null,
+    "nota": "Vendita - Ordine 20250725-0010",
+    "operatore": [
+      "daniele"
+    ],
+    "data_movimento": "2025-07-25T10:39:16.499Z"
+  }
+},
+{
+  "model": "core.movimentoscorte",
+  "pk": 3,
+  "fields": {
+    "prodotto": 12,
+    "tipo": "scarico",
+    "quantita": -2,
+    "quantita_prima": 25,
+    "quantita_dopo": 23,
+    "riferimento_ordine": 129,
+    "nota": "Vendita - Ordine 20250725-0010",
+    "operatore": [
+      "daniele"
+    ],
+    "data_movimento": "2025-07-25T10:40:22.159Z"
+  }
+},
+{
+  "model": "clienti.cliente",
+  "pk": 21,
+  "fields": {
+    "tipo": "azienda",
+    "email": "danielelombardo12@gmail.com",
+    "telefono": "3273477473",
+    "indirizzo": "Via Gela, 215",
+    "cap": "92027",
+    "citta": "Licata",
+    "nome": "",
+    "cognome": "",
+    "codice_fiscale": "",
+    "ragione_sociale": "Ds Giochi Srl",
+    "partita_iva": "02703400842",
+    "codice_sdi": "",
+    "pec": "",
+    "user": null,
+    "consenso_marketing": false,
+    "data_registrazione": "2025-07-22T15:52:16.879Z"
+  }
+},
+{
+  "model": "clienti.cliente",
+  "pk": 22,
+  "fields": {
+    "tipo": "privato",
+    "email": null,
+    "telefono": "3273477473",
+    "indirizzo": "Corso Serrovira, 136",
+    "cap": "92027",
+    "citta": "Licata",
+    "nome": "Daniele",
+    "cognome": "Lombardo",
+    "codice_fiscale": "",
+    "ragione_sociale": "",
+    "partita_iva": "",
+    "codice_sdi": "",
+    "pec": "",
+    "user": null,
+    "consenso_marketing": false,
+    "data_registrazione": "2025-07-22T17:51:25.861Z"
+  }
+},
+{
+  "model": "clienti.cliente",
+  "pk": 23,
+  "fields": {
+    "tipo": "privato",
+    "email": null,
+    "telefono": "3202281310",
+    "indirizzo": "",
+    "cap": "",
+    "citta": "",
+    "nome": "Angelo",
+    "cognome": "Coco",
+    "codice_fiscale": "",
+    "ragione_sociale": "",
+    "partita_iva": "",
+    "codice_sdi": "",
+    "pec": "",
+    "user": null,
+    "consenso_marketing": false,
+    "data_registrazione": "2025-07-23T07:37:36.397Z"
+  }
+},
+{
+  "model": "clienti.cliente",
+  "pk": 24,
+  "fields": {
+    "tipo": "azienda",
+    "email": "zzz@mail.it",
+    "telefono": "3204184428",
+    "indirizzo": "Via Barrile 34",
+    "cap": "",
+    "citta": "",
+    "nome": "",
+    "cognome": "",
+    "codice_fiscale": "",
+    "ragione_sociale": "Aidival Metis Consulting S.R.L.",
+    "partita_iva": "03022490845",
+    "codice_sdi": "w7yvjk9",
+    "pec": "",
+    "user": null,
+    "consenso_marketing": false,
+    "data_registrazione": "2025-07-23T07:44:40.796Z"
+  }
+},
+{
+  "model": "clienti.cliente",
+  "pk": 25,
+  "fields": {
+    "tipo": "privato",
+    "email": "temp_1753257008@prenotazione.local",
+    "telefono": "3894862717",
+    "indirizzo": "",
+    "cap": "",
+    "citta": "",
+    "nome": "Christian",
+    "cognome": "Gatì",
+    "codice_fiscale": "",
+    "ragione_sociale": "",
+    "partita_iva": "",
+    "codice_sdi": "",
+    "pec": "",
+    "user": null,
+    "consenso_marketing": false,
+    "data_registrazione": "2025-07-23T07:50:08.108Z"
+  }
+},
+{
+  "model": "clienti.cliente",
+  "pk": 26,
+  "fields": {
+    "tipo": "privato",
+    "email": "OOO@1.IT",
+    "telefono": "3472904580",
+    "indirizzo": "",
+    "cap": "",
+    "citta": "",
+    "nome": "Vincenzo",
+    "cognome": "Vedda",
+    "codice_fiscale": "",
+    "ragione_sociale": "",
+    "partita_iva": "",
+    "codice_sdi": "",
+    "pec": "",
+    "user": null,
+    "consenso_marketing": false,
+    "data_registrazione": "2025-07-23T09:47:39.877Z"
+  }
+},
+{
+  "model": "clienti.cliente",
+  "pk": 28,
+  "fields": {
+    "tipo": "azienda",
+    "email": "GENEROSO@OK.IT",
+    "telefono": "3240833523",
+    "indirizzo": "",
+    "cap": "",
+    "citta": "",
+    "nome": "",
+    "cognome": "",
+    "codice_fiscale": "",
+    "ragione_sociale": "Generoso Roberta",
+    "partita_iva": "02696550843",
+    "codice_sdi": "BA6ET11",
+    "pec": "",
+    "user": null,
+    "consenso_marketing": false,
+    "data_registrazione": "2025-07-23T11:00:40.934Z"
+  }
+},
+{
+  "model": "clienti.cliente",
+  "pk": 29,
+  "fields": {
+    "tipo": "privato",
+    "email": null,
+    "telefono": "3395881196",
+    "indirizzo": "",
+    "cap": "",
+    "citta": "",
+    "nome": "Davide",
+    "cognome": "Cammilleri",
+    "codice_fiscale": "",
+    "ragione_sociale": "",
+    "partita_iva": "",
+    "codice_sdi": "",
+    "pec": "",
+    "user": null,
+    "consenso_marketing": false,
+    "data_registrazione": "2025-07-23T14:21:11.307Z"
+  }
+},
+{
+  "model": "clienti.cliente",
+  "pk": 30,
+  "fields": {
+    "tipo": "privato",
+    "email": "temp_1753425925@prenotazione.local",
+    "telefono": "3339975846",
+    "indirizzo": "",
+    "cap": "",
+    "citta": "",
+    "nome": "Gavin",
+    "cognome": "Licata",
+    "codice_fiscale": "",
+    "ragione_sociale": "",
+    "partita_iva": "",
+    "codice_sdi": "",
+    "pec": "",
+    "user": null,
+    "consenso_marketing": false,
+    "data_registrazione": "2025-07-25T06:45:25.805Z"
+  }
+},
+{
+  "model": "clienti.cliente",
+  "pk": 31,
+  "fields": {
+    "tipo": "privato",
+    "email": "temp_1753426144@prenotazione.local",
+    "telefono": 
