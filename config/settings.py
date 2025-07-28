@@ -110,6 +110,7 @@ SHORT_DATETIME_FORMAT = 'd/m/Y H:i'
 
 # File statici
 STATIC_URL = '/static/'
+STATIC_ROOT = os.path.join(BASE_DIR, 'staticfiles')
 STATICFILES_DIRS = [BASE_DIR / 'static']
 
 # Chiave primaria di default
