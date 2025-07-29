@@ -303,3 +303,80 @@ def servizi_json(request):
         })
     
     return JsonResponse({'servizi': servizi_data})
+
+
+@login_required
+def movimento_scorte(request):
+    """Gestisce i movimenti di scorte (carico/scarico)"""
+    if request.method == 'POST':
+        from django.shortcuts import redirect
+        from django.db import transaction
+        
+        prodotto_id = request.POST.get('prodotto_id')
+        tipo = request.POST.get('tipo')  # 'carico' o 'scarico'
+        quantita_str = request.POST.get('quantita', '0')
+        note = request.POST.get('note', '')
+        
+        # Debug
+        print(f"DEBUG: prodotto_id={prodotto_id}, tipo={tipo}, quantita_str={quantita_str}, note={note}")
+        
+        try:
+            quantita = int(quantita_str)
+        except (ValueError, TypeError):
+            quantita = 0
+        
+        if prodotto_id and tipo and quantita > 0:
+            try:
+                with transaction.atomic():
+                    prodotto = get_object_or_404(ServizioProdotto, id=prodotto_id)
+                    
+                    # Cattura la quantità prima del movimento
+                    quantita_prima = prodotto.quantita_disponibile
+                    
+                    # Calcola la quantità da usare nel movimento (con segno appropriato)
+                    if tipo == 'carico':
+                        quantita_movimento = quantita  # Positivo per carico
+                        quantita_dopo = quantita_prima + quantita
+                    elif tipo == 'scarico':
+                        if quantita_prima >= quantita:
+                            quantita_movimento = -quantita  # Negativo per scarico
+                            quantita_dopo = quantita_prima - quantita
+                        else:
+                            messages.error(request, f'Quantità insufficiente per scarico. Disponibili: {quantita_prima}, Richieste: {quantita}')
+                            return redirect('core:scorte-list')
+                    else:
+                        messages.error(request, 'Tipo di movimento non valido.')
+                        return redirect('core:scorte-list')
+                    
+                    # Crea il movimento con tutti i campi richiesti
+                    movimento = MovimentoScorte.objects.create(
+                        prodotto=prodotto,
+                        tipo=tipo,
+                        quantita=quantita_movimento,
+                        quantita_prima=quantita_prima,
+                        quantita_dopo=quantita_dopo,
+                        nota=note,
+                        operatore=request.user
+                    )
+                    
+                    # Aggiorna la quantità disponibile del prodotto
+                    prodotto.quantita_disponibile = quantita_dopo
+                    prodotto.save()
+                    
+                    # Messaggio di successo
+                    tipo_display = 'Carico' if tipo == 'carico' else 'Scarico'
+                    messages.success(request, 
+                        f'{tipo_display} di {abs(quantita_movimento)} unità per {prodotto.titolo} registrato con successo. '
+                        f'Quantità attuale: {quantita_dopo}')
+                
+            except Exception as e:
+                messages.error(request, f'Errore durante il movimento: {str(e)}')
+                print(f"DEBUG: Errore movimento: {str(e)}")
+        else:
+            messages.error(request, f'Dati incompleti per il movimento. prodotto_id={prodotto_id}, tipo={tipo}, quantita={quantita}')
+            print(f"DEBUG: Dati incompleti - prodotto_id={prodotto_id}, tipo={tipo}, quantita={quantita}")
+    else:
+        messages.error(request, 'Metodo non consentito.')
+        print(f"DEBUG: Metodo non POST: {request.method}")
+    
+    return redirect('core:scorte-list')

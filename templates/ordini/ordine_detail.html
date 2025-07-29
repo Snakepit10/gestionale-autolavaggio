@@ -304,6 +304,9 @@
                                             {% if postazione %}
                                                 <th>Stato</th>
                                             {% endif %}
+                                            {% if ordine.stato != 'completato' and ordine.stato != 'annullato' %}
+                                                <th>Azioni</th>
+                                            {% endif %}
                                         </tr>
                                     </thead>
                                     <tbody>
@@ -322,12 +325,23 @@
                                             <td><strong>€{{ item.subtotale }}</strong></td>
                                             {% if postazione %}
                                             <td>
-                                                {% if item.stato_lavorazione == 'in_attesa' %}
+                                                {% if item.stato == 'in_attesa' %}
                                                     <span class="badge bg-warning">In Attesa</span>
-                                                {% elif item.stato_lavorazione == 'in_corso' %}
-                                                    <span class="badge bg-info">In Corso</span>
-                                                {% elif item.stato_lavorazione == 'completato' %}
+                                                {% elif item.stato == 'in_lavorazione' %}
+                                                    <span class="badge bg-info">In Lavorazione</span>
+                                                {% elif item.stato == 'completato' %}
                                                     <span class="badge bg-success">Completato</span>
+                                                {% endif %}
+                                            </td>
+                                            {% endif %}
+                                            {% if ordine.stato != 'completato' and ordine.stato != 'annullato' %}
+                                            <td>
+                                                {% if item.stato != 'completato' %}
+                                                    <button class="btn btn-sm btn-outline-primary" onclick="mostraModalModificaConServizio({{ item.id }})">
+                                                        <i class="bi bi-pencil"></i> Modifica
+                                                    </button>
+                                                {% else %}
+                                                    <span class="text-muted">Completato</span>
                                                 {% endif %}
                                             </td>
                                             {% endif %}
@@ -841,12 +855,21 @@ function salvaModifiche() {
     // Converti FormData in oggetto JSON
     const data = {};
     formData.forEach((value, key) => {
-        if (value.trim()) {
+        if (value && value.toString().trim()) {
             data[key] = value;
         }
     });
     
-    fetch(`{% url 'ordini:modifica-ordine' ordine.pk %}`, {
+    // Determina se stiamo modificando un servizio o solo l'ordine
+    const itemId = document.getElementById('item-id-hidden').value;
+    const isModificaServizio = itemId && itemId.trim() !== '';
+    
+    let url = `{% url 'ordini:modifica-ordine' ordine.pk %}`;
+    if (isModificaServizio) {
+        url = `{% url 'ordini:modifica-item-ordine' ordine.pk %}`;
+    }
+    
+    fetch(url, {
         method: 'POST',
         headers: {
             'Content-Type': 'application/json',
@@ -884,6 +907,94 @@ function salvaModifiche() {
         console.error('Errore:', error);
         alert('Errore durante la modifica dell\'ordine');
     });
+}
+
+// Funzioni per modifica ordine con servizi integrata
+function mostraModalModificaConServizio(itemId) {
+    const modal = new bootstrap.Modal(document.getElementById('modalModifica'));
+    
+    // Precompila i dati dell'ordine come prima
+    document.getElementById('cliente-select').value = "{{ ordine.cliente.id|default:'' }}";
+    document.getElementById('tipo-consegna-select').value = "{{ ordine.tipo_consegna }}";
+    document.getElementById('ora-consegna-input').value = "{{ ordine.ora_consegna_richiesta|time:'H:i'|default:'' }}";
+    document.getElementById('tipo-auto-input').value = "{{ ordine.tipo_auto|default_if_none:'' }}";
+    
+    // Seleziona l'item specifico se fornito
+    if (itemId) {
+        document.getElementById('item-select').value = itemId;
+        caricaDettagliItem();
+    }
+    
+    toggleOraConsegnaModifica();
+    modal.show();
+}
+
+function caricaDettagliItem() {
+    const select = document.getElementById('item-select');
+    const selectedOption = select.options[select.selectedIndex];
+    const section = document.getElementById('modifica-item-section');
+    
+    if (selectedOption && selectedOption.value) {
+        // Mostra la sezione di modifica
+        section.style.display = 'block';
+        
+        // Carica i dati dell'item selezionato
+        const itemId = selectedOption.value;
+        const servizioId = selectedOption.getAttribute('data-servizio-id');
+        const quantita = selectedOption.getAttribute('data-quantita');
+        const prezzo = selectedOption.getAttribute('data-prezzo');
+        
+        // Precompila i campi
+        document.getElementById('item-id-hidden').value = itemId;
+        document.getElementById('nuovo-servizio-select').value = servizioId;
+        document.getElementById('nuova-quantita-input').value = quantita;
+        document.getElementById('nuovo-prezzo-input').value = prezzo;
+        
+        // Aggiorna subtotale e info
+        aggiornaSubtotaleNuovo();
+        aggiornaInfoNuovoServizio();
+    } else {
+        // Nasconde la sezione di modifica
+        section.style.display = 'none';
+    }
+}
+
+function aggiornaInfoNuovoServizio() {
+    const select = document.getElementById('nuovo-servizio-select');
+    const selectedOption = select.options[select.selectedIndex];
+    const prezzoInput = document.getElementById('nuovo-prezzo-input');
+    const alertDiv = document.getElementById('alert-disponibilita-nuovo');
+    const alertMessaggio = document.getElementById('alert-messaggio-nuovo');
+    
+    if (selectedOption && selectedOption.value) {
+        const prezzo = selectedOption.getAttribute('data-prezzo');
+        const tipo = selectedOption.getAttribute('data-tipo');
+        const disponibile = selectedOption.getAttribute('data-disponibile') === 'True';
+        
+        // Aggiorna il prezzo
+        prezzoInput.value = prezzo;
+        
+        // Controlla disponibilità
+        if (!disponibile) {
+            alertMessaggio.textContent = 'Attenzione: questo servizio/prodotto non è attualmente disponibile.';
+            alertDiv.classList.remove('d-none');
+        } else {
+            alertDiv.classList.add('d-none');
+        }
+        
+        // Aggiorna subtotale
+        aggiornaSubtotaleNuovo();
+    } else {
+        alertDiv.classList.add('d-none');
+    }
+}
+
+function aggiornaSubtotaleNuovo() {
+    const quantita = parseFloat(document.getElementById('nuova-quantita-input').value) || 0;
+    const prezzo = parseFloat(document.getElementById('nuovo-prezzo-input').value) || 0;
+    const subtotale = quantita * prezzo;
+    
+    document.getElementById('nuovo-subtotale-display').textContent = '€' + subtotale.toFixed(2);
 }
 </script>
 
@@ -944,6 +1055,91 @@ function salvaModifiche() {
                                value="{{ ordine.tipo_auto|default_if_none:'' }}" placeholder="es. Fiat 500 bianca, BMW X3 nera...">
                     </div>
                     
+                    <hr>
+                    
+                    <!-- Sezione Modifica Servizi -->
+                    <h6><i class="bi bi-list-ul"></i> Modifica Servizi</h6>
+                    <p class="text-muted small">Seleziona un servizio dall'ordine per modificarlo:</p>
+                    
+                    <div class="mb-3">
+                        <label for="item-select" class="form-label">Servizio da modificare</label>
+                        <select class="form-select" id="item-select" name="item_select" onchange="caricaDettagliItem()">
+                            <option value="">Seleziona un servizio...</option>
+                            {% for item in ordine.items.all %}
+                                {% if item.stato != 'completato' %}
+                                    <option value="{{ item.id }}" 
+                                        data-servizio-id="{{ item.servizio_prodotto.id }}"
+                                        data-servizio-titolo="{{ item.servizio_prodotto.titolo }}"
+                                        data-quantita="{{ item.quantita }}"
+                                        data-prezzo="{{ item.prezzo_unitario }}">
+                                        {{ item.servizio_prodotto.titolo }} (Qtà: {{ item.quantita }}, €{{ item.prezzo_unitario }})
+                                    </option>
+                                {% endif %}
+                            {% endfor %}
+                        </select>
+                    </div>
+                    
+                    <div id="modifica-item-section" style="display: none;">
+                        <input type="hidden" id="item-id-hidden" name="item_id" value="">
+                        
+                        <!-- Nuovo Servizio/Prodotto -->
+                        <div class="mb-3">
+                            <label for="nuovo-servizio-select" class="form-label">Nuovo Servizio/Prodotto</label>
+                            <select class="form-select" id="nuovo-servizio-select" name="nuovo_servizio_id" onchange="aggiornaInfoNuovoServizio()">
+                                <option value="">Seleziona un servizio/prodotto</option>
+                                {% for categoria in categorie %}
+                                    <optgroup label="{{ categoria.nome }}">
+                                        {% for servizio in categoria.servizioprodotto_set.all %}
+                                            {% if servizio.attivo %}
+                                                <option value="{{ servizio.id }}" 
+                                                    data-prezzo="{{ servizio.prezzo }}" 
+                                                    data-tipo="{{ servizio.tipo }}"
+                                                    data-disponibile="{{ servizio.disponibile }}">
+                                                    {{ servizio.titolo }} - €{{ servizio.prezzo }}
+                                                    {% if servizio.tipo == 'prodotto' and servizio.quantita_disponibile > 0 %}
+                                                        ({{ servizio.quantita_disponibile }} disponibili)
+                                                    {% endif %}
+                                                </option>
+                                            {% endif %}
+                                        {% endfor %}
+                                    </optgroup>
+                                {% endfor %}
+                            </select>
+                        </div>
+                        
+                        <!-- Nuova Quantità -->
+                        <div class="mb-3">
+                            <label for="nuova-quantita-input" class="form-label">Quantità</label>
+                            <input type="number" class="form-control" id="nuova-quantita-input" name="nuova_quantita" 
+                                   value="1" min="1" onchange="aggiornaSubtotaleNuovo()">
+                        </div>
+                        
+                        <!-- Nuovo Prezzo Unitario -->
+                        <div class="mb-3">
+                            <label for="nuovo-prezzo-input" class="form-label">Prezzo Unitario</label>
+                            <div class="input-group">
+                                <span class="input-group-text">€</span>
+                                <input type="number" class="form-control" id="nuovo-prezzo-input" name="nuovo_prezzo" 
+                                       step="0.01" min="0" onchange="aggiornaSubtotaleNuovo()">
+                            </div>
+                            <small class="form-text text-muted">Il prezzo può essere modificato se necessario</small>
+                        </div>
+                        
+                        <!-- Nuovo Subtotale -->
+                        <div class="mb-3">
+                            <label class="form-label">Nuovo Subtotale</label>
+                            <div class="form-control-plaintext">
+                                <strong id="nuovo-subtotale-display">€0.00</strong>
+                            </div>
+                        </div>
+                        
+                        <!-- Alert per disponibilità -->
+                        <div id="alert-disponibilita-nuovo" class="alert alert-warning d-none">
+                            <i class="bi bi-exclamation-triangle"></i>
+                            <span id="alert-messaggio-nuovo"></span>
+                        </div>
+                    </div>
+                    
                 </form>
             </div>
             <div class="modal-footer">
@@ -955,5 +1151,6 @@ function salvaModifiche() {
         </div>
     </div>
 </div>
+
 
 {% endblock %}

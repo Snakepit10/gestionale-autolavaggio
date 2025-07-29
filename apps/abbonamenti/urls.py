@@ -16,15 +16,17 @@ urlpatterns = [
     # Gestione Abbonamenti
     path('', views.AbbonamentiListView.as_view(), name='abbonamenti-list'),
     path('nuovo/', views.VenditaAbbonamentoView.as_view(), name='vendita-abbonamento'),
-    path('<str:codice>/', views.DettaglioAbbonamentoView.as_view(), name='dettaglio-abbonamento'),
-    path('<str:codice>/rinnova/', views.rinnova_abbonamento, name='rinnova-abbonamento'),
-    path('<str:codice>/sospendi/', views.sospendi_abbonamento, name='sospendi-abbonamento'),
     path('in-scadenza/', views.AbbonamentiInScadenzaView.as_view(), name='abbonamenti-scadenza'),
     
     # Verifica Accessi
     path('verifica/', views.VerificaAccessoView.as_view(), name='verifica-accesso'),
     path('verifica/<str:codice>/', views.VerificaAbbonamentoView.as_view(), name='verifica-abbonamento'),
     path('verifica/<str:codice>/registra-accesso/', views.registra_accesso_abbonamento, name='registra-accesso'),
+    
+    # Dettaglio abbonamento (deve essere ultimo per evitare conflitti)
+    path('<str:codice>/', views.DettaglioAbbonamentoView.as_view(), name='dettaglio-abbonamento'),
+    path('<str:codice>/rinnova/', views.rinnova_abbonamento, name='rinnova-abbonamento'),
+    path('<str:codice>/sospendi/', views.sospendi_abbonamento, name='sospendi-abbonamento'),
     
     # API Endpoints
     path('api/verifica/<str:codice>/', views.verifica_abbonamento_json, name='verifica-abbonamento-json'),

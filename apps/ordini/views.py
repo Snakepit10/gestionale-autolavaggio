@@ -538,6 +538,9 @@ class OrdineDetailView(LoginRequiredMixin, DetailView):
         # Lista clienti per il modal di modifica
         context['clienti'] = Cliente.objects.all().order_by('cognome', 'nome', 'ragione_sociale')
         
+        # Categorie e servizi per la modifica dei servizi
+        context['categorie'] = Categoria.objects.filter(attiva=True).prefetch_related('servizioprodotto_set')
+        
         return context
 
 
@@ -963,6 +966,194 @@ def modifica_ordine(request, pk):
                 return JsonResponse({
                     'success': True,
                     'message': f'Ordine modificato con successo. Cambiamenti: {", ".join(cambiamenti)}'
+                })
+            else:
+                return JsonResponse({
+                    'success': True,
+                    'message': 'Nessuna modifica apportata'
+                })
+                
+        except json.JSONDecodeError:
+            return JsonResponse({
+                'success': False,
+                'error': 'Dati JSON non validi'
+            }, status=400)
+        except Exception as e:
+            return JsonResponse({
+                'success': False,
+                'error': f'Errore durante la modifica: {str(e)}'
+            }, status=500)
+    
+    return JsonResponse({
+        'success': False,
+        'error': 'Metodo non consentito'
+    }, status=405)
+
+
+@login_required
+@transaction.atomic
+def modifica_item_ordine(request, pk):
+    """Modifica un item specifico dell'ordine (servizio e prezzo)"""
+    ordine = get_object_or_404(Ordine, pk=pk)
+    
+    # Verifica che l'ordine sia modificabile
+    if ordine.stato in ['completato', 'annullato']:
+        return JsonResponse({
+            'success': False,
+            'error': 'Non è possibile modificare un ordine completato o annullato'
+        }, status=400)
+    
+    if request.method == 'POST':
+        try:
+            data = json.loads(request.body)
+            
+            # Ottieni l'item da modificare
+            item_id = data.get('item_id')
+            if not item_id:
+                return JsonResponse({
+                    'success': False,
+                    'error': 'ID item non fornito'
+                }, status=400)
+            
+            try:
+                item = ItemOrdine.objects.get(id=item_id, ordine=ordine)
+            except ItemOrdine.DoesNotExist:
+                return JsonResponse({
+                    'success': False,
+                    'error': 'Item non trovato'
+                }, status=400)
+            
+            # Verifica che l'item non sia già completato
+            if item.stato == 'completato':
+                return JsonResponse({
+                    'success': False,
+                    'error': 'Non è possibile modificare un servizio già completato'
+                }, status=400)
+            
+            # Traccia i cambiamenti
+            cambiamenti = []
+            
+            # Nuovo servizio/prodotto
+            nuovo_servizio_id = data.get('nuovo_servizio_id')
+            if nuovo_servizio_id:
+                try:
+                    nuovo_servizio = ServizioProdotto.objects.get(id=nuovo_servizio_id, attivo=True)
+                    
+                    # Verifica disponibilità
+                    if not nuovo_servizio.disponibile:
+                        return JsonResponse({
+                            'success': False,
+                            'error': 'Il servizio/prodotto selezionato non è disponibile'
+                        }, status=400)
+                    
+                    if item.servizio_prodotto != nuovo_servizio:
+                        vecchio_servizio = item.servizio_prodotto.titolo
+                        item.servizio_prodotto = nuovo_servizio
+                        cambiamenti.append(f"Servizio: {vecchio_servizio} → {nuovo_servizio.titolo}")
+                        
+                        # Riassegna postazione se necessario per i servizi
+                        if nuovo_servizio.tipo == 'servizio':
+                            postazioni_disponibili = nuovo_servizio.postazioni.filter(attiva=True)
+                            if postazioni_disponibili.exists():
+                                # Assegna alla postazione con meno carico
+                                nuova_postazione = min(
+                                    postazioni_disponibili,
+                                    key=lambda p: p.get_ordini_in_coda().count()
+                                )
+                                if item.postazione_assegnata != nuova_postazione:
+                                    vecchia_postazione = item.postazione_assegnata.nome if item.postazione_assegnata else "Nessuna"
+                                    item.postazione_assegnata = nuova_postazione
+                                    cambiamenti.append(f"Postazione: {vecchia_postazione} → {nuova_postazione.nome}")
+                        else:
+                            # Per i prodotti, rimuovi la postazione
+                            if item.postazione_assegnata:
+                                cambiamenti.append(f"Postazione rimossa (prodotto)")
+                                item.postazione_assegnata = None
+                                
+                except ServizioProdotto.DoesNotExist:
+                    return JsonResponse({
+                        'success': False,
+                        'error': 'Servizio/prodotto non trovato'
+                    }, status=400)
+            
+            # Nuova quantità
+            nuova_quantita = data.get('nuova_quantita')
+            if nuova_quantita:
+                try:
+                    nuova_quantita = int(nuova_quantita)
+                    if nuova_quantita <= 0:
+                        return JsonResponse({
+                            'success': False,
+                            'error': 'La quantità deve essere maggiore di 0'
+                        }, status=400)
+                    
+                    # Verifica disponibilità per prodotti
+                    if item.servizio_prodotto.tipo == 'prodotto' and item.servizio_prodotto.quantita_disponibile > 0:
+                        if item.servizio_prodotto.quantita_disponibile < nuova_quantita:
+                            return JsonResponse({
+                                'success': False,
+                                'error': f'Disponibili solo {item.servizio_prodotto.quantita_disponibile} unità'
+                            }, status=400)
+                    
+                    if item.quantita != nuova_quantita:
+                        vecchia_quantita = item.quantita
+                        item.quantita = nuova_quantita
+                        cambiamenti.append(f"Quantità: {vecchia_quantita} → {nuova_quantita}")
+                        
+                except (ValueError, TypeError):
+                    return JsonResponse({
+                        'success': False,
+                        'error': 'Quantità non valida'
+                    }, status=400)
+            
+            # Nuovo prezzo
+            nuovo_prezzo = data.get('nuovo_prezzo')
+            if nuovo_prezzo:
+                try:
+                    from decimal import Decimal
+                    nuovo_prezzo = Decimal(str(nuovo_prezzo))
+                    if nuovo_prezzo < 0:
+                        return JsonResponse({
+                            'success': False,
+                            'error': 'Il prezzo non può essere negativo'
+                        }, status=400)
+                    
+                    if item.prezzo_unitario != nuovo_prezzo:
+                        vecchio_prezzo = item.prezzo_unitario
+                        item.prezzo_unitario = nuovo_prezzo
+                        cambiamenti.append(f"Prezzo: €{vecchio_prezzo} → €{nuovo_prezzo}")
+                        
+                except (ValueError, TypeError):
+                    return JsonResponse({
+                        'success': False,
+                        'error': 'Prezzo non valido'
+                    }, status=400)
+            
+            # Salva solo se ci sono stati cambiamenti
+            if cambiamenti:
+                item.save()
+                
+                # Ricalcola i totali dell'ordine
+                ordine.totale = sum(item.subtotale for item in ordine.items.all())
+                
+                # Ricalcola sconto se applicato
+                if ordine.sconto_applicato:
+                    ordine.importo_sconto = ordine.sconto_applicato.calcola_sconto(ordine.totale)
+                else:
+                    ordine.importo_sconto = 0
+                
+                ordine.totale_finale = ordine.totale - ordine.importo_sconto
+                
+                # Aggiorna stato pagamento
+                ordine.aggiorna_stato_pagamento()
+                ordine.save()
+                
+                # Log dell'operazione
+                print(f"Item {item.id} dell'ordine {ordine.numero_progressivo} modificato da {request.user}: {', '.join(cambiamenti)}")
+                
+                return JsonResponse({
+                    'success': True,
+                    'message': f'Servizio modificato con successo. Cambiamenti: {", ".join(cambiamenti)}'
                 })
             else:
                 return JsonResponse({

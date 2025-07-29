@@ -383,6 +383,13 @@ def dashboard_tv_data(request):
         if ordine.ora_consegna_richiesta:
             ora_consegna_richiesta_str = ordine.ora_consegna_richiesta.strftime('%H:%M')
         
+        # Converti tutti i timestamp in fuso orario locale per consistenza
+        from django.utils import timezone as tz
+        import pytz
+        
+        rome_tz = pytz.timezone('Europe/Rome')
+        data_ora_locale = ordine.data_ora.astimezone(rome_tz)
+        
         ordine_data = {
             'id': ordine.id,
             'numero_progressivo': ordine.numero_progressivo,
@@ -391,8 +398,9 @@ def dashboard_tv_data(request):
             'stato': ordine.stato,
             'stato_display': ordine.get_stato_display(),
             'stato_pagamento': ordine.stato_pagamento,
-            'data_ora': ordine.data_ora.strftime('%H:%M'),
+            'data_ora': data_ora_locale.strftime('%H:%M'),
             'data_ora_completa': ordine.data_ora.isoformat(),
+            'data_ora_server_formatted': data_ora_locale.isoformat(),
             'ora_consegna_prevista': ora_consegna_str,
             'ora_consegna_prevista_completa': ora_consegna_completa,
             'ora_consegna_richiesta': ora_consegna_richiesta_str,
@@ -416,7 +424,16 @@ def dashboard_tv_data(request):
         
         ordini_data.append(ordine_data)
     
+    # Timestamp del server in fuso orario locale per sincronizzare tutti i dispositivi
+    from django.utils import timezone as tz
+    import pytz
+    
+    rome_tz = pytz.timezone('Europe/Rome')
+    server_time_local = tz.now().astimezone(rome_tz)
+    
     return JsonResponse({
         'ordini': ordini_data,
-        'timestamp': timezone.now().isoformat()
+        'timestamp': timezone.now().isoformat(),
+        'server_time_local': server_time_local.isoformat(),
+        'server_time_formatted': server_time_local.strftime('%H:%M:%S')
     })

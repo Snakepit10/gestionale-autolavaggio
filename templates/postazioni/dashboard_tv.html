@@ -28,43 +28,45 @@
         
         .dashboard-header {
             background: linear-gradient(135deg, #2c3e50 0%, #34495e 100%);
-            border-bottom: 3px solid #3498db;
-            padding: 10px 20px;
+            border-bottom: 2px solid #3498db;
+            padding: 5px 15px;
             position: sticky;
             top: 0;
             z-index: 100;
-            box-shadow: 0 2px 10px rgba(0,0,0,0.3);
+            box-shadow: 0 1px 5px rgba(0,0,0,0.2);
             display: flex;
             justify-content: space-between;
             align-items: center;
+            min-height: 50px;
         }
         
         .dashboard-title {
-            font-size: 2.2rem;
-            font-weight: 700;
+            font-size: 1.4rem;
+            font-weight: 600;
             color: #ffffff;
-            text-shadow: 1px 1px 3px rgba(0,0,0,0.5);
+            text-shadow: 1px 1px 2px rgba(0,0,0,0.5);
             margin: 0;
-            letter-spacing: 1px;
+            letter-spacing: 0.5px;
             display: flex;
             align-items: center;
-            gap: 10px;
+            gap: 6px;
         }
         
         .dashboard-clock {
-            font-size: 1.6rem;
+            font-size: 2.5rem;
             color: #3498db;
-            font-weight: 600;
-            text-shadow: 1px 1px 2px rgba(0,0,0,0.5);
+            font-weight: 700;
+            text-shadow: 2px 2px 4px rgba(0,0,0,0.8);
             font-family: 'Segoe UI', monospace;
-            background: rgba(52, 152, 219, 0.1);
-            padding: 5px 15px;
+            background: rgba(52, 152, 219, 0.15);
+            padding: 8px 20px;
             border-radius: 20px;
-            border: 1px solid rgba(52, 152, 219, 0.3);
+            border: 2px solid rgba(52, 152, 219, 0.4);
+            letter-spacing: 2px;
         }
         
         .main-container {
-            height: calc(100vh - 80px);
+            height: calc(100vh - 50px);
             overflow-y: hidden; /* Nasconde scrollbar durante autoscroll */
             padding: 15px;
             scroll-behavior: smooth;
@@ -124,59 +126,26 @@
         }
         
         .table-header {
-            background: linear-gradient(135deg, #1a252f 0%, #2c3e50 50%, #34495e 100%);
+            background: linear-gradient(135deg, #2c3e50 0%, #34495e 100%);
             color: #ffffff;
-            font-weight: 700;
-            font-size: 1.3rem;
-            padding: 18px 12px;
+            font-weight: 600;
+            font-size: 1.1rem;
+            padding: 12px 8px;
             text-align: center;
-            border-bottom: 3px solid #3498db;
-            text-shadow: 2px 2px 4px rgba(0,0,0,0.7);
-            letter-spacing: 0.8px;
+            border-bottom: 2px solid #3498db;
+            text-shadow: 1px 1px 2px rgba(0,0,0,0.5);
+            letter-spacing: 0.5px;
             position: sticky;
             top: 0;
             z-index: 10;
-            border-left: 1px solid rgba(52, 152, 219, 0.3);
-            border-right: 1px solid rgba(52, 152, 219, 0.3);
-            position: relative;
-            overflow: hidden;
-        }
-        
-        .table-header::before {
-            content: '';
-            position: absolute;
-            top: 0;
-            left: 0;
-            right: 0;
-            height: 2px;
-            background: linear-gradient(90deg, transparent, #3498db, transparent);
-            opacity: 0.8;
-        }
-        
-        .table-header::after {
-            content: '';
-            position: absolute;
-            bottom: 0;
-            left: 0;
-            right: 0;
-            height: 1px;
-            background: linear-gradient(90deg, transparent, rgba(52, 152, 219, 0.8), transparent);
+            border-left: 1px solid rgba(52, 152, 219, 0.2);
+            border-right: 1px solid rgba(52, 152, 219, 0.2);
+            text-transform: uppercase;
+            font-family: 'Segoe UI', sans-serif;
         }
         
         
-        .table-header:hover {
-            background: linear-gradient(135deg, #2c3e50 0%, #34495e 50%, #4a6741 100%);
-            transform: translateY(-1px);
-            box-shadow: 0 4px 12px rgba(52, 152, 219, 0.3);
-        }
         
-        .table-header:first-child {
-            border-top-left-radius: 10px;
-        }
-        
-        .table-header:last-child {
-            border-top-right-radius: 10px;
-        }
         
         .table-row {
             background: rgba(26, 37, 70, 0.8);
@@ -197,15 +166,16 @@
         
         
         .table-cell {
-            padding: 12px 10px;
+            padding: 10px 8px;
             vertical-align: middle;
-            font-size: 1.1rem;
+            font-size: 1rem;
             text-align: center;
             border: none;
             font-weight: 500;
             color: #ffffff;
             word-wrap: break-word;
             overflow-wrap: break-word;
+            font-family: 'Segoe UI', sans-serif;
         }
         
         .col-order-number {
@@ -371,30 +341,6 @@
             display: block;
         }
         
-        .connection-status {
-            position: fixed;
-            top: 20px;
-            right: 20px;
-            padding: 8px 16px;
-            border-radius: 20px;
-            font-size: 1rem;
-            font-weight: 600;
-            z-index: 1000;
-            display: flex;
-            align-items: center;
-            gap: 8px;
-            box-shadow: 0 4px 15px rgba(0,0,0,0.3);
-        }
-        
-        .connection-status.connected {
-            background: linear-gradient(135deg, #27ae60 0%, #229954 100%);
-            color: #ffffff;
-        }
-        
-        .connection-status.disconnected {
-            background: linear-gradient(135deg, #e74c3c 0%, #c0392b 100%);
-            color: #ffffff;
-        }
         
         .loading-spinner {
             display: inline-block;
@@ -548,9 +494,6 @@
     </style>
 </head>
 <body>
-    <div class="connection-status connected" id="connectionStatus">
-        <i class="bi bi-wifi"></i> Connesso
-    </div>
     
     <!-- Notifica nuovo ordine -->
     <div class="new-order-notification" id="newOrderNotification">
@@ -568,6 +511,9 @@
             <i class="bi bi-car-front-fill"></i>
             Dashboard Ordini
         </h1>
+        
+        <div class="dashboard-clock" id="currentTime">--:--</div>
+        
         <div class="d-flex align-items-center gap-3">
             <!-- Controlli Autoscroll -->
             <div class="autoscroll-controls" style="display: flex; align-items: center; gap: 10px; font-size: 0.9rem;">
@@ -581,7 +527,6 @@
                     <option value="20">Molto Veloce (20s)</option>
                 </select>
             </div>
-            <div class="dashboard-clock" id="currentTime">--:--:--</div>
         </div>
     </div>
     
@@ -636,14 +581,30 @@
         let lastOrderIds = new Set(); // Tracking degli ordini esistenti
         let notificationSound = null;
         
-        // Aggiorna l'orologio header
-        function updateClock() {
-            const now = new Date();
-            const timeString = now.toLocaleTimeString('it-IT', { 
-                hour: '2-digit', 
-                minute: '2-digit',
-                second: '2-digit'
-            });
+        // Variabile globale per memorizzare l'offset del server
+        let serverTimeOffset = 0;
+        
+        // Aggiorna l'orologio header usando il tempo del server
+        function updateClock(serverTime = null) {
+            let timeString;
+            
+            if (serverTime) {
+                // Usa il tempo del server se disponibile
+                const serverDate = new Date(serverTime);
+                timeString = serverDate.toLocaleTimeString('it-IT', { 
+                    hour: '2-digit', 
+                    minute: '2-digit'
+                });
+            } else {
+                // Fallback: usa il tempo locale con offset del server
+                const now = new Date();
+                const adjustedTime = new Date(now.getTime() + serverTimeOffset);
+                timeString = adjustedTime.toLocaleTimeString('it-IT', { 
+                    hour: '2-digit', 
+                    minute: '2-digit'
+                });
+            }
+            
             document.getElementById('currentTime').textContent = timeString;
         }
         
@@ -788,7 +749,8 @@
         }
         
         // Funzione per creare una riga della tabella
-        function createOrderRow(ordine, serverTimestamp) {
+        function createOrderRow(ordine, data) {
+            const serverTimestamp = data.server_time_local || data.timestamp;
             const row = document.createElement('tr');
             let rowClasses = 'table-row';
             
@@ -811,15 +773,22 @@
             const serviziConNote = servizi + noteHtml;
             
             // Calcola tempo di attesa se consegna immediata usando il timestamp del server
-            const waitingTime = calculateWaitingTime(ordine.data_ora_completa, ordine.tipo_consegna === 'immediata', serverTimestamp);
+            const waitingTime = calculateWaitingTime(ordine.data_ora_completa, ordine.tipo_consegna === 'immediata', data.server_time_local || data.timestamp);
             const waitingTimeHtml = waitingTime ? `<span class="waiting-time">Attesa: ${waitingTime}</span>` : '';
             
-            // Formato data registrazione - usa SEMPRE la data dal backend
-            const registrationDate = new Date(ordine.data_ora_completa);
-            const timeStr = registrationDate.toLocaleTimeString('it-IT', { 
-                hour: '2-digit', 
-                minute: '2-digit' 
-            });
+            // Formato data registrazione - usa SEMPRE la data formattata dal server
+            let timeStr;
+            if (ordine.data_ora_server_formatted) {
+                // Usa il timestamp già formattato dal server in fuso orario Europe/Rome
+                const serverFormattedDate = new Date(ordine.data_ora_server_formatted);
+                timeStr = serverFormattedDate.toLocaleTimeString('it-IT', { 
+                    hour: '2-digit', 
+                    minute: '2-digit' 
+                });
+            } else {
+                // Fallback per compatibilità
+                timeStr = ordine.data_ora;
+            }
             
             // Consegna - mostra "Immediata" se è immediata, per programmata mostra ora richiesta
             let deliveryText = '';
@@ -915,9 +884,17 @@
             const tbody = document.getElementById('ordersTableBody');
             const connectionStatus = document.getElementById('connectionStatus');
             
-            // Aggiorna stato connessione
-            connectionStatus.className = 'connection-status connected';
-            connectionStatus.innerHTML = '<i class="bi bi-wifi"></i> Connesso';
+            // Calcola e memorizza l'offset del server per sincronizzare l'orologio
+            if (data.server_time_local) {
+                const serverTime = new Date(data.server_time_local);
+                const localTime = new Date();
+                serverTimeOffset = serverTime.getTime() - localTime.getTime();
+                
+                // Aggiorna l'orologio con il tempo del server
+                updateClock(data.server_time_local);
+            }
+            
+            // Stato connessione rimosso
             
             // Filtra e ordina gli ordini
             const ordiniAttivi = data.ordini
@@ -966,10 +943,9 @@
                 `;
                 tbody.appendChild(row);
             } else {
-                // Passa il timestamp del server a ogni riga per calcoli coerenti
-                const serverTimestamp = data.timestamp;
+                // Passa l'intero oggetto data per accesso ai timestamp del server
                 ordiniAttivi.forEach(ordine => {
-                    tbody.appendChild(createOrderRow(ordine, serverTimestamp));
+                    tbody.appendChild(createOrderRow(ordine, data));
                 });
             }
         }
@@ -989,10 +965,7 @@
             } catch (error) {
                 console.error('Errore nel caricamento dati:', error);
                 
-                // Mostra stato disconnesso
-                const connectionStatus = document.getElementById('connectionStatus');
-                connectionStatus.className = 'connection-status disconnected';
-                connectionStatus.innerHTML = '<i class="bi bi-wifi-off"></i> Disconnesso';
+                // Stato disconnesso rimosso
                 
                 // Mostra messaggio di errore
                 const tbody = document.getElementById('ordersTableBody');

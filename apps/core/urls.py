@@ -33,6 +33,7 @@ urlpatterns = [
     # Gestione Scorte
     path('scorte/', views.ScorteListView.as_view(), name='scorte-list'),
     path('scorte/movimenti/', views.MovimentiScorteView.as_view(), name='movimenti-scorte'),
+    path('scorte/movimento/', views.movimento_scorte, name='movimento-scorte'),
     path('scorte/alert/', views.ProdottiSottoScortaView.as_view(), name='alert-scorte'),
     
     # API
