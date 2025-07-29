@@ -385,10 +385,13 @@ def dashboard_tv_data(request):
         
         # Converti tutti i timestamp in fuso orario locale per consistenza
         from django.utils import timezone as tz
-        import pytz
-        
-        rome_tz = pytz.timezone('Europe/Rome')
-        data_ora_locale = ordine.data_ora.astimezone(rome_tz)
+        try:
+            import pytz
+            rome_tz = pytz.timezone('Europe/Rome')
+            data_ora_locale = ordine.data_ora.astimezone(rome_tz)
+        except ImportError:
+            # Fallback senza pytz - usa il timezone locale di Django
+            data_ora_locale = ordine.data_ora
         
         ordine_data = {
             'id': ordine.id,
@@ -426,10 +429,13 @@ def dashboard_tv_data(request):
     
     # Timestamp del server in fuso orario locale per sincronizzare tutti i dispositivi
     from django.utils import timezone as tz
-    import pytz
-    
-    rome_tz = pytz.timezone('Europe/Rome')
-    server_time_local = tz.now().astimezone(rome_tz)
+    try:
+        import pytz
+        rome_tz = pytz.timezone('Europe/Rome')
+        server_time_local = tz.now().astimezone(rome_tz)
+    except ImportError:
+        # Fallback senza pytz - usa il timezone locale di Django
+        server_time_local = tz.now()
     
     return JsonResponse({
         'ordini': ordini_data,
