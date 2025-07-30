@@ -314,7 +314,7 @@
                             <div class="col-lg-2">
                                 <div class="d-grid">
                                     <form method="post" action="{% url 'prenotazioni:checkin-prenotazione' prenotazione.pk %}?from_checkin=true" 
-                                          onsubmit="return confirm('Confermi il check-in per {% if prenotazione.cliente.ragione_sociale %}{{ prenotazione.cliente.ragione_sociale }}{% else %}{{ prenotazione.cliente.nome }}{% if prenotazione.cliente.cognome %} {{ prenotazione.cliente.cognome }}{% endif %}{% endif %}?')"
+                                          onsubmit="return confirm('Confermi il check-in per {% if prenotazione.cliente.ragione_sociale %}{{ prenotazione.cliente.ragione_sociale }}{% else %}{{ prenotazione.cliente.nome }}{% if prenotazione.cliente.cognome %} {{ prenotazione.cliente.cognome }}{% endif %}{% endif %}?')">
                                         {% csrf_token %}
                                         <button type="submit" class="btn btn-checkin">
                                             <i class="bi bi-check-circle-fill"></i>
