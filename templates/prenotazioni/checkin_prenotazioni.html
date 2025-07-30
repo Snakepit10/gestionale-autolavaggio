@@ -313,14 +313,11 @@
                             <!-- Azioni -->
                             <div class="col-lg-2">
                                 <div class="d-grid">
-                                    <form method="post" action="{% url 'prenotazioni:checkin-prenotazione' prenotazione.pk %}?from_checkin=true" 
-                                          onsubmit="return confirm('Confermi il check-in per {% if prenotazione.cliente.ragione_sociale %}{{ prenotazione.cliente.ragione_sociale }}{% else %}{{ prenotazione.cliente.nome }}{% if prenotazione.cliente.cognome %} {{ prenotazione.cliente.cognome }}{% endif %}{% endif %}?')">
-                                        {% csrf_token %}
-                                        <button type="submit" class="btn btn-checkin">
-                                            <i class="bi bi-check-circle-fill"></i>
-                                            Check-in
-                                        </button>
-                                    </form>
+                                    <button type="button" class="btn btn-checkin" 
+                                            onclick="showCheckinModal({{ prenotazione.pk }})">
+                                        <i class="bi bi-check-circle-fill"></i>
+                                        Check-in
+                                    </button>
                                     <a href="{% url 'prenotazioni:dettaglio-prenotazione' prenotazione.pk %}" 
                                        class="btn btn-outline-info btn-sm mt-2">
                                         <i class="bi bi-eye"></i> Dettagli
@@ -378,7 +375,162 @@
     </div>
 </div>
 
+<!-- Modal Conferma Check-in -->
+<div class="modal fade" id="checkinModal" tabindex="-1" aria-labelledby="checkinModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header bg-success text-white">
+                <h5 class="modal-title" id="checkinModalLabel">
+                    <i class="bi bi-check-circle-fill"></i> Conferma Check-in
+                </h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <div class="alert alert-info">
+                    <i class="bi bi-info-circle"></i>
+                    Verifica i dati dell'ordine prima di procedere con il check-in
+                </div>
+                
+                <div class="row">
+                    <div class="col-md-6">
+                        <h6><i class="bi bi-person-circle"></i> Informazioni Cliente</h6>
+                        <div class="bg-light p-3 rounded mb-3">
+                            <div class="mb-2">
+                                <strong>Nome:</strong> <span id="modal-cliente-nome"></span>
+                            </div>
+                            <div class="mb-2">
+                                <strong>Email:</strong> <span id="modal-cliente-email"></span>
+                            </div>
+                            <div class="mb-2">
+                                <strong>Telefono:</strong> <span id="modal-cliente-telefono"></span>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="col-md-6">
+                        <h6><i class="bi bi-car-front"></i> Dettagli Servizio</h6>
+                        <div class="bg-light p-3 rounded mb-3">
+                            <div class="mb-2">
+                                <strong>Tipo Auto:</strong> <span id="modal-tipo-auto"></span>
+                            </div>
+                            <div class="mb-2">
+                                <strong>Data e Ora:</strong> <span id="modal-data-ora"></span>
+                            </div>
+                            <div class="mb-2">
+                                <strong>Durata Stimata:</strong> <span id="modal-durata"></span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="row">
+                    <div class="col-12">
+                        <h6><i class="bi bi-list-ul"></i> Servizi Prenotati</h6>
+                        <div class="bg-light p-3 rounded mb-3">
+                            <div id="modal-servizi-list"></div>
+                            <div class="mt-2">
+                                <strong>Totale Stimato: €<span id="modal-totale"></span></strong>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="row" id="modal-note-container" style="display: none;">
+                    <div class="col-12">
+                        <h6><i class="bi bi-chat-text"></i> Note Cliente</h6>
+                        <div class="bg-light p-3 rounded">
+                            <span id="modal-note-cliente"></span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">
+                    <i class="bi bi-x-circle"></i> Annulla
+                </button>
+                <form method="post" id="checkin-form" style="display: inline;">
+                    {% csrf_token %}
+                    <button type="submit" class="btn btn-success">
+                        <i class="bi bi-check-circle-fill"></i> Conferma Check-in
+                    </button>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+
 <script>
+// Dati delle prenotazioni per il modal
+const prenotazioniData = {
+    {% for prenotazione in prenotazioni %}
+    {{ prenotazione.pk }}: {
+        'cliente_nome': '{% if prenotazione.cliente.ragione_sociale %}{{ prenotazione.cliente.ragione_sociale }}{% else %}{{ prenotazione.cliente.nome }}{% if prenotazione.cliente.cognome %} {{ prenotazione.cliente.cognome }}{% endif %}{% endif %}',
+        'cliente_email': '{{ prenotazione.cliente.email|default:"Non fornita" }}',
+        'cliente_telefono': '{{ prenotazione.cliente.telefono|default:"Non fornito" }}',
+        'tipo_auto': '{{ prenotazione.tipo_auto|default:"Non specificato" }}',
+        'data_ora': '{{ prenotazione.slot.data|date:"d/m/Y" }} alle {{ prenotazione.slot.ora_inizio }}',
+        'durata': '{{ prenotazione.durata_stimata_minuti }} minuti',
+        'totale': '{{ prenotazione.totale_stimato|floatformat:2 }}',
+        'nota_cliente': '{{ prenotazione.nota_cliente|default:"" }}',
+        'codice': '{{ prenotazione.codice_prenotazione }}',
+        'servizi': [
+            {% for servizio in prenotazione.servizi.all %}
+            {
+                'nome': '{{ servizio.titolo }}',
+                'prezzo': '{{ servizio.prezzo|floatformat:2 }}'
+            }{% if not forloop.last %},{% endif %}
+            {% endfor %}
+        ],
+        'checkin_url': '{% url "prenotazioni:checkin-prenotazione" prenotazione.pk %}?from_checkin=true'
+    }{% if not forloop.last %},{% endif %}
+    {% endfor %}
+};
+
+function showCheckinModal(prenotazioneId) {
+    const data = prenotazioniData[prenotazioneId];
+    if (!data) {
+        alert('Errore: dati prenotazione non trovati');
+        return;
+    }
+    
+    // Popola i dati nel modal
+    document.getElementById('modal-cliente-nome').textContent = data.cliente_nome;
+    document.getElementById('modal-cliente-email').textContent = data.cliente_email;
+    document.getElementById('modal-cliente-telefono').textContent = data.cliente_telefono;
+    document.getElementById('modal-tipo-auto').textContent = data.tipo_auto;
+    document.getElementById('modal-data-ora').textContent = data.data_ora;
+    document.getElementById('modal-durata').textContent = data.durata;
+    document.getElementById('modal-totale').textContent = data.totale;
+    
+    // Popola i servizi
+    const serviziContainer = document.getElementById('modal-servizi-list');
+    serviziContainer.innerHTML = '';
+    data.servizi.forEach(servizio => {
+        const servizioBadge = document.createElement('span');
+        servizioBadge.className = 'badge bg-primary me-2 mb-2';
+        servizioBadge.textContent = `${servizio.nome} - €${servizio.prezzo}`;
+        serviziContainer.appendChild(servizioBadge);
+    });
+    
+    // Gestisci le note del cliente
+    const noteContainer = document.getElementById('modal-note-container');
+    const noteText = document.getElementById('modal-note-cliente');
+    if (data.nota_cliente && data.nota_cliente.trim() !== '') {
+        noteText.textContent = data.nota_cliente;
+        noteContainer.style.display = 'block';
+    } else {
+        noteContainer.style.display = 'none';
+    }
+    
+    // Imposta l'action del form
+    const form = document.getElementById('checkin-form');
+    form.action = data.checkin_url;
+    
+    // Mostra il modal
+    const modal = new bootstrap.Modal(document.getElementById('checkinModal'));
+    modal.show();
+}
+
 function submitFilter() {
     document.getElementById('filterForm').submit();
 }
