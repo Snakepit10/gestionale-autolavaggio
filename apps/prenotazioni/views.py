@@ -1129,8 +1129,36 @@ def checkin_prenotazione(request, pk):
                 messages.warning(request, 'Check-in già effettuato per questa prenotazione')
                 return redirect('prenotazioni:checkin-prenotazioni')
             
+            # Recupera i dati modificabili dal form
+            tipo_auto_modificato = request.POST.get('tipo_auto', '').strip()
+            ora_consegna_richiesta = request.POST.get('ora_consegna_richiesta', '').strip()
+            note_interne = request.POST.get('note_interne', '').strip()
+            
+            # Aggiorna il tipo auto nella prenotazione se modificato
+            if tipo_auto_modificato and tipo_auto_modificato != prenotazione.tipo_auto:
+                prenotazione.tipo_auto = tipo_auto_modificato
+                prenotazione.save()
+            
             # Converte prenotazione in ordine
             ordine = prenotazione.converti_in_ordine(request.user)
+            
+            # Aggiorna l'ordine con i dati modificabili
+            if ora_consegna_richiesta:
+                from datetime import datetime
+                try:
+                    ora_obj = datetime.strptime(ora_consegna_richiesta, '%H:%M').time()
+                    ordine.ora_consegna_richiesta = ora_obj
+                except ValueError:
+                    pass  # Ignora se il formato non è valido
+            
+            # Aggiungi note interne alle note dell'ordine
+            if note_interne:
+                if ordine.nota:
+                    ordine.nota = f"{ordine.nota}\n\nNote Check-in: {note_interne}"
+                else:
+                    ordine.nota = f"Note Check-in: {note_interne}"
+            
+            ordine.save()
             
             # Aggiorna stato prenotazione
             prenotazione.stato = 'completata'

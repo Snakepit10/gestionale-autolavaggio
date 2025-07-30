@@ -388,21 +388,24 @@
             <div class="modal-body">
                 <div class="alert alert-info">
                     <i class="bi bi-info-circle"></i>
-                    Verifica i dati dell'ordine prima di procedere con il check-in
+                    Verifica e modifica i dati dell'ordine prima di procedere con il check-in
                 </div>
                 
                 <div class="row">
                     <div class="col-md-6">
                         <h6><i class="bi bi-person-circle"></i> Informazioni Cliente</h6>
                         <div class="bg-light p-3 rounded mb-3">
-                            <div class="mb-2">
-                                <strong>Nome:</strong> <span id="modal-cliente-nome"></span>
+                            <div class="mb-3">
+                                <label for="modal-cliente-nome-input" class="form-label">Nome/Ragione Sociale</label>
+                                <input type="text" class="form-control" id="modal-cliente-nome-input" readonly>
+                            </div>
+                            <div class="mb-3">
+                                <label for="modal-cliente-email-input" class="form-label">Email</label>
+                                <input type="email" class="form-control" id="modal-cliente-email-input" readonly>
                             </div>
                             <div class="mb-2">
-                                <strong>Email:</strong> <span id="modal-cliente-email"></span>
-                            </div>
-                            <div class="mb-2">
-                                <strong>Telefono:</strong> <span id="modal-cliente-telefono"></span>
+                                <label for="modal-cliente-telefono-input" class="form-label">Telefono</label>
+                                <input type="text" class="form-control" id="modal-cliente-telefono-input" readonly>
                             </div>
                         </div>
                     </div>
@@ -410,14 +413,22 @@
                     <div class="col-md-6">
                         <h6><i class="bi bi-car-front"></i> Dettagli Servizio</h6>
                         <div class="bg-light p-3 rounded mb-3">
-                            <div class="mb-2">
-                                <strong>Tipo Auto:</strong> <span id="modal-tipo-auto"></span>
+                            <div class="mb-3">
+                                <label for="modal-tipo-auto-input" class="form-label">Tipo Auto</label>
+                                <input type="text" class="form-control" id="modal-tipo-auto-input" 
+                                       placeholder="Es: Fiat Panda Bianca">
+                            </div>
+                            <div class="mb-3">
+                                <label for="modal-data-ora-input" class="form-label">Data e Ora Prenotazione</label>
+                                <input type="text" class="form-control" id="modal-data-ora-input" readonly>
+                            </div>
+                            <div class="mb-3">
+                                <label for="modal-ora-consegna-input" class="form-label">Ora Consegna Richiesta</label>
+                                <input type="time" class="form-control" id="modal-ora-consegna-input">
                             </div>
                             <div class="mb-2">
-                                <strong>Data e Ora:</strong> <span id="modal-data-ora"></span>
-                            </div>
-                            <div class="mb-2">
-                                <strong>Durata Stimata:</strong> <span id="modal-durata"></span>
+                                <label class="form-label">Durata Stimata</label>
+                                <input type="text" class="form-control" id="modal-durata-input" readonly>
                             </div>
                         </div>
                     </div>
@@ -435,11 +446,19 @@
                     </div>
                 </div>
                 
-                <div class="row" id="modal-note-container" style="display: none;">
+                <div class="row">
                     <div class="col-12">
-                        <h6><i class="bi bi-chat-text"></i> Note Cliente</h6>
+                        <h6><i class="bi bi-chat-text"></i> Note</h6>
                         <div class="bg-light p-3 rounded">
-                            <span id="modal-note-cliente"></span>
+                            <div class="mb-3">
+                                <label for="modal-note-cliente-input" class="form-label">Note Cliente (originali)</label>
+                                <textarea class="form-control" id="modal-note-cliente-input" rows="2" readonly></textarea>
+                            </div>
+                            <div class="mb-2">
+                                <label for="modal-note-interne-input" class="form-label">Note Interne (modificabili)</label>
+                                <textarea class="form-control" id="modal-note-interne-input" rows="2" 
+                                          placeholder="Aggiungi note interne per l'ordine..."></textarea>
+                            </div>
                         </div>
                     </div>
                 </div>
@@ -450,6 +469,10 @@
                 </button>
                 <form method="post" id="checkin-form" style="display: inline;">
                     {% csrf_token %}
+                    <!-- Hidden inputs per i dati modificabili -->
+                    <input type="hidden" name="tipo_auto" id="form-tipo-auto">
+                    <input type="hidden" name="ora_consegna_richiesta" id="form-ora-consegna">
+                    <input type="hidden" name="note_interne" id="form-note-interne">
                     <button type="submit" class="btn btn-success">
                         <i class="bi bi-check-circle-fill"></i> Conferma Check-in
                     </button>
@@ -493,14 +516,29 @@ function showCheckinModal(prenotazioneId) {
         return;
     }
     
-    // Popola i dati nel modal
-    document.getElementById('modal-cliente-nome').textContent = data.cliente_nome;
-    document.getElementById('modal-cliente-email').textContent = data.cliente_email;
-    document.getElementById('modal-cliente-telefono').textContent = data.cliente_telefono;
-    document.getElementById('modal-tipo-auto').textContent = data.tipo_auto;
-    document.getElementById('modal-data-ora').textContent = data.data_ora;
-    document.getElementById('modal-durata').textContent = data.durata;
+    // Popola i campi readonly
+    document.getElementById('modal-cliente-nome-input').value = data.cliente_nome;
+    document.getElementById('modal-cliente-email-input').value = data.cliente_email;
+    document.getElementById('modal-cliente-telefono-input').value = data.cliente_telefono;
+    document.getElementById('modal-data-ora-input').value = data.data_ora;
+    document.getElementById('modal-durata-input').value = data.durata;
     document.getElementById('modal-totale').textContent = data.totale;
+    
+    // Popola i campi modificabili
+    document.getElementById('modal-tipo-auto-input').value = data.tipo_auto;
+    document.getElementById('modal-note-cliente-input').value = data.nota_cliente;
+    document.getElementById('modal-note-interne-input').value = '';
+    
+    // Calcola ora consegna suggerita (ora prenotazione + durata)
+    const oraPrenotazione = data.data_ora.match(/alle (\d{2}:\d{2})/);
+    if (oraPrenotazione) {
+        const [ore, minuti] = oraPrenotazione[1].split(':').map(Number);
+        const durataMint = parseInt(data.durata);
+        const oraConsegna = new Date();
+        oraConsegna.setHours(ore, minuti + durataMint, 0, 0);
+        const oraConsegnaStr = oraConsegna.toTimeString().substring(0, 5);
+        document.getElementById('modal-ora-consegna-input').value = oraConsegnaStr;
+    }
     
     // Popola i servizi
     const serviziContainer = document.getElementById('modal-servizi-list');
@@ -512,19 +550,17 @@ function showCheckinModal(prenotazioneId) {
         serviziContainer.appendChild(servizioBadge);
     });
     
-    // Gestisci le note del cliente
-    const noteContainer = document.getElementById('modal-note-container');
-    const noteText = document.getElementById('modal-note-cliente');
-    if (data.nota_cliente && data.nota_cliente.trim() !== '') {
-        noteText.textContent = data.nota_cliente;
-        noteContainer.style.display = 'block';
-    } else {
-        noteContainer.style.display = 'none';
-    }
-    
     // Imposta l'action del form
     const form = document.getElementById('checkin-form');
     form.action = data.checkin_url;
+    
+    // Aggiungi event listener per aggiornare i campi hidden prima del submit
+    form.onsubmit = function() {
+        document.getElementById('form-tipo-auto').value = document.getElementById('modal-tipo-auto-input').value;
+        document.getElementById('form-ora-consegna').value = document.getElementById('modal-ora-consegna-input').value;
+        document.getElementById('form-note-interne').value = document.getElementById('modal-note-interne-input').value;
+        return true;
+    };
     
     // Mostra il modal
     const modal = new bootstrap.Modal(document.getElementById('checkinModal'));
