@@ -227,10 +227,6 @@
                     <i class="bi bi-list-check"></i> 
                     Prenotazioni da Fare Check-in ({{ prenotazioni.count }})
                 </h5>
-                <!-- Debug info -->
-                <div class="alert alert-info" style="font-size: 0.8em;">
-                    Debug: Oggetto prenotazioni: {{ prenotazioni }} | Count: {{ prenotazioni.count }} | È lista: {{ prenotazioni|length }}
-                </div>
                 <button class="btn btn-outline-primary" onclick="location.reload()">
                     <i class="bi bi-arrow-clockwise"></i> Aggiorna
                 </button>
@@ -253,7 +249,11 @@
                                 <div class="cliente-info">
                                     <h6 class="mb-2">
                                         <i class="bi bi-person-circle"></i>
-                                        {{ prenotazione.cliente.nome }}
+                                        {% if prenotazione.cliente.ragione_sociale %}
+                                            {{ prenotazione.cliente.ragione_sociale }}
+                                        {% else %}
+                                            {{ prenotazione.cliente.nome }}{% if prenotazione.cliente.cognome %} {{ prenotazione.cliente.cognome }}{% endif %}
+                                        {% endif %}
                                     </h6>
                                     <div class="row text-sm">
                                         <div class="col-6">
@@ -314,7 +314,7 @@
                             <div class="col-lg-2">
                                 <div class="d-grid">
                                     <form method="post" action="{% url 'prenotazioni:checkin-prenotazione' prenotazione.pk %}?from_checkin=true" 
-                                          onsubmit="return confirm('Confermi il check-in per {{ prenotazione.cliente.nome }}?')">
+                                          onsubmit="return confirm('Confermi il check-in per {% if prenotazione.cliente.ragione_sociale %}{{ prenotazione.cliente.ragione_sociale }}{% else %}{{ prenotazione.cliente.nome }}{% if prenotazione.cliente.cognome %} {{ prenotazione.cliente.cognome }}{% endif %}{% endif %}?')"
                                         {% csrf_token %}
                                         <button type="submit" class="btn btn-checkin">
                                             <i class="bi bi-check-circle-fill"></i>
