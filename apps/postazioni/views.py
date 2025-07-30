@@ -357,8 +357,56 @@ def dashboard_tv_data(request):
         items__postazione_assegnata__isnull=False
     ).distinct().order_by('numero_progressivo')
     
+    # Aggiungi le prenotazioni di oggi confermate
+    from apps.prenotazioni.models import Prenotazione
+    from django.utils import timezone as tz
+    today = tz.now().date()
+    
+    prenotazioni_oggi = Prenotazione.objects.select_related(
+        'cliente', 'slot'
+    ).prefetch_related('servizi').filter(
+        slot__data=today,
+        stato='confermata',
+        ordine__isnull=True  # Solo prenotazioni non ancora convertite in ordini
+    ).order_by('slot__ora_inizio')
+    
     ordini_data = []
     for ordine in ordini:
+        # Verifica se questo ordine deriva da una prenotazione
+        booking_info = None
+        is_from_booking = False
+        
+        try:
+            # Controlla se esiste una prenotazione collegata a questo ordine
+            if hasattr(ordine, 'prenotazione') and ordine.prenotazione:
+                from datetime import datetime as dt_module
+                prenotazione = ordine.prenotazione
+                data_ora_prenotazione = dt_module.combine(prenotazione.slot.data, prenotazione.slot.ora_inizio)
+                
+                # Estrai solo i dati necessari per evitare problemi di serializzazione
+                cliente_nome = prenotazione.cliente.nome if prenotazione.cliente else ''
+                cliente_cognome = ''
+                if prenotazione.cliente and prenotazione.cliente.cognome:
+                    cliente_cognome = prenotazione.cliente.cognome
+                elif cliente_nome:
+                    # Se non c'è cognome, usa l'ultima parola del nome
+                    nome_parti = cliente_nome.split()
+                    cliente_cognome = nome_parti[-1] if nome_parti else 'Cliente'
+                else:
+                    cliente_cognome = 'Cliente'
+                
+                booking_info = {
+                    'cliente_cognome': cliente_cognome,
+                    'ora_prenotazione': prenotazione.slot.ora_inizio.strftime('%H:%M'),
+                    'nota_cliente': prenotazione.nota_cliente or '',
+                    'data_ora_prenotazione': data_ora_prenotazione.isoformat(),
+                    'ora_checkin': ordine.data_ora.isoformat(),
+                }
+                is_from_booking = True
+        except Exception as e:
+            # Se c'è un errore nel recupero dei dati della prenotazione, ignora
+            booking_info = None
+            is_from_booking = False
         # Calcola ora consegna prevista o usa data_ora
         ora_consegna = ordine.ora_consegna_prevista
         if ora_consegna:
@@ -410,6 +458,8 @@ def dashboard_tv_data(request):
             'tipo_consegna': ordine.tipo_consegna,
             'totale_finale': str(ordine.totale_finale),
             'nota': ordine.nota,
+            'is_from_booking': is_from_booking,
+            'booking_info': booking_info,
             'items': []
         }
         
@@ -427,6 +477,47 @@ def dashboard_tv_data(request):
         
         ordini_data.append(ordine_data)
     
+    # Aggiungi i dati delle prenotazioni di oggi
+    prenotazioni_data = []
+    for prenotazione in prenotazioni_oggi:
+        # Calcola ora consegna prevista (ora prenotazione + durata servizi)
+        from datetime import datetime as dt_module, timedelta
+        ora_prenotazione = dt_module.combine(prenotazione.slot.data, prenotazione.slot.ora_inizio)
+        ora_consegna_prevista = ora_prenotazione + timedelta(minutes=prenotazione.durata_stimata_minuti)
+        
+        # Prepara i servizi
+        servizi_list = []
+        for servizio in prenotazione.servizi.all():
+            servizi_list.append({
+                'nome': servizio.titolo,
+                'categoria': servizio.categoria.nome if servizio.categoria else ''
+            })
+        
+        prenotazione_data = {
+            'id': f'prenotazione_{prenotazione.id}',
+            'numero_progressivo': f'prenotazione',  # Come richiesto dall'utente
+            'cliente': prenotazione.cliente.nome,
+            'tipo_auto': prenotazione.tipo_auto if prenotazione.tipo_auto else '',
+            'stato': 'da_confermare',  # Come richiesto dall'utente
+            'stato_display': 'Da Confermare',
+            'stato_pagamento': 'non_pagato',
+            'data_ora': prenotazione.slot.ora_inizio.strftime('%H:%M'),  # Ora prenotazione
+            'data_ora_completa': ora_prenotazione.isoformat(),
+            'ora_consegna_prevista': ora_consegna_prevista.strftime('%H:%M'),  # Ora prenotazione + durata
+            'ora_consegna_prevista_completa': ora_consegna_prevista.isoformat(),
+            'ora_consegna_richiesta': '',
+            'tipo_consegna': 'programmata',
+            'totale_finale': str(prenotazione.totale_stimato),
+            'nota': prenotazione.nota_cliente,
+            'codice_prenotazione': prenotazione.codice_prenotazione,
+            'durata_stimata': prenotazione.durata_stimata_minuti,
+            'is_prenotazione': True,  # Flag per distinguere dalle order normali
+            'servizi': servizi_list,
+            'items': []  # Vuoto per compatibilità con il template
+        }
+        
+        prenotazioni_data.append(prenotazione_data)
+    
     # Timestamp del server in fuso orario locale per sincronizzare tutti i dispositivi
     from django.utils import timezone as tz
     try:
@@ -439,6 +530,7 @@ def dashboard_tv_data(request):
     
     return JsonResponse({
         'ordini': ordini_data,
+        'prenotazioni': prenotazioni_data,
         'timestamp': timezone.now().isoformat(),
         'server_time_local': server_time_local.isoformat(),
         'server_time_formatted': server_time_local.strftime('%H:%M:%S')

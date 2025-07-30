@@ -54,14 +54,14 @@
         
         .dashboard-clock {
             font-size: 2.5rem;
-            color: #3498db;
+            color: #ffffff;
             font-weight: 700;
             text-shadow: 2px 2px 4px rgba(0,0,0,0.8);
             font-family: 'Segoe UI', monospace;
-            background: rgba(52, 152, 219, 0.15);
+            background: rgba(255, 255, 255, 0.15);
             padding: 8px 20px;
             border-radius: 20px;
-            border: 2px solid rgba(52, 152, 219, 0.4);
+            border: 2px solid rgba(255, 255, 255, 0.4);
             letter-spacing: 2px;
         }
         
@@ -261,6 +261,21 @@
             line-height: 1.2;
         }
         
+        .delay-message {
+            color: #e74c3c !important;
+            background: rgba(231, 76, 60, 0.2) !important;
+            border: 1px solid rgba(231, 76, 60, 0.4);
+            font-weight: 700 !important;
+        }
+        
+        .booking-info {
+            font-size: 0.9rem !important;
+            color: #9b59b6 !important;
+            font-weight: 600 !important;
+            line-height: 1.3 !important;
+            text-align: center !important;
+        }
+        
         .status-badge {
             padding: 6px 12px;
             border-radius: 20px;
@@ -288,6 +303,12 @@
             background: linear-gradient(135deg, #27ae60 0%, #229954 100%);
             color: #ffffff;
             box-shadow: 0 2px 8px rgba(39, 174, 96, 0.4);
+        }
+        
+        .status-da-confermare {
+            background: linear-gradient(135deg, #9b59b6 0%, #8e44ad 100%);
+            color: #ffffff;
+            box-shadow: 0 2px 8px rgba(155, 89, 182, 0.4);
         }
         
         .payment-dot {
@@ -717,6 +738,37 @@
             return `${hours}h ${minutes}m`;
         }
         
+        // Funzione per calcolare il ritardo delle prenotazioni
+        function calculateBookingDelay(prenotazione, serverTimestamp) {
+            // Usa il timestamp del server se disponibile, altrimenti usa l'ora locale
+            const now = serverTimestamp ? new Date(serverTimestamp) : new Date();
+            
+            // Estrai l'orario della prenotazione (formato HH:MM)
+            const bookingTime = prenotazione.data_ora; // es. "14:30"
+            const [hours, minutes] = bookingTime.split(':').map(Number);
+            
+            // Crea l'oggetto Date per l'orario della prenotazione di oggi
+            const today = new Date(now.getFullYear(), now.getMonth(), now.getDate(), hours, minutes);
+            
+            // Calcola la differenza in minuti
+            const diffMs = now - today;
+            const diffMinutes = Math.floor(diffMs / 60000);
+            
+            // Se è in ritardo (ora attuale > ora prenotazione)
+            if (diffMinutes > 0) {
+                if (diffMinutes < 60) {
+                    return `In ritardo di ${diffMinutes} min`;
+                } else {
+                    const delayHours = Math.floor(diffMinutes / 60);
+                    const delayMins = diffMinutes % 60;
+                    return `In ritardo di ${delayHours}h ${delayMins}m`;
+                }
+            }
+            
+            // Se è in anticipo o puntuale, non mostrare nulla
+            return '';
+        }
+        
         // Funzione per verificare se un ordine è urgente basato sul timestamp del server
         function isUrgentOrder(ordine, serverTimestamp) {
             // Controlla: consegna programmata, stato SOLO in attesa (non in lavorazione), meno di 1 ora
@@ -762,19 +814,56 @@
             row.className = rowClasses;
             row.setAttribute('data-order-id', ordine.id);
             
-            // Concatena tutti i servizi
-            const servizi = ordine.items.map(item => {
-                const qty = item.quantita > 1 ? ` x${item.quantita}` : '';
-                return `${item.servizio}${qty}`;
-            }).join('<br>');
+            // Concatena tutti i servizi (gestisce sia ordini che prenotazioni)
+            let servizi;
+            let noteHtml = '';
             
-            // Aggiungi le note dell'ordine se presenti
-            const noteHtml = ordine.nota ? `<div class="order-notes">${ordine.nota}</div>` : '';
+            if (ordine.is_prenotazione) {
+                // Per le prenotazioni, usa il campo servizi
+                servizi = ordine.servizi.map(servizio => servizio.nome).join('<br>');
+            } else {
+                // Per gli ordini, usa il campo items
+                servizi = ordine.items.map(item => {
+                    const qty = item.quantita > 1 ? ` x${item.quantita}` : '';
+                    return `${item.servizio}${qty}`;
+                }).join('<br>');
+                
+                // Se l'ordine deriva da una prenotazione, aggiungi info prenotazione ai servizi
+                if (ordine.is_from_booking && ordine.booking_info) {
+                    const cognome = ordine.booking_info.cliente_cognome;
+                    const oraPrenotazione = ordine.booking_info.ora_prenotazione;
+                    
+                    // Calcola eventuale ritardo del check-in per le note
+                    const dataOraPrenotazione = new Date(ordine.booking_info.data_ora_prenotazione);
+                    const oraCheckin = new Date(ordine.booking_info.ora_checkin);
+                    const ritardoMs = oraCheckin - dataOraPrenotazione;
+                    const ritardoMinuti = Math.floor(ritardoMs / 60000);
+                    
+                    let messaggioPrenotazione = `${cognome} prenotato alle ${oraPrenotazione}`;
+                    if (ritardoMinuti > 0) {
+                        messaggioPrenotazione += ` (ritardo ${ritardoMinuti} min)`;
+                    }
+                    
+                    noteHtml = `<div class="order-notes">${messaggioPrenotazione}</div>`;
+                } else if (ordine.nota) {
+                    // Altrimenti usa le note dell'ordine normali
+                    noteHtml = `<div class="order-notes">${ordine.nota}</div>`;
+                }
+            }
+            
             const serviziConNote = servizi + noteHtml;
             
             // Calcola tempo di attesa se consegna immediata usando il timestamp del server
             const waitingTime = calculateWaitingTime(ordine.data_ora_completa, ordine.tipo_consegna === 'immediata', data.server_time_local || data.timestamp);
-            const waitingTimeHtml = waitingTime ? `<span class="waiting-time">Attesa: ${waitingTime}</span>` : '';
+            let waitingTimeHtml = waitingTime ? `<span class="waiting-time">Attesa: ${waitingTime}</span>` : '';
+            
+            // Per le prenotazioni, calcola eventuale ritardo
+            if (ordine.is_prenotazione) {
+                const delayMessage = calculateBookingDelay(ordine, data.server_time_local || data.timestamp);
+                if (delayMessage) {
+                    waitingTimeHtml = `<span class="waiting-time delay-message">${delayMessage}</span>`;
+                }
+            }
             
             // Formato data registrazione - usa SEMPRE la data formattata dal server
             let timeStr;
@@ -816,16 +905,25 @@
                     statusClass = 'status-completato';
                     statusText = 'COMPLETATO';
                     break;
+                case 'da_confermare':
+                    statusClass = 'status-da-confermare';
+                    statusText = 'DA CONFERMARE';
+                    break;
                 default:
                     statusClass = 'status-in-attesa';
-                    statusText = ordine.stato_display.toUpperCase();
+                    statusText = ordine.stato_display ? ordine.stato_display.toUpperCase() : ordine.stato.toUpperCase();
             }
             
-            // Estrai solo le ultime due cifre del numero progressivo
-            const orderNumber = ordine.numero_progressivo;
-            const lastTwoDigits = orderNumber.slice(-2);
+            // Estrai numero ordine - per prenotazioni mostra "P", per ordini le ultime due cifre
+            let displayNumber;
+            if (ordine.is_prenotazione) {
+                displayNumber = 'P';
+            } else {
+                const orderNumber = ordine.numero_progressivo;
+                displayNumber = orderNumber.slice(-2);
+            }
             
-            // Formato registrazione: solo ora in alto, attesa in basso
+            // Formato registrazione: uguale per tutti gli ordini (inclusi quelli da prenotazione)
             const registrationHtml = `
                 <div class="registration-time">${timeStr}</div>
                 ${waitingTimeHtml}
@@ -852,7 +950,7 @@
 
             row.innerHTML = `
                 <td class="table-cell col-order-number">
-                    ${lastTwoDigits}
+                    ${displayNumber}
                 </td>
                 <td class="table-cell col-registration">
                     ${registrationHtml}
@@ -908,7 +1006,19 @@
                     return a.numero_progressivo.localeCompare(b.numero_progressivo);
                 });
             
-            // Rileva nuovi ordini
+            // Aggiungi le prenotazioni di oggi
+            const prenotazioniOggi = data.prenotazioni || [];
+            
+            // Combina ordini e prenotazioni
+            const tuttiGliElementi = [...ordiniAttivi, ...prenotazioniOggi]
+                .sort((a, b) => {
+                    // Ordina per ora: prima quelli con ora più vicina
+                    const timeA = a.data_ora || '00:00';
+                    const timeB = b.data_ora || '00:00';
+                    return timeA.localeCompare(timeB);
+                });
+            
+            // Rileva nuovi ordini (solo per ordini, non prenotazioni)
             const currentOrderIds = new Set(ordiniAttivi.map(o => o.id));
             
             // Se non è il primo caricamento, controlla per nuovi ordini
@@ -930,22 +1040,22 @@
             // Pulisci la tabella
             tbody.innerHTML = '';
             
-            if (ordiniAttivi.length === 0) {
+            if (tuttiGliElementi.length === 0) {
                 const row = document.createElement('tr');
                 row.className = 'table-row';
                 row.innerHTML = `
                     <td class="table-cell" colspan="7">
                         <div class="no-orders">
                             <i class="bi bi-check-circle"></i>
-                            Nessun ordine in lavorazione
+                            Nessun ordine o prenotazione
                         </div>
                     </td>
                 `;
                 tbody.appendChild(row);
             } else {
                 // Passa l'intero oggetto data per accesso ai timestamp del server
-                ordiniAttivi.forEach(ordine => {
-                    tbody.appendChild(createOrderRow(ordine, data));
+                tuttiGliElementi.forEach(elemento => {
+                    tbody.appendChild(createOrderRow(elemento, data));
                 });
             }
         }
