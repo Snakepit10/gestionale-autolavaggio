@@ -230,7 +230,19 @@ class ItemOrdine(models.Model):
                     key=lambda p: p.get_ordini_in_coda().count()
                 )
         
+        # Se è un prodotto, imposta lo stato come completato fin dall'inizio
+        if self.servizio_prodotto.tipo == 'prodotto' and not self.pk:
+            self.stato = 'completato'
+            self.fine_lavorazione = timezone.now()
+        
         super().save(*args, **kwargs)
+        
+        # Verifica se tutto l'ordine è completato dopo il salvataggio
+        if self.stato == 'completato':
+            ordine = self.ordine
+            if all(item.stato == 'completato' for item in ordine.items.all()):
+                ordine.stato = 'completato'
+                ordine.save()
 
 
 class Pagamento(models.Model):

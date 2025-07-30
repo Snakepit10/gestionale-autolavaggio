@@ -126,16 +126,18 @@ class NuovaPrenotazioneView(TemplateView):
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
         
-        # Aggiungi servizi disponibili per il template (solo categoria "Servito")
+        # Aggiungi servizi disponibili per il template (categorie "Servito" e "Mezzi Pesanti")
         from apps.core.models import ServizioProdotto, Categoria
-        servito_categoria = Categoria.objects.filter(nome='Servito').first()
-        if servito_categoria:
+        categorie_prenotabili = Categoria.objects.filter(nome__in=['Servito', 'Mezzi Pesanti'])
+        if categorie_prenotabili.exists():
             context['servizi_disponibili'] = ServizioProdotto.objects.filter(
                 attivo=True,
-                categoria=servito_categoria
-            )
+                categoria__in=categorie_prenotabili
+            ).select_related('categoria')
+            context['categorie'] = categorie_prenotabili
         else:
-            context['servizi_disponibili'] = ServizioProdotto.objects.filter(attivo=True)
+            context['servizi_disponibili'] = ServizioProdotto.objects.filter(attivo=True).select_related('categoria')
+            context['categorie'] = Categoria.objects.filter(attiva=True)
         
         # Aggiungi un form vuoto per il CSRF token
         from .forms import PrenotazioneForm

@@ -113,13 +113,15 @@
 }
 
 .service-card {
-    border: 1px solid #dee2e6;
-    border-radius: 12px;
-    padding: 20px;
+    border: 2px solid #dee2e6;
+    border-radius: 8px;
+    padding: 8px;
     text-align: center;
     cursor: pointer;
     transition: all 0.3s ease;
     height: 100%;
+    position: relative;
+    min-height: 100px;
 }
 
 .service-card:hover {
@@ -134,22 +136,55 @@
     color: white;
 }
 
-.service-icon {
-    width: 60px;
-    height: 60px;
-    background: linear-gradient(135deg, #0d6efd, #6610f2);
-    border-radius: 50%;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    margin: 0 auto 15px;
-    color: white;
-    font-size: 1.5rem;
+/* Colori per le categorie nelle prenotazioni */
+.service-card[data-categoria="1"] { background-color: rgba(255, 107, 107, 0.1); border-color: #ff6b6b; }
+.service-card[data-categoria="2"] { background-color: rgba(78, 205, 196, 0.1); border-color: #4ecdc4; }
+.service-card[data-categoria="3"] { background-color: rgba(69, 183, 209, 0.1); border-color: #45b7d1; }
+.service-card[data-categoria="4"] { background-color: rgba(249, 202, 36, 0.1); border-color: #f9ca24; }
+.service-card[data-categoria="5"] { background-color: rgba(240, 147, 43, 0.1); border-color: #f0932b; }
+.service-card[data-categoria="6"] { background-color: rgba(108, 92, 231, 0.1); border-color: #6c5ce7; }
+
+.service-card.selected[data-categoria="1"] { background: #ff6b6b; border-color: #ff6b6b; }
+.service-card.selected[data-categoria="2"] { background: #4ecdc4; border-color: #4ecdc4; }
+.service-card.selected[data-categoria="3"] { background: #45b7d1; border-color: #45b7d1; }
+.service-card.selected[data-categoria="4"] { background: #f9ca24; border-color: #f9ca24; }
+.service-card.selected[data-categoria="5"] { background: #f0932b; border-color: #f0932b; }
+.service-card.selected[data-categoria="6"] { background: #6c5ce7; border-color: #6c5ce7; }
+
+.categoria-header-booking {
+    background: #f8f9fa;
+    padding: 15px;
+    margin-bottom: 20px;
+    border-radius: 8px;
+    border-left: 4px solid transparent;
 }
 
-.service-card.selected .service-icon {
-    background: white;
-    color: #0d6efd;
+.categoria-header-booking[data-categoria="1"] { border-left-color: #ff6b6b; }
+.categoria-header-booking[data-categoria="2"] { border-left-color: #4ecdc4; }
+.categoria-header-booking[data-categoria="3"] { border-left-color: #45b7d1; }
+.categoria-header-booking[data-categoria="4"] { border-left-color: #f9ca24; }
+.categoria-header-booking[data-categoria="5"] { border-left-color: #f0932b; }
+.categoria-header-booking[data-categoria="6"] { border-left-color: #6c5ce7; }
+
+.service-card h6 {
+    font-size: 0.9rem;
+    margin-bottom: 4px;
+    font-weight: 600;
+}
+
+.service-card .text-primary {
+    font-size: 1rem;
+    font-weight: bold;
+    margin-bottom: 2px;
+}
+
+.service-card small {
+    font-size: 0.75rem;
+}
+
+.service-card .small {
+    font-size: 0.7rem;
+    line-height: 1.2;
 }
 
 .time-slot {
@@ -203,13 +238,76 @@
     justify-content: space-between;
     margin: 10px 30px;
 }
+
+/* Stili per il riepilogo prenotazione */
+.booking-summary-card {
+    top: 20px;
+}
+
+.summary-section-title {
+    font-size: 0.9rem;
+    font-weight: 600;
+    color: #495057;
+    margin-bottom: 8px;
+}
+
+.summary-content {
+    font-size: 0.85rem;
+    line-height: 1.4;
+}
+
+.summary-service-item {
+    background: #f8f9fa;
+    border-radius: 6px;
+    padding: 8px 10px;
+    margin-bottom: 6px;
+    border-left: 3px solid #0d6efd;
+}
+
+.summary-service-item:last-child {
+    margin-bottom: 0;
+}
+
+.summary-service-title {
+    font-weight: 600;
+    font-size: 0.8rem;
+    color: #495057;
+}
+
+.summary-service-details {
+    font-size: 0.75rem;
+    color: #6c757d;
+}
+
+.summary-totals {
+    background: #f8f9fa;
+    border-radius: 8px;
+    padding: 12px;
+    margin: 0 -12px;
+}
+
+.wizard-content {
+    padding: 20px 40px;
+    min-height: auto;
+}
+
+@media (max-width: 991px) {
+    .booking-summary-card {
+        position: static !important;
+        margin-top: 20px;
+    }
+    
+    .wizard-content {
+        padding: 20px;
+    }
+}
 </style>
 {% endblock %}
 
 {% block content %}
 <div class="container-fluid">
-    <div class="row justify-content-center">
-        <div class="col-12 col-xl-10">
+    <div class="row">
+        <div class="col-lg-8">
             <div class="wizard-container">
                 <!-- Header -->
                 <div class="wizard-header">
@@ -330,26 +428,34 @@
                                 Seleziona Servizi
                             </h3>
                             
-                            <div class="row" id="services-container">
-                                {% for servizio in servizi_disponibili %}
-                                <div class="col-md-6 col-lg-4 mb-3">
-                                    <div class="service-card" 
-                                         onclick="toggleService({{ servizio.id }}, '{{ servizio.titolo|escapejs }}', {{ servizio.prezzo|floatformat:2 }}, {{ servizio.durata_minuti }})"
-                                         data-service-id="{{ servizio.id }}"
-                                         data-service-title="{{ servizio.titolo|escapejs }}"
-                                         data-service-price="{{ servizio.prezzo|floatformat:2 }}"
-                                         data-service-duration="{{ servizio.durata_minuti }}">
-                                        <div class="service-icon">
-                                            <i class="bi bi-droplet"></i>
-                                        </div>
-                                        <h6>{{ servizio.titolo }}</h6>
-                                        <p class="text-primary h5 mb-1">€{{ servizio.prezzo|floatformat:2 }}</p>
-                                        <small class="text-muted">{{ servizio.durata_minuti }} min</small>
-                                        {% if servizio.descrizione %}
-                                            <p class="small mt-2">{{ servizio.descrizione|truncatewords:8 }}</p>
-                                        {% endif %}
+                            <div id="services-container">
+                                {% regroup servizi_disponibili by categoria as categorie_raggruppate %}
+                                {% for categoria_group in categorie_raggruppate %}
+                                    <div class="categoria-header-booking mb-3" data-categoria="{{ categoria_group.grouper.id }}">
+                                        <h5 class="mb-2 text-dark">
+                                            <i class="bi bi-{% if categoria_group.grouper.nome == 'Mezzi Pesanti' %}truck{% else %}droplet{% endif %}"></i>
+                                            {{ categoria_group.grouper.nome }}
+                                        </h5>
+                                        <small class="text-muted">{{ categoria_group.list|length }} servizi disponibili</small>
                                     </div>
-                                </div>
+                                    
+                                    <div class="row g-2 mb-4">
+                                        {% for servizio in categoria_group.list %}
+                                        <div class="col-sm-6 col-md-4 col-lg-3 mb-2">
+                                            <div class="service-card" 
+                                                 onclick="toggleService({{ servizio.id }}, '{{ servizio.titolo|escapejs }}', {{ servizio.prezzo|floatformat:2 }}, {{ servizio.durata_minuti }})"
+                                                 data-service-id="{{ servizio.id }}"
+                                                 data-service-title="{{ servizio.titolo|escapejs }}"
+                                                 data-service-price="{{ servizio.prezzo|floatformat:2 }}"
+                                                 data-service-duration="{{ servizio.durata_minuti }}"
+                                                 data-categoria="{{ servizio.categoria.id }}">
+                                                <h6 class="mb-1">{{ servizio.titolo }}</h6>
+                                                <div class="text-primary fw-bold">€{{ servizio.prezzo|floatformat:2 }}</div>
+                                                <small class="text-muted d-block">{{ servizio.durata_minuti }}min</small>
+                                            </div>
+                                        </div>
+                                        {% endfor %}
+                                    </div>
                                 {% endfor %}
                             </div>
                         </div>
@@ -498,6 +604,88 @@
                 </div>
             </div>
         </div>
+        
+        <!-- Riepilogo Prenotazione Column -->
+        <div class="col-lg-4">
+            <div class="booking-summary-card sticky-top">
+                <div class="card">
+                    <div class="card-header bg-primary text-white">
+                        <h6 class="mb-0">
+                            <i class="bi bi-clipboard-check"></i>
+                            Riepilogo Prenotazione
+                        </h6>
+                    </div>
+                    <div class="card-body">
+                        <!-- Cliente -->
+                        <div class="summary-section mb-3">
+                            <h6 class="summary-section-title">
+                                <i class="bi bi-person text-primary"></i>
+                                Cliente
+                            </h6>
+                            <div id="summary-cliente-live" class="summary-content text-muted">
+                                Non selezionato
+                            </div>
+                        </div>
+                        
+                        <!-- Servizi -->
+                        <div class="summary-section mb-3">
+                            <h6 class="summary-section-title">
+                                <i class="bi bi-gear text-primary"></i>
+                                Servizi
+                                <span id="services-count" class="badge bg-secondary ms-1">0</span>
+                            </h6>
+                            <div id="summary-servizi-live" class="summary-content text-muted">
+                                Nessun servizio selezionato
+                            </div>
+                        </div>
+                        
+                        <!-- Data e Ora -->
+                        <div class="summary-section mb-3">
+                            <h6 class="summary-section-title">
+                                <i class="bi bi-calendar-event text-primary"></i>
+                                Data e Ora
+                            </h6>
+                            <div id="summary-datetime-live" class="summary-content text-muted">
+                                Non selezionate
+                            </div>
+                        </div>
+                        
+                        <!-- Note -->
+                        <div class="summary-section mb-3" id="summary-note-section" style="display: none;">
+                            <h6 class="summary-section-title">
+                                <i class="bi bi-chat-text text-primary"></i>
+                                Note
+                            </h6>
+                            <div id="summary-note-live" class="summary-content">
+                            </div>
+                        </div>
+                        
+                        <!-- Totali -->
+                        <div class="summary-totals mt-3 pt-3 border-top">
+                            <div class="d-flex justify-content-between mb-2">
+                                <span class="fw-bold">Durata Totale:</span>
+                                <span id="summary-durata-live" class="text-primary fw-bold">0 min</span>
+                            </div>
+                            <div class="d-flex justify-content-between">
+                                <span class="fw-bold">Totale Stimato:</span>
+                                <span id="summary-totale-live" class="h5 text-success mb-0">€0.00</span>
+                            </div>
+                        </div>
+                        
+                        <!-- Progress Indicator -->
+                        <div class="mt-3 pt-3 border-top">
+                            <div class="d-flex justify-content-between align-items-center mb-2">
+                                <small class="text-muted">Completamento</small>
+                                <small id="progress-percentage" class="text-muted">0%</small>
+                            </div>
+                            <div class="progress" style="height: 6px;">
+                                <div id="progress-bar" class="progress-bar bg-primary" role="progressbar" style="width: 0%"></div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
     </div>
 </div>
 
@@ -515,6 +703,7 @@ let totalDuration = 0;
 document.addEventListener('DOMContentLoaded', function() {
     updateNavigation();
     setupEventListeners();
+    updateLiveSummary();
 });
 
 function setupEventListeners() {
@@ -541,13 +730,19 @@ function setupEventListeners() {
     }
     
     // Campi nuovo cliente
-    const nuoviCampiCliente = ['id_nome_cliente', 'id_telefono_cliente', 'id_tipo_auto'];
+    const nuoviCampiCliente = ['id_nome_cliente', 'id_cognome_cliente', 'id_telefono_cliente', 'id_tipo_auto'];
     nuoviCampiCliente.forEach(fieldId => {
         const field = document.getElementById(fieldId);
         if (field) {
             field.addEventListener('input', checkNewClientData);
         }
     });
+    
+    // Note cliente
+    const noteField = document.getElementById('id_nota_cliente');
+    if (noteField) {
+        noteField.addEventListener('input', updateLiveSummary);
+    }
 }
 
 function debounce(func, wait) {
@@ -616,12 +811,14 @@ function selectSearchResult(id, nomeCompleto, tipo, telefono) {
     clientSelect.value = id;
     
     updateNavigation();
+    updateLiveSummary();
 }
 
 function selectExistingClient(id, text) {
     const [nome, email] = text.split(' - ');
     selectedClient = { id, nome, email, type: 'existing' };
     updateNavigation();
+    updateLiveSummary();
 }
 
 function checkNewClientData() {
@@ -648,6 +845,7 @@ function checkNewClientData() {
     }
     
     updateNavigation();
+    updateLiveSummary();
 }
 
 function toggleService(id, title, price, duration) {
@@ -667,6 +865,9 @@ function toggleService(id, title, price, duration) {
     price = parseFloat(price);
     duration = parseInt(duration);
     
+    // Decodifica il titolo se proviene dai data attributes o se è escaped
+    title = decodeHTMLEntities(title);
+    
     console.log(`Toggle servizio: ID=${id}, Titolo='${title}', Prezzo=${price}, Durata=${duration}`);
     
     if (existingIndex > -1) {
@@ -683,6 +884,7 @@ function toggleService(id, title, price, duration) {
     
     updateTotals();
     updateNavigation();
+    updateLiveSummary();
     
     console.log(`Totale attuale: €${totalPrice.toFixed(2)}, Durata: ${totalDuration} min`);
 }
@@ -778,6 +980,7 @@ function selectTimeSlot(time) {
     event.target.classList.add('selected');
     
     updateNavigation();
+    updateLiveSummary();
 }
 
 function nextStep() {
@@ -798,6 +1001,7 @@ function nextStep() {
         }
         
         updateNavigation();
+        updateLiveSummary();
     }
 }
 
@@ -814,6 +1018,7 @@ function previousStep() {
         document.getElementById(`step-${currentStep}`).classList.add('active');
         
         updateNavigation();
+        updateLiveSummary();
     }
 }
 
@@ -877,7 +1082,8 @@ function updateSummary() {
     if (selectedServices.length > 0) {
         let servicesHtml = '<ul class="mb-0">';
         selectedServices.forEach(service => {
-            servicesHtml += `<li>${service.title} - €${service.price}</li>`;
+            const decodedTitle = decodeHTMLEntities(service.title);
+            servicesHtml += `<li>${decodedTitle} - €${service.price}</li>`;
         });
         servicesHtml += '</ul>';
         document.getElementById('summary-services').innerHTML = servicesHtml;
@@ -987,6 +1193,183 @@ function submitWizard() {
     
     // Submit del form
     document.getElementById('wizardForm').submit();
+}
+
+// Funzione per decodificare caratteri HTML/JS escaped
+function decodeHTMLEntities(text) {
+    const textarea = document.createElement('textarea');
+    textarea.innerHTML = text;
+    let decoded = textarea.value;
+    
+    // Decodifica anche i caratteri JavaScript escaped comuni
+    decoded = decoded.replace(/\\u002D/g, '-');
+    decoded = decoded.replace(/\\u0027/g, "'");
+    decoded = decoded.replace(/\\u0022/g, '"');
+    decoded = decoded.replace(/\\u0026/g, '&');
+    decoded = decoded.replace(/\\u003C/g, '<');
+    decoded = decoded.replace(/\\u003E/g, '>');
+    
+    return decoded;
+}
+
+// Funzione per aggiornare il riepilogo live
+function updateLiveSummary() {
+    // Aggiorna cliente
+    const clienteElement = document.getElementById('summary-cliente-live');
+    if (selectedClient) {
+        let clientText = '';
+        if (selectedClient.type === 'new') {
+            clientText = `${selectedClient.nome} ${selectedClient.cognome || ''}`.trim();
+            if (selectedClient.telefono) {
+                clientText += ` (${selectedClient.telefono})`;
+            }
+        } else {
+            clientText = selectedClient.nome;
+            if (selectedClient.telefono) {
+                clientText += ` (${selectedClient.telefono})`;
+            }
+        }
+        clienteElement.textContent = clientText;
+        clienteElement.classList.remove('text-muted');
+        clienteElement.classList.add('text-dark');
+    } else {
+        clienteElement.textContent = 'Non selezionato';
+        clienteElement.classList.remove('text-dark');
+        clienteElement.classList.add('text-muted');
+    }
+    
+    // Aggiorna servizi
+    const serviziElement = document.getElementById('summary-servizi-live');
+    const servicesCountElement = document.getElementById('services-count');
+    
+    if (selectedServices.length > 0) {
+        let serviziHtml = '';
+        selectedServices.forEach(service => {
+            // Decodifica i caratteri HTML/JS escaped
+            const decodedTitle = decodeHTMLEntities(service.title);
+            serviziHtml += `
+                <div class="summary-service-item">
+                    <div class="summary-service-title">${decodedTitle}</div>
+                    <div class="summary-service-details">€${service.price} • ${service.duration} min</div>
+                </div>
+            `;
+        });
+        serviziElement.innerHTML = serviziHtml;
+        servicesCountElement.textContent = selectedServices.length;
+        servicesCountElement.classList.remove('bg-secondary');
+        servicesCountElement.classList.add('bg-primary');
+    } else {
+        serviziElement.innerHTML = '<span class="text-muted">Nessun servizio selezionato</span>';
+        servicesCountElement.textContent = '0';
+        servicesCountElement.classList.remove('bg-primary');
+        servicesCountElement.classList.add('bg-secondary');
+    }
+    
+    // Aggiorna data e ora
+    const datetimeElement = document.getElementById('summary-datetime-live');
+    if (selectedDate && selectedSlot) {
+        const dateObj = new Date(selectedDate);
+        const formattedDate = dateObj.toLocaleDateString('it-IT', {
+            weekday: 'long',
+            day: 'numeric',
+            month: 'long'
+        });
+        datetimeElement.innerHTML = `
+            <div class="fw-bold">${formattedDate}</div>
+            <div class="text-primary">ore ${selectedSlot}</div>
+        `;
+        datetimeElement.classList.remove('text-muted');
+    } else if (selectedDate) {
+        const dateObj = new Date(selectedDate);
+        const formattedDate = dateObj.toLocaleDateString('it-IT', {
+            weekday: 'long',
+            day: 'numeric',
+            month: 'long'
+        });
+        datetimeElement.innerHTML = `
+            <div class="fw-bold">${formattedDate}</div>
+            <div class="text-muted">Orario da selezionare</div>
+        `;
+        datetimeElement.classList.remove('text-muted');
+    } else {
+        datetimeElement.textContent = 'Non selezionate';
+        datetimeElement.classList.add('text-muted');
+    }
+    
+    // Aggiorna note
+    const noteElement = document.getElementById('id_nota_cliente');
+    const noteSectionElement = document.getElementById('summary-note-section');
+    const noteLiveElement = document.getElementById('summary-note-live');
+    
+    if (noteElement && noteElement.value.trim()) {
+        noteLiveElement.textContent = noteElement.value.trim();
+        noteSectionElement.style.display = 'block';
+    } else {
+        noteSectionElement.style.display = 'none';
+    }
+    
+    // Aggiorna totali
+    document.getElementById('summary-durata-live').textContent = `${totalDuration} min`;
+    document.getElementById('summary-totale-live').textContent = `€${totalPrice.toFixed(2)}`;
+    
+    // Aggiorna progress bar
+    updateProgressBar();
+}
+
+function updateProgressBar() {
+    let progress = 0;
+    let completedSteps = 0;
+    
+    // Step 1: Cliente (20%)
+    if (selectedClient) {
+        completedSteps += 1;
+        progress += 20;
+    }
+    
+    // Step 2: Servizi (30%)
+    if (selectedServices.length > 0) {
+        completedSteps += 1;
+        progress += 30;
+    }
+    
+    // Step 3: Data (25%)
+    if (selectedDate) {
+        completedSteps += 1;
+        progress += 15;
+    }
+    
+    // Step 3: Ora (25%)
+    if (selectedSlot) {
+        progress += 15;
+    }
+    
+    // Step 4: Note (opzionale, 5%)
+    const noteElement = document.getElementById('id_nota_cliente');
+    if (noteElement && noteElement.value.trim()) {
+        progress += 5;
+    }
+    
+    // Step 5: Completamento (15%)
+    if (currentStep === 5) {
+        progress += 15;
+    }
+    
+    // Aggiorna barra di progresso
+    const progressBar = document.getElementById('progress-bar');
+    const progressPercentage = document.getElementById('progress-percentage');
+    
+    progressBar.style.width = progress + '%';
+    progressPercentage.textContent = Math.round(progress) + '%';
+    
+    // Cambia colore in base al progresso
+    progressBar.classList.remove('bg-primary', 'bg-warning', 'bg-success');
+    if (progress < 50) {
+        progressBar.classList.add('bg-primary');
+    } else if (progress < 90) {
+        progressBar.classList.add('bg-warning');
+    } else {
+        progressBar.classList.add('bg-success');
+    }
 }
 
 // Inizializzazione con parametri dal calendario
