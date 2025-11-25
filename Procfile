@@ -1,1 +1,1 @@
-web: gunicorn config.wsgi:application --bind 0.0.0.0:$PORT --log-file - --timeout 120 --workers 2 --access-logfile - --error-logfile - --preload
+web: gunicorn config.wsgi --log-file -
