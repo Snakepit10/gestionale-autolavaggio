@@ -715,9 +715,7 @@ function mostraModalPagamento() {
     modal.show();
 }
 
-// WebSocket per aggiornamenti real-time - TEMPORANEAMENTE DISABILITATO
-// TODO: Riattivare quando Channels sarà configurato su Railway
-/*
+// WebSocket per aggiornamenti real-time
 let webSocket = null;
 
 function inizializzaWebSocket() {
@@ -813,9 +811,7 @@ window.addEventListener('beforeunload', function() {
         webSocket.close();
     }
 });
-*/
 
-console.log('WebSocket temporaneamente disabilitato - La pagina funziona normalmente senza aggiornamenti real-time');
 
 // Funzione per mostrare il modal di modifica
 function mostraModalModifica() {

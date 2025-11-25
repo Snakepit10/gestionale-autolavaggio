@@ -500,9 +500,7 @@ document.getElementById('form-pagamento').addEventListener('submit', function(e)
     });
 });
 
-// WebSocket per aggiornamenti real-time - TEMPORANEAMENTE DISABILITATO
-// TODO: Riattivare quando Channels sarà configurato su Railway
-/*
+// WebSocket per aggiornamenti real-time
 let webSocket = null;
 
 function inizializzaWebSocket() {
@@ -649,8 +647,5 @@ window.addEventListener('beforeunload', function() {
         webSocket.close();
     }
 });
-*/
-
-console.log('WebSocket temporaneamente disabilitato - La pagina funziona normalmente senza aggiornamenti real-time');
 </script>
 {% endblock %}

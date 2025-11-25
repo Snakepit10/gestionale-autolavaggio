@@ -947,9 +947,7 @@ document.addEventListener('DOMContentLoaded', function() {
     console.log('✅ Dashboard operativa caricata - Contatori:', counts);
 });
 
-// WebSocket per aggiornamenti real-time - TEMPORANEAMENTE DISABILITATO
-// TODO: Riattivare quando Channels sarà configurato su Railway
-/*
+// WebSocket per aggiornamenti real-time
 function inizializzaWebSocket() {
     const wsProtocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
     const wsUrl = `${wsProtocol}//${window.location.host}/ws/postazione/{{ postazione.id }}/`;
