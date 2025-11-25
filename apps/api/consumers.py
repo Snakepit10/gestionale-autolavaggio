@@ -1,11 +1,12 @@
 import json
 from channels.generic.websocket import AsyncWebsocketConsumer
 from channels.db import database_sync_to_async
-from django.contrib.auth.models import AnonymousUser
 
 
 class PostazioneConsumer(AsyncWebsocketConsumer):
     async def connect(self):
+        from django.contrib.auth.models import AnonymousUser
+
         if isinstance(self.scope["user"], AnonymousUser):
             await self.close()
             return
@@ -96,6 +97,8 @@ class PostazioneConsumer(AsyncWebsocketConsumer):
 
 class OrdiniConsumer(AsyncWebsocketConsumer):
     async def connect(self):
+        from django.contrib.auth.models import AnonymousUser
+
         if isinstance(self.scope["user"], AnonymousUser):
             await self.close()
             return
@@ -141,6 +144,8 @@ class OrdiniConsumer(AsyncWebsocketConsumer):
 
 class DashboardConsumer(AsyncWebsocketConsumer):
     async def connect(self):
+        from django.contrib.auth.models import AnonymousUser
+
         if isinstance(self.scope["user"], AnonymousUser):
             await self.close()
             return
