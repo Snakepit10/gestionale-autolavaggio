@@ -7,14 +7,14 @@ from pathlib import Path
 # Directory base del progetto
 BASE_DIR = Path(__file__).resolve().parent.parent
 
-# Chiave segreta per development
-SECRET_KEY = 'django-secret-key-for-development-change-in-production'
+# Chiave segreta - da variabile d'ambiente in produzione
+SECRET_KEY = os.environ.get('SECRET_KEY', 'django-secret-key-for-development-change-in-production')
 
-# Debug attivo
-DEBUG = True
+# Debug - False in produzione
+DEBUG = os.environ.get('DEBUG', 'True').lower() in ('true', '1', 'yes')
 
-# Host consentiti - tutti per development
-ALLOWED_HOSTS = ['*']
+# Host consentiti
+ALLOWED_HOSTS = os.environ.get('ALLOWED_HOSTS', '*').split(',') if os.environ.get('ALLOWED_HOSTS') else ['*']
 
 # CSRF trusted origins for Railway
 CSRF_TRUSTED_ORIGINS = [
