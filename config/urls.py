@@ -2,22 +2,28 @@ from django.contrib import admin
 from django.urls import path, include
 from django.conf import settings
 from django.conf.urls.static import static
+from django.http import HttpResponse
+
+# Health check endpoint per Railway
+def health_check(request):
+    return HttpResponse("OK", status=200)
 
 urlpatterns = [
+    path('health/', health_check, name='health_check'),
     path('admin/', admin.site.urls),
-    
+
     # Sistema di Autenticazione
     path('auth/', include('apps.auth_system.urls')),
-    
+
     # Core URLs essenziali
     path('', include('apps.core.urls')),
     path('clienti/', include('apps.clienti.urls')),
     path('ordini/', include('apps.ordini.urls')),
     path('postazioni/', include('apps.postazioni.urls')),
-    
+
     # Abbonamenti e NFC
     path('abbonamenti/', include('apps.abbonamenti.urls')),
-    
+
     # Prenotazioni
     path('prenotazioni/', include('apps.prenotazioni.urls')),
     # path('shop/', include('apps.shop.urls')),
