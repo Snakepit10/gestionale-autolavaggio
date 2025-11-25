@@ -37,7 +37,8 @@ INSTALLED_APPS = [
     'crispy_forms',
     'crispy_bootstrap5',
     'formtools',
-    
+    'channels',
+
     # App del gestionale autolavaggio (core essenziali)
     'apps.auth_system',
     'apps.core',
@@ -46,9 +47,9 @@ INSTALLED_APPS = [
     'apps.postazioni',
     'apps.abbonamenti',
     'apps.prenotazioni',
+    'apps.api',
     # 'apps.reportistica',  # Temporarily disabled due to pandas dependency
     # 'apps.shop',
-    # 'apps.api',
 ]
 
 # Middleware
@@ -145,5 +146,18 @@ SESSION_COOKIE_AGE = 1209600  # 2 settimane
 SESSION_EXPIRE_AT_BROWSER_CLOSE = False
 SESSION_COOKIE_HTTPONLY = True
 SESSION_COOKIE_SECURE = False  # True in produzione con HTTPS
+
+# Channels configuration
+ASGI_APPLICATION = 'config.asgi.application'
+
+# Channel layers (Redis per WebSocket)
+CHANNEL_LAYERS = {
+    'default': {
+        'BACKEND': 'channels_redis.core.RedisChannelLayer',
+        'CONFIG': {
+            "hosts": [os.environ.get('REDIS_URL', 'redis://localhost:6379')],
+        },
+    },
+}
 
 # --- FINE CONFIGURAZIONE ---
