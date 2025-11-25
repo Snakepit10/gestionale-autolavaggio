@@ -396,16 +396,59 @@
                         <h6><i class="bi bi-person-circle"></i> Informazioni Cliente</h6>
                         <div class="bg-light p-3 rounded mb-3">
                             <div class="mb-3">
-                                <label for="modal-cliente-nome-input" class="form-label">Nome/Ragione Sociale</label>
-                                <input type="text" class="form-control" id="modal-cliente-nome-input" readonly>
+                                <label for="modal-cliente-select" class="form-label">Cliente Esistente</label>
+                                <select class="form-select" id="modal-cliente-select" onchange="handleClienteChange()">
+                                    <option value="">Seleziona un cliente esistente...</option>
+                                    {% for cliente in clienti %}
+                                    <option value="{{ cliente.id }}" 
+                                            data-nome="{{ cliente.nome }}" 
+                                            data-cognome="{{ cliente.cognome|default:'' }}"
+                                            data-ragione-sociale="{{ cliente.ragione_sociale|default:'' }}"
+                                            data-email="{{ cliente.email|default:'' }}"
+                                            data-telefono="{{ cliente.telefono|default:'' }}"
+                                            data-tipo="{{ cliente.tipo_cliente }}">
+                                        {% if cliente.ragione_sociale %}{{ cliente.ragione_sociale }}{% else %}{{ cliente.nome }} {{ cliente.cognome|default:'' }}{% endif %}
+                                    </option>
+                                    {% endfor %}
+                                </select>
                             </div>
+                            
+                            <!-- Campi cliente -->
+                            <div class="mb-3">
+                                <label for="modal-tipo-cliente" class="form-label">Tipo Cliente</label>
+                                <select class="form-select" id="modal-tipo-cliente" onchange="handleTipoClienteChange()">
+                                    <option value="privato">Privato</option>
+                                    <option value="business">Business</option>
+                                </select>
+                            </div>
+                            
+                            <!-- Campi per privato -->
+                            <div id="modal-campi-privato">
+                                <div class="mb-3">
+                                    <label for="modal-cliente-nome-input" class="form-label">Nome *</label>
+                                    <input type="text" class="form-control" id="modal-cliente-nome-input" required>
+                                </div>
+                                <div class="mb-3">
+                                    <label for="modal-cliente-cognome-input" class="form-label">Cognome</label>
+                                    <input type="text" class="form-control" id="modal-cliente-cognome-input">
+                                </div>
+                            </div>
+                            
+                            <!-- Campi per business -->
+                            <div id="modal-campi-business" style="display: none;">
+                                <div class="mb-3">
+                                    <label for="modal-ragione-sociale-input" class="form-label">Ragione Sociale *</label>
+                                    <input type="text" class="form-control" id="modal-ragione-sociale-input">
+                                </div>
+                            </div>
+                            
                             <div class="mb-3">
                                 <label for="modal-cliente-email-input" class="form-label">Email</label>
-                                <input type="email" class="form-control" id="modal-cliente-email-input" readonly>
+                                <input type="email" class="form-control" id="modal-cliente-email-input">
                             </div>
                             <div class="mb-2">
                                 <label for="modal-cliente-telefono-input" class="form-label">Telefono</label>
-                                <input type="text" class="form-control" id="modal-cliente-telefono-input" readonly>
+                                <input type="text" class="form-control" id="modal-cliente-telefono-input">
                             </div>
                         </div>
                     </div>
@@ -436,11 +479,37 @@
                 
                 <div class="row">
                     <div class="col-12">
-                        <h6><i class="bi bi-list-ul"></i> Servizi Prenotati</h6>
+                        <h6><i class="bi bi-list-ul"></i> Servizi</h6>
                         <div class="bg-light p-3 rounded mb-3">
-                            <div id="modal-servizi-list"></div>
+                            <div class="mb-3">
+                                <label class="form-label">Servizi Disponibili</label>
+                                <div class="row" id="modal-servizi-disponibili">
+                                    {% for servizio in servizi_disponibili %}
+                                    <div class="col-md-6 mb-2">
+                                        <div class="form-check">
+                                            <input class="form-check-input servizio-checkbox" type="checkbox" 
+                                                   value="{{ servizio.id }}" id="servizio-{{ servizio.id }}"
+                                                   data-nome="{{ servizio.titolo }}" 
+                                                   data-prezzo="{{ servizio.prezzo }}"
+                                                   onchange="updateServiziTotale()">
+                                            <label class="form-check-label" for="servizio-{{ servizio.id }}">
+                                                {{ servizio.titolo }} - €{{ servizio.prezzo }}
+                                            </label>
+                                        </div>
+                                    </div>
+                                    {% endfor %}
+                                </div>
+                            </div>
+                            
+                            <div class="mb-2">
+                                <h6>Servizi Selezionati:</h6>
+                                <div id="modal-servizi-selezionati" class="mb-2">
+                                    <!-- Popolato dinamicamente -->
+                                </div>
+                            </div>
+                            
                             <div class="mt-2">
-                                <strong>Totale Stimato: €<span id="modal-totale"></span></strong>
+                                <strong>Totale: €<span id="modal-totale">0.00</span></strong>
                             </div>
                         </div>
                     </div>
@@ -470,6 +539,14 @@
                 <form method="post" id="checkin-form" style="display: inline;">
                     {% csrf_token %}
                     <!-- Hidden inputs per i dati modificabili -->
+                    <input type="hidden" name="cliente_id" id="form-cliente-id">
+                    <input type="hidden" name="tipo_cliente" id="form-tipo-cliente">
+                    <input type="hidden" name="nome_cliente" id="form-nome-cliente">
+                    <input type="hidden" name="cognome_cliente" id="form-cognome-cliente">
+                    <input type="hidden" name="ragione_sociale" id="form-ragione-sociale">
+                    <input type="hidden" name="email_cliente" id="form-email-cliente">
+                    <input type="hidden" name="telefono_cliente" id="form-telefono-cliente">
+                    <input type="hidden" name="servizi_ids" id="form-servizi-ids">
                     <input type="hidden" name="tipo_auto" id="form-tipo-auto">
                     <input type="hidden" name="ora_consegna_richiesta" id="form-ora-consegna">
                     <input type="hidden" name="note_interne" id="form-note-interne">
@@ -509,6 +586,9 @@ const prenotazioniData = {
     {% endfor %}
 };
 
+// Variabile globale per memorizzare l'ID prenotazione corrente
+let currentPrenotazioneId = null;
+
 function showCheckinModal(prenotazioneId) {
     const data = prenotazioniData[prenotazioneId];
     if (!data) {
@@ -516,20 +596,103 @@ function showCheckinModal(prenotazioneId) {
         return;
     }
     
-    // Popola i campi readonly
-    document.getElementById('modal-cliente-nome-input').value = data.cliente_nome;
-    document.getElementById('modal-cliente-email-input').value = data.cliente_email;
-    document.getElementById('modal-cliente-telefono-input').value = data.cliente_telefono;
+    currentPrenotazioneId = prenotazioneId;
+    
+    // Reset del form
+    resetModalForm();
+    
+    // Popola i dati originali del cliente
+    populateClienteData(data);
+    
+    // Popola i campi servizio
     document.getElementById('modal-data-ora-input').value = data.data_ora;
     document.getElementById('modal-durata-input').value = data.durata;
-    document.getElementById('modal-totale').textContent = data.totale;
-    
-    // Popola i campi modificabili
     document.getElementById('modal-tipo-auto-input').value = data.tipo_auto;
+    
+    // Calcola ora consegna suggerita
+    calculateSuggestedDeliveryTime(data);
+    
+    // Popola i servizi prenotati
+    populateServiziPrenotati(data.servizi);
+    
+    // Popola le note
     document.getElementById('modal-note-cliente-input').value = data.nota_cliente;
     document.getElementById('modal-note-interne-input').value = '';
     
-    // Calcola ora consegna suggerita (ora prenotazione + durata)
+    // Imposta l'action del form
+    const form = document.getElementById('checkin-form');
+    form.action = data.checkin_url;
+    
+    // Aggiungi event listener per il submit
+    form.onsubmit = handleFormSubmit;
+    
+    // Mostra il modal
+    const modal = new bootstrap.Modal(document.getElementById('checkinModal'));
+    modal.show();
+}
+
+function resetModalForm() {
+    // Reset selezione cliente
+    document.getElementById('modal-cliente-select').value = '';
+    document.getElementById('modal-tipo-cliente').value = 'privato';
+    
+    // Reset campi cliente
+    document.getElementById('modal-cliente-nome-input').value = '';
+    document.getElementById('modal-cliente-cognome-input').value = '';
+    document.getElementById('modal-ragione-sociale-input').value = '';
+    document.getElementById('modal-cliente-email-input').value = '';
+    document.getElementById('modal-cliente-telefono-input').value = '';
+    
+    // Mostra campi privato, nascondi business
+    document.getElementById('modal-campi-privato').style.display = 'block';
+    document.getElementById('modal-campi-business').style.display = 'none';
+    
+    // Reset servizi
+    document.querySelectorAll('.servizio-checkbox').forEach(checkbox => {
+        checkbox.checked = false;
+    });
+    updateServiziTotale();
+}
+
+function populateClienteData(data) {
+    // Popola i campi con i dati del cliente originale
+    const clienteNomeCompleto = data.cliente_nome;
+    
+    // Tenta di trovare il cliente nella select
+    const clienteSelect = document.getElementById('modal-cliente-select');
+    let clienteTrovato = false;
+    
+    for (let option of clienteSelect.options) {
+        if (option.textContent.trim() === clienteNomeCompleto.trim()) {
+            clienteSelect.value = option.value;
+            handleClienteChange();
+            clienteTrovato = true;
+            break;
+        }
+    }
+    
+    // Se non trovato, popola manualmente i campi
+    if (!clienteTrovato) {
+        const parti = clienteNomeCompleto.split(' ');
+        if (parti.length === 1) {
+            // Potrebbe essere ragione sociale
+            document.getElementById('modal-tipo-cliente').value = 'business';
+            handleTipoClienteChange();
+            document.getElementById('modal-ragione-sociale-input').value = clienteNomeCompleto;
+        } else {
+            // Nome e cognome
+            document.getElementById('modal-cliente-nome-input').value = parti[0];
+            if (parti.length > 1) {
+                document.getElementById('modal-cliente-cognome-input').value = parti.slice(1).join(' ');
+            }
+        }
+        
+        document.getElementById('modal-cliente-email-input').value = data.cliente_email !== 'Non fornita' ? data.cliente_email : '';
+        document.getElementById('modal-cliente-telefono-input').value = data.cliente_telefono !== 'Non fornito' ? data.cliente_telefono : '';
+    }
+}
+
+function calculateSuggestedDeliveryTime(data) {
     const oraPrenotazione = data.data_ora.match(/alle (\d{2}:\d{2})/);
     if (oraPrenotazione) {
         const [ore, minuti] = oraPrenotazione[1].split(':').map(Number);
@@ -539,32 +702,109 @@ function showCheckinModal(prenotazioneId) {
         const oraConsegnaStr = oraConsegna.toTimeString().substring(0, 5);
         document.getElementById('modal-ora-consegna-input').value = oraConsegnaStr;
     }
+}
+
+function populateServiziPrenotati(servizi) {
+    // Seleziona i servizi prenotati
+    servizi.forEach(servizio => {
+        const checkbox = document.querySelector(`input[data-nome="${servizio.nome}"]`);
+        if (checkbox) {
+            checkbox.checked = true;
+        }
+    });
+    updateServiziTotale();
+}
+
+function handleClienteChange() {
+    const select = document.getElementById('modal-cliente-select');
+    const selectedOption = select.options[select.selectedIndex];
     
-    // Popola i servizi
-    const serviziContainer = document.getElementById('modal-servizi-list');
-    serviziContainer.innerHTML = '';
-    data.servizi.forEach(servizio => {
-        const servizioBadge = document.createElement('span');
-        servizioBadge.className = 'badge bg-primary me-2 mb-2';
-        servizioBadge.textContent = `${servizio.nome} - €${servizio.prezzo}`;
-        serviziContainer.appendChild(servizioBadge);
+    if (select.value) {
+        // Cliente esistente selezionato
+        const tipoCliente = selectedOption.dataset.tipo;
+        document.getElementById('modal-tipo-cliente').value = tipoCliente;
+        handleTipoClienteChange();
+        
+        // Popola i campi
+        if (tipoCliente === 'business') {
+            document.getElementById('modal-ragione-sociale-input').value = selectedOption.dataset.ragioneSociale;
+        } else {
+            document.getElementById('modal-cliente-nome-input').value = selectedOption.dataset.nome;
+            document.getElementById('modal-cliente-cognome-input').value = selectedOption.dataset.cognome;
+        }
+        
+        document.getElementById('modal-cliente-email-input').value = selectedOption.dataset.email;
+        document.getElementById('modal-cliente-telefono-input').value = selectedOption.dataset.telefono;
+    }
+}
+
+function handleTipoClienteChange() {
+    const tipoCliente = document.getElementById('modal-tipo-cliente').value;
+    const campiPrivato = document.getElementById('modal-campi-privato');
+    const campiBusiness = document.getElementById('modal-campi-business');
+    
+    if (tipoCliente === 'business') {
+        campiPrivato.style.display = 'none';
+        campiBusiness.style.display = 'block';
+    } else {
+        campiPrivato.style.display = 'block';
+        campiBusiness.style.display = 'none';
+    }
+}
+
+function updateServiziTotale() {
+    const checkboxes = document.querySelectorAll('.servizio-checkbox:checked');
+    const serviziSelezionati = document.getElementById('modal-servizi-selezionati');
+    const totaleSpan = document.getElementById('modal-totale');
+    
+    let totale = 0;
+    serviziSelezionati.innerHTML = '';
+    
+    checkboxes.forEach(checkbox => {
+        const prezzo = parseFloat(checkbox.dataset.prezzo);
+        const nome = checkbox.dataset.nome;
+        totale += prezzo;
+        
+        const badge = document.createElement('span');
+        badge.className = 'badge bg-success me-2 mb-2';
+        badge.textContent = `${nome} - €${prezzo.toFixed(2)}`;
+        serviziSelezionati.appendChild(badge);
     });
     
-    // Imposta l'action del form
-    const form = document.getElementById('checkin-form');
-    form.action = data.checkin_url;
+    totaleSpan.textContent = totale.toFixed(2);
+}
+
+function handleFormSubmit() {
+    // Popola i campi hidden con i dati del form
+    const clienteSelect = document.getElementById('modal-cliente-select');
+    document.getElementById('form-cliente-id').value = clienteSelect.value;
+    document.getElementById('form-tipo-cliente').value = document.getElementById('modal-tipo-cliente').value;
     
-    // Aggiungi event listener per aggiornare i campi hidden prima del submit
-    form.onsubmit = function() {
-        document.getElementById('form-tipo-auto').value = document.getElementById('modal-tipo-auto-input').value;
-        document.getElementById('form-ora-consegna').value = document.getElementById('modal-ora-consegna-input').value;
-        document.getElementById('form-note-interne').value = document.getElementById('modal-note-interne-input').value;
-        return true;
-    };
+    const tipoCliente = document.getElementById('modal-tipo-cliente').value;
+    if (tipoCliente === 'business') {
+        document.getElementById('form-ragione-sociale').value = document.getElementById('modal-ragione-sociale-input').value;
+        document.getElementById('form-nome-cliente').value = '';
+        document.getElementById('form-cognome-cliente').value = '';
+    } else {
+        document.getElementById('form-nome-cliente').value = document.getElementById('modal-cliente-nome-input').value;
+        document.getElementById('form-cognome-cliente').value = document.getElementById('modal-cliente-cognome-input').value;
+        document.getElementById('form-ragione-sociale').value = '';
+    }
     
-    // Mostra il modal
-    const modal = new bootstrap.Modal(document.getElementById('checkinModal'));
-    modal.show();
+    document.getElementById('form-email-cliente').value = document.getElementById('modal-cliente-email-input').value;
+    document.getElementById('form-telefono-cliente').value = document.getElementById('modal-cliente-telefono-input').value;
+    
+    // Servizi selezionati
+    const serviziSelezionati = Array.from(document.querySelectorAll('.servizio-checkbox:checked'))
+        .map(checkbox => checkbox.value);
+    document.getElementById('form-servizi-ids').value = serviziSelezionati.join(',');
+    
+    // Altri campi
+    document.getElementById('form-tipo-auto').value = document.getElementById('modal-tipo-auto-input').value;
+    document.getElementById('form-ora-consegna').value = document.getElementById('modal-ora-consegna-input').value;
+    document.getElementById('form-note-interne').value = document.getElementById('modal-note-interne-input').value;
+    
+    return true;
 }
 
 function submitFilter() {

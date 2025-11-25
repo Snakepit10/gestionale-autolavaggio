@@ -1,0 +1,86 @@
+# Python
+*.py[cod]
+*$py.class
+__pycache__/
+*.so
+.Python
+
+# Virtual Environment
+venv/
+ENV/
+env/
+.venv
+
+# Django
+*.log
+db.sqlite3
+db.sqlite3-journal
+/staticfiles/
+/mediafiles/
+/media/
+local_settings.py
+
+# Database backups and exports
+*.sql
+*.dump
+*.json.backup
+data_export.json
+backup_*.json
+*_export.json
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+.DS_Store
+
+# Environment variables
+.env
+.env.local
+.env.*.local
+*.env
+
+# Django settings variants
+config/settings_local.py
+config/settings_export.py
+config/settings_backup.py
+config/settings_working.py
+config/settings_simple.py
+
+# Pytest
+.pytest_cache/
+.coverage
+htmlcov/
+
+# Logs
+*.log
+logs/
+
+# OS
+Thumbs.db
+ehthumbs.db
+Desktop.ini
+
+# Management scripts temporanei
+management/commands/test_*.py
+management/temp_*.py
+
+# Backup files
+*.bak
+*.backup
+*.old
+
+# Excel/CSV exports
+*.xlsx
+*.xls
+*.csv
+exports/
+
+# Compiled translations
+*.mo
+
+# Coverage reports
+coverage/
+.coverage.*

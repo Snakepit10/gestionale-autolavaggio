@@ -500,30 +500,32 @@ document.getElementById('form-pagamento').addEventListener('submit', function(e)
     });
 });
 
-// WebSocket per aggiornamenti real-time
+// WebSocket per aggiornamenti real-time - TEMPORANEAMENTE DISABILITATO
+// TODO: Riattivare quando Channels sarà configurato su Railway
+/*
 let webSocket = null;
 
 function inizializzaWebSocket() {
     const wsProtocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
     const wsUrl = `${wsProtocol}//${window.location.host}/ws/ordini/`;
-    
+
     try {
         webSocket = new WebSocket(wsUrl);
-        
+
         webSocket.onopen = function() {
             console.log('WebSocket connesso per lista ordini');
         };
-        
+
         webSocket.onmessage = function(event) {
             const data = JSON.parse(event.data);
             handleWebSocketMessage(data);
         };
-        
+
         webSocket.onclose = function() {
             console.log('WebSocket disconnesso, tentativo riconnessione...');
             setTimeout(inizializzaWebSocket, 3000);
         };
-        
+
         webSocket.onerror = function(error) {
             console.error('Errore WebSocket:', error);
         };
@@ -545,12 +547,12 @@ function handleWebSocketMessage(data) {
             console.log(`Ordine ${data.numero_progressivo} cambiato da ${data.vecchio_stato} a ${data.nuovo_stato}`);
             aggiornaStatoOrdineInLista(data);
             break;
-            
+
         case 'nuovo_ordine':
             console.log('Nuovo ordine ricevuto, ricarico la pagina');
             location.reload();
             break;
-            
+
         default:
             console.log('Messaggio WebSocket non gestito:', data);
     }
@@ -563,13 +565,13 @@ function aggiornaStatoOrdineInLista(data) {
         console.log(`Riga ordine ${data.ordine_id} non trovata`);
         return;
     }
-    
+
     // Aggiorna la colonna stato
     const statoCell = ordineRow.querySelector('.stato-cell');
     if (statoCell) {
         let badgeClass = '';
         let iconClass = '';
-        
+
         switch (data.nuovo_stato) {
             case 'in_attesa':
                 badgeClass = 'bg-primary';
@@ -588,20 +590,20 @@ function aggiornaStatoOrdineInLista(data) {
                 iconClass = 'bi-x-circle';
                 break;
         }
-        
+
         statoCell.innerHTML = `
             <span class="badge ${badgeClass}">
                 <i class="${iconClass}"></i> ${data.stato_display}
             </span>
         `;
     }
-    
+
     // Aggiorna i bottoni di azione se necessario
     const azioniCell = ordineRow.querySelector('.azioni-cell');
     if (azioniCell) {
         aggiornaBottoniAzione(azioniCell, data.ordine_id, data.nuovo_stato);
     }
-    
+
     // Mostra notifica
     const alertDiv = document.createElement('div');
     alertDiv.className = 'alert alert-info alert-dismissible fade show';
@@ -609,11 +611,11 @@ function aggiornaStatoOrdineInLista(data) {
         <i class="bi bi-info-circle"></i> Ordine #${data.numero_progressivo} aggiornato a: ${data.stato_display}
         <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
     `;
-    
+
     // Inserisce l'alert dopo il titolo
     const titleDiv = document.querySelector('.d-flex.justify-content-between');
     titleDiv.insertAdjacentElement('afterend', alertDiv);
-    
+
     // Rimuove l'alert dopo 5 secondi
     setTimeout(() => {
         alertDiv.remove();
@@ -623,13 +625,13 @@ function aggiornaStatoOrdineInLista(data) {
 function aggiornaBottoniAzione(azioniCell, ordineId, nuovoStato) {
     const btnGroup = azioniCell.querySelector('.btn-group');
     if (!btnGroup) return;
-    
+
     // Rimuovi bottone "Completa" se l'ordine è completato o annullato
     const completaBtn = btnGroup.querySelector('[title="Completa"]');
     if (completaBtn && (nuovoStato === 'completato' || nuovoStato === 'annullato')) {
         completaBtn.remove();
     }
-    
+
     // Aggiorna il bottone se necessario
     if (nuovoStato === 'completato' || nuovoStato === 'annullato') {
         btnGroup.classList.add('opacity-50');
@@ -647,5 +649,8 @@ window.addEventListener('beforeunload', function() {
         webSocket.close();
     }
 });
+*/
+
+console.log('WebSocket temporaneamente disabilitato - La pagina funziona normalmente senza aggiornamenti real-time');
 </script>
 {% endblock %}

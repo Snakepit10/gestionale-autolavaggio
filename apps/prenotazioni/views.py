@@ -1105,6 +1105,25 @@ class CheckinPrenotazioniView(LoginRequiredMixin, ListView):
         context['today'] = oggi
         context['now_time'] = datetime.now().time()
         
+        # Aggiungi clienti e servizi disponibili per il modal
+        from apps.clienti.models import Cliente
+        from apps.core.models import ServizioProdotto, Categoria
+        
+        context['clienti'] = Cliente.objects.all().order_by('nome')
+        
+        # Servizi disponibili per le prenotazioni (Servito e Mezzi Pesanti)
+        categorie_prenotabili = Categoria.objects.filter(nome__in=['Servito', 'Mezzi Pesanti'])
+        if categorie_prenotabili.exists():
+            context['servizi_disponibili'] = ServizioProdotto.objects.filter(
+                attivo=True,
+                categoria__in=categorie_prenotabili
+            ).select_related('categoria').order_by('categoria__nome', 'titolo')
+        else:
+            context['servizi_disponibili'] = ServizioProdotto.objects.filter(
+                attivo=True,
+                tipo='servizio'
+            ).select_related('categoria').order_by('titolo')
+        
         return context
 
 
@@ -1130,9 +1149,81 @@ def checkin_prenotazione(request, pk):
                 return redirect('prenotazioni:checkin-prenotazioni')
             
             # Recupera i dati modificabili dal form
+            cliente_id = request.POST.get('cliente_id', '').strip()
+            tipo_cliente = request.POST.get('tipo_cliente', '').strip()
+            nome_cliente = request.POST.get('nome_cliente', '').strip()
+            cognome_cliente = request.POST.get('cognome_cliente', '').strip()
+            ragione_sociale = request.POST.get('ragione_sociale', '').strip()
+            email_cliente = request.POST.get('email_cliente', '').strip()
+            telefono_cliente = request.POST.get('telefono_cliente', '').strip()
+            servizi_ids = request.POST.get('servizi_ids', '').strip()
             tipo_auto_modificato = request.POST.get('tipo_auto', '').strip()
             ora_consegna_richiesta = request.POST.get('ora_consegna_richiesta', '').strip()
             note_interne = request.POST.get('note_interne', '').strip()
+            
+            # Gestione cliente
+            from apps.clienti.models import Cliente
+            cliente_finale = None
+            
+            if cliente_id:
+                # Cliente esistente selezionato
+                try:
+                    cliente_finale = Cliente.objects.get(id=cliente_id)
+                except Cliente.DoesNotExist:
+                    pass
+            
+            # Se non è stato selezionato un cliente esistente o dati sono stati modificati, crea/aggiorna
+            if not cliente_finale or nome_cliente or ragione_sociale:
+                if tipo_cliente == 'business' and ragione_sociale:
+                    # Cliente business
+                    cliente_finale, created = Cliente.objects.get_or_create(
+                        ragione_sociale=ragione_sociale,
+                        defaults={
+                            'tipo_cliente': 'business',
+                            'email': email_cliente,
+                            'telefono': telefono_cliente
+                        }
+                    )
+                    if not created and (email_cliente or telefono_cliente):
+                        if email_cliente:
+                            cliente_finale.email = email_cliente
+                        if telefono_cliente:
+                            cliente_finale.telefono = telefono_cliente
+                        cliente_finale.save()
+                        
+                elif nome_cliente:
+                    # Cliente privato
+                    cliente_finale, created = Cliente.objects.get_or_create(
+                        nome=nome_cliente,
+                        cognome=cognome_cliente or '',
+                        defaults={
+                            'tipo_cliente': 'privato',
+                            'email': email_cliente,
+                            'telefono': telefono_cliente
+                        }
+                    )
+                    if not created and (email_cliente or telefono_cliente):
+                        if email_cliente:
+                            cliente_finale.email = email_cliente
+                        if telefono_cliente:
+                            cliente_finale.telefono = telefono_cliente
+                        cliente_finale.save()
+            
+            # Aggiorna il cliente nella prenotazione se è cambiato
+            if cliente_finale and cliente_finale != prenotazione.cliente:
+                prenotazione.cliente = cliente_finale
+                prenotazione.save()
+            
+            # Gestione servizi
+            if servizi_ids:
+                from apps.core.models import ServizioProdotto
+                servizi_id_list = [int(id.strip()) for id in servizi_ids.split(',') if id.strip().isdigit()]
+                if servizi_id_list:
+                    nuovi_servizi = ServizioProdotto.objects.filter(id__in=servizi_id_list)
+                    prenotazione.servizi.set(nuovi_servizi)
+                    # Ricalcola durata stimata
+                    prenotazione.durata_stimata_minuti = sum(s.durata_minuti for s in nuovi_servizi)
+                    prenotazione.save()
             
             # Aggiorna il tipo auto nella prenotazione se modificato
             if tipo_auto_modificato and tipo_auto_modificato != prenotazione.tipo_auto:

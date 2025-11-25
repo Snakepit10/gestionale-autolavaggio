@@ -947,29 +947,31 @@ document.addEventListener('DOMContentLoaded', function() {
     console.log('✅ Dashboard operativa caricata - Contatori:', counts);
 });
 
-// WebSocket per aggiornamenti real-time
+// WebSocket per aggiornamenti real-time - TEMPORANEAMENTE DISABILITATO
+// TODO: Riattivare quando Channels sarà configurato su Railway
+/*
 function inizializzaWebSocket() {
     const wsProtocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
     const wsUrl = `${wsProtocol}//${window.location.host}/ws/postazione/{{ postazione.id }}/`;
-    
+
     try {
         webSocket = new WebSocket(wsUrl);
-        
+
         webSocket.onopen = function() {
             console.log('WebSocket connesso per postazione {{ postazione.id }}');
             document.querySelector('.badge.bg-primary').classList.add('pulse');
         };
-        
+
         webSocket.onmessage = function(event) {
             const data = JSON.parse(event.data);
             handleWebSocketMessage(data);
         };
-        
+
         webSocket.onclose = function() {
             console.log('WebSocket disconnesso, tentativo riconnessione...');
             setTimeout(inizializzaWebSocket, 3000);
         };
-        
+
         webSocket.onerror = function(error) {
             console.error('Errore WebSocket:', error);
         };
@@ -986,19 +988,26 @@ function handleWebSocketMessage(data) {
             aggiornaOrdini();
             riproduciSuonoNotifica();
             break;
-            
+
         case 'item_status_update':
             aggiornaStatoItem(data.item_id, data.stato);
             break;
-            
+
         case 'order_status_update':
             console.log(`Ordine ${data.numero_progressivo} cambiato da ${data.vecchio_stato} a ${data.nuovo_stato}`);
             gestisciCambioStatoOrdine(data);
             break;
-            
+
         default:
             console.log('Messaggio WebSocket non gestito:', data);
     }
+}
+*/
+
+function inizializzaWebSocket() {
+    // WebSocket temporaneamente disabilitato
+    console.log('WebSocket temporaneamente disabilitato - Usa polling per aggiornamenti');
+    webSocket = null;
 }
 
 // Gestione cambio stato ordine da altre interfacce
@@ -1144,8 +1153,9 @@ function cambiaStato(itemId, nuovoStato) {
     
     // Ottieni CSRF token
     const csrfToken = AutolavaggioJS.getCookie('csrftoken') || '{{ csrf_token }}';
-    
-    // Invia via WebSocket se disponibile
+
+    // Invia via WebSocket se disponibile - TEMPORANEAMENTE DISABILITATO
+    /*
     if (webSocket && webSocket.readyState === WebSocket.OPEN) {
         webSocket.send(JSON.stringify({
             type: 'aggiorna_stato_item',
@@ -1154,8 +1164,9 @@ function cambiaStato(itemId, nuovoStato) {
             timestamp: new Date().toISOString()
         }));
     }
-    
-    // Fallback AJAX
+    */
+
+    // AJAX
     fetch(url, {
         method: 'POST',
         headers: {

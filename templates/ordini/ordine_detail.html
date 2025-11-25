@@ -715,30 +715,32 @@ function mostraModalPagamento() {
     modal.show();
 }
 
-// WebSocket per aggiornamenti real-time
+// WebSocket per aggiornamenti real-time - TEMPORANEAMENTE DISABILITATO
+// TODO: Riattivare quando Channels sarà configurato su Railway
+/*
 let webSocket = null;
 
 function inizializzaWebSocket() {
     const wsProtocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
     const wsUrl = `${wsProtocol}//${window.location.host}/ws/ordini/`;
-    
+
     try {
         webSocket = new WebSocket(wsUrl);
-        
+
         webSocket.onopen = function() {
             console.log('WebSocket connesso per dettaglio ordine');
         };
-        
+
         webSocket.onmessage = function(event) {
             const data = JSON.parse(event.data);
             handleWebSocketMessage(data);
         };
-        
+
         webSocket.onclose = function() {
             console.log('WebSocket disconnesso, tentativo riconnessione...');
             setTimeout(inizializzaWebSocket, 3000);
         };
-        
+
         webSocket.onerror = function(error) {
             console.error('Errore WebSocket:', error);
         };
@@ -769,13 +771,13 @@ function handleWebSocketMessage(data) {
     if (data.ordine_id != {{ ordine.id }}) {
         return;
     }
-    
+
     switch (data.type) {
         case 'order_status_update':
             console.log(`Ordine ${data.numero_progressivo} cambiato da ${data.vecchio_stato} a ${data.nuovo_stato}`);
             aggiornaStatoOrdine(data);
             break;
-            
+
         default:
             console.log('Messaggio WebSocket non gestito:', data);
     }
@@ -789,11 +791,11 @@ function aggiornaStatoOrdine(data) {
         <i class="bi bi-info-circle"></i> Lo stato dell'ordine è cambiato a: ${data.stato_display}
         <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
     `;
-    
+
     // Inserisce l'alert dopo il titolo
     const titleDiv = document.querySelector('.d-flex.justify-content-between');
     titleDiv.insertAdjacentElement('afterend', alertDiv);
-    
+
     // Ricarica la pagina dopo 2 secondi per mostrare i nuovi dati
     setTimeout(() => {
         location.reload();
@@ -811,6 +813,9 @@ window.addEventListener('beforeunload', function() {
         webSocket.close();
     }
 });
+*/
+
+console.log('WebSocket temporaneamente disabilitato - La pagina funziona normalmente senza aggiornamenti real-time');
 
 // Funzione per mostrare il modal di modifica
 function mostraModalModifica() {
