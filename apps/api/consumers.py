@@ -97,11 +97,11 @@ class PostazioneConsumer(AsyncWebsocketConsumer):
 
 class OrdiniConsumer(AsyncWebsocketConsumer):
     async def connect(self):
-        # from django.contrib.auth.models import AnonymousUser
+        from django.contrib.auth.models import AnonymousUser
 
-        # if isinstance(self.scope["user"], AnonymousUser):
-        #     await self.close()
-        #     return
+        if isinstance(self.scope["user"], AnonymousUser):
+            await self.close()
+            return
 
         self.room_group_name = 'ordini_list'
         
