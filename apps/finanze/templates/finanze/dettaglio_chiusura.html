@@ -1,0 +1,138 @@
+{% extends 'core/base.html' %}
+
+{% block title %}Dettaglio Chiusura{% endblock %}
+
+{% block content %}
+<div class="container-fluid mt-4">
+    <div class="row mb-4">
+        <div class="col">
+            <h2><i class="bi bi-file-text"></i> Dettaglio Chiusura Cassa - {{ chiusura.data|date:"d/m/Y" }}</h2>
+        </div>
+        <div class="col-auto">
+            <a href="{% url 'finanze:storico_chiusure' %}" class="btn btn-outline-secondary">
+                <i class="bi bi-arrow-left"></i> Torna allo Storico
+            </a>
+        </div>
+    </div>
+
+    <!-- Riepilogo principale (riusa il template del dashboard) -->
+    <div class="row mb-4">
+        <div class="col-md-3">
+            <div class="card">
+                <div class="card-body">
+                    <h6 class="text-muted">Fondo Iniziale</h6>
+                    <h3>€{{ chiusura.fondo_cassa_iniziale }}</h3>
+                    <small>{{ chiusura.data_ora_apertura|date:"H:i" }} - {{ chiusura.operatore_apertura.username }}</small>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="card">
+                <div class="card-body">
+                    <h6 class="text-muted">Incassi Totali</h6>
+                    <h3 class="text-success">€{{ chiusura.totale_incassi_giornalieri }}</h3>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="card">
+                <div class="card-body">
+                    <h6 class="text-muted">Cassa Teorica</h6>
+                    <h3>€{{ chiusura.cassa_teorica_finale }}</h3>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="card">
+                <div class="card-body">
+                    <h6 class="text-muted">Differenza</h6>
+                    <h3 class="{% if chiusura.stato_differenza == 'ok' %}text-success{% elif chiusura.stato_differenza == 'mancante' %}text-danger{% else %}text-warning{% endif %}">
+                        {% if chiusura.differenza_cassa >= 0 %}+{% endif %}€{{ chiusura.differenza_cassa|default:"-" }}
+                    </h3>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Note -->
+    {% if chiusura.note_apertura or chiusura.note_chiusura %}
+    <div class="card mb-4">
+        <div class="card-header"><h5>Note</h5></div>
+        <div class="card-body">
+            {% if chiusura.note_apertura %}
+                <p><strong>Apertura:</strong> {{ chiusura.note_apertura }}</p>
+            {% endif %}
+            {% if chiusura.note_chiusura %}
+                <p><strong>Chiusura:</strong> {{ chiusura.note_chiusura }}</p>
+            {% endif %}
+        </div>
+    </div>
+    {% endif %}
+
+    <!-- Pagamenti -->
+    <div class="card mb-4">
+        <div class="card-header"><h5>Pagamenti ({{ pagamenti.count }})</h5></div>
+        <div class="card-body">
+            <div class="table-responsive">
+                <table class="table table-sm">
+                    <thead>
+                        <tr>
+                            <th>Ora</th>
+                            <th>Ordine</th>
+                            <th>Cliente</th>
+                            <th>Metodo</th>
+                            <th>Importo</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for pag in pagamenti %}
+                        <tr>
+                            <td>{{ pag.data_pagamento|date:"H:i" }}</td>
+                            <td>{{ pag.ordine.numero_progressivo }}</td>
+                            <td>{{ pag.ordine.cliente|default:"Anonimo" }}</td>
+                            <td>{{ pag.get_metodo_display }}</td>
+                            <td class="text-success">€{{ pag.importo }}</td>
+                        </tr>
+                        {% empty %}
+                        <tr><td colspan="5" class="text-center text-muted">Nessun pagamento</td></tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
+    <!-- Movimenti -->
+    <div class="card mb-4">
+        <div class="card-header"><h5>Movimenti Cassa ({{ movimenti.count }})</h5></div>
+        <div class="card-body">
+            <div class="table-responsive">
+                <table class="table table-sm">
+                    <thead>
+                        <tr>
+                            <th>Ora</th>
+                            <th>Tipo</th>
+                            <th>Causale</th>
+                            <th>Importo</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for mov in movimenti %}
+                        <tr>
+                            <td>{{ mov.data_ora|date:"H:i" }}</td>
+                            <td>{{ mov.get_tipo_display }}</td>
+                            <td>{{ mov.causale }}</td>
+                            <td class="{% if mov.tipo == 'uscita' or mov.tipo == 'prelievo' %}text-danger{% else %}text-success{% endif %}">
+                                {% if mov.tipo == 'uscita' or mov.tipo == 'prelievo' %}-{% else %}+{% endif %}€{{ mov.importo }}
+                            </td>
+                        </tr>
+                        {% empty %}
+                        <tr><td colspan="4" class="text-center text-muted">Nessun movimento</td></tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

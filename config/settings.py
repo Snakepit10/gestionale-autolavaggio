@@ -47,6 +47,7 @@ INSTALLED_APPS = [
     'apps.postazioni',
     'apps.abbonamenti',
     'apps.prenotazioni',
+    'apps.finanze',
     'apps.api',
     # 'apps.reportistica',  # Temporarily disabled due to pandas dependency
     # 'apps.shop',

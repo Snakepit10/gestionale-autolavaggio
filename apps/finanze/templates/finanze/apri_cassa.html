@@ -1,0 +1,58 @@
+{% extends 'core/base.html' %}
+
+{% block title %}Apri Cassa{% endblock %}
+
+{% block content %}
+<div class="container mt-5">
+    <div class="row justify-content-center">
+        <div class="col-md-6">
+            <div class="card">
+                <div class="card-header bg-primary text-white">
+                    <h4><i class="bi bi-unlock"></i> Apertura Cassa</h4>
+                </div>
+                <div class="card-body">
+                    <form method="post">
+                        {% csrf_token %}
+
+                        <div class="mb-3">
+                            <label for="fondo_cassa_iniziale" class="form-label">Fondo Cassa Iniziale *</label>
+                            <div class="input-group">
+                                <span class="input-group-text">€</span>
+                                <input type="number" step="0.01" class="form-control" id="fondo_cassa_iniziale"
+                                       name="fondo_cassa_iniziale" required
+                                       value="{% if ultima_chiusura %}{{ ultima_chiusura.conteggio_cassa_reale }}{% endif %}">
+                            </div>
+                            <small class="form-text text-muted">
+                                Contanti presenti in cassa all'apertura
+                            </small>
+                        </div>
+
+                        {% if ultima_chiusura %}
+                        <div class="mb-3">
+                            <div class="form-check">
+                                <input class="form-check-input" type="checkbox" id="copia_da_ieri" name="copia_da_ieri" checked>
+                                <label class="form-check-label" for="copia_da_ieri">
+                                    Usa il conteggio finale di ieri (€{{ ultima_chiusura.conteggio_cassa_reale }})
+                                </label>
+                            </div>
+                        </div>
+                        {% endif %}
+
+                        <div class="mb-3">
+                            <label for="note_apertura" class="form-label">Note (opzionali)</label>
+                            <textarea class="form-control" id="note_apertura" name="note_apertura" rows="3"></textarea>
+                        </div>
+
+                        <div class="d-grid gap-2">
+                            <button type="submit" class="btn btn-primary btn-lg">
+                                <i class="bi bi-unlock-fill"></i> Apri Cassa
+                            </button>
+                            <a href="{% url 'finanze:dashboard' %}" class="btn btn-outline-secondary">Annulla</a>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

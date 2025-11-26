@@ -1,0 +1,217 @@
+{% extends 'core/base.html' %}
+{% load static %}
+
+{% block title %}Chiusura Cassa{% endblock %}
+
+{% block content %}
+<div class="container-fluid mt-4">
+    <div class="row mb-4">
+        <div class="col">
+            <h2><i class="bi bi-cash-stack"></i> Chiusura Cassa - {{ oggi|date:"d/m/Y" }}</h2>
+        </div>
+    </div>
+
+    {% if not chiusura_oggi %}
+    <!-- Cassa non ancora aperta -->
+    <div class="alert alert-warning">
+        <h4><i class="bi bi-exclamation-triangle"></i> Cassa non ancora aperta</h4>
+        <p>La cassa non è stata ancora aperta per oggi. Apri la cassa per iniziare.</p>
+        <a href="{% url 'finanze:apri_cassa' %}" class="btn btn-primary">
+            <i class="bi bi-unlock"></i> Apri Cassa
+        </a>
+    </div>
+    {% else %}
+
+    <!-- Dashboard cassa aperta -->
+    <div class="row mb-4">
+        <div class="col-md-3">
+            <div class="card text-white bg-primary">
+                <div class="card-body">
+                    <h6 class="card-title">Fondo Iniziale</h6>
+                    <h3>€{{ chiusura_oggi.fondo_cassa_iniziale }}</h3>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="card text-white bg-success">
+                <div class="card-body">
+                    <h6 class="card-title">Incassi Totali</h6>
+                    <h3>€{{ chiusura_oggi.totale_incassi_giornalieri }}</h3>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="card text-white bg-info">
+                <div class="card-body">
+                    <h6 class="card-title">Cassa Teorica</h6>
+                    <h3>€{{ chiusura_oggi.cassa_teorica_finale }}</h3>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="card text-white {% if chiusura_oggi.stato == 'chiusa' %}bg-secondary{% else %}bg-warning{% endif %}">
+                <div class="card-body">
+                    <h6 class="card-title">Stato</h6>
+                    <h3>{{ chiusura_oggi.get_stato_display }}</h3>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Metodi di pagamento -->
+    <div class="card mb-4">
+        <div class="card-header">
+            <h5><i class="bi bi-credit-card"></i> Incassi per Metodo di Pagamento</h5>
+        </div>
+        <div class="card-body">
+            <div class="row">
+                <div class="col-md-3">
+                    <strong>Contanti:</strong> €{{ chiusura_oggi.totale_incassi_contanti }}
+                </div>
+                <div class="col-md-3">
+                    <strong>Carte:</strong> €{{ chiusura_oggi.totale_carte }}
+                </div>
+                <div class="col-md-3">
+                    <strong>Bancomat:</strong> €{{ chiusura_oggi.totale_bancomat }}
+                </div>
+                <div class="col-md-3">
+                    <strong>Bonifici:</strong> €{{ chiusura_oggi.totale_bonifici }}
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Servizi non pagati -->
+    {% if servizi_non_pagati %}
+    <div class="alert alert-danger">
+        <h5><i class="bi bi-exclamation-circle"></i> Attenzione: {{ servizi_non_pagati.count }} servizi non pagati</h5>
+        <ul class="mb-0">
+            {% for ordine in servizi_non_pagati %}
+            <li>
+                Ordine #{{ ordine.numero_progressivo }} -
+                {{ ordine.cliente|default:"Anonimo" }} -
+                €{{ ordine.saldo_dovuto }} da incassare
+                <a href="{% url 'ordini:dettaglio' ordine.id %}" class="btn btn-sm btn-outline-danger">Vedi</a>
+            </li>
+            {% endfor %}
+        </ul>
+    </div>
+    {% endif %}
+
+    <!-- Pagamenti del giorno -->
+    <div class="card mb-4">
+        <div class="card-header d-flex justify-content-between align-items-center">
+            <h5><i class="bi bi-receipt"></i> Pagamenti del Giorno ({{ pagamenti.count }})</h5>
+        </div>
+        <div class="card-body">
+            <div class="table-responsive">
+                <table class="table table-sm table-hover">
+                    <thead>
+                        <tr>
+                            <th>Ora</th>
+                            <th>Ordine</th>
+                            <th>Cliente</th>
+                            <th>Metodo</th>
+                            <th>Importo</th>
+                            <th>Operatore</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for pag in pagamenti %}
+                        <tr>
+                            <td>{{ pag.data_pagamento|date:"H:i" }}</td>
+                            <td>{{ pag.ordine.numero_progressivo }}</td>
+                            <td>{{ pag.ordine.cliente|default:"Anonimo" }}</td>
+                            <td><span class="badge bg-secondary">{{ pag.get_metodo_display }}</span></td>
+                            <td class="text-success fw-bold">€{{ pag.importo }}</td>
+                            <td>{{ pag.operatore.username }}</td>
+                        </tr>
+                        {% empty %}
+                        <tr><td colspan="6" class="text-center text-muted">Nessun pagamento oggi</td></tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
+    <!-- Movimenti cassa -->
+    <div class="card mb-4">
+        <div class="card-header d-flex justify-content-between align-items-center">
+            <h5><i class="bi bi-arrow-left-right"></i> Movimenti Cassa ({{ movimenti.count }})</h5>
+            {% if chiusura_oggi.stato == 'aperta' %}
+            <a href="{% url 'finanze:aggiungi_movimento' %}" class="btn btn-sm btn-primary">
+                <i class="bi bi-plus-circle"></i> Aggiungi Movimento
+            </a>
+            {% endif %}
+        </div>
+        <div class="card-body">
+            <div class="table-responsive">
+                <table class="table table-sm">
+                    <thead>
+                        <tr>
+                            <th>Ora</th>
+                            <th>Tipo</th>
+                            <th>Categoria</th>
+                            <th>Causale</th>
+                            <th>Importo</th>
+                            <th>Operatore</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for mov in movimenti %}
+                        <tr>
+                            <td>{{ mov.data_ora|date:"H:i" }}</td>
+                            <td><span class="badge bg-info">{{ mov.get_tipo_display }}</span></td>
+                            <td>{{ mov.get_categoria_display }}</td>
+                            <td>{{ mov.causale }}</td>
+                            <td class="{% if mov.tipo == 'uscita' or mov.tipo == 'prelievo' %}text-danger{% else %}text-success{% endif %} fw-bold">
+                                {% if mov.tipo == 'uscita' or mov.tipo == 'prelievo' %}-{% else %}+{% endif %}€{{ mov.importo }}
+                            </td>
+                            <td>{{ mov.operatore.username }}</td>
+                        </tr>
+                        {% empty %}
+                        <tr><td colspan="6" class="text-center text-muted">Nessun movimento registrato</td></tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
+    <!-- Azioni -->
+    <div class="card">
+        <div class="card-body text-center">
+            {% if chiusura_oggi.stato == 'aperta' %}
+                <a href="{% url 'finanze:chiudi_cassa' %}" class="btn btn-lg btn-danger">
+                    <i class="bi bi-lock"></i> Chiudi Cassa
+                </a>
+            {% elif chiusura_oggi.stato == 'chiusa' and not chiusura_oggi.confermata %}
+                <div class="alert alert-info">
+                    <p><strong>Cassa chiusa.</strong> Differenza:
+                        <span class="fs-4 {% if chiusura_oggi.stato_differenza == 'ok' %}text-success{% elif chiusura_oggi.stato_differenza == 'mancante' %}text-danger{% else %}text-warning{% endif %}">
+                            {% if chiusura_oggi.differenza_cassa >= 0 %}+{% endif %}€{{ chiusura_oggi.differenza_cassa }}
+                        </span>
+                    </p>
+                    <a href="{% url 'finanze:conferma_chiusura' chiusura_oggi.id %}" class="btn btn-success">
+                        <i class="bi bi-check-circle"></i> Conferma Chiusura
+                    </a>
+                </div>
+            {% else %}
+                <div class="alert alert-success">
+                    <i class="bi bi-check-circle-fill"></i> Cassa confermata e bloccata.
+                </div>
+            {% endif %}
+        </div>
+    </div>
+
+    {% endif %}
+
+    <!-- Link storico -->
+    <div class="mt-4 text-center">
+        <a href="{% url 'finanze:storico_chiusure' %}" class="btn btn-outline-secondary">
+            <i class="bi bi-clock-history"></i> Storico Chiusure
+        </a>
+    </div>
+</div>
+{% endblock %}

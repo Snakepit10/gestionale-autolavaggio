@@ -1,0 +1,86 @@
+{% extends 'core/base.html' %}
+
+{% block title %}Storico Chiusure{% endblock %}
+
+{% block content %}
+<div class="container-fluid mt-4">
+    <div class="row mb-4">
+        <div class="col">
+            <h2><i class="bi bi-clock-history"></i> Storico Chiusure Cassa</h2>
+        </div>
+        <div class="col-auto">
+            <a href="{% url 'finanze:dashboard' %}" class="btn btn-primary">
+                <i class="bi bi-arrow-left"></i> Torna alla Dashboard
+            </a>
+        </div>
+    </div>
+
+    <div class="card">
+        <div class="card-body">
+            <div class="table-responsive">
+                <table class="table table-hover">
+                    <thead>
+                        <tr>
+                            <th>Data</th>
+                            <th>Operatore Apertura</th>
+                            <th>Fondo Iniziale</th>
+                            <th>Incassi Totali</th>
+                            <th>Cassa Teorica</th>
+                            <th>Cassa Reale</th>
+                            <th>Differenza</th>
+                            <th>Stato</th>
+                            <th>Azioni</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for chiusura in chiusure %}
+                        <tr>
+                            <td><strong>{{ chiusura.data|date:"d/m/Y" }}</strong></td>
+                            <td>{{ chiusura.operatore_apertura.username }}</td>
+                            <td>€{{ chiusura.fondo_cassa_iniziale }}</td>
+                            <td class="text-success fw-bold">€{{ chiusura.totale_incassi_giornalieri }}</td>
+                            <td>€{{ chiusura.cassa_teorica_finale }}</td>
+                            <td>
+                                {% if chiusura.conteggio_cassa_reale %}
+                                    €{{ chiusura.conteggio_cassa_reale }}
+                                {% else %}
+                                    <span class="text-muted">-</span>
+                                {% endif %}
+                            </td>
+                            <td>
+                                {% if chiusura.differenza_cassa is not None %}
+                                    <span class="fw-bold {% if chiusura.stato_differenza == 'ok' %}text-success{% elif chiusura.stato_differenza == 'mancante' %}text-danger{% else %}text-warning{% endif %}">
+                                        {% if chiusura.differenza_cassa >= 0 %}+{% endif %}€{{ chiusura.differenza_cassa }}
+                                    </span>
+                                {% else %}
+                                    <span class="text-muted">-</span>
+                                {% endif %}
+                            </td>
+                            <td>
+                                <span class="badge {% if chiusura.stato == 'aperta' %}bg-warning{% else %}bg-secondary{% endif %}">
+                                    {{ chiusura.get_stato_display }}
+                                </span>
+                                {% if chiusura.confermata %}
+                                    <span class="badge bg-success">Confermata</span>
+                                {% endif %}
+                            </td>
+                            <td>
+                                <a href="{% url 'finanze:dettaglio_chiusura' chiusura.id %}" class="btn btn-sm btn-outline-primary">
+                                    <i class="bi bi-eye"></i> Dettagli
+                                </a>
+                            </td>
+                        </tr>
+                        {% empty %}
+                        <tr>
+                            <td colspan="9" class="text-center text-muted py-4">
+                                Nessuna chiusura registrata
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

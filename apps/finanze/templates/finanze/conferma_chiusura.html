@@ -1,0 +1,64 @@
+{% extends 'core/base.html' %}
+
+{% block title %}Conferma Chiusura{% endblock %}
+
+{% block content %}
+<div class="container mt-5">
+    <div class="row justify-content-center">
+        <div class="col-md-6">
+            <div class="card">
+                <div class="card-header bg-success text-white">
+                    <h4><i class="bi bi-check-circle"></i> Conferma Chiusura Cassa</h4>
+                </div>
+                <div class="card-body">
+
+                    <div class="alert {% if chiusura.stato_differenza == 'ok' %}alert-success{% elif chiusura.stato_differenza == 'mancante' %}alert-danger{% else %}alert-warning{% endif %}">
+                        <h5>Riepilogo Chiusura</h5>
+                        <table class="table table-sm table-borderless mb-0">
+                            <tr>
+                                <td><strong>Data:</strong></td>
+                                <td>{{ chiusura.data|date:"d/m/Y" }}</td>
+                            </tr>
+                            <tr>
+                                <td><strong>Cassa Teorica:</strong></td>
+                                <td>€{{ chiusura.cassa_teorica_finale }}</td>
+                            </tr>
+                            <tr>
+                                <td><strong>Cassa Reale:</strong></td>
+                                <td>€{{ chiusura.conteggio_cassa_reale }}</td>
+                            </tr>
+                            <tr class="fs-5">
+                                <td><strong>Differenza:</strong></td>
+                                <td class="{% if chiusura.differenza_cassa >= 0 %}text-success{% else %}text-danger{% endif %} fw-bold">
+                                    {% if chiusura.differenza_cassa >= 0 %}+{% endif %}€{{ chiusura.differenza_cassa }}
+                                </td>
+                            </tr>
+                        </table>
+                    </div>
+
+                    <div class="alert alert-warning">
+                        <i class="bi bi-exclamation-triangle"></i> <strong>Attenzione:</strong>
+                        Confermando la chiusura, tutti i dati verranno bloccati e non sarà più possibile modificarli.
+                    </div>
+
+                    <form method="post">
+                        {% csrf_token %}
+
+                        <div class="mb-3">
+                            <label for="password" class="form-label">Inserisci la tua password per confermare *</label>
+                            <input type="password" class="form-control" id="password" name="password" required autofocus>
+                        </div>
+
+                        <div class="d-grid gap-2">
+                            <button type="submit" class="btn btn-success btn-lg">
+                                <i class="bi bi-check-circle-fill"></i> Conferma Definitivamente
+                            </button>
+                            <a href="{% url 'finanze:dashboard' %}" class="btn btn-outline-secondary">Annulla</a>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

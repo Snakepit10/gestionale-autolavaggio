@@ -26,6 +26,10 @@ urlpatterns = [
 
     # Prenotazioni
     path('prenotazioni/', include('apps.prenotazioni.urls')),
+
+    # Gestione finanziaria
+    path('finanze/', include('apps.finanze.urls')),
+
     # path('shop/', include('apps.shop.urls')),
     # path('cassa/', include('apps.ordini.urls', namespace='cassa')),
     # path('report/', include('apps.reportistica.urls')),  # Temporarily disabled

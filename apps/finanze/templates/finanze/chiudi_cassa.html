@@ -1,0 +1,101 @@
+{% extends 'core/base.html' %}
+
+{% block title %}Chiudi Cassa{% endblock %}
+
+{% block content %}
+<div class="container mt-5">
+    <div class="row justify-content-center">
+        <div class="col-md-8">
+            <div class="card">
+                <div class="card-header bg-danger text-white">
+                    <h4><i class="bi bi-lock"></i> Chiusura Cassa - {{ chiusura.data|date:"d/m/Y" }}</h4>
+                </div>
+                <div class="card-body">
+
+                    <!-- Riepilogo teorico -->
+                    <div class="row mb-4">
+                        <div class="col-md-6">
+                            <div class="card bg-light">
+                                <div class="card-body">
+                                    <h6 class="text-muted">Fondo Iniziale</h6>
+                                    <h4>€{{ chiusura.fondo_cassa_iniziale }}</h4>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="card bg-light">
+                                <div class="card-body">
+                                    <h6 class="text-muted">Incassi Contanti</h6>
+                                    <h4 class="text-success">+€{{ chiusura.totale_incassi_contanti }}</h4>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="row mb-4">
+                        <div class="col-md-6">
+                            <div class="card bg-light">
+                                <div class="card-body">
+                                    <h6 class="text-muted">Pagamenti Contanti</h6>
+                                    <h4 class="text-danger">-€{{ chiusura.totale_pagamenti_contanti }}</h4>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="card bg-light">
+                                <div class="card-body">
+                                    <h6 class="text-muted">Prelievi/Versamenti</h6>
+                                    <h4>
+                                        <span class="text-success">+€{{ chiusura.totale_versamenti }}</span> /
+                                        <span class="text-danger">-€{{ chiusura.totale_prelievi }}</span>
+                                    </h4>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="alert alert-info text-center">
+                        <h5>Cassa Teorica Finale</h5>
+                        <h2 class="mb-0">€{{ chiusura.cassa_teorica_finale }}</h2>
+                        <small class="text-muted">Questo è l'importo che dovresti trovare in cassa</small>
+                    </div>
+
+                    <hr>
+
+                    <!-- Form chiusura -->
+                    <form method="post">
+                        {% csrf_token %}
+
+                        <div class="mb-4">
+                            <label for="conteggio_cassa_reale" class="form-label fs-5">
+                                <i class="bi bi-cash-coin"></i> Conteggio Cassa Reale *
+                            </label>
+                            <div class="input-group input-group-lg">
+                                <span class="input-group-text">€</span>
+                                <input type="number" step="0.01" class="form-control" id="conteggio_cassa_reale"
+                                       name="conteggio_cassa_reale" required autofocus>
+                            </div>
+                            <small class="form-text text-muted">
+                                Conta tutti i contanti presenti in cassa e inserisci l'importo
+                            </small>
+                        </div>
+
+                        <div class="mb-4">
+                            <label for="note_chiusura" class="form-label">Note Chiusura</label>
+                            <textarea class="form-control" id="note_chiusura" name="note_chiusura" rows="3"
+                                      placeholder="Eventuali giustificazioni per differenze cassa..."></textarea>
+                        </div>
+
+                        <div class="d-grid gap-2">
+                            <button type="submit" class="btn btn-danger btn-lg">
+                                <i class="bi bi-lock-fill"></i> Chiudi Cassa
+                            </button>
+                            <a href="{% url 'finanze:dashboard' %}" class="btn btn-outline-secondary">Annulla</a>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
