@@ -156,6 +156,10 @@ from urllib.parse import urlparse
 REDIS_URL = os.environ.get('REDIS_URL', 'redis://localhost:6379')
 redis_url = urlparse(REDIS_URL)
 
+# Debug: print per verificare parsing (visibile nei log Railway)
+print(f"REDIS_URL: {REDIS_URL}")
+print(f"Parsed hostname: {redis_url.hostname}, port: {redis_url.port}")
+
 CHANNEL_LAYERS = {
     'default': {
         'BACKEND': 'channels_redis.core.RedisChannelLayer',
