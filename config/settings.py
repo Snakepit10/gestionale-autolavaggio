@@ -151,25 +151,13 @@ SESSION_COOKIE_SECURE = False  # True in produzione con HTTPS
 ASGI_APPLICATION = 'config.asgi.application'
 
 # Channel layers (Redis per WebSocket)
-from urllib.parse import urlparse
-
 REDIS_URL = os.environ.get('REDIS_URL', 'redis://localhost:6379')
-redis_url = urlparse(REDIS_URL)
-
-redis_host_config = {
-    "address": (redis_url.hostname or 'localhost', redis_url.port or 6379),
-}
-
-if redis_url.password:
-    redis_host_config["password"] = redis_url.password
-if redis_url.username:
-    redis_host_config["username"] = redis_url.username
 
 CHANNEL_LAYERS = {
     'default': {
         'BACKEND': 'channels_redis.core.RedisChannelLayer',
         'CONFIG': {
-            "hosts": [redis_host_config],
+            "hosts": [REDIS_URL],
         },
     },
 }
