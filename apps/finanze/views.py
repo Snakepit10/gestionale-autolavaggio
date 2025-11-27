@@ -559,6 +559,10 @@ def analisi_vendite(request):
     num_transazioni = pagamenti_periodo.count()
     scontrino_medio = totale_periodo / num_transazioni if num_transazioni > 0 else Decimal('0.00')
 
+    # Calcola range date
+    giorni_periodo = (data_fine - data_inizio).days + 1
+    media_giornaliera = totale_periodo / giorni_periodo if giorni_periodo > 0 else Decimal('0.00')
+
     # Analisi per categoria
     items_periodo = ItemOrdine.objects.filter(
         ordine__data_ora__date__gte=data_inizio,
@@ -611,7 +615,6 @@ def analisi_vendite(request):
         servizi_per_categoria[cat_nome].sort(key=lambda x: x['quantita'], reverse=True)
 
     # Confronto con periodo precedente
-    giorni_periodo = (data_fine - data_inizio).days + 1
     data_inizio_precedente = data_inizio - timedelta(days=giorni_periodo)
     data_fine_precedente = data_inizio - timedelta(days=1)
 
@@ -647,6 +650,7 @@ def analisi_vendite(request):
         'totale_periodo': totale_periodo,
         'num_transazioni': num_transazioni,
         'scontrino_medio': scontrino_medio,
+        'media_giornaliera': media_giornaliera,
         'totale_contanti': totale_contanti,
         'totale_carte': totale_carte,
         'totale_bancomat': totale_bancomat,

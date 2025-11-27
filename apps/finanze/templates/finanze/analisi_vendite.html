@@ -68,7 +68,7 @@
                 <div class="card-body">
                     <h6 class="text-muted">Transazioni</h6>
                     <h3>{{ num_transazioni }}</h3>
-                    <small class="text-muted">Media {{ totale_periodo|floatformat:2|default:"0.00" }} / {{ giorni_periodo }} = €{{ totale_periodo|floatformat:2|default:"0.00"|add:"0"|divisibleby:giorni_periodo|yesno:"0.00," }}{% widthratio totale_periodo giorni_periodo 1 %}/giorno</small>
+                    <small class="text-muted">Media €{{ media_giornaliera|floatformat:2 }}/giorno</small>
                 </div>
             </div>
         </div>
