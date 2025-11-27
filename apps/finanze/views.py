@@ -280,3 +280,157 @@ def aggiungi_movimento(request):
     }
 
     return render(request, 'finanze/aggiungi_movimento.html', context)
+
+
+@login_required
+@user_passes_test(is_staff_user)
+def riepilogo_incassi(request):
+    """Riepilogo incassi giornalieri con spaccato metodi pagamento"""
+    # Data selezionata (default oggi)
+    data_str = request.GET.get('data')
+    if data_str:
+        try:
+            data = datetime.strptime(data_str, '%Y-%m-%d').date()
+        except ValueError:
+            data = timezone.now().date()
+    else:
+        data = timezone.now().date()
+
+    # Pagamenti del giorno
+    pagamenti = Pagamento.objects.filter(
+        data_pagamento__date=data
+    ).select_related('ordine', 'operatore')
+
+    # Calcola totali per metodo
+    totale_contanti = pagamenti.filter(metodo='contanti').aggregate(
+        totale=Sum('importo')
+    )['totale'] or Decimal('0.00')
+
+    totale_carte = pagamenti.filter(metodo='carta').aggregate(
+        totale=Sum('importo')
+    )['totale'] or Decimal('0.00')
+
+    totale_bancomat = pagamenti.filter(metodo='bancomat').aggregate(
+        totale=Sum('importo')
+    )['totale'] or Decimal('0.00')
+
+    totale_bonifici = pagamenti.filter(metodo='bonifico').aggregate(
+        totale=Sum('importo')
+    )['totale'] or Decimal('0.00')
+
+    totale_assegni = pagamenti.filter(metodo='assegno').aggregate(
+        totale=Sum('importo')
+    )['totale'] or Decimal('0.00')
+
+    totale_abbonamenti = pagamenti.filter(metodo='abbonamento').aggregate(
+        totale=Sum('importo')
+    )['totale'] or Decimal('0.00')
+
+    # Totale generale
+    totale_incassi = (
+        totale_contanti + totale_carte + totale_bancomat +
+        totale_bonifici + totale_assegni + totale_abbonamenti
+    )
+
+    # Numero transazioni
+    num_transazioni = pagamenti.count()
+
+    # Scontrino medio
+    scontrino_medio = totale_incassi / num_transazioni if num_transazioni > 0 else Decimal('0.00')
+
+    # Confronto con giorno precedente
+    ieri = data - timedelta(days=1)
+    pagamenti_ieri = Pagamento.objects.filter(data_pagamento__date=ieri)
+    totale_ieri = pagamenti_ieri.aggregate(totale=Sum('importo'))['totale'] or Decimal('0.00')
+
+    variazione_percentuale = None
+    if totale_ieri > 0:
+        variazione_percentuale = ((totale_incassi - totale_ieri) / totale_ieri) * 100
+
+    # Servizi non pagati
+    servizi_non_pagati = Ordine.objects.filter(
+        data_ora__date__lte=data,
+        stato_pagamento__in=['non_pagato', 'parziale']
+    ).select_related('cliente').order_by('-data_ora')
+
+    totale_crediti = sum(ordine.saldo_dovuto for ordine in servizi_non_pagati)
+
+    # Dati per grafico (JSON)
+    metodi_pagamento_data = {
+        'labels': ['Contanti', 'Carte', 'Bancomat', 'Bonifici', 'Assegni', 'Abbonamenti'],
+        'data': [
+            float(totale_contanti),
+            float(totale_carte),
+            float(totale_bancomat),
+            float(totale_bonifici),
+            float(totale_assegni),
+            float(totale_abbonamenti)
+        ],
+        'counts': [
+            pagamenti.filter(metodo='contanti').count(),
+            pagamenti.filter(metodo='carta').count(),
+            pagamenti.filter(metodo='bancomat').count(),
+            pagamenti.filter(metodo='bonifico').count(),
+            pagamenti.filter(metodo='assegno').count(),
+            pagamenti.filter(metodo='abbonamento').count(),
+        ]
+    }
+
+    # Link chiusura cassa del giorno
+    chiusura_cassa = ChiusuraCassa.objects.filter(data=data).first()
+
+    context = {
+        'data': data,
+        'totale_incassi': totale_incassi,
+        'num_transazioni': num_transazioni,
+        'scontrino_medio': scontrino_medio,
+        'totale_ieri': totale_ieri,
+        'variazione_percentuale': variazione_percentuale,
+        'totale_contanti': totale_contanti,
+        'totale_carte': totale_carte,
+        'totale_bancomat': totale_bancomat,
+        'totale_bonifici': totale_bonifici,
+        'totale_assegni': totale_assegni,
+        'totale_abbonamenti': totale_abbonamenti,
+        'servizi_non_pagati': servizi_non_pagati,
+        'totale_crediti': totale_crediti,
+        'metodi_pagamento_data': metodi_pagamento_data,
+        'pagamenti': pagamenti,
+        'chiusura_cassa': chiusura_cassa,
+    }
+
+    return render(request, 'finanze/riepilogo_incassi.html', context)
+
+
+@login_required
+@user_passes_test(is_staff_user)
+def marca_pagato(request, ordine_id):
+    """Marca un ordine come pagato"""
+    ordine = get_object_or_404(Ordine, id=ordine_id)
+
+    if request.method == 'POST':
+        metodo = request.POST.get('metodo_pagamento')
+        importo = request.POST.get('importo')
+
+        try:
+            importo = Decimal(importo)
+
+            # Crea pagamento
+            pagamento = Pagamento.objects.create(
+                ordine=ordine,
+                importo=importo,
+                metodo=metodo,
+                operatore=request.user,
+                nota=f"Pagamento registrato da riepilogo incassi"
+            )
+
+            # Aggiorna importo pagato ordine
+            ordine.importo_pagato += importo
+            ordine.aggiorna_stato_pagamento()
+
+            messages.success(request, f"Pagamento di €{importo} registrato per ordine {ordine.numero_progressivo}")
+
+        except (ValueError, TypeError):
+            messages.error(request, "Importo non valido")
+
+    return redirect('finanze:riepilogo_incassi')

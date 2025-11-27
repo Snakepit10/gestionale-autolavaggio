@@ -18,4 +18,8 @@ urlpatterns = [
     # Storico
     path('storico/', views.storico_chiusure, name='storico_chiusure'),
     path('dettaglio/<int:chiusura_id>/', views.dettaglio_chiusura, name='dettaglio_chiusura'),
+
+    # Riepilogo incassi
+    path('incassi/', views.riepilogo_incassi, name='riepilogo_incassi'),
+    path('incassi/marca-pagato/<int:ordine_id>/', views.marca_pagato, name='marca_pagato'),
 ]

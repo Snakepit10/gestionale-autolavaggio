@@ -1,0 +1,371 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}Riepilogo Incassi{% endblock %}
+
+{% block extra_head %}
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+{% endblock %}
+
+{% block content %}
+<div class="container-fluid mt-4">
+    <div class="row mb-4">
+        <div class="col">
+            <h2><i class="bi bi-cash-coin"></i> Riepilogo Incassi Giornalieri</h2>
+        </div>
+        <div class="col-auto">
+            <input type="date" id="data_picker" class="form-control" value="{{ data|date:'Y-m-d' }}">
+        </div>
+        <div class="col-auto">
+            {% if chiusura_cassa %}
+            <a href="{% url 'finanze:dettaglio_chiusura' chiusura_cassa.id %}" class="btn btn-outline-primary">
+                <i class="bi bi-file-text"></i> Chiusura Cassa
+            </a>
+            {% endif %}
+            <a href="{% url 'finanze:dashboard' %}" class="btn btn-outline-secondary">
+                <i class="bi bi-arrow-left"></i> Dashboard Cassa
+            </a>
+        </div>
+    </div>
+
+    <!-- KPI Cards -->
+    <div class="row mb-4">
+        <div class="col-md-3">
+            <div class="card text-white bg-success">
+                <div class="card-body">
+                    <h6 class="card-title">Totale Incassi</h6>
+                    <h2 class="mb-0">€{{ totale_incassi }}</h2>
+                    {% if variazione_percentuale is not None %}
+                    <small>
+                        {% if variazione_percentuale >= 0 %}
+                        <i class="bi bi-arrow-up"></i> +{{ variazione_percentuale|floatformat:1 }}%
+                        {% else %}
+                        <i class="bi bi-arrow-down"></i> {{ variazione_percentuale|floatformat:1 }}%
+                        {% endif %}
+                        vs ieri
+                    </small>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="card text-white bg-primary">
+                <div class="card-body">
+                    <h6 class="card-title">Transazioni</h6>
+                    <h2 class="mb-0">{{ num_transazioni }}</h2>
+                    <small>pagamenti registrati</small>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="card text-white bg-info">
+                <div class="card-body">
+                    <h6 class="card-title">Scontrino Medio</h6>
+                    <h2 class="mb-0">€{{ scontrino_medio|floatformat:2 }}</h2>
+                    <small>per transazione</small>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="card text-white {% if servizi_non_pagati %}bg-danger{% else %}bg-secondary{% endif %}">
+                <div class="card-body">
+                    <h6 class="card-title">Crediti in Sospeso</h6>
+                    <h2 class="mb-0">€{{ totale_crediti|floatformat:2 }}</h2>
+                    <small>{{ servizi_non_pagati.count }} ordini non pagati</small>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Spaccato metodi di pagamento -->
+    <div class="row mb-4">
+        <div class="col-md-6">
+            <div class="card">
+                <div class="card-header">
+                    <h5><i class="bi bi-credit-card"></i> Metodi di Pagamento</h5>
+                </div>
+                <div class="card-body">
+                    <canvas id="metodi_pagamento_chart" height="200"></canvas>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-6">
+            <div class="card">
+                <div class="card-header">
+                    <h5><i class="bi bi-table"></i> Dettaglio per Metodo</h5>
+                </div>
+                <div class="card-body">
+                    <table class="table table-sm">
+                        <thead>
+                            <tr>
+                                <th>Metodo</th>
+                                <th class="text-end">Transazioni</th>
+                                <th class="text-end">Importo</th>
+                                <th class="text-end">%</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr>
+                                <td><i class="bi bi-cash"></i> Contanti</td>
+                                <td class="text-end">{{ metodi_pagamento_data.counts.0 }}</td>
+                                <td class="text-end text-success fw-bold">€{{ totale_contanti }}</td>
+                                <td class="text-end">
+                                    {% if totale_incassi > 0 %}
+                                    {% widthratio totale_contanti totale_incassi 100 %}%
+                                    {% else %}0%{% endif %}
+                                </td>
+                            </tr>
+                            <tr>
+                                <td><i class="bi bi-credit-card-2-front"></i> Carte</td>
+                                <td class="text-end">{{ metodi_pagamento_data.counts.1 }}</td>
+                                <td class="text-end text-success fw-bold">€{{ totale_carte }}</td>
+                                <td class="text-end">
+                                    {% if totale_incassi > 0 %}
+                                    {% widthratio totale_carte totale_incassi 100 %}%
+                                    {% else %}0%{% endif %}
+                                </td>
+                            </tr>
+                            <tr>
+                                <td><i class="bi bi-credit-card"></i> Bancomat</td>
+                                <td class="text-end">{{ metodi_pagamento_data.counts.2 }}</td>
+                                <td class="text-end text-success fw-bold">€{{ totale_bancomat }}</td>
+                                <td class="text-end">
+                                    {% if totale_incassi > 0 %}
+                                    {% widthratio totale_bancomat totale_incassi 100 %}%
+                                    {% else %}0%{% endif %}
+                                </td>
+                            </tr>
+                            <tr>
+                                <td><i class="bi bi-bank"></i> Bonifici</td>
+                                <td class="text-end">{{ metodi_pagamento_data.counts.3 }}</td>
+                                <td class="text-end text-success fw-bold">€{{ totale_bonifici }}</td>
+                                <td class="text-end">
+                                    {% if totale_incassi > 0 %}
+                                    {% widthratio totale_bonifici totale_incassi 100 %}%
+                                    {% else %}0%{% endif %}
+                                </td>
+                            </tr>
+                            <tr>
+                                <td><i class="bi bi-file-text"></i> Assegni</td>
+                                <td class="text-end">{{ metodi_pagamento_data.counts.4 }}</td>
+                                <td class="text-end text-success fw-bold">€{{ totale_assegni }}</td>
+                                <td class="text-end">
+                                    {% if totale_incassi > 0 %}
+                                    {% widthratio totale_assegni totale_incassi 100 %}%
+                                    {% else %}0%{% endif %}
+                                </td>
+                            </tr>
+                            <tr>
+                                <td><i class="bi bi-ticket-perforated"></i> Abbonamenti</td>
+                                <td class="text-end">{{ metodi_pagamento_data.counts.5 }}</td>
+                                <td class="text-end text-success fw-bold">€{{ totale_abbonamenti }}</td>
+                                <td class="text-end">
+                                    {% if totale_incassi > 0 %}
+                                    {% widthratio totale_abbonamenti totale_incassi 100 %}%
+                                    {% else %}0%{% endif %}
+                                </td>
+                            </tr>
+                            <tr class="table-active fw-bold">
+                                <td>TOTALE</td>
+                                <td class="text-end">{{ num_transazioni }}</td>
+                                <td class="text-end text-success">€{{ totale_incassi }}</td>
+                                <td class="text-end">100%</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Servizi non pagati -->
+    {% if servizi_non_pagati %}
+    <div class="card mb-4">
+        <div class="card-header bg-danger text-white">
+            <h5><i class="bi bi-exclamation-triangle"></i> Servizi Non Pagati ({{ servizi_non_pagati.count }})</h5>
+        </div>
+        <div class="card-body">
+            <div class="table-responsive">
+                <table class="table table-hover">
+                    <thead>
+                        <tr>
+                            <th>Data</th>
+                            <th>Ordine</th>
+                            <th>Cliente</th>
+                            <th>Totale</th>
+                            <th>Pagato</th>
+                            <th>Da Incassare</th>
+                            <th>Stato</th>
+                            <th>Azioni</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for ordine in servizi_non_pagati %}
+                        <tr>
+                            <td>{{ ordine.data_ora|date:"d/m/Y" }}</td>
+                            <td><strong>{{ ordine.numero_progressivo }}</strong></td>
+                            <td>{{ ordine.cliente|default:"Anonimo" }}</td>
+                            <td>€{{ ordine.totale_finale }}</td>
+                            <td class="text-success">€{{ ordine.importo_pagato }}</td>
+                            <td class="text-danger fw-bold">€{{ ordine.saldo_dovuto }}</td>
+                            <td><span class="badge bg-warning">{{ ordine.get_stato_pagamento_display }}</span></td>
+                            <td>
+                                <a href="{% url 'ordini:dettaglio' ordine.id %}" class="btn btn-sm btn-outline-primary">
+                                    <i class="bi bi-eye"></i>
+                                </a>
+                                <button class="btn btn-sm btn-success" data-bs-toggle="modal"
+                                        data-bs-target="#pagamentoModal"
+                                        data-ordine-id="{{ ordine.id }}"
+                                        data-ordine-numero="{{ ordine.numero_progressivo }}"
+                                        data-importo="{{ ordine.saldo_dovuto }}">
+                                    <i class="bi bi-cash"></i> Incassa
+                                </button>
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+    {% endif %}
+
+    <!-- Elenco pagamenti -->
+    <div class="card">
+        <div class="card-header">
+            <h5><i class="bi bi-list-ul"></i> Tutti i Pagamenti ({{ pagamenti.count }})</h5>
+        </div>
+        <div class="card-body">
+            <div class="table-responsive">
+                <table class="table table-sm table-hover">
+                    <thead>
+                        <tr>
+                            <th>Ora</th>
+                            <th>Ordine</th>
+                            <th>Cliente</th>
+                            <th>Metodo</th>
+                            <th>Importo</th>
+                            <th>Operatore</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for pag in pagamenti %}
+                        <tr>
+                            <td>{{ pag.data_pagamento|date:"H:i" }}</td>
+                            <td>{{ pag.ordine.numero_progressivo }}</td>
+                            <td>{{ pag.ordine.cliente|default:"Anonimo" }}</td>
+                            <td><span class="badge bg-secondary">{{ pag.get_metodo_display }}</span></td>
+                            <td class="text-success fw-bold">€{{ pag.importo }}</td>
+                            <td>{{ pag.operatore.username }}</td>
+                        </tr>
+                        {% empty %}
+                        <tr><td colspan="6" class="text-center text-muted">Nessun pagamento registrato</td></tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Modal per registrare pagamento -->
+<div class="modal fade" id="pagamentoModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Registra Pagamento</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <form method="post" id="pagamentoForm">
+                {% csrf_token %}
+                <div class="modal-body">
+                    <p>Ordine: <strong id="modal-ordine-numero"></strong></p>
+
+                    <div class="mb-3">
+                        <label for="importo" class="form-label">Importo *</label>
+                        <div class="input-group">
+                            <span class="input-group-text">€</span>
+                            <input type="number" step="0.01" class="form-control" id="importo" name="importo" required>
+                        </div>
+                    </div>
+
+                    <div class="mb-3">
+                        <label for="metodo_pagamento" class="form-label">Metodo Pagamento *</label>
+                        <select class="form-select" id="metodo_pagamento" name="metodo_pagamento" required>
+                            <option value="contanti">Contanti</option>
+                            <option value="carta">Carta di Credito/Debito</option>
+                            <option value="bancomat">Bancomat</option>
+                            <option value="bonifico">Bonifico</option>
+                            <option value="assegno">Assegno</option>
+                        </select>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Annulla</button>
+                    <button type="submit" class="btn btn-success">Registra Pagamento</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<script>
+// Cambia data e ricarica
+document.getElementById('data_picker').addEventListener('change', function() {
+    window.location.href = '{% url "finanze:riepilogo_incassi" %}?data=' + this.value;
+});
+
+// Grafico metodi di pagamento
+const ctx = document.getElementById('metodi_pagamento_chart').getContext('2d');
+const metodi_data = {{ metodi_pagamento_data|safe }};
+
+new Chart(ctx, {
+    type: 'doughnut',
+    data: {
+        labels: metodi_data.labels,
+        datasets: [{
+            data: metodi_data.data,
+            backgroundColor: [
+                '#28a745',
+                '#007bff',
+                '#17a2b8',
+                '#ffc107',
+                '#6c757d',
+                '#6f42c1'
+            ]
+        }]
+    },
+    options: {
+        responsive: true,
+        plugins: {
+            legend: {
+                position: 'bottom'
+            },
+            tooltip: {
+                callbacks: {
+                    label: function(context) {
+                        const label = context.label || '';
+                        const value = context.parsed || 0;
+                        const count = metodi_data.counts[context.dataIndex];
+                        return label + ': €' + value.toFixed(2) + ' (' + count + ' trans.)';
+                    }
+                }
+            }
+        }
+    }
+});
+
+// Modal pagamento - popola dati
+const pagamentoModal = document.getElementById('pagamentoModal');
+pagamentoModal.addEventListener('show.bs.modal', function (event) {
+    const button = event.relatedTarget;
+    const ordineId = button.getAttribute('data-ordine-id');
+    const ordineNumero = button.getAttribute('data-ordine-numero');
+    const importo = button.getAttribute('data-importo');
+
+    document.getElementById('modal-ordine-numero').textContent = ordineNumero;
+    document.getElementById('importo').value = importo;
+    document.getElementById('pagamentoForm').action = '/finanze/incassi/marca-pagato/' + ordineId + '/';
+});
+</script>
+{% endblock %}
