@@ -6,6 +6,7 @@ from django.db.models import Sum, Q, Count
 from django.http import JsonResponse
 from datetime import datetime, timedelta
 from decimal import Decimal
+import json
 
 from .models import ChiusuraCassa, MovimentoCassa
 from apps.ordini.models import Pagamento, Ordine
@@ -394,7 +395,7 @@ def riepilogo_incassi(request):
         'totale_abbonamenti': totale_abbonamenti,
         'servizi_non_pagati': servizi_non_pagati,
         'totale_crediti': totale_crediti,
-        'metodi_pagamento_data': metodi_pagamento_data,
+        'metodi_pagamento_data': json.dumps(metodi_pagamento_data),
         'pagamenti': pagamenti,
         'chiusura_cassa': chiusura_cassa,
     }

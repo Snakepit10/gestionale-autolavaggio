@@ -210,7 +210,7 @@
                             <td class="text-danger fw-bold">€{{ ordine.saldo_dovuto }}</td>
                             <td><span class="badge bg-warning">{{ ordine.get_stato_pagamento_display }}</span></td>
                             <td>
-                                <a href="{% url 'ordini:dettaglio' ordine.id %}" class="btn btn-sm btn-outline-primary">
+                                <a href="{% url 'ordini:ordine-detail' ordine.id %}" class="btn btn-sm btn-outline-primary">
                                     <i class="bi bi-eye"></i>
                                 </a>
                                 <button class="btn btn-sm btn-success" data-bs-toggle="modal"
