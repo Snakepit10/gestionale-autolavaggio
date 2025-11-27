@@ -178,6 +178,82 @@
         </div>
     </div>
 
+    <!-- Report per Categoria e Servizi Più Venduti -->
+    <div class="row mb-4">
+        <div class="col-md-6">
+            <div class="card">
+                <div class="card-header">
+                    <h5><i class="bi bi-folder"></i> Fatturato per Categoria</h5>
+                </div>
+                <div class="card-body">
+                    {% if categorie_report %}
+                    <canvas id="categorie_chart" height="200"></canvas>
+                    <div class="mt-3">
+                        <table class="table table-sm">
+                            <thead>
+                                <tr>
+                                    <th>Categoria</th>
+                                    <th class="text-end">Quantità</th>
+                                    <th class="text-end">Fatturato</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for cat in categorie_report %}
+                                <tr>
+                                    <td><strong>{{ cat.nome }}</strong></td>
+                                    <td class="text-end">{{ cat.quantita }}</td>
+                                    <td class="text-end text-success fw-bold">€{{ cat.fatturato|floatformat:2 }}</td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                    {% else %}
+                    <p class="text-muted text-center">Nessun dato disponibile</p>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+
+        <div class="col-md-6">
+            <div class="card">
+                <div class="card-header">
+                    <h5><i class="bi bi-trophy"></i> Top 10 Servizi Più Venduti</h5>
+                </div>
+                <div class="card-body">
+                    {% if top_servizi %}
+                    <div class="table-responsive">
+                        <table class="table table-sm table-hover">
+                            <thead>
+                                <tr>
+                                    <th>#</th>
+                                    <th>Servizio/Prodotto</th>
+                                    <th>Categoria</th>
+                                    <th class="text-end">Qtà</th>
+                                    <th class="text-end">Fatturato</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for servizio in top_servizi %}
+                                <tr>
+                                    <td><span class="badge bg-primary">{{ forloop.counter }}</span></td>
+                                    <td><strong>{{ servizio.nome }}</strong></td>
+                                    <td><small class="text-muted">{{ servizio.categoria }}</small></td>
+                                    <td class="text-end">{{ servizio.quantita }}</td>
+                                    <td class="text-end text-success fw-bold">€{{ servizio.fatturato|floatformat:2 }}</td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                    {% else %}
+                    <p class="text-muted text-center">Nessun servizio venduto oggi</p>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+    </div>
+
     <!-- Servizi non pagati -->
     {% if servizi_non_pagati %}
     <div class="card mb-4">
@@ -354,6 +430,56 @@ new Chart(ctx, {
         }
     }
 });
+
+// Grafico categorie
+{% if categorie_report %}
+const ctx_cat = document.getElementById('categorie_chart');
+if (ctx_cat) {
+    const categorie_data = {{ categorie_chart_data|safe }};
+
+    new Chart(ctx_cat.getContext('2d'), {
+        type: 'bar',
+        data: {
+            labels: categorie_data.labels,
+            datasets: [{
+                label: 'Fatturato €',
+                data: categorie_data.data,
+                backgroundColor: '#28a745',
+                borderColor: '#1e7e34',
+                borderWidth: 1
+            }]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: true,
+            plugins: {
+                legend: {
+                    display: false
+                },
+                tooltip: {
+                    callbacks: {
+                        label: function(context) {
+                            const value = context.parsed.y || 0;
+                            const count = categorie_data.counts[context.dataIndex];
+                            return 'Fatturato: €' + value.toFixed(2) + ' (' + count + ' pz)';
+                        }
+                    }
+                }
+            },
+            scales: {
+                y: {
+                    beginAtZero: true,
+                    ticks: {
+                        callback: function(value) {
+                            return '€' + value;
+                        }
+                    }
+                }
+            }
+        }
+    });
+}
+{% endif %}
 
 // Modal pagamento - popola dati
 const pagamentoModal = document.getElementById('pagamentoModal');

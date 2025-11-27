@@ -9,7 +9,8 @@ from decimal import Decimal
 import json
 
 from .models import ChiusuraCassa, MovimentoCassa
-from apps.ordini.models import Pagamento, Ordine
+from apps.ordini.models import Pagamento, Ordine, ItemOrdine
+from apps.core.models import Categoria
 
 
 def is_staff_user(user):
@@ -380,6 +381,60 @@ def riepilogo_incassi(request):
     # Link chiusura cassa del giorno
     chiusura_cassa = ChiusuraCassa.objects.filter(data=data).first()
 
+    # Report per categoria
+    items_giorno = ItemOrdine.objects.filter(
+        ordine__data_ora__date=data,
+        ordine__stato_pagamento='pagato'
+    ).select_related('servizio_prodotto__categoria')
+
+    categorie_stats = {}
+    for item in items_giorno:
+        categoria_nome = item.servizio_prodotto.categoria.nome
+        if categoria_nome not in categorie_stats:
+            categorie_stats[categoria_nome] = {
+                'nome': categoria_nome,
+                'quantita': 0,
+                'fatturato': Decimal('0.00')
+            }
+        categorie_stats[categoria_nome]['quantita'] += item.quantita
+        categorie_stats[categoria_nome]['fatturato'] += item.subtotale
+
+    # Ordina per fatturato
+    categorie_report = sorted(
+        categorie_stats.values(),
+        key=lambda x: x['fatturato'],
+        reverse=True
+    )
+
+    # Servizi più venduti (top 10)
+    servizi_stats = {}
+    for item in items_giorno:
+        servizio_nome = item.servizio_prodotto.titolo
+        if servizio_nome not in servizi_stats:
+            servizi_stats[servizio_nome] = {
+                'nome': servizio_nome,
+                'categoria': item.servizio_prodotto.categoria.nome,
+                'quantita': 0,
+                'fatturato': Decimal('0.00'),
+                'prezzo_medio': item.prezzo_unitario
+            }
+        servizi_stats[servizio_nome]['quantita'] += item.quantita
+        servizi_stats[servizio_nome]['fatturato'] += item.subtotale
+
+    # Top 10 per quantità
+    top_servizi = sorted(
+        servizi_stats.values(),
+        key=lambda x: x['quantita'],
+        reverse=True
+    )[:10]
+
+    # Dati per grafici categorie (JSON)
+    categorie_chart_data = {
+        'labels': [c['nome'] for c in categorie_report],
+        'data': [float(c['fatturato']) for c in categorie_report],
+        'counts': [c['quantita'] for c in categorie_report]
+    }
+
     context = {
         'data': data,
         'totale_incassi': totale_incassi,
@@ -398,6 +453,9 @@ def riepilogo_incassi(request):
         'metodi_pagamento_data': json.dumps(metodi_pagamento_data),
         'pagamenti': pagamenti,
         'chiusura_cassa': chiusura_cassa,
+        'categorie_report': categorie_report,
+        'top_servizi': top_servizi,
+        'categorie_chart_data': json.dumps(categorie_chart_data),
     }
 
     return render(request, 'finanze/riepilogo_incassi.html', context)
