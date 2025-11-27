@@ -22,4 +22,7 @@ urlpatterns = [
     # Riepilogo incassi
     path('incassi/', views.riepilogo_incassi, name='riepilogo_incassi'),
     path('incassi/marca-pagato/<int:ordine_id>/', views.marca_pagato, name='marca_pagato'),
+
+    # Analisi vendite
+    path('analisi/', views.analisi_vendite, name='analisi_vendite'),
 ]

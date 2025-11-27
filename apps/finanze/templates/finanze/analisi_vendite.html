@@ -1,0 +1,268 @@
+{% extends 'base.html' %}
+
+{% block title %}Analisi Vendite{% endblock %}
+
+{% block content %}
+<div class="container-fluid mt-4">
+    <div class="row mb-4">
+        <div class="col">
+            <h2><i class="bi bi-graph-up"></i> Analisi Vendite</h2>
+        </div>
+    </div>
+
+    <!-- Filtri Periodo -->
+    <div class="card mb-4">
+        <div class="card-body">
+            <form method="get" id="filtroForm">
+                <div class="row align-items-end">
+                    <div class="col-md-3">
+                        <label class="form-label fw-bold">Tipo Periodo</label>
+                        <select name="periodo" class="form-select" id="periodoSelect">
+                            <option value="giornaliero" {% if periodo_tipo == 'giornaliero' %}selected{% endif %}>Giornaliero</option>
+                            <option value="settimanale" {% if periodo_tipo == 'settimanale' %}selected{% endif %}>Settimanale</option>
+                            <option value="mensile" {% if periodo_tipo == 'mensile' %}selected{% endif %}>Mensile</option>
+                            <option value="personalizzato" {% if periodo_tipo == 'personalizzato' %}selected{% endif %}>Personalizzato</option>
+                        </select>
+                    </div>
+                    <div class="col-md-3" id="dataInizioDiv" style="{% if periodo_tipo != 'personalizzato' %}display:none;{% endif %}">
+                        <label class="form-label fw-bold">Data Inizio</label>
+                        <input type="date" name="data_inizio" class="form-control" value="{{ data_inizio|date:'Y-m-d' }}">
+                    </div>
+                    <div class="col-md-3" id="dataFineDiv" style="{% if periodo_tipo != 'personalizzato' %}display:none;{% endif %}">
+                        <label class="form-label fw-bold">Data Fine</label>
+                        <input type="date" name="data_fine" class="form-control" value="{{ data_fine|date:'Y-m-d' }}">
+                    </div>
+                    <div class="col-md-3">
+                        <button type="submit" class="btn btn-primary w-100">
+                            <i class="bi bi-search"></i> Applica Filtri
+                        </button>
+                    </div>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Info Periodo -->
+    <div class="alert alert-info mb-4">
+        <i class="bi bi-calendar-range"></i> <strong>Periodo analizzato:</strong>
+        {{ data_inizio|date:"d/m/Y" }} - {{ data_fine|date:"d/m/Y" }} ({{ giorni_periodo }} giorn{% if giorni_periodo == 1 %}o{% else %}i{% endif %})
+    </div>
+
+    <!-- KPI Cards -->
+    <div class="row mb-4">
+        <div class="col-md-3">
+            <div class="card">
+                <div class="card-body">
+                    <h6 class="text-muted">Totale Vendite</h6>
+                    <h3 class="text-success">€{{ totale_periodo|floatformat:2 }}</h3>
+                    {% if variazione_percentuale is not None %}
+                    <small class="{% if variazione_percentuale >= 0 %}text-success{% else %}text-danger{% endif %}">
+                        {% if variazione_percentuale >= 0 %}+{% endif %}{{ variazione_percentuale|floatformat:1 }}% vs periodo precedente
+                    </small>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="card">
+                <div class="card-body">
+                    <h6 class="text-muted">Transazioni</h6>
+                    <h3>{{ num_transazioni }}</h3>
+                    <small class="text-muted">Media {{ totale_periodo|floatformat:2|default:"0.00" }} / {{ giorni_periodo }} = €{{ totale_periodo|floatformat:2|default:"0.00"|add:"0"|divisibleby:giorni_periodo|yesno:"0.00," }}{% widthratio totale_periodo giorni_periodo 1 %}/giorno</small>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="card">
+                <div class="card-body">
+                    <h6 class="text-muted">Scontrino Medio</h6>
+                    <h3>€{{ scontrino_medio|floatformat:2 }}</h3>
+                    <small class="text-muted">Per transazione</small>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="card">
+                <div class="card-body">
+                    <h6 class="text-muted">Periodo Precedente</h6>
+                    <h3 class="text-muted">€{{ totale_precedente|floatformat:2 }}</h3>
+                    <small class="text-muted">Confronto</small>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Metodi di Pagamento -->
+    <div class="card mb-4">
+        <div class="card-header">
+            <h5><i class="bi bi-credit-card"></i> Dettaglio Metodi di Pagamento</h5>
+        </div>
+        <div class="card-body">
+            <div class="table-responsive">
+                <table class="table table-hover">
+                    <thead>
+                        <tr>
+                            <th>Metodo</th>
+                            <th class="text-end">Importo</th>
+                            <th class="text-end">% sul Totale</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr>
+                            <td><i class="bi bi-cash"></i> Contanti</td>
+                            <td class="text-end">€{{ totale_contanti|floatformat:2 }}</td>
+                            <td class="text-end">{% if totale_periodo > 0 %}{% widthratio totale_contanti totale_periodo 100 %}%{% else %}0%{% endif %}</td>
+                        </tr>
+                        <tr>
+                            <td><i class="bi bi-credit-card-2-front"></i> Carte di Credito</td>
+                            <td class="text-end">€{{ totale_carte|floatformat:2 }}</td>
+                            <td class="text-end">{% if totale_periodo > 0 %}{% widthratio totale_carte totale_periodo 100 %}%{% else %}0%{% endif %}</td>
+                        </tr>
+                        <tr>
+                            <td><i class="bi bi-credit-card"></i> Bancomat</td>
+                            <td class="text-end">€{{ totale_bancomat|floatformat:2 }}</td>
+                            <td class="text-end">{% if totale_periodo > 0 %}{% widthratio totale_bancomat totale_periodo 100 %}%{% else %}0%{% endif %}</td>
+                        </tr>
+                        <tr>
+                            <td><i class="bi bi-bank"></i> Bonifici</td>
+                            <td class="text-end">€{{ totale_bonifici|floatformat:2 }}</td>
+                            <td class="text-end">{% if totale_periodo > 0 %}{% widthratio totale_bonifici totale_periodo 100 %}%{% else %}0%{% endif %}</td>
+                        </tr>
+                        <tr>
+                            <td><i class="bi bi-receipt"></i> Assegni</td>
+                            <td class="text-end">€{{ totale_assegni|floatformat:2 }}</td>
+                            <td class="text-end">{% if totale_periodo > 0 %}{% widthratio totale_assegni totale_periodo 100 %}%{% else %}0%{% endif %}</td>
+                        </tr>
+                        <tr>
+                            <td><i class="bi bi-card-checklist"></i> Abbonamenti</td>
+                            <td class="text-end">€{{ totale_abbonamenti|floatformat:2 }}</td>
+                            <td class="text-end">{% if totale_periodo > 0 %}{% widthratio totale_abbonamenti totale_periodo 100 %}%{% else %}0%{% endif %}</td>
+                        </tr>
+                        <tr class="table-active fw-bold">
+                            <td>TOTALE</td>
+                            <td class="text-end">€{{ totale_periodo|floatformat:2 }}</td>
+                            <td class="text-end">100%</td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
+    <!-- Fatturato per Categoria -->
+    <div class="card mb-4">
+        <div class="card-header">
+            <h5><i class="bi bi-pie-chart"></i> Fatturato per Categoria</h5>
+        </div>
+        <div class="card-body">
+            <div class="table-responsive">
+                <table class="table table-hover">
+                    <thead>
+                        <tr>
+                            <th>Categoria</th>
+                            <th class="text-end">Quantità</th>
+                            <th class="text-end">Fatturato</th>
+                            <th class="text-end">% sul Totale</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for cat in categorie_report %}
+                        <tr>
+                            <td><strong>{{ cat.nome }}</strong></td>
+                            <td class="text-end">{{ cat.quantita }}</td>
+                            <td class="text-end text-success fw-bold">€{{ cat.fatturato|floatformat:2 }}</td>
+                            <td class="text-end">{% if totale_periodo > 0 %}{% widthratio cat.fatturato totale_periodo 100 %}%{% else %}0%{% endif %}</td>
+                        </tr>
+                        {% empty %}
+                        <tr><td colspan="4" class="text-center text-muted">Nessun dato</td></tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
+    <!-- Servizi e Prodotti Venduti -->
+    <div class="card mb-4">
+        <div class="card-header">
+            <h5><i class="bi bi-cart-check"></i> Servizi e Prodotti Venduti</h5>
+        </div>
+        <div class="card-body">
+            {% if servizi_per_categoria %}
+            {% for cat_nome, servizi_lista in servizi_per_categoria.items %}
+            <div class="mb-4">
+                <h6 class="text-primary border-bottom pb-2"><i class="bi bi-tag"></i> {{ cat_nome }}</h6>
+                <table class="table table-sm table-hover">
+                    <thead>
+                        <tr>
+                            <th>Servizio/Prodotto</th>
+                            <th class="text-end">Quantità</th>
+                            <th class="text-end">Prezzo Medio</th>
+                            <th class="text-end">Fatturato</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for servizio in servizi_lista %}
+                        <tr>
+                            <td>{{ servizio.nome }}</td>
+                            <td class="text-end">{{ servizio.quantita }}</td>
+                            <td class="text-end">€{{ servizio.prezzo_medio|floatformat:2 }}</td>
+                            <td class="text-end text-success fw-bold">€{{ servizio.fatturato|floatformat:2 }}</td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+            {% endfor %}
+            {% else %}
+            <p class="text-center text-muted">Nessun servizio venduto nel periodo</p>
+            {% endif %}
+        </div>
+    </div>
+
+    <!-- Trend Giornaliero -->
+    <div class="card mb-4">
+        <div class="card-header">
+            <h5><i class="bi bi-graph-up-arrow"></i> Trend Giornaliero</h5>
+        </div>
+        <div class="card-body">
+            <div class="table-responsive">
+                <table class="table table-sm table-hover">
+                    <thead>
+                        <tr>
+                            <th>Data</th>
+                            <th class="text-end">Totale Vendite</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for giorno in giorni_trend %}
+                        <tr>
+                            <td>{{ giorno.data|date:"d/m/Y (l)" }}</td>
+                            <td class="text-end">€{{ giorno.totale|floatformat:2 }}</td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    const periodoSelect = document.getElementById('periodoSelect');
+    const dataInizioDiv = document.getElementById('dataInizioDiv');
+    const dataFineDiv = document.getElementById('dataFineDiv');
+
+    periodoSelect.addEventListener('change', function() {
+        if (this.value === 'personalizzato') {
+            dataInizioDiv.style.display = 'block';
+            dataFineDiv.style.display = 'block';
+        } else {
+            dataInizioDiv.style.display = 'none';
+            dataFineDiv.style.display = 'none';
+        }
+    });
+});
+</script>
+{% endblock %}

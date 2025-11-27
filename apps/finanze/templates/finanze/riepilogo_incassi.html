@@ -79,20 +79,10 @@
 
     <!-- Spaccato metodi di pagamento -->
     <div class="row mb-4">
-        <div class="col-md-6">
+        <div class="col-md-12">
             <div class="card">
                 <div class="card-header">
-                    <h5><i class="bi bi-credit-card"></i> Metodi di Pagamento</h5>
-                </div>
-                <div class="card-body">
-                    <canvas id="metodi_pagamento_chart" height="200"></canvas>
-                </div>
-            </div>
-        </div>
-        <div class="col-md-6">
-            <div class="card">
-                <div class="card-header">
-                    <h5><i class="bi bi-table"></i> Dettaglio per Metodo</h5>
+                    <h5><i class="bi bi-credit-card"></i> Dettaglio Metodi di Pagamento</h5>
                 </div>
                 <div class="card-body">
                     <table class="table table-sm">
@@ -178,23 +168,23 @@
         </div>
     </div>
 
-    <!-- Report per Categoria e Servizi Più Venduti -->
+    <!-- Report per Categoria -->
     <div class="row mb-4">
-        <div class="col-md-6">
+        <div class="col-md-12">
             <div class="card">
                 <div class="card-header">
                     <h5><i class="bi bi-folder"></i> Fatturato per Categoria</h5>
                 </div>
                 <div class="card-body">
                     {% if categorie_report %}
-                    <canvas id="categorie_chart" height="200"></canvas>
-                    <div class="mt-3">
+                    <div class="table-responsive">
                         <table class="table table-sm">
                             <thead>
                                 <tr>
                                     <th>Categoria</th>
                                     <th class="text-end">Quantità</th>
                                     <th class="text-end">Fatturato</th>
+                                    <th class="text-end">% sul Totale</th>
                                 </tr>
                             </thead>
                             <tbody>
@@ -203,6 +193,11 @@
                                     <td><strong>{{ cat.nome }}</strong></td>
                                     <td class="text-end">{{ cat.quantita }}</td>
                                     <td class="text-end text-success fw-bold">€{{ cat.fatturato|floatformat:2 }}</td>
+                                    <td class="text-end">
+                                        {% if totale_incassi > 0 %}
+                                        {% widthratio cat.fatturato totale_incassi 100 %}%
+                                        {% else %}0%{% endif %}
+                                    </td>
                                 </tr>
                                 {% endfor %}
                             </tbody>
@@ -214,43 +209,45 @@
                 </div>
             </div>
         </div>
+    </div>
 
-        <div class="col-md-6">
-            <div class="card">
-                <div class="card-header">
-                    <h5><i class="bi bi-trophy"></i> Top 10 Servizi Più Venduti</h5>
-                </div>
-                <div class="card-body">
-                    {% if top_servizi %}
-                    <div class="table-responsive">
-                        <table class="table table-sm table-hover">
-                            <thead>
-                                <tr>
-                                    <th>#</th>
-                                    <th>Servizio/Prodotto</th>
-                                    <th>Categoria</th>
-                                    <th class="text-end">Qtà</th>
-                                    <th class="text-end">Fatturato</th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                {% for servizio in top_servizi %}
-                                <tr>
-                                    <td><span class="badge bg-primary">{{ forloop.counter }}</span></td>
-                                    <td><strong>{{ servizio.nome }}</strong></td>
-                                    <td><small class="text-muted">{{ servizio.categoria }}</small></td>
-                                    <td class="text-end">{{ servizio.quantita }}</td>
-                                    <td class="text-end text-success fw-bold">€{{ servizio.fatturato|floatformat:2 }}</td>
-                                </tr>
-                                {% endfor %}
-                            </tbody>
-                        </table>
-                    </div>
-                    {% else %}
-                    <p class="text-muted text-center">Nessun servizio venduto oggi</p>
-                    {% endif %}
+    <!-- Servizi/Prodotti Venduti per Categoria -->
+    <div class="card mb-4">
+        <div class="card-header">
+            <h5><i class="bi bi-cart-check"></i> Servizi e Prodotti Venduti</h5>
+        </div>
+        <div class="card-body">
+            {% if servizi_per_categoria %}
+            {% for cat_nome, servizi_lista in servizi_per_categoria.items %}
+            <div class="mb-4">
+                <h6 class="text-primary border-bottom pb-2"><i class="bi bi-tag"></i> {{ cat_nome }}</h6>
+                <div class="table-responsive">
+                    <table class="table table-sm table-hover">
+                        <thead>
+                            <tr>
+                                <th>Servizio/Prodotto</th>
+                                <th class="text-end">Quantità</th>
+                                <th class="text-end">Prezzo Medio</th>
+                                <th class="text-end">Fatturato</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for servizio in servizi_lista %}
+                            <tr>
+                                <td>{{ servizio.nome }}</td>
+                                <td class="text-end">{{ servizio.quantita }}</td>
+                                <td class="text-end">€{{ servizio.prezzo_medio|floatformat:2 }}</td>
+                                <td class="text-end text-success fw-bold">€{{ servizio.fatturato|floatformat:2 }}</td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
                 </div>
             </div>
+            {% endfor %}
+            {% else %}
+            <p class="text-muted text-center">Nessun servizio venduto oggi</p>
+            {% endif %}
         </div>
     </div>
 

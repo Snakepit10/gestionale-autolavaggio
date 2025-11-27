@@ -421,19 +421,17 @@ def riepilogo_incassi(request):
         servizi_stats[servizio_nome]['quantita'] += item.quantita
         servizi_stats[servizio_nome]['fatturato'] += item.subtotale
 
-    # Top 10 per quantità
-    top_servizi = sorted(
-        servizi_stats.values(),
-        key=lambda x: x['quantita'],
-        reverse=True
-    )[:10]
+    # Raggruppa servizi per categoria
+    servizi_per_categoria = {}
+    for servizio_nome, servizio_data in servizi_stats.items():
+        cat_nome = servizio_data['categoria']
+        if cat_nome not in servizi_per_categoria:
+            servizi_per_categoria[cat_nome] = []
+        servizi_per_categoria[cat_nome].append(servizio_data)
 
-    # Dati per grafici categorie (JSON)
-    categorie_chart_data = {
-        'labels': [c['nome'] for c in categorie_report],
-        'data': [float(c['fatturato']) for c in categorie_report],
-        'counts': [c['quantita'] for c in categorie_report]
-    }
+    # Ordina servizi dentro ogni categoria per quantità
+    for cat_nome in servizi_per_categoria:
+        servizi_per_categoria[cat_nome].sort(key=lambda x: x['quantita'], reverse=True)
 
     context = {
         'data': data,
@@ -454,8 +452,7 @@ def riepilogo_incassi(request):
         'pagamenti': pagamenti,
         'chiusura_cassa': chiusura_cassa,
         'categorie_report': categorie_report,
-        'top_servizi': top_servizi,
-        'categorie_chart_data': json.dumps(categorie_chart_data),
+        'servizi_per_categoria': servizi_per_categoria,
     }
 
     return render(request, 'finanze/riepilogo_incassi.html', context)
@@ -493,3 +490,174 @@ def marca_pagato(request, ordine_id):
             messages.error(request, "Importo non valido")
 
     return redirect('finanze:riepilogo_incassi')
+
+
+@login_required
+@user_passes_test(is_staff_user)
+def analisi_vendite(request):
+    """Analisi vendite con filtri periodo: giornaliero, settimanale, mensile, personalizzato"""
+    oggi = timezone.now().date()
+
+    # Ottieni parametri filtro
+    periodo_tipo = request.GET.get('periodo', 'giornaliero')
+    data_inizio_str = request.GET.get('data_inizio')
+    data_fine_str = request.GET.get('data_fine')
+
+    # Calcola range date in base al periodo
+    if periodo_tipo == 'giornaliero':
+        data_inizio = oggi
+        data_fine = oggi
+    elif periodo_tipo == 'settimanale':
+        # Settimana corrente (lunedì - domenica)
+        data_inizio = oggi - timedelta(days=oggi.weekday())
+        data_fine = data_inizio + timedelta(days=6)
+    elif periodo_tipo == 'mensile':
+        # Mese corrente
+        data_inizio = oggi.replace(day=1)
+        # Ultimo giorno del mese
+        if oggi.month == 12:
+            data_fine = oggi.replace(day=31)
+        else:
+            data_fine = (oggi.replace(month=oggi.month + 1, day=1) - timedelta(days=1))
+    elif periodo_tipo == 'personalizzato':
+        # Range personalizzato
+        if data_inizio_str and data_fine_str:
+            try:
+                data_inizio = datetime.strptime(data_inizio_str, '%Y-%m-%d').date()
+                data_fine = datetime.strptime(data_fine_str, '%Y-%m-%d').date()
+            except ValueError:
+                data_inizio = oggi
+                data_fine = oggi
+        else:
+            data_inizio = oggi
+            data_fine = oggi
+    else:
+        data_inizio = oggi
+        data_fine = oggi
+
+    # Pagamenti nel periodo
+    pagamenti_periodo = Pagamento.objects.filter(
+        data_pagamento__date__gte=data_inizio,
+        data_pagamento__date__lte=data_fine
+    ).select_related('ordine', 'operatore')
+
+    # Totali per metodo
+    totale_contanti = pagamenti_periodo.filter(metodo='contanti').aggregate(Sum('importo'))['importo__sum'] or Decimal('0.00')
+    totale_carte = pagamenti_periodo.filter(metodo='carta').aggregate(Sum('importo'))['importo__sum'] or Decimal('0.00')
+    totale_bancomat = pagamenti_periodo.filter(metodo='bancomat').aggregate(Sum('importo'))['importo__sum'] or Decimal('0.00')
+    totale_bonifici = pagamenti_periodo.filter(metodo='bonifico').aggregate(Sum('importo'))['importo__sum'] or Decimal('0.00')
+    totale_assegni = pagamenti_periodo.filter(metodo='assegno').aggregate(Sum('importo'))['importo__sum'] or Decimal('0.00')
+    totale_abbonamenti = pagamenti_periodo.filter(metodo='abbonamento').aggregate(Sum('importo'))['importo__sum'] or Decimal('0.00')
+
+    # Totale generale
+    totale_periodo = (
+        totale_contanti + totale_carte + totale_bancomat +
+        totale_bonifici + totale_assegni + totale_abbonamenti
+    )
+
+    # Statistiche generali
+    num_transazioni = pagamenti_periodo.count()
+    scontrino_medio = totale_periodo / num_transazioni if num_transazioni > 0 else Decimal('0.00')
+
+    # Analisi per categoria
+    items_periodo = ItemOrdine.objects.filter(
+        ordine__data_ora__date__gte=data_inizio,
+        ordine__data_ora__date__lte=data_fine,
+        ordine__stato_pagamento='pagato'
+    ).select_related('servizio_prodotto__categoria')
+
+    categorie_stats = {}
+    for item in items_periodo:
+        categoria_nome = item.servizio_prodotto.categoria.nome
+        if categoria_nome not in categorie_stats:
+            categorie_stats[categoria_nome] = {
+                'nome': categoria_nome,
+                'quantita': 0,
+                'fatturato': Decimal('0.00')
+            }
+        categorie_stats[categoria_nome]['quantita'] += item.quantita
+        categorie_stats[categoria_nome]['fatturato'] += item.subtotale
+
+    categorie_report = sorted(
+        categorie_stats.values(),
+        key=lambda x: x['fatturato'],
+        reverse=True
+    )
+
+    # Analisi servizi per categoria
+    servizi_stats = {}
+    for item in items_periodo:
+        servizio_nome = item.servizio_prodotto.titolo
+        if servizio_nome not in servizi_stats:
+            servizi_stats[servizio_nome] = {
+                'nome': servizio_nome,
+                'categoria': item.servizio_prodotto.categoria.nome,
+                'quantita': 0,
+                'fatturato': Decimal('0.00'),
+                'prezzo_medio': item.prezzo_unitario
+            }
+        servizi_stats[servizio_nome]['quantita'] += item.quantita
+        servizi_stats[servizio_nome]['fatturato'] += item.subtotale
+
+    # Raggruppa per categoria
+    servizi_per_categoria = {}
+    for servizio_nome, servizio_data in servizi_stats.items():
+        cat_nome = servizio_data['categoria']
+        if cat_nome not in servizi_per_categoria:
+            servizi_per_categoria[cat_nome] = []
+        servizi_per_categoria[cat_nome].append(servizio_data)
+
+    for cat_nome in servizi_per_categoria:
+        servizi_per_categoria[cat_nome].sort(key=lambda x: x['quantita'], reverse=True)
+
+    # Confronto con periodo precedente
+    giorni_periodo = (data_fine - data_inizio).days + 1
+    data_inizio_precedente = data_inizio - timedelta(days=giorni_periodo)
+    data_fine_precedente = data_inizio - timedelta(days=1)
+
+    pagamenti_precedente = Pagamento.objects.filter(
+        data_pagamento__date__gte=data_inizio_precedente,
+        data_pagamento__date__lte=data_fine_precedente
+    )
+    totale_precedente = pagamenti_precedente.aggregate(Sum('importo'))['importo__sum'] or Decimal('0.00')
+
+    variazione_percentuale = None
+    if totale_precedente > 0:
+        variazione_percentuale = ((totale_periodo - totale_precedente) / totale_precedente) * 100
+
+    # Analisi giornaliera (per grafici trend)
+    giorni_trend = []
+    data_corrente = data_inizio
+    while data_corrente <= data_fine:
+        totale_giorno = Pagamento.objects.filter(
+            data_pagamento__date=data_corrente
+        ).aggregate(Sum('importo'))['importo__sum'] or Decimal('0.00')
+
+        giorni_trend.append({
+            'data': data_corrente,
+            'totale': totale_giorno
+        })
+        data_corrente += timedelta(days=1)
+
+    context = {
+        'periodo_tipo': periodo_tipo,
+        'data_inizio': data_inizio,
+        'data_fine': data_fine,
+        'giorni_periodo': giorni_periodo,
+        'totale_periodo': totale_periodo,
+        'num_transazioni': num_transazioni,
+        'scontrino_medio': scontrino_medio,
+        'totale_contanti': totale_contanti,
+        'totale_carte': totale_carte,
+        'totale_bancomat': totale_bancomat,
+        'totale_bonifici': totale_bonifici,
+        'totale_assegni': totale_assegni,
+        'totale_abbonamenti': totale_abbonamenti,
+        'categorie_report': categorie_report,
+        'servizi_per_categoria': servizi_per_categoria,
+        'totale_precedente': totale_precedente,
+        'variazione_percentuale': variazione_percentuale,
+        'giorni_trend': giorni_trend,
+    }
+
+    return render(request, 'finanze/analisi_vendite.html', context)
