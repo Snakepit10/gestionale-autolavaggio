@@ -3,10 +3,6 @@
 
 {% block title %}Riepilogo Incassi{% endblock %}
 
-{% block extra_head %}
-<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
-{% endblock %}
-
 {% block content %}
 <div class="container-fluid mt-4">
     <div class="row mb-4">
@@ -387,96 +383,6 @@
 document.getElementById('data_picker').addEventListener('change', function() {
     window.location.href = '{% url "finanze:riepilogo_incassi" %}?data=' + this.value;
 });
-
-// Grafico metodi di pagamento
-const ctx = document.getElementById('metodi_pagamento_chart').getContext('2d');
-const metodi_data = {{ metodi_pagamento_data|safe }};
-
-new Chart(ctx, {
-    type: 'doughnut',
-    data: {
-        labels: metodi_data.labels,
-        datasets: [{
-            data: metodi_data.data,
-            backgroundColor: [
-                '#28a745',
-                '#007bff',
-                '#17a2b8',
-                '#ffc107',
-                '#6c757d',
-                '#6f42c1'
-            ]
-        }]
-    },
-    options: {
-        responsive: true,
-        plugins: {
-            legend: {
-                position: 'bottom'
-            },
-            tooltip: {
-                callbacks: {
-                    label: function(context) {
-                        const label = context.label || '';
-                        const value = context.parsed || 0;
-                        const count = metodi_data.counts[context.dataIndex];
-                        return label + ': €' + value.toFixed(2) + ' (' + count + ' trans.)';
-                    }
-                }
-            }
-        }
-    }
-});
-
-// Grafico categorie
-{% if categorie_report %}
-const ctx_cat = document.getElementById('categorie_chart');
-if (ctx_cat) {
-    const categorie_data = {{ categorie_chart_data|safe }};
-
-    new Chart(ctx_cat.getContext('2d'), {
-        type: 'bar',
-        data: {
-            labels: categorie_data.labels,
-            datasets: [{
-                label: 'Fatturato €',
-                data: categorie_data.data,
-                backgroundColor: '#28a745',
-                borderColor: '#1e7e34',
-                borderWidth: 1
-            }]
-        },
-        options: {
-            responsive: true,
-            maintainAspectRatio: true,
-            plugins: {
-                legend: {
-                    display: false
-                },
-                tooltip: {
-                    callbacks: {
-                        label: function(context) {
-                            const value = context.parsed.y || 0;
-                            const count = categorie_data.counts[context.dataIndex];
-                            return 'Fatturato: €' + value.toFixed(2) + ' (' + count + ' pz)';
-                        }
-                    }
-                }
-            },
-            scales: {
-                y: {
-                    beginAtZero: true,
-                    ticks: {
-                        callback: function(value) {
-                            return '€' + value;
-                        }
-                    }
-                }
-            }
-        }
-    });
-}
-{% endif %}
 
 // Modal pagamento - popola dati
 const pagamentoModal = document.getElementById('pagamentoModal');
