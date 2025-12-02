@@ -1001,10 +1001,12 @@ def modifica_ordine(request, pk):
 
 
 @login_required
-@transaction.atomic
 def aggiungi_item_ordine(request, pk):
     """Aggiunge un nuovo servizio/prodotto a un ordine esistente"""
+    print(f"DEBUG: aggiungi_item_ordine chiamato - ordine_id={pk}, metodo={request.method}, user={request.user}")
+
     ordine = get_object_or_404(Ordine, pk=pk)
+    print(f"DEBUG: Ordine trovato - numero={ordine.numero_progressivo}, stato={ordine.stato}")
 
     # Verifica che l'ordine sia modificabile
     if ordine.stato in ['completato', 'annullato']:
@@ -1095,6 +1097,8 @@ def aggiungi_item_ordine(request, pk):
                     )
 
             # Crea il nuovo item
+            print(f"DEBUG: Creazione item - servizio_id={servizio.id}, quantita={quantita}, prezzo={prezzo}")
+
             nuovo_item = ItemOrdine.objects.create(
                 ordine=ordine,
                 servizio_prodotto=servizio,
@@ -1103,8 +1107,14 @@ def aggiungi_item_ordine(request, pk):
                 postazione_assegnata=postazione_assegnata
             )
 
+            print(f"DEBUG: Item creato con ID={nuovo_item.id}")
+
             # Ricalcola i totali dell'ordine
+            items_count = ordine.items.count()
+            print(f"DEBUG: Numero items nell'ordine: {items_count}")
+
             ordine.totale = sum(item.subtotale for item in ordine.items.all())
+            print(f"DEBUG: Nuovo totale ordine: {ordine.totale}")
 
             # Ricalcola sconto se applicato
             if ordine.sconto_applicato:
@@ -1113,13 +1123,18 @@ def aggiungi_item_ordine(request, pk):
                 ordine.importo_sconto = 0
 
             ordine.totale_finale = ordine.totale - ordine.importo_sconto
+            print(f"DEBUG: Totale finale: {ordine.totale_finale}")
 
-            # Aggiorna stato pagamento
-            ordine.aggiorna_stato_pagamento()
+            # Salva l'ordine con i nuovi totali
             ordine.save()
+            print(f"DEBUG: Ordine salvato con nuovi totali")
+
+            # Aggiorna stato pagamento (che salva di nuovo l'ordine)
+            ordine.aggiorna_stato_pagamento()
+            print(f"DEBUG: Stato pagamento aggiornato")
 
             # Log dell'operazione
-            print(f"Aggiunto servizio {servizio.titolo} (Qtà: {quantita}) all'ordine {ordine.numero_progressivo} da {request.user}")
+            print(f"SUCCESS: Aggiunto servizio {servizio.titolo} (Qtà: {quantita}) all'ordine {ordine.numero_progressivo} da {request.user}")
 
             return JsonResponse({
                 'success': True,
@@ -1128,12 +1143,16 @@ def aggiungi_item_ordine(request, pk):
                 'nuovo_totale': float(ordine.totale_finale)
             })
 
-        except json.JSONDecodeError:
+        except json.JSONDecodeError as e:
+            print(f"ERROR: JSONDecodeError - {str(e)}")
             return JsonResponse({
                 'success': False,
                 'error': 'Dati JSON non validi'
             }, status=400)
         except Exception as e:
+            import traceback
+            print(f"ERROR: Exception durante aggiunta item - {str(e)}")
+            print(f"ERROR: Traceback - {traceback.format_exc()}")
             return JsonResponse({
                 'success': False,
                 'error': f'Errore durante l\'aggiunta: {str(e)}'
