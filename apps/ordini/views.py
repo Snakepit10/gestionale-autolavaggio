@@ -499,22 +499,28 @@ class OrdiniListView(LoginRequiredMixin, ListView):
     
     def get_queryset(self):
         queryset = Ordine.objects.select_related('cliente', 'operatore').prefetch_related('items', 'pagamenti')
-        
+
         # Filtri
         stato = self.request.GET.get('stato')
         data_da = self.request.GET.get('data_da')
         data_a = self.request.GET.get('data_a')
         cliente = self.request.GET.get('cliente')
-        
-        if stato:
-            queryset = queryset.filter(stato=stato)
-        if data_da:
-            queryset = queryset.filter(data_ora__date__gte=data_da)
-        if data_a:
-            queryset = queryset.filter(data_ora__date__lte=data_a)
-        if cliente:
-            queryset = queryset.filter(cliente_id=cliente)
-        
+
+        # Se non ci sono filtri, mostra solo ordini di oggi
+        if not any([stato, data_da, data_a, cliente]):
+            oggi = timezone.now().date()
+            queryset = queryset.filter(data_ora__date=oggi)
+        else:
+            # Applica filtri personalizzati
+            if stato:
+                queryset = queryset.filter(stato=stato)
+            if data_da:
+                queryset = queryset.filter(data_ora__date__gte=data_da)
+            if data_a:
+                queryset = queryset.filter(data_ora__date__lte=data_a)
+            if cliente:
+                queryset = queryset.filter(cliente_id=cliente)
+
         return queryset.order_by('-data_ora')
 
 
