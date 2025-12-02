@@ -412,97 +412,167 @@
 
 <!-- Modal Modifica Ordine -->
 <div class="modal fade" id="modalModifica" tabindex="-1">
-    <div class="modal-dialog">
+    <div class="modal-dialog modal-xl">
         <div class="modal-content">
-            <div class="modal-header">
+            <div class="modal-header bg-primary text-white">
                 <h5 class="modal-title">
-                    <i class="bi bi-pencil"></i>
+                    <i class="bi bi-pencil-square"></i>
                     Modifica Ordine <span id="modifica-ordine-numero"></span>
                 </h5>
-                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
             </div>
             <form id="form-modifica-ordine">
-                <div class="modal-body">
+                <div class="modal-body" style="max-height: 70vh; overflow-y: auto;">
                     {% csrf_token %}
                     <input type="hidden" id="modifica-ordine-id">
 
-                    <div class="mb-3">
-                        <label for="modifica-cliente" class="form-label">Cliente</label>
-                        <select class="form-select" id="modifica-cliente" name="cliente_id">
-                            <option value="">Nessun cliente (anonimo)</option>
-                        </select>
-                    </div>
-
-                    <div class="mb-3">
-                        <label for="modifica-tipo-consegna" class="form-label">Tipo Consegna</label>
-                        <select class="form-select" id="modifica-tipo-consegna" name="tipo_consegna"
-                                onchange="toggleOraConsegna()" required>
-                            <option value="immediata">Consegna Immediata</option>
-                            <option value="programmata">Consegna Programmata</option>
-                        </select>
-                    </div>
-
-                    <div class="mb-3" id="modifica-ora-consegna-group" style="display: none;">
-                        <label for="modifica-ora-consegna" class="form-label">Ora Consegna</label>
-                        <input type="time" class="form-control" id="modifica-ora-consegna" name="ora_consegna_richiesta">
-                    </div>
-
-                    <div class="mb-3">
-                        <label for="modifica-tipo-auto" class="form-label">Tipo Auto</label>
-                        <input type="text" class="form-control" id="modifica-tipo-auto" name="tipo_auto"
-                               placeholder="es. Fiat 500 bianca, BMW X3 nera...">
-                    </div>
-
-                    <hr>
-
-                    <!-- Gestione Servizi -->
-                    <h6><i class="bi bi-list-ul"></i> Gestione Servizi</h6>
-
-                    <!-- Lista servizi correnti -->
-                    <div class="mb-3">
-                        <label class="form-label">Servizi attuali</label>
-                        <div id="lista-servizi-correnti" class="border rounded p-2" style="max-height: 200px; overflow-y: auto;">
-                            <div class="text-muted text-center py-2">Caricamento...</div>
+                    <!-- Sezione 1: Informazioni Ordine -->
+                    <div class="card mb-3 border-info">
+                        <div class="card-header bg-info bg-opacity-10">
+                            <h6 class="mb-0"><i class="bi bi-info-circle"></i> Informazioni Ordine</h6>
                         </div>
-                    </div>
+                        <div class="card-body">
+                            <div class="row">
+                                <div class="col-md-6 mb-3">
+                                    <label for="modifica-cliente" class="form-label fw-bold">Cliente</label>
+                                    <select class="form-select" id="modifica-cliente" name="cliente_id">
+                                        <option value="">Nessun cliente (anonimo)</option>
+                                    </select>
+                                </div>
 
-                    <!-- Aggiungi nuovo servizio -->
-                    <div class="mb-3">
-                        <label for="aggiungi-servizio-select" class="form-label">Aggiungi Servizio/Prodotto</label>
-                        <select class="form-select form-select-sm" id="aggiungi-servizio-select">
-                            <option value="">Seleziona per aggiungere...</option>
-                        </select>
-                    </div>
+                                <div class="col-md-6 mb-3">
+                                    <label for="modifica-tipo-auto" class="form-label fw-bold">Tipo Auto</label>
+                                    <input type="text" class="form-control" id="modifica-tipo-auto" name="tipo_auto"
+                                           placeholder="es. Fiat 500 bianca, BMW X3 nera...">
+                                </div>
 
-                    <div id="form-aggiungi-servizio" style="display: none;">
-                        <div class="row">
-                            <div class="col-md-4">
-                                <label for="aggiungi-quantita" class="form-label">Quantità</label>
-                                <input type="number" class="form-control form-control-sm" id="aggiungi-quantita"
-                                       value="1" min="1">
-                            </div>
-                            <div class="col-md-4">
-                                <label for="aggiungi-prezzo" class="form-label">Prezzo €</label>
-                                <input type="number" class="form-control form-control-sm" id="aggiungi-prezzo"
-                                       step="0.01" min="0">
-                            </div>
-                            <div class="col-md-4">
-                                <label class="form-label">Subtotale</label>
-                                <div class="form-control-plaintext">
-                                    <strong id="aggiungi-subtotale">€0.00</strong>
+                                <div class="col-md-6 mb-3">
+                                    <label for="modifica-tipo-consegna" class="form-label fw-bold">Tipo Consegna</label>
+                                    <select class="form-select" id="modifica-tipo-consegna" name="tipo_consegna"
+                                            onchange="toggleOraConsegna()" required>
+                                        <option value="immediata">Consegna Immediata</option>
+                                        <option value="programmata">Consegna Programmata</option>
+                                    </select>
+                                </div>
+
+                                <div class="col-md-6 mb-3" id="modifica-ora-consegna-group" style="display: none;">
+                                    <label for="modifica-ora-consegna" class="form-label fw-bold">Ora Consegna</label>
+                                    <input type="time" class="form-control" id="modifica-ora-consegna" name="ora_consegna_richiesta">
                                 </div>
                             </div>
                         </div>
-                        <button type="button" class="btn btn-sm btn-success mt-2" onclick="confermaAggiuntaServizio()">
-                            <i class="bi bi-plus-circle"></i> Conferma Aggiunta
-                        </button>
-                        <button type="button" class="btn btn-sm btn-secondary mt-2" onclick="annullaAggiuntaServizio()">
-                            Annulla
-                        </button>
                     </div>
 
-                    <div id="totale-ordine-aggiornato" class="mt-3 alert alert-info" style="display: none;">
-                        <strong>Nuovo Totale Ordine: <span id="nuovo-totale-display">€0.00</span></strong>
+                    <!-- Sezione 2: Servizi Correnti -->
+                    <div class="card mb-3 border-warning">
+                        <div class="card-header bg-warning bg-opacity-10">
+                            <h6 class="mb-0"><i class="bi bi-list-check"></i> Servizi Correnti</h6>
+                        </div>
+                        <div class="card-body">
+                            <div id="lista-servizi-correnti" class="border rounded p-2 bg-light" style="max-height: 250px; overflow-y: auto;">
+                                <div class="text-muted text-center py-2">Caricamento...</div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Sezione 3: Modifica Servizio -->
+                    <div class="card mb-3 border-primary">
+                        <div class="card-header bg-primary bg-opacity-10">
+                            <h6 class="mb-0"><i class="bi bi-pencil"></i> Modifica Servizio Esistente</h6>
+                        </div>
+                        <div class="card-body">
+                            <div class="mb-3">
+                                <label for="modifica-item-select" class="form-label fw-bold">Seleziona servizio da modificare</label>
+                                <select class="form-select" id="modifica-item-select" onchange="caricaDettagliItemModifica()">
+                                    <option value="">Seleziona un servizio...</option>
+                                </select>
+                            </div>
+
+                            <div id="form-modifica-item" style="display: none;">
+                                <input type="hidden" id="modifica-item-id">
+                                <div class="alert alert-info">
+                                    <i class="bi bi-info-circle"></i>
+                                    <small>Puoi cambiare il servizio, la quantità o il prezzo</small>
+                                </div>
+                                <div class="row">
+                                    <div class="col-md-4 mb-3">
+                                        <label for="modifica-nuovo-servizio" class="form-label fw-bold">Nuovo Servizio</label>
+                                        <select class="form-select" id="modifica-nuovo-servizio" onchange="aggiornaInfoServizioModifica()">
+                                            <option value="">Mantieni servizio corrente</option>
+                                        </select>
+                                    </div>
+                                    <div class="col-md-3 mb-3">
+                                        <label for="modifica-item-quantita" class="form-label fw-bold">Quantità</label>
+                                        <input type="number" class="form-control" id="modifica-item-quantita" min="1" value="1" onchange="calcolaSubtotaleModifica()">
+                                    </div>
+                                    <div class="col-md-3 mb-3">
+                                        <label for="modifica-item-prezzo" class="form-label fw-bold">Prezzo €</label>
+                                        <input type="number" class="form-control" id="modifica-item-prezzo" step="0.01" min="0" onchange="calcolaSubtotaleModifica()">
+                                    </div>
+                                    <div class="col-md-2 mb-3">
+                                        <label class="form-label fw-bold">Subtotale</label>
+                                        <div class="fs-5 text-primary fw-bold" id="modifica-item-subtotale">€0.00</div>
+                                    </div>
+                                </div>
+                                <button type="button" class="btn btn-primary" onclick="salvaModificaItem()">
+                                    <i class="bi bi-check-circle"></i> Salva Modifica
+                                </button>
+                                <button type="button" class="btn btn-danger" onclick="eliminaItem()">
+                                    <i class="bi bi-trash"></i> Elimina Servizio
+                                </button>
+                                <button type="button" class="btn btn-secondary" onclick="annullaModificaItem()">
+                                    Annulla
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Sezione 4: Aggiungi Nuovo Servizio -->
+                    <div class="card mb-3 border-success">
+                        <div class="card-header bg-success bg-opacity-10">
+                            <h6 class="mb-0"><i class="bi bi-plus-circle"></i> Aggiungi Nuovo Servizio</h6>
+                        </div>
+                        <div class="card-body">
+                            <div class="mb-3">
+                                <label for="aggiungi-servizio-select" class="form-label fw-bold">Servizio/Prodotto</label>
+                                <select class="form-select" id="aggiungi-servizio-select">
+                                    <option value="">Seleziona per aggiungere...</option>
+                                </select>
+                            </div>
+
+                            <div id="form-aggiungi-servizio" style="display: none;">
+                                <div class="row">
+                                    <div class="col-md-4 mb-3">
+                                        <label for="aggiungi-quantita" class="form-label fw-bold">Quantità</label>
+                                        <input type="number" class="form-control" id="aggiungi-quantita"
+                                               value="1" min="1" onchange="calcolaSubtotaleAggiunta()">
+                                    </div>
+                                    <div class="col-md-4 mb-3">
+                                        <label for="aggiungi-prezzo" class="form-label fw-bold">Prezzo €</label>
+                                        <input type="number" class="form-control" id="aggiungi-prezzo"
+                                               step="0.01" min="0" onchange="calcolaSubtotaleAggiunta()">
+                                    </div>
+                                    <div class="col-md-4 mb-3">
+                                        <label class="form-label fw-bold">Subtotale</label>
+                                        <div class="fs-5 text-success fw-bold" id="aggiungi-subtotale">€0.00</div>
+                                    </div>
+                                </div>
+                                <button type="button" class="btn btn-success" onclick="confermaAggiuntaServizio()">
+                                    <i class="bi bi-plus-circle"></i> Conferma Aggiunta
+                                </button>
+                                <button type="button" class="btn btn-secondary" onclick="annullaAggiuntaServizio()">
+                                    Annulla
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Riepilogo Totale -->
+                    <div id="totale-ordine-aggiornato" class="alert alert-success" style="display: none;">
+                        <h5 class="mb-0">
+                            <i class="bi bi-cash-stack"></i>
+                            Nuovo Totale Ordine: <span id="nuovo-totale-display" class="fw-bold">€0.00</span>
+                        </h5>
                     </div>
                 </div>
                 <div class="modal-footer">
@@ -627,6 +697,7 @@ function apriModalModifica(ordineId) {
 }
 
 function caricaServiziOrdine(ordineId) {
+    // Carica dalla pagina HTML per ora (potremmo creare un endpoint JSON dedicato)
     fetch(`/ordini/${ordineId}/`)
         .then(response => response.text())
         .then(html => {
@@ -634,32 +705,56 @@ function caricaServiziOrdine(ordineId) {
             const doc = parser.parseFromString(html, 'text/html');
 
             const container = document.getElementById('lista-servizi-correnti');
+            const selectModifica = document.getElementById('modifica-item-select');
             container.innerHTML = '';
+            selectModifica.innerHTML = '<option value="">Seleziona un servizio...</option>';
+            itemsData = [];
 
             // Cerca la tabella degli items nella pagina di dettaglio
             const itemRows = doc.querySelectorAll('table tbody tr');
             let hasItems = false;
 
-            itemRows.forEach(row => {
+            itemRows.forEach((row, index) => {
                 const cells = row.cells;
-                if (cells && cells.length >= 3) {
+                if (cells && cells.length >= 4) {
                     hasItems = true;
                     const servizioText = cells[0]?.textContent.trim();
                     const quantitaText = cells[1]?.textContent.trim();
                     const prezzoText = cells[2]?.textContent.trim();
+                    const subtotaleText = cells[3]?.textContent.trim();
 
                     if (servizioText && quantitaText && prezzoText) {
+                        // Estrai valori numerici
+                        const quantita = quantitaText;
+                        const prezzo = prezzoText.replace('€', '').trim();
+
+                        // Salva i dati per modifica
+                        const itemId = `item-${index}`; // Temporaneo, idealmente dovrebbe venire dal backend
+                        itemsData.push({
+                            id: itemId,
+                            nome: servizioText,
+                            quantita: quantita,
+                            prezzo: prezzo
+                        });
+
+                        // Aggiungi alla lista visuale
                         const itemDiv = document.createElement('div');
                         itemDiv.className = 'border-bottom py-2';
                         itemDiv.innerHTML = `
                             <div class="d-flex justify-content-between align-items-center">
                                 <div>
                                     <strong>${servizioText}</strong><br>
-                                    <small class="text-muted">Qtà: ${quantitaText} - ${prezzoText}</small>
+                                    <small class="text-muted">Qtà: ${quantitaText} - Prezzo: ${prezzoText} - Tot: ${subtotaleText}</small>
                                 </div>
                             </div>
                         `;
                         container.appendChild(itemDiv);
+
+                        // Aggiungi al select di modifica
+                        const option = document.createElement('option');
+                        option.value = itemId;
+                        option.textContent = `${servizioText} (${quantitaText}x ${prezzoText})`;
+                        selectModifica.appendChild(option);
                     }
                 }
             });
@@ -813,6 +908,130 @@ function annullaAggiuntaServizio() {
     document.getElementById('aggiungi-quantita').value = '1';
     document.getElementById('aggiungi-prezzo').value = '0';
     document.getElementById('aggiungi-subtotale').textContent = '€0.00';
+}
+
+// Funzioni per modifica item esistente
+let itemsData = [];
+
+function caricaDettagliItemModifica() {
+    const select = document.getElementById('modifica-item-select');
+    const form = document.getElementById('form-modifica-item');
+
+    if (select.value) {
+        const itemData = itemsData.find(i => i.id === select.value);
+        if (itemData) {
+            document.getElementById('modifica-item-id').value = itemData.id;
+            document.getElementById('modifica-item-quantita').value = itemData.quantita;
+            document.getElementById('modifica-item-prezzo').value = itemData.prezzo;
+
+            // Popola il select dei servizi se non già fatto
+            if (document.getElementById('modifica-nuovo-servizio').options.length === 1) {
+                populateServizioSelect();
+            }
+
+            calcolaSubtotaleModifica();
+            form.style.display = 'block';
+        }
+    } else {
+        form.style.display = 'none';
+    }
+}
+
+function populateServizioSelect() {
+    const select = document.getElementById('modifica-nuovo-servizio');
+    serviziDisponibili.forEach(servizio => {
+        const option = document.createElement('option');
+        option.value = servizio.id;
+        option.textContent = `${servizio.titolo} - €${servizio.prezzo.toFixed(2)}`;
+        option.setAttribute('data-prezzo', servizio.prezzo);
+        select.appendChild(option);
+    });
+}
+
+function aggiornaInfoServizioModifica() {
+    const select = document.getElementById('modifica-nuovo-servizio');
+    if (select.value) {
+        const option = select.options[select.selectedIndex];
+        const prezzo = option.getAttribute('data-prezzo');
+        document.getElementById('modifica-item-prezzo').value = prezzo;
+        calcolaSubtotaleModifica();
+    }
+}
+
+function calcolaSubtotaleModifica() {
+    const quantita = parseFloat(document.getElementById('modifica-item-quantita').value) || 0;
+    const prezzo = parseFloat(document.getElementById('modifica-item-prezzo').value) || 0;
+    const subtotale = quantita * prezzo;
+    document.getElementById('modifica-item-subtotale').textContent = `€${subtotale.toFixed(2)}`;
+}
+
+function salvaModificaItem() {
+    const itemId = document.getElementById('modifica-item-id').value;
+    const nuovoServizioId = document.getElementById('modifica-nuovo-servizio').value;
+    const quantita = document.getElementById('modifica-item-quantita').value;
+    const prezzo = document.getElementById('modifica-item-prezzo').value;
+
+    if (!quantita || !prezzo) {
+        alert('Completa tutti i campi');
+        return;
+    }
+
+    const data = {
+        item_id: itemId,
+        quantita: parseInt(quantita),
+        prezzo: parseFloat(prezzo)
+    };
+
+    if (nuovoServizioId) {
+        data.nuovo_servizio_id = nuovoServizioId;
+    }
+
+    console.log('DEBUG: salvaModificaItem', data);
+
+    fetch(`{% url 'ordini:modifica-item-ordine' 0 %}`.replace('0', ordineCorrenteId), {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+            'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]').value
+        },
+        body: JSON.stringify(data)
+    })
+    .then(response => response.json())
+    .then(data => {
+        console.log('DEBUG: Response modifica item:', data);
+        if (data.success) {
+            alert(data.message);
+            bootstrap.Modal.getInstance(document.getElementById('modalModifica'))?.hide();
+            location.reload();
+        } else {
+            alert('Errore: ' + data.error);
+        }
+    })
+    .catch(error => {
+        console.error('ERROR:', error);
+        alert('Errore durante la modifica: ' + error.message);
+    });
+}
+
+function eliminaItem() {
+    if (!confirm('Sei sicuro di voler eliminare questo servizio dall\'ordine?')) {
+        return;
+    }
+
+    const itemId = document.getElementById('modifica-item-id').value;
+
+    // Implementa la chiamata per eliminare l'item
+    alert('Funzionalità elimina servizio - da implementare');
+}
+
+function annullaModificaItem() {
+    document.getElementById('modifica-item-select').value = '';
+    document.getElementById('form-modifica-item').style.display = 'none';
+    document.getElementById('modifica-item-id').value = '';
+    document.getElementById('modifica-nuovo-servizio').value = '';
+    document.getElementById('modifica-item-quantita').value = '1';
+    document.getElementById('modifica-item-prezzo').value = '0';
+    document.getElementById('modifica-item-subtotale').textContent = '€0.00';
 }
 
 function toggleOraConsegna() {
