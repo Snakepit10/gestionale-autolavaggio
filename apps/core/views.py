@@ -286,23 +286,29 @@ def test_stampante(request, pk):
 
 @login_required
 def servizi_json(request):
-    """API JSON per elenco servizi attivi"""
+    """API JSON per elenco servizi/prodotti attivi raggruppati per categoria"""
     servizi = ServizioProdotto.objects.filter(
-        tipo='servizio',
         attivo=True
-    ).order_by('titolo')
-    
-    servizi_data = []
+    ).select_related('categoria').order_by('categoria__ordine_visualizzazione', 'titolo')
+
+    # Raggruppa per categoria
+    categorie_data = {}
     for servizio in servizi:
-        servizi_data.append({
+        categoria_nome = servizio.categoria.nome if servizio.categoria else 'Senza categoria'
+        if categoria_nome not in categorie_data:
+            categorie_data[categoria_nome] = []
+
+        categorie_data[categoria_nome].append({
             'id': servizio.id,
             'titolo': servizio.titolo,
             'prezzo': float(servizio.prezzo),
+            'tipo': servizio.tipo,
             'durata_minuti': servizio.durata_minuti or 0,
-            'categoria': servizio.categoria.nome if servizio.categoria else None
+            'disponibile': servizio.disponibile,
+            'quantita_disponibile': servizio.quantita_disponibile if servizio.tipo == 'prodotto' else None
         })
-    
-    return JsonResponse({'servizi': servizi_data})
+
+    return JsonResponse({'categorie': categorie_data})
 
 
 @login_required
@@ -380,3 +386,23 @@ def movimento_scorte(request):
         print(f"DEBUG: Metodo non POST: {request.method}")
     
     return redirect('core:scorte-list')
+
+@login_required
+def servizi_api(request):
+    """API per ottenere la lista dei servizi/prodotti disponibili"""
+    servizi = ServizioProdotto.objects.filter(attivo=True).select_related("categoria").order_by("categoria__ordine_visualizzazione", "titolo")
+    data = {}
+    for servizio in servizi:
+        categoria_nome = servizio.categoria.nome
+        if categoria_nome not in data:
+            data[categoria_nome] = []
+        data[categoria_nome].append({
+            "id": servizio.id,
+            "titolo": servizio.titolo,
+            "prezzo": float(servizio.prezzo),
+            "tipo": servizio.tipo,
+            "disponibile": servizio.disponibile,
+            "quantita_disponibile": servizio.quantita_disponibile if servizio.tipo == "prodotto" else None
+        })
+    return JsonResponse(data, safe=False)
+

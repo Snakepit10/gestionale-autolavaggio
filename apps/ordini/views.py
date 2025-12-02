@@ -1002,6 +1002,151 @@ def modifica_ordine(request, pk):
 
 @login_required
 @transaction.atomic
+def aggiungi_item_ordine(request, pk):
+    """Aggiunge un nuovo servizio/prodotto a un ordine esistente"""
+    ordine = get_object_or_404(Ordine, pk=pk)
+
+    # Verifica che l'ordine sia modificabile
+    if ordine.stato in ['completato', 'annullato']:
+        return JsonResponse({
+            'success': False,
+            'error': 'Non è possibile modificare un ordine completato o annullato'
+        }, status=400)
+
+    if request.method == 'POST':
+        try:
+            data = json.loads(request.body)
+
+            # Ottieni il servizio/prodotto da aggiungere
+            servizio_id = data.get('servizio_id')
+            quantita = data.get('quantita', 1)
+            prezzo = data.get('prezzo')
+
+            if not servizio_id:
+                return JsonResponse({
+                    'success': False,
+                    'error': 'Servizio non specificato'
+                }, status=400)
+
+            try:
+                servizio = ServizioProdotto.objects.get(id=servizio_id, attivo=True)
+            except ServizioProdotto.DoesNotExist:
+                return JsonResponse({
+                    'success': False,
+                    'error': 'Servizio non trovato'
+                }, status=400)
+
+            # Verifica disponibilità
+            if not servizio.disponibile:
+                return JsonResponse({
+                    'success': False,
+                    'error': 'Il servizio/prodotto selezionato non è disponibile'
+                }, status=400)
+
+            # Valida quantità
+            try:
+                quantita = int(quantita)
+                if quantita <= 0:
+                    return JsonResponse({
+                        'success': False,
+                        'error': 'La quantità deve essere maggiore di 0'
+                    }, status=400)
+            except (ValueError, TypeError):
+                return JsonResponse({
+                    'success': False,
+                    'error': 'Quantità non valida'
+                }, status=400)
+
+            # Verifica disponibilità per prodotti
+            if servizio.tipo == 'prodotto' and servizio.quantita_disponibile > 0:
+                if servizio.quantita_disponibile < quantita:
+                    return JsonResponse({
+                        'success': False,
+                        'error': f'Disponibili solo {servizio.quantita_disponibile} unità'
+                    }, status=400)
+
+            # Valida prezzo
+            if prezzo:
+                try:
+                    from decimal import Decimal
+                    prezzo = Decimal(str(prezzo))
+                    if prezzo < 0:
+                        return JsonResponse({
+                            'success': False,
+                            'error': 'Il prezzo non può essere negativo'
+                        }, status=400)
+                except (ValueError, TypeError):
+                    return JsonResponse({
+                        'success': False,
+                        'error': 'Prezzo non valido'
+                    }, status=400)
+            else:
+                prezzo = servizio.prezzo
+
+            # Assegna postazione se è un servizio
+            postazione_assegnata = None
+            if servizio.tipo == 'servizio':
+                postazioni_disponibili = servizio.postazioni.filter(attiva=True)
+                if postazioni_disponibili.exists():
+                    # Assegna alla postazione con meno carico
+                    postazione_assegnata = min(
+                        postazioni_disponibili,
+                        key=lambda p: p.get_ordini_in_coda().count()
+                    )
+
+            # Crea il nuovo item
+            nuovo_item = ItemOrdine.objects.create(
+                ordine=ordine,
+                servizio_prodotto=servizio,
+                quantita=quantita,
+                prezzo_unitario=prezzo,
+                postazione_assegnata=postazione_assegnata
+            )
+
+            # Ricalcola i totali dell'ordine
+            ordine.totale = sum(item.subtotale for item in ordine.items.all())
+
+            # Ricalcola sconto se applicato
+            if ordine.sconto_applicato:
+                ordine.importo_sconto = ordine.sconto_applicato.calcola_sconto(ordine.totale)
+            else:
+                ordine.importo_sconto = 0
+
+            ordine.totale_finale = ordine.totale - ordine.importo_sconto
+
+            # Aggiorna stato pagamento
+            ordine.aggiorna_stato_pagamento()
+            ordine.save()
+
+            # Log dell'operazione
+            print(f"Aggiunto servizio {servizio.titolo} (Qtà: {quantita}) all'ordine {ordine.numero_progressivo} da {request.user}")
+
+            return JsonResponse({
+                'success': True,
+                'message': f'Servizio "{servizio.titolo}" aggiunto con successo',
+                'item_id': nuovo_item.id,
+                'nuovo_totale': float(ordine.totale_finale)
+            })
+
+        except json.JSONDecodeError:
+            return JsonResponse({
+                'success': False,
+                'error': 'Dati JSON non validi'
+            }, status=400)
+        except Exception as e:
+            return JsonResponse({
+                'success': False,
+                'error': f'Errore durante l\'aggiunta: {str(e)}'
+            }, status=500)
+
+    return JsonResponse({
+        'success': False,
+        'error': 'Metodo non consentito'
+    }, status=405)
+
+
+@login_required
+@transaction.atomic
 def modifica_item_ordine(request, pk):
     """Modifica un item specifico dell'ordine (servizio e prezzo)"""
     ordine = get_object_or_404(Ordine, pk=pk)
