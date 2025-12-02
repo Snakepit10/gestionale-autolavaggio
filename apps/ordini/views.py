@@ -614,7 +614,7 @@ def registra_pagamento(request, pk):
 def dettaglio_ordine_json(request, pk):
     """Restituisce i dettagli di un ordine in formato JSON"""
     ordine = get_object_or_404(Ordine, pk=pk)
-    
+
     return JsonResponse({
         'id': ordine.id,
         'numero_progressivo': ordine.numero_progressivo,
@@ -624,6 +624,10 @@ def dettaglio_ordine_json(request, pk):
         'stato_pagamento': ordine.stato_pagamento,
         'stato_pagamento_display': ordine.get_stato_pagamento_display(),
         'cliente': ordine.cliente.nome_completo if ordine.cliente else 'Cliente anonimo',
+        'cliente_id': ordine.cliente.id if ordine.cliente else None,
+        'tipo_consegna': ordine.tipo_consegna,
+        'ora_consegna_richiesta': ordine.ora_consegna_richiesta.strftime('%H:%M') if ordine.ora_consegna_richiesta else None,
+        'tipo_auto': ordine.tipo_auto or '',
         'data_ora': ordine.data_ora.strftime('%d/%m/%Y %H:%M')
     })
 

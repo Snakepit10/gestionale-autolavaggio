@@ -552,33 +552,13 @@ function apriModalModifica(ordineId) {
                     console.log('API clienti non disponibile');
                 });
 
-            // Carica i dettagli completi dell'ordine per altri campi
-            fetch(`/ordini/${ordineId}/`)
-                .then(response => response.text())
-                .then(html => {
-                    // Parse HTML per estrarre i dati
-                    const parser = new DOMParser();
-                    const doc = parser.parseFromString(html, 'text/html');
+            // Imposta gli altri campi dai dati JSON
+            document.getElementById('modifica-tipo-consegna').value = data.tipo_consegna || 'immediata';
+            document.getElementById('modifica-ora-consegna').value = data.ora_consegna_richiesta || '';
+            document.getElementById('modifica-tipo-auto').value = data.tipo_auto || '';
 
-                    // Imposta tipo consegna
-                    const tipoConsegnaElements = doc.querySelectorAll('strong');
-                    let tipoConsegna = 'immediata';
-                    let oraConsegna = '';
-                    let tipoAuto = '';
-
-                    // Cerca nel documento i valori (metodo alternativo)
-                    tipoConsegnaElements.forEach(el => {
-                        if (el.textContent.includes('Programmata')) {
-                            tipoConsegna = 'programmata';
-                        }
-                    });
-
-                    document.getElementById('modifica-tipo-consegna').value = tipoConsegna;
-                    toggleOraConsegna();
-                })
-                .catch(error => {
-                    console.error('Errore caricamento dettagli:', error);
-                });
+            // Aggiorna visibilità campo ora
+            toggleOraConsegna();
 
             const modal = new bootstrap.Modal(document.getElementById('modalModifica'));
             modal.show();
