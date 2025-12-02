@@ -676,7 +676,7 @@ function caricaServiziOrdine(ordineId) {
 }
 
 function caricaServiziDisponibili() {
-    fetch('/core/api/servizi/')
+    fetch('/api/servizi/')
         .then(response => response.json())
         .then(data => {
             const select = document.getElementById('aggiungi-servizio-select');
