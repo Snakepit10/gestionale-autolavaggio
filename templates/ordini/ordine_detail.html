@@ -994,8 +994,80 @@ function aggiornaSubtotaleNuovo() {
     const quantita = parseFloat(document.getElementById('nuova-quantita-input').value) || 0;
     const prezzo = parseFloat(document.getElementById('nuovo-prezzo-input').value) || 0;
     const subtotale = quantita * prezzo;
-    
+
     document.getElementById('nuovo-subtotale-display').textContent = '€' + subtotale.toFixed(2);
+}
+
+// Funzioni per aggiunta nuovo servizio
+function mostraFormAggiuntaServizio() {
+    const select = document.getElementById('aggiungi-nuovo-servizio-select');
+    const form = document.getElementById('form-aggiungi-nuovo-servizio');
+
+    if (select.value) {
+        const option = select.options[select.selectedIndex];
+        const prezzo = option.getAttribute('data-prezzo');
+
+        document.getElementById('aggiungi-prezzo').value = prezzo;
+        document.getElementById('aggiungi-quantita').value = 1;
+        calcolaSubtotaleAggiunta();
+
+        form.style.display = 'block';
+    } else {
+        form.style.display = 'none';
+    }
+}
+
+function calcolaSubtotaleAggiunta() {
+    const quantita = parseFloat(document.getElementById('aggiungi-quantita').value) || 0;
+    const prezzo = parseFloat(document.getElementById('aggiungi-prezzo').value) || 0;
+    const subtotale = quantita * prezzo;
+
+    document.getElementById('aggiungi-subtotale').textContent = '€' + subtotale.toFixed(2);
+}
+
+function confermaAggiuntaNuovoServizio() {
+    const servizioId = document.getElementById('aggiungi-nuovo-servizio-select').value;
+    const quantita = document.getElementById('aggiungi-quantita').value;
+    const prezzo = document.getElementById('aggiungi-prezzo').value;
+
+    if (!servizioId || !quantita || !prezzo) {
+        alert('Completa tutti i campi');
+        return;
+    }
+
+    fetch(`{% url 'ordini:aggiungi-item-ordine' ordine.pk %}`, {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+            'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]').value
+        },
+        body: JSON.stringify({
+            servizio_id: servizioId,
+            quantita: quantita,
+            prezzo: prezzo
+        })
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            alert(data.message + '\nNuovo totale ordine: €' + data.nuovo_totale.toFixed(2));
+            location.reload();
+        } else {
+            alert('Errore: ' + data.error);
+        }
+    })
+    .catch(error => {
+        console.error('Errore:', error);
+        alert('Errore durante l\'aggiunta del servizio');
+    });
+}
+
+function annullaAggiuntaNuovoServizio() {
+    document.getElementById('aggiungi-nuovo-servizio-select').value = '';
+    document.getElementById('form-aggiungi-nuovo-servizio').style.display = 'none';
+    document.getElementById('aggiungi-quantita').value = 1;
+    document.getElementById('aggiungi-prezzo').value = 0;
+    document.getElementById('aggiungi-subtotale').textContent = '€0.00';
 }
 </script>
 
@@ -1140,7 +1212,69 @@ function aggiornaSubtotaleNuovo() {
                             <span id="alert-messaggio-nuovo"></span>
                         </div>
                     </div>
-                    
+
+                    <hr>
+
+                    <!-- Sezione Aggiungi Nuovo Servizio -->
+                    <h6><i class="bi bi-plus-circle"></i> Aggiungi Nuovo Servizio</h6>
+                    <p class="text-muted small">Seleziona un servizio/prodotto da aggiungere all'ordine:</p>
+
+                    <div class="mb-3">
+                        <label for="aggiungi-nuovo-servizio-select" class="form-label">Servizio/Prodotto da aggiungere</label>
+                        <select class="form-select" id="aggiungi-nuovo-servizio-select" onchange="mostraFormAggiuntaServizio()">
+                            <option value="">Seleziona per aggiungere...</option>
+                            {% for categoria in categorie %}
+                                <optgroup label="{{ categoria.nome }}">
+                                    {% for servizio in categoria.servizioprodotto_set.all %}
+                                        {% if servizio.attivo and servizio.disponibile %}
+                                            <option value="{{ servizio.id }}"
+                                                data-prezzo="{{ servizio.prezzo }}"
+                                                data-tipo="{{ servizio.tipo }}"
+                                                data-quantita-disponibile="{{ servizio.quantita_disponibile }}">
+                                                {{ servizio.titolo }} - €{{ servizio.prezzo }}
+                                                {% if servizio.tipo == 'prodotto' and servizio.quantita_disponibile > 0 %}
+                                                    ({{ servizio.quantita_disponibile }} disponibili)
+                                                {% endif %}
+                                            </option>
+                                        {% endif %}
+                                    {% endfor %}
+                                </optgroup>
+                            {% endfor %}
+                        </select>
+                    </div>
+
+                    <div id="form-aggiungi-nuovo-servizio" style="display: none;">
+                        <div class="row">
+                            <div class="col-md-4">
+                                <label for="aggiungi-quantita" class="form-label">Quantità</label>
+                                <input type="number" class="form-control" id="aggiungi-quantita"
+                                       value="1" min="1" onchange="calcolaSubtotaleAggiunta()">
+                            </div>
+                            <div class="col-md-4">
+                                <label for="aggiungi-prezzo" class="form-label">Prezzo Unitario</label>
+                                <div class="input-group">
+                                    <span class="input-group-text">€</span>
+                                    <input type="number" class="form-control" id="aggiungi-prezzo"
+                                           step="0.01" min="0" onchange="calcolaSubtotaleAggiunta()">
+                                </div>
+                            </div>
+                            <div class="col-md-4">
+                                <label class="form-label">Subtotale</label>
+                                <div class="form-control-plaintext">
+                                    <strong id="aggiungi-subtotale">€0.00</strong>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="mt-3">
+                            <button type="button" class="btn btn-success" onclick="confermaAggiuntaNuovoServizio()">
+                                <i class="bi bi-plus-circle"></i> Conferma Aggiunta
+                            </button>
+                            <button type="button" class="btn btn-secondary" onclick="annullaAggiuntaNuovoServizio()">
+                                Annulla
+                            </button>
+                        </div>
+                    </div>
+
                 </form>
             </div>
             <div class="modal-footer">
