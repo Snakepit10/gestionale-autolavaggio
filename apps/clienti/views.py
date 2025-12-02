@@ -427,3 +427,19 @@ def gestisci_punti_fedelta(request, pk):
                 messages.error(request, 'Punti insufficienti')
     
     return redirect('clienti:storico-cliente', pk=pk)
+
+@login_required
+def clienti_api(request):
+    """API per ottenere la lista dei clienti in formato JSON"""
+    clienti = Cliente.objects.all().order_by("cognome", "nome", "ragione_sociale")
+    data = []
+    for cliente in clienti:
+        data.append({
+            "id": cliente.id,
+            "nome_completo": cliente.nome_completo,
+            "telefono": cliente.telefono or "",
+            "email": cliente.email or "",
+            "tipo": cliente.tipo
+        })
+    return JsonResponse(data, safe=False)
+

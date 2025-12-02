@@ -21,6 +21,9 @@ urlpatterns = [
     path('crea-ajax/', views.crea_cliente_ajax, name='crea-cliente-ajax'),
     path('admin/<int:pk>/invia-credenziali/', views.invia_credenziali_cliente, name='invia-credenziali'),
     path('admin/<int:pk>/gestisci-punti/', views.gestisci_punti_fedelta, name='gestisci-punti'),
+
+    # API
+    path('api/', views.clienti_api, name='clienti-api'),
     
     # Export
     path('export/csv/', views.export_clienti_csv, name='export-clienti-csv'),

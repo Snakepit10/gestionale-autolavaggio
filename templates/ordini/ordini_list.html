@@ -280,10 +280,11 @@
                                         </button>
                                     {% endif %}
                                     {% if ordine.stato != 'completato' and ordine.stato != 'annullato' %}
-                                        <a href="{% url 'ordini:ordine-detail' ordine.pk %}"
-                                           class="btn btn-sm btn-outline-secondary" title="Modifica">
+                                        <button class="btn btn-sm btn-outline-secondary"
+                                                onclick="apriModalModifica('{{ ordine.pk }}')"
+                                                title="Modifica">
                                             <i class="bi bi-pencil"></i>
-                                        </a>
+                                        </button>
                                     {% endif %}
                                     {% if ordine.stato_pagamento != 'pagato' %}
                                         <button class="btn btn-sm btn-outline-warning"
@@ -363,7 +364,7 @@
                 <div class="modal-body">
                     {% csrf_token %}
                     <input type="hidden" id="ordine-id">
-                    
+
                     <div class="alert alert-info">
                         Ordine: <strong id="ordine-numero"></strong><br>
                         Totale: <strong id="ordine-totale"></strong><br>
@@ -371,13 +372,13 @@
                         <hr class="my-2">
                         <strong>Da pagare: <span id="ordine-residuo"></span></strong>
                     </div>
-                    
+
                     <div class="mb-3">
                         <label class="form-label">Importo Pagamento:</label>
-                        <input type="number" class="form-control" id="importo-pagamento" 
+                        <input type="number" class="form-control" id="importo-pagamento"
                                step="0.01" min="0" required>
                     </div>
-                    
+
                     <div class="mb-3">
                         <label class="form-label">Metodo Pagamento:</label>
                         <select class="form-select" id="metodo-pagamento-modal" required>
@@ -390,7 +391,7 @@
                             <option value="abbonamento">Abbonamento</option>
                         </select>
                     </div>
-                    
+
                     <div class="mb-3">
                         <label class="form-label">Note:</label>
                         <textarea class="form-control" id="note-pagamento" rows="2"></textarea>
@@ -402,6 +403,67 @@
                     </button>
                     <button type="submit" class="btn btn-success">
                         <i class="bi bi-check-circle"></i> Registra Pagamento
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<!-- Modal Modifica Ordine -->
+<div class="modal fade" id="modalModifica" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">
+                    <i class="bi bi-pencil"></i>
+                    Modifica Ordine <span id="modifica-ordine-numero"></span>
+                </h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <form id="form-modifica-ordine">
+                <div class="modal-body">
+                    {% csrf_token %}
+                    <input type="hidden" id="modifica-ordine-id">
+
+                    <div class="mb-3">
+                        <label for="modifica-cliente" class="form-label">Cliente</label>
+                        <select class="form-select" id="modifica-cliente" name="cliente_id">
+                            <option value="">Nessun cliente (anonimo)</option>
+                        </select>
+                    </div>
+
+                    <div class="mb-3">
+                        <label for="modifica-tipo-consegna" class="form-label">Tipo Consegna</label>
+                        <select class="form-select" id="modifica-tipo-consegna" name="tipo_consegna"
+                                onchange="toggleOraConsegna()" required>
+                            <option value="immediata">Consegna Immediata</option>
+                            <option value="programmata">Consegna Programmata</option>
+                        </select>
+                    </div>
+
+                    <div class="mb-3" id="modifica-ora-consegna-group" style="display: none;">
+                        <label for="modifica-ora-consegna" class="form-label">Ora Consegna</label>
+                        <input type="time" class="form-control" id="modifica-ora-consegna" name="ora_consegna_richiesta">
+                    </div>
+
+                    <div class="mb-3">
+                        <label for="modifica-tipo-auto" class="form-label">Tipo Auto</label>
+                        <input type="text" class="form-control" id="modifica-tipo-auto" name="tipo_auto"
+                               placeholder="es. Fiat 500 bianca, BMW X3 nera...">
+                    </div>
+
+                    <div class="alert alert-info">
+                        <i class="bi bi-info-circle"></i>
+                        <small>Per modificare i servizi dell'ordine, vai alla pagina di dettaglio.</small>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">
+                        <i class="bi bi-x-circle"></i> Annulla
+                    </button>
+                    <button type="submit" class="btn btn-primary">
+                        <i class="bi bi-check-circle"></i> Salva Modifiche
                     </button>
                 </div>
             </form>
@@ -460,15 +522,97 @@ function stampaOrdine(ordineId) {
     window.open(`{% url 'ordini:stampa-ordine' 0 %}`.replace('0', ordineId), '_blank');
 }
 
+function apriModalModifica(ordineId) {
+    // Carica i dati dell'ordine
+    fetch(`{% url 'ordini:dettaglio-json' 0 %}`.replace('0', ordineId))
+        .then(response => response.json())
+        .then(data => {
+            // Imposta i campi del modale
+            document.getElementById('modifica-ordine-id').value = ordineId;
+            document.getElementById('modifica-ordine-numero').textContent = `#${data.numero_progressivo}`;
+
+            // Carica la lista clienti
+            fetch('/clienti/api/')
+                .then(response => response.json())
+                .then(clienti => {
+                    const select = document.getElementById('modifica-cliente');
+                    select.innerHTML = '<option value="">Nessun cliente (anonimo)</option>';
+                    clienti.forEach(cliente => {
+                        const option = document.createElement('option');
+                        option.value = cliente.id;
+                        option.textContent = cliente.nome_completo;
+                        if (data.cliente_id && data.cliente_id === cliente.id) {
+                            option.selected = true;
+                        }
+                        select.appendChild(option);
+                    });
+                })
+                .catch(() => {
+                    // Se l'API non è disponibile, usa l'elenco statico
+                    console.log('API clienti non disponibile');
+                });
+
+            // Carica i dettagli completi dell'ordine per altri campi
+            fetch(`/ordini/${ordineId}/`)
+                .then(response => response.text())
+                .then(html => {
+                    // Parse HTML per estrarre i dati
+                    const parser = new DOMParser();
+                    const doc = parser.parseFromString(html, 'text/html');
+
+                    // Imposta tipo consegna
+                    const tipoConsegnaElements = doc.querySelectorAll('strong');
+                    let tipoConsegna = 'immediata';
+                    let oraConsegna = '';
+                    let tipoAuto = '';
+
+                    // Cerca nel documento i valori (metodo alternativo)
+                    tipoConsegnaElements.forEach(el => {
+                        if (el.textContent.includes('Programmata')) {
+                            tipoConsegna = 'programmata';
+                        }
+                    });
+
+                    document.getElementById('modifica-tipo-consegna').value = tipoConsegna;
+                    toggleOraConsegna();
+                })
+                .catch(error => {
+                    console.error('Errore caricamento dettagli:', error);
+                });
+
+            const modal = new bootstrap.Modal(document.getElementById('modalModifica'));
+            modal.show();
+        })
+        .catch(error => {
+            console.error('Errore nel caricamento dati ordine:', error);
+            alert('Errore nel caricamento dati ordine');
+        });
+}
+
+function toggleOraConsegna() {
+    const tipoConsegna = document.getElementById('modifica-tipo-consegna').value;
+    const oraGroup = document.getElementById('modifica-ora-consegna-group');
+    const oraInput = document.getElementById('modifica-ora-consegna');
+
+    if (tipoConsegna === 'programmata') {
+        oraGroup.style.display = 'block';
+        oraInput.required = true;
+    } else {
+        oraGroup.style.display = 'none';
+        oraInput.required = false;
+        oraInput.value = '';
+    }
+}
+
 // Gestione form pagamento
 document.getElementById('form-pagamento').addEventListener('submit', function(e) {
     e.preventDefault();
-    
+
     const ordineId = document.getElementById('ordine-id').value;
     const importo = document.getElementById('importo-pagamento').value;
     const metodo = document.getElementById('metodo-pagamento-modal').value;
     const note = document.getElementById('note-pagamento').value;
-    
+
     fetch(`{% url 'ordini:registra-pagamento' 0 %}`.replace('0', ordineId), {
         method: 'POST',
         headers: {
@@ -485,10 +629,10 @@ document.getElementById('form-pagamento').addEventListener('submit', function(e)
     .then(data => {
         if (data.success) {
             bootstrap.Modal.getInstance(document.getElementById('modalPagamento')).hide();
-            
+
             // Reset form
             document.getElementById('form-pagamento').reset();
-            
+
             // Mostra messaggio di successo
             const alertDiv = document.createElement('div');
             alertDiv.className = 'alert alert-success alert-dismissible fade show';
@@ -498,7 +642,7 @@ document.getElementById('form-pagamento').addEventListener('submit', function(e)
                 <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
             `;
             document.querySelector('.d-flex.justify-content-between').insertAdjacentElement('afterend', alertDiv);
-            
+
             // Ricarica la pagina dopo 2 secondi
             setTimeout(() => {
                 location.reload();
@@ -510,6 +654,60 @@ document.getElementById('form-pagamento').addEventListener('submit', function(e)
     .catch(error => {
         console.error('Errore:', error);
         alert('Errore durante la registrazione del pagamento');
+    });
+});
+
+// Gestione form modifica ordine
+document.getElementById('form-modifica-ordine').addEventListener('submit', function(e) {
+    e.preventDefault();
+
+    const ordineId = document.getElementById('modifica-ordine-id').value;
+    const formData = new FormData(this);
+
+    // Converti FormData in oggetto JSON
+    const data = {};
+    formData.forEach((value, key) => {
+        if (value && value.toString().trim()) {
+            data[key] = value;
+        }
+    });
+
+    fetch(`{% url 'ordini:modifica-ordine' 0 %}`.replace('0', ordineId), {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+            'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]').value
+        },
+        body: JSON.stringify(data)
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            bootstrap.Modal.getInstance(document.getElementById('modalModifica')).hide();
+
+            // Reset form
+            document.getElementById('form-modifica-ordine').reset();
+
+            // Mostra messaggio di successo
+            const alertDiv = document.createElement('div');
+            alertDiv.className = 'alert alert-success alert-dismissible fade show';
+            alertDiv.innerHTML = `
+                <i class="bi bi-check-circle"></i> ${data.message}
+                <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+            `;
+            document.querySelector('.d-flex.justify-content-between').insertAdjacentElement('afterend', alertDiv);
+
+            // Ricarica la pagina dopo 2 secondi
+            setTimeout(() => {
+                location.reload();
+            }, 2000);
+        } else {
+            alert('Errore: ' + data.error);
+        }
+    })
+    .catch(error => {
+        console.error('Errore:', error);
+        alert('Errore durante la modifica dell\'ordine');
     });
 });
 
