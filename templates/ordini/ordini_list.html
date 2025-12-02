@@ -745,45 +745,65 @@ function confermaAggiuntaServizio() {
     const quantita = document.getElementById('aggiungi-quantita').value;
     const prezzo = document.getElementById('aggiungi-prezzo').value;
 
+    console.log('DEBUG: confermaAggiuntaServizio chiamata', {
+        servizioId,
+        quantita,
+        prezzo,
+        ordineCorrenteId
+    });
+
     if (!servizioId || !quantita || !prezzo) {
         alert('Completa tutti i campi');
         return;
     }
 
-    fetch(`{% url 'ordini:aggiungi-item-ordine' 0 %}`.replace('0', ordineCorrenteId), {
+    if (!ordineCorrenteId) {
+        alert('Errore: ID ordine non trovato');
+        console.error('ERROR: ordineCorrenteId è null o undefined');
+        return;
+    }
+
+    const url = `{% url 'ordini:aggiungi-item-ordine' 0 %}`.replace('0', ordineCorrenteId);
+    console.log('DEBUG: URL chiamata:', url);
+
+    const requestData = {
+        servizio_id: servizioId,
+        quantita: parseInt(quantita),
+        prezzo: parseFloat(prezzo)
+    };
+    console.log('DEBUG: Dati inviati:', requestData);
+
+    fetch(url, {
         method: 'POST',
         headers: {
             'Content-Type': 'application/json',
             'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]').value
         },
-        body: JSON.stringify({
-            servizio_id: servizioId,
-            quantita: quantita,
-            prezzo: prezzo
-        })
+        body: JSON.stringify(requestData)
     })
-    .then(response => response.json())
+    .then(response => {
+        console.log('DEBUG: Response status:', response.status);
+        if (!response.ok) {
+            console.error('ERROR: Response not OK:', response.status, response.statusText);
+        }
+        return response.json();
+    })
     .then(data => {
+        console.log('DEBUG: Response data:', data);
         if (data.success) {
-            // Mostra il nuovo totale
-            document.getElementById('nuovo-totale-display').textContent = `€${data.nuovo_totale.toFixed(2)}`;
-            document.getElementById('totale-ordine-aggiornato').style.display = 'block';
+            alert(data.message + '\nNuovo totale ordine: €' + data.nuovo_totale.toFixed(2));
 
-            // Ricarica la lista servizi
-            caricaServiziOrdine(ordineCorrenteId);
-
-            // Reset form
-            annullaAggiuntaServizio();
-
-            // Mostra messaggio
-            alert(data.message);
+            // Chiudi il modale e ricarica la pagina
+            bootstrap.Modal.getInstance(document.getElementById('modalModifica'))?.hide();
+            location.reload();
         } else {
             alert('Errore: ' + data.error);
+            console.error('ERROR:', data.error);
         }
     })
     .catch(error => {
-        console.error('Errore:', error);
-        alert('Errore durante l\'aggiunta del servizio');
+        console.error('ERROR: Fetch error:', error);
+        alert('Errore durante l\'aggiunta del servizio: ' + error.message);
     });
 }
 
