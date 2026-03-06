@@ -543,27 +543,37 @@ class OrdiniListView(LoginRequiredMixin, ListView):
                 context['ordini_attivi'] = Ordine.objects.none()
                 context['ordini_completati'] = queryset.filter(stato='completato').order_by('-data_ora')
             else:
-                # Ordina: prima immediati (per data_ora), poi programmati (per ora di consegna)
-                context['ordini_attivi'] = queryset.filter(stato=stato).annotate(
-                    tipo_ordine=Case(
-                        When(tipo_consegna='immediata', then=Value(1)),
-                        default=Value(2),
-                        output_field=CharField()
-                    )
-                ).order_by('tipo_ordine', 'data_ora', 'ora_consegna_richiesta')
+                # Ordini immediati e programmati separati, poi concatenati
+                ordini_immediati = queryset.filter(
+                    stato=stato,
+                    tipo_consegna='immediata'
+                ).order_by('data_ora')
+
+                ordini_programmati = queryset.filter(
+                    stato=stato,
+                    tipo_consegna='programmata'
+                ).order_by('ora_consegna_richiesta')
+
+                # Concatena: prima immediati, poi programmati
+                from itertools import chain
+                context['ordini_attivi'] = list(chain(ordini_immediati, ordini_programmati))
                 context['ordini_completati'] = Ordine.objects.none()
         else:
             # Senza filtro stato, mostra ordini attivi e completati separatamente
-            # Ordina: prima immediati (per data_ora), poi programmati (per ora di consegna)
-            context['ordini_attivi'] = queryset.filter(
-                stato__in=['in_attesa', 'in_lavorazione']
-            ).annotate(
-                tipo_ordine=Case(
-                    When(tipo_consegna='immediata', then=Value(1)),
-                    default=Value(2),
-                    output_field=CharField()
-                )
-            ).order_by('tipo_ordine', 'data_ora', 'ora_consegna_richiesta')
+            # Ordini immediati e programmati separati, poi concatenati
+            ordini_immediati = queryset.filter(
+                stato__in=['in_attesa', 'in_lavorazione'],
+                tipo_consegna='immediata'
+            ).order_by('data_ora')
+
+            ordini_programmati = queryset.filter(
+                stato__in=['in_attesa', 'in_lavorazione'],
+                tipo_consegna='programmata'
+            ).order_by('ora_consegna_richiesta')
+
+            # Concatena: prima immediati, poi programmati
+            from itertools import chain
+            context['ordini_attivi'] = list(chain(ordini_immediati, ordini_programmati))
 
             context['ordini_completati'] = queryset.filter(
                 stato='completato'
@@ -978,27 +988,28 @@ def modifica_ordine(request, pk):
             
             # Traccia i cambiamenti
             cambiamenti = []
-            
-            # Modifica cliente
-            cliente_id = data.get('cliente_id')
-            if cliente_id:
-                try:
-                    nuovo_cliente = Cliente.objects.get(id=cliente_id)
-                    if ordine.cliente != nuovo_cliente:
-                        vecchio_cliente = ordine.cliente.nome_completo if ordine.cliente else "Anonimo"
-                        ordine.cliente = nuovo_cliente
-                        cambiamenti.append(f"Cliente: {vecchio_cliente} → {nuovo_cliente.nome_completo}")
-                except Cliente.DoesNotExist:
-                    return JsonResponse({
-                        'success': False,
-                        'error': 'Cliente non trovato'
-                    }, status=400)
-            else:
-                # Cliente vuoto = ordine anonimo
-                if ordine.cliente:
-                    vecchio_cliente = ordine.cliente.nome_completo
-                    ordine.cliente = None
-                    cambiamenti.append(f"Cliente: {vecchio_cliente} → Anonimo")
+
+            # Modifica cliente (solo se presente nel JSON)
+            if 'cliente_id' in data:
+                cliente_id = data.get('cliente_id')
+                if cliente_id:
+                    try:
+                        nuovo_cliente = Cliente.objects.get(id=cliente_id)
+                        if ordine.cliente != nuovo_cliente:
+                            vecchio_cliente = ordine.cliente.nome_completo if ordine.cliente else "Anonimo"
+                            ordine.cliente = nuovo_cliente
+                            cambiamenti.append(f"Cliente: {vecchio_cliente} → {nuovo_cliente.nome_completo}")
+                    except Cliente.DoesNotExist:
+                        return JsonResponse({
+                            'success': False,
+                            'error': 'Cliente non trovato'
+                        }, status=400)
+                else:
+                    # Cliente vuoto = ordine anonimo
+                    if ordine.cliente:
+                        vecchio_cliente = ordine.cliente.nome_completo
+                        ordine.cliente = None
+                        cambiamenti.append(f"Cliente: {vecchio_cliente} → Anonimo")
             
             # Modifica tipo consegna
             tipo_consegna = data.get('tipo_consegna')
@@ -1039,13 +1050,14 @@ def modifica_ordine(request, pk):
                             'error': 'Formato ora non valido'
                         }, status=400)
             
-            # Modifica tipo auto
-            tipo_auto = data.get('tipo_auto', '').strip()
-            if ordine.tipo_auto != tipo_auto:
-                vecchio_tipo_auto = ordine.tipo_auto or "Non specificato"
-                ordine.tipo_auto = tipo_auto
-                nuovo_tipo_auto = tipo_auto or "Non specificato"
-                cambiamenti.append(f"Tipo auto: {vecchio_tipo_auto} → {nuovo_tipo_auto}")
+            # Modifica tipo auto (solo se presente nel JSON)
+            if 'tipo_auto' in data:
+                tipo_auto = data.get('tipo_auto', '').strip()
+                if ordine.tipo_auto != tipo_auto:
+                    vecchio_tipo_auto = ordine.tipo_auto or "Non specificato"
+                    ordine.tipo_auto = tipo_auto
+                    nuovo_tipo_auto = tipo_auto or "Non specificato"
+                    cambiamenti.append(f"Tipo auto: {vecchio_tipo_auto} → {nuovo_tipo_auto}")
             
             # Salva solo se ci sono stati cambiamenti
             if cambiamenti:
