@@ -26,6 +26,7 @@ urlpatterns = [
     path('<int:pk>/modifica/', views.modifica_ordine, name='modifica-ordine'),
     path('<int:pk>/modifica-item/', views.modifica_item_ordine, name='modifica-item-ordine'),
     path('<int:pk>/aggiungi-item/', views.aggiungi_item_ordine, name='aggiungi-item-ordine'),
+    path('<int:pk>/elimina-item/', views.elimina_item_ordine, name='elimina-item-ordine'),
     
     # Ordini speciali
     path('non-pagati/', views.OrdiniNonPagatiView.as_view(), name='ordini-non-pagati'),
