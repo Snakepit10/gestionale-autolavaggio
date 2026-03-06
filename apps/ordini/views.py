@@ -7,7 +7,7 @@ from django.views.generic import (
 from django.urls import reverse_lazy
 from django.http import JsonResponse, HttpResponse
 from django.contrib import messages
-from django.db.models import Q, Sum, Count
+from django.db.models import Q, Sum, Count, F, Case, When, Value, CharField
 from django.utils import timezone
 from django.db import transaction
 from django.views.decorators.csrf import csrf_exempt
@@ -423,13 +423,14 @@ def completa_ordine(request):
                 # Non bloccare l'ordine per errori di stampa
                 print(f'Errore stampa scontrino: {str(e)}')  # Log invece di messages
         
-        # Invia notifica WebSocket alle postazioni
+        # Invia notifica WebSocket alle postazioni e alla lista ordini
         try:
             from channels.layers import get_channel_layer
             from asgiref.sync import async_to_sync
-            
+
             channel_layer = get_channel_layer()
             if channel_layer:
+                # Notifica alle postazioni
                 for item in ordine.items.all():
                     if item.postazione_assegnata:
                         async_to_sync(channel_layer.group_send)(
@@ -447,6 +448,17 @@ def completa_ordine(request):
                                 }
                             }
                         )
+
+                # Notifica alla lista ordini per aggiornamento automatico
+                async_to_sync(channel_layer.group_send)(
+                    'ordini_list',
+                    {
+                        'type': 'nuovo_ordine',
+                        'ordine_id': ordine.id,
+                        'numero_progressivo': ordine.numero_progressivo,
+                        'timestamp': timezone.now().isoformat()
+                    }
+                )
         except Exception as e:
             print(f'Errore invio notifica WebSocket: {str(e)}')
         
@@ -495,25 +507,28 @@ class OrdiniListView(LoginRequiredMixin, ListView):
     model = Ordine
     template_name = 'ordini/ordini_list.html'
     context_object_name = 'ordini'
-    paginate_by = 50
-    
-    def get_queryset(self):
-        queryset = Ordine.objects.select_related('cliente', 'operatore').prefetch_related('items', 'pagamenti')
 
-        # Filtri
+    def get_queryset(self):
+        # Queryset base non utilizzato in questo caso, ma richiesto da ListView
+        return Ordine.objects.none()
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+
+        # Ottieni i filtri
         stato = self.request.GET.get('stato')
         data_da = self.request.GET.get('data_da')
         data_a = self.request.GET.get('data_a')
         cliente = self.request.GET.get('cliente')
 
-        # Se non ci sono filtri, mostra solo ordini di oggi
+        # Query base per tutti gli ordini
+        queryset = Ordine.objects.select_related('cliente', 'operatore').prefetch_related('items', 'pagamenti')
+
+        # Applica filtri temporali
         if not any([stato, data_da, data_a, cliente]):
             oggi = timezone.now().date()
             queryset = queryset.filter(data_ora__date=oggi)
         else:
-            # Applica filtri personalizzati
-            if stato:
-                queryset = queryset.filter(stato=stato)
             if data_da:
                 queryset = queryset.filter(data_ora__date__gte=data_da)
             if data_a:
@@ -521,7 +536,40 @@ class OrdiniListView(LoginRequiredMixin, ListView):
             if cliente:
                 queryset = queryset.filter(cliente_id=cliente)
 
-        return queryset.order_by('-data_ora')
+        # Separa ordini attivi da completati
+        if stato:
+            # Se c'è un filtro stato specifico, usalo
+            if stato == 'completato':
+                context['ordini_attivi'] = Ordine.objects.none()
+                context['ordini_completati'] = queryset.filter(stato='completato').order_by('-data_ora')
+            else:
+                # Ordina: prima immediati (per data_ora), poi programmati (per ora di consegna)
+                context['ordini_attivi'] = queryset.filter(stato=stato).annotate(
+                    tipo_ordine=Case(
+                        When(tipo_consegna='immediata', then=Value(1)),
+                        default=Value(2),
+                        output_field=CharField()
+                    )
+                ).order_by('tipo_ordine', 'data_ora', 'ora_consegna_richiesta')
+                context['ordini_completati'] = Ordine.objects.none()
+        else:
+            # Senza filtro stato, mostra ordini attivi e completati separatamente
+            # Ordina: prima immediati (per data_ora), poi programmati (per ora di consegna)
+            context['ordini_attivi'] = queryset.filter(
+                stato__in=['in_attesa', 'in_lavorazione']
+            ).annotate(
+                tipo_ordine=Case(
+                    When(tipo_consegna='immediata', then=Value(1)),
+                    default=Value(2),
+                    output_field=CharField()
+                )
+            ).order_by('tipo_ordine', 'data_ora', 'ora_consegna_richiesta')
+
+            context['ordini_completati'] = queryset.filter(
+                stato='completato'
+            ).order_by('-data_ora')
+
+        return context
 
 
 class OrdineDetailView(LoginRequiredMixin, DetailView):
@@ -578,7 +626,26 @@ def registra_pagamento(request, pk):
                     nota=note,
                     operatore=request.user
                 )
-                
+
+                # Notifica WebSocket alla lista ordini
+                try:
+                    from channels.layers import get_channel_layer
+                    from asgiref.sync import async_to_sync
+
+                    channel_layer = get_channel_layer()
+                    if channel_layer:
+                        async_to_sync(channel_layer.group_send)(
+                            'ordini_list',
+                            {
+                                'type': 'pagamento_aggiunto',
+                                'ordine_id': ordine.id,
+                                'numero_progressivo': ordine.numero_progressivo,
+                                'timestamp': timezone.now().isoformat()
+                            }
+                        )
+                except Exception as e:
+                    print(f'Errore WebSocket: {e}')
+
                 return JsonResponse({
                     'success': True,
                     'message': f'Pagamento di €{pagamento.importo} registrato',
@@ -615,6 +682,19 @@ def dettaglio_ordine_json(request, pk):
     """Restituisce i dettagli di un ordine in formato JSON"""
     ordine = get_object_or_404(Ordine, pk=pk)
 
+    # Includi anche gli items
+    items = []
+    for item in ordine.items.all():
+        items.append({
+            'id': item.id,
+            'servizio_id': item.servizio_prodotto.id,
+            'servizio_nome': item.servizio_prodotto.titolo,
+            'quantita': item.quantita,
+            'prezzo_unitario': float(item.prezzo_unitario),
+            'subtotale': float(item.subtotale),
+            'stato': item.stato
+        })
+
     return JsonResponse({
         'id': ordine.id,
         'numero_progressivo': ordine.numero_progressivo,
@@ -628,7 +708,8 @@ def dettaglio_ordine_json(request, pk):
         'tipo_consegna': ordine.tipo_consegna,
         'ora_consegna_richiesta': ordine.ora_consegna_richiesta.strftime('%H:%M') if ordine.ora_consegna_richiesta else None,
         'tipo_auto': ordine.tipo_auto or '',
-        'data_ora': ordine.data_ora.strftime('%d/%m/%Y %H:%M')
+        'data_ora': ordine.data_ora.strftime('%d/%m/%Y %H:%M'),
+        'items': items
     })
 
 
@@ -969,10 +1050,30 @@ def modifica_ordine(request, pk):
             # Salva solo se ci sono stati cambiamenti
             if cambiamenti:
                 ordine.save()
-                
+
                 # Log dell'operazione
                 print(f"Ordine {ordine.numero_progressivo} modificato da {request.user}: {', '.join(cambiamenti)}")
-                
+
+                # Notifica WebSocket alla lista ordini se è stato modificato il tipo consegna o ora
+                if any('consegna' in c.lower() or 'ora' in c.lower() for c in cambiamenti):
+                    try:
+                        from channels.layers import get_channel_layer
+                        from asgiref.sync import async_to_sync
+
+                        channel_layer = get_channel_layer()
+                        if channel_layer:
+                            async_to_sync(channel_layer.group_send)(
+                                'ordini_list',
+                                {
+                                    'type': 'ordine_modificato',
+                                    'ordine_id': ordine.id,
+                                    'numero_progressivo': ordine.numero_progressivo,
+                                    'timestamp': timezone.now().isoformat()
+                                }
+                            )
+                    except Exception as e:
+                        print(f'Errore WebSocket: {e}')
+
                 return JsonResponse({
                     'success': True,
                     'message': f'Ordine modificato con successo. Cambiamenti: {", ".join(cambiamenti)}'
@@ -1324,7 +1425,7 @@ def modifica_item_ordine(request, pk):
                 
                 # Log dell'operazione
                 print(f"Item {item.id} dell'ordine {ordine.numero_progressivo} modificato da {request.user}: {', '.join(cambiamenti)}")
-                
+
                 return JsonResponse({
                     'success': True,
                     'message': f'Servizio modificato con successo. Cambiamenti: {", ".join(cambiamenti)}'
@@ -1334,7 +1435,7 @@ def modifica_item_ordine(request, pk):
                     'success': True,
                     'message': 'Nessuna modifica apportata'
                 })
-                
+
         except json.JSONDecodeError:
             return JsonResponse({
                 'success': False,
@@ -1345,7 +1446,100 @@ def modifica_item_ordine(request, pk):
                 'success': False,
                 'error': f'Errore durante la modifica: {str(e)}'
             }, status=500)
-    
+
+    return JsonResponse({
+        'success': False,
+        'error': 'Metodo non consentito'
+    }, status=405)
+
+
+@login_required
+def elimina_item_ordine(request, pk):
+    """Elimina un item specifico dall'ordine"""
+    ordine = get_object_or_404(Ordine, pk=pk)
+
+    # Verifica che l'ordine sia modificabile
+    if ordine.stato in ['completato', 'annullato']:
+        return JsonResponse({
+            'success': False,
+            'error': 'Non è possibile modificare un ordine completato o annullato'
+        }, status=400)
+
+    if request.method == 'POST':
+        try:
+            data = json.loads(request.body)
+
+            # Ottieni l'item da eliminare
+            item_id = data.get('item_id')
+            if not item_id:
+                return JsonResponse({
+                    'success': False,
+                    'error': 'ID item non fornito'
+                }, status=400)
+
+            try:
+                item = ItemOrdine.objects.get(id=item_id, ordine=ordine)
+            except ItemOrdine.DoesNotExist:
+                return JsonResponse({
+                    'success': False,
+                    'error': 'Item non trovato'
+                }, status=400)
+
+            # Verifica che l'item non sia già completato
+            if item.stato == 'completato':
+                return JsonResponse({
+                    'success': False,
+                    'error': 'Non è possibile eliminare un servizio già completato'
+                }, status=400)
+
+            # Verifica che ci sia almeno un altro item nell'ordine
+            if ordine.items.count() <= 1:
+                return JsonResponse({
+                    'success': False,
+                    'error': 'Impossibile eliminare l\'unico servizio dell\'ordine'
+                }, status=400)
+
+            # Salva i dati per il log
+            servizio_nome = item.servizio_prodotto.titolo
+            item_subtotale = item.subtotale
+
+            # Elimina l'item
+            item.delete()
+
+            # Ricalcola i totali dell'ordine
+            ordine.totale = sum(item.subtotale for item in ordine.items.all())
+
+            # Ricalcola sconto se applicato
+            if ordine.sconto_applicato:
+                ordine.importo_sconto = ordine.sconto_applicato.calcola_sconto(ordine.totale)
+            else:
+                ordine.importo_sconto = 0
+
+            ordine.totale_finale = ordine.totale - ordine.importo_sconto
+
+            # Aggiorna stato pagamento
+            ordine.aggiorna_stato_pagamento()
+            ordine.save()
+
+            # Log dell'operazione
+            print(f"Item {item_id} ({servizio_nome}) eliminato dall'ordine {ordine.numero_progressivo} da {request.user}. Subtotale rimosso: €{item_subtotale}")
+
+            return JsonResponse({
+                'success': True,
+                'message': f'Servizio "{servizio_nome}" eliminato con successo'
+            })
+
+        except json.JSONDecodeError:
+            return JsonResponse({
+                'success': False,
+                'error': 'Dati JSON non validi'
+            }, status=400)
+        except Exception as e:
+            return JsonResponse({
+                'success': False,
+                'error': f'Errore durante l\'eliminazione: {str(e)}'
+            }, status=500)
+
     return JsonResponse({
         'success': False,
         'error': 'Metodo non consentito'

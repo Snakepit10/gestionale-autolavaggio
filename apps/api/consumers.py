@@ -134,11 +134,30 @@ class OrdiniConsumer(AsyncWebsocketConsumer):
             'stato_display': event['stato_display'],
             'timestamp': event['timestamp']
         }))
-    
+
     async def nuovo_ordine(self, event):
         await self.send(text_data=json.dumps({
             'type': 'nuovo_ordine',
-            'ordine': event['ordine']
+            'ordine_id': event.get('ordine_id'),
+            'numero_progressivo': event.get('numero_progressivo'),
+            'timestamp': event.get('timestamp'),
+            'ordine': event.get('ordine')  # Per compatibilità con vecchi messaggi
+        }))
+
+    async def ordine_modificato(self, event):
+        await self.send(text_data=json.dumps({
+            'type': 'ordine_modificato',
+            'ordine_id': event.get('ordine_id'),
+            'numero_progressivo': event.get('numero_progressivo'),
+            'timestamp': event.get('timestamp')
+        }))
+
+    async def pagamento_aggiunto(self, event):
+        await self.send(text_data=json.dumps({
+            'type': 'pagamento_aggiunto',
+            'ordine_id': event.get('ordine_id'),
+            'numero_progressivo': event.get('numero_progressivo'),
+            'timestamp': event.get('timestamp')
         }))
 
 

@@ -54,70 +54,39 @@
     </div>
 </div>
 
-<!-- Statistiche rapide -->
-<div class="row mb-4">
-    <div class="col-md-3">
-        <div class="card bg-primary text-white">
-            <div class="card-body text-center">
-                <i class="bi bi-receipt display-6"></i>
-                <h4>{{ ordini.count }}</h4>
-                <small>Ordini Totali</small>
+<!-- Vista Ordini -->
+<div>
+        <!-- Ordini Attivi -->
+        <div class="card mb-4">
+            <div class="card-header bg-primary text-white">
+                <h5 class="mb-0">
+                    <i class="bi bi-list-check"></i> Ordini Attivi
+                    <span class="badge bg-light text-primary ms-2">{{ ordini_attivi.count }}</span>
+                </h5>
             </div>
-        </div>
-    </div>
-    <div class="col-md-3">
-        <div class="card bg-warning text-white">
-            <div class="card-body text-center">
-                <i class="bi bi-clock display-6"></i>
-                <h4>{{ ordini_in_lavorazione|default:0 }}</h4>
-                <small>In Lavorazione</small>
-            </div>
-        </div>
-    </div>
-    <div class="col-md-3">
-        <div class="card bg-success text-white">
-            <div class="card-body text-center">
-                <i class="bi bi-check-circle display-6"></i>
-                <h4>{{ ordini_completati|default:0 }}</h4>
-                <small>Completati</small>
-            </div>
-        </div>
-    </div>
-    <div class="col-md-3">
-        <div class="card bg-info text-white">
-            <div class="card-body text-center">
-                <i class="bi bi-currency-euro display-6"></i>
-                <h4>€{{ fatturato_giorno|default:0|floatformat:0 }}</h4>
-                <small>Fatturato Oggi</small>
-            </div>
-        </div>
-    </div>
-</div>
-
-<div class="card">
-    <div class="card-body">
-        {% if ordini %}
-            <div class="table-responsive">
-                <table class="table table-hover">
-                    <thead class="table-dark">
-                        <tr>
-                            <th>N° Ordine</th>
-                            <th>Data/Ora</th>
-                            <th>Cliente</th>
-                            <th>Tipo Auto</th>
-                            <th>Servizi</th>
-                            <th>Totale</th>
-                            <th>Pagamento</th>
-                            <th>Stato</th>
-                            <th>Operatore</th>
-                            <th class="text-center">Azioni</th>
-                        </tr>
-                    </thead>
+            <div class="card-body">
+                {% if ordini_attivi %}
+                    <div class="table-responsive">
+                        <table class="table table-hover">
+                            <thead class="table-dark">
+                                <tr>
+                                    <th>N° Ordine</th>
+                                    <th>Data/Ora</th>
+                                    <th>Ora di Consegna</th>
+                                    <th>Cliente</th>
+                                    <th>Tipo Auto</th>
+                                    <th>Servizi</th>
+                                    <th>Totale</th>
+                                    <th>Pagamento</th>
+                                    <th>Stato</th>
+                                    <th class="text-center">Azioni</th>
+                                </tr>
+                            </thead>
                     <tbody>
-                        {% for ordine in ordini %}
+                        {% for ordine in ordini_attivi %}
                         <tr data-ordine-id="{{ ordine.id }}">
                             <td>
-                                <a href="{% url 'ordini:ordine-detail' ordine.pk %}" 
+                                <a href="{% url 'ordini:ordine-detail' ordine.pk %}"
                                    class="text-decoration-none fw-bold">
                                     #{{ ordine.numero_progressivo }}
                                 </a>
@@ -132,6 +101,25 @@
                                     <strong>{{ ordine.data_ora|date:"d/m/Y" }}</strong>
                                     <br><small class="text-muted">{{ ordine.data_ora|date:"H:i" }}</small>
                                 </div>
+                            </td>
+                            <td>
+                                {% if ordine.tipo_consegna == 'programmata' and ordine.ora_consegna_richiesta %}
+                                    <div class="text-center">
+                                        <span class="badge bg-warning text-dark cursor-pointer"
+                                              onclick="modificaOraConsegna('{{ ordine.pk }}', '{{ ordine.ora_consegna_richiesta|time:"H:i" }}', 'programmata')"
+                                              title="Clicca per modificare">
+                                            <i class="bi bi-calendar-check"></i> {{ ordine.ora_consegna_richiesta|time:"H:i" }}
+                                        </span>
+                                    </div>
+                                {% else %}
+                                    <div class="text-center">
+                                        <span class="badge bg-danger cursor-pointer"
+                                              onclick="modificaOraConsegna('{{ ordine.pk }}', '', 'immediata')"
+                                              title="Clicca per modificare">
+                                            <i class="bi bi-lightning-fill"></i> Immediata
+                                        </span>
+                                    </div>
+                                {% endif %}
                             </td>
                             <td>
                                 {% if ordine.cliente %}
@@ -152,7 +140,252 @@
                                 {% if ordine.tipo_auto %}
                                     <div class="d-flex align-items-center">
                                         <i class="bi bi-car-front me-1"></i>
-                                        <small>{{ ordine.tipo_auto }}</small>
+                                        <strong>{{ ordine.tipo_auto }}</strong>
+                                    </div>
+                                {% else %}
+                                    <span class="text-muted">
+                                        <i class="bi bi-dash"></i> Non specificato
+                                    </span>
+                                {% endif %}
+                            </td>
+                            <td>
+                                <div class="small">
+                                    {% for item in ordine.items.all|slice:":3" %}
+                                        <div class="d-flex justify-content-between">
+                                            <span>{{ item.servizio_prodotto.titolo }}</span>
+                                            <span class="text-muted">x{{ item.quantita }}</span>
+                                        </div>
+                                    {% endfor %}
+                                    {% if ordine.items.count > 3 %}
+                                        <small class="text-muted">+{{ ordine.items.count|add:"-3" }} altri</small>
+                                    {% endif %}
+                                </div>
+                            </td>
+                            <td>
+                                <div>
+                                    {% if ordine.importo_sconto > 0 %}
+                                        <small class="text-muted text-decoration-line-through">€{{ ordine.totale }}</small><br>
+                                    {% endif %}
+                                    <strong class="h6">€{{ ordine.totale_finale }}</strong>
+                                    {% if ordine.importo_sconto > 0 %}
+                                        <br><small class="text-success">
+                                            <i class="bi bi-percent"></i> -€{{ ordine.importo_sconto }}
+                                        </small>
+                                    {% endif %}
+                                </div>
+                            </td>
+                            <td>
+                                {% if ordine.stato_pagamento == 'pagato' %}
+                                    <span class="badge bg-success cursor-pointer"
+                                          onclick="modificaPagamentoOrdine('{{ ordine.pk }}', '{{ ordine.stato_pagamento }}', {{ ordine.totale_finale }}, {{ ordine.importo_pagato }}, {{ ordine.saldo_dovuto }})"
+                                          title="Clicca per vedere dettagli">
+                                        <i class="bi bi-check-circle"></i> Pagato
+                                    </span>
+                                    {% if ordine.pagamenti.all %}
+                                        <br><small class="text-muted">
+                                            {% if ordine.pagamenti.count == 1 %}
+                                                {{ ordine.pagamenti.first.get_metodo_display }}
+                                            {% else %}
+                                                {{ ordine.pagamenti.count }} pagamenti
+                                            {% endif %}
+                                        </small>
+                                    {% endif %}
+                                {% elif ordine.stato_pagamento == 'parziale' %}
+                                    <span class="badge bg-warning cursor-pointer"
+                                          onclick="modificaPagamentoOrdine('{{ ordine.pk }}', '{{ ordine.stato_pagamento }}', {{ ordine.totale_finale }}, {{ ordine.importo_pagato }}, {{ ordine.saldo_dovuto }})"
+                                          title="Clicca per aggiungere pagamento">
+                                        <i class="bi bi-clock"></i> Parziale
+                                    </span>
+                                    <br><small class="text-muted">€{{ ordine.importo_pagato }}</small>
+                                    {% if ordine.pagamenti.all %}
+                                        <br><small class="text-muted">
+                                            {% if ordine.pagamenti.count == 1 %}
+                                                {{ ordine.pagamenti.first.get_metodo_display }}
+                                            {% else %}
+                                                {{ ordine.pagamenti.count }} pagamenti
+                                            {% endif %}
+                                        </small>
+                                    {% endif %}
+                                {% elif ordine.stato_pagamento == 'differito' %}
+                                    <span class="badge bg-info cursor-pointer"
+                                          onclick="modificaPagamentoOrdine('{{ ordine.pk }}', '{{ ordine.stato_pagamento }}', {{ ordine.totale_finale }}, {{ ordine.importo_pagato }}, {{ ordine.saldo_dovuto }})"
+                                          title="Clicca per aggiungere pagamento">
+                                        <i class="bi bi-calendar"></i> Differito
+                                    </span>
+                                    {% if ordine.data_scadenza_pagamento %}
+                                        <br><small class="text-muted">Scad: {{ ordine.data_scadenza_pagamento|date:"d/m" }}</small>
+                                    {% endif %}
+                                {% else %}
+                                    <span class="badge bg-danger cursor-pointer"
+                                          onclick="modificaPagamentoOrdine('{{ ordine.pk }}', '{{ ordine.stato_pagamento }}', {{ ordine.totale_finale }}, {{ ordine.importo_pagato }}, {{ ordine.saldo_dovuto }})"
+                                          title="Clicca per aggiungere pagamento">
+                                        <i class="bi bi-x-circle"></i> Non Pagato
+                                    </span>
+                                {% endif %}
+                            </td>
+                            <td class="stato-cell">
+                                {% if ordine.stato == 'in_attesa' %}
+                                    <span class="badge bg-primary cursor-pointer"
+                                          onclick="modificaStatoOrdine('{{ ordine.pk }}', '{{ ordine.stato }}')"
+                                          title="Clicca per modificare">
+                                        <i class="bi bi-clock"></i> In Attesa
+                                    </span>
+                                {% elif ordine.stato == 'in_lavorazione' %}
+                                    <span class="badge bg-warning cursor-pointer"
+                                          onclick="modificaStatoOrdine('{{ ordine.pk }}', '{{ ordine.stato }}')"
+                                          title="Clicca per modificare">
+                                        <i class="bi bi-clock"></i> In Lavorazione
+                                    </span>
+                                    {% if ordine.tempo_attesa_minuti %}
+                                        <br><small class="text-muted">{{ ordine.tempo_attesa_minuti }}min</small>
+                                    {% endif %}
+                                {% elif ordine.stato == 'completato' %}
+                                    <span class="badge bg-success">
+                                        <i class="bi bi-check-circle"></i> Completato
+                                    </span>
+                                {% elif ordine.stato == 'annullato' %}
+                                    <span class="badge bg-danger">
+                                        <i class="bi bi-x-circle"></i> Annullato
+                                    </span>
+                                {% endif %}
+                            </td>
+                            <td class="text-center azioni-cell">
+                                <div class="btn-group" role="group">
+                                    <a href="{% url 'ordini:ordine-detail' ordine.pk %}"
+                                       class="btn btn-sm btn-outline-primary" title="Dettagli">
+                                        <i class="bi bi-eye"></i>
+                                    </a>
+                                    {% if ordine.stato == 'in_attesa' %}
+                                        <button class="btn btn-sm btn-outline-info"
+                                                onclick="cambiaStato('{{ ordine.pk }}', 'in_lavorazione')"
+                                                title="Avvia Lavorazione">
+                                            <i class="bi bi-play-circle"></i>
+                                        </button>
+                                    {% endif %}
+                                    {% if ordine.stato != 'completato' and ordine.stato != 'annullato' %}
+                                        <button class="btn btn-sm btn-outline-success"
+                                                onclick="cambiaStato('{{ ordine.pk }}', 'completato')"
+                                                title="Completa">
+                                            <i class="bi bi-check"></i>
+                                        </button>
+                                    {% endif %}
+                                    {% if ordine.stato != 'completato' and ordine.stato != 'annullato' %}
+                                        <button class="btn btn-sm btn-outline-secondary"
+                                                onclick="apriModalModifica('{{ ordine.pk }}')"
+                                                title="Modifica">
+                                            <i class="bi bi-pencil"></i>
+                                        </button>
+                                    {% endif %}
+                                    {% if ordine.stato_pagamento != 'pagato' %}
+                                        <button class="btn btn-sm btn-outline-warning"
+                                                onclick="aggiungiPagamento('{{ ordine.pk }}')"
+                                                title="Pagamento">
+                                            <i class="bi bi-credit-card"></i>
+                                        </button>
+                                    {% endif %}
+                                    <button class="btn btn-sm btn-outline-info"
+                                            onclick="stampaOrdine('{{ ordine.pk }}')"
+                                            title="Stampa">
+                                        <i class="bi bi-printer"></i>
+                                    </button>
+                                </div>
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        {% else %}
+            <div class="text-center py-5">
+                <i class="bi bi-hourglass display-1 text-muted"></i>
+                <h5 class="text-muted mt-3">Nessun Ordine Attivo</h5>
+                <p class="text-muted">Non ci sono ordini in attesa o in lavorazione.</p>
+            </div>
+        {% endif %}
+            </div>
+        </div>
+
+        <!-- Ordini Completati -->
+        <div class="card">
+            <div class="card-header bg-success text-white">
+                <h5 class="mb-0">
+                    <i class="bi bi-check-circle"></i> Ordini Completati
+                    <span class="badge bg-light text-success ms-2">{{ ordini_completati.count }}</span>
+                </h5>
+            </div>
+            <div class="card-body">
+                {% if ordini_completati %}
+                    <div class="table-responsive">
+                        <table class="table table-hover">
+                            <thead class="table-dark">
+                                <tr>
+                                    <th>N° Ordine</th>
+                                    <th>Data/Ora</th>
+                                    <th>Ora di Consegna</th>
+                                    <th>Cliente</th>
+                                    <th>Tipo Auto</th>
+                                    <th>Servizi</th>
+                                    <th>Totale</th>
+                                    <th>Pagamento</th>
+                                    <th>Stato</th>
+                                    <th class="text-center">Azioni</th>
+                                </tr>
+                            </thead>
+                    <tbody>
+                        {% for ordine in ordini_completati %}
+                        <tr data-ordine-id="{{ ordine.id }}">
+                            <td>
+                                <a href="{% url 'ordini:ordine-detail' ordine.pk %}"
+                                   class="text-decoration-none fw-bold">
+                                    #{{ ordine.numero_progressivo }}
+                                </a>
+                                {% if ordine.origine != 'operatore' %}
+                                    <br><small class="text-muted">
+                                        <i class="bi bi-globe"></i> {{ ordine.get_origine_display }}
+                                    </small>
+                                {% endif %}
+                            </td>
+                            <td>
+                                <div>
+                                    <strong>{{ ordine.data_ora|date:"d/m/Y" }}</strong>
+                                    <br><small class="text-muted">{{ ordine.data_ora|date:"H:i" }}</small>
+                                </div>
+                            </td>
+                            <td>
+                                {% if ordine.tipo_consegna == 'programmata' and ordine.ora_consegna_richiesta %}
+                                    <div class="text-center">
+                                        <span class="badge bg-warning text-dark">
+                                            <i class="bi bi-calendar-check"></i> {{ ordine.ora_consegna_richiesta|time:"H:i" }}
+                                        </span>
+                                    </div>
+                                {% else %}
+                                    <div class="text-center">
+                                        <span class="badge bg-success">
+                                            <i class="bi bi-lightning-fill"></i> Immediata
+                                        </span>
+                                    </div>
+                                {% endif %}
+                            </td>
+                            <td>
+                                {% if ordine.cliente %}
+                                    <div class="d-flex align-items-center">
+                                        <i class="bi bi-person me-1"></i>
+                                        <div>
+                                            <strong>{{ ordine.cliente.nome_completo }}</strong>
+                                            <br><small class="text-muted">{{ ordine.cliente.telefono }}</small>
+                                        </div>
+                                    </div>
+                                {% else %}
+                                    <span class="text-muted">
+                                        <i class="bi bi-person-x"></i> Cliente anonimo
+                                    </span>
+                                {% endif %}
+                            </td>
+                            <td>
+                                {% if ordine.tipo_auto %}
+                                    <div class="d-flex align-items-center">
+                                        <i class="bi bi-car-front me-1"></i>
+                                        <strong>{{ ordine.tipo_auto }}</strong>
                                     </div>
                                 {% else %}
                                     <span class="text-muted">
@@ -228,36 +461,9 @@
                                 {% endif %}
                             </td>
                             <td class="stato-cell">
-                                {% if ordine.stato == 'in_attesa' %}
-                                    <span class="badge bg-primary">
-                                        <i class="bi bi-clock"></i> In Attesa
-                                    </span>
-                                {% elif ordine.stato == 'in_lavorazione' %}
-                                    <span class="badge bg-warning">
-                                        <i class="bi bi-clock"></i> In Lavorazione
-                                    </span>
-                                    {% if ordine.tempo_attesa_minuti %}
-                                        <br><small class="text-muted">{{ ordine.tempo_attesa_minuti }}min</small>
-                                    {% endif %}
-                                {% elif ordine.stato == 'completato' %}
-                                    <span class="badge bg-success">
-                                        <i class="bi bi-check-circle"></i> Completato
-                                    </span>
-                                {% elif ordine.stato == 'annullato' %}
-                                    <span class="badge bg-danger">
-                                        <i class="bi bi-x-circle"></i> Annullato
-                                    </span>
-                                {% endif %}
-                            </td>
-                            <td>
-                                {% if ordine.operatore %}
-                                    <small>
-                                        <i class="bi bi-person-badge"></i>
-                                        {{ ordine.operatore.username }}
-                                    </small>
-                                {% else %}
-                                    <small class="text-muted">Sistema</small>
-                                {% endif %}
+                                <span class="badge bg-success">
+                                    <i class="bi bi-check-circle"></i> Completato
+                                </span>
                             </td>
                             <td class="text-center azioni-cell">
                                 <div class="btn-group" role="group">
@@ -265,34 +471,6 @@
                                        class="btn btn-sm btn-outline-primary" title="Dettagli">
                                         <i class="bi bi-eye"></i>
                                     </a>
-                                    {% if ordine.stato == 'in_attesa' %}
-                                        <button class="btn btn-sm btn-outline-info"
-                                                onclick="cambiaStato('{{ ordine.pk }}', 'in_lavorazione')"
-                                                title="Avvia Lavorazione">
-                                            <i class="bi bi-play-circle"></i>
-                                        </button>
-                                    {% endif %}
-                                    {% if ordine.stato != 'completato' and ordine.stato != 'annullato' %}
-                                        <button class="btn btn-sm btn-outline-success"
-                                                onclick="cambiaStato('{{ ordine.pk }}', 'completato')"
-                                                title="Completa">
-                                            <i class="bi bi-check"></i>
-                                        </button>
-                                    {% endif %}
-                                    {% if ordine.stato != 'completato' and ordine.stato != 'annullato' %}
-                                        <button class="btn btn-sm btn-outline-secondary"
-                                                onclick="apriModalModifica('{{ ordine.pk }}')"
-                                                title="Modifica">
-                                            <i class="bi bi-pencil"></i>
-                                        </button>
-                                    {% endif %}
-                                    {% if ordine.stato_pagamento != 'pagato' %}
-                                        <button class="btn btn-sm btn-outline-warning"
-                                                onclick="aggiungiPagamento('{{ ordine.pk }}')"
-                                                title="Pagamento">
-                                            <i class="bi bi-credit-card"></i>
-                                        </button>
-                                    {% endif %}
                                     <button class="btn btn-sm btn-outline-info"
                                             onclick="stampaOrdine('{{ ordine.pk }}')"
                                             title="Stampa">
@@ -305,47 +483,105 @@
                     </tbody>
                 </table>
             </div>
-            
-            <!-- Paginazione -->
-            {% if is_paginated %}
-                <nav aria-label="Paginazione ordini">
-                    <ul class="pagination justify-content-center">
-                        {% if page_obj.has_previous %}
-                            <li class="page-item">
-                                <a class="page-link" href="?page=1{% for key, value in request.GET.items %}{% if key != 'page' %}&{{ key }}={{ value }}{% endif %}{% endfor %}">&laquo; Prima</a>
-                            </li>
-                            <li class="page-item">
-                                <a class="page-link" href="?page={{ page_obj.previous_page_number }}{% for key, value in request.GET.items %}{% if key != 'page' %}&{{ key }}={{ value }}{% endif %}{% endfor %}">Precedente</a>
-                            </li>
-                        {% endif %}
-                        
-                        <li class="page-item active">
-                            <span class="page-link">
-                                Pagina {{ page_obj.number }} di {{ page_obj.paginator.num_pages }}
-                            </span>
-                        </li>
-                        
-                        {% if page_obj.has_next %}
-                            <li class="page-item">
-                                <a class="page-link" href="?page={{ page_obj.next_page_number }}{% for key, value in request.GET.items %}{% if key != 'page' %}&{{ key }}={{ value }}{% endif %}{% endfor %}">Successiva</a>
-                            </li>
-                            <li class="page-item">
-                                <a class="page-link" href="?page={{ page_obj.paginator.num_pages }}{% for key, value in request.GET.items %}{% if key != 'page' %}&{{ key }}={{ value }}{% endif %}{% endfor %}">Ultima &raquo;</a>
-                            </li>
-                        {% endif %}
-                    </ul>
-                </nav>
-            {% endif %}
         {% else %}
             <div class="text-center py-5">
-                <i class="bi bi-receipt display-1 text-muted"></i>
-                <h3 class="text-muted mt-3">Nessun Ordine</h3>
-                <p class="text-muted">Non ci sono ancora ordini che corrispondono ai filtri selezionati.</p>
-                <a href="{% url 'ordini:cassa' %}" class="btn btn-primary">
-                    <i class="bi bi-plus-circle"></i> Crea il Primo Ordine
-                </a>
+                <i class="bi bi-check-circle display-1 text-muted"></i>
+                <h5 class="text-muted mt-3">Nessun Ordine Completato</h5>
+                <p class="text-muted">Non ci sono ancora ordini completati.</p>
             </div>
         {% endif %}
+            </div>
+        </div>
+    </div>
+</div>
+<!-- Fine Vista Ordini -->
+
+<!-- Modal Modifica Ora Consegna -->
+<div class="modal fade" id="modalOraConsegna" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">
+                    <i class="bi bi-clock"></i>
+                    Modifica Ora di Consegna
+                </h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <form id="form-ora-consegna">
+                <div class="modal-body">
+                    {% csrf_token %}
+                    <input type="hidden" id="ora-ordine-id">
+
+                    <div class="mb-3">
+                        <label class="form-label fw-bold">Tipo Consegna:</label>
+                        <select class="form-select" id="ora-tipo-consegna" onchange="toggleOraInput()">
+                            <option value="immediata">Consegna Immediata</option>
+                            <option value="programmata">Consegna Programmata</option>
+                        </select>
+                    </div>
+
+                    <div class="mb-3" id="ora-input-group" style="display: none;">
+                        <label class="form-label fw-bold">Ora Consegna:</label>
+                        <input type="time" class="form-control" id="ora-consegna-input">
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">
+                        <i class="bi bi-x-circle"></i> Annulla
+                    </button>
+                    <button type="submit" class="btn btn-primary">
+                        <i class="bi bi-check-circle"></i> Salva
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<!-- Modal Modifica Stato Ordine -->
+<div class="modal fade" id="modalStatoOrdine" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">
+                    <i class="bi bi-arrow-left-right"></i>
+                    Modifica Stato Ordine
+                </h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <form id="form-stato-ordine">
+                <div class="modal-body">
+                    {% csrf_token %}
+                    <input type="hidden" id="stato-ordine-id">
+
+                    <div class="mb-3">
+                        <label class="form-label fw-bold">Nuovo Stato:</label>
+                        <select class="form-select" id="stato-ordine-select" required>
+                            <option value="">Seleziona stato...</option>
+                            <option value="in_attesa">In Attesa</option>
+                            <option value="in_lavorazione">In Lavorazione</option>
+                            <option value="completato">Completato</option>
+                            <option value="annullato">Annullato</option>
+                        </select>
+                    </div>
+
+                    <div class="alert alert-info">
+                        <small>
+                            <i class="bi bi-info-circle"></i>
+                            Il cambio stato aggiornerà automaticamente lo stato dei servizi associati.
+                        </small>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">
+                        <i class="bi bi-x-circle"></i> Annulla
+                    </button>
+                    <button type="submit" class="btn btn-primary">
+                        <i class="bi bi-check-circle"></i> Cambia Stato
+                    </button>
+                </div>
+            </form>
+        </div>
     </div>
 </div>
 
@@ -639,6 +875,128 @@ function stampaOrdine(ordineId) {
     window.open(`{% url 'ordini:stampa-ordine' 0 %}`.replace('0', ordineId), '_blank');
 }
 
+function modificaOraConsegna(ordineId, oraAttuale, tipoConsegna) {
+    document.getElementById('ora-ordine-id').value = ordineId;
+    document.getElementById('ora-tipo-consegna').value = tipoConsegna;
+
+    if (tipoConsegna === 'programmata' && oraAttuale) {
+        document.getElementById('ora-consegna-input').value = oraAttuale;
+        document.getElementById('ora-input-group').style.display = 'block';
+    } else {
+        document.getElementById('ora-consegna-input').value = '';
+        document.getElementById('ora-input-group').style.display = 'none';
+    }
+
+    const modal = new bootstrap.Modal(document.getElementById('modalOraConsegna'));
+    modal.show();
+}
+
+function toggleOraInput() {
+    const tipoConsegna = document.getElementById('ora-tipo-consegna').value;
+    const oraInputGroup = document.getElementById('ora-input-group');
+    const oraInput = document.getElementById('ora-consegna-input');
+
+    if (tipoConsegna === 'programmata') {
+        oraInputGroup.style.display = 'block';
+        oraInput.required = true;
+    } else {
+        oraInputGroup.style.display = 'none';
+        oraInput.required = false;
+        oraInput.value = '';
+    }
+}
+
+document.getElementById('form-ora-consegna').addEventListener('submit', function(e) {
+    e.preventDefault();
+
+    const ordineId = document.getElementById('ora-ordine-id').value;
+    const tipoConsegna = document.getElementById('ora-tipo-consegna').value;
+    const oraConsegna = document.getElementById('ora-consegna-input').value;
+
+    if (tipoConsegna === 'programmata' && !oraConsegna) {
+        alert('Inserisci l\'ora di consegna');
+        return;
+    }
+
+    const data = {
+        tipo_consegna: tipoConsegna,
+        ora_consegna_richiesta: tipoConsegna === 'programmata' ? oraConsegna : null
+    };
+
+    fetch(`{% url 'ordini:modifica-ordine' 0 %}`.replace('0', ordineId), {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+            'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]').value
+        },
+        body: JSON.stringify(data)
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            bootstrap.Modal.getInstance(document.getElementById('modalOraConsegna')).hide();
+            location.reload();
+        } else {
+            alert('Errore: ' + data.error);
+        }
+    })
+    .catch(error => {
+        console.error('Errore:', error);
+        alert('Errore durante la modifica');
+    });
+});
+
+function modificaStatoOrdine(ordineId, statoAttuale) {
+    document.getElementById('stato-ordine-id').value = ordineId;
+    document.getElementById('stato-ordine-select').value = statoAttuale;
+
+    const modal = new bootstrap.Modal(document.getElementById('modalStatoOrdine'));
+    modal.show();
+}
+
+document.getElementById('form-stato-ordine').addEventListener('submit', function(e) {
+    e.preventDefault();
+
+    const ordineId = document.getElementById('stato-ordine-id').value;
+    const nuovoStato = document.getElementById('stato-ordine-select').value;
+
+    if (!nuovoStato) {
+        alert('Seleziona un nuovo stato');
+        return;
+    }
+
+    if (!confirm(`Confermi il cambio stato a "${nuovoStato}"?`)) {
+        return;
+    }
+
+    fetch(`{% url 'ordini:cambia-stato' 0 %}`.replace('0', ordineId), {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+            'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]').value
+        },
+        body: JSON.stringify({ stato: nuovoStato })
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            bootstrap.Modal.getInstance(document.getElementById('modalStatoOrdine')).hide();
+            location.reload();
+        } else {
+            alert('Errore: ' + data.error);
+        }
+    })
+    .catch(error => {
+        console.error('Errore:', error);
+        alert('Errore durante il cambio stato');
+    });
+});
+
+function modificaPagamentoOrdine(ordineId, statoPagamento, totaleFinal, importoPagato, saldoDovuto) {
+    // Reindirizza alla funzione aggiungiPagamento esistente
+    aggiungiPagamento(ordineId);
+}
+
 let ordineCorrenteId = null;
 let serviziDisponibili = [];
 
@@ -697,12 +1055,11 @@ function apriModalModifica(ordineId) {
 }
 
 function caricaServiziOrdine(ordineId) {
-    // Carica dalla pagina HTML per ora (potremmo creare un endpoint JSON dedicato)
-    fetch(`/ordini/${ordineId}/`)
-        .then(response => response.text())
-        .then(html => {
-            const parser = new DOMParser();
-            const doc = parser.parseFromString(html, 'text/html');
+    // Usa l'endpoint JSON per ottenere gli items con ID reali
+    fetch(`{% url 'ordini:dettaglio-json' 0 %}`.replace('0', ordineId))
+        .then(response => response.json())
+        .then(data => {
+            console.log('DEBUG: Items caricati:', data.items);
 
             const container = document.getElementById('lista-servizi-correnti');
             const selectModifica = document.getElementById('modifica-item-select');
@@ -710,56 +1067,37 @@ function caricaServiziOrdine(ordineId) {
             selectModifica.innerHTML = '<option value="">Seleziona un servizio...</option>';
             itemsData = [];
 
-            // Cerca la tabella degli items nella pagina di dettaglio
-            const itemRows = doc.querySelectorAll('table tbody tr');
-            let hasItems = false;
+            if (data.items && data.items.length > 0) {
+                data.items.forEach(item => {
+                    // Salva i dati per modifica
+                    itemsData.push({
+                        id: item.id,
+                        servizio_id: item.servizio_id,
+                        nome: item.servizio_nome,
+                        quantita: item.quantita,
+                        prezzo: item.prezzo_unitario
+                    });
 
-            itemRows.forEach((row, index) => {
-                const cells = row.cells;
-                if (cells && cells.length >= 4) {
-                    hasItems = true;
-                    const servizioText = cells[0]?.textContent.trim();
-                    const quantitaText = cells[1]?.textContent.trim();
-                    const prezzoText = cells[2]?.textContent.trim();
-                    const subtotaleText = cells[3]?.textContent.trim();
-
-                    if (servizioText && quantitaText && prezzoText) {
-                        // Estrai valori numerici
-                        const quantita = quantitaText;
-                        const prezzo = prezzoText.replace('€', '').trim();
-
-                        // Salva i dati per modifica
-                        const itemId = `item-${index}`; // Temporaneo, idealmente dovrebbe venire dal backend
-                        itemsData.push({
-                            id: itemId,
-                            nome: servizioText,
-                            quantita: quantita,
-                            prezzo: prezzo
-                        });
-
-                        // Aggiungi alla lista visuale
-                        const itemDiv = document.createElement('div');
-                        itemDiv.className = 'border-bottom py-2';
-                        itemDiv.innerHTML = `
-                            <div class="d-flex justify-content-between align-items-center">
-                                <div>
-                                    <strong>${servizioText}</strong><br>
-                                    <small class="text-muted">Qtà: ${quantitaText} - Prezzo: ${prezzoText} - Tot: ${subtotaleText}</small>
-                                </div>
+                    // Aggiungi alla lista visuale
+                    const itemDiv = document.createElement('div');
+                    itemDiv.className = 'border-bottom py-2';
+                    itemDiv.innerHTML = `
+                        <div class="d-flex justify-content-between align-items-center">
+                            <div>
+                                <strong>${item.servizio_nome}</strong><br>
+                                <small class="text-muted">Qtà: ${item.quantita} - Prezzo: €${item.prezzo_unitario.toFixed(2)} - Tot: €${item.subtotale.toFixed(2)}</small>
                             </div>
-                        `;
-                        container.appendChild(itemDiv);
+                        </div>
+                    `;
+                    container.appendChild(itemDiv);
 
-                        // Aggiungi al select di modifica
-                        const option = document.createElement('option');
-                        option.value = itemId;
-                        option.textContent = `${servizioText} (${quantitaText}x ${prezzoText})`;
-                        selectModifica.appendChild(option);
-                    }
-                }
-            });
-
-            if (!hasItems) {
+                    // Aggiungi al select di modifica
+                    const option = document.createElement('option');
+                    option.value = item.id;
+                    option.textContent = `${item.servizio_nome} (${item.quantita}x €${item.prezzo_unitario.toFixed(2)})`;
+                    selectModifica.appendChild(option);
+                });
+            } else {
                 container.innerHTML = '<div class="text-muted text-center py-2">Nessun servizio</div>';
             }
         })
@@ -918,8 +1256,14 @@ function caricaDettagliItemModifica() {
     const form = document.getElementById('form-modifica-item');
 
     if (select.value) {
-        const itemData = itemsData.find(i => i.id === select.value);
+        // Converti a numero per confronto
+        const selectedId = parseInt(select.value);
+        const itemData = itemsData.find(i => i.id === selectedId);
+
+        console.log('DEBUG: Cercando item con ID', selectedId, 'in', itemsData);
+
         if (itemData) {
+            console.log('DEBUG: Item trovato:', itemData);
             document.getElementById('modifica-item-id').value = itemData.id;
             document.getElementById('modifica-item-quantita').value = itemData.quantita;
             document.getElementById('modifica-item-prezzo').value = itemData.prezzo;
@@ -931,6 +1275,8 @@ function caricaDettagliItemModifica() {
 
             calcolaSubtotaleModifica();
             form.style.display = 'block';
+        } else {
+            console.error('ERROR: Item non trovato con ID', selectedId);
         }
     } else {
         form.style.display = 'none';
@@ -978,8 +1324,8 @@ function salvaModificaItem() {
 
     const data = {
         item_id: itemId,
-        quantita: parseInt(quantita),
-        prezzo: parseFloat(prezzo)
+        nuova_quantita: parseInt(quantita),
+        nuovo_prezzo: parseFloat(prezzo)
     };
 
     if (nuovoServizioId) {
@@ -1020,8 +1366,36 @@ function eliminaItem() {
 
     const itemId = document.getElementById('modifica-item-id').value;
 
-    // Implementa la chiamata per eliminare l'item
-    alert('Funzionalità elimina servizio - da implementare');
+    if (!itemId) {
+        alert('Nessun servizio selezionato');
+        return;
+    }
+
+    console.log('DEBUG: eliminaItem', { itemId, ordineId: ordineCorrenteId });
+
+    fetch(`{% url 'ordini:elimina-item-ordine' 0 %}`.replace('0', ordineCorrenteId), {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+            'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]').value
+        },
+        body: JSON.stringify({
+            item_id: itemId
+        })
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            alert(data.message);
+            location.reload();
+        } else {
+            alert('Errore: ' + data.error);
+        }
+    })
+    .catch(error => {
+        console.error('Errore:', error);
+        alert('Errore durante l\'eliminazione del servizio');
+    });
 }
 
 function annullaModificaItem() {
@@ -1163,20 +1537,24 @@ function inizializzaWebSocket() {
     const wsProtocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
     const wsUrl = `${wsProtocol}//${window.location.host}/ws/ordini/`;
 
+    console.log('Tentativo connessione WebSocket:', wsUrl);
+
     try {
         webSocket = new WebSocket(wsUrl);
 
         webSocket.onopen = function() {
-            console.log('WebSocket connesso per lista ordini');
+            console.log('✓ WebSocket connesso per lista ordini');
         };
 
         webSocket.onmessage = function(event) {
+            console.log('Messaggio WebSocket ricevuto:', event.data);
             const data = JSON.parse(event.data);
             handleWebSocketMessage(data);
         };
 
-        webSocket.onclose = function() {
-            console.log('WebSocket disconnesso, tentativo riconnessione...');
+        webSocket.onclose = function(event) {
+            console.log('WebSocket disconnesso - Code:', event.code, 'Reason:', event.reason);
+            console.log('Tentativo riconnessione tra 3 secondi...');
             setTimeout(inizializzaWebSocket, 3000);
         };
 
@@ -1184,7 +1562,7 @@ function inizializzaWebSocket() {
             console.error('Errore WebSocket:', error);
         };
     } catch (error) {
-        console.warn('WebSocket non supportato, uso auto-refresh');
+        console.warn('WebSocket non supportato, uso auto-refresh:', error);
         webSocket = null;
         // Fallback: Auto-refresh ogni 30 secondi per ordini in lavorazione
         if (document.querySelector('.badge.bg-warning')) {
@@ -1204,6 +1582,16 @@ function handleWebSocketMessage(data) {
 
         case 'nuovo_ordine':
             console.log('Nuovo ordine ricevuto, ricarico la pagina');
+            location.reload();
+            break;
+
+        case 'ordine_modificato':
+            console.log(`Ordine ${data.numero_progressivo} modificato, ricarico la pagina`);
+            location.reload();
+            break;
+
+        case 'pagamento_aggiunto':
+            console.log(`Pagamento aggiunto all'ordine ${data.numero_progressivo}, ricarico la pagina`);
             location.reload();
             break;
 
@@ -1316,4 +1704,16 @@ window.addEventListener('beforeunload', function() {
     }
 });
 </script>
+
+<style>
+.cursor-pointer {
+    cursor: pointer;
+    transition: opacity 0.2s;
+}
+
+.cursor-pointer:hover {
+    opacity: 0.8;
+}
+</style>
+
 {% endblock %}
