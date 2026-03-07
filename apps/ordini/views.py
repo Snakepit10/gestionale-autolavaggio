@@ -541,7 +541,8 @@ class OrdiniListView(LoginRequiredMixin, ListView):
             # Se c'è un filtro stato specifico, usalo
             if stato == 'completato':
                 context['ordini_attivi'] = Ordine.objects.none()
-                context['ordini_completati'] = queryset.filter(stato='completato').order_by('-data_ora')
+                context['ordini_da_ritirare'] = queryset.filter(stato='completato', auto_ritirata=False).order_by('-data_ora')
+                context['ordini_completati'] = queryset.filter(stato='completato', auto_ritirata=True).order_by('-data_ora')
             else:
                 # Ordini immediati e programmati separati, poi concatenati
                 ordini_immediati = queryset.filter(
@@ -557,6 +558,7 @@ class OrdiniListView(LoginRequiredMixin, ListView):
                 # Concatena: prima immediati, poi programmati
                 from itertools import chain
                 context['ordini_attivi'] = list(chain(ordini_immediati, ordini_programmati))
+                context['ordini_da_ritirare'] = Ordine.objects.none()
                 context['ordini_completati'] = Ordine.objects.none()
         else:
             # Senza filtro stato, mostra ordini attivi e completati separatamente
@@ -575,8 +577,16 @@ class OrdiniListView(LoginRequiredMixin, ListView):
             from itertools import chain
             context['ordini_attivi'] = list(chain(ordini_immediati, ordini_programmati))
 
+            # Ordini da ritirare: completati ma NON ancora ritirati
+            context['ordini_da_ritirare'] = queryset.filter(
+                stato='completato',
+                auto_ritirata=False
+            ).order_by('-data_ora')
+
+            # Ordini completati: completati E già ritirati
             context['ordini_completati'] = queryset.filter(
-                stato='completato'
+                stato='completato',
+                auto_ritirata=True
             ).order_by('-data_ora')
 
         # Calcola statistiche finanziarie
@@ -1635,6 +1645,73 @@ def elimina_item_ordine(request, pk):
                 'error': f'Errore durante l\'eliminazione: {str(e)}'
             }, status=500)
 
+    return JsonResponse({
+        'success': False,
+        'error': 'Metodo non consentito'
+    }, status=405)
+
+@login_required
+def segna_ritirata(request, pk):
+    """Segna un ordine come ritirato dal cliente"""
+    ordine = get_object_or_404(Ordine, pk=pk)
+    
+    if request.method == 'POST':
+        try:
+            data = json.loads(request.body)
+            ritirata = data.get('ritirata', False)
+            
+            # Verifica che l'ordine sia completato
+            if ordine.stato != 'completato':
+                return JsonResponse({
+                    'success': False,
+                    'error': 'Solo gli ordini completati possono essere segnati come ritirati'
+                }, status=400)
+            
+            # Aggiorna lo stato
+            ordine.auto_ritirata = ritirata
+            if ritirata:
+                ordine.data_ritiro = timezone.now()
+            else:
+                ordine.data_ritiro = None
+            
+            ordine.save(update_fields=['auto_ritirata', 'data_ritiro'])
+            
+            # Notifica WebSocket
+            try:
+                from channels.layers import get_channel_layer
+                from asgiref.sync import async_to_sync
+                
+                channel_layer = get_channel_layer()
+                if channel_layer:
+                    async_to_sync(channel_layer.group_send)(
+                        'ordini_list',
+                        {
+                            'type': 'ordine_modificato',
+                            'ordine_id': ordine.id,
+                            'numero_progressivo': ordine.numero_progressivo,
+                            'timestamp': timezone.now().isoformat()
+                        }
+                    )
+            except Exception as e:
+                print(f'Errore WebSocket: {e}')
+            
+            return JsonResponse({
+                'success': True,
+                'message': 'Auto segnata come ritirata' if ritirata else 'Ritiro annullato',
+                'data_ritiro': ordine.data_ritiro.strftime('%d/%m/%Y %H:%M') if ordine.data_ritiro else None
+            })
+            
+        except json.JSONDecodeError:
+            return JsonResponse({
+                'success': False,
+                'error': 'Dati JSON non validi'
+            }, status=400)
+        except Exception as e:
+            return JsonResponse({
+                'success': False,
+                'error': str(e)
+            }, status=500)
+    
     return JsonResponse({
         'success': False,
         'error': 'Metodo non consentito'

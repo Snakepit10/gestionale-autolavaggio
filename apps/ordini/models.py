@@ -74,7 +74,11 @@ class Ordine(models.Model):
     tipo_auto = models.CharField(max_length=200, blank=True, help_text="Modello e colore dell'auto")
     stato = models.CharField(max_length=20, choices=STATO_CHOICES, default='in_attesa')
     operatore = models.ForeignKey(User, on_delete=models.SET_NULL, null=True)
-    
+
+    # Ritiro auto
+    auto_ritirata = models.BooleanField(default=False, help_text="Indica se l'auto è stata ritirata dal cliente")
+    data_ritiro = models.DateTimeField(null=True, blank=True, help_text="Data e ora del ritiro")
+
     creato_il = models.DateTimeField(auto_now_add=True)
     aggiornato_il = models.DateTimeField(auto_now=True)
     

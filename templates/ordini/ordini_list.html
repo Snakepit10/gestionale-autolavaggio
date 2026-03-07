@@ -338,6 +338,206 @@
             </div>
         </div>
 
+        <!-- Ordini Da Ritirare -->
+        <div class="card">
+            <div class="card-header bg-warning text-dark">
+                <h5 class="mb-0">
+                    <i class="bi bi-car-front"></i> Da Ritirare
+                    <span class="badge bg-light text-warning ms-2">{{ ordini_da_ritirare.count }}</span>
+                </h5>
+            </div>
+            <div class="card-body">
+                {% if ordini_da_ritirare %}
+                    <div class="table-responsive">
+                        <table class="table table-hover table-striped">
+                            <thead class="table-dark">
+                                <tr>
+                                    <th>N° Ordine</th>
+                                    <th>Data/Ora</th>
+                                    <th>Cliente</th>
+                                    <th>Tipo Auto</th>
+                                    <th>Servizi</th>
+                                    <th>Totale</th>
+                                    <th>Pagamento</th>
+                                    <th>Stato</th>
+                                    <th>Ora di Consegna</th>
+                                    <th>Auto Ritirata</th>
+                                </tr>
+                            </thead>
+                    <tbody>
+                        {% for ordine in ordini_da_ritirare %}
+                        <tr data-ordine-id="{{ ordine.id }}">
+                            <td>
+                                <a href="{% url 'ordini:ordine-detail' ordine.pk %}"
+                                   class="text-decoration-none">
+                                    <span class="badge bg-primary" style="font-size: 1.2rem; padding: 0.5rem 0.8rem;">
+                                        {{ ordine.numero_breve }}
+                                    </span>
+                                    <br><small class="text-muted">#{{ ordine.numero_progressivo }}</small>
+                                </a>
+                                {% if ordine.origine != 'operatore' %}
+                                    <br><small class="text-muted">
+                                        <i class="bi bi-globe"></i> {{ ordine.get_origine_display }}
+                                    </small>
+                                {% endif %}
+                            </td>
+                            <td>
+                                <div>
+                                    <strong>{{ ordine.data_ora|date:"d/m/Y" }}</strong>
+                                    <br><small class="text-muted">{{ ordine.data_ora|date:"H:i" }}</small>
+                                </div>
+                            </td>
+                            <td>
+                                {% if ordine.cliente %}
+                                    <div class="d-flex align-items-center">
+                                        <i class="bi bi-person me-1"></i>
+                                        <div>
+                                            <strong>{{ ordine.cliente.nome_completo }}</strong>
+                                            <br><small class="text-muted">{{ ordine.cliente.telefono }}</small>
+                                        </div>
+                                    </div>
+                                {% else %}
+                                    <span class="text-muted">
+                                        <i class="bi bi-person-x"></i> Cliente anonimo
+                                    </span>
+                                {% endif %}
+                            </td>
+                            <td>
+                                {% if ordine.tipo_auto %}
+                                    <div class="d-flex align-items-center">
+                                        <i class="bi bi-car-front me-1"></i>
+                                        <div>
+                                            <strong>{{ ordine.tipo_auto }}</strong>
+                                            {% if ordine.nota %}
+                                                <br><small class="text-muted">{{ ordine.nota|truncatewords:8 }}</small>
+                                            {% endif %}
+                                        </div>
+                                    </div>
+                                {% else %}
+                                    <span class="text-muted">
+                                        <i class="bi bi-dash"></i> Non specificato
+                                    </span>
+                                {% endif %}
+                            </td>
+                            <td>
+                                <div class="small">
+                                    {% for item in ordine.items.all|slice:":3" %}
+                                        <div class="d-flex justify-content-between">
+                                            <span>{{ item.servizio_prodotto.titolo }}</span>
+                                            <span class="text-muted">x{{ item.quantita }}</span>
+                                        </div>
+                                    {% endfor %}
+                                    {% if ordine.items.count > 3 %}
+                                        <small class="text-muted">+{{ ordine.items.count|add:"-3" }} altri</small>
+                                    {% endif %}
+                                </div>
+                            </td>
+                            <td>
+                                <div>
+                                    {% if ordine.importo_sconto > 0 %}
+                                        <small class="text-muted text-decoration-line-through">€{{ ordine.totale }}</small><br>
+                                    {% endif %}
+                                    <strong class="h4 text-primary">€{{ ordine.totale_finale }}</strong>
+                                    {% if ordine.importo_sconto > 0 %}
+                                        <br><small class="text-success">
+                                            <i class="bi bi-percent"></i> -€{{ ordine.importo_sconto }}
+                                        </small>
+                                    {% endif %}
+                                </div>
+                            </td>
+                            <td>
+                                {% if ordine.stato_pagamento == 'pagato' %}
+                                    <span class="badge bg-success cursor-pointer"
+                                          onclick="modificaPagamentoOrdine('{{ ordine.pk }}', '{{ ordine.stato_pagamento }}', {{ ordine.totale_finale }}, {{ ordine.importo_pagato }}, {{ ordine.saldo_dovuto }})"
+                                          title="Clicca per vedere dettagli">
+                                        <i class="bi bi-check-circle"></i> Pagato
+                                    </span>
+                                    {% if ordine.pagamenti.all %}
+                                        <br><small class="text-muted">
+                                            {% if ordine.pagamenti.count == 1 %}
+                                                {{ ordine.pagamenti.first.get_metodo_display }}
+                                            {% else %}
+                                                {{ ordine.pagamenti.count }} pagamenti
+                                            {% endif %}
+                                        </small>
+                                    {% endif %}
+                                {% elif ordine.stato_pagamento == 'parziale' %}
+                                    <span class="badge bg-warning cursor-pointer"
+                                          onclick="modificaPagamentoOrdine('{{ ordine.pk }}', '{{ ordine.stato_pagamento }}', {{ ordine.totale_finale }}, {{ ordine.importo_pagato }}, {{ ordine.saldo_dovuto }})"
+                                          title="Clicca per aggiungere pagamento">
+                                        <i class="bi bi-clock"></i> Parziale
+                                    </span>
+                                    <br><small class="text-muted">€{{ ordine.importo_pagato }}</small>
+                                    {% if ordine.pagamenti.all %}
+                                        <br><small class="text-muted">
+                                            {% if ordine.pagamenti.count == 1 %}
+                                                {{ ordine.pagamenti.first.get_metodo_display }}
+                                            {% else %}
+                                                {{ ordine.pagamenti.count }} pagamenti
+                                            {% endif %}
+                                        </small>
+                                    {% endif %}
+                                {% elif ordine.stato_pagamento == 'differito' %}
+                                    <span class="badge bg-info cursor-pointer"
+                                          onclick="modificaPagamentoOrdine('{{ ordine.pk }}', '{{ ordine.stato_pagamento }}', {{ ordine.totale_finale }}, {{ ordine.importo_pagato }}, {{ ordine.saldo_dovuto }})"
+                                          title="Clicca per aggiungere pagamento">
+                                        <i class="bi bi-calendar"></i> Differito
+                                    </span>
+                                    {% if ordine.data_scadenza_pagamento %}
+                                        <br><small class="text-muted">Scad: {{ ordine.data_scadenza_pagamento|date:"d/m" }}</small>
+                                    {% endif %}
+                                {% else %}
+                                    <span class="badge bg-danger cursor-pointer"
+                                          onclick="modificaPagamentoOrdine('{{ ordine.pk }}', '{{ ordine.stato_pagamento }}', {{ ordine.totale_finale }}, {{ ordine.importo_pagato }}, {{ ordine.saldo_dovuto }})"
+                                          title="Clicca per aggiungere pagamento">
+                                        <i class="bi bi-x-circle"></i> Non Pagato
+                                    </span>
+                                {% endif %}
+                            </td>
+                            <td class="stato-cell">
+                                <span class="badge bg-success">
+                                    <i class="bi bi-check-circle"></i> Completato
+                                </span>
+                            </td>
+                            <td>
+                                {% if ordine.tipo_consegna == 'programmata' and ordine.ora_consegna_richiesta %}
+                                    <div class="text-center">
+                                        <span class="badge bg-warning text-dark">
+                                            <i class="bi bi-calendar-check"></i> {{ ordine.ora_consegna_richiesta|time:"H:i" }}
+                                        </span>
+                                    </div>
+                                {% else %}
+                                    <div class="text-center">
+                                        <span class="badge bg-secondary">
+                                            <i class="bi bi-lightning-fill"></i> Immediata
+                                        </span>
+                                    </div>
+                                {% endif %}
+                            </td>
+                            <td class="text-center">
+                                <div class="form-check form-switch d-inline-block">
+                                    <input class="form-check-input"
+                                           type="checkbox"
+                                           id="ritirata_{{ ordine.id }}"
+                                           onchange="toggleAutoRitirata({{ ordine.id }}, this.checked)"
+                                           style="cursor: pointer; width: 3em; height: 1.5em;">
+                                </div>
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        {% else %}
+            <div class="text-center py-5">
+                <i class="bi bi-car-front display-1 text-muted"></i>
+                <h5 class="text-muted mt-3">Nessun Ordine da Ritirare</h5>
+                <p class="text-muted">Non ci sono ordini completati in attesa di ritiro.</p>
+            </div>
+        {% endif %}
+            </div>
+        </div>
+
         <!-- Ordini Completati -->
         <div class="card">
             <div class="card-header bg-success text-white">
@@ -361,6 +561,7 @@
                                     <th>Pagamento</th>
                                     <th>Stato</th>
                                     <th>Ora di Consegna</th>
+                                    <th>Auto Ritirata</th>
                                 </tr>
                             </thead>
                     <tbody>
@@ -511,6 +712,17 @@
                                             <i class="bi bi-lightning-fill"></i> Immediata
                                         </span>
                                     </div>
+                                {% endif %}
+                            </td>
+                            <td class="text-center">
+                                {% if ordine.data_ritiro %}
+                                    <div>
+                                        <i class="bi bi-check-circle-fill text-success"></i>
+                                        <br><small class="text-muted">{{ ordine.data_ritiro|date:"d/m/Y" }}</small>
+                                        <br><small class="text-muted">{{ ordine.data_ritiro|date:"H:i" }}</small>
+                                    </div>
+                                {% else %}
+                                    <span class="text-muted">-</span>
                                 {% endif %}
                             </td>
                         </tr>
@@ -1058,7 +1270,7 @@
 <script>
 function cambiaStato(ordineId, nuovoStato) {
     if (!confirm(`Confermi il cambio stato a "${nuovoStato}"?`)) return;
-    
+
     fetch(`{% url 'ordini:cambia-stato' 0 %}`.replace('0', ordineId), {
         method: 'POST',
         headers: {
@@ -1078,6 +1290,37 @@ function cambiaStato(ordineId, nuovoStato) {
     .catch(error => {
         console.error('Errore:', error);
         alert('Errore durante il cambio stato');
+    });
+}
+
+function toggleAutoRitirata(ordineId, ritirata) {
+    const checkbox = document.getElementById(`ritirata_${ordineId}`);
+    const originalState = !ritirata;
+
+    fetch(`{% url 'ordini:segna-ritirata' 0 %}`.replace('0', ordineId), {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+            'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]').value
+        },
+        body: JSON.stringify({ ritirata: ritirata })
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            // Ricarica la pagina per aggiornare le sezioni
+            location.reload();
+        } else {
+            // Ripristina lo stato del checkbox in caso di errore
+            checkbox.checked = originalState;
+            alert('Errore: ' + data.error);
+        }
+    })
+    .catch(error => {
+        // Ripristina lo stato del checkbox in caso di errore
+        checkbox.checked = originalState;
+        console.error('Errore:', error);
+        alert('Errore durante l\'aggiornamento dello stato di ritiro');
     });
 }
 
