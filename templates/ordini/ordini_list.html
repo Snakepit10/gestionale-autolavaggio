@@ -157,32 +157,7 @@
                                     <strong>{{ ordine.data_ora|date:"d/m/Y" }}</strong>
                                     <br><small class="text-muted">{{ ordine.data_ora|date:"H:i" }}</small>
                                 </div>
-                            </td>
-                            <td>
-                                {% if ordine.tipo_consegna == 'programmata' and ordine.ora_consegna_richiesta %}
-                                    <div class="text-center">
-                                        <span class="badge bg-warning text-dark cursor-pointer"
-                                              onclick="modificaOraConsegna('{{ ordine.pk }}', '{{ ordine.ora_consegna_richiesta|time:"H:i" }}', 'programmata')"
-                                              title="Clicca per modificare">
-                                            <i class="bi bi-calendar-check"></i> {{ ordine.ora_consegna_richiesta|time:"H:i" }}
-                                        </span>
-                                        <br>
-                                        <small class="countdown-timer"
-                                               data-target-date="{{ ordine.data_ora|date:"Y-m-d" }}"
-                                               data-target-time="{{ ordine.ora_consegna_richiesta|time:"H:i" }}">
-                                            Caricamento...
-                                        </small>
-                                    </div>
-                                {% else %}
-                                    <div class="text-center">
-                                        <span class="badge bg-danger cursor-pointer"
-                                              onclick="modificaOraConsegna('{{ ordine.pk }}', '', 'immediata')"
-                                              title="Clicca per modificare">
-                                            <i class="bi bi-lightning-fill"></i> Immediata
-                                        </span>
-                                    </div>
-                                {% endif %}
-                            </td>
+                            
                             <td>
                                 <div class="cursor-pointer"
                                      onclick="modificaClienteOrdine('{{ ordine.pk }}', '{% if ordine.cliente %}{{ ordine.cliente.id }}{% endif %}', '{% if ordine.cliente %}{{ ordine.cliente.nome_completo|escapejs }}{% endif %}')"
@@ -323,6 +298,31 @@
                                     </span>
                                 {% endif %}
                             </td>
+                            <td>
+                                {% if ordine.tipo_consegna == 'programmata' and ordine.ora_consegna_richiesta %}
+                                    <div class="text-center">
+                                        <span class="badge bg-warning text-dark cursor-pointer"
+                                              onclick="modificaOraConsegna('{{ ordine.pk }}', '{{ ordine.ora_consegna_richiesta|time:"H:i" }}', 'programmata')"
+                                              title="Clicca per modificare">
+                                            <i class="bi bi-calendar-check"></i> {{ ordine.ora_consegna_richiesta|time:"H:i" }}
+                                        </span>
+                                        <br>
+                                        <small class="countdown-timer"
+                                               data-target-date="{{ ordine.data_ora|date:"Y-m-d" }}"
+                                               data-target-time="{{ ordine.ora_consegna_richiesta|time:"H:i" }}">
+                                            Caricamento...
+                                        </small>
+                                    </div>
+                                {% else %}
+                                    <div class="text-center">
+                                        <span class="badge bg-danger cursor-pointer"
+                                              onclick="modificaOraConsegna('{{ ordine.pk }}', '', 'immediata')"
+                                              title="Clicca per modificare">
+                                            <i class="bi bi-lightning-fill"></i> Immediata
+                                        </span>
+                                    </div>
+                                {% endif %}
+                            </td>
                         </tr>
                         {% endfor %}
                     </tbody>
@@ -385,22 +385,7 @@
                                     <strong>{{ ordine.data_ora|date:"d/m/Y" }}</strong>
                                     <br><small class="text-muted">{{ ordine.data_ora|date:"H:i" }}</small>
                                 </div>
-                            </td>
-                            <td>
-                                {% if ordine.tipo_consegna == 'programmata' and ordine.ora_consegna_richiesta %}
-                                    <div class="text-center">
-                                        <span class="badge bg-warning text-dark">
-                                            <i class="bi bi-calendar-check"></i> {{ ordine.ora_consegna_richiesta|time:"H:i" }}
-                                        </span>
-                                    </div>
-                                {% else %}
-                                    <div class="text-center">
-                                        <span class="badge bg-success">
-                                            <i class="bi bi-lightning-fill"></i> Immediata
-                                        </span>
-                                    </div>
-                                {% endif %}
-                            </td>
+                            
                             <td>
                                 {% if ordine.cliente %}
                                     <div class="d-flex align-items-center">
@@ -512,6 +497,21 @@
                                 <span class="badge bg-success">
                                     <i class="bi bi-check-circle"></i> Completato
                                 </span>
+                            </td>
+                            <td>
+                                {% if ordine.tipo_consegna == 'programmata' and ordine.ora_consegna_richiesta %}
+                                    <div class="text-center">
+                                        <span class="badge bg-warning text-dark">
+                                            <i class="bi bi-calendar-check"></i> {{ ordine.ora_consegna_richiesta|time:"H:i" }}
+                                        </span>
+                                    </div>
+                                {% else %}
+                                    <div class="text-center">
+                                        <span class="badge bg-secondary">
+                                            <i class="bi bi-lightning-fill"></i> Immediata
+                                        </span>
+                                    </div>
+                                {% endif %}
                             </td>
                         </tr>
                         {% endfor %}
