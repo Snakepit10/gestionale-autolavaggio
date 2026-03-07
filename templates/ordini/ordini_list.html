@@ -140,7 +140,12 @@
                                 {% if ordine.tipo_auto %}
                                     <div class="d-flex align-items-center">
                                         <i class="bi bi-car-front me-1"></i>
-                                        <strong>{{ ordine.tipo_auto }}</strong>
+                                        <div>
+                                            <strong>{{ ordine.tipo_auto }}</strong>
+                                            {% if ordine.nota %}
+                                                <br><small class="text-muted">{{ ordine.nota|truncatewords:8 }}</small>
+                                            {% endif %}
+                                        </div>
                                     </div>
                                 {% else %}
                                     <span class="text-muted">
@@ -385,7 +390,12 @@
                                 {% if ordine.tipo_auto %}
                                     <div class="d-flex align-items-center">
                                         <i class="bi bi-car-front me-1"></i>
-                                        <strong>{{ ordine.tipo_auto }}</strong>
+                                        <div>
+                                            <strong>{{ ordine.tipo_auto }}</strong>
+                                            {% if ordine.nota %}
+                                                <br><small class="text-muted">{{ ordine.nota|truncatewords:8 }}</small>
+                                            {% endif %}
+                                        </div>
                                     </div>
                                 {% else %}
                                     <span class="text-muted">
