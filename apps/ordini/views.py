@@ -1020,12 +1020,12 @@ def _valida_transizione_stato_pagamento(stato_attuale, nuovo_stato, ordine):
 def modifica_ordine(request, pk):
     """Modifica i dati di un ordine (cliente, tipo consegna, tipo auto)"""
     ordine = get_object_or_404(Ordine, pk=pk)
-    
-    # Verifica che l'ordine sia modificabile
-    if ordine.stato in ['completato', 'annullato']:
+
+    # Verifica che l'ordine sia modificabile (solo gli annullati sono bloccati)
+    if ordine.stato == 'annullato':
         return JsonResponse({
             'success': False,
-            'error': 'Non è possibile modificare un ordine completato o annullato'
+            'error': 'Non è possibile modificare un ordine annullato'
         }, status=400)
     
     if request.method == 'POST':
@@ -1214,11 +1214,11 @@ def aggiungi_item_ordine(request, pk):
     ordine = get_object_or_404(Ordine, pk=pk)
     print(f"DEBUG: Ordine trovato - numero={ordine.numero_progressivo}, stato={ordine.stato}")
 
-    # Verifica che l'ordine sia modificabile
-    if ordine.stato in ['completato', 'annullato']:
+    # Verifica che l'ordine sia modificabile (solo gli annullati sono bloccati)
+    if ordine.stato == 'annullato':
         return JsonResponse({
             'success': False,
-            'error': 'Non è possibile modificare un ordine completato o annullato'
+            'error': 'Non è possibile modificare un ordine annullato'
         }, status=400)
 
     if request.method == 'POST':
@@ -1375,12 +1375,12 @@ def aggiungi_item_ordine(request, pk):
 def modifica_item_ordine(request, pk):
     """Modifica un item specifico dell'ordine (servizio e prezzo)"""
     ordine = get_object_or_404(Ordine, pk=pk)
-    
-    # Verifica che l'ordine sia modificabile
-    if ordine.stato in ['completato', 'annullato']:
+
+    # Verifica che l'ordine sia modificabile (solo gli annullati sono bloccati)
+    if ordine.stato == 'annullato':
         return JsonResponse({
             'success': False,
-            'error': 'Non è possibile modificare un ordine completato o annullato'
+            'error': 'Non è possibile modificare un ordine annullato'
         }, status=400)
     
     if request.method == 'POST':
@@ -1563,11 +1563,11 @@ def elimina_item_ordine(request, pk):
     """Elimina un item specifico dall'ordine"""
     ordine = get_object_or_404(Ordine, pk=pk)
 
-    # Verifica che l'ordine sia modificabile
-    if ordine.stato in ['completato', 'annullato']:
+    # Verifica che l'ordine sia modificabile (solo gli annullati sono bloccati)
+    if ordine.stato == 'annullato':
         return JsonResponse({
             'success': False,
-            'error': 'Non è possibile modificare un ordine completato o annullato'
+            'error': 'Non è possibile modificare un ordine annullato'
         }, status=400)
 
     if request.method == 'POST':

@@ -340,7 +340,7 @@
 
         <!-- Ordini Da Ritirare -->
         <div class="card">
-            <div class="card-header bg-warning text-dark">
+            <div class="card-header bg-warning text-white">
                 <h5 class="mb-0">
                     <i class="bi bi-car-front"></i> Da Ritirare
                     <span class="badge bg-light text-warning ms-2">{{ ordini_da_ritirare.count }}</span>
@@ -388,39 +388,49 @@
                                 </div>
                             </td>
                             <td>
-                                {% if ordine.cliente %}
-                                    <div class="d-flex align-items-center">
-                                        <i class="bi bi-person me-1"></i>
-                                        <div>
-                                            <strong>{{ ordine.cliente.nome_completo }}</strong>
-                                            <br><small class="text-muted">{{ ordine.cliente.telefono }}</small>
+                                <div class="cursor-pointer"
+                                     onclick="modificaClienteOrdine('{{ ordine.pk }}', '{% if ordine.cliente %}{{ ordine.cliente.id }}{% endif %}', '{% if ordine.cliente %}{{ ordine.cliente.nome_completo|escapejs }}{% endif %}')"
+                                     title="Clicca per modificare">
+                                    {% if ordine.cliente %}
+                                        <div class="d-flex align-items-center">
+                                            <i class="bi bi-person me-1"></i>
+                                            <div>
+                                                <strong>{{ ordine.cliente.nome_completo }}</strong>
+                                                <br><small class="text-muted">{{ ordine.cliente.telefono }}</small>
+                                            </div>
                                         </div>
-                                    </div>
-                                {% else %}
-                                    <span class="text-muted">
-                                        <i class="bi bi-person-x"></i> Cliente anonimo
-                                    </span>
-                                {% endif %}
+                                    {% else %}
+                                        <span class="text-muted">
+                                            <i class="bi bi-person-x"></i> Cliente anonimo
+                                        </span>
+                                    {% endif %}
+                                </div>
                             </td>
                             <td>
-                                {% if ordine.tipo_auto %}
-                                    <div class="d-flex align-items-center">
-                                        <i class="bi bi-car-front me-1"></i>
-                                        <div>
-                                            <strong>{{ ordine.tipo_auto }}</strong>
-                                            {% if ordine.nota %}
-                                                <br><small class="text-muted">{{ ordine.nota|truncatewords:8 }}</small>
-                                            {% endif %}
+                                <div class="cursor-pointer"
+                                     onclick="modificaTipoAutoOrdine('{{ ordine.pk }}', '{{ ordine.tipo_auto|escapejs }}', '{{ ordine.nota|escapejs }}')"
+                                     title="Clicca per modificare tipo auto e note">
+                                    {% if ordine.tipo_auto %}
+                                        <div class="d-flex align-items-center">
+                                            <i class="bi bi-car-front me-1"></i>
+                                            <div>
+                                                <strong>{{ ordine.tipo_auto }}</strong>
+                                                {% if ordine.nota %}
+                                                    <br><small class="text-muted">{{ ordine.nota|truncatewords:8 }}</small>
+                                                {% endif %}
+                                            </div>
                                         </div>
-                                    </div>
-                                {% else %}
-                                    <span class="text-muted">
-                                        <i class="bi bi-dash"></i> Non specificato
-                                    </span>
-                                {% endif %}
+                                    {% else %}
+                                        <span class="text-muted">
+                                            <i class="bi bi-dash"></i> Non specificato
+                                        </span>
+                                    {% endif %}
+                                </div>
                             </td>
                             <td>
-                                <div class="small">
+                                <div class="small cursor-pointer"
+                                     onclick="apriModalModifica('{{ ordine.pk }}')"
+                                     title="Clicca per modificare servizi">
                                     {% for item in ordine.items.all|slice:":3" %}
                                         <div class="d-flex justify-content-between">
                                             <span>{{ item.servizio_prodotto.titolo }}</span>
@@ -502,13 +512,17 @@
                             <td>
                                 {% if ordine.tipo_consegna == 'programmata' and ordine.ora_consegna_richiesta %}
                                     <div class="text-center">
-                                        <span class="badge bg-warning text-dark">
+                                        <span class="badge bg-warning text-dark cursor-pointer"
+                                              onclick="modificaOraConsegna('{{ ordine.pk }}', '{{ ordine.ora_consegna_richiesta|time:"H:i" }}', 'programmata')"
+                                              title="Clicca per modificare">
                                             <i class="bi bi-calendar-check"></i> {{ ordine.ora_consegna_richiesta|time:"H:i" }}
                                         </span>
                                     </div>
                                 {% else %}
                                     <div class="text-center">
-                                        <span class="badge bg-secondary">
+                                        <span class="badge bg-secondary cursor-pointer"
+                                              onclick="modificaOraConsegna('{{ ordine.pk }}', '', 'immediata')"
+                                              title="Clicca per modificare">
                                             <i class="bi bi-lightning-fill"></i> Immediata
                                         </span>
                                     </div>
@@ -586,41 +600,51 @@
                                     <strong>{{ ordine.data_ora|date:"d/m/Y" }}</strong>
                                     <br><small class="text-muted">{{ ordine.data_ora|date:"H:i" }}</small>
                                 </div>
-                            
+
                             <td>
-                                {% if ordine.cliente %}
-                                    <div class="d-flex align-items-center">
-                                        <i class="bi bi-person me-1"></i>
-                                        <div>
-                                            <strong>{{ ordine.cliente.nome_completo }}</strong>
-                                            <br><small class="text-muted">{{ ordine.cliente.telefono }}</small>
+                                <div class="cursor-pointer"
+                                     onclick="modificaClienteOrdine('{{ ordine.pk }}', '{% if ordine.cliente %}{{ ordine.cliente.id }}{% endif %}', '{% if ordine.cliente %}{{ ordine.cliente.nome_completo|escapejs }}{% endif %}')"
+                                     title="Clicca per modificare">
+                                    {% if ordine.cliente %}
+                                        <div class="d-flex align-items-center">
+                                            <i class="bi bi-person me-1"></i>
+                                            <div>
+                                                <strong>{{ ordine.cliente.nome_completo }}</strong>
+                                                <br><small class="text-muted">{{ ordine.cliente.telefono }}</small>
+                                            </div>
                                         </div>
-                                    </div>
-                                {% else %}
-                                    <span class="text-muted">
-                                        <i class="bi bi-person-x"></i> Cliente anonimo
-                                    </span>
-                                {% endif %}
+                                    {% else %}
+                                        <span class="text-muted">
+                                            <i class="bi bi-person-x"></i> Cliente anonimo
+                                        </span>
+                                    {% endif %}
+                                </div>
                             </td>
                             <td>
-                                {% if ordine.tipo_auto %}
-                                    <div class="d-flex align-items-center">
-                                        <i class="bi bi-car-front me-1"></i>
-                                        <div>
-                                            <strong>{{ ordine.tipo_auto }}</strong>
-                                            {% if ordine.nota %}
-                                                <br><small class="text-muted">{{ ordine.nota|truncatewords:8 }}</small>
-                                            {% endif %}
+                                <div class="cursor-pointer"
+                                     onclick="modificaTipoAutoOrdine('{{ ordine.pk }}', '{{ ordine.tipo_auto|escapejs }}', '{{ ordine.nota|escapejs }}')"
+                                     title="Clicca per modificare tipo auto e note">
+                                    {% if ordine.tipo_auto %}
+                                        <div class="d-flex align-items-center">
+                                            <i class="bi bi-car-front me-1"></i>
+                                            <div>
+                                                <strong>{{ ordine.tipo_auto }}</strong>
+                                                {% if ordine.nota %}
+                                                    <br><small class="text-muted">{{ ordine.nota|truncatewords:8 }}</small>
+                                                {% endif %}
+                                            </div>
                                         </div>
-                                    </div>
-                                {% else %}
-                                    <span class="text-muted">
-                                        <i class="bi bi-dash"></i> Non specificato
-                                    </span>
-                                {% endif %}
+                                    {% else %}
+                                        <span class="text-muted">
+                                            <i class="bi bi-dash"></i> Non specificato
+                                        </span>
+                                    {% endif %}
+                                </div>
                             </td>
                             <td>
-                                <div class="small">
+                                <div class="small cursor-pointer"
+                                     onclick="apriModalModifica('{{ ordine.pk }}')"
+                                     title="Clicca per modificare servizi">
                                     {% for item in ordine.items.all|slice:":3" %}
                                         <div class="d-flex justify-content-between">
                                             <span>{{ item.servizio_prodotto.titolo }}</span>
@@ -702,13 +726,17 @@
                             <td>
                                 {% if ordine.tipo_consegna == 'programmata' and ordine.ora_consegna_richiesta %}
                                     <div class="text-center">
-                                        <span class="badge bg-warning text-dark">
+                                        <span class="badge bg-warning text-dark cursor-pointer"
+                                              onclick="modificaOraConsegna('{{ ordine.pk }}', '{{ ordine.ora_consegna_richiesta|time:"H:i" }}', 'programmata')"
+                                              title="Clicca per modificare">
                                             <i class="bi bi-calendar-check"></i> {{ ordine.ora_consegna_richiesta|time:"H:i" }}
                                         </span>
                                     </div>
                                 {% else %}
                                     <div class="text-center">
-                                        <span class="badge bg-secondary">
+                                        <span class="badge bg-secondary cursor-pointer"
+                                              onclick="modificaOraConsegna('{{ ordine.pk }}', '', 'immediata')"
+                                              title="Clicca per modificare">
                                             <i class="bi bi-lightning-fill"></i> Immediata
                                         </span>
                                     </div>
