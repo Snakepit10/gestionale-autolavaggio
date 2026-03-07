@@ -122,39 +122,49 @@
                                 {% endif %}
                             </td>
                             <td>
-                                {% if ordine.cliente %}
-                                    <div class="d-flex align-items-center">
-                                        <i class="bi bi-person me-1"></i>
-                                        <div>
-                                            <strong>{{ ordine.cliente.nome_completo }}</strong>
-                                            <br><small class="text-muted">{{ ordine.cliente.telefono }}</small>
+                                <div class="cursor-pointer"
+                                     onclick="modificaClienteOrdine('{{ ordine.pk }}', '{% if ordine.cliente %}{{ ordine.cliente.id }}{% endif %}', '{% if ordine.cliente %}{{ ordine.cliente.nome_completo|escapejs }}{% endif %}')"
+                                     title="Clicca per modificare">
+                                    {% if ordine.cliente %}
+                                        <div class="d-flex align-items-center">
+                                            <i class="bi bi-person me-1"></i>
+                                            <div>
+                                                <strong>{{ ordine.cliente.nome_completo }}</strong>
+                                                <br><small class="text-muted">{{ ordine.cliente.telefono }}</small>
+                                            </div>
                                         </div>
-                                    </div>
-                                {% else %}
-                                    <span class="text-muted">
-                                        <i class="bi bi-person-x"></i> Cliente anonimo
-                                    </span>
-                                {% endif %}
+                                    {% else %}
+                                        <span class="text-muted">
+                                            <i class="bi bi-person-x"></i> Cliente anonimo
+                                        </span>
+                                    {% endif %}
+                                </div>
                             </td>
                             <td>
-                                {% if ordine.tipo_auto %}
-                                    <div class="d-flex align-items-center">
-                                        <i class="bi bi-car-front me-1"></i>
-                                        <div>
-                                            <strong>{{ ordine.tipo_auto }}</strong>
-                                            {% if ordine.nota %}
-                                                <br><small class="text-muted">{{ ordine.nota|truncatewords:8 }}</small>
-                                            {% endif %}
+                                <div class="cursor-pointer"
+                                     onclick="modificaTipoAutoOrdine('{{ ordine.pk }}', '{{ ordine.tipo_auto|escapejs }}')"
+                                     title="Clicca per modificare">
+                                    {% if ordine.tipo_auto %}
+                                        <div class="d-flex align-items-center">
+                                            <i class="bi bi-car-front me-1"></i>
+                                            <div>
+                                                <strong>{{ ordine.tipo_auto }}</strong>
+                                                {% if ordine.nota %}
+                                                    <br><small class="text-muted">{{ ordine.nota|truncatewords:8 }}</small>
+                                                {% endif %}
+                                            </div>
                                         </div>
-                                    </div>
-                                {% else %}
-                                    <span class="text-muted">
-                                        <i class="bi bi-dash"></i> Non specificato
-                                    </span>
-                                {% endif %}
+                                    {% else %}
+                                        <span class="text-muted">
+                                            <i class="bi bi-dash"></i> Non specificato
+                                        </span>
+                                    {% endif %}
+                                </div>
                             </td>
                             <td>
-                                <div class="small">
+                                <div class="small cursor-pointer"
+                                     onclick="apriModalModifica('{{ ordine.pk }}')"
+                                     title="Clicca per modificare servizi">
                                     {% for item in ordine.items.all|slice:":3" %}
                                         <div class="d-flex justify-content-between">
                                             <span>{{ item.servizio_prodotto.titolo }}</span>
@@ -533,6 +543,77 @@
                     <div class="mb-3" id="ora-input-group" style="display: none;">
                         <label class="form-label fw-bold">Ora Consegna:</label>
                         <input type="time" class="form-control" id="ora-consegna-input">
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">
+                        <i class="bi bi-x-circle"></i> Annulla
+                    </button>
+                    <button type="submit" class="btn btn-primary">
+                        <i class="bi bi-check-circle"></i> Salva
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<!-- Modal Modifica Cliente -->
+<div class="modal fade" id="modalCliente" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">
+                    <i class="bi bi-person"></i>
+                    Modifica Cliente
+                </h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <form id="form-cliente">
+                <div class="modal-body">
+                    {% csrf_token %}
+                    <input type="hidden" id="cliente-ordine-id">
+
+                    <div class="mb-3">
+                        <label class="form-label fw-bold">Seleziona Cliente:</label>
+                        <select class="form-select" id="cliente-select">
+                            <option value="">Nessun cliente (anonimo)</option>
+                        </select>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">
+                        <i class="bi bi-x-circle"></i> Annulla
+                    </button>
+                    <button type="submit" class="btn btn-primary">
+                        <i class="bi bi-check-circle"></i> Salva
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<!-- Modal Modifica Tipo Auto -->
+<div class="modal fade" id="modalTipoAuto" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">
+                    <i class="bi bi-car-front"></i>
+                    Modifica Tipo Auto
+                </h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <form id="form-tipo-auto">
+                <div class="modal-body">
+                    {% csrf_token %}
+                    <input type="hidden" id="tipo-auto-ordine-id">
+
+                    <div class="mb-3">
+                        <label class="form-label fw-bold">Tipo Auto:</label>
+                        <input type="text" class="form-control" id="tipo-auto-input"
+                               placeholder="es. Fiat 500 bianca, BMW X3 nera...">
                     </div>
                 </div>
                 <div class="modal-footer">
@@ -1006,6 +1087,108 @@ function modificaPagamentoOrdine(ordineId, statoPagamento, totaleFinal, importoP
     // Reindirizza alla funzione aggiungiPagamento esistente
     aggiungiPagamento(ordineId);
 }
+
+function modificaClienteOrdine(ordineId, clienteId, clienteNome) {
+    document.getElementById('cliente-ordine-id').value = ordineId;
+
+    // Carica la lista clienti
+    fetch('/clienti/api/')
+        .then(response => response.json())
+        .then(clienti => {
+            const select = document.getElementById('cliente-select');
+            select.innerHTML = '<option value="">Nessun cliente (anonimo)</option>';
+            clienti.forEach(cliente => {
+                const option = document.createElement('option');
+                option.value = cliente.id;
+                option.textContent = cliente.nome_completo;
+                if (clienteId && cliente.id == clienteId) {
+                    option.selected = true;
+                }
+                select.appendChild(option);
+            });
+
+            const modal = new bootstrap.Modal(document.getElementById('modalCliente'));
+            modal.show();
+        })
+        .catch(error => {
+            console.error('Errore nel caricamento clienti:', error);
+            alert('Errore nel caricamento clienti');
+        });
+}
+
+document.getElementById('form-cliente').addEventListener('submit', function(e) {
+    e.preventDefault();
+
+    const ordineId = document.getElementById('cliente-ordine-id').value;
+    const clienteId = document.getElementById('cliente-select').value;
+
+    const data = {
+        cliente_id: clienteId || null
+    };
+
+    fetch(`{% url 'ordini:modifica-ordine' 0 %}`.replace('0', ordineId), {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+            'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]').value
+        },
+        body: JSON.stringify(data)
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            bootstrap.Modal.getInstance(document.getElementById('modalCliente')).hide();
+            location.reload();
+        } else {
+            alert('Errore: ' + data.error);
+        }
+    })
+    .catch(error => {
+        console.error('Errore:', error);
+        alert('Errore durante la modifica');
+    });
+});
+
+function modificaTipoAutoOrdine(ordineId, tipoAuto) {
+    document.getElementById('tipo-auto-ordine-id').value = ordineId;
+    document.getElementById('tipo-auto-input').value = tipoAuto || '';
+
+    const modal = new bootstrap.Modal(document.getElementById('modalTipoAuto'));
+    modal.show();
+}
+
+document.getElementById('form-tipo-auto').addEventListener('submit', function(e) {
+    e.preventDefault();
+
+    const ordineId = document.getElementById('tipo-auto-ordine-id').value;
+    const tipoAuto = document.getElementById('tipo-auto-input').value;
+
+    const data = {
+        tipo_auto: tipoAuto
+    };
+
+    fetch(`{% url 'ordini:modifica-ordine' 0 %}`.replace('0', ordineId), {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+            'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]').value
+        },
+        body: JSON.stringify(data)
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            bootstrap.Modal.getInstance(document.getElementById('modalTipoAuto')).hide();
+            location.reload();
+        } else {
+            alert('Errore: ' + data.error);
+        }
+    })
+    .catch(error => {
+        console.error('Errore:', error);
+        alert('Errore durante la modifica');
+    });
+});
 
 let ordineCorrenteId = null;
 let serviziDisponibili = [];
