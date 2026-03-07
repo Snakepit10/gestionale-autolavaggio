@@ -142,8 +142,8 @@
                             </td>
                             <td>
                                 <div class="cursor-pointer"
-                                     onclick="modificaTipoAutoOrdine('{{ ordine.pk }}', '{{ ordine.tipo_auto|escapejs }}')"
-                                     title="Clicca per modificare">
+                                     onclick="modificaTipoAutoOrdine('{{ ordine.pk }}', '{{ ordine.tipo_auto|escapejs }}', '{{ ordine.nota|escapejs }}')"
+                                     title="Clicca per modificare tipo auto e note">
                                     {% if ordine.tipo_auto %}
                                         <div class="d-flex align-items-center">
                                             <i class="bi bi-car-front me-1"></i>
@@ -565,43 +565,162 @@
             <div class="modal-header">
                 <h5 class="modal-title">
                     <i class="bi bi-person"></i>
-                    Modifica Cliente
+                    Seleziona o Crea Cliente
                 </h5>
                 <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
             </div>
-            <form id="form-cliente">
-                <div class="modal-body">
-                    {% csrf_token %}
-                    <input type="hidden" id="cliente-ordine-id">
+            <div class="modal-body">
+                <input type="hidden" id="cliente-ordine-id">
 
-                    <div class="mb-3">
-                        <label class="form-label fw-bold">Seleziona Cliente:</label>
-                        <select class="form-select" id="cliente-select">
-                            <option value="">Nessun cliente (anonimo)</option>
-                        </select>
+                <ul class="nav nav-tabs mb-3" id="clienteTabs" role="tablist">
+                    <li class="nav-item" role="presentation">
+                        <button class="nav-link active" id="cerca-tab-list" data-bs-toggle="tab" data-bs-target="#cerca-list" type="button">
+                            Cerca Esistente
+                        </button>
+                    </li>
+                    <li class="nav-item" role="presentation">
+                        <button class="nav-link" id="nuovo-tab-list" data-bs-toggle="tab" data-bs-target="#nuovo-list" type="button">
+                            Nuovo Cliente
+                        </button>
+                    </li>
+                    <li class="nav-item" role="presentation">
+                        <button class="nav-link" id="anonimo-tab-list" data-bs-toggle="tab" data-bs-target="#anonimo-list" type="button">
+                            Anonimo
+                        </button>
+                    </li>
+                </ul>
+
+                <div class="tab-content" id="clienteTabContent">
+                    <!-- Tab Cerca Cliente -->
+                    <div class="tab-pane fade show active" id="cerca-list" role="tabpanel">
+                        <div class="row mb-3">
+                            <div class="col-md-8">
+                                <input type="text" class="form-control" id="cerca-cliente-list"
+                                       placeholder="Cerca per nome, email, telefono...">
+                            </div>
+                            <div class="col-md-4">
+                                <select class="form-select" id="filtro-tipo-cliente-list">
+                                    <option value="">Tutti i tipi</option>
+                                    <option value="privato">Privati</option>
+                                    <option value="azienda">Aziende</option>
+                                </select>
+                            </div>
+                        </div>
+                        <div id="risultati-ricerca-list" style="max-height: 400px; overflow-y: auto;"></div>
+                    </div>
+
+                    <!-- Tab Nuovo Cliente -->
+                    <div class="tab-pane fade" id="nuovo-list" role="tabpanel">
+                        <form id="form-nuovo-cliente-list">
+                            {% csrf_token %}
+                            <!-- Tipo Cliente -->
+                            <div class="mb-3">
+                                <label class="form-label">Tipo Cliente *</label>
+                                <select class="form-select" name="tipo" id="tipo-nuovo-cliente-list" onchange="toggleNuovoClienteFieldsList()" required>
+                                    <option value="">Seleziona tipo...</option>
+                                    <option value="privato">Privato</option>
+                                    <option value="azienda">Azienda</option>
+                                </select>
+                            </div>
+
+                            <!-- Campi Privato -->
+                            <div id="campi-privato-list" style="display: none;">
+                                <div class="row">
+                                    <div class="col-md-6">
+                                        <div class="mb-3">
+                                            <label class="form-label">Nome *</label>
+                                            <input type="text" class="form-control" name="nome" id="nome-privato-list">
+                                        </div>
+                                    </div>
+                                    <div class="col-md-6">
+                                        <div class="mb-3">
+                                            <label class="form-label">Cognome *</label>
+                                            <input type="text" class="form-control" name="cognome" id="cognome-privato-list">
+                                        </div>
+                                    </div>
+                                </div>
+                                <div class="row">
+                                    <div class="col-md-6">
+                                        <div class="mb-3">
+                                            <label class="form-label">Telefono *</label>
+                                            <input type="tel" class="form-control" name="telefono" id="telefono-privato-list">
+                                        </div>
+                                    </div>
+                                    <div class="col-md-6">
+                                        <div class="mb-3">
+                                            <label class="form-label">Email (facoltativo)</label>
+                                            <input type="email" class="form-control" name="email" id="email-privato-list" placeholder="indirizzo@email.com">
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <!-- Campi Azienda -->
+                            <div id="campi-azienda-list" style="display: none;">
+                                <div class="mb-3">
+                                    <label class="form-label">Ragione Sociale *</label>
+                                    <input type="text" class="form-control" name="ragione_sociale" id="ragione-sociale-list">
+                                </div>
+                                <div class="row">
+                                    <div class="col-md-6">
+                                        <div class="mb-3">
+                                            <label class="form-label">Partita IVA *</label>
+                                            <input type="text" class="form-control" name="partita_iva" id="partita-iva-list" maxlength="11">
+                                        </div>
+                                    </div>
+                                    <div class="col-md-6">
+                                        <div class="mb-3">
+                                            <label class="form-label">Codice SDI</label>
+                                            <input type="text" class="form-control" name="codice_sdi" id="codice-sdi-list" maxlength="7">
+                                        </div>
+                                    </div>
+                                </div>
+                                <div class="mb-3">
+                                    <label class="form-label">Indirizzo</label>
+                                    <input type="text" class="form-control" name="indirizzo" id="indirizzo-list">
+                                </div>
+                                <div class="row">
+                                    <div class="col-md-6">
+                                        <div class="mb-3">
+                                            <label class="form-label">Telefono *</label>
+                                            <input type="tel" class="form-control" name="telefono" id="telefono-azienda-list">
+                                        </div>
+                                    </div>
+                                    <div class="col-md-6">
+                                        <div class="mb-3">
+                                            <label class="form-label">Email (facoltativo)</label>
+                                            <input type="email" class="form-control" name="email" id="email-azienda-list" placeholder="indirizzo@email.com">
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </form>
+                    </div>
+
+                    <!-- Tab Anonimo -->
+                    <div class="tab-pane fade" id="anonimo-list" role="tabpanel">
+                        <div class="alert alert-info">
+                            <i class="bi bi-info-circle"></i> L'ordine non sarà associato ad alcun cliente.
+                        </div>
                     </div>
                 </div>
-                <div class="modal-footer">
-                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">
-                        <i class="bi bi-x-circle"></i> Annulla
-                    </button>
-                    <button type="submit" class="btn btn-primary">
-                        <i class="bi bi-check-circle"></i> Salva
-                    </button>
-                </div>
-            </form>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Annulla</button>
+                <button type="button" class="btn btn-primary" onclick="confermaSelezioneCliente()">Conferma</button>
+            </div>
         </div>
     </div>
 </div>
 
-<!-- Modal Modifica Tipo Auto -->
+<!-- Modal Modifica Tipo Auto e Note -->
 <div class="modal fade" id="modalTipoAuto" tabindex="-1">
     <div class="modal-dialog">
         <div class="modal-content">
             <div class="modal-header">
                 <h5 class="modal-title">
                     <i class="bi bi-car-front"></i>
-                    Modifica Tipo Auto
+                    Modifica Tipo Auto e Note
                 </h5>
                 <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
             </div>
@@ -614,6 +733,12 @@
                         <label class="form-label fw-bold">Tipo Auto:</label>
                         <input type="text" class="form-control" id="tipo-auto-input"
                                placeholder="es. Fiat 500 bianca, BMW X3 nera...">
+                    </div>
+
+                    <div class="mb-3">
+                        <label class="form-label fw-bold">Note:</label>
+                        <textarea class="form-control" id="nota-input" rows="3"
+                                  placeholder="Inserisci eventuali note per questo ordine..."></textarea>
                     </div>
                 </div>
                 <div class="modal-footer">
@@ -1088,51 +1213,179 @@ function modificaPagamentoOrdine(ordineId, statoPagamento, totaleFinal, importoP
     aggiungiPagamento(ordineId);
 }
 
+let clienteSelezionatoList = null;
+
 function modificaClienteOrdine(ordineId, clienteId, clienteNome) {
     document.getElementById('cliente-ordine-id').value = ordineId;
+    clienteSelezionatoList = clienteId ? { id: clienteId, nome: clienteNome } : null;
 
-    // Carica la lista clienti
-    fetch('/clienti/api/')
-        .then(response => response.json())
-        .then(clienti => {
-            const select = document.getElementById('cliente-select');
-            select.innerHTML = '<option value="">Nessun cliente (anonimo)</option>';
-            clienti.forEach(cliente => {
-                const option = document.createElement('option');
-                option.value = cliente.id;
-                option.textContent = cliente.nome_completo;
-                if (clienteId && cliente.id == clienteId) {
-                    option.selected = true;
-                }
-                select.appendChild(option);
-            });
+    // Resetta i form
+    document.getElementById('cerca-cliente-list').value = '';
+    document.getElementById('filtro-tipo-cliente-list').value = '';
+    document.getElementById('risultati-ricerca-list').innerHTML = '';
+    document.getElementById('form-nuovo-cliente-list').reset();
+    document.getElementById('campi-privato-list').style.display = 'none';
+    document.getElementById('campi-azienda-list').style.display = 'none';
 
-            const modal = new bootstrap.Modal(document.getElementById('modalCliente'));
-            modal.show();
-        })
-        .catch(error => {
-            console.error('Errore nel caricamento clienti:', error);
-            alert('Errore nel caricamento clienti');
-        });
+    // Mostra il tab appropriato
+    if (clienteId) {
+        document.getElementById('cerca-tab-list').click();
+    } else {
+        document.getElementById('anonimo-tab-list').click();
+    }
+
+    const modal = new bootstrap.Modal(document.getElementById('modalCliente'));
+    modal.show();
 }
 
-document.getElementById('form-cliente').addEventListener('submit', function(e) {
-    e.preventDefault();
+function configuraCercaClienteList() {
+    const input = document.getElementById('cerca-cliente-list');
+    const filtroTipo = document.getElementById('filtro-tipo-cliente-list');
+    let timeout;
 
+    function eseguiRicerca() {
+        clearTimeout(timeout);
+        const term = input.value.trim();
+        const tipo = filtroTipo.value;
+
+        if (term.length < 2 && !tipo) {
+            document.getElementById('risultati-ricerca-list').innerHTML = '';
+            return;
+        }
+
+        timeout = setTimeout(() => {
+            let url = `/clienti/cerca/?term=${encodeURIComponent(term)}`;
+            if (tipo) {
+                url += `&tipo=${tipo}`;
+            }
+
+            fetch(url)
+            .then(response => response.json())
+            .then(data => {
+                mostraRisultatiRicercaList(data.results);
+            })
+            .catch(error => console.error('Errore ricerca:', error));
+        }, 300);
+    }
+
+    input.addEventListener('input', eseguiRicerca);
+    filtroTipo.addEventListener('change', eseguiRicerca);
+}
+
+function mostraRisultatiRicercaList(risultati) {
+    const container = document.getElementById('risultati-ricerca-list');
+
+    if (risultati.length === 0) {
+        container.innerHTML = '<p class="text-muted">Nessun cliente trovato</p>';
+        return;
+    }
+
+    let html = '<div class="list-group">';
+    risultati.forEach(cliente => {
+        html += `
+            <button type="button" class="list-group-item list-group-item-action"
+                    onclick="selezionaClienteTrovatoList(${cliente.id}, '${cliente.text.replace(/'/g, "\\'")}')">
+                <div class="d-flex w-100 justify-content-between">
+                    <h6 class="mb-1">${cliente.text}</h6>
+                    <small class="text-muted">${cliente.tipo}</small>
+                </div>
+                <p class="mb-1">${cliente.email || ''}</p>
+                <small>${cliente.telefono}</small>
+            </button>
+        `;
+    });
+    html += '</div>';
+
+    container.innerHTML = html;
+}
+
+function selezionaClienteTrovatoList(id, nome) {
+    clienteSelezionatoList = { id: id, nome: nome };
+}
+
+function toggleNuovoClienteFieldsList() {
+    const tipo = document.getElementById('tipo-nuovo-cliente-list').value;
+    const campiPrivato = document.getElementById('campi-privato-list');
+    const campiAzienda = document.getElementById('campi-azienda-list');
+
+    campiPrivato.style.display = 'none';
+    campiAzienda.style.display = 'none';
+
+    document.getElementById('nome-privato-list').required = false;
+    document.getElementById('cognome-privato-list').required = false;
+    document.getElementById('telefono-privato-list').required = false;
+    document.getElementById('ragione-sociale-list').required = false;
+    document.getElementById('partita-iva-list').required = false;
+    document.getElementById('telefono-azienda-list').required = false;
+
+    if (tipo === 'privato') {
+        campiPrivato.style.display = 'block';
+        document.getElementById('nome-privato-list').required = true;
+        document.getElementById('cognome-privato-list').required = true;
+        document.getElementById('telefono-privato-list').required = true;
+    } else if (tipo === 'azienda') {
+        campiAzienda.style.display = 'block';
+        document.getElementById('ragione-sociale-list').required = true;
+        document.getElementById('partita-iva-list').required = true;
+        document.getElementById('telefono-azienda-list').required = true;
+    }
+}
+
+function confermaSelezioneCliente() {
     const ordineId = document.getElementById('cliente-ordine-id').value;
-    const clienteId = document.getElementById('cliente-select').value;
+    const tabAttivo = document.querySelector('#clienteTabs .nav-link.active').id;
 
-    const data = {
-        cliente_id: clienteId || null
-    };
+    let clienteData = null;
 
+    if (tabAttivo === 'cerca-tab-list') {
+        // Cliente esistente selezionato
+        if (!clienteSelezionatoList || !clienteSelezionatoList.id) {
+            alert('Seleziona un cliente dalla lista');
+            return;
+        }
+        clienteData = { cliente_id: clienteSelezionatoList.id };
+    } else if (tabAttivo === 'nuovo-tab-list') {
+        // Crea nuovo cliente
+        const form = document.getElementById('form-nuovo-cliente-list');
+        if (!form.checkValidity()) {
+            form.reportValidity();
+            return;
+        }
+
+        const formData = new FormData(form);
+        const tipo = formData.get('tipo');
+
+        clienteData = {
+            nuovo_cliente: true,
+            tipo: tipo
+        };
+
+        if (tipo === 'privato') {
+            clienteData.nome = formData.get('nome');
+            clienteData.cognome = formData.get('cognome');
+            clienteData.telefono = formData.get('telefono');
+            clienteData.email = formData.get('email');
+        } else if (tipo === 'azienda') {
+            clienteData.ragione_sociale = formData.get('ragione_sociale');
+            clienteData.partita_iva = formData.get('partita_iva');
+            clienteData.codice_sdi = formData.get('codice_sdi');
+            clienteData.indirizzo = formData.get('indirizzo');
+            clienteData.telefono = formData.get('telefono');
+            clienteData.email = formData.get('email');
+        }
+    } else if (tabAttivo === 'anonimo-tab-list') {
+        // Nessun cliente (anonimo)
+        clienteData = { cliente_id: null };
+    }
+
+    // Invia la richiesta
     fetch(`{% url 'ordini:modifica-ordine' 0 %}`.replace('0', ordineId), {
         method: 'POST',
         headers: {
             'Content-Type': 'application/json',
             'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]').value
         },
-        body: JSON.stringify(data)
+        body: JSON.stringify(clienteData)
     })
     .then(response => response.json())
     .then(data => {
@@ -1147,11 +1400,17 @@ document.getElementById('form-cliente').addEventListener('submit', function(e) {
         console.error('Errore:', error);
         alert('Errore durante la modifica');
     });
+}
+
+// Inizializza la ricerca cliente quando il documento è pronto
+document.addEventListener('DOMContentLoaded', function() {
+    configuraCercaClienteList();
 });
 
-function modificaTipoAutoOrdine(ordineId, tipoAuto) {
+function modificaTipoAutoOrdine(ordineId, tipoAuto, nota) {
     document.getElementById('tipo-auto-ordine-id').value = ordineId;
     document.getElementById('tipo-auto-input').value = tipoAuto || '';
+    document.getElementById('nota-input').value = nota || '';
 
     const modal = new bootstrap.Modal(document.getElementById('modalTipoAuto'));
     modal.show();
@@ -1162,9 +1421,11 @@ document.getElementById('form-tipo-auto').addEventListener('submit', function(e)
 
     const ordineId = document.getElementById('tipo-auto-ordine-id').value;
     const tipoAuto = document.getElementById('tipo-auto-input').value;
+    const nota = document.getElementById('nota-input').value;
 
     const data = {
-        tipo_auto: tipoAuto
+        tipo_auto: tipoAuto,
+        nota: nota
     };
 
     fetch(`{% url 'ordini:modifica-ordine' 0 %}`.replace('0', ordineId), {

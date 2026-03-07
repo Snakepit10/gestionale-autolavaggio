@@ -990,26 +990,64 @@ def modifica_ordine(request, pk):
             cambiamenti = []
 
             # Modifica cliente (solo se presente nel JSON)
-            if 'cliente_id' in data:
-                cliente_id = data.get('cliente_id')
-                if cliente_id:
+            if 'cliente_id' in data or 'nuovo_cliente' in data:
+                # Verifica se si sta creando un nuovo cliente
+                if data.get('nuovo_cliente'):
                     try:
-                        nuovo_cliente = Cliente.objects.get(id=cliente_id)
-                        if ordine.cliente != nuovo_cliente:
-                            vecchio_cliente = ordine.cliente.nome_completo if ordine.cliente else "Anonimo"
-                            ordine.cliente = nuovo_cliente
-                            cambiamenti.append(f"Cliente: {vecchio_cliente} → {nuovo_cliente.nome_completo}")
-                    except Cliente.DoesNotExist:
+                        tipo = data.get('tipo')
+                        if tipo == 'privato':
+                            nuovo_cliente = Cliente.objects.create(
+                                tipo='privato',
+                                nome=data.get('nome'),
+                                cognome=data.get('cognome'),
+                                telefono=data.get('telefono'),
+                                email=data.get('email', '')
+                            )
+                        elif tipo == 'azienda':
+                            nuovo_cliente = Cliente.objects.create(
+                                tipo='azienda',
+                                ragione_sociale=data.get('ragione_sociale'),
+                                partita_iva=data.get('partita_iva'),
+                                codice_sdi=data.get('codice_sdi', ''),
+                                indirizzo=data.get('indirizzo', ''),
+                                telefono=data.get('telefono'),
+                                email=data.get('email', '')
+                            )
+                        else:
+                            return JsonResponse({
+                                'success': False,
+                                'error': 'Tipo cliente non valido'
+                            }, status=400)
+
+                        vecchio_cliente = ordine.cliente.nome_completo if ordine.cliente else "Anonimo"
+                        ordine.cliente = nuovo_cliente
+                        cambiamenti.append(f"Cliente: {vecchio_cliente} → {nuovo_cliente.nome_completo} (nuovo)")
+                    except Exception as e:
                         return JsonResponse({
                             'success': False,
-                            'error': 'Cliente non trovato'
+                            'error': f'Errore nella creazione del cliente: {str(e)}'
                         }, status=400)
                 else:
-                    # Cliente vuoto = ordine anonimo
-                    if ordine.cliente:
-                        vecchio_cliente = ordine.cliente.nome_completo
-                        ordine.cliente = None
-                        cambiamenti.append(f"Cliente: {vecchio_cliente} → Anonimo")
+                    # Cliente esistente
+                    cliente_id = data.get('cliente_id')
+                    if cliente_id:
+                        try:
+                            nuovo_cliente = Cliente.objects.get(id=cliente_id)
+                            if ordine.cliente != nuovo_cliente:
+                                vecchio_cliente = ordine.cliente.nome_completo if ordine.cliente else "Anonimo"
+                                ordine.cliente = nuovo_cliente
+                                cambiamenti.append(f"Cliente: {vecchio_cliente} → {nuovo_cliente.nome_completo}")
+                        except Cliente.DoesNotExist:
+                            return JsonResponse({
+                                'success': False,
+                                'error': 'Cliente non trovato'
+                            }, status=400)
+                    else:
+                        # Cliente vuoto = ordine anonimo
+                        if ordine.cliente:
+                            vecchio_cliente = ordine.cliente.nome_completo
+                            ordine.cliente = None
+                            cambiamenti.append(f"Cliente: {vecchio_cliente} → Anonimo")
             
             # Modifica tipo consegna
             tipo_consegna = data.get('tipo_consegna')
@@ -1058,7 +1096,16 @@ def modifica_ordine(request, pk):
                     ordine.tipo_auto = tipo_auto
                     nuovo_tipo_auto = tipo_auto or "Non specificato"
                     cambiamenti.append(f"Tipo auto: {vecchio_tipo_auto} → {nuovo_tipo_auto}")
-            
+
+            # Modifica nota (solo se presente nel JSON)
+            if 'nota' in data:
+                nota = data.get('nota', '').strip()
+                if ordine.nota != nota:
+                    vecchia_nota = ordine.nota or "Nessuna nota"
+                    ordine.nota = nota
+                    nuova_nota = nota or "Nessuna nota"
+                    cambiamenti.append(f"Note: {vecchia_nota[:30]}... → {nuova_nota[:30]}...")
+
             # Salva solo se ci sono stati cambiamenti
             if cambiamenti:
                 ordine.save()
@@ -1066,8 +1113,8 @@ def modifica_ordine(request, pk):
                 # Log dell'operazione
                 print(f"Ordine {ordine.numero_progressivo} modificato da {request.user}: {', '.join(cambiamenti)}")
 
-                # Notifica WebSocket alla lista ordini se è stato modificato il tipo consegna o ora
-                if any('consegna' in c.lower() or 'ora' in c.lower() for c in cambiamenti):
+                # Notifica WebSocket alla lista ordini per qualsiasi modifica
+                if cambiamenti:
                     try:
                         from channels.layers import get_channel_layer
                         from asgiref.sync import async_to_sync
