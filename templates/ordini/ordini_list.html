@@ -142,7 +142,7 @@
                                 <a href="{% url 'ordini:ordine-detail' ordine.pk %}"
                                    class="text-decoration-none">
                                     <span class="badge bg-primary" style="font-size: 1.2rem; padding: 0.5rem 0.8rem;">
-                                        {{ forloop.counter }}
+                                        {{ ordine.numero_breve }}
                                     </span>
                                     <br><small class="text-muted">#{{ ordine.numero_progressivo }}</small>
                                 </a>
@@ -370,7 +370,7 @@
                                 <a href="{% url 'ordini:ordine-detail' ordine.pk %}"
                                    class="text-decoration-none">
                                     <span class="badge bg-primary" style="font-size: 1.2rem; padding: 0.5rem 0.8rem;">
-                                        {{ forloop.counter }}
+                                        {{ ordine.numero_breve }}
                                     </span>
                                     <br><small class="text-muted">#{{ ordine.numero_progressivo }}</small>
                                 </a>

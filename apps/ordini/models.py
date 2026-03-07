@@ -107,13 +107,22 @@ class Ordine(models.Model):
         return f"{prefisso}-{nuovo_numero:04d}"
     
     @property
+    def numero_breve(self):
+        """Restituisce solo la parte numerica del numero progressivo senza zeri iniziali
+        Es: da '20260307-0031' restituisce 31
+        """
+        if self.numero_progressivo and '-' in self.numero_progressivo:
+            return int(self.numero_progressivo.split('-')[1])
+        return 0
+
+    @property
     def saldo_dovuto(self):
         from decimal import Decimal
         # Converti entrambi a Decimal per evitare errori di tipo
         totale_finale_decimal = Decimal(str(self.totale_finale))
         importo_pagato_decimal = Decimal(str(self.importo_pagato))
         return totale_finale_decimal - importo_pagato_decimal
-    
+
     @property
     def is_pagato(self):
         return self.saldo_dovuto <= 0
