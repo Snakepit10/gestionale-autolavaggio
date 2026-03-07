@@ -141,8 +141,11 @@
                         <tr data-ordine-id="{{ ordine.id }}">
                             <td>
                                 <a href="{% url 'ordini:ordine-detail' ordine.pk %}"
-                                   class="text-decoration-none fw-bold">
-                                    #{{ ordine.numero_progressivo }}
+                                   class="text-decoration-none">
+                                    <span class="badge bg-primary" style="font-size: 1.2rem; padding: 0.5rem 0.8rem;">
+                                        {{ forloop.counter }}
+                                    </span>
+                                    <br><small class="text-muted">#{{ ordine.numero_progressivo }}</small>
                                 </a>
                                 {% if ordine.origine != 'operatore' %}
                                     <br><small class="text-muted">
@@ -164,6 +167,12 @@
                                               title="Clicca per modificare">
                                             <i class="bi bi-calendar-check"></i> {{ ordine.ora_consegna_richiesta|time:"H:i" }}
                                         </span>
+                                        <br>
+                                        <small class="countdown-timer"
+                                               data-target-date="{{ ordine.data_ora|date:"Y-m-d" }}"
+                                               data-target-time="{{ ordine.ora_consegna_richiesta|time:"H:i" }}">
+                                            Caricamento...
+                                        </small>
                                     </div>
                                 {% else %}
                                     <div class="text-center">
@@ -305,9 +314,6 @@
                                           title="Clicca per modificare">
                                         <i class="bi bi-clock"></i> In Lavorazione
                                     </span>
-                                    {% if ordine.tempo_attesa_minuti %}
-                                        <br><small class="text-muted">{{ ordine.tempo_attesa_minuti }}min</small>
-                                    {% endif %}
                                 {% elif ordine.stato == 'completato' %}
                                     <span class="badge bg-success">
                                         <i class="bi bi-check-circle"></i> Completato
@@ -405,8 +411,11 @@
                         <tr data-ordine-id="{{ ordine.id }}">
                             <td>
                                 <a href="{% url 'ordini:ordine-detail' ordine.pk %}"
-                                   class="text-decoration-none fw-bold">
-                                    #{{ ordine.numero_progressivo }}
+                                   class="text-decoration-none">
+                                    <span class="badge bg-primary" style="font-size: 1.2rem; padding: 0.5rem 0.8rem;">
+                                        {{ forloop.counter }}
+                                    </span>
+                                    <br><small class="text-muted">#{{ ordine.numero_progressivo }}</small>
                                 </a>
                                 {% if ordine.origine != 'operatore' %}
                                     <br><small class="text-muted">
@@ -2208,9 +2217,62 @@ function aggiornaBottoniAzione(azioniCell, ordineId, nuovoStato) {
     }
 }
 
+// Funzione per aggiornare i countdown
+function aggiornaCountdowns() {
+    const countdownElements = document.querySelectorAll('.countdown-timer');
+    const now = new Date();
+
+    countdownElements.forEach(element => {
+        const targetDate = element.getAttribute('data-target-date');
+        const targetTime = element.getAttribute('data-target-time');
+
+        if (!targetDate || !targetTime) return;
+
+        // Crea la data target
+        const [year, month, day] = targetDate.split('-');
+        const [hours, minutes] = targetTime.split(':');
+        const targetDateTime = new Date(year, month - 1, day, hours, minutes, 0);
+
+        // Calcola la differenza in millisecondi
+        const diff = targetDateTime - now;
+
+        if (diff <= 0) {
+            // Tempo scaduto
+            element.textContent = 'Scaduto!';
+            element.className = 'countdown-timer text-danger fw-bold';
+        } else {
+            // Calcola ore e minuti rimanenti
+            const totalMinutes = Math.floor(diff / 60000);
+            const ore = Math.floor(totalMinutes / 60);
+            const minuti = totalMinutes % 60;
+
+            let testo = '';
+            if (ore > 0) {
+                testo = `${ore}h ${minuti}min`;
+            } else {
+                testo = `${minuti}min`;
+            }
+
+            element.textContent = `Tra ${testo}`;
+
+            // Evidenzia in rosso se mancano meno di 45 minuti
+            if (totalMinutes < 45) {
+                element.className = 'countdown-timer text-danger fw-bold';
+            } else {
+                element.className = 'countdown-timer text-muted';
+            }
+        }
+    });
+}
+
 // Inizializza WebSocket quando la pagina è caricata
 document.addEventListener('DOMContentLoaded', function() {
     inizializzaWebSocket();
+
+    // Avvia il countdown
+    aggiornaCountdowns();
+    // Aggiorna ogni 30 secondi
+    setInterval(aggiornaCountdowns, 30000);
 });
 
 // Cleanup quando si chiude la pagina
