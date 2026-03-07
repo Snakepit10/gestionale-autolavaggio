@@ -115,7 +115,7 @@
             <div class="card-header bg-primary text-white">
                 <h5 class="mb-0">
                     <i class="bi bi-list-check"></i> Ordini Attivi
-                    <span class="badge bg-light text-primary ms-2">{{ ordini_attivi.count }}</span>
+                    <span class="badge bg-light text-primary ms-2">{{ ordini_attivi|length }}</span>
                 </h5>
             </div>
             <div class="card-body">
@@ -2201,6 +2201,12 @@ window.addEventListener('beforeunload', function() {
 
 .cursor-pointer:hover {
     opacity: 0.8;
+}
+
+/* Hover azzurrino per le righe della tabella */
+.table-hover tbody tr:hover {
+    background-color: #cfe2ff !important;
+    cursor: pointer;
 }
 </style>
 
