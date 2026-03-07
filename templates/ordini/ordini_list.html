@@ -133,7 +133,6 @@
                                     <th>Totale</th>
                                     <th>Pagamento</th>
                                     <th>Stato</th>
-                                    <th class="text-center">Azioni</th>
                                 </tr>
                             </thead>
                     <tbody>
@@ -244,7 +243,7 @@
                                     {% if ordine.importo_sconto > 0 %}
                                         <small class="text-muted text-decoration-line-through">€{{ ordine.totale }}</small><br>
                                     {% endif %}
-                                    <strong class="h6">€{{ ordine.totale_finale }}</strong>
+                                    <strong class="h4 text-primary">€{{ ordine.totale_finale }}</strong>
                                     {% if ordine.importo_sconto > 0 %}
                                         <br><small class="text-success">
                                             <i class="bi bi-percent"></i> -€{{ ordine.importo_sconto }}
@@ -324,47 +323,6 @@
                                     </span>
                                 {% endif %}
                             </td>
-                            <td class="text-center azioni-cell">
-                                <div class="btn-group" role="group">
-                                    <a href="{% url 'ordini:ordine-detail' ordine.pk %}"
-                                       class="btn btn-sm btn-outline-primary" title="Dettagli">
-                                        <i class="bi bi-eye"></i>
-                                    </a>
-                                    {% if ordine.stato == 'in_attesa' %}
-                                        <button class="btn btn-sm btn-outline-info"
-                                                onclick="cambiaStato('{{ ordine.pk }}', 'in_lavorazione')"
-                                                title="Avvia Lavorazione">
-                                            <i class="bi bi-play-circle"></i>
-                                        </button>
-                                    {% endif %}
-                                    {% if ordine.stato != 'completato' and ordine.stato != 'annullato' %}
-                                        <button class="btn btn-sm btn-outline-success"
-                                                onclick="cambiaStato('{{ ordine.pk }}', 'completato')"
-                                                title="Completa">
-                                            <i class="bi bi-check"></i>
-                                        </button>
-                                    {% endif %}
-                                    {% if ordine.stato != 'completato' and ordine.stato != 'annullato' %}
-                                        <button class="btn btn-sm btn-outline-secondary"
-                                                onclick="apriModalModifica('{{ ordine.pk }}')"
-                                                title="Modifica">
-                                            <i class="bi bi-pencil"></i>
-                                        </button>
-                                    {% endif %}
-                                    {% if ordine.stato_pagamento != 'pagato' %}
-                                        <button class="btn btn-sm btn-outline-warning"
-                                                onclick="aggiungiPagamento('{{ ordine.pk }}')"
-                                                title="Pagamento">
-                                            <i class="bi bi-credit-card"></i>
-                                        </button>
-                                    {% endif %}
-                                    <button class="btn btn-sm btn-outline-info"
-                                            onclick="stampaOrdine('{{ ordine.pk }}')"
-                                            title="Stampa">
-                                        <i class="bi bi-printer"></i>
-                                    </button>
-                                </div>
-                            </td>
                         </tr>
                         {% endfor %}
                     </tbody>
@@ -403,7 +361,6 @@
                                     <th>Totale</th>
                                     <th>Pagamento</th>
                                     <th>Stato</th>
-                                    <th class="text-center">Azioni</th>
                                 </tr>
                             </thead>
                     <tbody>
@@ -494,7 +451,7 @@
                                     {% if ordine.importo_sconto > 0 %}
                                         <small class="text-muted text-decoration-line-through">€{{ ordine.totale }}</small><br>
                                     {% endif %}
-                                    <strong class="h6">€{{ ordine.totale_finale }}</strong>
+                                    <strong class="h4 text-primary">€{{ ordine.totale_finale }}</strong>
                                     {% if ordine.importo_sconto > 0 %}
                                         <br><small class="text-success">
                                             <i class="bi bi-percent"></i> -€{{ ordine.importo_sconto }}
@@ -555,19 +512,6 @@
                                 <span class="badge bg-success">
                                     <i class="bi bi-check-circle"></i> Completato
                                 </span>
-                            </td>
-                            <td class="text-center azioni-cell">
-                                <div class="btn-group" role="group">
-                                    <a href="{% url 'ordini:ordine-detail' ordine.pk %}"
-                                       class="btn btn-sm btn-outline-primary" title="Dettagli">
-                                        <i class="bi bi-eye"></i>
-                                    </a>
-                                    <button class="btn btn-sm btn-outline-info"
-                                            onclick="stampaOrdine('{{ ordine.pk }}')"
-                                            title="Stampa">
-                                        <i class="bi bi-printer"></i>
-                                    </button>
-                                </div>
                             </td>
                         </tr>
                         {% endfor %}
@@ -2165,12 +2109,6 @@ function aggiornaStatoOrdineInLista(data) {
         `;
     }
 
-    // Aggiorna i bottoni di azione se necessario
-    const azioniCell = ordineRow.querySelector('.azioni-cell');
-    if (azioniCell) {
-        aggiornaBottoniAzione(azioniCell, data.ordine_id, data.nuovo_stato);
-    }
-
     // Mostra notifica
     const alertDiv = document.createElement('div');
     alertDiv.className = 'alert alert-info alert-dismissible fade show';
@@ -2187,34 +2125,6 @@ function aggiornaStatoOrdineInLista(data) {
     setTimeout(() => {
         alertDiv.remove();
     }, 5000);
-}
-
-function aggiornaBottoniAzione(azioniCell, ordineId, nuovoStato) {
-    const btnGroup = azioniCell.querySelector('.btn-group');
-    if (!btnGroup) return;
-
-    // Rimuovi bottone "Avvia Lavorazione" se non è più in attesa
-    const avviaBtn = btnGroup.querySelector('[title="Avvia Lavorazione"]');
-    if (avviaBtn && nuovoStato !== 'in_attesa') {
-        avviaBtn.remove();
-    }
-
-    // Rimuovi bottone "Completa" se l'ordine è completato o annullato
-    const completaBtn = btnGroup.querySelector('[title="Completa"]');
-    if (completaBtn && (nuovoStato === 'completato' || nuovoStato === 'annullato')) {
-        completaBtn.remove();
-    }
-
-    // Rimuovi bottone "Modifica" se l'ordine è completato o annullato
-    const modificaBtn = btnGroup.querySelector('[title="Modifica"]');
-    if (modificaBtn && (nuovoStato === 'completato' || nuovoStato === 'annullato')) {
-        modificaBtn.remove();
-    }
-
-    // Aggiorna il bottone se necessario
-    if (nuovoStato === 'completato' || nuovoStato === 'annullato') {
-        btnGroup.classList.add('opacity-50');
-    }
 }
 
 // Funzione per aggiornare i countdown
