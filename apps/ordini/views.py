@@ -579,6 +579,42 @@ class OrdiniListView(LoginRequiredMixin, ListView):
                 stato='completato'
             ).order_by('-data_ora')
 
+        # Calcola statistiche finanziarie
+        # Usa lo stesso queryset filtrato per le statistiche
+        from decimal import Decimal
+
+        # Totale ordini (somma dei totale_finale)
+        totale_ordini = queryset.aggregate(
+            totale=Sum('totale_finale')
+        )['totale'] or Decimal('0.00')
+
+        # Totale incassato in contanti
+        totale_contanti = Pagamento.objects.filter(
+            ordine__in=queryset,
+            metodo='contanti'
+        ).aggregate(totale=Sum('importo'))['totale'] or Decimal('0.00')
+
+        # Totale incassato con carte (carta + bancomat)
+        totale_carte = Pagamento.objects.filter(
+            ordine__in=queryset,
+            metodo__in=['carta', 'bancomat']
+        ).aggregate(totale=Sum('importo'))['totale'] or Decimal('0.00')
+
+        # Totale non ancora incassato (saldo dovuto)
+        # Calcola manualmente perché saldo_dovuto è una property
+        totale_non_incassato = Decimal('0.00')
+        for ordine in queryset:
+            if ordine.saldo_dovuto > 0:
+                totale_non_incassato += ordine.saldo_dovuto
+
+        context['statistiche'] = {
+            'totale_ordini': totale_ordini,
+            'totale_contanti': totale_contanti,
+            'totale_carte': totale_carte,
+            'totale_non_incassato': totale_non_incassato,
+            'totale_incassato': totale_contanti + totale_carte,
+        }
+
         return context
 
 

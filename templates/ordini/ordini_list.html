@@ -17,6 +17,58 @@
     </div>
 </div>
 
+<!-- Card Statistiche -->
+<div class="row mb-4">
+    <div class="col-md-3">
+        <div class="card border-primary">
+            <div class="card-body text-center">
+                <h6 class="card-subtitle mb-2 text-muted">
+                    <i class="bi bi-cash-stack"></i> Totale Ordini
+                </h6>
+                <h3 class="card-title text-primary mb-0">
+                    €{{ statistiche.totale_ordini|floatformat:2 }}
+                </h3>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-3">
+        <div class="card border-success">
+            <div class="card-body text-center">
+                <h6 class="card-subtitle mb-2 text-muted">
+                    <i class="bi bi-wallet2"></i> Incassato Contanti
+                </h6>
+                <h3 class="card-title text-success mb-0">
+                    €{{ statistiche.totale_contanti|floatformat:2 }}
+                </h3>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-3">
+        <div class="card border-info">
+            <div class="card-body text-center">
+                <h6 class="card-subtitle mb-2 text-muted">
+                    <i class="bi bi-credit-card"></i> Incassato Carte
+                </h6>
+                <h3 class="card-title text-info mb-0">
+                    €{{ statistiche.totale_carte|floatformat:2 }}
+                </h3>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-3">
+        <div class="card border-danger">
+            <div class="card-body text-center">
+                <h6 class="card-subtitle mb-2 text-muted">
+                    <i class="bi bi-exclamation-triangle"></i> Non Incassato
+                </h6>
+                <h3 class="card-title text-danger mb-0">
+                    €{{ statistiche.totale_non_incassato|floatformat:2 }}
+                </h3>
+            </div>
+        </div>
+    </div>
+</div>
+
 <!-- Filtri -->
 <div class="card mb-4">
     <div class="card-body">
