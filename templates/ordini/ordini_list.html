@@ -2204,9 +2204,14 @@ window.addEventListener('beforeunload', function() {
 }
 
 /* Hover azzurrino per le righe della tabella */
-.table-hover tbody tr:hover {
+.table-hover.table-striped tbody tr:hover,
+.table-hover tbody tr:hover td {
     background-color: #cfe2ff !important;
     cursor: pointer;
+}
+
+.table-hover.table-striped tbody tr:hover td {
+    background-color: #cfe2ff !important;
 }
 </style>
 
