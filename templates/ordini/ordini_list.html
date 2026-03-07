@@ -493,7 +493,9 @@
                             </td>
                             <td>
                                 {% if ordine.stato_pagamento == 'pagato' %}
-                                    <span class="badge bg-success">
+                                    <span class="badge bg-success cursor-pointer"
+                                          onclick="modificaPagamentoOrdine('{{ ordine.pk }}', '{{ ordine.stato_pagamento }}', {{ ordine.totale_finale }}, {{ ordine.importo_pagato }}, {{ ordine.saldo_dovuto }})"
+                                          title="Clicca per vedere dettagli">
                                         <i class="bi bi-check-circle"></i> Pagato
                                     </span>
                                     {% if ordine.pagamenti.all %}
@@ -506,7 +508,9 @@
                                         </small>
                                     {% endif %}
                                 {% elif ordine.stato_pagamento == 'parziale' %}
-                                    <span class="badge bg-warning">
+                                    <span class="badge bg-warning cursor-pointer"
+                                          onclick="modificaPagamentoOrdine('{{ ordine.pk }}', '{{ ordine.stato_pagamento }}', {{ ordine.totale_finale }}, {{ ordine.importo_pagato }}, {{ ordine.saldo_dovuto }})"
+                                          title="Clicca per aggiungere pagamento">
                                         <i class="bi bi-clock"></i> Parziale
                                     </span>
                                     <br><small class="text-muted">€{{ ordine.importo_pagato }}</small>
@@ -520,14 +524,18 @@
                                         </small>
                                     {% endif %}
                                 {% elif ordine.stato_pagamento == 'differito' %}
-                                    <span class="badge bg-info">
+                                    <span class="badge bg-info cursor-pointer"
+                                          onclick="modificaPagamentoOrdine('{{ ordine.pk }}', '{{ ordine.stato_pagamento }}', {{ ordine.totale_finale }}, {{ ordine.importo_pagato }}, {{ ordine.saldo_dovuto }})"
+                                          title="Clicca per aggiungere pagamento">
                                         <i class="bi bi-calendar"></i> Differito
                                     </span>
                                     {% if ordine.data_scadenza_pagamento %}
                                         <br><small class="text-muted">Scad: {{ ordine.data_scadenza_pagamento|date:"d/m" }}</small>
                                     {% endif %}
                                 {% else %}
-                                    <span class="badge bg-danger">
+                                    <span class="badge bg-danger cursor-pointer"
+                                          onclick="modificaPagamentoOrdine('{{ ordine.pk }}', '{{ ordine.stato_pagamento }}', {{ ordine.totale_finale }}, {{ ordine.importo_pagato }}, {{ ordine.saldo_dovuto }})"
+                                          title="Clicca per aggiungere pagamento">
                                         <i class="bi bi-x-circle"></i> Non Pagato
                                     </span>
                                 {% endif %}
