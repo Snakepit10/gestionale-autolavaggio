@@ -1,0 +1,207 @@
+{% extends "base.html" %}
+{% load cq_tags %}
+
+{% block title %}Scheda CQ — Ordine #{{ ordine.numero_progressivo }}{% endblock %}
+
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-3">
+  <div class="d-flex align-items-center gap-3">
+    <h4 class="mb-0">
+      <i class="bi bi-clipboard2-check"></i> Scheda CQ — Ordine #{{ ordine.numero_progressivo }}
+    </h4>
+    {% if scheda.esito == 'ok' %}
+      <span class="badge bg-success fs-6"><i class="bi bi-check-circle"></i> OK</span>
+    {% else %}
+      <span class="badge bg-danger fs-6"><i class="bi bi-x-circle"></i> Non OK — {{ scheda.num_difetti }} difett{{ scheda.num_difetti|pluralize:"o,i" }}</span>
+    {% endif %}
+  </div>
+  <div class="d-flex gap-2">
+    {% if is_titolare %}
+      <a href="{% url 'cq:scheda_modifica' ordine_pk=ordine.pk %}" class="btn btn-warning btn-sm">
+        <i class="bi bi-pencil"></i> Modifica
+      </a>
+    {% endif %}
+    <a href="{% url 'ordini:ordine-detail' ordine.pk %}" class="btn btn-outline-secondary btn-sm">
+      <i class="bi bi-arrow-left"></i> Torna all'ordine
+    </a>
+  </div>
+</div>
+
+{# Info ordine #}
+<div class="card mb-3 border-primary">
+  <div class="card-body py-2">
+    <div class="d-flex flex-wrap gap-3 align-items-center small">
+      <span><i class="bi bi-calendar3 text-primary"></i> <strong>{{ ordine.data_ora|date:"d/m/Y H:i" }}</strong></span>
+      {% if ordine.cliente %}
+        <span><i class="bi bi-person-fill text-primary"></i> {{ ordine.cliente }}</span>
+      {% endif %}
+      {% if ordine.tipo_auto %}
+        <span><i class="bi bi-car-front text-secondary"></i> {{ ordine.tipo_auto }}</span>
+      {% endif %}
+      <span class="fw-bold text-success ms-auto"><i class="bi bi-cash-coin"></i> €{{ ordine.totale_finale }}</span>
+    </div>
+    {% with items=ordine.items.all %}
+      {% if items %}
+      <div class="d-flex flex-wrap gap-1 mt-2">
+        {% for item in items %}
+          <span class="badge bg-primary" style="font-size:.78rem">
+            {{ item.servizio_prodotto.titolo }}{% if item.quantita > 1 %} ×{{ item.quantita }}{% endif %}
+          </span>
+        {% endfor %}
+      </div>
+      {% endif %}
+    {% endwith %}
+  </div>
+</div>
+
+{# Info scheda #}
+<div class="card mb-3">
+  <div class="card-body">
+    <div class="row g-2 small text-muted">
+      <div class="col-md-4">
+        <i class="bi bi-person-check"></i>
+        <strong>Compilata da:</strong> {{ scheda.compilata_da.get_full_name|default:scheda.compilata_da.username }}
+      </div>
+      <div class="col-md-4">
+        <i class="bi bi-eye"></i>
+        <strong>Rilevato da:</strong> {{ scheda.get_rilevato_da_display }}
+      </div>
+      <div class="col-md-4">
+        <i class="bi bi-info-circle"></i>
+        <strong>Stato:</strong> {{ scheda.get_stato_display }}
+      </div>
+      {% if scheda.note %}
+        <div class="col-12 mt-1">
+          <i class="bi bi-chat-left-text"></i>
+          <strong>Note:</strong> {{ scheda.note }}
+        </div>
+      {% endif %}
+    </div>
+  </div>
+</div>
+
+{# Operatori in turno #}
+<div class="card mb-3">
+  <div class="card-header bg-primary text-white">
+    <i class="bi bi-people"></i> Operatori in turno
+  </div>
+  <div class="card-body p-0">
+    {% if operatori_turno %}
+      <table class="table table-sm mb-0">
+        <thead class="table-light">
+          <tr>
+            <th>Postazione</th>
+            <th>Operatore</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for ot in operatori_turno %}
+            <tr>
+              <td>{{ ot.get_postazione_display }}</td>
+              <td>{{ ot.operatore.get_full_name|default:ot.operatore.username }}</td>
+            </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    {% else %}
+      <p class="text-muted small p-3 mb-0">Nessun operatore registrato per questo ordine.</p>
+    {% endif %}
+  </div>
+</div>
+
+{# Difetti #}
+{% if scheda.ha_difetti %}
+  <div class="card mb-3 border-danger">
+    <div class="card-header bg-danger text-white">
+      <i class="bi bi-exclamation-triangle"></i> Difetti rilevati ({{ scheda.num_difetti }})
+    </div>
+    <div class="card-body p-0">
+      <div class="table-responsive">
+        <table class="table table-sm align-middle mb-0">
+          <thead class="table-light">
+            <tr>
+              <th>Zona</th>
+              <th>Tipo difetto</th>
+              <th>Gravità</th>
+              <th>Postazione resp.</th>
+              <th>Azione correttiva</th>
+              <th>Note / Foto</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for difetto in difetti %}
+              <tr>
+                <td class="small">{{ difetto.zona_nome }}</td>
+                <td class="small">
+                  {{ difetto.tipo_difetto_nome }}
+                  {% if difetto.descrizione_altro %}
+                    <br><span class="text-muted">{{ difetto.descrizione_altro }}</span>
+                  {% endif %}
+                </td>
+                <td>
+                  {% if difetto.gravita == 'bassa' %}
+                    <span class="badge bg-success">Bassa</span>
+                  {% elif difetto.gravita == 'media' %}
+                    <span class="badge bg-warning text-dark">Media</span>
+                  {% else %}
+                    <span class="badge bg-danger">Alta</span>
+                  {% endif %}
+                </td>
+                <td class="small">{{ difetto.get_postazione_responsabile_display }}</td>
+                <td class="small">{{ difetto.get_azione_correttiva_display }}</td>
+                <td>
+                  {% if difetto.note %}<span class="small text-muted">{{ difetto.note }}</span>{% endif %}
+                  {% if difetto.foto %}
+                    <br><a href="{{ difetto.foto.url }}" target="_blank">
+                      <img src="{{ difetto.foto.url }}" alt="foto" class="img-thumbnail" style="max-height:50px;">
+                    </a>
+                  {% endif %}
+                </td>
+              </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+{% else %}
+  <div class="alert alert-success">
+    <i class="bi bi-check-circle"></i> Nessun difetto rilevato — esito OK.
+  </div>
+{% endif %}
+
+{# Punteggi generati — visibile solo a responsabile e titolare #}
+{% if request.user|in_group:"responsabile" or is_titolare %}
+  <div class="card mb-3">
+    <div class="card-header">
+      <i class="bi bi-trophy"></i> Punteggi generati da questa scheda
+    </div>
+    <div class="card-body p-0">
+      {% if punteggi %}
+        <table class="table table-sm align-middle mb-0">
+          <thead class="table-light">
+            <tr>
+              <th>Operatore</th>
+              <th class="text-center">Punti</th>
+              <th>Tipo</th>
+              <th>Motivazione</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for p in punteggi %}
+              <tr class="{% if p.punti > 0 %}table-success{% elif p.punti < 0 %}table-danger{% endif %}">
+                <td>{{ p.operatore.get_full_name|default:p.operatore.username }}</td>
+                <td class="text-center fw-bold">{{ p.punti|segno }}</td>
+                <td class="small">{{ p.get_tipo_display }}</td>
+                <td class="small text-muted">{{ p.motivazione }}</td>
+              </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      {% else %}
+        <p class="text-muted small p-3 mb-0">Nessun punteggio generato.</p>
+      {% endif %}
+    </div>
+  </div>
+{% endif %}
+{% endblock %}

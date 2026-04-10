@@ -49,6 +49,7 @@ INSTALLED_APPS = [
     'apps.prenotazioni',
     'apps.finanze',
     'apps.api',
+    'apps.cq',
     # 'apps.reportistica',  # Temporarily disabled due to pandas dependency
     # 'apps.shop',
 ]
@@ -81,6 +82,7 @@ TEMPLATES = [
                 'django.template.context_processors.request',
                 'django.contrib.auth.context_processors.auth',
                 'django.contrib.messages.context_processors.messages',
+                'apps.cq.context_processors.oggi',
             ],
         },
     },
@@ -132,6 +134,10 @@ STATICFILES_STORAGE = 'whitenoise.storage.CompressedManifestStaticFilesStorage'
 
 # Chiave primaria di default
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
+
+# Media files (foto difetti CQ)
+MEDIA_URL = '/media/'
+MEDIA_ROOT = os.path.join(BASE_DIR, 'media')
 
 # Crispy Forms
 CRISPY_ALLOWED_TEMPLATE_PACKS = "bootstrap5"

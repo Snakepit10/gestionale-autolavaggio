@@ -1,6 +1,7 @@
 {% extends 'base.html' %}
 {% load static %}
 {% load crispy_forms_tags %}
+{% load cq_tags %}
 
 {% block title %}Gestione Ordini - Gestionale Autolavaggio{% endblock %}
 
@@ -133,6 +134,7 @@
                                     <th>Pagamento</th>
                                     <th>Stato</th>
                                     <th>Ora di Consegna</th>
+                                    <th class="text-center">CQ</th>
                                 </tr>
                             </thead>
                     <tbody>
@@ -323,6 +325,25 @@
                                     </div>
                                 {% endif %}
                             </td>
+                            <td class="text-center">
+                                {% if ordine.scheda_cq %}
+                                    <a href="{% url 'cq:scheda_detail' ordine_pk=ordine.pk %}" class="text-decoration-none">
+                                        {% if ordine.scheda_cq.esito == 'ok' %}
+                                            <span class="badge bg-success"><i class="bi bi-check-circle"></i> OK</span>
+                                        {% else %}
+                                            <span class="badge bg-danger"><i class="bi bi-x-circle"></i> Non OK</span>
+                                        {% endif %}
+                                    </a>
+                                {% else %}
+                                    {% if request.user|can_compile_cq %}
+                                        <a href="{% url 'cq:scheda_crea' ordine_pk=ordine.pk %}" class="text-decoration-none">
+                                            <span class="badge bg-secondary"><i class="bi bi-clipboard2-plus"></i> Compila</span>
+                                        </a>
+                                    {% else %}
+                                        <span class="badge bg-light text-muted border">—</span>
+                                    {% endif %}
+                                {% endif %}
+                            </td>
                         </tr>
                         {% endfor %}
                     </tbody>
@@ -362,6 +383,7 @@
                                     <th>Stato</th>
                                     <th>Ora di Consegna</th>
                                     <th>Auto Ritirata</th>
+                                    <th class="text-center">CQ</th>
                                 </tr>
                             </thead>
                     <tbody>
@@ -537,6 +559,25 @@
                                            style="cursor: pointer; width: 3em; height: 1.5em;">
                                 </div>
                             </td>
+                            <td class="text-center">
+                                {% if ordine.scheda_cq %}
+                                    <a href="{% url 'cq:scheda_detail' ordine_pk=ordine.pk %}" class="text-decoration-none">
+                                        {% if ordine.scheda_cq.esito == 'ok' %}
+                                            <span class="badge bg-success"><i class="bi bi-check-circle"></i> OK</span>
+                                        {% else %}
+                                            <span class="badge bg-danger"><i class="bi bi-x-circle"></i> Non OK</span>
+                                        {% endif %}
+                                    </a>
+                                {% else %}
+                                    {% if request.user|can_compile_cq %}
+                                        <a href="{% url 'cq:scheda_crea' ordine_pk=ordine.pk %}" class="text-decoration-none">
+                                            <span class="badge bg-secondary"><i class="bi bi-clipboard2-plus"></i> Compila</span>
+                                        </a>
+                                    {% else %}
+                                        <span class="badge bg-light text-muted border">—</span>
+                                    {% endif %}
+                                {% endif %}
+                            </td>
                         </tr>
                         {% endfor %}
                     </tbody>
@@ -576,6 +617,7 @@
                                     <th>Stato</th>
                                     <th>Ora di Consegna</th>
                                     <th>Auto Ritirata</th>
+                                    <th class="text-center">CQ</th>
                                 </tr>
                             </thead>
                     <tbody>
@@ -751,6 +793,25 @@
                                     </div>
                                 {% else %}
                                     <span class="text-muted">-</span>
+                                {% endif %}
+                            </td>
+                            <td class="text-center">
+                                {% if ordine.scheda_cq %}
+                                    <a href="{% url 'cq:scheda_detail' ordine_pk=ordine.pk %}" class="text-decoration-none">
+                                        {% if ordine.scheda_cq.esito == 'ok' %}
+                                            <span class="badge bg-success"><i class="bi bi-check-circle"></i> OK</span>
+                                        {% else %}
+                                            <span class="badge bg-danger"><i class="bi bi-x-circle"></i> Non OK</span>
+                                        {% endif %}
+                                    </a>
+                                {% else %}
+                                    {% if request.user|can_compile_cq %}
+                                        <a href="{% url 'cq:scheda_crea' ordine_pk=ordine.pk %}" class="text-decoration-none">
+                                            <span class="badge bg-secondary"><i class="bi bi-clipboard2-plus"></i> Compila</span>
+                                        </a>
+                                    {% else %}
+                                        <span class="badge bg-light text-muted border">—</span>
+                                    {% endif %}
                                 {% endif %}
                             </td>
                         </tr>

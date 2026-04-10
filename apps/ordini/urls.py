@@ -35,4 +35,24 @@ urlpatterns = [
     # Stampa
     path('<int:pk>/stampa/', views.stampa_ordine, name='stampa-ordine'),
     path('stampa/scontrino/<str:numero>/', views.stampa_scontrino, name='stampa-scontrino'),
+
+    # Pianificazione Timeline
+    path('pianificazione/', views.PianificazioneView.as_view(), name='pianificazione'),
+    path('pianificazione/configurazione/',
+         views.ConfigurazionePianificazioneUpdateView.as_view(),
+         name='pianificazione-configurazione'),
+
+    # API Pianificazione
+    path('api/pianificazione/assegna/',
+         views.assegna_ordine_timeline,
+         name='assegna-ordine-timeline'),
+    path('api/pianificazione/rimuovi/',
+         views.rimuovi_ordine_timeline,
+         name='rimuovi-ordine-timeline'),
+    path('api/pianificazione/<int:pk>/modifica-durata/',
+         views.modifica_durata_ordine,
+         name='modifica-durata-ordine'),
+    path('api/pianificazione/<int:pk>/ricalcola-durata/',
+         views.ricalcola_durata_ordine,
+         name='ricalcola-durata-ordine'),
 ]

@@ -1,0 +1,1550 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}Pianificazione Ordini - Timeline{% endblock %}
+
+{% block extra_css %}
+<style>
+/* Layout principale */
+.pianificazione-container {
+    display: flex;
+    height: calc(100vh - 120px);
+    gap: 0;
+    background: #f8f9fa;
+}
+
+/* Header con controlli */
+.pianificazione-header {
+    background: white;
+    padding: 15px 20px;
+    border-bottom: 2px solid #dee2e6;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 15px;
+}
+
+.date-navigation {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+
+.date-navigation .btn {
+    padding: 8px 15px;
+}
+
+.current-date-display {
+    font-size: 1.1rem;
+    font-weight: 600;
+    color: #0d6efd;
+    min-width: 200px;
+    text-align: center;
+}
+
+/* Sidebar ordini non pianificati */
+.sidebar-ordini {
+    width: 380px;
+    background: #f8f9fa;
+    padding: 20px;
+    overflow-y: auto;
+    border-right: 2px solid #dee2e6;
+    flex-shrink: 0;
+}
+
+.sidebar-header {
+    font-size: 1.2rem;
+    font-weight: 600;
+    color: #212529;
+    margin-bottom: 15px;
+    padding-bottom: 10px;
+    border-bottom: 2px solid #0d6efd;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+/* Timeline area */
+.timeline-area {
+    flex: 1;
+    overflow: auto;
+    position: relative;
+    background: white;
+    transition: background 0.2s;
+}
+
+.timeline-area.drag-over {
+    background: #f8f9fa;
+    outline: 2px dashed #0d6efd;
+    outline-offset: -4px;
+}
+
+.timeline-grid {
+    position: relative;
+    min-height: 2200px; /* 11 ore * 200px/ora */
+    padding: 20px 20px 20px 100px;
+}
+
+/* Scala oraria */
+.timeline-hour-marker {
+    position: absolute;
+    left: 0;
+    right: 0;
+    height: 1px;
+    background: #dee2e6;
+    display: flex;
+    align-items: center;
+}
+
+.timeline-hour-label {
+    position: absolute;
+    left: 10px;
+    background: white;
+    padding: 2px 10px;
+    font-size: 14px;
+    font-weight: 600;
+    color: #6c757d;
+    border-radius: 4px;
+    transform: translateY(-50%);
+}
+
+/* Marker ogni 15 minuti (più leggero) */
+.timeline-quarter-marker {
+    position: absolute;
+    left: 80px;
+    right: 0;
+    height: 1px;
+    background: #e9ecef;
+}
+
+/* Linea ora corrente */
+.timeline-current-time {
+    position: absolute;
+    left: 0;
+    right: 0;
+    height: 3px;
+    background: #dc3545;
+    z-index: 100;
+    box-shadow: 0 0 8px rgba(220, 53, 69, 0.6);
+    transition: top 1s linear;
+}
+
+.timeline-current-time::before {
+    content: 'ORA';
+    position: absolute;
+    left: 10px;
+    top: -10px;
+    background: #dc3545;
+    color: white;
+    padding: 2px 8px;
+    border-radius: 4px;
+    font-size: 11px;
+    font-weight: bold;
+}
+
+.timeline-current-time::after {
+    content: '';
+    position: absolute;
+    left: 80px;
+    top: -4px;
+    width: 0;
+    height: 0;
+    border-left: 10px solid #dc3545;
+    border-top: 5px solid transparent;
+    border-bottom: 5px solid transparent;
+}
+
+/* Pausa pranzo */
+.timeline-pausa {
+    position: absolute;
+    left: 80px;
+    right: 0;
+    background: repeating-linear-gradient(
+        45deg,
+        #f8f9fa,
+        #f8f9fa 10px,
+        #e9ecef 10px,
+        #e9ecef 20px
+    );
+    border-top: 2px solid #adb5bd;
+    border-bottom: 2px solid #adb5bd;
+    pointer-events: none;
+    z-index: 50;
+    opacity: 0.8;
+}
+
+.timeline-pausa-label {
+    position: absolute;
+    left: 50%;
+    top: 50%;
+    transform: translate(-50%, -50%);
+    background: rgba(108, 117, 125, 0.9);
+    color: white;
+    padding: 5px 15px;
+    border-radius: 20px;
+    font-size: 13px;
+    font-weight: 600;
+}
+
+/* Order cards nella sidebar */
+.order-card {
+    background: white;
+    border: 2px solid #dee2e6;
+    border-radius: 8px;
+    padding: 12px;
+    margin-bottom: 12px;
+    cursor: grab;
+    transition: all 0.2s;
+    user-select: none;
+}
+
+.order-card:hover {
+    box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+    transform: translateY(-2px);
+    border-color: #0d6efd;
+    background: #f8f9fa;
+}
+
+.order-card:active {
+    cursor: grabbing;
+}
+
+.order-card.dragging {
+    opacity: 0.4;
+    transform: scale(0.95);
+    cursor: grabbing;
+}
+
+.order-card-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 8px;
+}
+
+.order-card-header-actions {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.order-card-numero {
+    font-size: 18px;
+    font-weight: bold;
+    color: #0d6efd;
+}
+
+.order-card-durata {
+    background: #e7f3ff;
+    color: #0d6efd;
+    padding: 3px 10px;
+    border-radius: 12px;
+    font-size: 12px;
+    font-weight: 600;
+    display: flex;
+    align-items: center;
+    gap: 4px;
+}
+
+.order-card-remove-btn {
+    background: transparent;
+    border: none;
+    color: #dc3545;
+    padding: 4px;
+    cursor: pointer;
+    opacity: 0.6;
+    transition: all 0.2s;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.order-card-remove-btn:hover {
+    opacity: 1;
+    transform: scale(1.2);
+}
+
+.order-card-remove-btn i {
+    font-size: 14px;
+}
+
+.order-card-durata.modificata {
+    background: #fff3cd;
+    color: #856404;
+    border: 1px solid #ffc107;
+}
+
+.order-card-cliente {
+    font-size: 14px;
+    color: #495057;
+    margin-bottom: 6px;
+    font-weight: 500;
+}
+
+.order-card-servizi {
+    font-size: 12px;
+    color: #6c757d;
+    margin-bottom: 8px;
+    line-height: 1.4;
+}
+
+.order-card-info {
+    font-size: 12px;
+    color: #495057;
+    margin-bottom: 4px;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+}
+
+.order-card-info i {
+    color: #6c757d;
+}
+
+.order-card-note {
+    font-size: 11px;
+    color: #856404;
+    background: #fff3cd;
+    padding: 4px 8px;
+    border-radius: 4px;
+    margin-bottom: 8px;
+    display: flex;
+    align-items: start;
+    gap: 6px;
+}
+
+.order-card-note i {
+    margin-top: 2px;
+}
+
+.order-card-footer {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-top: 8px;
+    padding-top: 8px;
+    border-top: 1px solid #e9ecef;
+}
+
+/* Blocchi ordini sulla timeline */
+.timeline-order-block {
+    position: absolute;
+    left: 0;
+    right: 20px;
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    border-radius: 8px;
+    padding: 12px;
+    color: white;
+    cursor: move;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.2);
+    transition: all 0.2s;
+    border-left: 4px solid rgba(255,255,255,0.6);
+    overflow: hidden;
+}
+
+.timeline-order-block:hover {
+    box-shadow: 0 4px 16px rgba(0,0,0,0.3);
+    transform: translateX(4px);
+    z-index: 10;
+}
+
+.timeline-order-block.dragging-timeline {
+    opacity: 0.6;
+    cursor: grabbing;
+    z-index: 1000;
+}
+
+.timeline-order-block.has-conflict {
+    border: 3px solid #dc3545 !important;
+    animation: shake 0.3s;
+}
+
+@keyframes shake {
+    0%, 100% { transform: translateX(0); }
+    25% { transform: translateX(-5px); }
+    75% { transform: translateX(5px); }
+}
+
+.timeline-order-block.in_attesa {
+    background: linear-gradient(135deg, #4facfe 0%, #00f2fe 100%);
+}
+
+.timeline-order-block.in_lavorazione {
+    background: linear-gradient(135deg, #fa709a 0%, #fee140 100%);
+    color: #000;
+}
+
+.timeline-order-block.sovrapposizione {
+    border: 3px solid #dc3545;
+    animation: pulse-red 2s infinite;
+}
+
+@keyframes pulse-red {
+    0%, 100% { border-color: #dc3545; }
+    50% { border-color: #ff6b6b; }
+}
+
+.timeline-order-block-header {
+    font-weight: bold;
+    font-size: 15px;
+    margin-bottom: 6px;
+    display: flex;
+    justify-content: space-between;
+    align-items: start;
+    gap: 8px;
+}
+
+.timeline-order-drag-handle {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    cursor: grab;
+    user-select: none;
+}
+
+.timeline-order-drag-handle:active {
+    cursor: grabbing;
+}
+
+.timeline-order-drag-handle .bi-grip-vertical {
+    opacity: 0.6;
+    font-size: 14px;
+}
+
+.timeline-order-drag-handle:hover .bi-grip-vertical {
+    opacity: 1;
+}
+
+.timeline-order-time {
+    font-size: 12px;
+    font-weight: normal;
+    opacity: 0.9;
+    margin-left: 4px;
+}
+
+.timeline-order-actions {
+    display: flex;
+    gap: 4px;
+}
+
+.timeline-order-block-btn {
+    background: rgba(255,255,255,0.3);
+    border: none;
+    color: white;
+    padding: 3px 8px;
+    border-radius: 4px;
+    font-size: 13px;
+    cursor: pointer;
+    transition: background 0.2s;
+}
+
+.timeline-order-block-btn:hover {
+    background: rgba(255,255,255,0.5);
+}
+
+.timeline-order-block.in_lavorazione .timeline-order-block-btn {
+    color: #000;
+    background: rgba(0,0,0,0.1);
+}
+
+.timeline-order-block.in_lavorazione .timeline-order-block-btn:hover {
+    background: rgba(0,0,0,0.2);
+}
+
+.timeline-order-block-cliente {
+    font-size: 13px;
+    opacity: 0.9;
+    margin-bottom: 4px;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+}
+
+.timeline-order-block-auto {
+    font-size: 11px;
+    opacity: 0.85;
+    margin-bottom: 4px;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+}
+
+.timeline-order-block-servizi {
+    font-size: 11px;
+    opacity: 0.85;
+    margin-bottom: 6px;
+    line-height: 1.4;
+}
+
+.timeline-order-block-note {
+    font-size: 10px;
+    background: rgba(255,255,255,0.2);
+    padding: 4px 8px;
+    border-radius: 4px;
+    margin-bottom: 6px;
+    display: flex;
+    align-items: start;
+    gap: 4px;
+    line-height: 1.3;
+}
+
+.timeline-order-block.in_lavorazione .timeline-order-block-note {
+    background: rgba(0,0,0,0.1);
+}
+
+.timeline-order-block-footer {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    font-size: 11px;
+    opacity: 0.95;
+    border-top: 1px solid rgba(255,255,255,0.3);
+    padding-top: 8px;
+    margin-top: auto;
+}
+
+.timeline-order-block.in_lavorazione .timeline-order-block-footer {
+    border-top-color: rgba(0,0,0,0.2);
+}
+
+.timeline-order-duration {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+}
+
+.timeline-order-block-footer .badge {
+    font-size: 9px;
+    padding: 3px 6px;
+    opacity: 1;
+}
+
+.badge-sm {
+    font-size: 10px;
+    padding: 3px 8px;
+}
+
+.bg-in_attesa {
+    background: rgba(255,255,255,0.3);
+}
+
+.bg-in_lavorazione {
+    background: rgba(0,0,0,0.3);
+}
+
+/* Drag preview */
+.timeline-drag-preview {
+    position: absolute;
+    left: 0;
+    right: 20px;
+    background: rgba(13, 110, 253, 0.15);
+    border: 2px solid #0d6efd;
+    border-radius: 6px;
+    pointer-events: none;
+    z-index: 1000;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: #0d6efd;
+    font-weight: 600;
+    box-shadow: 0 2px 8px rgba(13, 110, 253, 0.3);
+    backdrop-filter: blur(2px);
+    transition: top 0.1s ease-out, height 0.1s ease-out;
+}
+
+/* Stati badge */
+.badge.stato-in_attesa {
+    background: #0dcaf0;
+}
+
+.badge.stato-in_lavorazione {
+    background: #ffc107;
+    color: #000;
+}
+
+/* Empty state */
+.empty-state {
+    text-align: center;
+    padding: 40px 20px;
+    color: #6c757d;
+}
+
+.empty-state i {
+    font-size: 48px;
+    margin-bottom: 15px;
+    opacity: 0.5;
+}
+
+/* Responsive */
+@media (max-width: 768px) {
+    .pianificazione-container {
+        flex-direction: column;
+        height: auto;
+    }
+
+    .sidebar-ordini {
+        width: 100%;
+        max-height: 300px;
+    }
+
+    .timeline-grid {
+        padding-left: 60px;
+    }
+
+    .timeline-hour-label {
+        font-size: 11px;
+        padding: 2px 6px;
+    }
+}
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="pianificazione-header">
+    <div class="date-navigation">
+        <a href="?data={{ data_precedente|date:'Y-m-d' }}"
+           class="btn btn-outline-secondary">
+            <i class="bi bi-chevron-left"></i>
+        </a>
+
+        <div class="current-date-display">
+            {{ data_selezionata|date:"l d F Y" }}
+        </div>
+
+        <a href="?data={{ data_successiva|date:'Y-m-d' }}"
+           class="btn btn-outline-secondary">
+            <i class="bi bi-chevron-right"></i>
+        </a>
+
+        <a href="{% url 'ordini:pianificazione' %}" class="btn btn-primary">
+            <i class="bi bi-calendar-today"></i> Oggi
+        </a>
+    </div>
+
+    <div class="d-flex gap-2">
+        <a href="{% url 'ordini:pianificazione-configurazione' %}" class="btn btn-outline-primary">
+            <i class="bi bi-gear"></i> Configurazione
+        </a>
+
+        <a href="{% url 'ordini:ordini-list' %}" class="btn btn-outline-secondary">
+            <i class="bi bi-list"></i> Lista Ordini
+        </a>
+    </div>
+</div>
+
+<div class="pianificazione-container">
+    <!-- Sidebar: Ordini non pianificati -->
+    <div class="sidebar-ordini">
+        <div class="sidebar-header">
+            <div>
+                <i class="bi bi-inbox"></i> Ordini da Pianificare
+                <span class="badge bg-primary ms-2">{{ ordini_non_pianificati.count }}</span>
+            </div>
+            <button class="btn btn-sm btn-outline-secondary" onclick="resetOrdiniNascosti()" title="Ripristina ordini nascosti">
+                <i class="bi bi-arrow-clockwise"></i>
+            </button>
+        </div>
+
+        {% if ordini_non_pianificati %}
+            {% for ordine in ordini_non_pianificati %}
+            <div class="order-card"
+                 draggable="true"
+                 data-ordine-id="{{ ordine.id }}"
+                 data-durata="{{ ordine.durata_stimata_minuti }}"
+                 ondragstart="dragStart(event)">
+
+                <div class="order-card-header">
+                    <div class="order-card-numero">#{{ ordine.numero_breve }}</div>
+                    <div class="order-card-header-actions">
+                        <div class="order-card-durata {% if ordine.durata_modificata_manualmente %}modificata{% endif %}">
+                            <i class="bi bi-clock"></i> {{ ordine.durata_stimata_minuti }} min
+                            {% if ordine.durata_modificata_manualmente %}
+                            <i class="bi bi-pencil-fill" title="Durata modificata manualmente"></i>
+                            {% endif %}
+                        </div>
+                        <button class="order-card-remove-btn"
+                                onclick="event.stopPropagation(); nascondiOrdineDaPianificazione({{ ordine.id }})"
+                                title="Nascondi ordine">
+                            <i class="bi bi-x-lg"></i>
+                        </button>
+                    </div>
+                </div>
+
+                <div class="order-card-cliente">
+                    <i class="bi bi-person"></i>
+                    {% if ordine.cliente %}
+                        {{ ordine.cliente.nome }} {{ ordine.cliente.cognome }}
+                    {% else %}
+                        Cliente Anonimo
+                    {% endif %}
+                </div>
+
+                <div class="order-card-servizi">
+                    {% for item in ordine.items.all %}
+                        {% if item.servizio_prodotto.tipo == 'servizio' %}
+                        <div>• {{ item.servizio_prodotto.titolo }} x{{ item.quantita }}</div>
+                        {% endif %}
+                    {% endfor %}
+                </div>
+
+                {% if ordine.tipo_auto %}
+                <div class="order-card-info">
+                    <i class="bi bi-car-front"></i>
+                    <small>{{ ordine.tipo_auto }}</small>
+                </div>
+                {% endif %}
+
+                {% if ordine.ora_consegna_richiesta %}
+                <div class="order-card-info">
+                    <i class="bi bi-alarm"></i>
+                    <small>Richiesta: {{ ordine.ora_consegna_richiesta|date:"H:i" }}</small>
+                </div>
+                {% endif %}
+
+                {% if ordine.nota %}
+                <div class="order-card-note">
+                    <i class="bi bi-sticky"></i>
+                    <small>{{ ordine.nota|truncatewords:10 }}</small>
+                </div>
+                {% endif %}
+
+                <div class="order-card-footer">
+                    <span class="badge stato-{{ ordine.stato }}">{{ ordine.get_stato_display }}</span>
+                    <small class="text-muted">{{ ordine.data_ora|date:"H:i" }}</small>
+                </div>
+            </div>
+            {% endfor %}
+        {% else %}
+            <div class="empty-state">
+                <i class="bi bi-check-circle"></i>
+                <p>Tutti gli ordini sono pianificati!</p>
+            </div>
+        {% endif %}
+    </div>
+
+    <!-- Timeline principale -->
+    <div class="timeline-area" id="timelineArea">
+        <div class="timeline-grid" id="timelineGrid">
+            <!-- Marker orari (generati da JavaScript) -->
+            <div id="timeline-markers"></div>
+
+            <!-- Pausa pranzo -->
+            {% if configurazione.pausa_pranzo_attiva %}
+            <div class="timeline-pausa" id="pausaPranzo" style="display: none;">
+                <div class="timeline-pausa-label">
+                    <i class="bi bi-cup-hot"></i> PAUSA PRANZO
+                </div>
+            </div>
+            {% endif %}
+
+            <!-- Linea ora corrente -->
+            <div class="timeline-current-time" id="currentTimeLine" style="display: none;"></div>
+
+            <!-- Ordini pianificati -->
+            {% for ordine in ordini_pianificati %}
+            <div class="timeline-order-block {{ ordine.stato }} {% if ordine.id in sovrapposizioni %}sovrapposizione{% endif %}"
+                 data-ordine-id="{{ ordine.id }}"
+                 data-ora-inizio="{{ ordine.ora_consegna_prevista|date:'c' }}"
+                 data-ora-fine="{{ ordine.ora_fine_prevista|date:'c' }}"
+                 data-durata="{{ ordine.durata_stimata_minuti }}"
+                 draggable="true"
+                 ondragstart="dragStartTimeline(event)"
+                 ondragend="dragEndTimeline(event)"
+                 style="display: none;">
+
+                <div class="timeline-order-block-header">
+                    <div class="timeline-order-drag-handle" title="Trascina per spostare">
+                        <i class="bi bi-grip-vertical"></i>
+                        <strong>#{{ ordine.numero_breve }}</strong>
+                        <span class="timeline-order-time">
+                            {{ ordine.ora_consegna_prevista|date:"H:i" }} → {{ ordine.ora_fine_prevista|date:"H:i" }}
+                        </span>
+                    </div>
+                    <div class="timeline-order-actions">
+                        <button class="timeline-order-block-btn"
+                                draggable="false"
+                                onclick="event.stopPropagation(); apriModalModificaDurata({{ ordine.id }})"
+                                title="Modifica durata">
+                            <i class="bi bi-clock"></i>
+                        </button>
+                        <button class="timeline-order-block-btn"
+                                draggable="false"
+                                onclick="event.stopPropagation(); apriModalCambioStato({{ ordine.id }}, '{{ ordine.stato }}')"
+                                title="Cambia stato">
+                            <i class="bi bi-arrow-repeat"></i>
+                        </button>
+                        <button class="timeline-order-block-btn"
+                                draggable="false"
+                                onclick="event.stopPropagation(); rimuoviOrdineDaTimeline({{ ordine.id }})"
+                                title="Rimuovi dalla pianificazione">
+                            <i class="bi bi-x"></i>
+                        </button>
+                    </div>
+                </div>
+
+                <div class="timeline-order-block-cliente">
+                    <i class="bi bi-person-circle"></i>
+                    {% if ordine.cliente %}
+                        {{ ordine.cliente.nome }} {{ ordine.cliente.cognome }}
+                    {% else %}
+                        Cliente Anonimo
+                    {% endif %}
+                </div>
+
+                {% if ordine.tipo_auto %}
+                <div class="timeline-order-block-auto">
+                    <i class="bi bi-car-front"></i> {{ ordine.tipo_auto }}
+                </div>
+                {% endif %}
+
+                <div class="timeline-order-block-servizi">
+                    {% for item in ordine.items.all %}
+                        {% if item.servizio_prodotto.tipo == 'servizio' %}
+                        <div>• {{ item.servizio_prodotto.titolo }}{% if item.quantita > 1 %} x{{ item.quantita }}{% endif %}</div>
+                        {% endif %}
+                    {% endfor %}
+                </div>
+
+                {% if ordine.nota %}
+                <div class="timeline-order-block-note">
+                    <i class="bi bi-sticky"></i> {{ ordine.nota|truncatewords:8 }}
+                </div>
+                {% endif %}
+
+                <div class="timeline-order-block-footer">
+                    <span class="timeline-order-duration">
+                        <i class="bi bi-clock"></i> {{ ordine.durata_stimata_minuti }} min
+                    </span>
+                    <span class="badge badge-sm bg-{{ ordine.stato }}">{{ ordine.get_stato_display }}</span>
+                </div>
+            </div>
+            {% endfor %}
+
+            <!-- Preview drag -->
+            <div class="timeline-drag-preview" id="dragPreview" style="display: none;">
+                Drop qui
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Modal Modifica Durata -->
+<div class="modal fade" id="modalModificaDurata" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Modifica Durata Ordine</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <p>
+                    <strong>Ordine:</strong> <span id="modal-ordine-numero"></span><br>
+                    <strong>Durata Calcolata:</strong> <span id="modal-durata-calcolata"></span> minuti
+                </p>
+
+                <div class="mb-3">
+                    <label class="form-label">Nuova Durata (minuti)</label>
+                    <input type="number" class="form-control" id="input-nuova-durata" min="5" step="5">
+                    <small class="text-muted">Modifica se l'auto richiede più tempo del previsto</small>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" onclick="ricalcolaDurataAutomatica()">
+                    <i class="bi bi-arrow-clockwise"></i> Ricalcola Automaticamente
+                </button>
+                <button type="button" class="btn btn-primary" onclick="salvaNuovaDurata()">
+                    Salva
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Modal Cambio Stato Ordine -->
+<div class="modal fade" id="modalCambioStato" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">
+                    <i class="bi bi-arrow-left-right"></i>
+                    Cambia Stato Ordine
+                </h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <form id="form-cambio-stato">
+                <div class="modal-body">
+                    {% csrf_token %}
+                    <input type="hidden" id="cambio-stato-ordine-id">
+
+                    <p class="mb-3">
+                        <strong>Ordine:</strong> <span id="cambio-stato-ordine-numero"></span>
+                    </p>
+
+                    <div class="mb-3">
+                        <label class="form-label fw-bold">Nuovo Stato:</label>
+                        <select class="form-select" id="cambio-stato-select" required>
+                            <option value="">Seleziona stato...</option>
+                            <option value="in_attesa">In Attesa</option>
+                            <option value="in_lavorazione">In Lavorazione</option>
+                            <option value="completato">Completato</option>
+                            <option value="annullato">Annullato</option>
+                        </select>
+                    </div>
+
+                    <div class="alert alert-info">
+                        <small>
+                            <i class="bi bi-info-circle"></i>
+                            Il cambio stato aggiornerà automaticamente lo stato dei servizi associati.
+                        </small>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">
+                        <i class="bi bi-x-circle"></i> Annulla
+                    </button>
+                    <button type="submit" class="btn btn-primary">
+                        <i class="bi bi-check-circle"></i> Cambia Stato
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<script>
+// Variabili globali
+let draggedOrderId = null;
+let draggedOrderDurata = 0;
+let currentOrdineId = null;
+let isDraggingFromTimeline = false;
+
+// Configurazione
+const PIXELS_PER_HOUR = 200; // 200 pixels per ora (vedi CSS min-height e generaMarkerOrari)
+const PIXELS_PER_MINUTE = PIXELS_PER_HOUR / 60; // 3.333... pixels per minuto
+const TIMELINE_PADDING_TOP = 20; // padding-top della timeline-grid
+const ORA_INIZIO = new Date('{{ ora_inizio_timeline|date:"c" }}');
+const ORA_FINE = new Date('{{ ora_fine_timeline|date:"c" }}');
+const PAUSA_ATTIVA = {{ configurazione.pausa_pranzo_attiva|yesno:"true,false" }};
+const ORA_INIZIO_PAUSA = new Date('{{ ora_inizio_timeline|date:"Y-m-d" }}T{{ configurazione.ora_inizio_pausa|date:"H:i" }}:00{{ ora_inizio_timeline|date:"P" }}');
+const ORA_FINE_PAUSA = new Date('{{ ora_inizio_timeline|date:"Y-m-d" }}T{{ configurazione.ora_fine_pausa|date:"H:i" }}:00{{ ora_inizio_timeline|date:"P" }}');
+
+// Funzioni drag & drop da sidebar
+function dragStart(event) {
+    const card = event.target.closest('.order-card');
+    if (!card) return;
+
+    draggedOrderId = card.dataset.ordineId;
+    draggedOrderDurata = parseInt(card.dataset.durata);
+    isDraggingFromTimeline = false;
+    card.classList.add('dragging');
+    event.dataTransfer.effectAllowed = 'move';
+
+    console.log('🟢 Drag START:', { ordineId: draggedOrderId, durata: draggedOrderDurata });
+}
+
+// Drag end da sidebar
+document.addEventListener('dragend', function(event) {
+    if (event.target.classList.contains('order-card')) {
+        event.target.classList.remove('dragging');
+        console.log('🔴 Drag END sidebar');
+    }
+});
+
+// Funzioni drag & drop da timeline
+function dragStartTimeline(event) {
+    const block = event.currentTarget;
+
+    // Controlla se il click è sul drag handle o suoi figli
+    const dragHandle = block.querySelector('.timeline-order-drag-handle');
+    const clickedElement = event.target;
+
+    // Se non si clicca sul drag handle o suoi discendenti, previeni il drag
+    if (!dragHandle.contains(clickedElement)) {
+        event.preventDefault();
+        return false;
+    }
+
+    draggedOrderId = block.dataset.ordineId;
+    draggedOrderDurata = parseInt(block.dataset.durata);
+    isDraggingFromTimeline = true;
+    block.classList.add('dragging-timeline');
+    event.dataTransfer.effectAllowed = 'move';
+
+    // Imposta un'immagine drag trasparente per vedere il preview
+    const img = new Image();
+    img.src = 'data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7';
+    event.dataTransfer.setDragImage(img, 0, 0);
+}
+
+function dragEndTimeline(event) {
+    event.currentTarget.classList.remove('dragging-timeline');
+    isDraggingFromTimeline = false;
+}
+
+function setupTimelineDragAndDrop() {
+    const timelineGrid = document.getElementById('timelineGrid');
+    const timelineArea = document.getElementById('timelineArea');
+
+    // Dragenter - evidenzia area
+    timelineArea.addEventListener('dragenter', function(event) {
+        event.preventDefault();
+        timelineArea.classList.add('drag-over');
+    });
+
+    // Dragover - mostra preview
+    timelineGrid.addEventListener('dragover', function(event) {
+        event.preventDefault();
+        event.dataTransfer.dropEffect = 'move';
+
+        const oraCalcolata = getTimeFromMousePosition(event);
+        if (oraCalcolata) {
+            mostraPreviewOrdine(oraCalcolata, draggedOrderDurata);
+        }
+    });
+
+    // Dragleave - nascondi preview
+    timelineArea.addEventListener('dragleave', function(event) {
+        // Solo se usciamo dall'area timeline completamente
+        const rect = timelineArea.getBoundingClientRect();
+        const x = event.clientX;
+        const y = event.clientY;
+
+        if (x < rect.left || x >= rect.right || y < rect.top || y >= rect.bottom) {
+            nascondiPreview();
+            timelineArea.classList.remove('drag-over');
+        }
+    });
+
+    // Drop - posiziona ordine
+    timelineGrid.addEventListener('drop', function(event) {
+        event.preventDefault();
+        console.log('📍 DROP sulla timeline!', { x: event.clientX, y: event.clientY });
+
+        nascondiPreview();
+        timelineArea.classList.remove('drag-over');
+
+        const oraConsegna = getTimeFromMousePosition(event);
+        console.log('⏰ Ora calcolata:', oraConsegna);
+
+        if (!oraConsegna) {
+            console.log('❌ Ora non valida');
+            pulisciDragState();
+            return;
+        }
+
+        // Valida: non nel passato
+        if (oraConsegna < new Date()) {
+            alert('Non puoi pianificare nel passato');
+            pulisciDragState();
+            return;
+        }
+
+        // Calcola ora fine
+        const oraFine = new Date(oraConsegna.getTime() + draggedOrderDurata * 60000);
+
+        // Valida sovrapposizioni lato client
+        const conflitto = verificaSovrapposizioni(draggedOrderId, oraConsegna, oraFine);
+        if (conflitto) {
+            if (!confirm(`ATTENZIONE: L'ordine si sovrappone con l'ordine #${conflitto}.\n\nVuoi comunque procedere?`)) {
+                pulisciDragState();
+                return;
+            }
+        }
+
+        console.log('✅ Assegnazione ordine:', { ordineId: draggedOrderId, ora: oraConsegna.toISOString() });
+
+        // Chiama backend
+        assegnaOrdineTimeline(draggedOrderId, oraConsegna);
+        pulisciDragState();
+    });
+}
+
+// Calcola l'ora dalla posizione del mouse
+function getTimeFromMousePosition(event) {
+    const timelineArea = document.getElementById('timelineArea');
+    const timelineGrid = document.getElementById('timelineGrid');
+
+    const gridRect = timelineGrid.getBoundingClientRect();
+    const scrollTop = timelineArea.scrollTop;
+
+    // Posizione Y relativa alla timeline grid (considerando scroll e padding)
+    const relativeY = event.clientY - gridRect.top + scrollTop - TIMELINE_PADDING_TOP;
+
+    console.log('🔢 Calcolo posizione:', {
+        clientY: event.clientY,
+        gridTop: gridRect.top,
+        scrollTop: scrollTop,
+        relativeY: relativeY
+    });
+
+    // Converti in ora
+    const oraConsegna = calcolaOraFromPosition(relativeY);
+
+    return oraConsegna;
+}
+
+function pulisciDragState() {
+    document.querySelectorAll('.dragging').forEach(el => el.classList.remove('dragging'));
+    document.querySelectorAll('.dragging-timeline').forEach(el => el.classList.remove('dragging-timeline'));
+    document.getElementById('timelineArea').classList.remove('drag-over');
+    nascondiPreview();
+    draggedOrderId = null;
+    draggedOrderDurata = 0;
+    isDraggingFromTimeline = false;
+}
+
+function verificaSovrapposizioni(ordineId, oraInizio, oraFine) {
+    const blocchi = document.querySelectorAll('.timeline-order-block');
+
+    for (const blocco of blocchi) {
+        const altroOrdineId = blocco.dataset.ordineId;
+
+        // Salta l'ordine corrente (caso spostamento)
+        if (altroOrdineId === ordineId) {
+            continue;
+        }
+
+        const altroInizio = new Date(blocco.dataset.oraInizio);
+        const altroFine = new Date(blocco.dataset.oraFine);
+
+        // Check sovrapposizione
+        if (oraInizio < altroFine && oraFine > altroInizio) {
+            // Trova numero ordine per mostrare messaggio
+            const numeroMatch = blocco.querySelector('strong');
+            return numeroMatch ? numeroMatch.textContent.replace('#', '') : altroOrdineId;
+        }
+    }
+
+    return null;
+}
+
+function calcolaOraFromPosition(pixelY) {
+    const minutiFromStart = pixelY / PIXELS_PER_MINUTE;
+    const oraConsegna = new Date(ORA_INIZIO.getTime() + minutiFromStart * 60000);
+
+    // Arrotonda ai 5 minuti
+    const minuti = oraConsegna.getMinutes();
+    const minutiArrotondati = Math.round(minuti / 5) * 5;
+    oraConsegna.setMinutes(minutiArrotondati);
+    oraConsegna.setSeconds(0);
+
+    return oraConsegna;
+}
+
+function calcolaPositionFromOra(ora) {
+    const minutiFromStart = (ora - ORA_INIZIO) / 60000;
+    // Aggiungi padding-top per posizionare correttamente rispetto alla griglia
+    return (minutiFromStart * PIXELS_PER_MINUTE) + TIMELINE_PADDING_TOP;
+}
+
+function mostraPreviewOrdine(oraInizio, durata) {
+    if (!oraInizio || !durata) {
+        console.log('⚠️ Preview non mostrato: dati mancanti', { oraInizio, durata });
+        return;
+    }
+
+    const preview = document.getElementById('dragPreview');
+    const topPixels = calcolaPositionFromOra(oraInizio);
+    const heightPixels = durata * PIXELS_PER_MINUTE;
+
+    preview.style.display = 'block';
+    preview.style.top = topPixels + 'px';
+    preview.style.height = heightPixels + 'px';
+
+    // Mostra orario nel preview
+    const oraInizioStr = oraInizio.getHours().toString().padStart(2, '0') + ':' +
+                         oraInizio.getMinutes().toString().padStart(2, '0');
+    const oraFine = new Date(oraInizio.getTime() + durata * 60000);
+    const oraFineStr = oraFine.getHours().toString().padStart(2, '0') + ':' +
+                       oraFine.getMinutes().toString().padStart(2, '0');
+
+    preview.innerHTML = `<div style="text-align: center; font-size: 13px;">
+        <div><i class="bi bi-clock"></i> ${oraInizioStr} - ${oraFineStr}</div>
+        <div style="font-size: 11px; opacity: 0.8; margin-top: 4px;">${durata} min</div>
+    </div>`;
+
+    console.log('👁️ Preview mostrato:', { ora: oraInizioStr, top: topPixels, height: heightPixels });
+}
+
+function nascondiPreview() {
+    const preview = document.getElementById('dragPreview');
+    preview.style.display = 'none';
+    preview.innerHTML = '';
+}
+
+// API calls
+function assegnaOrdineTimeline(ordineId, oraConsegna) {
+    fetch('{% url "ordini:assegna-ordine-timeline" %}', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+            'X-CSRFToken': getCookie('csrftoken')
+        },
+        body: JSON.stringify({
+            ordine_id: ordineId,
+            ora_consegna: oraConsegna.toISOString()
+        })
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            location.reload();
+        } else {
+            if (data.conflitto) {
+                // Evidenzia visivamente il conflitto
+                evidenziaConflitto(data.ordine_conflitto);
+                alert('❌ ' + data.error + '\n\nNon è possibile sovrapporre gli ordini.');
+            } else {
+                alert('Errore: ' + data.error);
+            }
+        }
+    })
+    .catch(error => {
+        console.error('Error:', error);
+        alert('Errore di connessione');
+    });
+}
+
+function evidenziaConflitto(numeroOrdine) {
+    // Trova e evidenzia il blocco in conflitto
+    document.querySelectorAll('.timeline-order-block').forEach(blocco => {
+        const strong = blocco.querySelector('strong');
+        if (strong && strong.textContent === '#' + numeroOrdine) {
+            blocco.classList.add('has-conflict');
+            setTimeout(() => {
+                blocco.classList.remove('has-conflict');
+            }, 2000);
+        }
+    });
+}
+
+function rimuoviOrdineDaTimeline(ordineId) {
+    if (!confirm('Rimuovere l\'ordine dalla pianificazione?')) {
+        return;
+    }
+
+    fetch('{% url "ordini:rimuovi-ordine-timeline" %}', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+            'X-CSRFToken': getCookie('csrftoken')
+        },
+        body: JSON.stringify({
+            ordine_id: ordineId
+        })
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            location.reload();
+        } else {
+            alert('Errore: ' + data.error);
+        }
+    });
+}
+
+function apriModalModificaDurata(ordineId) {
+    currentOrdineId = ordineId;
+
+    // Carica dati ordine
+    fetch(`/ordini/${ordineId}/dettaglio/`)
+        .then(response => response.json())
+        .then(ordine => {
+            document.getElementById('modal-ordine-numero').textContent = '#' + ordine.numero_breve;
+            document.getElementById('modal-durata-calcolata').textContent = ordine.durata_stimata_minuti;
+            document.getElementById('input-nuova-durata').value = ordine.durata_stimata_minuti;
+
+            const modal = new bootstrap.Modal(document.getElementById('modalModificaDurata'));
+            modal.show();
+        })
+        .catch(error => {
+            console.error('Error:', error);
+            alert('Errore nel caricamento dei dati');
+        });
+}
+
+function salvaNuovaDurata() {
+    const nuovaDurata = parseInt(document.getElementById('input-nuova-durata').value);
+
+    if (!nuovaDurata || nuovaDurata < 5) {
+        alert('Durata non valida');
+        return;
+    }
+
+    fetch(`/ordini/api/pianificazione/${currentOrdineId}/modifica-durata/`, {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+            'X-CSRFToken': getCookie('csrftoken')
+        },
+        body: JSON.stringify({ durata_minuti: nuovaDurata })
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            bootstrap.Modal.getInstance(document.getElementById('modalModificaDurata')).hide();
+            location.reload();
+        } else {
+            alert('Errore: ' + data.error);
+        }
+    });
+}
+
+function ricalcolaDurataAutomatica() {
+    if (!confirm('Ricalcolare la durata dai servizi? Le modifiche manuali andranno perse.')) {
+        return;
+    }
+
+    fetch(`/ordini/api/pianificazione/${currentOrdineId}/ricalcola-durata/`, {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+            'X-CSRFToken': getCookie('csrftoken')
+        }
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            bootstrap.Modal.getInstance(document.getElementById('modalModificaDurata')).hide();
+            location.reload();
+        }
+    });
+}
+
+// Cambio stato ordine
+function apriModalCambioStato(ordineId, statoAttuale) {
+    // Carica dati ordine
+    fetch(`/ordini/${ordineId}/dettaglio/`)
+        .then(response => response.json())
+        .then(ordine => {
+            document.getElementById('cambio-stato-ordine-id').value = ordineId;
+            document.getElementById('cambio-stato-ordine-numero').textContent = '#' + ordine.numero_breve;
+            document.getElementById('cambio-stato-select').value = statoAttuale;
+
+            const modal = new bootstrap.Modal(document.getElementById('modalCambioStato'));
+            modal.show();
+        })
+        .catch(error => {
+            console.error('Error:', error);
+            alert('Errore nel caricamento dei dati');
+        });
+}
+
+document.getElementById('form-cambio-stato').addEventListener('submit', function(e) {
+    e.preventDefault();
+
+    const ordineId = document.getElementById('cambio-stato-ordine-id').value;
+    const nuovoStato = document.getElementById('cambio-stato-select').value;
+
+    if (!nuovoStato) {
+        alert('Seleziona un nuovo stato');
+        return;
+    }
+
+    const statiLabels = {
+        'in_attesa': 'In Attesa',
+        'in_lavorazione': 'In Lavorazione',
+        'completato': 'Completato',
+        'annullato': 'Annullato'
+    };
+
+    if (!confirm(`Confermi il cambio stato a "${statiLabels[nuovoStato]}"?`)) {
+        return;
+    }
+
+    fetch(`/ordini/${ordineId}/cambia-stato/`, {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+            'X-CSRFToken': getCookie('csrftoken')
+        },
+        body: JSON.stringify({ stato: nuovoStato })
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            bootstrap.Modal.getInstance(document.getElementById('modalCambioStato')).hide();
+            location.reload();
+        } else {
+            alert('Errore: ' + data.error);
+        }
+    })
+    .catch(error => {
+        console.error('Error:', error);
+        alert('Errore durante il cambio stato');
+    });
+});
+
+// Nascondere ordini dalla pianificazione
+function nascondiOrdineDaPianificazione(ordineId) {
+    if (!confirm('Vuoi nascondere questo ordine dalla pianificazione?\n\nL\'ordine non verrà eliminato, ma non sarà più visibile in questa vista fino al prossimo aggiornamento.')) {
+        return;
+    }
+
+    // Salva in localStorage
+    const ordiniNascosti = getOrdiniNascosti();
+    if (!ordiniNascosti.includes(ordineId.toString())) {
+        ordiniNascosti.push(ordineId.toString());
+        localStorage.setItem('ordini_nascosti_pianificazione', JSON.stringify(ordiniNascosti));
+    }
+
+    // Rimuovi visivamente
+    const card = document.querySelector(`.order-card[data-ordine-id="${ordineId}"]`);
+    if (card) {
+        card.style.opacity = '0';
+        setTimeout(() => {
+            card.remove();
+            aggiornaContatoreSidebar();
+        }, 300);
+    }
+}
+
+function getOrdiniNascosti() {
+    const stored = localStorage.getItem('ordini_nascosti_pianificazione');
+    return stored ? JSON.parse(stored) : [];
+}
+
+function applicaOrdiniNascosti() {
+    const ordiniNascosti = getOrdiniNascosti();
+    ordiniNascosti.forEach(ordineId => {
+        const card = document.querySelector(`.order-card[data-ordine-id="${ordineId}"]`);
+        if (card) {
+            card.remove();
+        }
+    });
+    aggiornaContatoreSidebar();
+}
+
+function aggiornaContatoreSidebar() {
+    const badge = document.querySelector('.sidebar-header .badge');
+    const count = document.querySelectorAll('.order-card').length;
+    if (badge) {
+        badge.textContent = count;
+    }
+}
+
+function resetOrdiniNascosti() {
+    if (confirm('Vuoi ripristinare tutti gli ordini nascosti?')) {
+        localStorage.removeItem('ordini_nascosti_pianificazione');
+        location.reload();
+    }
+}
+
+// Genera marker orari
+function generaMarkerOrari() {
+    const container = document.getElementById('timeline-markers');
+    container.innerHTML = '';
+
+    const oraInizioHour = ORA_INIZIO.getHours();
+    const oraFineHour = ORA_FINE.getHours();
+    const numOre = oraFineHour - oraInizioHour + 1;
+
+    for (let i = 0; i < numOre; i++) {
+        const ora = oraInizioHour + i;
+        const topPixels = i * PIXELS_PER_HOUR;
+
+        // Marker ora principale
+        const markerDiv = document.createElement('div');
+        markerDiv.className = 'timeline-hour-marker';
+        markerDiv.style.top = topPixels + 'px';
+
+        const labelDiv = document.createElement('div');
+        labelDiv.className = 'timeline-hour-label';
+        labelDiv.textContent = ora.toString().padStart(2, '0') + ':00';
+        markerDiv.appendChild(labelDiv);
+
+        container.appendChild(markerDiv);
+
+        // Marker ogni 15 minuti
+        const pixelsPer15Min = PIXELS_PER_HOUR / 4; // 50 pixels
+        for (let q = 1; q <= 3; q++) {
+            const quarterDiv = document.createElement('div');
+            quarterDiv.className = 'timeline-quarter-marker';
+            quarterDiv.style.top = (topPixels + q * pixelsPer15Min) + 'px';
+            container.appendChild(quarterDiv);
+        }
+    }
+}
+
+// Posiziona ordini sulla timeline
+function posizionaOrdiniTimeline() {
+    document.querySelectorAll('.timeline-order-block').forEach(block => {
+        const oraInizio = new Date(block.dataset.oraInizio);
+        const durata = parseInt(block.dataset.durata);
+
+        const topPixels = calcolaPositionFromOra(oraInizio);
+        const heightPixels = durata * PIXELS_PER_MINUTE;
+
+        block.style.top = topPixels + 'px';
+        block.style.height = heightPixels + 'px';
+        block.style.display = 'block';
+    });
+}
+
+// Posiziona pausa pranzo
+function posizionaPausaPranzo() {
+    if (!PAUSA_ATTIVA) return;
+
+    const pausaDiv = document.getElementById('pausaPranzo');
+    const topPixels = calcolaPositionFromOra(ORA_INIZIO_PAUSA);
+    const durationMinutes = (ORA_FINE_PAUSA - ORA_INIZIO_PAUSA) / 60000;
+    const heightPixels = durationMinutes * PIXELS_PER_MINUTE;
+
+    pausaDiv.style.top = topPixels + 'px';
+    pausaDiv.style.height = heightPixels + 'px';
+    pausaDiv.style.display = 'block';
+}
+
+// Aggiorna linea ora corrente
+function aggiornaLineaOraCorrente() {
+    const now = new Date();
+
+    // Verifica se siamo nella giornata visualizzata
+    const dataSelezionata = new Date('{{ data_selezionata|date:"Y-m-d" }}');
+    if (now.toDateString() !== dataSelezionata.toDateString()) {
+        return;
+    }
+
+    // Verifica se siamo nell'orario lavorativo
+    if (now < ORA_INIZIO || now > ORA_FINE) {
+        return;
+    }
+
+    const line = document.getElementById('currentTimeLine');
+    const topPixels = calcolaPositionFromOra(now);
+
+    line.style.top = topPixels + 'px';
+    line.style.display = 'block';
+}
+
+// Helper function
+function getCookie(name) {
+    let cookieValue = null;
+    if (document.cookie && document.cookie !== '') {
+        const cookies = document.cookie.split(';');
+        for (let i = 0; i < cookies.length; i++) {
+            const cookie = cookies[i].trim();
+            if (cookie.substring(0, name.length + 1) === (name + '=')) {
+                cookieValue = decodeURIComponent(cookie.substring(name.length + 1));
+                break;
+            }
+        }
+    }
+    return cookieValue;
+}
+
+// Inizializzazione
+document.addEventListener('DOMContentLoaded', function() {
+    applicaOrdiniNascosti(); // Applica filtro ordini nascosti
+    generaMarkerOrari();
+    posizionaOrdiniTimeline();
+    posizionaPausaPranzo();
+    aggiornaLineaOraCorrente();
+    setupTimelineDragAndDrop(); // Setup drag & drop sulla timeline
+
+    // Aggiorna ora corrente ogni minuto
+    setInterval(aggiornaLineaOraCorrente, 60000);
+});
+</script>
+{% endblock %}

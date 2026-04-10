@@ -1,0 +1,192 @@
+{% extends "base.html" %}
+{% load cq_tags %}
+
+{% block title %}Report mensile CQ — {{ mese }}/{{ anno }}{% endblock %}
+
+{% block extra_css %}
+<style>
+  .indice-pos { color: #198754; font-weight: 700; }
+  .indice-neg { color: #dc3545; font-weight: 700; }
+  .indice-zero { color: #6c757d; }
+  .premio-cell { color: #0d6efd; font-weight: 700; }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="container-fluid py-3">
+
+  <div class="d-flex align-items-center justify-content-between mb-3">
+    <h4 class="mb-0"><i class="bi bi-trophy text-warning"></i> Report mensile — Premi & Sanzioni</h4>
+    <!-- Selettore mese/anno -->
+    <form method="get" class="d-flex gap-2 align-items-center">
+      <select name="anno_redirect" class="form-select form-select-sm" style="width:auto;">
+        {% for a in anni %}<option {% if a == anno %}selected{% endif %}>{{ a }}</option>{% endfor %}
+      </select>
+      <select name="mese_redirect" class="form-select form-select-sm" style="width:auto;">
+        {% for num, nome in mesi %}<option value="{{ num }}" {% if num == mese %}selected{% endif %}>{{ nome }}</option>{% endfor %}
+      </select>
+      <button type="submit" class="btn btn-outline-primary btn-sm">Vai</button>
+    </form>
+  </div>
+
+  {% if messages %}
+    {% for msg in messages %}
+    <div class="alert alert-{{ msg.tags }} alert-dismissible fade show">{{ msg }}<button type="button" class="btn-close" data-bs-dismiss="alert"></button></div>
+    {% endfor %}
+  {% endif %}
+
+  <div class="row g-3">
+
+    <!-- Tabella operatori -->
+    <div class="col-lg-8">
+      <div class="card shadow-sm">
+        <div class="card-header fw-semibold d-flex justify-content-between align-items-center">
+          <span><i class="bi bi-table"></i> Indici operatori — {{ mese }}/{{ anno }}</span>
+          {% if impostazione and not impostazione.validato %}
+          <form method="post" action="{% url 'cq:valida_mese' anno mese %}" class="d-inline">
+            {% csrf_token %}
+            <button class="btn btn-success btn-sm" onclick="return confirm('Congelare il mese {{ mese }}/{{ anno }}? L\'operazione non è reversibile.')">
+              <i class="bi bi-lock-fill"></i> Congela mese
+            </button>
+          </form>
+          {% elif impostazione and impostazione.validato %}
+          <span class="badge bg-success"><i class="bi bi-lock-fill"></i> Congelato il {{ impostazione.validato_il|date:"d/m/Y" }}</span>
+          {% endif %}
+        </div>
+        <div class="card-body p-0">
+          <div class="table-responsive">
+            <table class="table table-hover mb-0">
+              <thead class="table-light">
+                <tr>
+                  <th>#</th>
+                  <th>Operatore</th>
+                  <th class="text-center">Turni</th>
+                  <th class="text-center">Saldo grezzo</th>
+                  <th class="text-center">Indice</th>
+                  <th class="text-center">Premio €</th>
+                </tr>
+              </thead>
+              <tbody>
+                {% for r in report %}
+                <tr>
+                  <td class="text-muted small">{{ forloop.counter }}</td>
+                  <td class="fw-semibold">{{ r.operatore.get_full_name|default:r.operatore.username }}</td>
+                  <td class="text-center">{{ r.turni }}</td>
+                  <td class="text-center">
+                    <span class="{% if r.saldo_grezzo >= 0 %}text-success{% else %}text-danger{% endif %}">
+                      {{ r.saldo_grezzo|segno }}
+                    </span>
+                  </td>
+                  <td class="text-center">
+                    {% if r.indice is None %}
+                      <span class="text-muted">—</span>
+                    {% elif r.indice > 0 %}
+                      <span class="indice-pos">+{{ r.indice }}</span>
+                    {% elif r.indice < 0 %}
+                      <span class="indice-neg">{{ r.indice }}</span>
+                    {% else %}
+                      <span class="indice-zero">0</span>
+                    {% endif %}
+                  </td>
+                  <td class="text-center">
+                    {% if r.premio %}
+                      <span class="premio-cell">€ {{ r.premio }}</span>
+                    {% else %}
+                      <span class="text-muted">—</span>
+                    {% endif %}
+                  </td>
+                </tr>
+                {% empty %}
+                <tr><td colspan="6" class="text-center text-muted py-3">Nessun operatore con turni in questo mese.</td></tr>
+                {% endfor %}
+              </tbody>
+            </table>
+          </div>
+        </div>
+        {% if impostazione %}
+        <div class="card-footer text-muted small">
+          Monte premi: <strong>€ {{ impostazione.monte_premi }}</strong>
+          {% if impostazione.note %} · {{ impostazione.note }}{% endif %}
+        </div>
+        {% endif %}
+      </div>
+    </div>
+
+    <!-- Pannello laterale -->
+    <div class="col-lg-4">
+
+      <!-- Imposta monte premi -->
+      {% if not impostazione or not impostazione.validato %}
+      <div class="card mb-3 shadow-sm">
+        <div class="card-header fw-semibold"><i class="bi bi-currency-euro"></i> Monte premi</div>
+        <div class="card-body">
+          <form method="post" action="{% url 'cq:salva_impostazione_premio' %}">
+            {% csrf_token %}
+            <input type="hidden" name="anno" value="{{ anno }}">
+            <input type="hidden" name="mese" value="{{ mese }}">
+            <div class="mb-2">
+              <label class="form-label small">Importo (€)</label>
+              {{ premio_form.monte_premi }}
+            </div>
+            <div class="mb-2">
+              <label class="form-label small">Note</label>
+              {{ premio_form.note }}
+            </div>
+            <button type="submit" class="btn btn-primary btn-sm w-100">
+              <i class="bi bi-save"></i> Salva monte premi
+            </button>
+          </form>
+        </div>
+      </div>
+      {% endif %}
+
+      <!-- Modifica manuale punteggio -->
+      {% if not impostazione or not impostazione.validato %}
+      <div class="card shadow-sm">
+        <div class="card-header fw-semibold"><i class="bi bi-pencil-square"></i> Modifica punteggio</div>
+        <div class="card-body">
+          <form method="post" action="{% url 'cq:salva_modifica_punteggio' anno mese %}">
+            {% csrf_token %}
+            <div class="mb-2">
+              <label class="form-label small">Operatore</label>
+              {{ modifica_form.operatore }}
+            </div>
+            <div class="mb-2">
+              <label class="form-label small">Punti (es. +5 o -3)</label>
+              {{ modifica_form.punti }}
+            </div>
+            <div class="mb-2">
+              <label class="form-label small">Motivazione</label>
+              {{ modifica_form.motivazione }}
+            </div>
+            <button type="submit" class="btn btn-warning btn-sm w-100">
+              <i class="bi bi-check-lg"></i> Applica modifica
+            </button>
+          </form>
+          <p class="text-muted small mt-2 mb-0">
+            <i class="bi bi-info-circle"></i> La motivazione sarà visibile all'operatore.
+          </p>
+        </div>
+      </div>
+      {% else %}
+      <div class="alert alert-info small">
+        <i class="bi bi-lock-fill"></i> Mese congelato — nessuna modifica possibile.
+      </div>
+      {% endif %}
+
+    </div>
+  </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+// Reindirizza al mese/anno selezionato
+document.querySelector('form').addEventListener('submit', function(e) {
+  e.preventDefault();
+  const anno = this.querySelector('[name="anno_redirect"]').value;
+  const mese = this.querySelector('[name="mese_redirect"]').value;
+  window.location.href = `/cq/report/${anno}/${mese}/`;
+});
+</script>
+{% endblock %}

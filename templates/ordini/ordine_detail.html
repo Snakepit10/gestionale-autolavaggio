@@ -1,6 +1,7 @@
 {% extends 'base.html' %}
 {% load static %}
 {% load crispy_forms_tags %}
+{% load cq_tags %}
 
 {% block title %}Ordine #{{ ordine.numero_progressivo }} - Gestionale Autolavaggio{% endblock %}
 
@@ -536,6 +537,61 @@
     </div>
 </div>
 
+<!-- Sezione Controllo Qualità -->
+<div class="row mt-3">
+  <div class="col-12">
+    <div class="card {% if ordine.scheda_cq %}{% if ordine.scheda_cq.esito == 'ok' %}border-success{% else %}border-danger{% endif %}{% else %}border-secondary{% endif %}">
+      <div class="card-header d-flex justify-content-between align-items-center">
+        <h5 class="mb-0">
+          <i class="bi bi-clipboard2-check"></i> Controllo Qualità
+          {% if ordine.scheda_cq %}
+            {% if ordine.scheda_cq.esito == 'ok' %}
+              <span class="badge bg-success ms-2"><i class="bi bi-check-circle-fill"></i> OK</span>
+            {% else %}
+              <span class="badge bg-danger ms-2"><i class="bi bi-x-circle-fill"></i> Non OK — {{ ordine.scheda_cq.num_difetti }} difett{{ ordine.scheda_cq.num_difetti|pluralize:"o,i" }}</span>
+            {% endif %}
+          {% else %}
+            <span class="badge bg-secondary ms-2">Non compilata</span>
+          {% endif %}
+        </h5>
+        <div class="d-flex gap-2">
+          {% if ordine.scheda_cq %}
+            <a href="{% url 'cq:scheda_detail' ordine.pk %}" class="btn btn-outline-primary btn-sm">
+              <i class="bi bi-eye"></i> Vedi scheda
+            </a>
+            {% if user|in_group:'titolare' %}
+            <a href="{% url 'cq:scheda_modifica' ordine.pk %}" class="btn btn-outline-warning btn-sm">
+              <i class="bi bi-pencil"></i> Rettifica
+            </a>
+            {% endif %}
+          {% else %}
+            {% if user|can_compile_cq %}
+            <a href="{% url 'cq:scheda_crea' ordine.pk %}" class="btn btn-primary btn-sm">
+              <i class="bi bi-clipboard2-plus"></i> Compila scheda CQ
+            </a>
+            {% endif %}
+          {% endif %}
+        </div>
+      </div>
+      {% if ordine.scheda_cq and ordine.scheda_cq.difetti.all %}
+      <div class="card-body py-2 px-3">
+        <div class="d-flex flex-wrap gap-2">
+          {% for difetto in ordine.scheda_cq.difetti.all %}
+          <span class="badge {% if difetto.gravita == 'alta' %}bg-danger{% elif difetto.gravita == 'media' %}bg-warning text-dark{% else %}bg-secondary{% endif %}">
+            {{ difetto.get_zona_display }} — {{ difetto.get_gravita_display }}
+          </span>
+          {% endfor %}
+        </div>
+      </div>
+      {% elif ordine.scheda_cq and ordine.scheda_cq.esito == 'ok' %}
+      <div class="card-body py-2 px-3">
+        <span class="text-success small"><i class="bi bi-check-circle-fill"></i> Veicolo consegnato senza difetti</span>
+      </div>
+      {% endif %}
+    </div>
+  </div>
+</div>
+
 <!-- Modal Nuovo Pagamento -->
 <div class="modal fade" id="modalPagamento" tabindex="-1">
     <div class="modal-dialog">
@@ -1069,209 +1125,337 @@ function annullaAggiuntaNuovoServizio() {
     document.getElementById('aggiungi-prezzo').value = 0;
     document.getElementById('aggiungi-subtotale').textContent = '€0.00';
 }
+
+// Funzioni per modifica item dettaglio
+function salvaModificaItemDetail() {
+    const itemId = document.getElementById('item-id-hidden').value;
+    const nuovoServizioId = document.getElementById('nuovo-servizio-select').value;
+    const quantita = document.getElementById('nuova-quantita-input').value;
+    const prezzo = document.getElementById('nuovo-prezzo-input').value;
+
+    if (!quantita || !prezzo) {
+        alert('Completa tutti i campi');
+        return;
+    }
+
+    const data = {
+        item_id: itemId,
+        nuova_quantita: parseInt(quantita),
+        nuovo_prezzo: parseFloat(prezzo)
+    };
+
+    if (nuovoServizioId) {
+        data.nuovo_servizio_id = nuovoServizioId;
+    }
+
+    console.log('DEBUG: salvaModificaItemDetail', data);
+
+    fetch(`{% url 'ordini:modifica-item-ordine' ordine.id %}`, {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+            'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]').value
+        },
+        body: JSON.stringify(data)
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            alert(data.message);
+            location.reload();
+        } else {
+            alert('Errore: ' + data.error);
+        }
+    })
+    .catch(error => {
+        console.error('Errore:', error);
+        alert('Errore durante la modifica: ' + error.message);
+    });
+}
+
+function eliminaItemDetail() {
+    if (!confirm('Sei sicuro di voler eliminare questo servizio dall\'ordine?')) {
+        return;
+    }
+
+    const itemId = document.getElementById('item-id-hidden').value;
+
+    if (!itemId) {
+        alert('Nessun servizio selezionato');
+        return;
+    }
+
+    console.log('DEBUG: eliminaItemDetail', { itemId, ordineId: {{ ordine.id }} });
+
+    fetch(`{% url 'ordini:elimina-item-ordine' ordine.id %}`, {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+            'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]').value
+        },
+        body: JSON.stringify({
+            item_id: itemId
+        })
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            alert(data.message);
+            location.reload();
+        } else {
+            alert('Errore: ' + data.error);
+        }
+    })
+    .catch(error => {
+        console.error('Errore:', error);
+        alert('Errore durante l\'eliminazione del servizio');
+    });
+}
+
+function annullaModificaItemDetail() {
+    document.getElementById('item-select').value = '';
+    document.getElementById('modifica-item-section').style.display = 'none';
+    document.getElementById('item-id-hidden').value = '';
+    document.getElementById('nuovo-servizio-select').value = '';
+    document.getElementById('nuova-quantita-input').value = 1;
+    document.getElementById('nuovo-prezzo-input').value = 0;
+    document.getElementById('nuovo-subtotale-display').textContent = '€0.00';
+}
 </script>
 
 <!-- Modal Modifica Ordine -->
 <div class="modal fade" id="modalModifica" tabindex="-1">
-    <div class="modal-dialog">
+    <div class="modal-dialog modal-xl">
         <div class="modal-content">
-            <div class="modal-header">
+            <div class="modal-header bg-primary text-white">
                 <h5 class="modal-title">
-                    <i class="bi bi-pencil"></i>
+                    <i class="bi bi-pencil-square"></i>
                     Modifica Ordine #{{ ordine.numero_progressivo }}
                 </h5>
-                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
             </div>
-            <div class="modal-body">
+            <div class="modal-body" style="max-height: 70vh; overflow-y: auto;">
                 <form id="form-modifica-ordine">
                     {% csrf_token %}
-                    
-                    <!-- Cliente -->
-                    <div class="mb-3">
-                        <label for="cliente-select" class="form-label">Cliente</label>
-                        <select class="form-select" id="cliente-select" name="cliente_id">
-                            <option value="">Nessun cliente (anonimo)</option>
-                            {% for cliente in clienti %}
-                                <option value="{{ cliente.id }}" 
-                                    {% if ordine.cliente and ordine.cliente.id == cliente.id %}selected{% endif %}>
-                                    {{ cliente.nome_completo }}
-                                </option>
-                            {% endfor %}
-                        </select>
-                    </div>
-                    
-                    <!-- Tipo Consegna -->
-                    <div class="mb-3">
-                        <label for="tipo-consegna-select" class="form-label">Tipo Consegna</label>
-                        <select class="form-select" id="tipo-consegna-select" name="tipo_consegna" onchange="toggleOraConsegnaModifica()" required>
-                            <option value="immediata" {% if ordine.tipo_consegna == 'immediata' %}selected{% endif %}>
-                                Consegna Immediata
-                            </option>
-                            <option value="programmata" {% if ordine.tipo_consegna == 'programmata' %}selected{% endif %}>
-                                Consegna Programmata
-                            </option>
-                        </select>
-                    </div>
-                    
-                    <!-- Ora Consegna (mostrato solo se programmata) -->
-                    <div class="mb-3" id="ora-consegna-group" 
-                         style="display: {% if ordine.tipo_consegna == 'programmata' %}block{% else %}none{% endif %};">
-                        <label for="ora-consegna-input" class="form-label">Ora Consegna</label>
-                        <input type="time" class="form-control" id="ora-consegna-input" name="ora_consegna_richiesta"
-                               value="{{ ordine.ora_consegna_richiesta|time:'H:i'|default:'' }}">
-                    </div>
-                    
-                    <!-- Tipo Auto -->
-                    <div class="mb-3">
-                        <label for="tipo-auto-input" class="form-label">Tipo Auto</label>
-                        <input type="text" class="form-control" id="tipo-auto-input" name="tipo_auto" 
-                               value="{{ ordine.tipo_auto|default_if_none:'' }}" placeholder="es. Fiat 500 bianca, BMW X3 nera...">
-                    </div>
-                    
-                    <hr>
-                    
-                    <!-- Sezione Modifica Servizi -->
-                    <h6><i class="bi bi-list-ul"></i> Modifica Servizi</h6>
-                    <p class="text-muted small">Seleziona un servizio dall'ordine per modificarlo:</p>
-                    
-                    <div class="mb-3">
-                        <label for="item-select" class="form-label">Servizio da modificare</label>
-                        <select class="form-select" id="item-select" name="item_select" onchange="caricaDettagliItem()">
-                            <option value="">Seleziona un servizio...</option>
-                            {% for item in ordine.items.all %}
-                                {% if item.stato != 'completato' %}
-                                    <option value="{{ item.id }}" 
-                                        data-servizio-id="{{ item.servizio_prodotto.id }}"
-                                        data-servizio-titolo="{{ item.servizio_prodotto.titolo }}"
-                                        data-quantita="{{ item.quantita }}"
-                                        data-prezzo="{{ item.prezzo_unitario }}">
-                                        {{ item.servizio_prodotto.titolo }} (Qtà: {{ item.quantita }}, €{{ item.prezzo_unitario }})
+
+                    <!-- Sezione Info Ordine -->
+                    <div class="card mb-3 border-info">
+                        <div class="card-header bg-info bg-opacity-10">
+                            <h6 class="mb-0"><i class="bi bi-info-circle"></i> Informazioni Ordine</h6>
+                        </div>
+                        <div class="card-body">
+                            <!-- Cliente -->
+                            <div class="mb-3">
+                                <label for="cliente-select" class="form-label fw-bold">Cliente</label>
+                                <select class="form-select" id="cliente-select" name="cliente_id">
+                                    <option value="">Nessun cliente (anonimo)</option>
+                                    {% for cliente in clienti %}
+                                        <option value="{{ cliente.id }}"
+                                            {% if ordine.cliente and ordine.cliente.id == cliente.id %}selected{% endif %}>
+                                            {{ cliente.nome_completo }}
+                                        </option>
+                                    {% endfor %}
+                                </select>
+                            </div>
+
+                            <!-- Tipo Consegna -->
+                            <div class="mb-3">
+                                <label for="tipo-consegna-select" class="form-label fw-bold">Tipo Consegna</label>
+                                <select class="form-select" id="tipo-consegna-select" name="tipo_consegna" onchange="toggleOraConsegnaModifica()" required>
+                                    <option value="immediata" {% if ordine.tipo_consegna == 'immediata' %}selected{% endif %}>
+                                        Consegna Immediata
                                     </option>
-                                {% endif %}
-                            {% endfor %}
-                        </select>
-                    </div>
-                    
-                    <div id="modifica-item-section" style="display: none;">
-                        <input type="hidden" id="item-id-hidden" name="item_id" value="">
-                        
-                        <!-- Nuovo Servizio/Prodotto -->
-                        <div class="mb-3">
-                            <label for="nuovo-servizio-select" class="form-label">Nuovo Servizio/Prodotto</label>
-                            <select class="form-select" id="nuovo-servizio-select" name="nuovo_servizio_id" onchange="aggiornaInfoNuovoServizio()">
-                                <option value="">Seleziona un servizio/prodotto</option>
-                                {% for categoria in categorie %}
-                                    <optgroup label="{{ categoria.nome }}">
-                                        {% for servizio in categoria.servizioprodotto_set.all %}
-                                            {% if servizio.attivo %}
-                                                <option value="{{ servizio.id }}" 
-                                                    data-prezzo="{{ servizio.prezzo }}" 
-                                                    data-tipo="{{ servizio.tipo }}"
-                                                    data-disponibile="{{ servizio.disponibile }}">
-                                                    {{ servizio.titolo }} - €{{ servizio.prezzo }}
-                                                    {% if servizio.tipo == 'prodotto' and servizio.quantita_disponibile > 0 %}
-                                                        ({{ servizio.quantita_disponibile }} disponibili)
-                                                    {% endif %}
-                                                </option>
-                                            {% endif %}
-                                        {% endfor %}
-                                    </optgroup>
-                                {% endfor %}
-                            </select>
-                        </div>
-                        
-                        <!-- Nuova Quantità -->
-                        <div class="mb-3">
-                            <label for="nuova-quantita-input" class="form-label">Quantità</label>
-                            <input type="number" class="form-control" id="nuova-quantita-input" name="nuova_quantita" 
-                                   value="1" min="1" onchange="aggiornaSubtotaleNuovo()">
-                        </div>
-                        
-                        <!-- Nuovo Prezzo Unitario -->
-                        <div class="mb-3">
-                            <label for="nuovo-prezzo-input" class="form-label">Prezzo Unitario</label>
-                            <div class="input-group">
-                                <span class="input-group-text">€</span>
-                                <input type="number" class="form-control" id="nuovo-prezzo-input" name="nuovo_prezzo" 
-                                       step="0.01" min="0" onchange="aggiornaSubtotaleNuovo()">
+                                    <option value="programmata" {% if ordine.tipo_consegna == 'programmata' %}selected{% endif %}>
+                                        Consegna Programmata
+                                    </option>
+                                </select>
                             </div>
-                            <small class="form-text text-muted">Il prezzo può essere modificato se necessario</small>
-                        </div>
-                        
-                        <!-- Nuovo Subtotale -->
-                        <div class="mb-3">
-                            <label class="form-label">Nuovo Subtotale</label>
-                            <div class="form-control-plaintext">
-                                <strong id="nuovo-subtotale-display">€0.00</strong>
+
+                            <!-- Ora Consegna (mostrato solo se programmata) -->
+                            <div class="mb-3" id="ora-consegna-group"
+                                 style="display: {% if ordine.tipo_consegna == 'programmata' %}block{% else %}none{% endif %};">
+                                <label for="ora-consegna-input" class="form-label fw-bold">Ora Consegna</label>
+                                <input type="time" class="form-control" id="ora-consegna-input" name="ora_consegna_richiesta"
+                                       value="{{ ordine.ora_consegna_richiesta|time:'H:i'|default:'' }}">
                             </div>
-                        </div>
-                        
-                        <!-- Alert per disponibilità -->
-                        <div id="alert-disponibilita-nuovo" class="alert alert-warning d-none">
-                            <i class="bi bi-exclamation-triangle"></i>
-                            <span id="alert-messaggio-nuovo"></span>
+
+                            <!-- Tipo Auto -->
+                            <div class="mb-3">
+                                <label for="tipo-auto-input" class="form-label fw-bold">Tipo Auto</label>
+                                <input type="text" class="form-control" id="tipo-auto-input" name="tipo_auto"
+                                       value="{{ ordine.tipo_auto|default_if_none:'' }}" placeholder="es. Fiat 500 bianca, BMW X3 nera...">
+                            </div>
                         </div>
                     </div>
 
-                    <hr>
-
-                    <!-- Sezione Aggiungi Nuovo Servizio -->
-                    <h6><i class="bi bi-plus-circle"></i> Aggiungi Nuovo Servizio</h6>
-                    <p class="text-muted small">Seleziona un servizio/prodotto da aggiungere all'ordine:</p>
-
-                    <div class="mb-3">
-                        <label for="aggiungi-nuovo-servizio-select" class="form-label">Servizio/Prodotto da aggiungere</label>
-                        <select class="form-select" id="aggiungi-nuovo-servizio-select" onchange="mostraFormAggiuntaServizio()">
-                            <option value="">Seleziona per aggiungere...</option>
-                            {% for categoria in categorie %}
-                                <optgroup label="{{ categoria.nome }}">
-                                    {% for servizio in categoria.servizioprodotto_set.all %}
-                                        {% if servizio.attivo and servizio.disponibile %}
-                                            <option value="{{ servizio.id }}"
-                                                data-prezzo="{{ servizio.prezzo }}"
-                                                data-tipo="{{ servizio.tipo }}"
-                                                data-quantita-disponibile="{{ servizio.quantita_disponibile }}">
-                                                {{ servizio.titolo }} - €{{ servizio.prezzo }}
-                                                {% if servizio.tipo == 'prodotto' and servizio.quantita_disponibile > 0 %}
-                                                    ({{ servizio.quantita_disponibile }} disponibili)
-                                                {% endif %}
+                    <!-- Sezione Modifica Servizi -->
+                    <div class="card mb-3 border-primary">
+                        <div class="card-header bg-primary bg-opacity-10">
+                            <h6 class="mb-0"><i class="bi bi-pencil"></i> Modifica Servizio Esistente</h6>
+                        </div>
+                        <div class="card-body">
+                            <p class="text-muted small mb-3">Seleziona un servizio dall'ordine per modificarlo:</p>
+                            <!-- Select servizio da modificare -->
+                            <div class="mb-3">
+                                <label for="item-select" class="form-label fw-bold">Servizio da modificare</label>
+                                <select class="form-select" id="item-select" name="item_select" onchange="caricaDettagliItem()">
+                                    <option value="">Seleziona un servizio...</option>
+                                    {% for item in ordine.items.all %}
+                                        {% if item.stato != 'completato' %}
+                                            <option value="{{ item.id }}"
+                                                data-servizio-id="{{ item.servizio_prodotto.id }}"
+                                                data-servizio-titolo="{{ item.servizio_prodotto.titolo }}"
+                                                data-quantita="{{ item.quantita }}"
+                                                data-prezzo="{{ item.prezzo_unitario }}">
+                                                {{ item.servizio_prodotto.titolo }} (Qtà: {{ item.quantita }}, €{{ item.prezzo_unitario }})
                                             </option>
                                         {% endif %}
                                     {% endfor %}
-                                </optgroup>
-                            {% endfor %}
-                        </select>
-                    </div>
+                                </select>
+                            </div>
 
-                    <div id="form-aggiungi-nuovo-servizio" style="display: none;">
-                        <div class="row">
-                            <div class="col-md-4">
-                                <label for="aggiungi-quantita" class="form-label">Quantità</label>
-                                <input type="number" class="form-control" id="aggiungi-quantita"
-                                       value="1" min="1" onchange="calcolaSubtotaleAggiunta()">
-                            </div>
-                            <div class="col-md-4">
-                                <label for="aggiungi-prezzo" class="form-label">Prezzo Unitario</label>
-                                <div class="input-group">
-                                    <span class="input-group-text">€</span>
-                                    <input type="number" class="form-control" id="aggiungi-prezzo"
-                                           step="0.01" min="0" onchange="calcolaSubtotaleAggiunta()">
+                            <!-- Form modifica item -->
+                            <div id="modifica-item-section" style="display: none;">
+                                <input type="hidden" id="item-id-hidden" name="item_id" value="">
+
+                                <!-- Nuovo Servizio/Prodotto -->
+                                <div class="mb-3">
+                                    <label for="nuovo-servizio-select" class="form-label fw-bold">Nuovo Servizio/Prodotto</label>
+                                    <select class="form-select" id="nuovo-servizio-select" name="nuovo_servizio_id" onchange="aggiornaInfoNuovoServizio()">
+                                        <option value="">Seleziona un servizio/prodotto</option>
+                                        {% for categoria in categorie %}
+                                            <optgroup label="{{ categoria.nome }}">
+                                                {% for servizio in categoria.servizioprodotto_set.all %}
+                                                    {% if servizio.attivo %}
+                                                        <option value="{{ servizio.id }}"
+                                                            data-prezzo="{{ servizio.prezzo }}"
+                                                            data-tipo="{{ servizio.tipo }}"
+                                                            data-disponibile="{{ servizio.disponibile }}">
+                                                            {{ servizio.titolo }} - €{{ servizio.prezzo }}
+                                                            {% if servizio.tipo == 'prodotto' and servizio.quantita_disponibile > 0 %}
+                                                                ({{ servizio.quantita_disponibile }} disponibili)
+                                                            {% endif %}
+                                                        </option>
+                                                    {% endif %}
+                                                {% endfor %}
+                                            </optgroup>
+                                        {% endfor %}
+                                    </select>
                                 </div>
-                            </div>
-                            <div class="col-md-4">
-                                <label class="form-label">Subtotale</label>
-                                <div class="form-control-plaintext">
-                                    <strong id="aggiungi-subtotale">€0.00</strong>
+
+                                <div class="row">
+                                    <!-- Nuova Quantità -->
+                                    <div class="col-md-4">
+                                        <label for="nuova-quantita-input" class="form-label fw-bold">Quantità</label>
+                                        <input type="number" class="form-control" id="nuova-quantita-input" name="nuova_quantita"
+                                               value="1" min="1" onchange="aggiornaSubtotaleNuovo()">
+                                    </div>
+
+                                    <!-- Nuovo Prezzo Unitario -->
+                                    <div class="col-md-4">
+                                        <label for="nuovo-prezzo-input" class="form-label fw-bold">Prezzo Unitario</label>
+                                        <div class="input-group">
+                                            <span class="input-group-text">€</span>
+                                            <input type="number" class="form-control" id="nuovo-prezzo-input" name="nuovo_prezzo"
+                                                   step="0.01" min="0" onchange="aggiornaSubtotaleNuovo()">
+                                        </div>
+                                        <small class="form-text text-muted">Il prezzo può essere modificato se necessario</small>
+                                    </div>
+
+                                    <!-- Nuovo Subtotale -->
+                                    <div class="col-md-4">
+                                        <label class="form-label fw-bold">Nuovo Subtotale</label>
+                                        <div class="form-control-plaintext">
+                                            <strong class="fs-5" id="nuovo-subtotale-display">€0.00</strong>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <!-- Alert per disponibilità -->
+                                <div id="alert-disponibilita-nuovo" class="alert alert-warning d-none mt-3">
+                                    <i class="bi bi-exclamation-triangle"></i>
+                                    <span id="alert-messaggio-nuovo"></span>
+                                </div>
+
+                                <!-- Pulsanti azione -->
+                                <div class="mt-3">
+                                    <button type="button" class="btn btn-primary" onclick="salvaModificaItemDetail()">
+                                        <i class="bi bi-check-circle"></i> Salva Modifica
+                                    </button>
+                                    <button type="button" class="btn btn-danger" onclick="eliminaItemDetail()">
+                                        <i class="bi bi-trash"></i> Elimina Servizio
+                                    </button>
+                                    <button type="button" class="btn btn-secondary" onclick="annullaModificaItemDetail()">
+                                        Annulla
+                                    </button>
                                 </div>
                             </div>
                         </div>
-                        <div class="mt-3">
-                            <button type="button" class="btn btn-success" onclick="confermaAggiuntaNuovoServizio()">
-                                <i class="bi bi-plus-circle"></i> Conferma Aggiunta
-                            </button>
-                            <button type="button" class="btn btn-secondary" onclick="annullaAggiuntaNuovoServizio()">
-                                Annulla
-                            </button>
+                    </div>
+
+                    <!-- Sezione Aggiungi Nuovo Servizio -->
+                    <div class="card mb-3 border-success">
+                        <div class="card-header bg-success bg-opacity-10">
+                            <h6 class="mb-0"><i class="bi bi-plus-circle"></i> Aggiungi Nuovo Servizio</h6>
+                        </div>
+                        <div class="card-body">
+                            <p class="text-muted small mb-3">Seleziona un servizio/prodotto da aggiungere all'ordine:</p>
+
+                            <div class="mb-3">
+                                <label for="aggiungi-nuovo-servizio-select" class="form-label fw-bold">Servizio/Prodotto da aggiungere</label>
+                                <select class="form-select" id="aggiungi-nuovo-servizio-select" onchange="mostraFormAggiuntaServizio()">
+                                    <option value="">Seleziona per aggiungere...</option>
+                                    {% for categoria in categorie %}
+                                        <optgroup label="{{ categoria.nome }}">
+                                            {% for servizio in categoria.servizioprodotto_set.all %}
+                                                {% if servizio.attivo and servizio.disponibile %}
+                                                    <option value="{{ servizio.id }}"
+                                                        data-prezzo="{{ servizio.prezzo }}"
+                                                        data-tipo="{{ servizio.tipo }}"
+                                                        data-quantita-disponibile="{{ servizio.quantita_disponibile }}">
+                                                        {{ servizio.titolo }} - €{{ servizio.prezzo }}
+                                                        {% if servizio.tipo == 'prodotto' and servizio.quantita_disponibile > 0 %}
+                                                            ({{ servizio.quantita_disponibile }} disponibili)
+                                                        {% endif %}
+                                                    </option>
+                                                {% endif %}
+                                            {% endfor %}
+                                        </optgroup>
+                                    {% endfor %}
+                                </select>
+                            </div>
+
+                            <div id="form-aggiungi-nuovo-servizio" style="display: none;">
+                                <div class="row">
+                                    <div class="col-md-4">
+                                        <label for="aggiungi-quantita" class="form-label fw-bold">Quantità</label>
+                                        <input type="number" class="form-control" id="aggiungi-quantita"
+                                               value="1" min="1" onchange="calcolaSubtotaleAggiunta()">
+                                    </div>
+                                    <div class="col-md-4">
+                                        <label for="aggiungi-prezzo" class="form-label fw-bold">Prezzo Unitario</label>
+                                        <div class="input-group">
+                                            <span class="input-group-text">€</span>
+                                            <input type="number" class="form-control" id="aggiungi-prezzo"
+                                                   step="0.01" min="0" onchange="calcolaSubtotaleAggiunta()">
+                                        </div>
+                                    </div>
+                                    <div class="col-md-4">
+                                        <label class="form-label fw-bold">Subtotale</label>
+                                        <div class="form-control-plaintext">
+                                            <strong class="fs-5" id="aggiungi-subtotale">€0.00</strong>
+                                        </div>
+                                    </div>
+                                </div>
+                                <div class="mt-3">
+                                    <button type="button" class="btn btn-success" onclick="confermaAggiuntaNuovoServizio()">
+                                        <i class="bi bi-plus-circle"></i> Conferma Aggiunta
+                                    </button>
+                                    <button type="button" class="btn btn-secondary" onclick="annullaAggiuntaNuovoServizio()">
+                                        Annulla
+                                    </button>
+                                </div>
+                            </div>
                         </div>
                     </div>
 

@@ -30,6 +30,9 @@ urlpatterns = [
     # Gestione finanziaria
     path('finanze/', include('apps.finanze.urls')),
 
+    # Controllo qualità e premi/sanzioni
+    path('cq/', include('apps.cq.urls', namespace='cq')),
+
     # path('shop/', include('apps.shop.urls')),
     # path('cassa/', include('apps.ordini.urls', namespace='cassa')),
     # path('report/', include('apps.reportistica.urls')),  # Temporarily disabled

@@ -1,9 +1,10 @@
 from django.db import models
 from django.contrib.auth.models import User
 from django.utils import timezone
+from django.core.exceptions import ValidationError
 from decimal import Decimal
 import uuid
-from datetime import datetime
+from datetime import datetime, time
 
 
 class Ordine(models.Model):
@@ -51,6 +52,16 @@ class Ordine(models.Model):
     ora_consegna_richiesta = models.TimeField(null=True, blank=True)
     ora_consegna_prevista = models.DateTimeField(null=True, blank=True)
     tempo_attesa_minuti = models.IntegerField(default=0)
+
+    # Pianificazione
+    durata_stimata_minuti = models.IntegerField(
+        default=0,
+        help_text="Durata totale stimata per completare l'ordine (calcolata o modificata manualmente)"
+    )
+    durata_modificata_manualmente = models.BooleanField(
+        default=False,
+        help_text="True se l'operatore ha modificato manualmente la durata"
+    )
     
     # Totali
     totale = models.DecimalField(max_digits=10, decimal_places=2)
@@ -118,6 +129,30 @@ class Ordine(models.Model):
         if self.numero_progressivo and '-' in self.numero_progressivo:
             return int(self.numero_progressivo.split('-')[1])
         return 0
+
+    def calcola_durata_da_servizi(self):
+        """Calcola durata totale sommando durate dei servizi nell'ordine"""
+        durata_totale = 0
+        for item in self.items.all():
+            if item.servizio_prodotto.tipo == 'servizio':
+                durata_totale += item.servizio_prodotto.durata_minuti * item.quantita
+        return durata_totale
+
+    def aggiorna_durata_stimata(self, forza_ricalcolo=False):
+        """Aggiorna durata stimata se non modificata manualmente"""
+        if not self.durata_modificata_manualmente or forza_ricalcolo:
+            self.durata_stimata_minuti = self.calcola_durata_da_servizi()
+            if forza_ricalcolo:
+                self.durata_modificata_manualmente = False
+            self.save(update_fields=['durata_stimata_minuti', 'durata_modificata_manualmente'])
+
+    @property
+    def ora_fine_prevista(self):
+        """Calcola ora di fine basandosi su ora_consegna_prevista + durata"""
+        if self.ora_consegna_prevista and self.durata_stimata_minuti:
+            from datetime import timedelta
+            return self.ora_consegna_prevista + timedelta(minutes=self.durata_stimata_minuti)
+        return None
 
     @property
     def saldo_dovuto(self):
@@ -286,3 +321,47 @@ class Pagamento(models.Model):
     def save(self, *args, **kwargs):
         super().save(*args, **kwargs)
         # L'aggiornamento dello stato dell'ordine è gestito dal signal post_save
+
+
+class ConfigurazionePianificazione(models.Model):
+    """Configurazione orari di lavoro (singleton)"""
+
+    # Orari giornalieri
+    ora_inizio = models.TimeField(default=time(8, 0))
+    ora_fine = models.TimeField(default=time(19, 0))
+
+    # Pausa pranzo (opzionale)
+    pausa_pranzo_attiva = models.BooleanField(default=True)
+    ora_inizio_pausa = models.TimeField(default=time(13, 0))
+    ora_fine_pausa = models.TimeField(default=time(15, 0))
+
+    # Metadata
+    aggiornato_il = models.DateTimeField(auto_now=True)
+    aggiornato_da = models.ForeignKey(User, null=True, on_delete=models.SET_NULL)
+
+    class Meta:
+        verbose_name = "Configurazione Pianificazione"
+        verbose_name_plural = "Configurazione Pianificazione"
+
+    def __str__(self):
+        return f"Orari: {self.ora_inizio.strftime('%H:%M')} - {self.ora_fine.strftime('%H:%M')}"
+
+    def save(self, *args, **kwargs):
+        # Enforce singleton
+        if not self.pk and ConfigurazionePianificazione.objects.exists():
+            raise ValidationError("Configurazione già esistente")
+        return super().save(*args, **kwargs)
+
+    @classmethod
+    def get_configurazione(cls):
+        config, created = cls.objects.get_or_create(
+            pk=1,
+            defaults={
+                'ora_inizio': time(8, 0),
+                'ora_fine': time(19, 0),
+                'pausa_pranzo_attiva': True,
+                'ora_inizio_pausa': time(13, 0),
+                'ora_fine_pausa': time(15, 0),
+            }
+        )
+        return config

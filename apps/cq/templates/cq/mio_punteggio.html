@@ -1,0 +1,157 @@
+{% extends "base.html" %}
+{% load cq_tags %}
+
+{% block title %}Il mio punteggio — {{ mese }}/{{ anno }}{% endblock %}
+
+{% block content %}
+<div class="container-fluid py-3">
+
+  <div class="d-flex align-items-center justify-content-between mb-3">
+    <h4 class="mb-0">
+      <i class="bi bi-person-check text-primary"></i>
+      Il mio punteggio — {{ operatore.get_full_name|default:operatore.username }}
+    </h4>
+    <form method="get" class="d-flex gap-2 align-items-center">
+      <select name="mese" class="form-select form-select-sm" style="width:auto;">
+        {% for num, nome in mesi %}<option value="{{ num }}" {% if num == mese %}selected{% endif %}>{{ nome }}</option>{% endfor %}
+      </select>
+      <select name="anno" class="form-select form-select-sm" style="width:auto;">
+        {% for a in anni %}<option {% if a == anno %}selected{% endif %}>{{ a }}</option>{% endfor %}
+      </select>
+      <button type="submit" class="btn btn-outline-primary btn-sm">Vai</button>
+    </form>
+  </div>
+
+  <!-- KPI personali -->
+  <div class="row g-3 mb-4">
+    <div class="col-6 col-md-3">
+      <div class="card border-0 shadow-sm text-center py-3">
+        <div style="font-size:2rem; font-weight:700;" class="{% if saldo_grezzo >= 0 %}text-success{% else %}text-danger{% endif %}">
+          {{ saldo_grezzo|segno }}
+        </div>
+        <div class="small text-muted">Saldo grezzo</div>
+      </div>
+    </div>
+    <div class="col-6 col-md-3">
+      <div class="card border-0 shadow-sm text-center py-3">
+        <div style="font-size:2rem; font-weight:700;" class="text-primary">{{ turni }}</div>
+        <div class="small text-muted">Turni lavorati</div>
+      </div>
+    </div>
+    <div class="col-6 col-md-3">
+      <div class="card border-0 shadow-sm text-center py-3">
+        <div style="font-size:2rem; font-weight:700;"
+             class="{% if indice is None %}text-muted{% elif indice > 0 %}text-success{% elif indice < 0 %}text-danger{% else %}text-muted{% endif %}">
+          {% if indice is None %}—{% else %}{{ indice|segno }}{% endif %}
+        </div>
+        <div class="small text-muted">Indice mensile</div>
+      </div>
+    </div>
+    <div class="col-6 col-md-3">
+      <div class="card border-0 shadow-sm text-center py-3">
+        <div style="font-size:2rem; font-weight:700;" class="text-muted">
+          {% if indice is None or indice <= 0 %}
+            <i class="bi bi-dash-circle text-secondary"></i>
+          {% else %}
+            <i class="bi bi-trophy-fill text-warning"></i>
+          {% endif %}
+        </div>
+        <div class="small text-muted">
+          {% if indice is None or indice <= 0 %}Non ammesso al premio{% else %}Ammesso al premio{% endif %}
+        </div>
+      </div>
+    </div>
+  </div>
+
+  {% if indice is not None and indice < 0 %}
+  <div class="alert alert-warning d-flex align-items-center gap-2 mb-3">
+    <i class="bi bi-exclamation-triangle-fill"></i>
+    <div>
+      <strong>Indice negativo.</strong> Non partecipi alla distribuzione del premio questo mese.
+      Il conteggio riparte da zero il primo del mese prossimo.
+    </div>
+  </div>
+  {% endif %}
+
+  <div class="row g-3">
+
+    <!-- Storico punteggi CQ -->
+    <div class="col-lg-8">
+      <div class="card shadow-sm">
+        <div class="card-header fw-semibold"><i class="bi bi-list-check"></i> Dettaglio punteggi CQ</div>
+        <div class="card-body p-0">
+          <div class="table-responsive">
+            <table class="table table-sm table-hover mb-0">
+              <thead class="table-light">
+                <tr>
+                  <th>Data</th>
+                  <th>Ordine</th>
+                  <th>Tipo</th>
+                  <th>Dettaglio</th>
+                  <th class="text-center">Punti</th>
+                </tr>
+              </thead>
+              <tbody>
+                {% for p in punteggi %}
+                <tr>
+                  <td class="small">{{ p.data_ora|date:"d/m H:i" }}</td>
+                  <td class="small">
+                    <a href="{% url 'ordini:ordine-detail' p.scheda.ordine.pk %}">
+                      {{ p.scheda.ordine.numero_progressivo }}
+                    </a>
+                  </td>
+                  <td><span class="badge bg-secondary small">{{ p.get_tipo_display }}</span></td>
+                  <td class="small text-muted">{{ p.motivazione }}</td>
+                  <td class="text-center fw-bold {% if p.punti >= 0 %}text-success{% else %}text-danger{% endif %}">
+                    {{ p.punti|segno }}
+                  </td>
+                </tr>
+                {% empty %}
+                <tr><td colspan="5" class="text-center text-muted py-3 small">Nessun punteggio in questo mese.</td></tr>
+                {% endfor %}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Modifiche manuali del titolare -->
+    <div class="col-lg-4">
+      <div class="card shadow-sm">
+        <div class="card-header fw-semibold"><i class="bi bi-pencil-square"></i> Modifiche titolare</div>
+        <div class="card-body p-0">
+          {% if modifiche %}
+          <ul class="list-group list-group-flush">
+            {% for m in modifiche %}
+            <li class="list-group-item py-2">
+              <div class="d-flex justify-content-between align-items-start">
+                <div>
+                  <span class="fw-bold {% if m.punti >= 0 %}text-success{% else %}text-danger{% endif %}">
+                    {{ m.punti|segno }}
+                  </span>
+                  <span class="small text-muted ms-1">— {{ m.motivazione }}</span>
+                </div>
+                <span class="small text-muted text-nowrap">{{ m.data_ora|date:"d/m" }}</span>
+              </div>
+            </li>
+            {% endfor %}
+          </ul>
+          {% else %}
+          <p class="text-muted small p-3 mb-0">Nessuna modifica manuale questo mese.</p>
+          {% endif %}
+        </div>
+      </div>
+
+      <div class="card shadow-sm mt-3">
+        <div class="card-body small text-muted">
+          <p class="mb-1"><strong>Come funziona l'indice:</strong></p>
+          <p class="mb-1">Indice = saldo grezzo ÷ turni lavorati</p>
+          <p class="mb-1">+2 punti per ogni veicolo senza difetti.</p>
+          <p class="mb-0">Il conteggio si azzera il 1° di ogni mese.</p>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}

@@ -12,8 +12,8 @@ from django.utils import timezone
 from django.db import transaction
 from django.views.decorators.csrf import csrf_exempt
 import json
-from datetime import timedelta
-from .models import Ordine, ItemOrdine, Pagamento
+from datetime import timedelta, datetime
+from .models import Ordine, ItemOrdine, Pagamento, ConfigurazionePianificazione
 from .forms import OrdineForm, PagamentoForm
 from apps.clienti.models import Cliente
 from apps.clienti.forms import ClienteQuickForm
@@ -1711,8 +1711,271 @@ def segna_ritirata(request, pk):
                 'success': False,
                 'error': str(e)
             }, status=500)
-    
+
     return JsonResponse({
         'success': False,
         'error': 'Metodo non consentito'
     }, status=405)
+
+
+# ==================== PIANIFICAZIONE TIMELINE ====================
+
+class PianificazioneView(LoginRequiredMixin, TemplateView):
+    """Pianificazione ordini con timeline e durate variabili"""
+    template_name = 'ordini/pianificazione.html'
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+
+        # Configurazione orari
+        config = ConfigurazionePianificazione.get_configurazione()
+        context['configurazione'] = config
+
+        # Data selezionata
+        data_str = self.request.GET.get('data')
+        if data_str:
+            try:
+                data_selezionata = datetime.strptime(data_str, '%Y-%m-%d').date()
+            except ValueError:
+                data_selezionata = timezone.now().date()
+        else:
+            data_selezionata = timezone.now().date()
+
+        context['data_selezionata'] = data_selezionata
+        context['data_precedente'] = data_selezionata - timedelta(days=1)
+        context['data_successiva'] = data_selezionata + timedelta(days=1)
+
+        # Orari timeline
+        ora_inizio = timezone.make_aware(
+            datetime.combine(data_selezionata, config.ora_inizio)
+        )
+        ora_fine = timezone.make_aware(
+            datetime.combine(data_selezionata, config.ora_fine)
+        )
+        context['ora_inizio_timeline'] = ora_inizio
+        context['ora_fine_timeline'] = ora_fine
+
+        # Carica ordini non completati
+        ordini = Ordine.objects.filter(
+            stato__in=['in_attesa', 'in_lavorazione']
+        ).select_related('cliente').prefetch_related(
+            'items__servizio_prodotto'
+        ).order_by('data_ora')
+
+        # Aggiorna durata stimata per ordini che non l'hanno
+        for ordine in ordini:
+            if ordine.durata_stimata_minuti == 0:
+                ordine.aggiorna_durata_stimata()
+
+        # Separa ordini pianificati per questa data da non pianificati
+        ordini_pianificati = ordini.filter(
+            ora_consegna_prevista__isnull=False,
+            ora_consegna_prevista__date=data_selezionata,
+            ora_consegna_prevista__gte=ora_inizio,
+            ora_consegna_prevista__lte=ora_fine
+        ).order_by('ora_consegna_prevista')
+
+        ordini_non_pianificati = ordini.filter(
+            Q(ora_consegna_prevista__isnull=True) |
+            ~Q(ora_consegna_prevista__date=data_selezionata) |
+            Q(ora_consegna_prevista__lt=ora_inizio) |
+            Q(ora_consegna_prevista__gt=ora_fine)
+        ).order_by('data_ora')
+
+        context['ordini_pianificati'] = ordini_pianificati
+        context['ordini_non_pianificati'] = ordini_non_pianificati
+        context['ora_corrente'] = timezone.now()
+
+        # Calcola sovrapposizioni
+        sovrapposizioni = self.calcola_sovrapposizioni(ordini_pianificati)
+        context['sovrapposizioni'] = sovrapposizioni
+
+        return context
+
+    def calcola_sovrapposizioni(self, ordini):
+        """Identifica ordini con sovrapposizioni temporali"""
+        sovrapposizioni = []
+        ordini_list = list(ordini)
+
+        for i, ordine1 in enumerate(ordini_list):
+            if not ordine1.ora_consegna_prevista or not ordine1.ora_fine_prevista:
+                continue
+
+            for ordine2 in ordini_list[i+1:]:
+                if not ordine2.ora_consegna_prevista or not ordine2.ora_fine_prevista:
+                    continue
+
+                # Check sovrapposizione
+                if (ordine1.ora_consegna_prevista < ordine2.ora_fine_prevista and
+                    ordine1.ora_fine_prevista > ordine2.ora_consegna_prevista):
+                    sovrapposizioni.append((ordine1.id, ordine2.id))
+
+        return sovrapposizioni
+
+
+@login_required
+def assegna_ordine_timeline(request):
+    """Assegna ordine a un orario specifico sulla timeline"""
+    if request.method != 'POST':
+        return JsonResponse({'error': 'Method not allowed'}, status=405)
+
+    try:
+        data = json.loads(request.body)
+        ordine_id = data.get('ordine_id')
+        ora_consegna_str = data.get('ora_consegna')  # ISO format datetime string
+
+        if not ordine_id or not ora_consegna_str:
+            return JsonResponse({'error': 'Missing data'}, status=400)
+
+        # Parse datetime
+        ora_consegna = datetime.fromisoformat(ora_consegna_str.replace('Z', '+00:00'))
+        if timezone.is_naive(ora_consegna):
+            ora_consegna = timezone.make_aware(ora_consegna)
+
+        # Validazione: non nel passato
+        if ora_consegna < timezone.now():
+            return JsonResponse({'error': 'Cannot schedule in past'}, status=400)
+
+        # Get ordine
+        ordine = get_object_or_404(Ordine, pk=ordine_id)
+
+        # Validazione stato
+        if ordine.stato not in ['in_attesa', 'in_lavorazione']:
+            return JsonResponse({'error': 'Order already completed'}, status=400)
+
+        # Assicurati che abbia durata stimata
+        if ordine.durata_stimata_minuti == 0:
+            ordine.aggiorna_durata_stimata()
+
+        # Calcola ora fine prevista
+        ora_fine_prevista = ora_consegna + timedelta(minutes=ordine.durata_stimata_minuti)
+
+        # Verifica sovrapposizioni con altri ordini nella stessa data
+        ordini_nella_data = Ordine.objects.filter(
+            stato__in=['in_attesa', 'in_lavorazione'],
+            ora_consegna_prevista__isnull=False,
+            ora_consegna_prevista__date=ora_consegna.date()
+        ).exclude(pk=ordine.id)  # Escludi l'ordine corrente (caso spostamento)
+
+        for altro_ordine in ordini_nella_data:
+            if altro_ordine.ora_fine_prevista:
+                # Check sovrapposizione
+                if (ora_consegna < altro_ordine.ora_fine_prevista and
+                    ora_fine_prevista > altro_ordine.ora_consegna_prevista):
+                    return JsonResponse({
+                        'error': f'Sovrapposizione con ordine #{altro_ordine.numero_breve}',
+                        'conflitto': True,
+                        'ordine_conflitto': altro_ordine.numero_breve
+                    }, status=400)
+
+        # Aggiorna ora consegna prevista
+        ordine.ora_consegna_prevista = ora_consegna
+
+        # Calcola tempo attesa
+        tempo_attesa = (ora_consegna - timezone.now()).total_seconds() / 60
+        ordine.tempo_attesa_minuti = max(0, int(tempo_attesa))
+
+        ordine.save(update_fields=['ora_consegna_prevista', 'tempo_attesa_minuti'])
+
+        return JsonResponse({
+            'success': True,
+            'ordine_id': ordine.id,
+            'numero_progressivo': ordine.numero_progressivo,
+            'ora_consegna': ora_consegna.isoformat(),
+            'ora_fine': ordine.ora_fine_prevista.isoformat() if ordine.ora_fine_prevista else None,
+            'durata_minuti': ordine.durata_stimata_minuti
+        })
+
+    except Exception as e:
+        print(f"Error assigning order to timeline: {e}")
+        return JsonResponse({'error': str(e)}, status=500)
+
+
+@login_required
+def rimuovi_ordine_timeline(request):
+    """Rimuove ordine dalla pianificazione"""
+    if request.method != 'POST':
+        return JsonResponse({'error': 'Method not allowed'}, status=405)
+
+    try:
+        data = json.loads(request.body)
+        ordine_id = data.get('ordine_id')
+
+        ordine = get_object_or_404(Ordine, pk=ordine_id)
+        ordine.ora_consegna_prevista = None
+        ordine.tempo_attesa_minuti = 0
+        ordine.save(update_fields=['ora_consegna_prevista', 'tempo_attesa_minuti'])
+
+        return JsonResponse({'success': True, 'ordine_id': ordine.id})
+
+    except Exception as e:
+        return JsonResponse({'error': str(e)}, status=500)
+
+
+@login_required
+def modifica_durata_ordine(request, pk):
+    """Modifica manualmente la durata stimata di un ordine"""
+    ordine = get_object_or_404(Ordine, pk=pk)
+
+    if request.method == 'POST':
+        try:
+            data = json.loads(request.body)
+            nuova_durata = data.get('durata_minuti')
+
+            if nuova_durata is None or nuova_durata < 0:
+                return JsonResponse({'error': 'Invalid duration'}, status=400)
+
+            ordine.durata_stimata_minuti = int(nuova_durata)
+            ordine.durata_modificata_manualmente = True
+            ordine.save(update_fields=['durata_stimata_minuti', 'durata_modificata_manualmente'])
+
+            return JsonResponse({
+                'success': True,
+                'ordine_id': ordine.id,
+                'durata_minuti': ordine.durata_stimata_minuti,
+                'ora_fine': ordine.ora_fine_prevista.isoformat() if ordine.ora_fine_prevista else None
+            })
+
+        except Exception as e:
+            return JsonResponse({'error': str(e)}, status=500)
+
+    return JsonResponse({'error': 'Method not allowed'}, status=405)
+
+
+@login_required
+def ricalcola_durata_ordine(request, pk):
+    """Ricalcola durata da servizi (reset override manuale)"""
+    ordine = get_object_or_404(Ordine, pk=pk)
+
+    if request.method == 'POST':
+        try:
+            ordine.aggiorna_durata_stimata(forza_ricalcolo=True)
+
+            return JsonResponse({
+                'success': True,
+                'ordine_id': ordine.id,
+                'durata_minuti': ordine.durata_stimata_minuti,
+                'ora_fine': ordine.ora_fine_prevista.isoformat() if ordine.ora_fine_prevista else None
+            })
+
+        except Exception as e:
+            return JsonResponse({'error': str(e)}, status=500)
+
+    return JsonResponse({'error': 'Method not allowed'}, status=405)
+
+
+class ConfigurazionePianificazioneUpdateView(LoginRequiredMixin, UpdateView):
+    """Modifica orari di lavoro"""
+    model = ConfigurazionePianificazione
+    template_name = 'ordini/configurazione_pianificazione.html'
+    fields = ['ora_inizio', 'ora_fine', 'pausa_pranzo_attiva',
+              'ora_inizio_pausa', 'ora_fine_pausa']
+    success_url = reverse_lazy('ordini:pianificazione')
+
+    def get_object(self, queryset=None):
+        return ConfigurazionePianificazione.get_configurazione()
+
+    def form_valid(self, form):
+        form.instance.aggiornato_da = self.request.user
+        messages.success(self.request, 'Configurazione aggiornata')
+        return super().form_valid(form)

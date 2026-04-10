@@ -1,4 +1,4 @@
-{% load static %}
+{% load static cq_tags %}
 <!DOCTYPE html>
 <html lang="it">
 <head>
@@ -123,6 +123,32 @@
                             </ul>
                         </li>
                         
+                        {% if user.groups.all|length > 0 or user.is_superuser %}
+                        <li class="nav-item dropdown">
+                            <a class="nav-link dropdown-toggle" href="#" id="cqDropdown" role="button" data-bs-toggle="dropdown">
+                                <i class="bi bi-clipboard2-check"></i> Qualità
+                            </a>
+                            <ul class="dropdown-menu">
+                                <li><a class="dropdown-item" href="{% url 'cq:mio_punteggio' %}">
+                                    <i class="bi bi-person-check"></i> Il mio punteggio
+                                </a></li>
+                                <li><hr class="dropdown-divider"></li>
+                                <li><a class="dropdown-item" href="{% url 'cq:dashboard' %}">
+                                    <i class="bi bi-bar-chart-line"></i> Dashboard CQ
+                                </a></li>
+                                <li><a class="dropdown-item" href="{% url 'cq:report_mensile' anno=today.year mese=today.month %}">
+                                    <i class="bi bi-trophy"></i> Report & Premi
+                                </a></li>
+                                {% if user|in_group:"titolare" %}
+                                <li><hr class="dropdown-divider"></li>
+                                <li><a class="dropdown-item" href="{% url 'cq:configurazione' %}">
+                                    <i class="bi bi-gear"></i> Configurazione CQ
+                                </a></li>
+                                {% endif %}
+                            </ul>
+                        </li>
+                        {% endif %}
+
                         {% comment "Reportistica temporarily disabled due to pandas dependency" %}
                         <li class="nav-item dropdown">
                             <a class="nav-link dropdown-toggle" href="#" id="reportDropdown" role="button" data-bs-toggle="dropdown">

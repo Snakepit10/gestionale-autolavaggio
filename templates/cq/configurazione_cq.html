@@ -1,0 +1,590 @@
+{% extends "base.html" %}
+{% load cq_tags %}
+
+{% block title %}Configurazione CQ{% endblock %}
+
+{% block extra_css %}
+<style>
+.config-card { border-radius: 10px; }
+.config-card .card-header { font-weight: 600; }
+.table-config td, .table-config th { vertical-align: middle; font-size: .9rem; }
+.badge-codice { font-family: monospace; font-size: .8rem; background: #e9ecef; color: #333; padding: 2px 6px; border-radius: 4px; }
+.mapping-grid { overflow-x: auto; }
+.mapping-grid table { font-size: .75rem; min-width: 600px; }
+.mapping-grid th { white-space: nowrap; writing-mode: vertical-rl; transform: rotate(180deg); height: 120px; vertical-align: bottom; padding: 4px; }
+.mapping-grid td { text-align: center; padding: 4px; }
+.mapping-cb { width: 1.2em; height: 1.2em; cursor: pointer; }
+.zona-row-header { font-weight: 600; background: #f8f9fa; }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-3">
+  <h5 class="mb-0"><i class="bi bi-gear"></i> Configurazione Controllo Qualità</h5>
+  <a href="{% url 'cq:dashboard' %}" class="btn btn-outline-secondary btn-sm">
+    <i class="bi bi-arrow-left"></i> Dashboard CQ
+  </a>
+</div>
+
+{% if messages %}
+  {% for msg in messages %}
+    <div class="alert alert-{{ msg.tags }} alert-dismissible fade show" role="alert">
+      {{ msg }} <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+    </div>
+  {% endfor %}
+{% endif %}
+
+<ul class="nav nav-tabs mb-3" id="configTabs">
+  <li class="nav-item">
+    <button class="nav-link active" data-bs-toggle="tab" data-bs-target="#tab-zone">
+      <i class="bi bi-car-front"></i> Zone
+    </button>
+  </li>
+  <li class="nav-item">
+    <button class="nav-link" data-bs-toggle="tab" data-bs-target="#tab-difetti">
+      <i class="bi bi-exclamation-triangle"></i> Tipi Difetto
+    </button>
+  </li>
+  <li class="nav-item">
+    <button class="nav-link" data-bs-toggle="tab" data-bs-target="#tab-mappings">
+      <i class="bi bi-grid-3x3-gap"></i> Mappings Zona↔Difetto
+    </button>
+  </li>
+</ul>
+
+<div class="tab-content">
+
+  {# ===== TAB ZONE ===== #}
+  <div class="tab-pane fade show active" id="tab-zone">
+    <div class="row g-3">
+
+      {# Categorie zona #}
+      <div class="col-md-4">
+        <div class="card config-card">
+          <div class="card-header d-flex justify-content-between align-items-center">
+            <span><i class="bi bi-folder2"></i> Categorie Zona</span>
+            <button class="btn btn-primary btn-sm" onclick="apriModal('modalCatZona')">
+              <i class="bi bi-plus-lg"></i>
+            </button>
+          </div>
+          <div class="card-body p-0">
+            <table class="table table-config table-hover mb-0">
+              <thead class="table-light"><tr><th>Nome</th><th>Ord.</th><th></th></tr></thead>
+              <tbody>
+                {% for cat in categorie_zona %}
+                <tr>
+                  <td>{{ cat.nome }}</td>
+                  <td>{{ cat.ordine }}</td>
+                  <td>
+                    <button class="btn btn-outline-primary btn-sm py-0"
+                            onclick="modificaCatZona({{ cat.pk }}, '{{ cat.nome|escapejs }}', {{ cat.ordine }})">
+                      <i class="bi bi-pencil"></i>
+                    </button>
+                    <button class="btn btn-outline-danger btn-sm py-0"
+                            onclick="eliminaItem('{{ cat.pk }}', 'categoria-zona', '{{ cat.nome|escapejs }}')">
+                      <i class="bi bi-trash"></i>
+                    </button>
+                  </td>
+                </tr>
+                {% empty %}
+                <tr><td colspan="3" class="text-muted text-center py-3">Nessuna categoria</td></tr>
+                {% endfor %}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+
+      {# Zone #}
+      <div class="col-md-8">
+        <div class="card config-card">
+          <div class="card-header d-flex justify-content-between align-items-center">
+            <span><i class="bi bi-map"></i> Zone Auto</span>
+            <button class="btn btn-primary btn-sm" onclick="apriModal('modalZona')">
+              <i class="bi bi-plus-lg"></i>
+            </button>
+          </div>
+          <div class="card-body p-0">
+            <table class="table table-config table-hover mb-0">
+              <thead class="table-light">
+                <tr><th>Zona</th><th>Codice</th><th>Categoria</th><th>Produttore</th><th>Catena</th><th></th></tr>
+              </thead>
+              <tbody>
+                {% for cat in categorie_zona %}
+                  <tr class="zona-row-header">
+                    <td colspan="6" class="py-1 px-3 text-primary small">
+                      <i class="bi bi-folder2-open"></i> {{ cat.nome }}
+                    </td>
+                  </tr>
+                  {% for zona in cat.zone.all %}
+                  <tr>
+                    <td>
+                      {% if not zona.attiva %}<span class="badge bg-secondary me-1">OFF</span>{% endif %}
+                      {{ zona.nome }}
+                    </td>
+                    <td><span class="badge-codice">{{ zona.codice }}</span></td>
+                    <td>{{ zona.categoria.nome }}</td>
+                    <td>{{ zona.get_postazione_produttore_display|default:"—" }}</td>
+                    <td>
+                      {% for p in zona.postazioni_catena %}
+                        <span class="badge bg-light text-dark border">{{ p }}</span>
+                      {% empty %}—{% endfor %}
+                    </td>
+                    <td>
+                      <button class="btn btn-outline-primary btn-sm py-0"
+                              onclick="modificaZona({{ zona.pk }}, {{ zona|zona_json }})">
+                        <i class="bi bi-pencil"></i>
+                      </button>
+                      <button class="btn btn-outline-danger btn-sm py-0"
+                              onclick="eliminaItem('{{ zona.pk }}', 'zona', '{{ zona.nome|escapejs }}')">
+                        <i class="bi bi-trash"></i>
+                      </button>
+                    </td>
+                  </tr>
+                  {% endfor %}
+                {% endfor %}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  {# ===== TAB TIPI DIFETTO ===== #}
+  <div class="tab-pane fade" id="tab-difetti">
+    <div class="row g-3">
+
+      {# Categorie difetto #}
+      <div class="col-md-4">
+        <div class="card config-card">
+          <div class="card-header d-flex justify-content-between align-items-center">
+            <span><i class="bi bi-folder2"></i> Categorie Difetto</span>
+            <button class="btn btn-primary btn-sm" onclick="apriModal('modalCatDifetto')">
+              <i class="bi bi-plus-lg"></i>
+            </button>
+          </div>
+          <div class="card-body p-0">
+            <table class="table table-config table-hover mb-0">
+              <thead class="table-light"><tr><th>Nome</th><th>Ord.</th><th></th></tr></thead>
+              <tbody>
+                {% for cat in categorie_difetto %}
+                <tr>
+                  <td>{{ cat.nome }}</td>
+                  <td>{{ cat.ordine }}</td>
+                  <td>
+                    <button class="btn btn-outline-primary btn-sm py-0"
+                            onclick="modificaCatDifetto({{ cat.pk }}, '{{ cat.nome|escapejs }}', {{ cat.ordine }})">
+                      <i class="bi bi-pencil"></i>
+                    </button>
+                    <button class="btn btn-outline-danger btn-sm py-0"
+                            onclick="eliminaItem('{{ cat.pk }}', 'categoria-difetto', '{{ cat.nome|escapejs }}')">
+                      <i class="bi bi-trash"></i>
+                    </button>
+                  </td>
+                </tr>
+                {% empty %}
+                <tr><td colspan="3" class="text-muted text-center py-3">Nessuna categoria</td></tr>
+                {% endfor %}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+
+      {# Tipi difetto #}
+      <div class="col-md-8">
+        <div class="card config-card">
+          <div class="card-header d-flex justify-content-between align-items-center">
+            <span><i class="bi bi-exclamation-circle"></i> Tipi Difetto</span>
+            <button class="btn btn-primary btn-sm" onclick="apriModal('modalTipoDifetto')">
+              <i class="bi bi-plus-lg"></i>
+            </button>
+          </div>
+          <div class="card-body p-0">
+            <table class="table table-config table-hover mb-0">
+              <thead class="table-light">
+                <tr><th>Nome</th><th>Codice</th><th>Categoria</th><th>Desc?</th><th>Attivo</th><th></th></tr>
+              </thead>
+              <tbody>
+                {% for cat in categorie_difetto %}
+                  <tr class="zona-row-header">
+                    <td colspan="6" class="py-1 px-3 text-warning-emphasis small">
+                      <i class="bi bi-folder2-open"></i> {{ cat.nome }}
+                    </td>
+                  </tr>
+                  {% for tipo in cat.tipi.all %}
+                  <tr>
+                    <td>{{ tipo.nome }}</td>
+                    <td><span class="badge-codice">{{ tipo.codice }}</span></td>
+                    <td>{{ tipo.categoria.nome }}</td>
+                    <td>{% if tipo.richiede_descrizione %}<i class="bi bi-check-circle text-success"></i>{% else %}—{% endif %}</td>
+                    <td>{% if tipo.attivo %}<i class="bi bi-check-circle text-success"></i>{% else %}<i class="bi bi-x-circle text-danger"></i>{% endif %}</td>
+                    <td>
+                      <button class="btn btn-outline-primary btn-sm py-0"
+                              onclick="modificaTipoDifetto({{ tipo.pk }}, {{ tipo|tipo_json }})">
+                        <i class="bi bi-pencil"></i>
+                      </button>
+                      <button class="btn btn-outline-danger btn-sm py-0"
+                              onclick="eliminaItem('{{ tipo.pk }}', 'tipo-difetto', '{{ tipo.nome|escapejs }}')">
+                        <i class="bi bi-trash"></i>
+                      </button>
+                    </td>
+                  </tr>
+                  {% endfor %}
+                {% endfor %}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  {# ===== TAB MAPPINGS ===== #}
+  <div class="tab-pane fade" id="tab-mappings">
+    <div class="card config-card">
+      <div class="card-header">
+        <i class="bi bi-grid-3x3-gap"></i> Mapping Zona ↔ Tipo Difetto
+        <small class="text-muted ms-2">Spunta i difetti applicabili per ogni zona</small>
+      </div>
+      <div class="card-body mapping-grid p-2">
+        <table class="table table-bordered table-sm" id="mappingTable">
+          <thead>
+            <tr>
+              <th class="text-start" style="writing-mode:horizontal-tb; transform:none; height:auto;">Zona</th>
+              {% for tipo in tipi_matrice %}
+              <th title="{{ tipo.nome }}">{{ tipo.nome }}</th>
+              {% endfor %}
+            </tr>
+          </thead>
+          <tbody>
+            {% for cat in categorie_zona %}
+            <tr class="zona-row-header">
+              <td colspan="{{ tipi_matrice|length|add:1 }}" class="py-1 px-2 text-primary small">
+                <i class="bi bi-folder2-open"></i> {{ cat.nome }}
+              </td>
+            </tr>
+            {% for zona in cat.zone.all %}
+            <tr>
+              <td class="text-nowrap">
+                {% if not zona.attiva %}<span class="badge bg-secondary me-1" style="font-size:.65rem">OFF</span>{% endif %}
+                {{ zona.nome }}
+              </td>
+              {% for tipo in tipi_matrice %}
+              <td>
+                <input type="checkbox"
+                       class="mapping-cb"
+                       data-zona-id="{{ zona.pk }}"
+                       data-tipo-id="{{ tipo.pk }}"
+                       id="m_{{ zona.pk }}_{{ tipo.pk }}"
+                       onchange="toggleMapping(this)">
+              </td>
+              {% endfor %}
+            </tr>
+            {% endfor %}
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+</div>{# fine tab-content #}
+
+
+{# ====== MODALI ====== #}
+
+{# Categoria Zona #}
+<div class="modal fade" id="modalCatZona" tabindex="-1">
+  <div class="modal-dialog modal-sm">
+    <div class="modal-content">
+      <div class="modal-header"><h6 class="modal-title">Categoria Zona</h6><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div>
+      <div class="modal-body">
+        <input type="hidden" id="czId">
+        <div class="mb-2"><label class="form-label small">Nome *</label><input type="text" class="form-control" id="czNome"></div>
+        <div class="mb-2"><label class="form-label small">Ordine</label><input type="number" class="form-control" id="czOrdine" value="0"></div>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-secondary btn-sm" data-bs-dismiss="modal">Annulla</button>
+        <button type="button" class="btn btn-primary btn-sm" onclick="salvaCatZona()">Salva</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+{# Zona Config #}
+<div class="modal fade" id="modalZona" tabindex="-1">
+  <div class="modal-dialog">
+    <div class="modal-content">
+      <div class="modal-header"><h6 class="modal-title">Zona Auto</h6><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div>
+      <div class="modal-body">
+        <input type="hidden" id="zId">
+        <div class="row g-2">
+          <div class="col-8"><label class="form-label small">Nome *</label><input type="text" class="form-control" id="zNome"></div>
+          <div class="col-4"><label class="form-label small">Ordine</label><input type="number" class="form-control" id="zOrdine" value="0"></div>
+          <div class="col-12"><label class="form-label small">Codice (slug) *</label><input type="text" class="form-control font-monospace" id="zCodice" placeholder="es. parabrezza_esterno"></div>
+          <div class="col-12">
+            <label class="form-label small">Categoria *</label>
+            <select class="form-select" id="zCategoria">
+              {% for cat in categorie_zona %}
+              <option value="{{ cat.pk }}">{{ cat.nome }}</option>
+              {% endfor %}
+            </select>
+          </div>
+          <div class="col-md-6">
+            <label class="form-label small">Postazione produttore</label>
+            <select class="form-select" id="zProduttore">
+              <option value="">— nessuna —</option>
+              {% for v, l in post_choices %}<option value="{{ v }}">{{ l }}</option>{% endfor %}
+            </select>
+          </div>
+          <div class="col-md-6">
+            <label class="form-label small">Postazioni catena</label>
+            <select class="form-select" id="zCatena" multiple>
+              {% for v, l in post_choices %}<option value="{{ v }}">{{ l }}</option>{% endfor %}
+            </select>
+            <div class="form-text">Tieni premuto Ctrl per selezione multipla</div>
+          </div>
+          <div class="col-12">
+            <div class="form-check">
+              <input class="form-check-input" type="checkbox" id="zAttiva" checked>
+              <label class="form-check-label" for="zAttiva">Zona attiva</label>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-secondary btn-sm" data-bs-dismiss="modal">Annulla</button>
+        <button type="button" class="btn btn-primary btn-sm" onclick="salvaZona()">Salva</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+{# Categoria Difetto #}
+<div class="modal fade" id="modalCatDifetto" tabindex="-1">
+  <div class="modal-dialog modal-sm">
+    <div class="modal-content">
+      <div class="modal-header"><h6 class="modal-title">Categoria Difetto</h6><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div>
+      <div class="modal-body">
+        <input type="hidden" id="cdId">
+        <div class="mb-2"><label class="form-label small">Nome *</label><input type="text" class="form-control" id="cdNome"></div>
+        <div class="mb-2"><label class="form-label small">Ordine</label><input type="number" class="form-control" id="cdOrdine" value="0"></div>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-secondary btn-sm" data-bs-dismiss="modal">Annulla</button>
+        <button type="button" class="btn btn-primary btn-sm" onclick="salvaCatDifetto()">Salva</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+{# Tipo Difetto #}
+<div class="modal fade" id="modalTipoDifetto" tabindex="-1">
+  <div class="modal-dialog">
+    <div class="modal-content">
+      <div class="modal-header"><h6 class="modal-title">Tipo Difetto</h6><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div>
+      <div class="modal-body">
+        <input type="hidden" id="tdId">
+        <div class="row g-2">
+          <div class="col-8"><label class="form-label small">Nome *</label><input type="text" class="form-control" id="tdNome"></div>
+          <div class="col-4"><label class="form-label small">Ordine</label><input type="number" class="form-control" id="tdOrdine" value="0"></div>
+          <div class="col-12"><label class="form-label small">Codice (slug) *</label><input type="text" class="form-control font-monospace" id="tdCodice" placeholder="es. fango"></div>
+          <div class="col-12">
+            <label class="form-label small">Categoria *</label>
+            <select class="form-select" id="tdCategoria">
+              {% for cat in categorie_difetto %}
+              <option value="{{ cat.pk }}">{{ cat.nome }}</option>
+              {% endfor %}
+            </select>
+          </div>
+          <div class="col-12">
+            <div class="form-check">
+              <input class="form-check-input" type="checkbox" id="tdDesc">
+              <label class="form-check-label" for="tdDesc">Richiede descrizione libera</label>
+            </div>
+            <div class="form-check">
+              <input class="form-check-input" type="checkbox" id="tdAttivo" checked>
+              <label class="form-check-label" for="tdAttivo">Attivo</label>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-secondary btn-sm" data-bs-dismiss="modal">Annulla</button>
+        <button type="button" class="btn btn-primary btn-sm" onclick="salvaTipoDifetto()">Salva</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+{% endblock %}
+
+{% block extra_js %}
+<script>
+const CSRF = '{{ csrf_token }}';
+const MAPPINGS_INIT = {{ mapping_set_json|safe }};  // [[zona_id, tipo_id], ...]
+
+/* ---- helpers ---- */
+function apriModal(id) {
+  new bootstrap.Modal(document.getElementById(id)).show();
+}
+function chiudiModal(id) {
+  bootstrap.Modal.getInstance(document.getElementById(id))?.hide();
+}
+function toast(msg, tipo) {
+  const t = document.createElement('div');
+  t.className = `alert alert-${tipo || 'success'} position-fixed bottom-0 end-0 m-3`;
+  t.style.zIndex = 9999;
+  t.textContent = msg;
+  document.body.appendChild(t);
+  setTimeout(() => t.remove(), 3000);
+}
+
+async function apiPost(url, data) {
+  const fd = new FormData();
+  fd.append('csrfmiddlewaretoken', CSRF);
+  for (const [k, v] of Object.entries(data)) {
+    if (Array.isArray(v)) v.forEach(x => fd.append(k, x));
+    else fd.append(k, v);
+  }
+  const r = await fetch(url, { method: 'POST', body: fd });
+  return r.json();
+}
+
+async function eliminaItem(pk, tipo, nome) {
+  if (!confirm(`Eliminare "${nome}"? L'operazione non è reversibile.`)) return;
+  const urlMap = {
+    'categoria-zona': `/cq/api/categoria-zona/${pk}/elimina/`,
+    'zona':           `/cq/api/zona/${pk}/elimina/`,
+    'categoria-difetto': `/cq/api/categoria-difetto/${pk}/elimina/`,
+    'tipo-difetto':   `/cq/api/tipo-difetto/${pk}/elimina/`,
+  };
+  const res = await apiPost(urlMap[tipo], {});
+  if (res.ok) { toast('Eliminato.'); location.reload(); }
+  else toast(res.error, 'danger');
+}
+
+/* ---- Categoria Zona ---- */
+function modificaCatZona(id, nome, ordine) {
+  document.getElementById('czId').value = id;
+  document.getElementById('czNome').value = nome;
+  document.getElementById('czOrdine').value = ordine;
+  apriModal('modalCatZona');
+}
+async function salvaCatZona() {
+  const data = {
+    id: document.getElementById('czId').value,
+    nome: document.getElementById('czNome').value,
+    ordine: document.getElementById('czOrdine').value,
+  };
+  const res = await apiPost('/cq/api/categoria-zona/salva/', data);
+  if (res.ok) { chiudiModal('modalCatZona'); toast('Salvato.'); location.reload(); }
+  else toast(res.error, 'danger');
+}
+
+/* ---- Zona Config ---- */
+function modificaZona(id, data) {
+  document.getElementById('zId').value = id;
+  document.getElementById('zNome').value = data.nome;
+  document.getElementById('zCodice').value = data.codice;
+  document.getElementById('zOrdine').value = data.ordine;
+  document.getElementById('zCategoria').value = data.categoria_id;
+  document.getElementById('zProduttore').value = data.postazione_produttore || '';
+  document.getElementById('zAttiva').checked = data.attiva;
+  const sel = document.getElementById('zCatena');
+  Array.from(sel.options).forEach(o => { o.selected = (data.postazioni_catena || []).includes(o.value); });
+  apriModal('modalZona');
+}
+async function salvaZona() {
+  const catena = Array.from(document.getElementById('zCatena').selectedOptions).map(o => o.value);
+  const data = {
+    id: document.getElementById('zId').value,
+    nome: document.getElementById('zNome').value,
+    codice: document.getElementById('zCodice').value,
+    ordine: document.getElementById('zOrdine').value,
+    categoria_id: document.getElementById('zCategoria').value,
+    postazione_produttore: document.getElementById('zProduttore').value,
+    postazioni_catena: catena,
+    attiva: document.getElementById('zAttiva').checked ? '1' : '0',
+  };
+  const res = await apiPost('/cq/api/zona/salva/', data);
+  if (res.ok) { chiudiModal('modalZona'); toast('Salvato.'); location.reload(); }
+  else toast(res.error, 'danger');
+}
+
+/* ---- Categoria Difetto ---- */
+function modificaCatDifetto(id, nome, ordine) {
+  document.getElementById('cdId').value = id;
+  document.getElementById('cdNome').value = nome;
+  document.getElementById('cdOrdine').value = ordine;
+  apriModal('modalCatDifetto');
+}
+async function salvaCatDifetto() {
+  const res = await apiPost('/cq/api/categoria-difetto/salva/', {
+    id: document.getElementById('cdId').value,
+    nome: document.getElementById('cdNome').value,
+    ordine: document.getElementById('cdOrdine').value,
+  });
+  if (res.ok) { chiudiModal('modalCatDifetto'); toast('Salvato.'); location.reload(); }
+  else toast(res.error, 'danger');
+}
+
+/* ---- Tipo Difetto ---- */
+function modificaTipoDifetto(id, data) {
+  document.getElementById('tdId').value = id;
+  document.getElementById('tdNome').value = data.nome;
+  document.getElementById('tdCodice').value = data.codice;
+  document.getElementById('tdOrdine').value = data.ordine;
+  document.getElementById('tdCategoria').value = data.categoria_id;
+  document.getElementById('tdDesc').checked = data.richiede_descrizione;
+  document.getElementById('tdAttivo').checked = data.attivo;
+  apriModal('modalTipoDifetto');
+}
+async function salvaTipoDifetto() {
+  const res = await apiPost('/cq/api/tipo-difetto/salva/', {
+    id: document.getElementById('tdId').value,
+    nome: document.getElementById('tdNome').value,
+    codice: document.getElementById('tdCodice').value,
+    ordine: document.getElementById('tdOrdine').value,
+    categoria_id: document.getElementById('tdCategoria').value,
+    richiede_descrizione: document.getElementById('tdDesc').checked ? '1' : '0',
+    attivo: document.getElementById('tdAttivo').checked ? '1' : '0',
+  });
+  if (res.ok) { chiudiModal('modalTipoDifetto'); toast('Salvato.'); location.reload(); }
+  else toast(res.error, 'danger');
+}
+
+/* ---- Mapping grid init ---- */
+const mappingSet = new Set(MAPPINGS_INIT.map(([z, t]) => `${z}_${t}`));
+document.querySelectorAll('.mapping-cb').forEach(cb => {
+  const key = `${cb.dataset.zonaId}_${cb.dataset.tipoId}`;
+  cb.checked = mappingSet.has(key);
+});
+
+async function toggleMapping(cb) {
+  const zonaId = cb.dataset.zonaId;
+  const tipoId = cb.dataset.tipoId;
+  const res = await apiPost('/cq/api/mapping/toggle/', { zona_id: zonaId, tipo_difetto_id: tipoId });
+  if (!res.ok) {
+    cb.checked = !cb.checked;  // rollback
+    toast(res.error, 'danger');
+  }
+}
+
+/* Reset modali all'apertura */
+document.querySelectorAll('.modal').forEach(m => {
+  m.addEventListener('show.bs.modal', () => {
+    m.querySelectorAll('input[type=hidden]').forEach(i => { if (!i.value) i.value = ''; });
+  });
+  m.addEventListener('hide.bs.modal', () => {
+    m.querySelectorAll('input, select, textarea').forEach(el => {
+      if (el.type === 'hidden') el.value = '';
+      else if (el.type === 'checkbox') el.checked = el.defaultChecked;
+      else el.value = el.defaultValue || '';
+    });
+  });
+});
+</script>
+{% endblock %}

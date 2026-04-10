@@ -1,0 +1,314 @@
+{% extends "base.html" %}
+{% load static %}
+
+{% block title %}
+  {% if mode == 'modifica' %}Modifica{% else %}Nuova{% endif %} Scheda CQ — Ordine {{ ordine.numero_progressivo }}
+{% endblock %}
+
+{% block extra_css %}
+<style>
+  .postazione-card { border-left: 4px solid #0d6efd; }
+  .difetto-card { border-left: 4px solid #dc3545; background: #fff5f5; }
+  .difetto-card .card-header { background: #f8d7da; }
+  .zona-section-label { font-size: 0.75rem; text-transform: uppercase; letter-spacing: 1px; color: #6c757d; font-weight: 600; }
+  #difetti-container .difetto-card:not(:last-child) { margin-bottom: 1rem; }
+  .gravita-bassa { color: #fd7e14; }
+  .gravita-media { color: #dc3545; }
+  .gravita-alta { color: #6f42c1; font-weight: 700; }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="container-fluid py-3">
+
+  <!-- Header -->
+  <div class="d-flex align-items-center mb-3 gap-2">
+    <a href="{% url 'ordini:ordine-detail' ordine.pk %}" class="btn btn-outline-secondary btn-sm">
+      <i class="bi bi-arrow-left"></i>
+    </a>
+    <div>
+      <h4 class="mb-0">
+        <i class="bi bi-clipboard2-check text-primary"></i>
+        {% if mode == 'modifica' %}Modifica{% else %}Nuova{% endif %} Scheda CQ
+      </h4>
+      <small class="text-muted">
+        Ordine {{ ordine.numero_progressivo }} — {{ ordine.tipo_auto }}
+        {% if ordine.cliente %} — {{ ordine.cliente }}{% endif %}
+      </small>
+    </div>
+  </div>
+
+  <form method="post" enctype="multipart/form-data" id="form-scheda-cq">
+    {% csrf_token %}
+    {{ difetti_formset.management_form }}
+
+    <div class="row g-3">
+
+      <!-- Colonna sinistra: dati scheda -->
+      <div class="col-lg-5">
+
+        <!-- Operatori in turno -->
+        <div class="card mb-3">
+          <div class="card-header fw-semibold">
+            <i class="bi bi-people"></i> Operatori in turno
+          </div>
+          <div class="card-body">
+            {% for form in turno_forms %}
+            <div class="row align-items-center mb-2">
+              <div class="col-5">
+                <span class="postazione-label small fw-semibold">{{ form.postazione_label }}</span>
+              </div>
+              <div class="col-7">
+                {{ form.operatore }}
+                {{ form.postazione }}
+              </div>
+            </div>
+            {% endfor %}
+          </div>
+        </div>
+
+        <!-- Rilevato da + Esito -->
+        <div class="card mb-3">
+          <div class="card-header fw-semibold">
+            <i class="bi bi-person-check"></i> Controllo
+          </div>
+          <div class="card-body">
+            <div class="mb-3">
+              <label class="form-label fw-semibold">{{ scheda_form.rilevato_da.label }}</label>
+              {{ scheda_form.rilevato_da }}
+              {% if scheda_form.rilevato_da.errors %}
+                <div class="text-danger small">{{ scheda_form.rilevato_da.errors }}</div>
+              {% endif %}
+            </div>
+
+            <div class="mb-1">
+              <label class="form-label fw-semibold">{{ scheda_form.esito.label }}</label>
+              <div id="esito-ok-wrapper">
+                {% for choice in scheda_form.esito %}
+                <div class="form-check {% if choice.data.value == 'ok' %}text-success{% else %}text-danger{% endif %}">
+                  {{ choice.tag }}
+                  <label class="form-check-label fw-semibold" for="{{ choice.id_for_label }}">
+                    {% if choice.data.value == 'ok' %}
+                      <i class="bi bi-check-circle-fill"></i>
+                    {% else %}
+                      <i class="bi bi-x-circle-fill"></i>
+                    {% endif %}
+                    {{ choice.choice_label }}
+                  </label>
+                </div>
+                {% endfor %}
+              </div>
+              {% if scheda_form.esito.errors %}
+                <div class="text-danger small">{{ scheda_form.esito.errors }}</div>
+              {% endif %}
+            </div>
+          </div>
+        </div>
+
+        <!-- Note -->
+        <div class="card mb-3">
+          <div class="card-header fw-semibold"><i class="bi bi-chat-left-text"></i> Note aggiuntive</div>
+          <div class="card-body">
+            {{ scheda_form.note }}
+          </div>
+        </div>
+
+      </div>
+
+      <!-- Colonna destra: difetti (mostrata solo se esito = non_ok) -->
+      <div class="col-lg-7" id="sezione-difetti" style="display:none;">
+
+        <div class="card">
+          <div class="card-header d-flex justify-content-between align-items-center bg-danger text-white">
+            <span class="fw-semibold"><i class="bi bi-exclamation-triangle-fill"></i> Difetti rilevati</span>
+            <button type="button" class="btn btn-light btn-sm" id="aggiungi-difetto">
+              <i class="bi bi-plus-lg"></i> Aggiungi difetto
+            </button>
+          </div>
+          <div class="card-body p-2" id="difetti-container">
+            <!-- I difetti vengono inseriti qui dinamicamente -->
+          </div>
+        </div>
+
+      </div>
+
+    </div>
+
+    <!-- Salva -->
+    <div class="d-flex gap-2 mt-3">
+      <button type="submit" class="btn btn-primary">
+        <i class="bi bi-save"></i> Salva scheda CQ
+      </button>
+      <a href="{% url 'ordini:ordine-detail' ordine.pk %}" class="btn btn-outline-secondary">
+        Annulla
+      </a>
+    </div>
+
+  </form>
+</div>
+
+<!-- Template difetto (clonato via JS) -->
+<template id="template-difetto">
+  <div class="card difetto-card mb-2 difetto-form-wrapper">
+    <div class="card-header d-flex justify-content-between align-items-center py-1">
+      <span class="fw-semibold small"><i class="bi bi-exclamation-circle"></i> Difetto <span class="num-difetto"></span></span>
+      <button type="button" class="btn btn-sm btn-outline-danger rimuovi-difetto">
+        <i class="bi bi-trash"></i>
+      </button>
+    </div>
+    <div class="card-body p-2">
+      <div class="row g-2">
+        <div class="col-md-6">
+          <label class="form-label small fw-semibold">Zona auto</label>
+          <!-- zona select will be injected by JS -->
+          <select name="ZONA_PLACEHOLDER" class="form-select form-select-sm zona-select">
+            {% for val, label in zona_choices %}
+              <option value="{{ val }}">{{ label }}</option>
+            {% endfor %}
+          </select>
+        </div>
+        <div class="col-md-6">
+          <label class="form-label small fw-semibold">Tipo difetto</label>
+          <select name="TIPO_PLACEHOLDER" class="form-select form-select-sm">
+            {% for val, label in tipo_choices %}
+              <option value="{{ val }}">{{ label }}</option>
+            {% endfor %}
+          </select>
+        </div>
+        <div class="col-12 desc-altro-wrapper" style="display:none;">
+          <label class="form-label small fw-semibold">Descrizione altro</label>
+          <input type="text" name="DESC_PLACEHOLDER" class="form-control form-control-sm">
+        </div>
+        <div class="col-md-4">
+          <label class="form-label small fw-semibold">Gravità</label>
+          <select name="GRAV_PLACEHOLDER" class="form-select form-select-sm">
+            <option value="bassa">Bassa</option>
+            <option value="media">Media</option>
+            <option value="alta">Alta</option>
+          </select>
+        </div>
+        <div class="col-md-4">
+          <label class="form-label small fw-semibold">Postazione responsabile</label>
+          <select name="POST_PLACEHOLDER" class="form-select form-select-sm">
+            {% for val, label in post_choices %}
+              <option value="{{ val }}">{{ label }}</option>
+            {% endfor %}
+          </select>
+        </div>
+        <div class="col-md-4">
+          <label class="form-label small fw-semibold">Azione correttiva</label>
+          <select name="AZ_PLACEHOLDER" class="form-select form-select-sm">
+            {% for val, label in azione_choices %}
+              <option value="{{ val }}">{{ label }}</option>
+            {% endfor %}
+          </select>
+        </div>
+        <div class="col-md-6">
+          <label class="form-label small fw-semibold">Foto <span class="text-muted">(opzionale)</span></label>
+          <input type="file" name="FOTO_PLACEHOLDER" class="form-control form-control-sm" accept="image/*">
+        </div>
+        <div class="col-md-6">
+          <label class="form-label small fw-semibold">Note</label>
+          <input type="text" name="NOTE_PLACEHOLDER" class="form-control form-control-sm">
+        </div>
+      </div>
+    </div>
+  </div>
+</template>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+(function () {
+  const esito_inputs = document.querySelectorAll('[name="esito"]');
+  const sezione_difetti = document.getElementById('sezione-difetti');
+  const difetti_container = document.getElementById('difetti-container');
+  const btn_aggiungi = document.getElementById('aggiungi-difetto');
+  const TOTAL_FORMS_input = document.querySelector('[name="difetti-TOTAL_FORMS"]');
+  let form_index = 0;
+
+  function aggiorna_visibilita() {
+    const checked = document.querySelector('[name="esito"]:checked');
+    if (checked && checked.value === 'non_ok') {
+      sezione_difetti.style.display = '';
+      if (difetti_container.children.length === 0) aggiungi_difetto();
+    } else {
+      sezione_difetti.style.display = 'none';
+    }
+  }
+
+  esito_inputs.forEach(inp => inp.addEventListener('change', aggiorna_visibilita));
+
+  function aggiungi_difetto() {
+    const template = document.getElementById('template-difetto');
+    const clone = template.content.cloneNode(true);
+    const prefix = `difetti-${form_index}`;
+
+    // Sostituisci i placeholder nei name degli input
+    clone.querySelectorAll('[name]').forEach(el => {
+      el.name = el.name
+        .replace('ZONA_PLACEHOLDER', `${prefix}-zona`)
+        .replace('TIPO_PLACEHOLDER', `${prefix}-tipo_difetto`)
+        .replace('DESC_PLACEHOLDER', `${prefix}-descrizione_altro`)
+        .replace('GRAV_PLACEHOLDER', `${prefix}-gravita`)
+        .replace('POST_PLACEHOLDER', `${prefix}-postazione_responsabile`)
+        .replace('AZ_PLACEHOLDER', `${prefix}-azione_correttiva`)
+        .replace('FOTO_PLACEHOLDER', `${prefix}-foto`)
+        .replace('NOTE_PLACEHOLDER', `${prefix}-note`);
+    });
+
+    // Numero difetto
+    clone.querySelector('.num-difetto').textContent = form_index + 1;
+
+    // Rimuovi difetto
+    const wrapper = clone.querySelector('.difetto-form-wrapper');
+    clone.querySelector('.rimuovi-difetto').addEventListener('click', function () {
+      wrapper.remove();
+      aggiorna_numerazione();
+    });
+
+    // Mostra/nascondi campo "altro"
+    const tipo_select = clone.querySelector(`[name="${prefix}-tipo_difetto"]`);
+    const desc_wrapper = clone.querySelector('.desc-altro-wrapper');
+    tipo_select && tipo_select.addEventListener('change', function () {
+      desc_wrapper.style.display = this.value === 'altro' ? '' : 'none';
+    });
+
+    difetti_container.appendChild(clone);
+    form_index++;
+    TOTAL_FORMS_input.value = form_index;
+  }
+
+  function aggiorna_numerazione() {
+    difetti_container.querySelectorAll('.num-difetto').forEach((el, i) => {
+      el.textContent = i + 1;
+    });
+    TOTAL_FORMS_input.value = difetti_container.children.length;
+  }
+
+  btn_aggiungi.addEventListener('click', aggiungi_difetto);
+
+  // Init: se esito è già non_ok (pagina di modifica)
+  aggiorna_visibilita();
+
+  // Precompila difetti esistenti in modalità modifica
+  {% if mode == 'modifica' and scheda.difetti.all %}
+  {% for difetto in scheda.difetti.all %}
+  (function() {
+    aggiungi_difetto();
+    const idx = form_index - 1;
+    const prefix = `difetti-${idx}`;
+    document.querySelector(`[name="${prefix}-zona"]`).value = '{{ difetto.zona }}';
+    document.querySelector(`[name="${prefix}-tipo_difetto"]`).value = '{{ difetto.tipo_difetto }}';
+    document.querySelector(`[name="${prefix}-descrizione_altro"]`).value = '{{ difetto.descrizione_altro|escapejs }}';
+    document.querySelector(`[name="${prefix}-gravita"]`).value = '{{ difetto.gravita }}';
+    document.querySelector(`[name="${prefix}-postazione_responsabile"]`).value = '{{ difetto.postazione_responsabile }}';
+    document.querySelector(`[name="${prefix}-azione_correttiva"]`).value = '{{ difetto.azione_correttiva }}';
+    document.querySelector(`[name="${prefix}-note"]`).value = '{{ difetto.note|escapejs }}';
+  })();
+  {% endfor %}
+  {% endif %}
+
+})();
+</script>
+{% endblock %}

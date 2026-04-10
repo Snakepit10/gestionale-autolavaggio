@@ -1,0 +1,215 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}Configurazione Pianificazione{% endblock %}
+
+{% block content %}
+<div class="container mt-4">
+    <div class="row">
+        <div class="col-lg-8 mx-auto">
+            <div class="card shadow">
+                <div class="card-header bg-primary text-white">
+                    <h4 class="mb-0">
+                        <i class="bi bi-gear"></i> Configurazione Orari di Lavoro
+                    </h4>
+                </div>
+                <div class="card-body">
+                    <p class="text-muted mb-4">
+                        Configura gli orari di apertura e chiusura dell'autolavaggio, e l'eventuale pausa pranzo.
+                        Questi orari saranno utilizzati nella pianificazione della timeline.
+                    </p>
+
+                    <form method="post">
+                        {% csrf_token %}
+
+                        <div class="row mb-4">
+                            <div class="col-md-6">
+                                <div class="card bg-light">
+                                    <div class="card-body">
+                                        <h5 class="card-title">
+                                            <i class="bi bi-sunrise"></i> Orario Apertura
+                                        </h5>
+                                        <div class="mb-3">
+                                            <label for="id_ora_inizio" class="form-label fw-bold">Ora Inizio</label>
+                                            {{ form.ora_inizio }}
+                                            {% if form.ora_inizio.errors %}
+                                                <div class="invalid-feedback d-block">
+                                                    {{ form.ora_inizio.errors }}
+                                                </div>
+                                            {% endif %}
+                                            <small class="text-muted d-block mt-1">
+                                                Ora di inizio della giornata lavorativa
+                                            </small>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div class="col-md-6">
+                                <div class="card bg-light">
+                                    <div class="card-body">
+                                        <h5 class="card-title">
+                                            <i class="bi bi-sunset"></i> Orario Chiusura
+                                        </h5>
+                                        <div class="mb-3">
+                                            <label for="id_ora_fine" class="form-label fw-bold">Ora Fine</label>
+                                            {{ form.ora_fine }}
+                                            {% if form.ora_fine.errors %}
+                                                <div class="invalid-feedback d-block">
+                                                    {{ form.ora_fine.errors }}
+                                                </div>
+                                            {% endif %}
+                                            <small class="text-muted d-block mt-1">
+                                                Ora di fine della giornata lavorativa
+                                            </small>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <hr class="my-4">
+
+                        <h5 class="mb-3">
+                            <i class="bi bi-cup-hot"></i> Pausa Pranzo
+                        </h5>
+
+                        <div class="form-check form-switch mb-3">
+                            {{ form.pausa_pranzo_attiva }}
+                            <label class="form-check-label" for="id_pausa_pranzo_attiva">
+                                Abilita pausa pranzo
+                            </label>
+                            <small class="text-muted d-block mt-1">
+                                Se attiva, verrà mostrata un'area grigia sulla timeline durante l'orario di pausa
+                            </small>
+                        </div>
+
+                        <div class="row" id="orari-pausa">
+                            <div class="col-md-6">
+                                <div class="mb-3">
+                                    <label for="id_ora_inizio_pausa" class="form-label">Inizio Pausa</label>
+                                    {{ form.ora_inizio_pausa }}
+                                    {% if form.ora_inizio_pausa.errors %}
+                                        <div class="invalid-feedback d-block">
+                                            {{ form.ora_inizio_pausa.errors }}
+                                        </div>
+                                    {% endif %}
+                                </div>
+                            </div>
+
+                            <div class="col-md-6">
+                                <div class="mb-3">
+                                    <label for="id_ora_fine_pausa" class="form-label">Fine Pausa</label>
+                                    {{ form.ora_fine_pausa }}
+                                    {% if form.ora_fine_pausa.errors %}
+                                        <div class="invalid-feedback d-block">
+                                            {{ form.ora_fine_pausa.errors }}
+                                        </div>
+                                    {% endif %}
+                                </div>
+                            </div>
+                        </div>
+
+                        <hr class="my-4">
+
+                        <div class="alert alert-info">
+                            <i class="bi bi-info-circle"></i>
+                            <strong>Nota:</strong> Le modifiche agli orari saranno visibili immediatamente nella timeline di pianificazione.
+                            Gli ordini già pianificati non verranno spostati automaticamente.
+                        </div>
+
+                        <div class="d-flex justify-content-between">
+                            <a href="{% url 'ordini:pianificazione' %}" class="btn btn-secondary">
+                                <i class="bi bi-arrow-left"></i> Annulla
+                            </a>
+                            <button type="submit" class="btn btn-primary btn-lg">
+                                <i class="bi bi-check-lg"></i> Salva Configurazione
+                            </button>
+                        </div>
+                    </form>
+                </div>
+
+                {% if object.aggiornato_il %}
+                <div class="card-footer text-muted">
+                    <small>
+                        <i class="bi bi-clock-history"></i>
+                        Ultima modifica: {{ object.aggiornato_il|date:"d/m/Y H:i" }}
+                        {% if object.aggiornato_da %}
+                            da {{ object.aggiornato_da.get_full_name|default:object.aggiornato_da.username }}
+                        {% endif %}
+                    </small>
+                </div>
+                {% endif %}
+            </div>
+
+            <!-- Card di esempio -->
+            <div class="card mt-4 border-info">
+                <div class="card-header bg-info text-white">
+                    <h5 class="mb-0">
+                        <i class="bi bi-lightbulb"></i> Esempio di Configurazione
+                    </h5>
+                </div>
+                <div class="card-body">
+                    <ul class="mb-0">
+                        <li><strong>Orario Standard:</strong> 08:00 - 19:00 (11 ore operative)</li>
+                        <li><strong>Con Pausa Pranzo:</strong> 13:00 - 15:00 (2 ore di pausa)</li>
+                        <li><strong>Ore Lavorative Effettive:</strong> 9 ore al giorno</li>
+                    </ul>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<style>
+    .form-control[type="time"] {
+        font-size: 1.1rem;
+        padding: 0.6rem;
+        border: 2px solid #dee2e6;
+        border-radius: 8px;
+    }
+
+    .form-control[type="time"]:focus {
+        border-color: #0d6efd;
+        box-shadow: 0 0 0 0.25rem rgba(13, 110, 253, 0.25);
+    }
+
+    .form-check-input {
+        width: 3rem;
+        height: 1.5rem;
+        cursor: pointer;
+    }
+
+    .card {
+        border-radius: 12px;
+    }
+
+    .card-header {
+        border-radius: 12px 12px 0 0 !important;
+    }
+</style>
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    const pausaAttiva = document.getElementById('id_pausa_pranzo_attiva');
+    const orariPausa = document.getElementById('orari-pausa');
+
+    function toggleOrariPausa() {
+        if (pausaAttiva.checked) {
+            orariPausa.style.display = 'block';
+            orariPausa.querySelectorAll('input').forEach(input => {
+                input.required = true;
+            });
+        } else {
+            orariPausa.style.display = 'none';
+            orariPausa.querySelectorAll('input').forEach(input => {
+                input.required = false;
+            });
+        }
+    }
+
+    pausaAttiva.addEventListener('change', toggleOrariPausa);
+    toggleOrariPausa(); // Init
+});
+</script>
+{% endblock %}

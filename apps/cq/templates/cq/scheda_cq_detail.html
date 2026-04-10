@@ -1,0 +1,185 @@
+{% extends "base.html" %}
+
+{% block title %}Scheda CQ — Ordine {{ ordine.numero_progressivo }}{% endblock %}
+
+{% block extra_css %}
+<style>
+  .badge-gravita-bassa  { background: #fd7e14; }
+  .badge-gravita-media  { background: #dc3545; }
+  .badge-gravita-alta   { background: #6f42c1; }
+  .punteggio-pos { color: #198754; font-weight: 700; }
+  .punteggio-neg { color: #dc3545; font-weight: 700; }
+  .zona-tag { font-size: 0.78rem; background: #e9ecef; border-radius: 4px; padding: 2px 7px; }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="container-fluid py-3">
+
+  <!-- Header -->
+  <div class="d-flex align-items-center mb-3 gap-2">
+    <a href="{% url 'ordini:ordine-detail' ordine.pk %}" class="btn btn-outline-secondary btn-sm">
+      <i class="bi bi-arrow-left"></i>
+    </a>
+    <div class="flex-grow-1">
+      <h4 class="mb-0">
+        <i class="bi bi-clipboard2-check text-primary"></i>
+        Scheda CQ — Ordine {{ ordine.numero_progressivo }}
+      </h4>
+      <small class="text-muted">
+        {{ ordine.tipo_auto }}{% if ordine.cliente %} — {{ ordine.cliente }}{% endif %}
+        &nbsp;·&nbsp; Compilata da <strong>{{ scheda.compilata_da.get_full_name|default:scheda.compilata_da.username }}</strong>
+        il {{ scheda.data_ora|date:"d/m/Y H:i" }}
+      </small>
+    </div>
+    {% if is_titolare %}
+    <a href="{% url 'cq:scheda_modifica' ordine.pk %}" class="btn btn-warning btn-sm">
+      <i class="bi bi-pencil"></i> Rettifica
+    </a>
+    {% endif %}
+  </div>
+
+  <div class="row g-3">
+
+    <!-- Colonna sinistra: riepilogo -->
+    <div class="col-lg-4">
+
+      <!-- Esito -->
+      <div class="card mb-3">
+        <div class="card-body text-center py-4">
+          {% if scheda.esito == 'ok' %}
+            <i class="bi bi-check-circle-fill text-success" style="font-size:3rem;"></i>
+            <h4 class="mt-2 text-success">OK — Nessun difetto</h4>
+          {% else %}
+            <i class="bi bi-x-circle-fill text-danger" style="font-size:3rem;"></i>
+            <h4 class="mt-2 text-danger">Non OK — {{ scheda.num_difetti }} difett{{ scheda.num_difetti|pluralize:"o,i" }}</h4>
+          {% endif %}
+          <p class="text-muted small mb-0">
+            Rilevato da: <strong>{{ scheda.get_rilevato_da_display }}</strong>
+          </p>
+        </div>
+      </div>
+
+      <!-- Operatori in turno -->
+      <div class="card mb-3">
+        <div class="card-header fw-semibold"><i class="bi bi-people"></i> Operatori in turno</div>
+        <ul class="list-group list-group-flush">
+          {% for opt in operatori_turno %}
+          <li class="list-group-item d-flex justify-content-between align-items-center py-2">
+            <span class="text-muted small">{{ opt.get_postazione_display }}</span>
+            <strong class="small">{{ opt.operatore.get_full_name|default:opt.operatore.username }}</strong>
+          </li>
+          {% empty %}
+          <li class="list-group-item text-muted small">Nessun operatore registrato</li>
+          {% endfor %}
+        </ul>
+      </div>
+
+      <!-- Note -->
+      {% if scheda.note %}
+      <div class="card mb-3">
+        <div class="card-header fw-semibold"><i class="bi bi-chat-left-text"></i> Note</div>
+        <div class="card-body small">{{ scheda.note }}</div>
+      </div>
+      {% endif %}
+
+    </div>
+
+    <!-- Colonna destra: difetti e punteggi -->
+    <div class="col-lg-8">
+
+      <!-- Difetti -->
+      {% if difetti %}
+      <div class="card mb-3">
+        <div class="card-header fw-semibold bg-danger-subtle">
+          <i class="bi bi-exclamation-triangle-fill text-danger"></i> Difetti rilevati
+        </div>
+        <div class="card-body p-0">
+          <div class="table-responsive">
+            <table class="table table-sm table-hover mb-0">
+              <thead class="table-light">
+                <tr>
+                  <th>Zona</th>
+                  <th>Tipo</th>
+                  <th>Gravità</th>
+                  <th>Post. resp.</th>
+                  <th>Azione</th>
+                  <th></th>
+                </tr>
+              </thead>
+              <tbody>
+                {% for difetto in difetti %}
+                <tr>
+                  <td><span class="zona-tag">{{ difetto.get_zona_display }}</span></td>
+                  <td class="small">{{ difetto.get_tipo_difetto_display }}
+                    {% if difetto.descrizione_altro %}<br><em class="text-muted">{{ difetto.descrizione_altro }}</em>{% endif %}
+                  </td>
+                  <td>
+                    <span class="badge badge-gravita-{{ difetto.gravita }}">{{ difetto.get_gravita_display }}</span>
+                  </td>
+                  <td class="small">{{ difetto.get_postazione_responsabile_display }}</td>
+                  <td class="small">{{ difetto.get_azione_correttiva_display }}</td>
+                  <td>
+                    {% if difetto.foto %}
+                    <a href="{{ difetto.foto.url }}" target="_blank" class="btn btn-outline-secondary btn-sm py-0">
+                      <i class="bi bi-image"></i>
+                    </a>
+                    {% endif %}
+                  </td>
+                </tr>
+                {% if difetto.note %}
+                <tr class="table-secondary">
+                  <td colspan="6" class="small text-muted ps-3"><i class="bi bi-chat-dots"></i> {{ difetto.note }}</td>
+                </tr>
+                {% endif %}
+                {% endfor %}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+      {% endif %}
+
+      <!-- Punteggi generati -->
+      <div class="card">
+        <div class="card-header fw-semibold">
+          <i class="bi bi-trophy"></i> Punteggi generati
+        </div>
+        <div class="card-body p-0">
+          {% if punteggi %}
+          <div class="table-responsive">
+            <table class="table table-sm table-hover mb-0">
+              <thead class="table-light">
+                <tr>
+                  <th>Operatore</th>
+                  <th>Punti</th>
+                  <th>Tipo</th>
+                  <th>Motivazione</th>
+                </tr>
+              </thead>
+              <tbody>
+                {% for p in punteggi %}
+                <tr>
+                  <td class="fw-semibold small">{{ p.operatore.get_full_name|default:p.operatore.username }}</td>
+                  <td>
+                    <span class="{% if p.punti >= 0 %}punteggio-pos{% else %}punteggio-neg{% endif %}">
+                      {% if p.punti >= 0 %}+{% endif %}{{ p.punti }}
+                    </span>
+                  </td>
+                  <td><span class="badge bg-secondary small">{{ p.get_tipo_display }}</span></td>
+                  <td class="small text-muted">{{ p.motivazione }}</td>
+                </tr>
+                {% endfor %}
+              </tbody>
+            </table>
+          </div>
+          {% else %}
+          <p class="text-muted small p-3 mb-0">Nessun punteggio generato.</p>
+          {% endif %}
+        </div>
+      </div>
+
+    </div>
+  </div>
+</div>
+{% endblock %}

@@ -1,0 +1,690 @@
+{% extends "base.html" %}
+{% load cq_tags %}
+
+{% block title %}
+  {% if mode == 'modifica' %}Modifica Scheda CQ{% else %}Compila Scheda CQ{% endif %} — Ordine #{{ ordine.numero_progressivo }}
+{% endblock %}
+
+{% block extra_css %}
+<style>
+/* ---- Layout ---- */
+.cq-form-container { display: flex; flex-direction: column; gap: 12px; }
+
+/* ---- Order details bar ---- */
+.ordine-bar { background: #e7f1ff; border: 1px solid #b6d4fe; border-radius: 10px; padding: 10px 14px; }
+.ordine-bar .badge-servizio { font-size: .78rem; }
+
+/* ---- Operatori turno ---- */
+.operatori-check-group .form-check { display: inline-block; margin-right: 12px; margin-bottom: 4px; }
+.operatori-check-group .form-check-input { width: 1.3em; height: 1.3em; }
+
+/* ---- Esito radio ---- */
+.esito-radio-label {
+  display: flex; align-items: center; gap: 8px;
+  padding: 12px 18px; border-radius: 10px; border: 2px solid #dee2e6;
+  cursor: pointer; font-size: 1.05rem; font-weight: 600;
+  transition: border-color .15s, background .15s;
+  user-select: none;
+}
+.esito-radio-label:has(input:checked) { border-color: #0d6efd; background: #e7f1ff; }
+
+/* ---- POS layout ---- */
+.pos-layout { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+@media (max-width: 768px) { .pos-layout { grid-template-columns: 1fr; } }
+
+/* ---- Categoria pills — colori per categoria ---- */
+.cat-pill {
+  border-radius: 20px; padding: 6px 14px; font-size: .82rem; font-weight: 600;
+  border: 2px solid; cursor: pointer;
+  transition: background .15s, color .15s, border-color .15s;
+  white-space: nowrap;
+}
+.cat-pill-0 { background:#e7f3ff; border-color:#90c4f7; color:#0a58ca; }
+.cat-pill-1 { background:#fff3e0; border-color:#ffb74d; color:#bf5800; }
+.cat-pill-2 { background:#e8f5e9; border-color:#81c784; color:#145c1f; }
+.cat-pill-3 { background:#e0f7fa; border-color:#4dd0e1; color:#006978; }
+.cat-pill-4 { background:#f3e5f5; border-color:#ce93d8; color:#6a1b9a; }
+.cat-pill-0.active { background:#0d6efd; border-color:#0d6efd; color:#fff; }
+.cat-pill-1.active { background:#fd7e14; border-color:#fd7e14; color:#fff; }
+.cat-pill-2.active { background:#198754; border-color:#198754; color:#fff; }
+.cat-pill-3.active { background:#0dcaf0; border-color:#0dcaf0; color:#000; }
+.cat-pill-4.active { background:#6f42c1; border-color:#6f42c1; color:#fff; }
+
+/* ---- Zona cards — colori per categoria ---- */
+.zona-card {
+  border: 2px solid #dee2e6; border-radius: 10px; padding: 10px;
+  cursor: pointer; font-size: .85rem; font-weight: 600; text-align: center;
+  transition: border-color .15s, background .15s; position: relative;
+  min-height: 56px; display: flex; align-items: center; justify-content: center;
+}
+.zona-card-0 { background:#f0f7ff; border-color:#90c4f7; color:#0a58ca; }
+.zona-card-1 { background:#fff8f0; border-color:#ffb74d; color:#bf5800; }
+.zona-card-2 { background:#f0faf0; border-color:#81c784; color:#145c1f; }
+.zona-card-3 { background:#f0fbfd; border-color:#4dd0e1; color:#006978; }
+.zona-card-4 { background:#faf0ff; border-color:#ce93d8; color:#6a1b9a; }
+.zona-card-0:hover { background:#dceeff; border-color:#0d6efd; }
+.zona-card-1:hover { background:#ffe8cc; border-color:#fd7e14; }
+.zona-card-2:hover { background:#d4edda; border-color:#198754; }
+.zona-card-3:hover { background:#d0f4f8; border-color:#0dcaf0; }
+.zona-card-4:hover { background:#ead5f7; border-color:#6f42c1; }
+.zona-card.active { color:#fff !important; }
+.zona-card-0.active { background:#0d6efd; border-color:#0d6efd; }
+.zona-card-1.active { background:#fd7e14; border-color:#fd7e14; }
+.zona-card-2.active { background:#198754; border-color:#198754; }
+.zona-card-3.active { background:#0dcaf0; border-color:#0dcaf0; color:#000 !important; }
+.zona-card-4.active { background:#6f42c1; border-color:#6f42c1; }
+.zona-card.has-defects { border-color:#dc3545 !important; }
+.zona-card.has-defects:not(.active) { background:#fff5f5 !important; color:#842029 !important; }
+.zona-badge {
+  position: absolute; top: -7px; right: -7px;
+  background: #dc3545; color: #fff; border-radius: 50%;
+  width: 20px; height: 20px; font-size: .68rem;
+  display: none; align-items: center; justify-content: center;
+}
+.zona-card.has-defects .zona-badge { display: flex; }
+
+/* ---- Difetto panel (right side) ---- */
+.difetto-panel { border: 1px solid #dee2e6; border-radius: 10px; background: #fff; min-height: 200px; }
+.difetto-panel-header { background: #f8f9fa; border-bottom: 1px solid #dee2e6; padding: 8px 12px; border-radius: 10px 10px 0 0; }
+
+/* ---- Panel header colors ---- */
+.difetto-panel-header { background: #f8f9fa; border-bottom: 1px solid #dee2e6; padding: 8px 12px; border-radius: 10px 10px 0 0; transition: background .15s, color .15s; }
+.panel-header-0 { background:#dceeff; color:#0a58ca; border-bottom-color:#90c4f7; }
+.panel-header-1 { background:#ffe8cc; color:#bf5800; border-bottom-color:#ffb74d; }
+.panel-header-2 { background:#d4edda; color:#145c1f; border-bottom-color:#81c784; }
+.panel-header-3 { background:#d0f4f8; color:#006978; border-bottom-color:#4dd0e1; }
+.panel-header-4 { background:#ead5f7; color:#6a1b9a; border-bottom-color:#ce93d8; }
+
+/* ---- Difetto category headers in panel ---- */
+.tipo-cat-header { border-left: 3px solid; border-radius: 4px; padding: 3px 8px; margin-bottom: 4px; font-size: .78rem; font-weight: 700; letter-spacing: .03em; }
+.tipo-cat-0 { background:#e7f3ff; color:#0a58ca; border-left-color:#0d6efd; }
+.tipo-cat-1 { background:#fff3e0; color:#bf5800; border-left-color:#fd7e14; }
+.tipo-cat-2 { background:#e8f5e9; color:#145c1f; border-left-color:#198754; }
+.tipo-cat-3 { background:#e0f7fa; color:#006978; border-left-color:#0dcaf0; }
+.tipo-cat-4 { background:#f3e5f5; color:#6a1b9a; border-left-color:#6f42c1; }
+
+/* ---- Difetto type cards ---- */
+.tipo-card {
+  border: 2px solid #dee2e6; border-radius: 8px; padding: 8px 12px;
+  cursor: pointer; font-size: .85rem; font-weight: 500;
+  transition: border-color .15s, background .15s;
+  display: flex; align-items: center; gap: 8px;
+}
+.tipo-card:hover { border-color: #0d6efd; background: #f0f6ff; }
+.tipo-card.has-count { border-color: #198754; background: #f0fff4; }
+
+/* ---- Foto preview in cart ---- */
+.foto-thumb { max-height: 48px; max-width: 72px; border-radius: 4px; border: 1px solid #dee2e6; object-fit: cover; }
+.foto-btn { font-size: .78rem; padding: 3px 9px; }
+
+/* ---- Cart (selected defects) ---- */
+.cart-item {
+  border: 1px solid #dee2e6; border-radius: 8px; padding: 10px 12px;
+  background: #fff; margin-bottom: 8px;
+}
+.cart-item .zona-label { font-size: .78rem; color: #6c757d; }
+.cart-item .tipo-label { font-weight: 600; font-size: .92rem; }
+
+/* ---- Gravity + azione pills ---- */
+.pill-btn {
+  border-radius: 20px; padding: 5px 12px; font-size: .78rem; font-weight: 600;
+  border: 2px solid; background: transparent; cursor: pointer;
+  transition: background .12s, color .12s; min-height: 34px;
+}
+.pill-btn:not(.sel-bassa):not(.sel-media):not(.sel-alta):not(.sel-azione) { color: #6c757d; border-color: #dee2e6; }
+.pill-btn.sel-bassa  { background: #198754; color: #fff; border-color: #198754; }
+.pill-btn.sel-media  { background: #ffc107; color: #000; border-color: #ffc107; }
+.pill-btn.sel-alta   { background: #dc3545; color: #fff; border-color: #dc3545; }
+.pill-btn.sel-azione { background: #0d6efd; color: #fff; border-color: #0d6efd; }
+</style>
+{% endblock %}
+
+{% block content %}
+<form id="form-scheda-cq" method="post" enctype="multipart/form-data" novalidate>
+{% csrf_token %}
+{{ difetti_formset.management_form }}
+
+<div class="cq-form-container">
+
+  {# ---- Header ordine ---- #}
+  <div class="ordine-bar">
+    <div class="d-flex justify-content-between align-items-start flex-wrap gap-2">
+      <div>
+        <span class="fw-bold fs-6">
+          <i class="bi bi-clipboard2-check text-primary"></i>
+          {% if mode == 'modifica' %}Modifica Scheda CQ{% else %}Nuova Scheda CQ{% endif %}
+        </span>
+        <span class="text-muted ms-2">Ordine <strong>#{{ ordine.numero_progressivo }}</strong></span>
+        <span class="text-muted ms-2">— {{ ordine.data_ora|date:"d/m/Y H:i" }}</span>
+      </div>
+      <a href="{% url 'ordini:ordine-detail' ordine.pk %}" class="btn btn-outline-secondary btn-sm">
+        <i class="bi bi-arrow-left"></i> Torna all'ordine
+      </a>
+    </div>
+    <div class="mt-2 d-flex flex-wrap gap-2 align-items-center">
+      {% if ordine.cliente %}
+        <span><i class="bi bi-person-fill text-primary"></i> <strong>{{ ordine.cliente }}</strong></span>
+      {% else %}
+        <span class="text-muted"><i class="bi bi-person"></i> Cliente anonimo</span>
+      {% endif %}
+      {% if ordine.tipo_auto %}
+        <span class="ms-2"><i class="bi bi-car-front text-secondary"></i> {{ ordine.tipo_auto }}</span>
+      {% endif %}
+      <span class="ms-auto fw-bold text-success"><i class="bi bi-cash-coin"></i> €{{ ordine.totale_finale }}</span>
+    </div>
+    {% if ordine_items %}
+    <div class="mt-2 d-flex flex-wrap gap-1">
+      {% for item in ordine_items %}
+        <span class="badge bg-primary badge-servizio">{{ item.servizio_prodotto.titolo }}{% if item.quantita > 1 %} ×{{ item.quantita }}{% endif %}</span>
+      {% endfor %}
+    </div>
+    {% endif %}
+  </div>
+
+  {# ---- Operatori in turno ---- #}
+  <div class="card">
+    <div class="card-header bg-primary text-white fw-semibold py-2">
+      <i class="bi bi-people"></i> Operatori in turno
+    </div>
+    <div class="card-body py-2">
+      <div class="row g-2">
+        {% for form in turno_forms %}
+        <div class="col-md-6 col-xl-4">
+          <div class="border rounded p-2">
+            <div class="fw-semibold text-primary small mb-1">
+              <i class="bi bi-diagram-3"></i> {{ form.postazione_label }}
+            </div>
+            {% for hidden in form.hidden_fields %}{{ hidden }}{% endfor %}
+            <div class="operatori-check-group">{{ form.operatori }}</div>
+          </div>
+        </div>
+        {% endfor %}
+      </div>
+    </div>
+  </div>
+
+  {# ---- Dati controllo ---- #}
+  <div class="card">
+    <div class="card-header bg-primary text-white fw-semibold py-2">
+      <i class="bi bi-clipboard"></i> Esito controllo
+    </div>
+    <div class="card-body py-2">
+      <div class="d-flex gap-3 flex-wrap mb-2">
+        {% for widget in scheda_form.esito %}
+          <label class="esito-radio-label">
+            {{ widget.tag }}
+            {% if forloop.first %}
+              <i class="bi bi-check-circle-fill text-success fs-5"></i> OK — nessun difetto
+            {% else %}
+              <i class="bi bi-x-circle-fill text-danger fs-5"></i> Non OK — difetti rilevati
+            {% endif %}
+          </label>
+        {% endfor %}
+      </div>
+      {% if scheda_form.esito.errors %}
+        <div class="text-danger small">{{ scheda_form.esito.errors }}</div>
+      {% endif %}
+      <label class="form-label fw-semibold small mt-2">Note</label>
+      {{ scheda_form.note }}
+    </div>
+  </div>
+
+  {# ---- Sezione difetti (POS style) ---- #}
+  <div id="sezione-difetti" class="d-none">
+
+    <div id="alert-no-difetti" class="alert alert-warning d-none py-2">
+      <i class="bi bi-exclamation-triangle"></i> Seleziona almeno un difetto per esito Non OK.
+    </div>
+    <div id="alert-no-gravita" class="alert alert-warning d-none py-2">
+      <i class="bi bi-exclamation-triangle"></i> Imposta la gravità per ogni difetto segnalato.
+    </div>
+
+    {# POS: zona selector + difetto panel #}
+    <div class="card">
+      <div class="card-header bg-warning bg-opacity-25 fw-semibold py-2">
+        <i class="bi bi-map"></i> Seleziona zona e difetto
+      </div>
+      <div class="card-body p-2">
+
+        {# Category pills #}
+        <div class="d-flex flex-wrap gap-2 mb-3" id="catPills">
+          {% for cat_nome, zone in zone_categorie %}
+          <button type="button" class="cat-pill cat-pill-{{ forloop.counter0 }} {% if forloop.first %}active{% endif %}"
+                  data-cat="{{ forloop.counter0 }}"
+                  onclick="filtraCat({{ forloop.counter0 }})">
+            {{ cat_nome }}
+            <span class="badge bg-danger rounded-pill ms-1 d-none" id="cat-badge-{{ forloop.counter0 }}">0</span>
+          </button>
+          {% endfor %}
+        </div>
+
+        <div class="pos-layout">
+          {# Left: zone cards #}
+          <div>
+            <div class="text-muted small mb-2 fw-semibold"><i class="bi bi-map-fill"></i> Zone</div>
+            <div id="zonaGrid">
+              {% for cat_nome, zone in zone_categorie %}
+              {% with cat_idx=forloop.counter0 %}
+              <div class="zona-cat-group" data-cat="{{ cat_idx }}"
+                   {% if not forloop.first %}style="display:none"{% endif %}>
+                <div class="d-flex flex-wrap gap-2">
+                  {% for zona_codice, zona_nome in zone %}
+                  <div class="zona-card zona-card-{{ cat_idx }}" data-zona="{{ zona_codice }}"
+                       onclick="selezionaZona('{{ zona_codice }}', '{{ zona_nome|escapejs }}', {{ cat_idx }})">
+                    {{ zona_nome }}
+                    <span class="zona-badge" id="zbadge-{{ zona_codice }}">0</span>
+                  </div>
+                  {% endfor %}
+                </div>
+              </div>
+              {% endwith %}
+              {% endfor %}
+            </div>
+          </div>
+
+          {# Right: difetto types for selected zone #}
+          <div class="difetto-panel" id="difettoPanel">
+            <div class="difetto-panel-header text-muted small d-flex justify-content-between align-items-center">
+              <span id="panelZonaNome"><i class="bi bi-hand-index"></i> Seleziona una zona</span>
+            </div>
+            <div class="p-2" id="panelContent">
+              <p class="text-muted text-center py-4">Clicca una zona per vedere i difetti applicabili</p>
+            </div>
+          </div>
+        </div>
+
+      </div>
+    </div>
+
+    {# Cart: selected defects #}
+    <div class="card mt-2" id="cartCard" style="display:none">
+      <div class="card-header bg-danger bg-opacity-10 fw-semibold py-2">
+        <i class="bi bi-cart3"></i> Difetti selezionati
+        <span class="badge bg-danger ms-1" id="cartCount">0</span>
+      </div>
+      <div class="card-body p-2" id="cartBody"></div>
+    </div>
+
+  </div>{# fine sezione-difetti #}
+
+  {# Contenitore nascosto per i file input delle foto (persistono nel DOM) #}
+  <div id="foto-inputs-container" style="display:none"></div>
+
+  {# ---- Footer ---- #}
+  <div class="d-flex gap-2 mb-4">
+    <button type="submit" class="btn btn-primary btn-lg">
+      <i class="bi bi-save"></i>
+      {% if mode == 'modifica' %}Aggiorna scheda{% else %}Salva scheda{% endif %}
+    </button>
+    <a href="{% url 'ordini:ordine-detail' ordine.pk %}" class="btn btn-outline-secondary btn-lg">
+      <i class="bi bi-x-lg"></i> Annulla
+    </a>
+  </div>
+
+</div>{# cq-form-container #}
+</form>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+(function () {
+'use strict';
+
+/* ------------------------------------------------------------------ */
+/* Dati dal server                                                       */
+/* ------------------------------------------------------------------ */
+const ZONA_DIFETTI    = {{ zona_difetti_json|safe }};    // {zona_codice: [{cat_nome, tipi:[{codice,nome,richiede_descrizione}]}]}
+const ZONA_PRODUTTORE = {{ zona_produttore_json|safe }};  // {zona_codice: postazione}
+const AZIONE_CHOICES  = {{ azione_choices_json|safe }};   // [[v,l],...]
+const EXISTING        = {{ existing_difetti_json|safe }};  // [{zona,tipo_difetto,gravita,...}]
+
+/* ------------------------------------------------------------------ */
+/* Stato                                                                 */
+/* key = "zona__tipo__N"  (doppio underscore come separatore)           */
+/* N = defectCounter incrementale — garantisce unicità per stesso tipo  */
+/* ------------------------------------------------------------------ */
+const selezioni = {};   // key → {key, zona, tipo, zona_nome, tipo_nome, gravita, postazione, azione, desc, richiede_desc}
+let zonaAttiva  = null;
+let defectCounter = 0;
+
+/* ------------------------------------------------------------------ */
+/* Helpers                                                               */
+/* ------------------------------------------------------------------ */
+function escJs(s) { return String(s).replace(/\\/g, '\\\\').replace(/'/g, "\\'").replace(/"/g, '\\"'); }
+
+function zonaFromKey(k)  { return k.split('__')[0]; }
+function tipoFromKey(k)  { return k.split('__')[1]; }
+
+/* ------------------------------------------------------------------ */
+/* Esito — visibilità sezione difetti                                   */
+/* ------------------------------------------------------------------ */
+const sezione   = document.getElementById('sezione-difetti');
+const esitoName = '{{ scheda_form.esito.html_name }}';
+
+function aggiornaVisibilita() {
+  const checked = document.querySelector(`input[name="${esitoName}"]:checked`);
+  if (checked && checked.value === 'non_ok') {
+    sezione.classList.remove('d-none');
+  } else {
+    sezione.classList.add('d-none');
+    document.getElementById('alert-no-difetti').classList.add('d-none');
+    document.getElementById('alert-no-gravita').classList.add('d-none');
+  }
+}
+document.querySelectorAll(`input[name="${esitoName}"]`).forEach(r => r.addEventListener('change', aggiornaVisibilita));
+aggiornaVisibilita();
+
+/* ------------------------------------------------------------------ */
+/* Filtro categorie                                                      */
+/* ------------------------------------------------------------------ */
+window.filtraCat = function(catIdx) {
+  document.querySelectorAll('.cat-pill').forEach(p => p.classList.toggle('active', p.dataset.cat == catIdx));
+  document.querySelectorAll('.zona-cat-group').forEach(g => {
+    g.style.display = g.dataset.cat == catIdx ? '' : 'none';
+  });
+  // se la zona attiva non è in questa categoria, resetta il panel
+  if (zonaAttiva) {
+    const zonaCard = document.querySelector(`.zona-card[data-zona="${zonaAttiva}"]`);
+    if (zonaCard && zonaCard.closest('.zona-cat-group').dataset.cat != catIdx) {
+      resetPanel();
+      zonaAttiva = null;
+    }
+  }
+};
+
+function resetPanel() {
+  document.getElementById('panelZonaNome').innerHTML = '<i class="bi bi-hand-index"></i> Seleziona una zona';
+  const header = document.getElementById('panelZonaNome').closest('.difetto-panel-header');
+  if (header) header.className = 'difetto-panel-header small d-flex justify-content-between align-items-center';
+  document.getElementById('panelContent').innerHTML =
+    '<p class="text-muted text-center py-4">Clicca una zona per vedere i difetti applicabili</p>';
+}
+
+/* ------------------------------------------------------------------ */
+/* Selezione zona                                                        */
+/* ------------------------------------------------------------------ */
+window.selezionaZona = function(codice, nome, catIdx) {
+  document.querySelectorAll('.zona-card').forEach(c => c.classList.toggle('active', c.dataset.zona === codice));
+  zonaAttiva = codice;
+  document.getElementById('panelZonaNome').textContent = nome;
+  // colora l'header del panel con il colore della categoria
+  const header = document.getElementById('panelZonaNome').closest('.difetto-panel-header');
+  if (header) {
+    header.className = 'difetto-panel-header small d-flex justify-content-between align-items-center';
+    if (catIdx !== undefined) header.classList.add('panel-header-' + (catIdx % 5));
+  }
+  renderPanel(codice);
+};
+
+/* ------------------------------------------------------------------ */
+/* Renderizza il panel dei difetti per una zona                         */
+/* ------------------------------------------------------------------ */
+function renderPanel(zona) {
+  const container = document.getElementById('panelContent');
+  const categorie = ZONA_DIFETTI[zona] || [];
+  if (!categorie.length) {
+    container.innerHTML = '<p class="text-muted text-center py-3">Nessun difetto configurato per questa zona.</p>';
+    return;
+  }
+  let html = '';
+  categorie.forEach((cat, catIdx) => {
+    html += `<div class="mb-3">
+      <div class="tipo-cat-header tipo-cat-${catIdx % 5}"><i class="bi bi-tag-fill me-1"></i>${escJs(cat.cat_nome)}</div>
+      <div class="d-flex flex-wrap gap-2">`;
+    cat.tipi.forEach(tipo => {
+      const count = Object.keys(selezioni).filter(k =>
+        zonaFromKey(k) === zona && tipoFromKey(k) === tipo.codice
+      ).length;
+      const hasCount = count > 0;
+      html += `<div class="tipo-card ${hasCount ? 'has-count' : ''}"
+                    onclick="addTipo('${escJs(zona)}','${escJs(tipo.codice)}','${escJs(tipo.nome)}',${tipo.richiede_descrizione ? 'true' : 'false'})">
+                 <i class="bi bi-plus-circle${hasCount ? '-fill text-success' : ' text-primary'}"></i>
+                 ${tipo.nome}
+                 ${hasCount ? `<span class="badge bg-success rounded-pill ms-auto">×${count}</span>` : ''}
+               </div>`;
+    });
+    html += '</div></div>';
+  });
+  container.innerHTML = html;
+}
+
+/* ------------------------------------------------------------------ */
+/* Aggiunge un difetto al carrello (sempre nuovo — più istanze OK)      */
+/* ------------------------------------------------------------------ */
+window.addTipo = function(zona, tipo, tipoNome, richiedeDesc) {
+  const key = zona + '__' + tipo + '__' + (defectCounter++);
+  const zonaCard = document.querySelector(`.zona-card[data-zona="${zona}"]`);
+  const zona_nome = zonaCard ? zonaCard.textContent.trim() : zona;
+
+  selezioni[key] = {
+    key, zona, tipo, zona_nome, tipo_nome: tipoNome,
+    gravita: '', postazione: ZONA_PRODUTTORE[zona] || '',
+    azione: 'sistemato', desc: '', richiede_desc: richiedeDesc,
+  };
+
+  // Crea il file input per la foto (persiste nel DOM finché non viene rimosso)
+  creaFotoInput(key);
+
+  aggiornaContatoriZona(zona);
+  renderCart();
+  if (zonaAttiva === zona) renderPanel(zona);  // aggiorna badge count
+};
+
+/* ------------------------------------------------------------------ */
+/* File input foto                                                       */
+/* ------------------------------------------------------------------ */
+function creaFotoInput(key) {
+  const container = document.getElementById('foto-inputs-container');
+  const inp = document.createElement('input');
+  inp.type = 'file';
+  inp.id   = 'foto-input-' + key;
+  inp.accept = 'image/*';
+  inp.style.display = 'none';
+  inp.addEventListener('change', function() { aggiornaFotoPreview(key, this); });
+  container.appendChild(inp);
+}
+
+function aggiornaFotoPreview(key, input) {
+  const preview = document.getElementById('foto-preview-' + key);
+  if (!preview) return;
+  if (input.files && input.files[0]) {
+    const url = URL.createObjectURL(input.files[0]);
+    const name = input.files[0].name.length > 22 ? input.files[0].name.substring(0,22)+'…' : input.files[0].name;
+    preview.innerHTML = `<img src="${url}" class="foto-thumb ms-1">
+      <span class="small text-muted ms-1">${name}</span>
+      <button type="button" class="btn btn-link btn-sm text-danger p-0 ms-1" onclick="cancellFoto('${key}')">
+        <i class="bi bi-x-circle"></i></button>`;
+  } else {
+    preview.innerHTML = '';
+  }
+}
+
+window.cancellFoto = function(key) {
+  const inp = document.getElementById('foto-input-' + key);
+  if (inp) inp.value = '';
+  aggiornaFotoPreview(key, inp || {files: []});
+};
+
+/* ------------------------------------------------------------------ */
+/* Contatori badge zona                                                  */
+/* ------------------------------------------------------------------ */
+function aggiornaContatoriZona(zona) {
+  const n = Object.keys(selezioni).filter(k => zonaFromKey(k) === zona).length;
+  const badge = document.getElementById('zbadge-' + zona);
+  const card  = document.querySelector(`.zona-card[data-zona="${zona}"]`);
+  if (badge) badge.textContent = n;
+  if (card)  card.classList.toggle('has-defects', n > 0);
+  aggiornaBadgeCategorie();
+}
+
+function aggiornaBadgeCategorie() {
+  document.querySelectorAll('.zona-cat-group').forEach(group => {
+    const catIdx = group.dataset.cat;
+    let tot = 0;
+    group.querySelectorAll('.zona-card.has-defects').forEach(c => {
+      tot += parseInt(document.getElementById('zbadge-' + c.dataset.zona)?.textContent || 0);
+    });
+    const b = document.getElementById('cat-badge-' + catIdx);
+    if (b) { b.textContent = tot; b.classList.toggle('d-none', tot === 0); }
+  });
+}
+
+/* ------------------------------------------------------------------ */
+/* Cart                                                                  */
+/* ------------------------------------------------------------------ */
+function renderCart() {
+  const items = Object.values(selezioni);
+  const card  = document.getElementById('cartCard');
+  const body  = document.getElementById('cartBody');
+  const count = document.getElementById('cartCount');
+  card.style.display  = items.length ? '' : 'none';
+  count.textContent   = items.length;
+
+  body.innerHTML = items.map(d => {
+    const key = d.key;
+    return `<div class="cart-item" id="ci-${key}">
+      <div class="d-flex justify-content-between align-items-start mb-2">
+        <div>
+          <div class="zona-label"><i class="bi bi-map"></i> ${d.zona_nome}</div>
+          <div class="tipo-label">${d.tipo_nome}</div>
+        </div>
+        <button type="button" class="btn btn-outline-danger btn-sm py-0 px-1"
+                onclick="rimuoviDifetto('${key}')">
+          <i class="bi bi-trash"></i>
+        </button>
+      </div>
+      <div class="mb-1">
+        <span class="text-muted small me-1">Gravità *</span>
+        <div class="d-inline-flex gap-1 flex-wrap">
+          ${['bassa','media','alta'].map(g => `
+            <button type="button" class="pill-btn ${d.gravita === g ? 'sel-'+g : ''}"
+                    onclick="setGravita('${key}','${g}')">${g.charAt(0).toUpperCase()+g.slice(1)}</button>
+          `).join('')}
+        </div>
+      </div>
+      <div class="mb-1">
+        <span class="text-muted small me-1">Azione</span>
+        <div class="d-inline-flex gap-1 flex-wrap">
+          ${AZIONE_CHOICES.map(([v,l]) => `
+            <button type="button" class="pill-btn ${d.azione === v ? 'sel-azione' : ''}"
+                    onclick="setAzione('${key}','${v}')">${l.split(' — ')[0].substring(0,18)}</button>
+          `).join('')}
+        </div>
+      </div>
+      ${d.richiede_desc ? `
+      <div class="mb-1">
+        <input type="text" class="form-control form-control-sm"
+               placeholder="Descrizione obbligatoria..."
+               value="${escJs(d.desc)}"
+               oninput="setDesc('${key}', this.value)">
+      </div>` : ''}
+      <div class="d-flex align-items-center flex-wrap gap-1">
+        <label for="foto-input-${key}" class="btn btn-outline-secondary btn-sm foto-btn" style="cursor:pointer">
+          <i class="bi bi-camera"></i> Foto
+        </label>
+        <div id="foto-preview-${key}" class="d-inline-flex align-items-center"></div>
+      </div>
+    </div>`;
+  }).join('');
+}
+
+window.rimuoviDifetto = function(key) {
+  const zona = zonaFromKey(key);
+  delete selezioni[key];
+  // Rimuovi il file input dal DOM
+  const inp = document.getElementById('foto-input-' + key);
+  if (inp) inp.remove();
+  aggiornaContatoriZona(zona);
+  renderCart();
+  if (zonaAttiva === zona) renderPanel(zona);
+};
+
+window.setGravita = function(key, g) { if (selezioni[key]) { selezioni[key].gravita = g; renderCart(); } };
+window.setAzione  = function(key, v) { if (selezioni[key]) { selezioni[key].azione  = v; renderCart(); } };
+window.setDesc    = function(key, v) { if (selezioni[key])   selezioni[key].desc    = v; };
+
+/* ------------------------------------------------------------------ */
+/* Pre-carica difetti esistenti (edit mode)                             */
+/* ------------------------------------------------------------------ */
+if (EXISTING.length > 0) {
+  const nonOkInput = document.querySelector(`input[name="${esitoName}"][value="non_ok"]`);
+  if (nonOkInput) { nonOkInput.checked = true; aggiornaVisibilita(); }
+
+  EXISTING.forEach(d => {
+    const key = d.zona + '__' + d.tipo_difetto + '__' + (defectCounter++);
+    const zonaCard = document.querySelector(`.zona-card[data-zona="${d.zona}"]`);
+    const zona_nome = zonaCard ? zonaCard.textContent.trim() : d.zona;
+    let tipo_nome = d.tipo_difetto, richiede_desc = false;
+    (ZONA_DIFETTI[d.zona] || []).forEach(cat =>
+      cat.tipi.forEach(t => {
+        if (t.codice === d.tipo_difetto) { tipo_nome = t.nome; richiede_desc = t.richiede_descrizione; }
+      })
+    );
+    selezioni[key] = {
+      key, zona: d.zona, tipo: d.tipo_difetto,
+      zona_nome, tipo_nome, richiede_desc,
+      gravita:   d.gravita                 || '',
+      postazione: d.postazione_responsabile || ZONA_PRODUTTORE[d.zona] || '',
+      azione:    d.azione_correttiva        || 'sistemato',
+      desc:      d.descrizione_altro        || '',
+    };
+    creaFotoInput(key);
+    aggiornaContatoriZona(d.zona);
+  });
+  renderCart();
+}
+
+/* ------------------------------------------------------------------ */
+/* Submit: serializza selezioni in campi hidden + rinomina foto input   */
+/* ------------------------------------------------------------------ */
+document.getElementById('form-scheda-cq').addEventListener('submit', function(e) {
+  const esitoChecked = document.querySelector(`input[name="${esitoName}"]:checked`);
+  if (!esitoChecked || esitoChecked.value !== 'non_ok') return;
+
+  const difetti = Object.values(selezioni);
+
+  if (difetti.length === 0) {
+    e.preventDefault();
+    const al = document.getElementById('alert-no-difetti');
+    al.classList.remove('d-none');
+    al.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    return;
+  }
+  const senzaGravita = difetti.filter(d => !d.gravita);
+  if (senzaGravita.length > 0) {
+    e.preventDefault();
+    const al = document.getElementById('alert-no-gravita');
+    al.classList.remove('d-none');
+    al.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    return;
+  }
+
+  const form = this;
+  difetti.forEach(function(d, i) {
+    const fields = {
+      [`difetti-${i}-id`]:                     '',
+      [`difetti-${i}-zona`]:                   d.zona,
+      [`difetti-${i}-tipo_difetto`]:            d.tipo,
+      [`difetti-${i}-gravita`]:                d.gravita,
+      [`difetti-${i}-postazione_responsabile`]: d.postazione,
+      [`difetti-${i}-azione_correttiva`]:       d.azione || 'sistemato',
+      [`difetti-${i}-descrizione_altro`]:       d.desc   || '',
+      [`difetti-${i}-note`]:                   '',
+    };
+    Object.entries(fields).forEach(([name, value]) => {
+      const inp = document.createElement('input');
+      inp.type = 'hidden'; inp.name = name; inp.value = value;
+      form.appendChild(inp);
+    });
+    // Rinomina il file input della foto affinché Django lo riceva come difetti-N-foto
+    const fotoInput = document.getElementById('foto-input-' + d.key);
+    if (fotoInput) fotoInput.name = `difetti-${i}-foto`;
+  });
+
+  document.getElementById('id_difetti-TOTAL_FORMS').value  = difetti.length;
+  document.getElementById('id_difetti-INITIAL_FORMS').value = 0;
+});
+
+})();
+</script>
+{% endblock %}

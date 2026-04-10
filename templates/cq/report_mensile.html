@@ -1,0 +1,309 @@
+{% extends "base.html" %}
+{% load cq_tags %}
+
+{% block title %}Report Mensile CQ — {% for m, nome in mesi %}{% if m == mese %}{{ nome }}{% endif %}{% endfor %} {{ anno }}{% endblock %}
+
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-3">
+  <h4 class="mb-0">
+    <i class="bi bi-trophy"></i> Report Mensile —
+    {% for m, nome in mesi %}{% if m == mese %}<strong>{{ nome }}</strong>{% endif %}{% endfor %}
+    {{ anno }}
+  </h4>
+
+  {# Selettore mese/anno #}
+  <form method="get" action="" class="d-flex gap-2 align-items-center" id="form-periodo">
+    <select name="anno_sel" class="form-select form-select-sm" style="width:90px;"
+            onchange="this.form.submit()">
+      {% for a in anni %}
+        <option value="{{ a }}" {% if a == anno %}selected{% endif %}>{{ a }}</option>
+      {% endfor %}
+    </select>
+    <select name="mese_sel" class="form-select form-select-sm" style="width:130px;"
+            onchange="this.form.submit()">
+      {% for m, nome in mesi %}
+        <option value="{{ m }}" {% if m == mese %}selected{% endif %}>{{ nome }}</option>
+      {% endfor %}
+    </select>
+  </form>
+</div>
+
+{# Redirect GET → URL corretto con anno/mese #}
+<script>
+  document.getElementById('form-periodo').addEventListener('submit', function(e) {
+    e.preventDefault();
+    const anno = this.querySelector('[name=anno_sel]').value;
+    const mese = this.querySelector('[name=mese_sel]').value;
+    window.location.href = `/cq/report/${anno}/${mese}/`;
+  });
+</script>
+
+{# Alert mese validato #}
+{% if impostazione and impostazione.validato %}
+  <div class="alert alert-success d-flex align-items-center gap-2">
+    <i class="bi bi-lock-fill fs-5"></i>
+    <div>
+      Mese <strong>congelato</strong> il {{ impostazione.validato_il|date:"d/m/Y H:i" }}
+      da {{ impostazione.validato_da.get_full_name|default:impostazione.validato_da.username }}.
+      Nessuna modifica ulteriore consentita.
+    </div>
+  </div>
+{% endif %}
+
+{# Tabella operatori #}
+<div class="card mb-4">
+  <div class="card-header"><i class="bi bi-people"></i> Riepilogo operatori</div>
+  <div class="card-body p-0">
+    {% if report %}
+      <div class="table-responsive">
+        <table class="table table-sm align-middle mb-0">
+          <thead class="table-light">
+            <tr>
+              <th>Operatore</th>
+              <th class="text-center">Turni</th>
+              <th class="text-center">Saldo grezzo</th>
+              <th class="text-center">Indice</th>
+              <th class="text-center">Premio stimato</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for riga in report %}
+              <tr class="
+                {% if riga.indice is not None and riga.indice > 0 %}table-success
+                {% elif riga.indice is not None and riga.indice < 0 %}table-danger
+                {% else %}table-secondary{% endif %}">
+                <td>{{ riga.operatore.get_full_name|default:riga.operatore.username }}</td>
+                <td class="text-center">{{ riga.turni }}</td>
+                <td class="text-center fw-bold">{{ riga.saldo_grezzo|segno }}</td>
+                <td class="text-center">
+                  {% if riga.indice is not None %}
+                    <span class="badge {{ riga.indice|indice_badge_class }} fs-6">
+                      {{ riga.indice|floatformat:2 }}
+                    </span>
+                  {% else %}
+                    <span class="text-muted">—</span>
+                  {% endif %}
+                </td>
+                <td class="text-center">
+                  {% if riga.premio is not None %}
+                    <strong>€ {{ riga.premio }}</strong>
+                  {% else %}
+                    <span class="text-muted">—</span>
+                  {% endif %}
+                </td>
+              </tr>
+            {% endfor %}
+          </tbody>
+          {% if impostazione %}
+            <tfoot class="table-light">
+              <tr>
+                <td colspan="4" class="text-end fw-semibold">Monte premi disponibile:</td>
+                <td class="text-center fw-bold text-primary">€ {{ impostazione.monte_premi }}</td>
+              </tr>
+            </tfoot>
+          {% endif %}
+        </table>
+      </div>
+    {% else %}
+      <p class="text-muted p-3 mb-0">
+        <i class="bi bi-info-circle"></i> Nessun operatore ha lavorato in questo mese.
+      </p>
+    {% endif %}
+  </div>
+</div>
+
+{# Azioni — solo se mese non validato #}
+{% if not impostazione or not impostazione.validato %}
+<div class="row g-3 mb-4">
+
+  {# Monte premi #}
+  <div class="col-md-5">
+    <div class="card h-100">
+      <div class="card-header"><i class="bi bi-cash-stack"></i> Monte premi</div>
+      <div class="card-body">
+        <form method="post" action="{% url 'cq:salva_impostazione_premio' %}">
+          {% csrf_token %}
+          <div class="row g-2">
+            <div class="col-6">
+              <label class="form-label small">Anno</label>
+              {{ premio_form.anno }}
+            </div>
+            <div class="col-6">
+              <label class="form-label small">Mese</label>
+              {{ premio_form.mese }}
+            </div>
+            <div class="col-12">
+              <label class="form-label small">Monte premi (€)</label>
+              {{ premio_form.monte_premi }}
+            </div>
+            <div class="col-12">
+              <label class="form-label small">Note</label>
+              {{ premio_form.note }}
+            </div>
+          </div>
+          {% if premio_form.errors %}
+            <div class="alert alert-danger mt-2 small">{{ premio_form.errors }}</div>
+          {% endif %}
+          <button type="submit" class="btn btn-primary btn-sm mt-3 w-100">
+            <i class="bi bi-save"></i>
+            {% if impostazione %}Aggiorna monte premi{% else %}Imposta monte premi{% endif %}
+          </button>
+        </form>
+      </div>
+    </div>
+  </div>
+
+  {# Modifica punteggio #}
+  <div class="col-md-7">
+    <div class="card h-100">
+      <div class="card-header"><i class="bi bi-pencil-square"></i> Modifica punteggio manuale</div>
+      <div class="card-body">
+        <form method="post" action="{% url 'cq:salva_modifica_punteggio' anno=anno mese=mese %}">
+          {% csrf_token %}
+          <div class="row g-2">
+            <div class="col-md-6">
+              <label class="form-label small">Operatore</label>
+              {{ modifica_form.operatore }}
+            </div>
+            <div class="col-md-6">
+              <label class="form-label small">Punti (+ o -)</label>
+              {{ modifica_form.punti }}
+            </div>
+            <div class="col-12">
+              <label class="form-label small">{{ modifica_form.motivazione.label }}</label>
+              {{ modifica_form.motivazione }}
+            </div>
+          </div>
+          {% if modifica_form.errors %}
+            <div class="alert alert-danger mt-2 small">{{ modifica_form.errors }}</div>
+          {% endif %}
+          <button type="submit" class="btn btn-warning btn-sm mt-3 w-100">
+            <i class="bi bi-save"></i> Salva modifica
+          </button>
+        </form>
+      </div>
+    </div>
+  </div>
+
+</div>
+
+{# Valida mese #}
+{% if impostazione %}
+  <div class="d-flex justify-content-end mb-4">
+    <form method="post" action="{% url 'cq:valida_mese' anno=anno mese=mese %}"
+          onsubmit="return confirm('Congelare il mese? Questa operazione non è reversibile.');">
+      {% csrf_token %}
+      <button type="submit" class="btn btn-danger">
+        <i class="bi bi-lock"></i> Valida e congela mese
+      </button>
+    </form>
+  </div>
+{% endif %}
+
+{% endif %}{# fine blocco non-validato #}
+
+{# ---- Storico punteggi del mese ---- #}
+<div class="row g-3 mb-4">
+
+  {# Punteggi automatici da schede CQ #}
+  <div class="col-12">
+    <div class="card">
+      <div class="card-header d-flex justify-content-between align-items-center">
+        <span><i class="bi bi-list-check"></i> Punteggi CQ automatici</span>
+        <span class="badge bg-secondary">{{ punteggi_mese|length }}</span>
+      </div>
+      <div class="card-body p-0">
+        {% if punteggi_mese %}
+          <div class="table-responsive">
+            <table class="table table-sm align-middle mb-0" id="tbl-punteggi">
+              <thead class="table-light">
+                <tr>
+                  <th>Data</th>
+                  <th>Operatore</th>
+                  <th>Ordine</th>
+                  <th>Tipo</th>
+                  <th>Difetto / zona</th>
+                  <th class="text-center">Punti</th>
+                  <th>Motivazione</th>
+                </tr>
+              </thead>
+              <tbody>
+                {% for p in punteggi_mese %}
+                <tr class="{% if p.punti > 0 %}table-success{% elif p.punti < 0 %}table-danger{% endif %}">
+                  <td class="small text-nowrap">{{ p.data_ora|date:"d/m H:i" }}</td>
+                  <td class="small">{{ p.operatore.get_full_name|default:p.operatore.username }}</td>
+                  <td class="small">
+                    {% if p.scheda %}
+                      <a href="{% url 'cq:scheda_detail' ordine_pk=p.scheda.ordine.pk %}" class="text-decoration-none">
+                        #{{ p.scheda.ordine.numero_progressivo }}
+                      </a>
+                    {% else %}—{% endif %}
+                  </td>
+                  <td class="small">{{ p.get_tipo_display }}</td>
+                  <td class="small text-muted">
+                    {% if p.difetto %}{{ p.difetto.zona_nome }}{% else %}—{% endif %}
+                  </td>
+                  <td class="text-center fw-bold">
+                    <span class="badge {% if p.punti > 0 %}bg-success{% elif p.punti < 0 %}bg-danger{% else %}bg-secondary{% endif %}">
+                      {{ p.punti|segno }}
+                    </span>
+                  </td>
+                  <td class="small text-muted">{{ p.motivazione }}</td>
+                </tr>
+                {% endfor %}
+              </tbody>
+            </table>
+          </div>
+        {% else %}
+          <p class="text-muted p-3 mb-0"><i class="bi bi-info-circle"></i> Nessun punteggio automatico in questo mese.</p>
+        {% endif %}
+      </div>
+    </div>
+  </div>
+
+  {# Modifiche manuali #}
+  <div class="col-12">
+    <div class="card">
+      <div class="card-header d-flex justify-content-between align-items-center">
+        <span><i class="bi bi-pencil-square"></i> Modifiche manuali titolare</span>
+        <span class="badge bg-secondary">{{ modifiche_mese|length }}</span>
+      </div>
+      <div class="card-body p-0">
+        {% if modifiche_mese %}
+          <div class="table-responsive">
+            <table class="table table-sm align-middle mb-0">
+              <thead class="table-light">
+                <tr>
+                  <th>Data</th>
+                  <th>Operatore</th>
+                  <th class="text-center">Punti</th>
+                  <th>Motivazione</th>
+                  <th>Inserita da</th>
+                </tr>
+              </thead>
+              <tbody>
+                {% for m in modifiche_mese %}
+                <tr class="{% if m.punti > 0 %}table-success{% elif m.punti < 0 %}table-danger{% endif %}">
+                  <td class="small text-nowrap">{{ m.data_ora|date:"d/m H:i" }}</td>
+                  <td class="small">{{ m.operatore.get_full_name|default:m.operatore.username }}</td>
+                  <td class="text-center fw-bold">
+                    <span class="badge {% if m.punti > 0 %}bg-success{% elif m.punti < 0 %}bg-danger{% else %}bg-secondary{% endif %}">
+                      {{ m.punti|segno }}
+                    </span>
+                  </td>
+                  <td class="small">{{ m.motivazione }}</td>
+                  <td class="small text-muted">{{ m.creato_da.get_full_name|default:m.creato_da.username }}</td>
+                </tr>
+                {% endfor %}
+              </tbody>
+            </table>
+          </div>
+        {% else %}
+          <p class="text-muted p-3 mb-0"><i class="bi bi-info-circle"></i> Nessuna modifica manuale in questo mese.</p>
+        {% endif %}
+      </div>
+    </div>
+  </div>
+
+</div>
+{% endblock %}

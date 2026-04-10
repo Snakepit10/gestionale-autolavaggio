@@ -1,0 +1,245 @@
+{% extends "base.html" %}
+{% load cq_tags %}
+
+{% block title %}Dashboard Qualità{% endblock %}
+
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-3">
+  <h4 class="mb-0"><i class="bi bi-bar-chart-line"></i> Dashboard Qualità</h4>
+
+  {# Filtro periodo #}
+  <div class="btn-group" role="group">
+    <a href="?periodo=settimana"
+       class="btn btn-sm {% if periodo == 'settimana' %}btn-primary{% else %}btn-outline-primary{% endif %}">
+      Settimana
+    </a>
+    <a href="?periodo=mese"
+       class="btn btn-sm {% if periodo == 'mese' or not periodo %}btn-primary{% else %}btn-outline-primary{% endif %}">
+      Mese
+    </a>
+    <a href="?periodo=trimestre"
+       class="btn btn-sm {% if periodo == 'trimestre' %}btn-primary{% else %}btn-outline-primary{% endif %}">
+      Trimestre
+    </a>
+  </div>
+</div>
+
+<p class="text-muted small mb-3">
+  <i class="bi bi-calendar3"></i> Dati dal <strong>{{ data_inizio|date:"d/m/Y" }}</strong> ad oggi.
+</p>
+
+{# KPI Cards #}
+<div class="row g-3 mb-4">
+  <div class="col-6 col-md-3">
+    <div class="card text-center h-100">
+      <div class="card-body">
+        <div class="fs-1 fw-bold text-primary">{{ totale_schede }}</div>
+        <div class="text-muted small">Schede compilate</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="col-6 col-md-3">
+    <div class="card text-center h-100">
+      <div class="card-body">
+        <div class="fs-1 fw-bold {% if perc_ok >= 90 %}text-success{% elif perc_ok >= 70 %}text-warning{% else %}text-danger{% endif %}">
+          {{ perc_ok }}%
+        </div>
+        <div class="text-muted small">Esito OK ({{ ok_count }}/{{ totale_schede }})</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="col-6 col-md-3">
+    <div class="card text-center h-100">
+      <div class="card-body">
+        <div class="fs-1 fw-bold text-danger">{{ totale_difetti }}</div>
+        <div class="text-muted small">Difetti totali</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="col-6 col-md-3">
+    <div class="card text-center h-100">
+      <div class="card-body">
+        {% if zone_labels %}
+          <div class="fs-6 fw-bold text-warning mt-2">{{ zone_labels.0 }}</div>
+          <div class="text-muted small">Zona più problematica</div>
+        {% else %}
+          <div class="fs-1 text-success"><i class="bi bi-check-circle"></i></div>
+          <div class="text-muted small">Nessun difetto</div>
+        {% endif %}
+      </div>
+    </div>
+  </div>
+</div>
+
+{# Grafici #}
+{% if totale_schede > 0 %}
+<div class="row g-3 mb-4">
+
+  {# Bar chart zone #}
+  <div class="col-lg-7">
+    <div class="card h-100">
+      <div class="card-header"><i class="bi bi-map"></i> Zone più problematiche</div>
+      <div class="card-body">
+        {% if zone_labels %}
+          <canvas id="chartZone" height="220"></canvas>
+        {% else %}
+          <p class="text-muted text-center mt-4">Nessun difetto nel periodo.</p>
+        {% endif %}
+      </div>
+    </div>
+  </div>
+
+  {# Pie chart gravità #}
+  <div class="col-lg-5">
+    <div class="card h-100">
+      <div class="card-header"><i class="bi bi-exclamation-diamond"></i> Distribuzione gravità</div>
+      <div class="card-body d-flex align-items-center justify-content-center">
+        {% if totale_difetti > 0 %}
+          <canvas id="chartGravita" style="max-height:220px;"></canvas>
+        {% else %}
+          <p class="text-muted text-center">Nessun difetto nel periodo.</p>
+        {% endif %}
+      </div>
+    </div>
+  </div>
+
+</div>
+
+{# Postazioni più penalizzate #}
+{% if punteggi_neg %}
+<div class="card mb-4">
+  <div class="card-header"><i class="bi bi-diagram-3"></i> Postazioni più penalizzate</div>
+  <div class="card-body p-0">
+    <table class="table table-sm mb-0">
+      <thead class="table-light">
+        <tr><th>Postazione</th><th class="text-center">Penalità attribuite</th></tr>
+      </thead>
+      <tbody>
+        {% for p in punteggi_neg %}
+          <tr>
+            <td>{{ p.difetto__postazione_responsabile }}</td>
+            <td class="text-center">{{ p.totale }}</td>
+          </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+{% endif %}
+
+{# Ultimi difetti #}
+{% if ultimi_difetti %}
+<div class="card mb-3">
+  <div class="card-header"><i class="bi bi-clock-history"></i> Ultimi difetti rilevati</div>
+  <div class="card-body p-0">
+    <div class="table-responsive">
+      <table class="table table-sm align-middle mb-0">
+        <thead class="table-light">
+          <tr>
+            <th>Ordine</th>
+            <th>Data</th>
+            <th>Zona</th>
+            <th>Tipo</th>
+            <th>Gravità</th>
+            <th>Azione</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for d in ultimi_difetti %}
+            <tr>
+              <td>
+                <a href="{% url 'cq:scheda_detail' ordine_pk=d.scheda.ordine.pk %}" class="text-decoration-none">
+                  #{{ d.scheda.ordine.numero_ordine }}
+                </a>
+              </td>
+              <td class="small text-muted">{{ d.scheda.data_ora|date:"d/m H:i" }}</td>
+              <td class="small">{{ d.get_zona_display }}</td>
+              <td class="small">{{ d.get_tipo_difetto_display }}</td>
+              <td>
+                {% if d.gravita == 'bassa' %}
+                  <span class="badge bg-success">Bassa</span>
+                {% elif d.gravita == 'media' %}
+                  <span class="badge bg-warning text-dark">Media</span>
+                {% else %}
+                  <span class="badge bg-danger">Alta</span>
+                {% endif %}
+              </td>
+              <td class="small">{{ d.get_azione_correttiva_display }}</td>
+            </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div>
+{% endif %}
+
+{% else %}
+  <div class="alert alert-info">
+    <i class="bi bi-info-circle"></i> Nessuna scheda CQ compilata nel periodo selezionato.
+  </div>
+{% endif %}
+{% endblock %}
+
+{% block extra_js %}
+{% if zone_labels and zone_counts %}
+<script>
+(function () {
+  // Dati serializzati dal server
+  const zoneLabels = {{ zone_labels|safe }};
+  const zoneCounts = {{ zone_counts|safe }};
+  const gravBassa  = {{ grav_bassa }};
+  const gravMedia  = {{ grav_media }};
+  const gravAlta   = {{ grav_alta }};
+
+  // Bar chart orizzontale — zone
+  const ctxZone = document.getElementById('chartZone');
+  if (ctxZone) {
+    new Chart(ctxZone, {
+      type: 'bar',
+      data: {
+        labels: zoneLabels,
+        datasets: [{
+          label: 'Difetti',
+          data: zoneCounts,
+          backgroundColor: 'rgba(220, 53, 69, 0.7)',
+          borderColor: 'rgba(220, 53, 69, 1)',
+          borderWidth: 1,
+        }]
+      },
+      options: {
+        indexAxis: 'y',
+        responsive: true,
+        plugins: { legend: { display: false } },
+        scales: { x: { beginAtZero: true, ticks: { stepSize: 1 } } }
+      }
+    });
+  }
+
+  // Pie chart gravità
+  const ctxGravita = document.getElementById('chartGravita');
+  if (ctxGravita && (gravBassa + gravMedia + gravAlta) > 0) {
+    new Chart(ctxGravita, {
+      type: 'doughnut',
+      data: {
+        labels: ['Bassa', 'Media', 'Alta'],
+        datasets: [{
+          data: [gravBassa, gravMedia, gravAlta],
+          backgroundColor: ['#198754', '#ffc107', '#dc3545'],
+        }]
+      },
+      options: {
+        responsive: true,
+        plugins: {
+          legend: { position: 'bottom' }
+        }
+      }
+    });
+  }
+})();
+</script>
+{% endif %}
+{% endblock %}

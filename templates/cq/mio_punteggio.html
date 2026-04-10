@@ -1,0 +1,164 @@
+{% extends "base.html" %}
+{% load cq_tags %}
+
+{% block title %}Il mio punteggio — {% for m, nome in mesi %}{% if m == mese %}{{ nome }}{% endif %}{% endfor %} {{ anno }}{% endblock %}
+
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-3">
+  <h4 class="mb-0">
+    <i class="bi bi-person-check"></i> Il mio punteggio —
+    {% for m, nome in mesi %}{% if m == mese %}<strong>{{ nome }}</strong>{% endif %}{% endfor %}
+    {{ anno }}
+  </h4>
+
+  {# Selettore mese/anno #}
+  <form method="get" id="form-periodo" class="d-flex gap-2 align-items-center">
+    <select name="anno" class="form-select form-select-sm" style="width:90px;" onchange="this.form.submit()">
+      {% for a in anni %}
+        <option value="{{ a }}" {% if a == anno %}selected{% endif %}>{{ a }}</option>
+      {% endfor %}
+    </select>
+    <select name="mese" class="form-select form-select-sm" style="width:130px;" onchange="this.form.submit()">
+      {% for m, nome in mesi %}
+        <option value="{{ m }}" {% if m == mese %}selected{% endif %}>{{ nome }}</option>
+      {% endfor %}
+    </select>
+  </form>
+</div>
+
+{# Summary cards #}
+<div class="row g-3 mb-4">
+  <div class="col-6 col-md-3">
+    <div class="card text-center h-100">
+      <div class="card-body">
+        <div class="fs-1 fw-bold text-primary">{{ turni }}</div>
+        <div class="text-muted small">Turni lavorati</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="col-6 col-md-3">
+    <div class="card text-center h-100">
+      <div class="card-body">
+        <div class="fs-1 fw-bold {% if saldo_grezzo > 0 %}text-success{% elif saldo_grezzo < 0 %}text-danger{% else %}text-secondary{% endif %}">
+          {{ saldo_grezzo|segno }}
+        </div>
+        <div class="text-muted small">Saldo grezzo</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="col-6 col-md-3">
+    <div class="card text-center h-100">
+      <div class="card-body">
+        {% if indice is not None %}
+          <div class="mt-2">
+            <span class="badge {{ indice|indice_badge_class }} fs-4 px-3 py-2">
+              {{ indice|floatformat:2 }}
+            </span>
+          </div>
+        {% else %}
+          <div class="fs-1 text-secondary">—</div>
+        {% endif %}
+        <div class="text-muted small mt-1">Indice qualità</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="col-6 col-md-3">
+    <div class="card text-center h-100">
+      <div class="card-body">
+        <div class="fs-1 fw-bold text-secondary">{{ punteggi.count }}</div>
+        <div class="text-muted small">Voci punteggio</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+{# Tabella punteggi #}
+<div class="card mb-4">
+  <div class="card-header"><i class="bi bi-list-check"></i> Punteggi del mese</div>
+  <div class="card-body p-0">
+    {% if punteggi %}
+      <div class="table-responsive">
+        <table class="table table-sm align-middle mb-0">
+          <thead class="table-light">
+            <tr>
+              <th>Data</th>
+              <th>Ordine</th>
+              <th>Tipo</th>
+              <th>Zona difetto</th>
+              <th class="text-center">Punti</th>
+              <th>Motivazione</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for p in punteggi %}
+              <tr class="{% if p.punti > 0 %}table-success{% elif p.punti < 0 %}table-danger{% endif %}">
+                <td class="small text-muted">{{ p.data_ora|date:"d/m H:i" }}</td>
+                <td>
+                  {% if p.scheda %}
+                    <a href="{% url 'cq:scheda_detail' ordine_pk=p.scheda.ordine.pk %}" class="text-decoration-none">
+                      #{{ p.scheda.ordine.numero_ordine }}
+                    </a>
+                  {% else %}
+                    —
+                  {% endif %}
+                </td>
+                <td class="small">{{ p.get_tipo_display }}</td>
+                <td class="small">
+                  {% if p.difetto %}{{ p.difetto.get_zona_display }}{% else %}—{% endif %}
+                </td>
+                <td class="text-center fw-bold">
+                  <span class="{% if p.punti > 0 %}text-success{% else %}text-danger{% endif %}">
+                    {{ p.punti|segno }}
+                  </span>
+                </td>
+                <td class="small text-muted">{{ p.motivazione }}</td>
+              </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    {% else %}
+      <p class="text-muted p-3 mb-0">
+        <i class="bi bi-info-circle"></i> Nessun punteggio registrato per questo mese.
+      </p>
+    {% endif %}
+  </div>
+</div>
+
+{# Rettifiche titolare #}
+{% if modifiche %}
+<div class="card mb-3">
+  <div class="card-header"><i class="bi bi-pencil-square"></i> Rettifiche del titolare</div>
+  <div class="card-body p-0">
+    <table class="table table-sm align-middle mb-0">
+      <thead class="table-light">
+        <tr>
+          <th>Data</th>
+          <th class="text-center">Punti</th>
+          <th>Motivazione</th>
+          <th>Inserita da</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for m in modifiche %}
+          <tr class="{% if m.punti > 0 %}table-success{% elif m.punti < 0 %}table-danger{% endif %}">
+            <td class="small text-muted">{{ m.data_ora|date:"d/m H:i" }}</td>
+            <td class="text-center fw-bold">
+              <span class="{% if m.punti > 0 %}text-success{% else %}text-danger{% endif %}">
+                {{ m.punti|segno }}
+              </span>
+            </td>
+            <td class="small">{{ m.motivazione }}</td>
+            <td class="small text-muted">{{ m.creato_da.get_full_name|default:m.creato_da.username }}</td>
+          </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+{% endif %}
+
+{% endblock %}
