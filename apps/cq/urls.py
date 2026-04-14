@@ -34,4 +34,17 @@ urlpatterns = [
     path('api/tipo-difetto/salva/', views.api_salva_tipo_difetto, name='api_tipo_difetto_salva'),
     path('api/tipo-difetto/<int:pk>/elimina/', views.api_elimina_tipo_difetto, name='api_tipo_difetto_elimina'),
     path('api/mapping/toggle/', views.api_toggle_mapping, name='api_mapping_toggle'),
+
+    # API: Postazioni CQ
+    path('api/postazione/salva/', views.api_salva_postazione, name='api_postazione_salva'),
+    path('api/postazione/<int:pk>/elimina/', views.api_elimina_postazione, name='api_postazione_elimina'),
+    path('api/blocco/salva/', views.api_salva_blocco, name='api_blocco_salva'),
+    path('api/blocco/<int:pk>/elimina/', views.api_elimina_blocco, name='api_blocco_elimina'),
+
+    # API: Configurazioni assegnazione (preset)
+    path('api/config-assegnazione/salva/', views.api_salva_configurazione_assegnazione, name='api_config_assegnazione_salva'),
+    path('api/config-assegnazione/<int:pk>/elimina/', views.api_elimina_configurazione_assegnazione, name='api_config_assegnazione_elimina'),
+    path('api/config-assegnazione/<int:pk>/assegnazioni/', views.api_salva_assegnazioni_preset, name='api_config_assegnazione_assegnazioni'),
+    path('api/config-assegnazione/<int:pk>/dettaglio/', views.api_get_configurazione_assegnazione, name='api_config_assegnazione_dettaglio'),
+    path('api/config-assegnazione/<int:pk>/applica/', views.api_applica_preset, name='api_config_assegnazione_applica'),
 ]

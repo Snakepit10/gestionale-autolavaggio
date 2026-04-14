@@ -140,7 +140,7 @@ class ZonaConfig(models.Model):
     nome = models.CharField(max_length=100, verbose_name='Nome')
     codice = models.SlugField(max_length=80, unique=True, verbose_name='Codice')
     postazione_produttore = models.CharField(
-        max_length=20, choices=Postazione.choices, blank=True,
+        max_length=20, blank=True,
         verbose_name='Postazione produttore',
     )
     postazioni_catena = models.JSONField(
@@ -216,6 +216,153 @@ class ZonaDifettoMapping(models.Model):
 
 
 # ---------------------------------------------------------------------------
+# Postazioni CQ (configurabili da DB)
+# ---------------------------------------------------------------------------
+
+class PostazioneCQ(models.Model):
+    """
+    Postazione di lavoro nel flusso CQ, gestibile dalla pagina di configurazione.
+    Il campo codice mappa ai valori storici ('post1', 'post2', etc.).
+    """
+    codice = models.SlugField(max_length=20, unique=True, verbose_name='Codice')
+    nome = models.CharField(max_length=100, verbose_name='Nome')
+    ordine = models.PositiveIntegerField(default=0, verbose_name='Ordine')
+    attiva = models.BooleanField(default=True, verbose_name='Attiva')
+    is_controllo_finale = models.BooleanField(
+        default=False,
+        verbose_name='Controllo finale',
+        help_text='Segna questa postazione come controllo finale (una sola)',
+    )
+
+    class Meta:
+        verbose_name = 'Postazione CQ'
+        verbose_name_plural = 'Postazioni CQ'
+        ordering = ['ordine', 'nome']
+
+    def __str__(self):
+        return self.nome
+
+
+class BloccoPostazione(models.Model):
+    """
+    Sotto-blocco di lavoro all'interno di una postazione CQ.
+    Opzionale: se una postazione non ha blocchi, l'operatore viene assegnato
+    alla postazione intera.
+    """
+    postazione = models.ForeignKey(
+        PostazioneCQ, on_delete=models.CASCADE, related_name='blocchi',
+        verbose_name='Postazione',
+    )
+    codice = models.SlugField(max_length=40, unique=True, verbose_name='Codice')
+    nome = models.CharField(max_length=100, verbose_name='Nome')
+    ordine = models.PositiveIntegerField(default=0, verbose_name='Ordine')
+
+    class Meta:
+        verbose_name = 'Blocco postazione'
+        verbose_name_plural = 'Blocchi postazione'
+        ordering = ['ordine', 'nome']
+        unique_together = [('postazione', 'codice')]
+
+    def __str__(self):
+        return f"{self.postazione.nome} → {self.nome}"
+
+
+# ---------------------------------------------------------------------------
+# Configurazioni assegnazione operatori (preset)
+# ---------------------------------------------------------------------------
+
+class ConfigurazioneAssegnazione(models.Model):
+    """
+    Preset di assegnazione operatori alle postazioni/blocchi.
+    Permette di precaricare la griglia operatori nella scheda CQ.
+    """
+    nome = models.CharField(max_length=100, verbose_name='Nome')
+    attiva = models.BooleanField(default=True, verbose_name='Attiva')
+    creato_da = models.ForeignKey(
+        User, on_delete=models.PROTECT,
+        related_name='configurazioni_assegnazione_create',
+    )
+    creato_il = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        verbose_name = 'Configurazione assegnazione'
+        verbose_name_plural = 'Configurazioni assegnazione'
+        ordering = ['nome']
+
+    def __str__(self):
+        return self.nome
+
+
+class AssegnazionePreset(models.Model):
+    """
+    Singola riga di assegnazione operatore→postazione/blocco nel preset.
+    """
+    configurazione = models.ForeignKey(
+        ConfigurazioneAssegnazione, on_delete=models.CASCADE,
+        related_name='assegnazioni',
+    )
+    postazione_codice = models.CharField(max_length=20, verbose_name='Postazione')
+    blocco_codice = models.CharField(
+        max_length=40, blank=True, default='',
+        verbose_name='Blocco',
+        help_text='Vuoto = intera postazione',
+    )
+    operatore = models.ForeignKey(
+        User, on_delete=models.CASCADE,
+        related_name='assegnazioni_preset',
+    )
+
+    class Meta:
+        verbose_name = 'Assegnazione preset'
+        verbose_name_plural = 'Assegnazioni preset'
+        unique_together = [('configurazione', 'postazione_codice', 'blocco_codice', 'operatore')]
+
+    def __str__(self):
+        blocco = f" [{self.blocco_codice}]" if self.blocco_codice else ""
+        return f"{self.configurazione.nome}: {self.postazione_codice}{blocco} → {self.operatore}"
+
+
+# ---------------------------------------------------------------------------
+# Helper: choices dinamiche da DB
+# ---------------------------------------------------------------------------
+
+def get_postazione_choices():
+    """Restituisce le postazioni CQ dal DB, con fallback al TextChoices."""
+    try:
+        qs = PostazioneCQ.objects.filter(attiva=True).order_by('ordine')
+        if qs.exists():
+            return [(p.codice, p.nome) for p in qs]
+    except Exception:
+        pass
+    return list(Postazione.choices)
+
+
+def get_postazioni_ordinate():
+    """Restituisce i codici delle postazioni CQ ordinati."""
+    try:
+        qs = PostazioneCQ.objects.filter(attiva=True).order_by('ordine')
+        if qs.exists():
+            return list(qs.values_list('codice', flat=True))
+    except Exception:
+        pass
+    return [
+        Postazione.POST1, Postazione.POST2, Postazione.POST3,
+        Postazione.POST4, Postazione.CONTROLLO_FINALE,
+    ]
+
+
+def get_postazione_nome(codice):
+    """Restituisce il nome leggibile di una postazione dato il codice."""
+    try:
+        obj = PostazioneCQ.objects.filter(codice=codice).first()
+        if obj:
+            return obj.nome
+    except Exception:
+        pass
+    return dict(Postazione.choices).get(codice, codice)
+
+
+# ---------------------------------------------------------------------------
 # Modelli operativi
 # ---------------------------------------------------------------------------
 
@@ -229,7 +376,12 @@ class OperatorePostazioneTurno(models.Model):
         on_delete=models.CASCADE,
         related_name='operatori_turno',
     )
-    postazione = models.CharField(max_length=20, choices=Postazione.choices)
+    postazione = models.CharField(max_length=20)
+    blocco_codice = models.CharField(
+        max_length=40, blank=True, default='',
+        verbose_name='Blocco',
+        help_text='Vuoto = intera postazione',
+    )
     operatore = models.ForeignKey(
         User,
         on_delete=models.PROTECT,
@@ -239,11 +391,18 @@ class OperatorePostazioneTurno(models.Model):
     class Meta:
         verbose_name = 'Operatore in turno'
         verbose_name_plural = 'Operatori in turno'
-        unique_together = [('ordine', 'postazione', 'operatore')]
+        unique_together = [('ordine', 'postazione', 'blocco_codice', 'operatore')]
         ordering = ['ordine', 'postazione']
 
+    @property
+    def postazione_nome(self):
+        return get_postazione_nome(self.postazione)
+
     def __str__(self):
-        return f"{self.ordine} — {self.get_postazione_display()} — {self.operatore.get_full_name() or self.operatore.username}"
+        nome = self.postazione_nome
+        blocco = f" [{self.blocco_codice}]" if self.blocco_codice else ""
+        op = self.operatore.get_full_name() or self.operatore.username
+        return f"{self.ordine} — {nome}{blocco} — {op}"
 
 
 class SchedaCQ(models.Model):
@@ -319,7 +478,6 @@ class DifettoCQ(models.Model):
     gravita = models.CharField(max_length=10, choices=Gravita.choices, verbose_name='Gravità')
     postazione_responsabile = models.CharField(
         max_length=20,
-        choices=Postazione.choices,
         verbose_name='Postazione responsabile',
     )
     azione_correttiva = models.CharField(
@@ -348,6 +506,10 @@ class DifettoCQ(models.Model):
     def tipo_difetto_nome(self):
         obj = TipoDifettoConfig.objects.filter(codice=self.tipo_difetto).first()
         return obj.nome if obj else self.tipo_difetto
+
+    @property
+    def postazione_responsabile_nome(self):
+        return get_postazione_nome(self.postazione_responsabile)
 
     def __str__(self):
         return f"{self.zona_nome} — {self.get_gravita_display()}"

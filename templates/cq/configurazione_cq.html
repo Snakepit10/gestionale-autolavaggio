@@ -50,6 +50,16 @@
       <i class="bi bi-grid-3x3-gap"></i> Mappings Zona↔Difetto
     </button>
   </li>
+  <li class="nav-item">
+    <button class="nav-link" data-bs-toggle="tab" data-bs-target="#tab-postazioni">
+      <i class="bi bi-building"></i> Postazioni
+    </button>
+  </li>
+  <li class="nav-item">
+    <button class="nav-link" data-bs-toggle="tab" data-bs-target="#tab-assegnazioni">
+      <i class="bi bi-people"></i> Assegnazioni
+    </button>
+  </li>
 </ul>
 
 <div class="tab-content">
@@ -124,7 +134,7 @@
                     </td>
                     <td><span class="badge-codice">{{ zona.codice }}</span></td>
                     <td>{{ zona.categoria.nome }}</td>
-                    <td>{{ zona.get_postazione_produttore_display|default:"—" }}</td>
+                    <td>{{ zona.postazione_produttore|default:"—" }}</td>
                     <td>
                       {% for p in zona.postazioni_catena %}
                         <span class="badge bg-light text-dark border">{{ p }}</span>
@@ -290,6 +300,112 @@
     </div>
   </div>
 
+  {# ===== TAB POSTAZIONI CQ ===== #}
+  <div class="tab-pane fade" id="tab-postazioni">
+    <div class="card config-card">
+      <div class="card-header d-flex justify-content-between align-items-center">
+        <span><i class="bi bi-building"></i> Postazioni CQ e Blocchi</span>
+        <button class="btn btn-primary btn-sm" onclick="apriModal('modalPostazione')">
+          <i class="bi bi-plus-lg"></i> Nuova Postazione
+        </button>
+      </div>
+      <div class="card-body p-0">
+        <table class="table table-config table-hover mb-0">
+          <thead class="table-light">
+            <tr><th>Nome</th><th>Codice</th><th>Ord.</th><th>Attiva</th><th>Ctrl. Finale</th><th>Blocchi</th><th></th></tr>
+          </thead>
+          <tbody>
+            {% for post in postazioni_cq %}
+            <tr>
+              <td><strong>{{ post.nome }}</strong></td>
+              <td><span class="badge-codice">{{ post.codice }}</span></td>
+              <td>{{ post.ordine }}</td>
+              <td>{% if post.attiva %}<i class="bi bi-check-circle text-success"></i>{% else %}<i class="bi bi-x-circle text-danger"></i>{% endif %}</td>
+              <td>{% if post.is_controllo_finale %}<i class="bi bi-shield-check text-primary"></i>{% else %}—{% endif %}</td>
+              <td><span class="badge bg-secondary">{{ post.blocchi.count }}</span></td>
+              <td>
+                <button class="btn btn-outline-success btn-sm py-0" title="Aggiungi blocco"
+                        onclick="apriModalBlocco({{ post.pk }}, '{{ post.nome|escapejs }}')">
+                  <i class="bi bi-plus-square"></i>
+                </button>
+                <button class="btn btn-outline-primary btn-sm py-0"
+                        onclick="modificaPostazione({{ post.pk }}, {{ post|postazione_cq_json }})">
+                  <i class="bi bi-pencil"></i>
+                </button>
+                <button class="btn btn-outline-danger btn-sm py-0"
+                        onclick="eliminaItem('{{ post.pk }}', 'postazione', '{{ post.nome|escapejs }}')">
+                  <i class="bi bi-trash"></i>
+                </button>
+              </td>
+            </tr>
+            {% for blocco in post.blocchi.all %}
+            <tr class="table-light">
+              <td class="ps-4"><i class="bi bi-arrow-return-right text-muted me-1"></i>{{ blocco.nome }}</td>
+              <td><span class="badge-codice">{{ blocco.codice }}</span></td>
+              <td>{{ blocco.ordine }}</td>
+              <td colspan="2"></td>
+              <td></td>
+              <td>
+                <button class="btn btn-outline-primary btn-sm py-0"
+                        onclick="modificaBlocco({{ blocco.pk }}, {{ blocco|blocco_json }})">
+                  <i class="bi bi-pencil"></i>
+                </button>
+                <button class="btn btn-outline-danger btn-sm py-0"
+                        onclick="eliminaItem('{{ blocco.pk }}', 'blocco', '{{ blocco.nome|escapejs }}')">
+                  <i class="bi bi-trash"></i>
+                </button>
+              </td>
+            </tr>
+            {% endfor %}
+            {% empty %}
+            <tr><td colspan="7" class="text-muted text-center py-3">Nessuna postazione configurata</td></tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  {# ===== TAB ASSEGNAZIONI (Preset) ===== #}
+  <div class="tab-pane fade" id="tab-assegnazioni">
+    <div class="card config-card">
+      <div class="card-header d-flex justify-content-between align-items-center">
+        <span><i class="bi bi-people"></i> Configurazioni Assegnazione Operatori</span>
+        <button class="btn btn-primary btn-sm" onclick="apriModal('modalConfigAssegnazione')">
+          <i class="bi bi-plus-lg"></i> Nuova Configurazione
+        </button>
+      </div>
+      <div class="card-body p-0">
+        <table class="table table-config table-hover mb-0">
+          <thead class="table-light">
+            <tr><th>Nome</th><th>Attiva</th><th>Assegnazioni</th><th></th></tr>
+          </thead>
+          <tbody>
+            {% for cfg in configurazioni_assegnazione %}
+            <tr>
+              <td><strong>{{ cfg.nome }}</strong></td>
+              <td>{% if cfg.attiva %}<i class="bi bi-check-circle text-success"></i>{% else %}<i class="bi bi-x-circle text-danger"></i>{% endif %}</td>
+              <td><span class="badge bg-info">{{ cfg.assegnazioni.count }} assegnazioni</span></td>
+              <td>
+                <button class="btn btn-outline-primary btn-sm py-0" title="Modifica assegnazioni"
+                        onclick="apriEditAssegnazione({{ cfg.pk }}, '{{ cfg.nome|escapejs }}', {{ cfg.attiva|yesno:'true,false' }})">
+                  <i class="bi bi-pencil"></i>
+                </button>
+                <button class="btn btn-outline-danger btn-sm py-0"
+                        onclick="eliminaItem('{{ cfg.pk }}', 'config-assegnazione', '{{ cfg.nome|escapejs }}')">
+                  <i class="bi bi-trash"></i>
+                </button>
+              </td>
+            </tr>
+            {% empty %}
+            <tr><td colspan="4" class="text-muted text-center py-3">Nessuna configurazione di assegnazione</td></tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
 </div>{# fine tab-content #}
 
 
@@ -419,6 +535,110 @@
   </div>
 </div>
 
+{# Postazione CQ #}
+<div class="modal fade" id="modalPostazione" tabindex="-1">
+  <div class="modal-dialog">
+    <div class="modal-content">
+      <div class="modal-header"><h6 class="modal-title">Postazione CQ</h6><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div>
+      <div class="modal-body">
+        <input type="hidden" id="pId">
+        <div class="row g-2">
+          <div class="col-8"><label class="form-label small">Nome *</label><input type="text" class="form-control" id="pNome"></div>
+          <div class="col-4"><label class="form-label small">Ordine</label><input type="number" class="form-control" id="pOrdine" value="0"></div>
+          <div class="col-12"><label class="form-label small">Codice (slug) *</label><input type="text" class="form-control font-monospace" id="pCodice" placeholder="es. post5"></div>
+          <div class="col-6">
+            <div class="form-check">
+              <input class="form-check-input" type="checkbox" id="pAttiva" checked>
+              <label class="form-check-label" for="pAttiva">Attiva</label>
+            </div>
+          </div>
+          <div class="col-6">
+            <div class="form-check">
+              <input class="form-check-input" type="checkbox" id="pControlloFinale">
+              <label class="form-check-label" for="pControlloFinale">Controllo finale</label>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-secondary btn-sm" data-bs-dismiss="modal">Annulla</button>
+        <button type="button" class="btn btn-primary btn-sm" onclick="salvaPostazione()">Salva</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+{# Blocco Postazione #}
+<div class="modal fade" id="modalBlocco" tabindex="-1">
+  <div class="modal-dialog">
+    <div class="modal-content">
+      <div class="modal-header"><h6 class="modal-title">Blocco Postazione</h6><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div>
+      <div class="modal-body">
+        <input type="hidden" id="bId">
+        <input type="hidden" id="bPostazioneId">
+        <div class="mb-2">
+          <label class="form-label small">Postazione</label>
+          <input type="text" class="form-control" id="bPostazioneNome" readonly>
+        </div>
+        <div class="row g-2">
+          <div class="col-8"><label class="form-label small">Nome *</label><input type="text" class="form-control" id="bNome"></div>
+          <div class="col-4"><label class="form-label small">Ordine</label><input type="number" class="form-control" id="bOrdine" value="0"></div>
+          <div class="col-12"><label class="form-label small">Codice (slug) *</label><input type="text" class="form-control font-monospace" id="bCodice" placeholder="es. post3_a"></div>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-secondary btn-sm" data-bs-dismiss="modal">Annulla</button>
+        <button type="button" class="btn btn-primary btn-sm" onclick="salvaBlocco()">Salva</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+{# Configurazione Assegnazione (nome/attiva) #}
+<div class="modal fade" id="modalConfigAssegnazione" tabindex="-1">
+  <div class="modal-dialog modal-sm">
+    <div class="modal-content">
+      <div class="modal-header"><h6 class="modal-title">Configurazione Assegnazione</h6><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div>
+      <div class="modal-body">
+        <input type="hidden" id="caId">
+        <div class="mb-2"><label class="form-label small">Nome *</label><input type="text" class="form-control" id="caNome"></div>
+        <div class="form-check">
+          <input class="form-check-input" type="checkbox" id="caAttiva" checked>
+          <label class="form-check-label" for="caAttiva">Attiva</label>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-secondary btn-sm" data-bs-dismiss="modal">Annulla</button>
+        <button type="button" class="btn btn-primary btn-sm" onclick="salvaConfigAssegnazione()">Salva e configura</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+{# Editor assegnazioni preset (modal grande) #}
+<div class="modal fade" id="modalEditAssegnazioni" tabindex="-1">
+  <div class="modal-dialog modal-xl">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h6 class="modal-title"><i class="bi bi-people"></i> Assegnazioni: <span id="eaNome"></span></h6>
+        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+      </div>
+      <div class="modal-body" style="max-height:70vh; overflow-y:auto;">
+        <input type="hidden" id="eaId">
+        <div id="eaGrid">
+          {# Populated dynamically by JS #}
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-secondary btn-sm" data-bs-dismiss="modal">Annulla</button>
+        <button type="button" class="btn btn-primary btn-sm" onclick="salvaAssegnazioni()">
+          <i class="bi bi-check-lg"></i> Salva Assegnazioni
+        </button>
+      </div>
+    </div>
+  </div>
+</div>
+
 {% endblock %}
 
 {% block extra_js %}
@@ -460,6 +680,9 @@ async function eliminaItem(pk, tipo, nome) {
     'zona':           `/cq/api/zona/${pk}/elimina/`,
     'categoria-difetto': `/cq/api/categoria-difetto/${pk}/elimina/`,
     'tipo-difetto':   `/cq/api/tipo-difetto/${pk}/elimina/`,
+    'postazione':     `/cq/api/postazione/${pk}/elimina/`,
+    'blocco':         `/cq/api/blocco/${pk}/elimina/`,
+    'config-assegnazione': `/cq/api/config-assegnazione/${pk}/elimina/`,
   };
   const res = await apiPost(urlMap[tipo], {});
   if (res.ok) { toast('Eliminato.'); location.reload(); }
@@ -573,12 +796,199 @@ async function toggleMapping(cb) {
   }
 }
 
+/* ---- Postazione CQ ---- */
+function modificaPostazione(id, data) {
+  document.getElementById('pId').value = id;
+  document.getElementById('pNome').value = data.nome;
+  document.getElementById('pCodice').value = data.codice;
+  document.getElementById('pOrdine').value = data.ordine;
+  document.getElementById('pAttiva').checked = data.attiva;
+  document.getElementById('pControlloFinale').checked = data.is_controllo_finale;
+  apriModal('modalPostazione');
+}
+async function salvaPostazione() {
+  const res = await apiPost('/cq/api/postazione/salva/', {
+    id: document.getElementById('pId').value,
+    nome: document.getElementById('pNome').value,
+    codice: document.getElementById('pCodice').value,
+    ordine: document.getElementById('pOrdine').value,
+    attiva: document.getElementById('pAttiva').checked ? '1' : '0',
+    is_controllo_finale: document.getElementById('pControlloFinale').checked ? '1' : '0',
+  });
+  if (res.ok) { chiudiModal('modalPostazione'); toast('Postazione salvata.'); location.reload(); }
+  else toast(res.error, 'danger');
+}
+
+/* ---- Blocco Postazione ---- */
+function apriModalBlocco(postazioneId, postazioneNome) {
+  document.getElementById('bId').value = '';
+  document.getElementById('bPostazioneId').value = postazioneId;
+  document.getElementById('bPostazioneNome').value = postazioneNome;
+  document.getElementById('bNome').value = '';
+  document.getElementById('bCodice').value = '';
+  document.getElementById('bOrdine').value = '0';
+  apriModal('modalBlocco');
+}
+function modificaBlocco(id, data) {
+  document.getElementById('bId').value = id;
+  document.getElementById('bPostazioneId').value = data.postazione_id;
+  document.getElementById('bPostazioneNome').value = '';
+  document.getElementById('bNome').value = data.nome;
+  document.getElementById('bCodice').value = data.codice;
+  document.getElementById('bOrdine').value = data.ordine;
+  apriModal('modalBlocco');
+}
+async function salvaBlocco() {
+  const res = await apiPost('/cq/api/blocco/salva/', {
+    id: document.getElementById('bId').value,
+    postazione_id: document.getElementById('bPostazioneId').value,
+    nome: document.getElementById('bNome').value,
+    codice: document.getElementById('bCodice').value,
+    ordine: document.getElementById('bOrdine').value,
+  });
+  if (res.ok) { chiudiModal('modalBlocco'); toast('Blocco salvato.'); location.reload(); }
+  else toast(res.error, 'danger');
+}
+
+/* ---- Configurazione Assegnazione ---- */
+async function salvaConfigAssegnazione() {
+  const pk = document.getElementById('caId').value;
+  const res = await apiPost('/cq/api/config-assegnazione/salva/', {
+    id: pk,
+    nome: document.getElementById('caNome').value,
+    attiva: document.getElementById('caAttiva').checked ? '1' : '0',
+  });
+  if (res.ok) {
+    chiudiModal('modalConfigAssegnazione');
+    toast('Configurazione salvata.');
+    // Apri editor assegnazioni per la config appena creata/salvata
+    apriEditAssegnazione(res.id, res.nome, res.attiva);
+  }
+  else toast(res.error, 'danger');
+}
+
+/* ---- Editor Assegnazioni Preset ---- */
+const POSTAZIONI_CQ_DATA = [
+  {% for post in postazioni_cq %}
+  {
+    pk: {{ post.pk }},
+    codice: '{{ post.codice|escapejs }}',
+    nome: '{{ post.nome|escapejs }}',
+    blocchi: [
+      {% for b in post.blocchi.all %}
+      { pk: {{ b.pk }}, codice: '{{ b.codice|escapejs }}', nome: '{{ b.nome|escapejs }}' },
+      {% endfor %}
+    ]
+  },
+  {% endfor %}
+];
+
+const OPERATORI_DATA = [
+  {% for op in operatori_disponibili %}
+  { id: {{ op.pk }}, nome: '{{ op.get_full_name|default:op.username|escapejs }}' },
+  {% endfor %}
+];
+
+async function apriEditAssegnazione(configId, nome, attiva) {
+  document.getElementById('eaId').value = configId;
+  document.getElementById('eaNome').textContent = nome;
+
+  // Carica assegnazioni esistenti
+  let existing = [];
+  try {
+    const res = await fetch(`/cq/api/config-assegnazione/${configId}/dettaglio/`, {
+      headers: {'X-CSRFToken': CSRF}
+    });
+    const data = await res.json();
+    if (data.ok) existing = data.assegnazioni || [];
+  } catch(e) {}
+
+  // Costruisci la griglia
+  const grid = document.getElementById('eaGrid');
+  let html = '';
+  for (const post of POSTAZIONI_CQ_DATA) {
+    if (post.blocchi.length > 0) {
+      for (const blocco of post.blocchi) {
+        const key = `${post.codice}_${blocco.codice}`;
+        html += buildAssegnazioneRow(post.codice, blocco.codice, `${post.nome} › ${blocco.nome}`, existing);
+      }
+    } else {
+      html += buildAssegnazioneRow(post.codice, '', post.nome, existing);
+    }
+  }
+  grid.innerHTML = html;
+  apriModal('modalEditAssegnazioni');
+}
+
+function buildAssegnazioneRow(postCodice, bloccoCodice, label, existing) {
+  const selectedIds = existing
+    .filter(a => a.postazione_codice === postCodice && (a.blocco_codice || '') === bloccoCodice)
+    .map(a => a.operatore_id);
+  const key = bloccoCodice ? `${postCodice}__${bloccoCodice}` : postCodice;
+
+  let checkboxes = '';
+  for (const op of OPERATORI_DATA) {
+    const checked = selectedIds.includes(op.id) ? 'checked' : '';
+    checkboxes += `
+      <div class="form-check form-check-inline">
+        <input class="form-check-input ea-cb" type="checkbox" value="${op.id}"
+               data-post="${postCodice}" data-blocco="${bloccoCodice}" ${checked}
+               id="ea_${key}_${op.id}">
+        <label class="form-check-label small" for="ea_${key}_${op.id}">${op.nome}</label>
+      </div>`;
+  }
+
+  return `
+    <div class="mb-3 p-2 border rounded">
+      <div class="fw-bold small mb-1"><i class="bi bi-building me-1"></i>${label}</div>
+      <div>${checkboxes}</div>
+    </div>`;
+}
+
+async function salvaAssegnazioni() {
+  const configId = document.getElementById('eaId').value;
+  const checkboxes = document.querySelectorAll('#eaGrid .ea-cb:checked');
+  const assegnazioni = [];
+  checkboxes.forEach(cb => {
+    assegnazioni.push({
+      postazione_codice: cb.dataset.post,
+      blocco_codice: cb.dataset.blocco || '',
+      operatore_id: parseInt(cb.value),
+    });
+  });
+
+  const res = await fetch(`/cq/api/config-assegnazione/${configId}/assegnazioni/`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'X-CSRFToken': CSRF,
+    },
+    body: JSON.stringify({ assegnazioni }),
+  });
+  const data = await res.json();
+  if (data.ok) {
+    chiudiModal('modalEditAssegnazioni');
+    toast(`Assegnazioni salvate (${data.count}).`);
+    location.reload();
+  } else {
+    toast(data.error, 'danger');
+  }
+}
+
+function apriEditConfigNome(configId, nome, attiva) {
+  document.getElementById('caId').value = configId;
+  document.getElementById('caNome').value = nome;
+  document.getElementById('caAttiva').checked = attiva;
+  apriModal('modalConfigAssegnazione');
+}
+
 /* Reset modali all'apertura */
 document.querySelectorAll('.modal').forEach(m => {
   m.addEventListener('show.bs.modal', () => {
     m.querySelectorAll('input[type=hidden]').forEach(i => { if (!i.value) i.value = ''; });
   });
   m.addEventListener('hide.bs.modal', () => {
+    if (m.id === 'modalEditAssegnazioni') return; // Don't reset the big editor
     m.querySelectorAll('input, select, textarea').forEach(el => {
       if (el.type === 'hidden') el.value = '';
       else if (el.type === 'checkbox') el.checked = el.defaultChecked;

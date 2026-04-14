@@ -24,6 +24,9 @@ from apps.cq.models import (
     ModificaPunteggio, ImpostazionePremioMensile, Postazione,
     AzioneCorrettiva, CategoriaZona, ZonaConfig, CategoriaDifetto,
     TipoDifettoConfig, ZonaDifettoMapping,
+    PostazioneCQ, BloccoPostazione, ConfigurazioneAssegnazione,
+    AssegnazionePreset, get_postazione_choices, get_postazioni_ordinate,
+    get_postazione_nome,
 )
 from apps.cq.permissions import (
     ResponsabileOTitolareMixin, TitolareRequiredMixin,
@@ -35,41 +38,68 @@ from apps.ordini.models import Ordine
 # ---------------------------------------------------------------------------
 # Helper: postazioni in ordine di lavoro
 # ---------------------------------------------------------------------------
-POSTAZIONI_ORDINATE = [
-    Postazione.POST1, Postazione.POST2, Postazione.POST3,
-    Postazione.POST4, Postazione.CONTROLLO_FINALE,
-]
-
 
 def _build_operatori_turno_forms(request_post=None, ordine=None, scheda=None):
     """
-    Costruisce un form OperatoriTurnoForm per ogni postazione,
+    Costruisce un form OperatoriTurnoForm per ogni postazione/blocco,
     precompilato con gli operatori esistenti (supporta più operatori per postazione).
+    Se una postazione ha blocchi, genera un form per blocco.
     """
-    forms = []
+    forms_list = []
     _ordine = scheda.ordine if scheda else ordine
+    postazioni_nome = dict(get_postazione_choices())
+    postazioni_db = PostazioneCQ.objects.filter(attiva=True).prefetch_related('blocchi').order_by('ordine')
 
-    for postazione in POSTAZIONI_ORDINATE:
-        prefix = f'turno_{postazione}'
-        initial = {'postazione': postazione}
+    for post_cq in postazioni_db:
+        blocchi = list(post_cq.blocchi.order_by('ordine'))
 
-        if _ordine:
-            existing_ids = list(
-                OperatorePostazioneTurno.objects.filter(
-                    ordine=_ordine, postazione=postazione
-                ).values_list('operatore_id', flat=True)
+        if blocchi:
+            for blocco in blocchi:
+                prefix = f'turno_{post_cq.codice}_{blocco.codice}'
+                initial = {'postazione': post_cq.codice, 'blocco_codice': blocco.codice}
+
+                if _ordine:
+                    existing_ids = list(
+                        OperatorePostazioneTurno.objects.filter(
+                            ordine=_ordine, postazione=post_cq.codice,
+                            blocco_codice=blocco.codice,
+                        ).values_list('operatore_id', flat=True)
+                    )
+                    if existing_ids:
+                        initial['operatori'] = existing_ids
+
+                form = OperatoriTurnoForm(
+                    data=request_post or None,
+                    initial=initial,
+                    prefix=prefix,
+                )
+                form.postazione_label = f"{post_cq.nome} › {blocco.nome}"
+                form.postazione_group = post_cq.nome
+                forms_list.append(form)
+        else:
+            prefix = f'turno_{post_cq.codice}'
+            initial = {'postazione': post_cq.codice, 'blocco_codice': ''}
+
+            if _ordine:
+                existing_ids = list(
+                    OperatorePostazioneTurno.objects.filter(
+                        ordine=_ordine, postazione=post_cq.codice,
+                        blocco_codice='',
+                    ).values_list('operatore_id', flat=True)
+                )
+                if existing_ids:
+                    initial['operatori'] = existing_ids
+
+            form = OperatoriTurnoForm(
+                data=request_post or None,
+                initial=initial,
+                prefix=prefix,
             )
-            if existing_ids:
-                initial['operatori'] = existing_ids
+            form.postazione_label = post_cq.nome
+            form.postazione_group = post_cq.nome
+            forms_list.append(form)
 
-        form = OperatoriTurnoForm(
-            data=request_post or None,
-            initial=initial,
-            prefix=prefix,
-        )
-        form.postazione_label = dict(Postazione.choices).get(postazione, postazione)
-        forms.append(form)
-    return forms
+    return forms_list
 
 
 # ---------------------------------------------------------------------------
@@ -97,6 +127,7 @@ class SchedaCQCreateView(ResponsabileOTitolareMixin, View):
             'difetti_formset': difetti_formset,
             'turno_forms': turno_forms,
             'mode': 'crea',
+            'configurazioni_assegnazione': ConfigurazioneAssegnazione.objects.filter(attiva=True),
             **_choices_context(),
         })
 
@@ -141,6 +172,7 @@ class SchedaCQCreateView(ResponsabileOTitolareMixin, View):
             'difetti_formset': difetti_formset,
             'turno_forms': turno_forms,
             'mode': 'crea',
+            'configurazioni_assegnazione': ConfigurazioneAssegnazione.objects.filter(attiva=True),
             **_choices_context(),
         })
 
@@ -200,6 +232,7 @@ class SchedaCQUpdateView(TitolareRequiredMixin, View):
             'difetti_formset': difetti_formset,
             'turno_forms': turno_forms,
             'mode': 'modifica',
+            'configurazioni_assegnazione': ConfigurazioneAssegnazione.objects.filter(attiva=True),
             **_choices_context(),
             'existing_difetti_json': json.dumps(existing_difetti),
         })
@@ -558,7 +591,7 @@ def _choices_context():
 
     return {
         'zone_categorie': zone_categorie_list,
-        'post_choices': Postazione.choices,
+        'post_choices': get_postazione_choices(),
         'azione_choices': AzioneCorrettiva.choices,
         'zona_difetti_json': json.dumps(zona_difetti),
         'zona_produttore_json': json.dumps(zona_produttore),
@@ -568,22 +601,27 @@ def _choices_context():
 
 
 def _salva_operatori_turno(turno_forms, ordine):
-    """Salva i record OperatorePostazioneTurno per ogni postazione (supporta più operatori)."""
+    """Salva i record OperatorePostazioneTurno per ogni postazione/blocco (supporta più operatori)."""
     for form in turno_forms:
         if form.is_bound and form.is_valid():
             postazione = form.cleaned_data.get('postazione')
+            blocco_codice = form.cleaned_data.get('blocco_codice', '')
             operatori = form.cleaned_data.get('operatori') or []
         else:
             postazione = form.initial.get('postazione')
+            blocco_codice = form.initial.get('blocco_codice', '')
             operatori = []
 
         if not postazione:
             continue
 
-        OperatorePostazioneTurno.objects.filter(ordine=ordine, postazione=postazione).delete()
+        OperatorePostazioneTurno.objects.filter(
+            ordine=ordine, postazione=postazione, blocco_codice=blocco_codice
+        ).delete()
         for op in operatori:
             OperatorePostazioneTurno.objects.create(
-                ordine=ordine, postazione=postazione, operatore=op
+                ordine=ordine, postazione=postazione,
+                blocco_codice=blocco_codice, operatore=op,
             )
 
 
@@ -600,7 +638,7 @@ class ConfigurazioneCQView(TitolareRequiredMixin, TemplateView):
         ctx['categorie_difetto'] = CategoriaDifetto.objects.prefetch_related('tipi').all()
         ctx['zone_config'] = ZonaConfig.objects.select_related('categoria').all()
         ctx['tipi_difetto'] = TipoDifettoConfig.objects.select_related('categoria').all()
-        ctx['post_choices'] = Postazione.choices
+        ctx['post_choices'] = get_postazione_choices()
         # Matrice mappings per la tab Mappings
         zone_qs = ZonaConfig.objects.prefetch_related('difetti_config__tipo_difetto').select_related('categoria').all()
         tipi_qs = TipoDifettoConfig.objects.select_related('categoria').filter(attivo=True)
@@ -610,6 +648,14 @@ class ConfigurazioneCQView(TitolareRequiredMixin, TemplateView):
         ctx['zone_matrice'] = zone_qs
         ctx['tipi_matrice'] = tipi_qs
         ctx['mapping_set_json'] = json.dumps(list(mapping_set))
+        # Postazioni CQ e Blocchi
+        ctx['postazioni_cq'] = PostazioneCQ.objects.prefetch_related('blocchi').all()
+        # Preset assegnazione
+        from apps.cq.forms import get_operatori_queryset
+        ctx['configurazioni_assegnazione'] = ConfigurazioneAssegnazione.objects.prefetch_related(
+            'assegnazioni__operatore'
+        ).all()
+        ctx['operatori_disponibili'] = get_operatori_queryset()
         return ctx
 
 
@@ -771,3 +817,190 @@ def api_toggle_mapping(request):
     if not created:
         obj.delete()
     return _json_ok({'created': created, 'zona_id': zona.pk, 'tipo_difetto_id': tipo.pk})
+
+
+# ---------------------------------------------------------------------------
+# API: CRUD Postazioni CQ
+# ---------------------------------------------------------------------------
+
+@login_required
+def api_salva_postazione(request):
+    if not utente_nel_gruppo(request.user, 'titolare'):
+        return _json_err('Non autorizzato', 403)
+    pk = request.POST.get('id')
+    codice = request.POST.get('codice', '').strip()
+    nome = request.POST.get('nome', '').strip()
+    ordine = int(request.POST.get('ordine', 0))
+    attiva = request.POST.get('attiva', '1') == '1'
+    is_cf = request.POST.get('is_controllo_finale', '0') == '1'
+    if not codice or not nome:
+        return _json_err('Codice e nome obbligatori')
+    if pk:
+        obj = get_object_or_404(PostazioneCQ, pk=pk)
+        obj.codice = codice
+        obj.nome = nome
+        obj.ordine = ordine
+        obj.attiva = attiva
+        obj.is_controllo_finale = is_cf
+        obj.save()
+    else:
+        obj = PostazioneCQ.objects.create(
+            codice=codice, nome=nome, ordine=ordine,
+            attiva=attiva, is_controllo_finale=is_cf,
+        )
+    return _json_ok({
+        'id': obj.pk, 'codice': obj.codice, 'nome': obj.nome,
+        'ordine': obj.ordine, 'attiva': obj.attiva,
+        'is_controllo_finale': obj.is_controllo_finale,
+    })
+
+
+@login_required
+def api_elimina_postazione(request, pk):
+    if not utente_nel_gruppo(request.user, 'titolare'):
+        return _json_err('Non autorizzato', 403)
+    obj = get_object_or_404(PostazioneCQ, pk=pk)
+    # Controlla se il codice è usato in dati esistenti
+    in_uso = OperatorePostazioneTurno.objects.filter(postazione=obj.codice).exists()
+    if in_uso:
+        return _json_err(
+            f'Impossibile eliminare: il codice "{obj.codice}" è usato in schede CQ esistenti.'
+        )
+    obj.delete()
+    return _json_ok()
+
+
+@login_required
+def api_salva_blocco(request):
+    if not utente_nel_gruppo(request.user, 'titolare'):
+        return _json_err('Non autorizzato', 403)
+    pk = request.POST.get('id')
+    postazione_id = request.POST.get('postazione_id')
+    codice = request.POST.get('codice', '').strip()
+    nome = request.POST.get('nome', '').strip()
+    ordine = int(request.POST.get('ordine', 0))
+    if not codice or not nome or not postazione_id:
+        return _json_err('Postazione, codice e nome obbligatori')
+    postazione = get_object_or_404(PostazioneCQ, pk=postazione_id)
+    if pk:
+        obj = get_object_or_404(BloccoPostazione, pk=pk)
+        obj.postazione = postazione
+        obj.codice = codice
+        obj.nome = nome
+        obj.ordine = ordine
+        obj.save()
+    else:
+        obj = BloccoPostazione.objects.create(
+            postazione=postazione, codice=codice, nome=nome, ordine=ordine,
+        )
+    return _json_ok({
+        'id': obj.pk, 'codice': obj.codice, 'nome': obj.nome,
+        'ordine': obj.ordine, 'postazione_id': postazione.pk,
+        'postazione_nome': postazione.nome,
+    })
+
+
+@login_required
+def api_elimina_blocco(request, pk):
+    if not utente_nel_gruppo(request.user, 'titolare'):
+        return _json_err('Non autorizzato', 403)
+    obj = get_object_or_404(BloccoPostazione, pk=pk)
+    in_uso = OperatorePostazioneTurno.objects.filter(blocco_codice=obj.codice).exists()
+    if in_uso:
+        return _json_err(
+            f'Impossibile eliminare: il blocco "{obj.codice}" è usato in schede CQ esistenti.'
+        )
+    obj.delete()
+    return _json_ok()
+
+
+# ---------------------------------------------------------------------------
+# API: CRUD Configurazioni Assegnazione (Preset)
+# ---------------------------------------------------------------------------
+
+@login_required
+def api_salva_configurazione_assegnazione(request):
+    if not utente_nel_gruppo(request.user, 'titolare'):
+        return _json_err('Non autorizzato', 403)
+    pk = request.POST.get('id')
+    nome = request.POST.get('nome', '').strip()
+    attiva = request.POST.get('attiva', '1') == '1'
+    if not nome:
+        return _json_err('Nome obbligatorio')
+    if pk:
+        obj = get_object_or_404(ConfigurazioneAssegnazione, pk=pk)
+        obj.nome = nome
+        obj.attiva = attiva
+        obj.save()
+    else:
+        obj = ConfigurazioneAssegnazione.objects.create(
+            nome=nome, attiva=attiva, creato_da=request.user,
+        )
+    return _json_ok({'id': obj.pk, 'nome': obj.nome, 'attiva': obj.attiva})
+
+
+@login_required
+def api_elimina_configurazione_assegnazione(request, pk):
+    if not utente_nel_gruppo(request.user, 'titolare'):
+        return _json_err('Non autorizzato', 403)
+    get_object_or_404(ConfigurazioneAssegnazione, pk=pk).delete()
+    return _json_ok()
+
+
+@login_required
+def api_salva_assegnazioni_preset(request, pk):
+    """Bulk save delle righe assegnazione per un preset. Riceve JSON nel body."""
+    if not utente_nel_gruppo(request.user, 'titolare'):
+        return _json_err('Non autorizzato', 403)
+    config = get_object_or_404(ConfigurazioneAssegnazione, pk=pk)
+    try:
+        data = json.loads(request.body)
+    except json.JSONDecodeError:
+        return _json_err('JSON non valido')
+    assegnazioni = data.get('assegnazioni', [])
+    with transaction.atomic():
+        config.assegnazioni.all().delete()
+        for row in assegnazioni:
+            postazione_codice = row.get('postazione_codice', '')
+            blocco_codice = row.get('blocco_codice', '')
+            operatore_id = row.get('operatore_id')
+            if postazione_codice and operatore_id:
+                AssegnazionePreset.objects.create(
+                    configurazione=config,
+                    postazione_codice=postazione_codice,
+                    blocco_codice=blocco_codice,
+                    operatore_id=operatore_id,
+                )
+    return _json_ok({'count': config.assegnazioni.count()})
+
+
+@login_required
+def api_get_configurazione_assegnazione(request, pk):
+    """Restituisce il dettaglio completo di un preset."""
+    if not utente_nel_gruppo(request.user, 'titolare'):
+        return _json_err('Non autorizzato', 403)
+    config = get_object_or_404(ConfigurazioneAssegnazione, pk=pk)
+    assegnazioni = list(
+        config.assegnazioni.values(
+            'postazione_codice', 'blocco_codice', 'operatore_id'
+        )
+    )
+    return _json_ok({
+        'id': config.pk,
+        'nome': config.nome,
+        'attiva': config.attiva,
+        'assegnazioni': assegnazioni,
+    })
+
+
+@login_required
+def api_applica_preset(request, pk):
+    """Restituisce il mapping del preset per auto-popolare il form CQ."""
+    config = get_object_or_404(ConfigurazioneAssegnazione, pk=pk, attiva=True)
+    mapping = {}
+    for a in config.assegnazioni.all():
+        key = a.postazione_codice
+        if a.blocco_codice:
+            key = f"{a.postazione_codice}_{a.blocco_codice}"
+        mapping.setdefault(key, []).append(a.operatore_id)
+    return _json_ok({'mapping': mapping})

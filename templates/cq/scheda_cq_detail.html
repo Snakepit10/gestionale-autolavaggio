@@ -97,7 +97,7 @@
         <tbody>
           {% for ot in operatori_turno %}
             <tr>
-              <td>{{ ot.get_postazione_display }}</td>
+              <td>{{ ot.postazione_nome }}{% if ot.blocco_codice %} <span class="badge bg-light text-dark border">{{ ot.blocco_codice }}</span>{% endif %}</td>
               <td>{{ ot.operatore.get_full_name|default:ot.operatore.username }}</td>
             </tr>
           {% endfor %}
@@ -147,7 +147,7 @@
                     <span class="badge bg-danger">Alta</span>
                   {% endif %}
                 </td>
-                <td class="small">{{ difetto.get_postazione_responsabile_display }}</td>
+                <td class="small">{{ difetto.postazione_responsabile_nome }}</td>
                 <td class="small">{{ difetto.get_azione_correttiva_display }}</td>
                 <td>
                   {% if difetto.note %}<span class="small text-muted">{{ difetto.note }}</span>{% endif %}

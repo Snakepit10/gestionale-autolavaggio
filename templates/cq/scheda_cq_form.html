@@ -183,8 +183,21 @@
 
   {# ---- Operatori in turno ---- #}
   <div class="card">
-    <div class="card-header bg-primary text-white fw-semibold py-2">
-      <i class="bi bi-people"></i> Operatori in turno
+    <div class="card-header bg-primary text-white fw-semibold py-2 d-flex justify-content-between align-items-center">
+      <span><i class="bi bi-people"></i> Operatori in turno</span>
+      {% if configurazioni_assegnazione %}
+      <div class="d-flex align-items-center gap-2">
+        <select id="presetSelector" class="form-select form-select-sm text-dark" style="max-width:250px">
+          <option value="">-- Preset --</option>
+          {% for cfg in configurazioni_assegnazione %}
+            <option value="{{ cfg.pk }}">{{ cfg.nome }}</option>
+          {% endfor %}
+        </select>
+        <button type="button" class="btn btn-outline-light btn-sm" onclick="applicaPreset()">
+          <i class="bi bi-lightning"></i> Applica
+        </button>
+      </div>
+      {% endif %}
     </div>
     <div class="card-body py-2">
       <div class="row g-2">
@@ -686,5 +699,42 @@ document.getElementById('form-scheda-cq').addEventListener('submit', function(e)
 });
 
 })();
+
+/* ---- Preset assegnazione operatori ---- */
+async function applicaPreset() {
+  const sel = document.getElementById('presetSelector');
+  if (!sel) return;
+  const configId = sel.value;
+  if (!configId) { alert('Seleziona un preset.'); return; }
+
+  try {
+    const res = await fetch(`/cq/api/config-assegnazione/${configId}/applica/`, {
+      headers: { 'X-CSRFToken': '{{ csrf_token }}' }
+    });
+    const data = await res.json();
+    if (!data.ok) { alert(data.error || 'Errore'); return; }
+
+    const mapping = data.mapping; // { "post1": [id1,id2], "post3_blocco_a": [id3], ... }
+
+    // Deseleziona tutte le checkbox operatori
+    document.querySelectorAll('.operatori-check-group input[type=checkbox]').forEach(cb => {
+      cb.checked = false;
+    });
+
+    // Seleziona quelle del preset
+    for (const [key, operatoriIds] of Object.entries(mapping)) {
+      // key è postazione_codice o postazione_codice_blocco_codice
+      // Il prefix del form è turno_{key}
+      const prefix = `turno_${key}`;
+      for (const opId of operatoriIds) {
+        // Cerca checkbox con name che contiene il prefix e value = opId
+        const cb = document.querySelector(`input[name="${prefix}-operatori"][value="${opId}"]`);
+        if (cb) cb.checked = true;
+      }
+    }
+  } catch(e) {
+    alert('Errore di rete.');
+  }
+}
 </script>
 {% endblock %}

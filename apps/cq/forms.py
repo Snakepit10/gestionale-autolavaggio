@@ -5,6 +5,7 @@ from django.forms import modelformset_factory, BaseModelFormSet
 from apps.cq.models import (
     SchedaCQ, DifettoCQ, OperatorePostazioneTurno, ModificaPunteggio,
     ImpostazionePremioMensile, Postazione, AzioneCorrettiva, Gravita,
+    get_postazione_choices,
 )
 
 
@@ -19,10 +20,11 @@ def get_operatori_queryset():
 
 class OperatoriTurnoForm(forms.Form):
     """
-    Sottosezione del form scheda CQ per registrare chi ha lavorato a ogni postazione.
-    Un form per postazione — supporta più operatori per la stessa postazione.
+    Sottosezione del form scheda CQ per registrare chi ha lavorato a ogni postazione/blocco.
+    Un form per postazione (o per blocco se la postazione ha blocchi).
     """
-    postazione = forms.ChoiceField(choices=Postazione.choices, widget=forms.HiddenInput)
+    postazione = forms.ChoiceField(choices=[], widget=forms.HiddenInput)
+    blocco_codice = forms.CharField(required=False, widget=forms.HiddenInput)
     operatori = forms.ModelMultipleChoiceField(
         queryset=User.objects.none(),
         required=False,
@@ -32,6 +34,7 @@ class OperatoriTurnoForm(forms.Form):
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
+        self.fields['postazione'].choices = get_postazione_choices()
         self.fields['operatori'].queryset = get_operatori_queryset()
 
 

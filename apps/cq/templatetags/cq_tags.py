@@ -81,3 +81,26 @@ def tipo_json(tipo):
         'richiede_descrizione': tipo.richiede_descrizione,
         'attivo': tipo.attivo,
     })
+
+
+@register.filter
+def postazione_cq_json(postazione):
+    """Serializza un PostazioneCQ in JSON per i modal di modifica."""
+    return json.dumps({
+        'codice': postazione.codice,
+        'nome': postazione.nome,
+        'ordine': postazione.ordine,
+        'attiva': postazione.attiva,
+        'is_controllo_finale': postazione.is_controllo_finale,
+    })
+
+
+@register.filter
+def blocco_json(blocco):
+    """Serializza un BloccoPostazione in JSON per i modal di modifica."""
+    return json.dumps({
+        'codice': blocco.codice,
+        'nome': blocco.nome,
+        'ordine': blocco.ordine,
+        'postazione_id': blocco.postazione_id,
+    })
