@@ -1,0 +1,105 @@
+{% extends "base.html" %}
+{% block title %}Report Ordine #{{ ordine.numero_progressivo }}{% endblock %}
+
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-3">
+  <h5 class="mb-0">
+    <i class="bi bi-clock-history"></i>
+    Dettaglio Tempi — Ordine #{{ ordine.numero_progressivo }}
+  </h5>
+  <a href="{% url 'turni:report_lavorazioni' %}" class="btn btn-outline-secondary btn-sm">
+    <i class="bi bi-arrow-left"></i> Torna al Report
+  </a>
+</div>
+
+<div class="row g-3 mb-4">
+  <div class="col-md-4">
+    <div class="card">
+      <div class="card-body py-3">
+        <p class="mb-1"><strong>Cliente:</strong> {{ ordine.cliente|default:"N/D" }}</p>
+        <p class="mb-1"><strong>Auto:</strong> {{ ordine.tipo_auto|default:"N/D" }}</p>
+        <p class="mb-1"><strong>Data:</strong> {{ ordine.data_ora|date:"d/m/Y H:i" }}</p>
+        <p class="mb-0"><strong>Stato:</strong> <span class="badge bg-info">{{ ordine.stato }}</span></p>
+      </div>
+    </div>
+  </div>
+  <div class="col-md-4">
+    <div class="card text-center">
+      <div class="card-body py-3">
+        <div class="fs-2 fw-bold text-primary">{{ tempo_totale_min }} min</div>
+        <div class="text-muted">Tempo complessivo netto</div>
+      </div>
+    </div>
+  </div>
+  <div class="col-md-4">
+    <div class="card text-center">
+      <div class="card-body py-3">
+        <div class="fs-2 fw-bold text-success">{{ fasi|length }}</div>
+        <div class="text-muted">Fasi completate</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+{# Timeline visuale #}
+<div class="card mb-4">
+  <div class="card-header py-2"><i class="bi bi-diagram-3"></i> Timeline Fasi</div>
+  <div class="card-body">
+    {% if fasi %}
+    <div class="d-flex flex-wrap gap-2">
+      {% for fase in fasi %}
+      <div class="border rounded p-3 text-center" style="min-width:150px; flex:1;">
+        <div class="fw-bold text-primary small">{{ fase.postazione }}</div>
+        {% if fase.blocco %}<div class="text-muted" style="font-size:.7rem">{{ fase.blocco }}</div>{% endif %}
+        <div class="fs-4 fw-bold mt-1">{{ fase.tempo_netto_min }} min</div>
+        <div class="text-muted small">{{ fase.operatore }}</div>
+        {% if fase.pausa_min > 0 %}
+          <div class="text-warning small"><i class="bi bi-pause-circle"></i> {{ fase.pausa_min }} min pausa</div>
+        {% endif %}
+      </div>
+      {% if not forloop.last %}
+      <div class="d-flex align-items-center text-muted">
+        <i class="bi bi-arrow-right fs-4"></i>
+      </div>
+      {% endif %}
+      {% endfor %}
+    </div>
+    {% else %}
+    <p class="text-muted text-center py-3">Nessuna fase registrata per questo ordine.</p>
+    {% endif %}
+  </div>
+</div>
+
+{# Tabella dettaglio #}
+<div class="card">
+  <div class="card-header py-2"><i class="bi bi-table"></i> Dettaglio Fasi</div>
+  <div class="card-body p-0">
+    <table class="table table-hover mb-0">
+      <thead class="table-light">
+        <tr>
+          <th>Postazione</th><th>Blocco</th><th>Operatore</th>
+          <th>Inizio</th><th>Fine</th><th class="text-center">Pausa (min)</th>
+          <th class="text-center fw-bold">Tempo Netto (min)</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for fase in fasi %}
+        <tr>
+          <td>{{ fase.postazione }}</td>
+          <td>{{ fase.blocco|default:"—" }}</td>
+          <td>{{ fase.operatore }}</td>
+          <td>{{ fase.inizio|date:"H:i:s" }}</td>
+          <td>{{ fase.fine|date:"H:i:s" }}</td>
+          <td class="text-center">{% if fase.pausa_min > 0 %}{{ fase.pausa_min }}{% else %}—{% endif %}</td>
+          <td class="text-center fw-bold">{{ fase.tempo_netto_min }}</td>
+        </tr>
+        {% endfor %}
+        <tr class="table-primary fw-bold">
+          <td colspan="6" class="text-end">TOTALE</td>
+          <td class="text-center">{{ tempo_totale_min }}</td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+</div>
+{% endblock %}

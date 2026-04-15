@@ -91,9 +91,14 @@ class ServizioProdotto(models.Model):
     codice_prodotto = models.CharField(max_length=50, blank=True, help_text="SKU/codice interno")
     
     attivo = models.BooleanField(default=True)
+    is_supplemento = models.BooleanField(
+        default=False,
+        verbose_name='Supplemento operatore',
+        help_text='Se attivo, disponibile come supplemento dalla dashboard operatore (es. sporco eccessivo)',
+    )
     creato_il = models.DateTimeField(auto_now_add=True)
     aggiornato_il = models.DateTimeField(auto_now=True)
-    
+
     class Meta:
         ordering = ['categoria__ordine_visualizzazione', 'titolo']
         verbose_name_plural = "Servizi e Prodotti"

@@ -33,6 +33,9 @@ urlpatterns = [
     # Controllo qualità e premi/sanzioni
     path('cq/', include('apps.cq.urls', namespace='cq')),
 
+    # Turni operatore
+    path('turni/', include('apps.turni.urls', namespace='turni')),
+
     # path('shop/', include('apps.shop.urls')),
     # path('cassa/', include('apps.ordini.urls', namespace='cassa')),
     # path('report/', include('apps.reportistica.urls')),  # Temporarily disabled

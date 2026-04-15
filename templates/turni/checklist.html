@@ -1,0 +1,79 @@
+{% extends "base.html" %}
+{% block title %}Checklist {{ fase|title }} Turno{% endblock %}
+
+{% block content %}
+<div class="container py-4">
+  <div class="text-center mb-4">
+    <h4>
+      <i class="bi bi-clipboard-check"></i>
+      Checklist {% if fase == 'inizio' %}Inizio{% else %}Fine{% endif %} Turno
+    </h4>
+    <p class="text-muted">Verifica la strumentazione delle tue postazioni</p>
+  </div>
+
+  <form method="post">
+    {% csrf_token %}
+    <div class="accordion" id="checklistAccordion">
+      {% for group_name, items in grouped_items.items %}
+      <div class="accordion-item">
+        <h2 class="accordion-header">
+          <button class="accordion-button {% if not forloop.first %}collapsed{% endif %}" type="button"
+                  data-bs-toggle="collapse" data-bs-target="#group-{{ forloop.counter }}">
+            <i class="bi bi-building me-2"></i> {{ group_name }}
+            <span class="badge bg-primary ms-2">{{ items|length }}</span>
+          </button>
+        </h2>
+        <div id="group-{{ forloop.counter }}" class="accordion-collapse collapse {% if forloop.first %}show{% endif %}">
+          <div class="accordion-body p-0">
+            <table class="table table-hover mb-0">
+              <thead class="table-light">
+                <tr>
+                  <th>Voce</th>
+                  <th class="text-center" style="width:200px">Esito</th>
+                  <th style="width:250px">Note</th>
+                </tr>
+              </thead>
+              <tbody>
+                {% for item in items %}
+                {% with cc=compilazioni|default_if_none:"" %}
+                <tr>
+                  <td class="align-middle">{{ item.nome }}</td>
+                  <td class="text-center align-middle">
+                    <div class="btn-group btn-group-sm" role="group">
+                      <input type="radio" class="btn-check" name="esito_{{ item.pk }}" value="ok"
+                             id="ok_{{ item.pk }}" checked>
+                      <label class="btn btn-outline-success" for="ok_{{ item.pk }}">OK</label>
+
+                      <input type="radio" class="btn-check" name="esito_{{ item.pk }}" value="non_ok"
+                             id="nok_{{ item.pk }}">
+                      <label class="btn btn-outline-danger" for="nok_{{ item.pk }}">Non OK</label>
+
+                      <input type="radio" class="btn-check" name="esito_{{ item.pk }}" value="na"
+                             id="na_{{ item.pk }}">
+                      <label class="btn btn-outline-secondary" for="na_{{ item.pk }}">N/A</label>
+                    </div>
+                  </td>
+                  <td>
+                    <input type="text" class="form-control form-control-sm"
+                           name="note_{{ item.pk }}" placeholder="Note...">
+                  </td>
+                </tr>
+                {% endwith %}
+                {% endfor %}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+      {% endfor %}
+    </div>
+
+    <div class="text-center mt-4">
+      <button type="submit" class="btn btn-success btn-lg px-5">
+        <i class="bi bi-check-circle"></i>
+        {% if fase == 'inizio' %}Conferma e Vai alla Dashboard{% else %}Conferma e Chiudi Turno{% endif %}
+      </button>
+    </div>
+  </form>
+</div>
+{% endblock %}

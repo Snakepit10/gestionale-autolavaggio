@@ -32,8 +32,11 @@ def operator_login(request):
             
             messages.success(request, f'Benvenuto, {user.get_full_name() or user.username}!')
             
-            # Redirect alla dashboard operatori
-            next_url = request.GET.get('next', 'core:home')
+            # Redirect: operatori alla selezione postazioni, altri alla home
+            default_url = 'core:home'
+            if user.groups.filter(name='operatore').exists():
+                default_url = 'turni:selezione_postazioni'
+            next_url = request.GET.get('next', default_url)
             return redirect(next_url)
         else:
             messages.error(request, 'Credenziali non valide o accesso non autorizzato.')

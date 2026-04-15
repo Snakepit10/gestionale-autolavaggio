@@ -92,6 +92,7 @@ def postazione_cq_json(postazione):
         'ordine': postazione.ordine,
         'attiva': postazione.attiva,
         'is_controllo_finale': postazione.is_controllo_finale,
+        'postazione_fisica_id': postazione.postazione_fisica_id,
     })
 
 

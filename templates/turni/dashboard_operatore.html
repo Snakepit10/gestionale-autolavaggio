@@ -1,0 +1,324 @@
+{% extends "base.html" %}
+{% block title %}Dashboard Operatore{% endblock %}
+
+{% block extra_css %}
+<style>
+.dashboard-container { height: calc(100vh - 80px); overflow: hidden; }
+.panel-left { height: 100%; overflow-y: auto; border-right: 2px solid #dee2e6; }
+.panel-right { height: 100%; overflow-y: auto; }
+.ordine-card { cursor: pointer; transition: all .15s; border-left: 4px solid transparent; }
+.ordine-card:hover { background: #f0f4ff; }
+.ordine-card.active { border-left-color: var(--bs-primary); background: #e8f0fe; }
+.ordine-card.in-lavorazione { border-left-color: #ffc107; background: #fff8e1; }
+.timer-display { font-family: 'Courier New', monospace; font-size: 3rem; font-weight: bold; letter-spacing: 2px; }
+.timer-display.paused { color: #ffc107; }
+.timer-display.running { color: #198754; }
+.btn-lavoro { padding: .75rem 1.5rem; font-size: 1.1rem; }
+.section-header { font-weight: 600; font-size: .85rem; text-transform: uppercase; letter-spacing: .5px; color: #6c757d; }
+.empty-state { display: flex; flex-direction: column; align-items: center; justify-content: center; height: 100%; color: #adb5bd; }
+.badge-postazione { font-size: .7rem; }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="container-fluid p-0">
+  <div class="row g-0 dashboard-container">
+
+    {# ===== LEFT PANEL: Coda ordini ===== #}
+    <div class="col-md-4 panel-left p-3">
+      <div class="d-flex justify-content-between align-items-center mb-3">
+        <h6 class="mb-0"><i class="bi bi-list-ol"></i> Coda Ordini</h6>
+        <div>
+          <span class="badge bg-primary" id="codaCount">{{ ordini_coda|length }}</span>
+          <a href="{% url 'turni:checklist_fine' %}" class="btn btn-outline-danger btn-sm ms-2" title="Fine turno">
+            <i class="bi bi-box-arrow-right"></i>
+          </a>
+        </div>
+      </div>
+
+      <div id="codaContainer">
+        {% for entry in ordini_coda %}
+        <div class="card ordine-card mb-2 p-2 {% if lavorazione_attiva and lavorazione_attiva.ordine_id == entry.ordine.pk %}active in-lavorazione{% endif %}"
+             data-ordine-id="{{ entry.ordine.pk }}"
+             onclick="selezionaOrdine({{ entry.ordine.pk }})">
+          <div class="d-flex justify-content-between align-items-start">
+            <div>
+              <strong class="text-primary">#{{ entry.ordine.numero_progressivo|slice:"-4:" }}</strong>
+              {% if entry.ordine.cliente %}
+                <span class="text-muted ms-1 small">{{ entry.ordine.cliente }}</span>
+              {% endif %}
+            </div>
+            <span class="badge {% if entry.ordine.stato == 'in_lavorazione' %}bg-warning{% else %}bg-secondary{% endif %} badge-postazione">
+              {{ entry.ordine.stato }}
+            </span>
+          </div>
+          {% if entry.ordine.tipo_auto %}
+            <div class="text-muted small"><i class="bi bi-car-front"></i> {{ entry.ordine.tipo_auto }}</div>
+          {% endif %}
+          <div class="mt-1">
+            {% for item in entry.items %}
+              <span class="badge bg-light text-dark border me-1 small">{{ item.servizio_prodotto.titolo }}</span>
+            {% endfor %}
+          </div>
+        </div>
+        {% empty %}
+        <div class="text-center text-muted py-5">
+          <i class="bi bi-inbox fs-1"></i>
+          <p class="mt-2">Nessun ordine in coda</p>
+        </div>
+        {% endfor %}
+      </div>
+    </div>
+
+    {# ===== RIGHT PANEL: Area operativa ===== #}
+    <div class="col-md-8 panel-right p-3">
+
+      <div id="areaOperativa">
+        {% if lavorazione_attiva %}
+          {# Mostra ordine in lavorazione #}
+          <div id="ordineDettaglio" data-ordine-id="{{ lavorazione_attiva.ordine.pk }}">
+            {% include "turni/_area_operativa.html" with ordine=lavorazione_attiva.ordine lavorazione=lavorazione_attiva %}
+          </div>
+        {% else %}
+          <div class="empty-state">
+            <i class="bi bi-hand-index fs-1"></i>
+            <p class="mt-2">Seleziona un ordine dalla coda per iniziare</p>
+          </div>
+        {% endif %}
+      </div>
+
+    </div>
+  </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+const CSRF = '{{ csrf_token }}';
+let currentOrdineId = {{ lavorazione_attiva.ordine.pk|default:"null" }};
+let currentLavId = {{ lavorazione_attiva.pk|default:"null" }};
+let currentLavStato = '{{ lavorazione_attiva.stato|default:"" }}';
+let timerInterval = null;
+let timerStartTime = null;
+let timerPauseSec = 0;
+
+/* ---- Seleziona ordine dalla coda ---- */
+async function selezionaOrdine(ordineId) {
+  // Evidenzia nella coda
+  document.querySelectorAll('.ordine-card').forEach(c => c.classList.remove('active'));
+  const card = document.querySelector(`.ordine-card[data-ordine-id="${ordineId}"]`);
+  if (card) card.classList.add('active');
+
+  // Carica dettaglio
+  const res = await fetch(`/turni/api/ordine/${ordineId}/dettaglio/`);
+  const data = await res.json();
+  if (!data.ok) return;
+
+  currentOrdineId = ordineId;
+  renderAreaOperativa(data.ordine, data.lavorazione);
+}
+
+function renderAreaOperativa(ordine, lavorazione) {
+  const area = document.getElementById('areaOperativa');
+
+  let itemsHtml = ordine.items.map(i =>
+    `<tr><td>${i.servizio_prodotto__titolo}</td><td>${i.quantita}</td><td>&euro;${i.prezzo_unitario}</td><td><span class="badge ${i.stato === 'completato' ? 'bg-success' : i.stato === 'in_lavorazione' ? 'bg-warning' : 'bg-secondary'}">${i.stato}</span></td></tr>`
+  ).join('');
+
+  let timerHtml = '';
+  let buttonsHtml = '';
+
+  if (lavorazione) {
+    currentLavId = lavorazione.id;
+    currentLavStato = lavorazione.stato;
+    timerStartTime = new Date(lavorazione.inizio);
+    timerPauseSec = lavorazione.tempo_pausa_sec || 0;
+
+    const timerClass = lavorazione.stato === 'in_pausa' ? 'paused' : 'running';
+    timerHtml = `<div class="timer-display ${timerClass}" id="timerDisplay">00:00</div>`;
+
+    if (lavorazione.stato === 'in_lavorazione') {
+      buttonsHtml = `
+        <button class="btn btn-warning btn-lavoro me-2" onclick="pausaLavoro()"><i class="bi bi-pause-circle"></i> Pausa</button>
+        <button class="btn btn-success btn-lavoro" onclick="completaLavoro()"><i class="bi bi-check-circle"></i> Fine Lavoro</button>`;
+    } else if (lavorazione.stato === 'in_pausa') {
+      buttonsHtml = `
+        <button class="btn btn-primary btn-lavoro me-2" onclick="riprendiLavoro()"><i class="bi bi-play-circle"></i> Riprendi</button>
+        <button class="btn btn-success btn-lavoro" onclick="completaLavoro()"><i class="bi bi-check-circle"></i> Fine Lavoro</button>`;
+    }
+  } else {
+    currentLavId = null;
+    currentLavStato = '';
+    timerHtml = '<div class="timer-display text-muted" id="timerDisplay">--:--</div>';
+    buttonsHtml = `<button class="btn btn-primary btn-lavoro" onclick="iniziaLavoro()"><i class="bi bi-play-circle"></i> Inizia Lavoro</button>`;
+  }
+
+  // Supplementi
+  let suppHtml = '';
+  {% if supplementi %}
+  suppHtml = `
+    <div class="d-flex gap-2 align-items-center">
+      <select class="form-select form-select-sm" id="supplementoSelect" style="max-width:250px">
+        {% for s in supplementi %}
+        <option value="{{ s.pk }}">{{ s.titolo }} (&euro;{{ s.prezzo }})</option>
+        {% endfor %}
+      </select>
+      <button class="btn btn-outline-warning btn-sm" onclick="aggiungiItem()">
+        <i class="bi bi-plus-circle"></i> Aggiungi
+      </button>
+    </div>`;
+  {% endif %}
+
+  area.innerHTML = `
+    <div class="card mb-3">
+      <div class="card-header bg-primary text-white py-2">
+        <i class="bi bi-car-front"></i> Ordine #${ordine.numero}
+      </div>
+      <div class="card-body py-2">
+        <div class="row">
+          <div class="col-md-6">
+            <p class="mb-1"><strong>Cliente:</strong> ${ordine.cliente || 'N/D'}</p>
+            <p class="mb-1"><strong>Auto:</strong> ${ordine.tipo_auto || 'N/D'}</p>
+          </div>
+          <div class="col-md-6">
+            <p class="mb-1"><strong>Stato:</strong> <span class="badge bg-info">${ordine.stato}</span></p>
+            ${ordine.nota ? `<p class="mb-1"><strong>Note:</strong> ${ordine.nota}</p>` : ''}
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="card mb-3">
+      <div class="card-header py-2 d-flex justify-content-between align-items-center">
+        <span class="section-header"><i class="bi bi-bag-plus"></i> Servizi / Aggiungi Item</span>
+        ${suppHtml}
+      </div>
+      <div class="card-body p-0">
+        <table class="table table-sm table-hover mb-0">
+          <thead class="table-light"><tr><th>Servizio</th><th>Qty</th><th>Prezzo</th><th>Stato</th></tr></thead>
+          <tbody>${itemsHtml}</tbody>
+        </table>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-header py-2">
+        <span class="section-header"><i class="bi bi-stopwatch"></i> Lavorazione</span>
+      </div>
+      <div class="card-body text-center py-4">
+        ${timerHtml}
+        <div class="mt-3">${buttonsHtml}</div>
+      </div>
+    </div>`;
+
+  startTimer();
+}
+
+/* ---- Timer ---- */
+function startTimer() {
+  stopTimer();
+  if (!timerStartTime || !currentLavId) return;
+
+  timerInterval = setInterval(() => {
+    const now = new Date();
+    let elapsed = (now - timerStartTime) / 1000;
+    elapsed -= timerPauseSec;
+    if (currentLavStato === 'in_pausa') {
+      // Non contare tempo se in pausa
+    }
+    if (elapsed < 0) elapsed = 0;
+    const min = Math.floor(elapsed / 60);
+    const sec = Math.floor(elapsed % 60);
+    const display = document.getElementById('timerDisplay');
+    if (display) display.textContent = `${String(min).padStart(2,'0')}:${String(sec).padStart(2,'0')}`;
+  }, 1000);
+}
+
+function stopTimer() {
+  if (timerInterval) { clearInterval(timerInterval); timerInterval = null; }
+}
+
+/* ---- API calls ---- */
+async function apiPost(url, body) {
+  const res = await fetch(url, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', 'X-CSRFToken': CSRF },
+    body: body ? JSON.stringify(body) : '{}',
+  });
+  return res.json();
+}
+
+async function iniziaLavoro() {
+  if (!currentOrdineId) return;
+  const data = await apiPost(`/turni/api/ordine/${currentOrdineId}/inizia-lavoro/`);
+  if (data.ok) {
+    selezionaOrdine(currentOrdineId);
+  } else {
+    alert(data.error);
+  }
+}
+
+async function pausaLavoro() {
+  if (!currentLavId) return;
+  const data = await apiPost(`/turni/api/lavorazione/${currentLavId}/pausa/`);
+  if (data.ok) {
+    currentLavStato = 'in_pausa';
+    selezionaOrdine(currentOrdineId);
+  } else alert(data.error);
+}
+
+async function riprendiLavoro() {
+  if (!currentLavId) return;
+  const data = await apiPost(`/turni/api/lavorazione/${currentLavId}/riprendi/`);
+  if (data.ok) {
+    currentLavStato = 'in_lavorazione';
+    selezionaOrdine(currentOrdineId);
+  } else alert(data.error);
+}
+
+async function completaLavoro() {
+  if (!currentLavId) return;
+  if (!confirm('Confermi fine lavorazione?')) return;
+  const data = await apiPost(`/turni/api/lavorazione/${currentLavId}/completa/`);
+  if (data.ok) {
+    stopTimer();
+    currentLavId = null;
+    currentLavStato = '';
+    aggiornaCoда();
+    // Reset area
+    document.getElementById('areaOperativa').innerHTML = `
+      <div class="empty-state">
+        <i class="bi bi-check-circle fs-1 text-success"></i>
+        <p class="mt-2">Lavorazione completata in ${data.tempo_netto_min} min</p>
+        <p class="text-muted">Seleziona il prossimo ordine dalla coda</p>
+      </div>`;
+  } else alert(data.error);
+}
+
+async function aggiungiItem() {
+  if (!currentOrdineId) return;
+  const sel = document.getElementById('supplementoSelect');
+  if (!sel) return;
+  const data = await apiPost(`/turni/api/ordine/${currentOrdineId}/aggiungi-item/`, {
+    servizio_id: parseInt(sel.value),
+  });
+  if (data.ok) {
+    selezionaOrdine(currentOrdineId);
+  } else alert(data.error);
+}
+
+/* ---- Polling coda ---- */
+async function aggiornaCoда() {
+  try {
+    const res = await fetch('/turni/api/coda/');
+    const data = await res.json();
+    if (!data.ok) return;
+    document.getElementById('codaCount').textContent = data.ordini.length;
+    // Refresh simple - reload per semplicita
+    // In futuro si puo fare update parziale del DOM
+  } catch(e) {}
+}
+
+setInterval(aggiornaCoда, 10000);
+</script>
+{% endblock %}

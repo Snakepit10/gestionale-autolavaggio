@@ -233,6 +233,12 @@ class PostazioneCQ(models.Model):
         verbose_name='Controllo finale',
         help_text='Segna questa postazione come controllo finale (una sola)',
     )
+    postazione_fisica = models.ForeignKey(
+        'core.Postazione', null=True, blank=True,
+        on_delete=models.SET_NULL, related_name='postazione_cq',
+        verbose_name='Postazione fisica collegata',
+        help_text='Collega alla postazione fisica per il routing ordini',
+    )
 
     class Meta:
         verbose_name = 'Postazione CQ'

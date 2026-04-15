@@ -1,0 +1,29 @@
+{% extends "base.html" %}
+{% block title %}Chiudi Turno{% endblock %}
+
+{% block content %}
+<div class="container py-5">
+  <div class="row justify-content-center">
+    <div class="col-md-6">
+      <div class="card shadow">
+        <div class="card-header bg-danger text-white">
+          <h5 class="mb-0"><i class="bi bi-box-arrow-right"></i> Chiudi Turno</h5>
+        </div>
+        <div class="card-body text-center py-4">
+          <p>Stai per chiudere il turno iniziato alle <strong>{{ sessione.data_inizio|date:"H:i" }}</strong>.</p>
+          <p class="text-muted">Eventuali lavorazioni in corso verranno completate automaticamente.</p>
+          <form method="post" action="{% url 'turni:chiudi_turno' %}">
+            {% csrf_token %}
+            <button type="submit" class="btn btn-danger btn-lg">
+              <i class="bi bi-power"></i> Conferma Chiusura Turno
+            </button>
+          </form>
+          <a href="{% url 'turni:dashboard' %}" class="btn btn-outline-secondary mt-2">
+            <i class="bi bi-arrow-left"></i> Torna alla Dashboard
+          </a>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}

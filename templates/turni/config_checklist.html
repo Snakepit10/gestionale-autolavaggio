@@ -1,0 +1,144 @@
+{% extends "base.html" %}
+{% load cq_tags %}
+
+{% block title %}Configurazione Checklist Turni{% endblock %}
+
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-3">
+  <h5 class="mb-0"><i class="bi bi-clipboard-check"></i> Configurazione Checklist Turni</h5>
+  <button class="btn btn-primary btn-sm" onclick="apriModal()">
+    <i class="bi bi-plus-lg"></i> Nuova Voce
+  </button>
+</div>
+
+<div class="card">
+  <div class="card-body p-0">
+    <table class="table table-hover mb-0">
+      <thead class="table-light">
+        <tr><th>Postazione</th><th>Blocco</th><th>Voce</th><th>Ord.</th><th>Attivo</th><th></th></tr>
+      </thead>
+      <tbody>
+        {% for item in items %}
+        <tr>
+          <td>{{ item.postazione_cq.nome }}</td>
+          <td>{{ item.blocco.nome|default:"—" }}</td>
+          <td>{{ item.nome }}</td>
+          <td>{{ item.ordine }}</td>
+          <td>{% if item.attivo %}<i class="bi bi-check-circle text-success"></i>{% else %}<i class="bi bi-x-circle text-danger"></i>{% endif %}</td>
+          <td>
+            <button class="btn btn-outline-primary btn-sm py-0" onclick="modifica({{ item.pk }}, '{{ item.nome|escapejs }}', {{ item.postazione_cq_id }}, {{ item.blocco_id|default:'null' }}, {{ item.ordine }}, {{ item.attivo|yesno:'true,false' }})">
+              <i class="bi bi-pencil"></i>
+            </button>
+            <button class="btn btn-outline-danger btn-sm py-0" onclick="elimina({{ item.pk }}, '{{ item.nome|escapejs }}')">
+              <i class="bi bi-trash"></i>
+            </button>
+          </td>
+        </tr>
+        {% empty %}
+        <tr><td colspan="6" class="text-muted text-center py-3">Nessuna voce checklist configurata</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+
+{# Modal #}
+<div class="modal fade" id="modalChecklist" tabindex="-1">
+  <div class="modal-dialog">
+    <div class="modal-content">
+      <div class="modal-header"><h6 class="modal-title">Voce Checklist</h6><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div>
+      <div class="modal-body">
+        <input type="hidden" id="clId">
+        <div class="mb-2">
+          <label class="form-label small">Postazione *</label>
+          <select class="form-select" id="clPostazione" onchange="filtraBlocchi()">
+            {% for p in postazioni %}
+            <option value="{{ p.pk }}" data-blocchi='[{% for b in p.blocchi.all %}{"id":{{ b.pk }},"nome":"{{ b.nome|escapejs }}"}{% if not forloop.last %},{% endif %}{% endfor %}]'>{{ p.nome }}</option>
+            {% endfor %}
+          </select>
+        </div>
+        <div class="mb-2">
+          <label class="form-label small">Blocco (opzionale)</label>
+          <select class="form-select" id="clBlocco">
+            <option value="">— Tutta la postazione —</option>
+          </select>
+        </div>
+        <div class="row g-2">
+          <div class="col-8"><label class="form-label small">Nome voce *</label><input type="text" class="form-control" id="clNome"></div>
+          <div class="col-4"><label class="form-label small">Ordine</label><input type="number" class="form-control" id="clOrdine" value="0"></div>
+        </div>
+        <div class="form-check mt-2">
+          <input class="form-check-input" type="checkbox" id="clAttivo" checked>
+          <label class="form-check-label" for="clAttivo">Attivo</label>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-secondary btn-sm" data-bs-dismiss="modal">Annulla</button>
+        <button type="button" class="btn btn-primary btn-sm" onclick="salva()">Salva</button>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+const CSRF = '{{ csrf_token }}';
+
+function apriModal() {
+  document.getElementById('clId').value = '';
+  document.getElementById('clNome').value = '';
+  document.getElementById('clOrdine').value = '0';
+  document.getElementById('clAttivo').checked = true;
+  filtraBlocchi();
+  new bootstrap.Modal(document.getElementById('modalChecklist')).show();
+}
+
+function modifica(id, nome, postId, bloccoId, ordine, attivo) {
+  document.getElementById('clId').value = id;
+  document.getElementById('clNome').value = nome;
+  document.getElementById('clPostazione').value = postId;
+  document.getElementById('clOrdine').value = ordine;
+  document.getElementById('clAttivo').checked = attivo;
+  filtraBlocchi();
+  if (bloccoId) document.getElementById('clBlocco').value = bloccoId;
+  new bootstrap.Modal(document.getElementById('modalChecklist')).show();
+}
+
+function filtraBlocchi() {
+  const sel = document.getElementById('clPostazione');
+  const opt = sel.selectedOptions[0];
+  const blocchi = JSON.parse(opt.dataset.blocchi || '[]');
+  const bSel = document.getElementById('clBlocco');
+  bSel.innerHTML = '<option value="">— Tutta la postazione —</option>';
+  blocchi.forEach(b => {
+    bSel.innerHTML += `<option value="${b.id}">${b.nome}</option>`;
+  });
+}
+
+async function salva() {
+  const fd = new FormData();
+  fd.append('csrfmiddlewaretoken', CSRF);
+  fd.append('id', document.getElementById('clId').value);
+  fd.append('postazione_cq_id', document.getElementById('clPostazione').value);
+  fd.append('blocco_id', document.getElementById('clBlocco').value);
+  fd.append('nome', document.getElementById('clNome').value);
+  fd.append('ordine', document.getElementById('clOrdine').value);
+  fd.append('attivo', document.getElementById('clAttivo').checked ? '1' : '0');
+  const res = await fetch('/turni/api/checklist-item/salva/', { method: 'POST', body: fd });
+  const data = await res.json();
+  if (data.ok) location.reload();
+  else alert(data.error);
+}
+
+async function elimina(pk, nome) {
+  if (!confirm(`Eliminare "${nome}"?`)) return;
+  const fd = new FormData();
+  fd.append('csrfmiddlewaretoken', CSRF);
+  const res = await fetch(`/turni/api/checklist-item/${pk}/elimina/`, { method: 'POST', body: fd });
+  const data = await res.json();
+  if (data.ok) location.reload();
+  else alert(data.error);
+}
+</script>
+{% endblock %}

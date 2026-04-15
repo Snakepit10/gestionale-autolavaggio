@@ -649,7 +649,10 @@ class ConfigurazioneCQView(TitolareRequiredMixin, TemplateView):
         ctx['tipi_matrice'] = tipi_qs
         ctx['mapping_set_json'] = json.dumps(list(mapping_set))
         # Postazioni CQ e Blocchi
-        ctx['postazioni_cq'] = PostazioneCQ.objects.prefetch_related('blocchi').all()
+        ctx['postazioni_cq'] = PostazioneCQ.objects.prefetch_related('blocchi').select_related('postazione_fisica').all()
+        # Postazioni fisiche per il dropdown nella config PostazioneCQ
+        from apps.core.models import Postazione as PostazioneFisica
+        ctx['postazioni_fisiche'] = PostazioneFisica.objects.filter(attiva=True).order_by('ordine_visualizzazione')
         # Preset assegnazione
         from apps.cq.forms import get_operatori_queryset
         ctx['configurazioni_assegnazione'] = ConfigurazioneAssegnazione.objects.prefetch_related(
@@ -833,6 +836,7 @@ def api_salva_postazione(request):
     ordine = int(request.POST.get('ordine', 0))
     attiva = request.POST.get('attiva', '1') == '1'
     is_cf = request.POST.get('is_controllo_finale', '0') == '1'
+    pf_id = request.POST.get('postazione_fisica_id') or None
     if not codice or not nome:
         return _json_err('Codice e nome obbligatori')
     if pk:
@@ -842,11 +846,13 @@ def api_salva_postazione(request):
         obj.ordine = ordine
         obj.attiva = attiva
         obj.is_controllo_finale = is_cf
+        obj.postazione_fisica_id = pf_id
         obj.save()
     else:
         obj = PostazioneCQ.objects.create(
             codice=codice, nome=nome, ordine=ordine,
             attiva=attiva, is_controllo_finale=is_cf,
+            postazione_fisica_id=pf_id,
         )
     return _json_ok({
         'id': obj.pk, 'codice': obj.codice, 'nome': obj.nome,

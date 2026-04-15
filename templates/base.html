@@ -149,6 +149,30 @@
                         </li>
                         {% endif %}
 
+                        {# Turni operatore #}
+                        {% if user|in_group:"operatore" %}
+                        <li class="nav-item">
+                            <a class="nav-link" href="{% url 'turni:dashboard' %}">
+                                <i class="bi bi-person-workspace"></i> Il Mio Turno
+                            </a>
+                        </li>
+                        {% endif %}
+                        {% if user|in_group:"titolare" %}
+                        <li class="nav-item dropdown">
+                            <a class="nav-link dropdown-toggle" href="#" role="button" data-bs-toggle="dropdown">
+                                <i class="bi bi-clock-history"></i> Turni
+                            </a>
+                            <ul class="dropdown-menu">
+                                <li><a class="dropdown-item" href="{% url 'turni:report_lavorazioni' %}">
+                                    <i class="bi bi-graph-up"></i> Report Tempi
+                                </a></li>
+                                <li><a class="dropdown-item" href="{% url 'turni:config_checklist' %}">
+                                    <i class="bi bi-clipboard-check"></i> Config Checklist
+                                </a></li>
+                            </ul>
+                        </li>
+                        {% endif %}
+
                         {% comment "Reportistica temporarily disabled due to pandas dependency" %}
                         <li class="nav-item dropdown">
                             <a class="nav-link dropdown-toggle" href="#" id="reportDropdown" role="button" data-bs-toggle="dropdown">
