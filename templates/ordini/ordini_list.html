@@ -125,6 +125,7 @@
                         <table class="table table-hover table-striped">
                             <thead class="table-dark">
                                 <tr>
+                                    <th style="width:30px"></th>
                                     <th>N° Ordine</th>
                                     <th>Data/Ora</th>
                                     <th>Cliente</th>
@@ -137,9 +138,12 @@
                                     <th class="text-center">CQ</th>
                                 </tr>
                             </thead>
-                    <tbody>
+                    <tbody id="ordiniAttiviBody">
                         {% for ordine in ordini_attivi %}
-                        <tr data-ordine-id="{{ ordine.id }}">
+                        <tr data-ordine-id="{{ ordine.id }}" style="cursor:grab">
+                            <td class="drag-handle text-center text-muted" style="cursor:grab; width:30px">
+                                <i class="bi bi-grip-vertical"></i>
+                            </td>
                             <td>
                                 <a href="{% url 'ordini:ordine-detail' ordine.pk %}"
                                    class="text-decoration-none">
@@ -2555,6 +2559,47 @@ window.addEventListener('beforeunload', function() {
 .table-hover.table-striped tbody tr:hover td {
     background-color: #cfe2ff !important;
 }
+.sortable-ghost { opacity: 0.4; background: #e3f2fd !important; }
+.sortable-chosen { background: #bbdefb !important; }
+.drag-handle:hover { color: #0d6efd !important; }
 </style>
+
+<script src="https://cdn.jsdelivr.net/npm/sortablejs@1.15.6/Sortable.min.js"></script>
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+  const tbody = document.getElementById('ordiniAttiviBody');
+  if (!tbody) return;
+
+  new Sortable(tbody, {
+    handle: '.drag-handle',
+    animation: 150,
+    ghostClass: 'sortable-ghost',
+    chosenClass: 'sortable-chosen',
+    onEnd: async function(evt) {
+      // Raccogli tutti gli ID nell'ordine attuale del DOM
+      const rows = tbody.querySelectorAll('tr[data-ordine-id]');
+      const ordiniIds = Array.from(rows).map(r => parseInt(r.dataset.ordineId));
+
+      // Salva sul server
+      try {
+        const res = await fetch('/ordini/api/aggiorna-priorita/', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'X-CSRFToken': '{{ csrf_token }}',
+          },
+          body: JSON.stringify({ ordini_ids: ordiniIds }),
+        });
+        const data = await res.json();
+        if (!data.success) {
+          console.error('Errore aggiornamento priorità:', data.error);
+        }
+      } catch(e) {
+        console.error('Errore rete:', e);
+      }
+    }
+  });
+});
+</script>
 
 {% endblock %}

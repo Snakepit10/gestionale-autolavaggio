@@ -564,20 +564,28 @@ class OrdiniListView(LoginRequiredMixin, ListView):
                 context['ordini_completati'] = Ordine.objects.none()
         else:
             # Senza filtro stato, mostra ordini attivi e completati separatamente
-            # Ordini immediati e programmati separati, poi concatenati
-            ordini_immediati = queryset.filter(
+            # Ordini con priorita manuale vengono prima, poi il resto nell'ordine originale
+            ordini_con_priorita = queryset.filter(
                 stato__in=['in_attesa', 'in_lavorazione'],
-                tipo_consegna='immediata'
+                priorita__gt=0,
+            ).order_by('priorita')
+
+            ordini_senza_priorita_imm = queryset.filter(
+                stato__in=['in_attesa', 'in_lavorazione'],
+                priorita=0,
+                tipo_consegna='immediata',
             ).order_by('data_ora')
 
-            ordini_programmati = queryset.filter(
+            ordini_senza_priorita_prog = queryset.filter(
                 stato__in=['in_attesa', 'in_lavorazione'],
-                tipo_consegna='programmata'
+                priorita=0,
+                tipo_consegna='programmata',
             ).order_by('ora_consegna_richiesta')
 
-            # Concatena: prima immediati, poi programmati
             from itertools import chain
-            context['ordini_attivi'] = list(chain(ordini_immediati, ordini_programmati))
+            context['ordini_attivi'] = list(chain(
+                ordini_con_priorita, ordini_senza_priorita_imm, ordini_senza_priorita_prog
+            ))
 
             # Ordini da ritirare: completati ma NON ancora ritirati
             context['ordini_da_ritirare'] = queryset.filter(
@@ -1981,3 +1989,20 @@ class ConfigurazionePianificazioneUpdateView(LoginRequiredMixin, UpdateView):
         form.instance.aggiornato_da = self.request.user
         messages.success(self.request, 'Configurazione aggiornata')
         return super().form_valid(form)
+
+
+@login_required
+def aggiorna_priorita_ordini(request):
+    """AJAX POST: aggiorna la priorità degli ordini dopo drag-and-drop."""
+    if request.method != 'POST':
+        return JsonResponse({'success': False, 'error': 'Metodo non consentito'}, status=405)
+    try:
+        data = json.loads(request.body)
+        ordini_ids = data.get('ordini_ids', [])  # Lista di ID nell'ordine desiderato
+        if not ordini_ids:
+            return JsonResponse({'success': False, 'error': 'Nessun ordine specificato'})
+        for idx, ordine_id in enumerate(ordini_ids):
+            Ordine.objects.filter(pk=ordine_id).update(priorita=idx + 1)
+        return JsonResponse({'success': True, 'count': len(ordini_ids)})
+    except (json.JSONDecodeError, ValueError) as e:
+        return JsonResponse({'success': False, 'error': str(e)}, status=400)

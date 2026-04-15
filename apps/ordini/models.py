@@ -84,6 +84,11 @@ class Ordine(models.Model):
     nota = models.TextField(blank=True)
     tipo_auto = models.CharField(max_length=200, blank=True, help_text="Modello e colore dell'auto")
     stato = models.CharField(max_length=20, choices=STATO_CHOICES, default='in_attesa')
+    priorita = models.IntegerField(
+        default=0,
+        verbose_name='Priorità lavorazione',
+        help_text='Ordine di priorità: valori più bassi = priorità più alta. 0 = automatico.',
+    )
     operatore = models.ForeignKey(User, on_delete=models.SET_NULL, null=True)
 
     # Ritiro auto

@@ -3,8 +3,8 @@ from datetime import date, timedelta
 
 from django.contrib import messages
 from django.contrib.auth.decorators import login_required
-from django.db import transaction
-from django.db.models import Count, Sum, Avg, Q, F
+from django.db import models as db_models, transaction
+from django.db.models import Count, Sum, Avg, Q, F, Case, When, IntegerField
 from django.db.models.functions import Coalesce
 from django.http import JsonResponse
 from django.shortcuts import get_object_or_404, redirect, render
@@ -45,7 +45,14 @@ def _get_coda_ordini(sessione):
             servizio_prodotto__tipo='servizio',
         )
         .select_related('ordine', 'ordine__cliente', 'servizio_prodotto')
-        .order_by('ordine__numero_progressivo')
+        .annotate(
+            has_priority=Case(
+                When(ordine__priorita__gt=0, then=0),
+                default=1,
+                output_field=IntegerField(),
+            )
+        )
+        .order_by('has_priority', 'ordine__priorita', 'ordine__data_ora')
     )
 
 
