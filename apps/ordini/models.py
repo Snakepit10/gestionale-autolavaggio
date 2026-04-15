@@ -192,46 +192,51 @@ class Ordine(models.Model):
     def get_stati_postazioni(self):
         """
         Restituisce [{sigla, stato, nome}] per ogni PostazioneCQ dell'ordine.
-        Mappa le postazioni fisiche degli items alle PostazioneCQ tramite il FK
-        postazione_fisica. Se non c'e mapping, usa il nome della postazione fisica.
+        Legge direttamente il FK postazione_cq su ogni item.
+
+        Logica blocchi:
+        - Se una PostazioneCQ ha blocchi, lo stato della postazione e:
+          - 'in_lavorazione' se almeno un blocco e avviato o completato
+          - 'completato' solo se TUTTI i blocchi sono completati
+          - 'in_attesa' se nessun blocco e stato avviato
         """
-        from apps.cq.models import PostazioneCQ
-
-        # Carica mapping postazione_fisica_id → PostazioneCQ
-        mapping = {}
-        for pcq in PostazioneCQ.objects.filter(attiva=True, postazione_fisica__isnull=False):
-            mapping[pcq.postazione_fisica_id] = pcq
-
         risultato = {}
         for item in self.items.all():
-            if not item.postazione_assegnata_id:
+            if not item.postazione_cq_id:
                 continue
 
-            pcq = mapping.get(item.postazione_assegnata_id)
-            if pcq:
-                key = pcq.codice
-                nome = pcq.nome
-                # Sigla dal codice CQ: post1→P1, post2→P2, controllo_finale→CF
+            pcq = item.postazione_cq
+            key = pcq.codice
+            if key not in risultato:
                 codice = pcq.codice
                 if codice.startswith('post'):
                     sigla = 'P' + codice.replace('post', '')
                 else:
-                    sigla = ''.join(w[0].upper() for w in nome.split()[:2])
+                    sigla = ''.join(w[0].upper() for w in pcq.nome.split()[:2])
+                risultato[key] = {'sigla': sigla, 'nome': pcq.nome, 'items_stati': []}
+
+            risultato[key]['items_stati'].append(item.stato)
+
+        # Calcola lo stato aggregato per ogni postazione
+        output = []
+        for key, data in risultato.items():
+            stati = data['items_stati']
+            tutti_completati = all(s == 'completato' for s in stati)
+            almeno_uno_avviato = any(s in ('in_lavorazione', 'completato') for s in stati)
+
+            if tutti_completati:
+                stato = 'completato'
+            elif almeno_uno_avviato:
+                stato = 'in_lavorazione'
             else:
-                key = f'fisico_{item.postazione_assegnata_id}'
-                nome = item.postazione_assegnata.nome if item.postazione_assegnata else '?'
-                sigla = ''.join(w[0].upper() for w in nome.split()[:2])
+                stato = 'in_attesa'
 
-            if key not in risultato:
-                risultato[key] = {'sigla': sigla, 'stato': 'completato', 'nome': nome}
-
-            cur = risultato[key]['stato']
-            if item.stato == 'in_lavorazione':
-                risultato[key]['stato'] = 'in_lavorazione'
-            elif item.stato == 'in_attesa' and cur != 'in_lavorazione':
-                risultato[key]['stato'] = 'in_attesa'
-
-        return list(risultato.values())
+            output.append({
+                'sigla': data['sigla'],
+                'nome': data['nome'],
+                'stato': stato,
+            })
+        return output
 
 
 class ItemOrdine(models.Model):
@@ -246,10 +251,18 @@ class ItemOrdine(models.Model):
     quantita = models.IntegerField(default=1)
     prezzo_unitario = models.DecimalField(max_digits=10, decimal_places=2)
     postazione_assegnata = models.ForeignKey(
-        'core.Postazione', 
-        null=True, 
-        blank=True, 
+        'core.Postazione',
+        null=True,
+        blank=True,
         on_delete=models.SET_NULL
+    )
+    # Nuova FK diretta a PostazioneCQ (sostituisce postazione_assegnata)
+    postazione_cq = models.ForeignKey(
+        'cq.PostazioneCQ',
+        null=True, blank=True,
+        on_delete=models.SET_NULL,
+        related_name='items_ordine',
+        verbose_name='Postazione CQ',
     )
     
     # Stati per tracking nelle postazioni
@@ -299,33 +312,36 @@ class ItemOrdine(models.Model):
     
     def ricalcola_postazione(self):
         """
-        Ricalcola e aggiorna l'assegnazione della postazione basandosi sulla configurazione attuale del servizio.
-        Utile quando la configurazione delle postazioni del servizio viene modificata.
+        Ricalcola e aggiorna l'assegnazione della postazione CQ.
         """
         if self.servizio_prodotto.tipo == 'servizio':
-            postazioni_disponibili = self.servizio_prodotto.postazioni.filter(attiva=True)
-            if postazioni_disponibili.exists():
-                # Assegna alla postazione con meno carico
-                nuova_postazione = min(
-                    postazioni_disponibili,
-                    key=lambda p: p.get_ordini_in_coda().count()
+            from apps.cq.models import PostazioneCQ
+            postazioni_cq = PostazioneCQ.objects.filter(attiva=True).order_by('ordine')
+            if postazioni_cq.exists():
+                # Assegna alla prima PostazioneCQ attiva con meno carico
+                nuova = min(
+                    postazioni_cq,
+                    key=lambda p: ItemOrdine.objects.filter(
+                        postazione_cq=p, stato__in=['in_attesa', 'in_lavorazione']
+                    ).count()
                 )
-                if self.postazione_assegnata != nuova_postazione:
-                    vecchia_postazione = self.postazione_assegnata
-                    self.postazione_assegnata = nuova_postazione
+                if self.postazione_cq != nuova:
+                    self.postazione_cq = nuova
                     self.save()
-                    return f"Item {self.id} spostato da {vecchia_postazione} a {nuova_postazione}"
+                    return f"Item {self.id} assegnato a {nuova.nome}"
         return "Nessun cambiamento necessario"
-    
+
     def save(self, *args, **kwargs):
-        # Auto-assegna postazione se è un servizio
-        if not self.postazione_assegnata and self.servizio_prodotto.tipo == 'servizio':
-            postazioni_disponibili = self.servizio_prodotto.postazioni.filter(attiva=True)
-            if postazioni_disponibili.exists():
-                # Assegna alla postazione con meno carico
-                self.postazione_assegnata = min(
-                    postazioni_disponibili,
-                    key=lambda p: p.get_ordini_in_coda().count()
+        # Auto-assegna PostazioneCQ se è un servizio e non ha ancora una postazione
+        if not self.postazione_cq_id and self.servizio_prodotto.tipo == 'servizio':
+            from apps.cq.models import PostazioneCQ
+            postazioni_cq = PostazioneCQ.objects.filter(attiva=True).order_by('ordine')
+            if postazioni_cq.exists():
+                self.postazione_cq = min(
+                    postazioni_cq,
+                    key=lambda p: ItemOrdine.objects.filter(
+                        postazione_cq=p, stato__in=['in_attesa', 'in_lavorazione']
+                    ).count()
                 )
         
         # Se è un prodotto, imposta lo stato come completato fin dall'inizio

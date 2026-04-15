@@ -30,39 +30,33 @@ def _get_sessione_attiva(user):
     """Restituisce la sessione turno attiva per l'utente, o None."""
     return SessioneTurno.objects.filter(
         operatore=user, stato='attivo'
-    ).prefetch_related('postazioni__postazione_cq__postazione_fisica', 'postazioni__blocco').first()
+    ).prefetch_related('postazioni__postazione_cq', 'postazioni__blocco').first()
 
 
-def _get_postazioni_fisiche(sessione):
-    """Restituisce le Postazione fisiche collegate alla sessione turno."""
-    ids = set()
-    for pt in sessione.postazioni.select_related('postazione_cq__postazione_fisica').all():
-        if pt.postazione_cq.postazione_fisica_id:
-            ids.add(pt.postazione_cq.postazione_fisica_id)
-    return ids
+def _get_postazioni_cq_ids(sessione):
+    """Restituisce gli ID delle PostazioneCQ della sessione turno."""
+    return set(
+        pt.postazione_cq_id
+        for pt in sessione.postazioni.all()
+    )
 
 
 def _get_coda_ordini(sessione):
-    """
-    Restituisce gli ordini in coda per le postazioni dell'operatore.
-    Se nessuna PostazioneCQ ha una postazione_fisica collegata,
-    mostra tutti gli ordini in coda come fallback.
-    """
+    """Restituisce gli ordini in coda per le PostazioneCQ dell'operatore."""
+    pcq_ids = _get_postazioni_cq_ids(sessione)
+
     base_qs = (
         ItemOrdine.objects.filter(
             stato__in=['in_attesa', 'in_lavorazione'],
             ordine__stato__in=['in_attesa', 'in_lavorazione'],
         )
-        .select_related('ordine', 'ordine__cliente', 'servizio_prodotto', 'postazione_assegnata')
+        .select_related('ordine', 'ordine__cliente', 'servizio_prodotto', 'postazione_cq')
         .order_by('ordine__numero_progressivo')
     )
 
-    postazioni_fisiche_ids = _get_postazioni_fisiche(sessione)
-    if postazioni_fisiche_ids:
-        # Filtra solo gli ordini sulle postazioni dell'operatore
-        return base_qs.filter(postazione_assegnata_id__in=postazioni_fisiche_ids)
+    if pcq_ids:
+        return base_qs.filter(postazione_cq_id__in=pcq_ids)
     else:
-        # Fallback: nessuna postazione fisica configurata, mostra tutti gli ordini in coda
         return base_qs
 
 
@@ -379,26 +373,23 @@ def api_inizia_lavoro(request, ordine_id):
     ordine = get_object_or_404(Ordine, pk=ordine_id)
 
     # Trova la postazione CQ dell'operatore per questo ordine
-    post_turno = sessione.postazioni.select_related(
-        'postazione_cq__postazione_fisica', 'blocco'
-    ).all()
+    post_turno = sessione.postazioni.select_related('postazione_cq', 'blocco').all()
 
     postazione_cq = None
     blocco = None
 
-    # Prima prova: match per postazione fisica collegata
+    # Match diretto: item.postazione_cq == postazione del turno
     for pt in post_turno:
-        if pt.postazione_cq.postazione_fisica_id:
-            has_items = ordine.items.filter(
-                postazione_assegnata_id=pt.postazione_cq.postazione_fisica_id,
-                stato__in=['in_attesa', 'in_lavorazione'],
-            ).exists()
-            if has_items:
-                postazione_cq = pt.postazione_cq
-                blocco = pt.blocco
-                break
+        has_items = ordine.items.filter(
+            postazione_cq=pt.postazione_cq,
+            stato__in=['in_attesa', 'in_lavorazione'],
+        ).exists()
+        if has_items:
+            postazione_cq = pt.postazione_cq
+            blocco = pt.blocco
+            break
 
-    # Fallback: se nessuna postazione fisica configurata, usa la prima postazione del turno
+    # Fallback: prendi la prima postazione del turno se ci sono items lavorabili
     if not postazione_cq:
         has_pending = ordine.items.filter(stato__in=['in_attesa', 'in_lavorazione']).exists()
         if has_pending and post_turno.exists():
@@ -418,12 +409,11 @@ def api_inizia_lavoro(request, ordine_id):
     )
 
     # Aggiorna ItemOrdine in_attesa → in_lavorazione
-    if postazione_cq.postazione_fisica:
-        items_da_avviare = ordine.items.filter(
-            postazione_assegnata=postazione_cq.postazione_fisica,
-            stato='in_attesa',
-        )
-    else:
+    items_da_avviare = ordine.items.filter(
+        postazione_cq=postazione_cq,
+        stato='in_attesa',
+    )
+    if not items_da_avviare.exists():
         # Fallback: avvia tutti gli items in_attesa dell'ordine
         items_da_avviare = ordine.items.filter(stato='in_attesa')
     now = timezone.now()
@@ -493,15 +483,10 @@ def api_completa_lavoro(request, lav_id):
 
     lav.completa()
 
-    # Aggiorna gli ItemOrdine della postazione fisica
+    # Aggiorna gli ItemOrdine della PostazioneCQ
     ordine = lav.ordine
-    if lav.postazione_cq.postazione_fisica:
-        items = ordine.items.filter(
-            postazione_assegnata=lav.postazione_cq.postazione_fisica,
-            stato='in_lavorazione',
-        )
-    else:
-        # Fallback: completa tutti gli items in_lavorazione dell'ordine
+    items = ordine.items.filter(postazione_cq=lav.postazione_cq, stato='in_lavorazione')
+    if not items.exists():
         items = ordine.items.filter(stato='in_lavorazione')
 
     now = timezone.now()
@@ -550,21 +535,20 @@ def api_aggiungi_item(request, ordine_id):
 
     prezzo_unitario = float(prezzo) if prezzo is not None else float(servizio.prezzo)
 
-    # Trova la postazione fisica dell'operatore
+    # Trova la PostazioneCQ dell'operatore
     sessione = _get_sessione_attiva(request.user)
-    postazione_fisica = None
+    pcq = None
     if sessione:
-        for pt in sessione.postazioni.select_related('postazione_cq__postazione_fisica').all():
-            if pt.postazione_cq.postazione_fisica:
-                postazione_fisica = pt.postazione_cq.postazione_fisica
-                break
+        pt = sessione.postazioni.select_related('postazione_cq').first()
+        if pt:
+            pcq = pt.postazione_cq
 
     item = ItemOrdine.objects.create(
         ordine=ordine,
         servizio_prodotto=servizio,
         quantita=quantita,
         prezzo_unitario=prezzo_unitario,
-        postazione_assegnata=postazione_fisica,
+        postazione_cq=pcq,
         aggiunto_da=request.user,
     )
 

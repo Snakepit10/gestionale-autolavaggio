@@ -523,7 +523,7 @@ class OrdiniListView(LoginRequiredMixin, ListView):
 
         # Query base per tutti gli ordini
         queryset = Ordine.objects.select_related('cliente', 'operatore').prefetch_related(
-            'items__servizio_prodotto', 'items__postazione_assegnata', 'items__aggiunto_da', 'pagamenti'
+            'items__servizio_prodotto', 'items__postazione_cq', 'items__aggiunto_da', 'pagamenti'
         )
 
         # Applica filtri temporali
