@@ -62,8 +62,8 @@ class AuthenticationMiddleware(MiddlewareMixin):
         
         # Verifica autorizzazioni per utenti autenticati
         if any(path.startswith(op_path) for op_path in self.OPERATOR_REQUIRED_PATHS):
-            # Richiede permessi staff
-            if not user.is_staff:
+            # Richiede permessi staff o appartenenza a un gruppo operativo
+            if not user.is_staff and not user.groups.exists():
                 messages.error(request, 'Non hai i permessi per accedere a questa area.')
                 return redirect('auth:client-dashboard' if hasattr(user, 'cliente') else 'core:home')
         

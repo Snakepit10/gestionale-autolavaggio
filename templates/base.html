@@ -30,17 +30,7 @@
             <div class="collapse navbar-collapse" id="navbarNav">
                 <ul class="navbar-nav me-auto">
                     {% if user.is_authenticated %}
-                        <li class="nav-item dropdown">
-                            <a class="nav-link dropdown-toggle" href="#" id="catalogoDropdown" role="button" data-bs-toggle="dropdown">
-                                <i class="bi bi-grid"></i> Catalogo
-                            </a>
-                            <ul class="dropdown-menu">
-                                <li><a class="dropdown-item" href="{% url 'core:categoria-list' %}">Categorie</a></li>
-                                <li><a class="dropdown-item" href="{% url 'core:catalogo-list' %}">Servizi & Prodotti</a></li>
-                                <li><a class="dropdown-item" href="{% url 'core:sconti-list' %}">Sconti</a></li>
-                            </ul>
-                        </li>
-                        
+                        {# === Menu per TUTTI gli utenti autenticati === #}
                         <li class="nav-item dropdown">
                             <a class="nav-link dropdown-toggle" href="#" id="clientiDropdown" role="button" data-bs-toggle="dropdown">
                                 <i class="bi bi-people"></i> Clienti
@@ -50,39 +40,19 @@
                                 <li><a class="dropdown-item" href="{% url 'clienti:cliente-create' %}">Nuovo Cliente</a></li>
                             </ul>
                         </li>
-                        
+
                         <li class="nav-item">
                             <a class="nav-link" href="{% url 'ordini:cassa' %}">
                                 <i class="bi bi-cash-register"></i> Cassa
                             </a>
                         </li>
-                        
-                        <li class="nav-item dropdown">
-                            <a class="nav-link dropdown-toggle" href="#" id="ordiniDropdown" role="button" data-bs-toggle="dropdown">
+
+                        <li class="nav-item">
+                            <a class="nav-link" href="{% url 'ordini:ordini-list' %}">
                                 <i class="bi bi-receipt"></i> Ordini
                             </a>
-                            <ul class="dropdown-menu">
-                                <li><a class="dropdown-item" href="{% url 'ordini:ordini-list' %}">Tutti gli Ordini</a></li>
-                                <li><a class="dropdown-item" href="{% url 'ordini:ordini-non-pagati' %}">Ordini Non Pagati</a></li>
-                                <li><hr class="dropdown-divider"></li>
-                                <li><a class="dropdown-item" href="{% url 'ordini:cassa' %}">Nuovo Ordine</a></li>
-                            </ul>
                         </li>
-                        
-                        <li class="nav-item dropdown">
-                            <a class="nav-link dropdown-toggle" href="#" id="postazioniDropdown" role="button" data-bs-toggle="dropdown">
-                                <i class="bi bi-diagram-3"></i> Postazioni
-                            </a>
-                            <ul class="dropdown-menu">
-                                <li><a class="dropdown-item" href="{% url 'postazioni:postazioni-list' %}">Lista Postazioni</a></li>
-                                <li><a class="dropdown-item" href="{% url 'postazioni:postazione-create' %}">Nuova Postazione</a></li>
-                                <li><hr class="dropdown-divider"></li>
-                                <li><a class="dropdown-item" href="{% url 'postazioni:dashboard-tv' %}" target="_blank">
-                                    <i class="bi bi-tv"></i> Dashboard TV
-                                </a></li>
-                            </ul>
-                        </li>
-                        
+
                         <li class="nav-item dropdown">
                             <a class="nav-link dropdown-toggle" href="#" id="abbonamentiDropdown" role="button" data-bs-toggle="dropdown">
                                 <i class="bi bi-card-checklist"></i> Abbonamenti
@@ -90,40 +60,27 @@
                             <ul class="dropdown-menu">
                                 <li><a class="dropdown-item" href="{% url 'abbonamenti:abbonamenti-list' %}">Lista Abbonamenti</a></li>
                                 <li><a class="dropdown-item" href="{% url 'abbonamenti:vendita-abbonamento' %}">Nuovo Abbonamento</a></li>
-                                <li><a class="dropdown-item" href="{% url 'abbonamenti:config-abbonamenti-list' %}">Configurazioni</a></li>
                                 <li><hr class="dropdown-divider"></li>
                                 <li><a class="dropdown-item" href="{% url 'abbonamenti:verifica-accesso' %}">Verifica Accesso</a></li>
                             </ul>
                         </li>
-                        
+
                         <li class="nav-item dropdown">
                             <a class="nav-link dropdown-toggle" href="#" id="prenotazioniDropdown" role="button" data-bs-toggle="dropdown">
                                 <i class="bi bi-calendar-check"></i> Prenotazioni
                             </a>
                             <ul class="dropdown-menu">
                                 <li><a class="dropdown-item" href="{% url 'prenotazioni:checkin-prenotazioni' %}">
-                                    <i class="bi bi-check-circle text-success"></i> Check-in Prenotazioni
+                                    <i class="bi bi-check-circle text-success"></i> Check-in
                                 </a></li>
                                 <li><hr class="dropdown-divider"></li>
                                 <li><a class="dropdown-item" href="{% url 'prenotazioni:prenotazioni-admin' %}">Lista Prenotazioni</a></li>
-                                <li><a class="dropdown-item" href="{% url 'prenotazioni:nuova-prenotazione' %}">Crea Nuova Prenotazione</a></li>
+                                <li><a class="dropdown-item" href="{% url 'prenotazioni:nuova-prenotazione' %}">Nuova Prenotazione</a></li>
                                 <li><hr class="dropdown-divider"></li>
-                                <li><a class="dropdown-item" href="{% url 'prenotazioni:calendario-prenotazioni' %}">Vista Calendario</a></li>
+                                <li><a class="dropdown-item" href="{% url 'prenotazioni:calendario-prenotazioni' %}">Calendario</a></li>
                             </ul>
                         </li>
-                        
-                        <li class="nav-item dropdown">
-                            <a class="nav-link dropdown-toggle" href="#" id="configDropdown" role="button" data-bs-toggle="dropdown">
-                                <i class="bi bi-gear"></i> Configurazione
-                            </a>
-                            <ul class="dropdown-menu">
-                                <li><a class="dropdown-item" href="{% url 'core:stampanti-list' %}">Stampanti</a></li>
-                                <li><a class="dropdown-item" href="{% url 'core:scorte-list' %}">Gestione Scorte</a></li>
-                                <li><a class="dropdown-item" href="{% url 'prenotazioni:config-slot-list' %}">Slot Prenotazioni</a></li>
-                            </ul>
-                        </li>
-                        
-                        {% if user.groups.all|length > 0 or user.is_superuser %}
+
                         <li class="nav-item dropdown">
                             <a class="nav-link dropdown-toggle" href="#" id="cqDropdown" role="button" data-bs-toggle="dropdown">
                                 <i class="bi bi-clipboard2-check"></i> Qualità
@@ -139,17 +96,10 @@
                                 <li><a class="dropdown-item" href="{% url 'cq:report_mensile' anno=today.year mese=today.month %}">
                                     <i class="bi bi-trophy"></i> Report & Premi
                                 </a></li>
-                                {% if user|in_group:"titolare" %}
-                                <li><hr class="dropdown-divider"></li>
-                                <li><a class="dropdown-item" href="{% url 'cq:configurazione' %}">
-                                    <i class="bi bi-gear"></i> Configurazione CQ
-                                </a></li>
-                                {% endif %}
                             </ul>
                         </li>
-                        {% endif %}
 
-                        {# Turni operatore #}
+                        {# Turni: link diretto per operatore #}
                         {% if user|in_group:"operatore" %}
                         <li class="nav-item">
                             <a class="nav-link" href="{% url 'turni:dashboard' %}">
@@ -157,7 +107,9 @@
                             </a>
                         </li>
                         {% endif %}
-                        {% if user|in_group:"titolare" %}
+
+                        {# === Menu SOLO per titolare/admin === #}
+                        {% if user|in_group:"titolare" or user.is_superuser %}
                         <li class="nav-item dropdown">
                             <a class="nav-link dropdown-toggle" href="#" role="button" data-bs-toggle="dropdown">
                                 <i class="bi bi-clock-history"></i> Turni
@@ -166,9 +118,50 @@
                                 <li><a class="dropdown-item" href="{% url 'turni:report_lavorazioni' %}">
                                     <i class="bi bi-graph-up"></i> Report Tempi
                                 </a></li>
-                                <li><a class="dropdown-item" href="{% url 'turni:config_checklist' %}">
-                                    <i class="bi bi-clipboard-check"></i> Config Checklist
+                            </ul>
+                        </li>
+
+                        <li class="nav-item dropdown">
+                            <a class="nav-link dropdown-toggle" href="#" role="button" data-bs-toggle="dropdown">
+                                <i class="bi bi-cash-coin"></i> Finanze
+                            </a>
+                            <ul class="dropdown-menu">
+                                <li><a class="dropdown-item" href="{% url 'finanze:dashboard' %}">
+                                    <i class="bi bi-cash-stack"></i> Dashboard Cassa
                                 </a></li>
+                                <li><a class="dropdown-item" href="{% url 'finanze:storico_chiusure' %}">
+                                    <i class="bi bi-clock-history"></i> Storico Chiusure
+                                </a></li>
+                                <li><a class="dropdown-item" href="{% url 'finanze:riepilogo_incassi' %}">
+                                    <i class="bi bi-wallet2"></i> Riepilogo Incassi
+                                </a></li>
+                                <li><hr class="dropdown-divider"></li>
+                                <li><a class="dropdown-item" href="{% url 'finanze:analisi_vendite' %}">
+                                    <i class="bi bi-graph-up-arrow"></i> Analisi Vendite
+                                </a></li>
+                            </ul>
+                        </li>
+
+                        <li class="nav-item dropdown">
+                            <a class="nav-link dropdown-toggle" href="#" id="configDropdown" role="button" data-bs-toggle="dropdown">
+                                <i class="bi bi-gear"></i> Configurazione
+                            </a>
+                            <ul class="dropdown-menu">
+                                <li><h6 class="dropdown-header">Catalogo</h6></li>
+                                <li><a class="dropdown-item" href="{% url 'core:categoria-list' %}"><i class="bi bi-folder"></i> Categorie</a></li>
+                                <li><a class="dropdown-item" href="{% url 'core:catalogo-list' %}"><i class="bi bi-grid"></i> Servizi & Prodotti</a></li>
+                                <li><a class="dropdown-item" href="{% url 'core:sconti-list' %}"><i class="bi bi-percent"></i> Sconti</a></li>
+                                <li><hr class="dropdown-divider"></li>
+                                <li><h6 class="dropdown-header">Postazioni & Turni</h6></li>
+                                <li><a class="dropdown-item" href="{% url 'postazioni:postazioni-list' %}"><i class="bi bi-diagram-3"></i> Postazioni</a></li>
+                                <li><a class="dropdown-item" href="{% url 'cq:configurazione' %}"><i class="bi bi-clipboard2-check"></i> Configurazione CQ</a></li>
+                                <li><a class="dropdown-item" href="{% url 'turni:config_checklist' %}"><i class="bi bi-clipboard-check"></i> Checklist Turni</a></li>
+                                <li><hr class="dropdown-divider"></li>
+                                <li><h6 class="dropdown-header">Sistema</h6></li>
+                                <li><a class="dropdown-item" href="{% url 'core:stampanti-list' %}"><i class="bi bi-printer"></i> Stampanti</a></li>
+                                <li><a class="dropdown-item" href="{% url 'core:scorte-list' %}"><i class="bi bi-box-seam"></i> Gestione Scorte</a></li>
+                                <li><a class="dropdown-item" href="{% url 'prenotazioni:config-slot-list' %}"><i class="bi bi-calendar-range"></i> Slot Prenotazioni</a></li>
+                                <li><a class="dropdown-item" href="{% url 'abbonamenti:config-abbonamenti-list' %}"><i class="bi bi-card-checklist"></i> Config Abbonamenti</a></li>
                             </ul>
                         </li>
                         {% endif %}
