@@ -190,22 +190,47 @@ class Ordine(models.Model):
         return items_dict
 
     def get_stati_postazioni(self):
-        """Restituisce [{sigla, stato, nome}] per ogni postazione dell'ordine."""
+        """
+        Restituisce [{sigla, stato, nome}] per ogni PostazioneCQ dell'ordine.
+        Mappa le postazioni fisiche degli items alle PostazioneCQ tramite il FK
+        postazione_fisica. Se non c'e mapping, usa il nome della postazione fisica.
+        """
+        from apps.cq.models import PostazioneCQ
+
+        # Carica mapping postazione_fisica_id → PostazioneCQ
+        mapping = {}
+        for pcq in PostazioneCQ.objects.filter(attiva=True, postazione_fisica__isnull=False):
+            mapping[pcq.postazione_fisica_id] = pcq
+
         risultato = {}
         for item in self.items.all():
-            if not item.postazione_assegnata:
+            if not item.postazione_assegnata_id:
                 continue
-            nome = item.postazione_assegnata.nome
-            if nome not in risultato:
-                # Sigla: prime lettere di ogni parola (max 3 char)
-                sigla = ''.join(w[0].upper() for w in nome.split()[:3])
-                risultato[nome] = {'sigla': sigla, 'stato': 'completato', 'nome': nome}
-            # Priorita: in_lavorazione > in_attesa > completato
-            cur = risultato[nome]['stato']
+
+            pcq = mapping.get(item.postazione_assegnata_id)
+            if pcq:
+                key = pcq.codice
+                nome = pcq.nome
+                # Sigla dal codice CQ: post1→P1, post2→P2, controllo_finale→CF
+                codice = pcq.codice
+                if codice.startswith('post'):
+                    sigla = 'P' + codice.replace('post', '')
+                else:
+                    sigla = ''.join(w[0].upper() for w in nome.split()[:2])
+            else:
+                key = f'fisico_{item.postazione_assegnata_id}'
+                nome = item.postazione_assegnata.nome if item.postazione_assegnata else '?'
+                sigla = ''.join(w[0].upper() for w in nome.split()[:2])
+
+            if key not in risultato:
+                risultato[key] = {'sigla': sigla, 'stato': 'completato', 'nome': nome}
+
+            cur = risultato[key]['stato']
             if item.stato == 'in_lavorazione':
-                risultato[nome]['stato'] = 'in_lavorazione'
+                risultato[key]['stato'] = 'in_lavorazione'
             elif item.stato == 'in_attesa' and cur != 'in_lavorazione':
-                risultato[nome]['stato'] = 'in_attesa'
+                risultato[key]['stato'] = 'in_attesa'
+
         return list(risultato.values())
 
 
