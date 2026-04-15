@@ -33,31 +33,20 @@ def _get_sessione_attiva(user):
     ).prefetch_related('postazioni__postazione_cq', 'postazioni__blocco').first()
 
 
-def _get_postazioni_cq_ids(sessione):
-    """Restituisce gli ID delle PostazioneCQ della sessione turno."""
-    return set(
-        pt.postazione_cq_id
-        for pt in sessione.postazioni.all()
-    )
-
-
 def _get_coda_ordini(sessione):
-    """Restituisce gli ordini in coda per le PostazioneCQ dell'operatore."""
-    pcq_ids = _get_postazioni_cq_ids(sessione)
-
-    base_qs = (
+    """
+    Restituisce gli items in coda (coda unica).
+    Ogni ordine appare nella coda di tutti gli operatori.
+    """
+    return (
         ItemOrdine.objects.filter(
             stato__in=['in_attesa', 'in_lavorazione'],
             ordine__stato__in=['in_attesa', 'in_lavorazione'],
+            servizio_prodotto__tipo='servizio',
         )
-        .select_related('ordine', 'ordine__cliente', 'servizio_prodotto', 'postazione_cq')
+        .select_related('ordine', 'ordine__cliente', 'servizio_prodotto')
         .order_by('ordine__numero_progressivo')
     )
-
-    if pcq_ids:
-        return base_qs.filter(postazione_cq_id__in=pcq_ids)
-    else:
-        return base_qs
 
 
 def _json_ok(data=None, **kwargs):

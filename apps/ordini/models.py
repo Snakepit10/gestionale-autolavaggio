@@ -191,51 +191,72 @@ class Ordine(models.Model):
 
     def get_stati_postazioni(self):
         """
-        Restituisce [{sigla, stato, nome}] per ogni PostazioneCQ dell'ordine.
-        Legge direttamente il FK postazione_cq su ogni item.
+        Restituisce [{sigla, stato, nome}] per TUTTE le PostazioneCQ attive,
+        con lo stato basato sulle LavorazioneOperatore di questo ordine.
 
-        Logica blocchi:
-        - Se una PostazioneCQ ha blocchi, lo stato della postazione e:
-          - 'in_lavorazione' se almeno un blocco e avviato o completato
-          - 'completato' solo se TUTTI i blocchi sono completati
-          - 'in_attesa' se nessun blocco e stato avviato
+        - 'completato' (verde): la postazione ha almeno una lavorazione completata
+        - 'in_lavorazione' (giallo): la postazione ha una lavorazione in corso/pausa
+        - 'in_attesa' (blu): nessuna lavorazione per questa postazione
+
+        Se una postazione ha blocchi: completato solo se TUTTI i blocchi
+        hanno lavorazioni completate.
         """
-        risultato = {}
-        for item in self.items.all():
-            if not item.postazione_cq_id:
-                continue
+        from apps.cq.models import PostazioneCQ
+        from apps.turni.models import LavorazioneOperatore
 
-            pcq = item.postazione_cq
-            key = pcq.codice
-            if key not in risultato:
-                codice = pcq.codice
-                if codice.startswith('post'):
-                    sigla = 'P' + codice.replace('post', '')
-                else:
-                    sigla = ''.join(w[0].upper() for w in pcq.nome.split()[:2])
-                risultato[key] = {'sigla': sigla, 'nome': pcq.nome, 'items_stati': []}
+        # Tutte le postazioni CQ attive (escluso controllo finale)
+        postazioni = PostazioneCQ.objects.filter(
+            attiva=True, is_controllo_finale=False
+        ).prefetch_related('blocchi').order_by('ordine')
 
-            risultato[key]['items_stati'].append(item.stato)
+        # Lavorazioni per questo ordine
+        lavorazioni = LavorazioneOperatore.objects.filter(ordine=self).values(
+            'postazione_cq_id', 'blocco_id', 'stato'
+        )
+        # Mappa: {postazione_cq_id: {blocco_id: stato}}
+        mappa = {}
+        for lav in lavorazioni:
+            pcq_id = lav['postazione_cq_id']
+            mappa.setdefault(pcq_id, {})[lav['blocco_id']] = lav['stato']
 
-        # Calcola lo stato aggregato per ogni postazione
         output = []
-        for key, data in risultato.items():
-            stati = data['items_stati']
-            tutti_completati = all(s == 'completato' for s in stati)
-            almeno_uno_avviato = any(s in ('in_lavorazione', 'completato') for s in stati)
+        for pcq in postazioni:
+            codice = pcq.codice
+            sigla = 'P' + codice.replace('post', '') if codice.startswith('post') else ''.join(
+                w[0].upper() for w in pcq.nome.split()[:2]
+            )
 
-            if tutti_completati:
-                stato = 'completato'
-            elif almeno_uno_avviato:
-                stato = 'in_lavorazione'
-            else:
+            lav_map = mappa.get(pcq.pk, {})
+            blocchi = list(pcq.blocchi.all())
+
+            if not lav_map:
                 stato = 'in_attesa'
+            elif blocchi:
+                # Postazione con blocchi: completato solo se TUTTI i blocchi sono completati
+                blocchi_ids = [b.pk for b in blocchi]
+                stati_blocchi = [lav_map.get(bid, 'in_attesa') for bid in blocchi_ids]
+                # Aggiungi anche lavorazioni senza blocco specifico
+                if None in lav_map:
+                    stati_blocchi.append(lav_map[None])
 
-            output.append({
-                'sigla': data['sigla'],
-                'nome': data['nome'],
-                'stato': stato,
-            })
+                if all(s == 'completato' for s in stati_blocchi) and len(stati_blocchi) >= len(blocchi):
+                    stato = 'completato'
+                elif any(s in ('in_lavorazione', 'in_pausa', 'completato') for s in stati_blocchi):
+                    stato = 'in_lavorazione'
+                else:
+                    stato = 'in_attesa'
+            else:
+                # Postazione senza blocchi
+                stati = list(lav_map.values())
+                if any(s in ('in_lavorazione', 'in_pausa') for s in stati):
+                    stato = 'in_lavorazione'
+                elif all(s == 'completato' for s in stati):
+                    stato = 'completato'
+                else:
+                    stato = 'in_lavorazione'
+
+            output.append({'sigla': sigla, 'nome': pcq.nome, 'stato': stato})
+
         return output
 
 
@@ -311,39 +332,10 @@ class ItemOrdine(models.Model):
             ordine.save()
     
     def ricalcola_postazione(self):
-        """
-        Ricalcola e aggiorna l'assegnazione della postazione CQ.
-        """
-        if self.servizio_prodotto.tipo == 'servizio':
-            from apps.cq.models import PostazioneCQ
-            postazioni_cq = PostazioneCQ.objects.filter(attiva=True).order_by('ordine')
-            if postazioni_cq.exists():
-                # Assegna alla prima PostazioneCQ attiva con meno carico
-                nuova = min(
-                    postazioni_cq,
-                    key=lambda p: ItemOrdine.objects.filter(
-                        postazione_cq=p, stato__in=['in_attesa', 'in_lavorazione']
-                    ).count()
-                )
-                if self.postazione_cq != nuova:
-                    self.postazione_cq = nuova
-                    self.save()
-                    return f"Item {self.id} assegnato a {nuova.nome}"
+        """Legacy — non piu utilizzato nel flusso coda unica."""
         return "Nessun cambiamento necessario"
 
     def save(self, *args, **kwargs):
-        # Auto-assegna PostazioneCQ se è un servizio e non ha ancora una postazione
-        if not self.postazione_cq_id and self.servizio_prodotto.tipo == 'servizio':
-            from apps.cq.models import PostazioneCQ
-            postazioni_cq = PostazioneCQ.objects.filter(attiva=True).order_by('ordine')
-            if postazioni_cq.exists():
-                self.postazione_cq = min(
-                    postazioni_cq,
-                    key=lambda p: ItemOrdine.objects.filter(
-                        postazione_cq=p, stato__in=['in_attesa', 'in_lavorazione']
-                    ).count()
-                )
-        
         # Se è un prodotto, imposta lo stato come completato fin dall'inizio
         if self.servizio_prodotto.tipo == 'prodotto' and not self.pk:
             self.stato = 'completato'
