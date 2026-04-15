@@ -21,7 +21,7 @@ def operator_login(request):
         
         user = authenticate(request, username=username, password=password)
         
-        if user is not None and user.is_staff:
+        if user is not None and (user.is_staff or user.groups.exists()):
             login(request, user)
             
             # Gestisci "ricordami"
