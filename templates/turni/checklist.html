@@ -48,9 +48,6 @@
                       {% for esito in item.esiti_disponibili %}
                       <input type="radio" class="btn-check" name="esito_{{ item.pk }}" value="{{ esito.pk }}"
                              id="esito_{{ item.pk }}_{{ esito.pk }}"
-                             {% if cc and item.pk in cc and cc|dictsort:"0" %}
-                               {% comment %}Pre-select from compilazione{% endcomment %}
-                             {% endif %}
                              {% if forloop.first %}checked{% endif %}>
                       <label class="btn btn-outline-{{ esito.colore }}" for="esito_{{ item.pk }}_{{ esito.pk }}">
                         {{ esito.nome }}
@@ -60,11 +57,9 @@
                   </td>
                   <td style="width:200px">
                     <input type="text" class="form-control form-control-sm"
-                           name="note_{{ item.pk }}" placeholder="Note..."
-                           {% if item.pk in compilazioni %}value="{{ compilazioni|get_item:item.pk }}"{% endif %}>
+                           name="note_{{ item.pk }}" placeholder="Note...">
                   </td>
                 </tr>
-                {% endwith %}
                 {% endfor %}
               </tbody>
             </table>
