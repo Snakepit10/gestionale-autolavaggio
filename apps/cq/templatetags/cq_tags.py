@@ -89,6 +89,7 @@ def postazione_cq_json(postazione):
     return json.dumps({
         'codice': postazione.codice,
         'nome': postazione.nome,
+        'sigla': postazione.sigla,
         'ordine': postazione.ordine,
         'attiva': postazione.attiva,
         'is_controllo_finale': postazione.is_controllo_finale,

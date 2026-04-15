@@ -74,17 +74,10 @@
     <div class="col-md-8 panel-right p-3">
 
       <div id="areaOperativa">
-        {% if lavorazione_attiva %}
-          {# Mostra ordine in lavorazione #}
-          <div id="ordineDettaglio" data-ordine-id="{{ lavorazione_attiva.ordine.pk }}">
-            {% include "turni/_area_operativa.html" with ordine=lavorazione_attiva.ordine lavorazione=lavorazione_attiva %}
-          </div>
-        {% else %}
-          <div class="empty-state">
-            <i class="bi bi-hand-index fs-1"></i>
-            <p class="mt-2">Seleziona un ordine dalla coda per iniziare</p>
-          </div>
-        {% endif %}
+        <div class="empty-state">
+          <i class="bi bi-hand-index fs-1"></i>
+          <p class="mt-2">Seleziona un ordine dalla coda per iniziare</p>
+        </div>
       </div>
 
     </div>
@@ -380,5 +373,10 @@ async function aggiornaCoда() {
 }
 
 setInterval(aggiornaCoда, 10000);
+
+// Auto-carica ordine in lavorazione attiva al caricamento pagina
+{% if lavorazione_attiva %}
+  document.addEventListener('DOMContentLoaded', () => selezionaOrdine({{ lavorazione_attiva.ordine.pk }}));
+{% endif %}
 </script>
 {% endblock %}

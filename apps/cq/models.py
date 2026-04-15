@@ -226,6 +226,8 @@ class PostazioneCQ(models.Model):
     """
     codice = models.SlugField(max_length=20, unique=True, verbose_name='Codice')
     nome = models.CharField(max_length=100, verbose_name='Nome')
+    sigla = models.CharField(max_length=5, blank=True, default='', verbose_name='Sigla',
+        help_text='Sigla breve per i bollini (es. PL, SP, AS, PV, CF)')
     ordine = models.PositiveIntegerField(default=0, verbose_name='Ordine')
     attiva = models.BooleanField(default=True, verbose_name='Attiva')
     is_controllo_finale = models.BooleanField(

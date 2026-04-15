@@ -836,6 +836,7 @@ def api_salva_postazione(request):
     ordine = int(request.POST.get('ordine', 0))
     attiva = request.POST.get('attiva', '1') == '1'
     is_cf = request.POST.get('is_controllo_finale', '0') == '1'
+    sigla = request.POST.get('sigla', '').strip()
     pf_id = request.POST.get('postazione_fisica_id') or None
     if not codice or not nome:
         return _json_err('Codice e nome obbligatori')
@@ -843,6 +844,7 @@ def api_salva_postazione(request):
         obj = get_object_or_404(PostazioneCQ, pk=pk)
         obj.codice = codice
         obj.nome = nome
+        obj.sigla = sigla
         obj.ordine = ordine
         obj.attiva = attiva
         obj.is_controllo_finale = is_cf
@@ -850,7 +852,7 @@ def api_salva_postazione(request):
         obj.save()
     else:
         obj = PostazioneCQ.objects.create(
-            codice=codice, nome=nome, ordine=ordine,
+            codice=codice, nome=nome, sigla=sigla, ordine=ordine,
             attiva=attiva, is_controllo_finale=is_cf,
             postazione_fisica_id=pf_id,
         )

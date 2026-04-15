@@ -221,10 +221,7 @@ class Ordine(models.Model):
 
         output = []
         for pcq in postazioni:
-            codice = pcq.codice
-            sigla = 'P' + codice.replace('post', '') if codice.startswith('post') else ''.join(
-                w[0].upper() for w in pcq.nome.split()[:2]
-            )
+            sigla = pcq.sigla or pcq.codice[:3].upper()
 
             lav_map = mappa.get(pcq.pk, {})
             blocchi = list(pcq.blocchi.all())
