@@ -19,6 +19,7 @@ from apps.ordini.models import Ordine, ItemOrdine
 from apps.turni.models import (
     SessioneTurno, PostazioneTurno, ChecklistItem,
     ChecklistCompilata, LavorazioneOperatore,
+    CategoriaChecklist, EsitoChecklist,
 )
 
 
@@ -136,8 +137,8 @@ def _checklist_view_inner(request, fase):
         attivo=True, postazione_cq_id__in=post_ids
     ).filter(
         Q(blocco__isnull=True) | Q(blocco_id__in=blocco_ids)
-    ).select_related('postazione_cq', 'blocco').order_by(
-        'postazione_cq__ordine', 'blocco__ordine', 'ordine'
+    ).select_related('postazione_cq', 'blocco', 'categoria').order_by(
+        'postazione_cq__ordine', 'blocco__ordine', 'categoria__ordine', 'ordine'
     )
 
     items = list(items_qs)
@@ -149,16 +150,39 @@ def _checklist_view_inner(request, fase):
         else:
             return redirect('turni:chiudi_turno')
 
+    # Mappa esiti per categoria
+    esiti_map = {}
+    for cat in CategoriaChecklist.objects.prefetch_related('esiti').all():
+        esiti_map[cat.pk] = list(cat.esiti.order_by('ordine'))
+
+    # Aggiungi esiti disponibili a ogni item
+    for item in items:
+        item.esiti_disponibili = esiti_map.get(item.categoria_id, [])
+
     if request.method == 'POST':
         with transaction.atomic():
             for item in items:
-                esito = request.POST.get(f'esito_{item.pk}', 'ok')
+                esito_pk = request.POST.get(f'esito_{item.pk}', '')
                 note = request.POST.get(f'note_{item.pk}', '')
+                esito_obj = None
+                esito_str = 'ok'
+                if esito_pk:
+                    try:
+                        esito_obj = EsitoChecklist.objects.get(pk=esito_pk)
+                        # Mappa a stringa per backward compatibility
+                        if esito_obj.codice == 'ok':
+                            esito_str = 'ok'
+                        elif esito_obj.codice == 'na':
+                            esito_str = 'na'
+                        else:
+                            esito_str = 'non_ok'
+                    except EsitoChecklist.DoesNotExist:
+                        pass
                 ChecklistCompilata.objects.update_or_create(
                     sessione=sessione,
                     checklist_item=item,
                     fase=fase,
-                    defaults={'esito': esito, 'note': note},
+                    defaults={'esito': esito_str, 'esito_obj': esito_obj, 'note': note},
                 )
         if fase == 'inizio':
             messages.success(request, 'Checklist inizio turno compilata.')
@@ -167,23 +191,37 @@ def _checklist_view_inner(request, fase):
             messages.success(request, 'Checklist fine turno compilata.')
             return redirect('turni:chiudi_turno')
 
-    # Raggruppa items per postazione/blocco
-    grouped = {}
+    # Raggruppa items: postazione > categoria > items
+    from collections import OrderedDict
+    grouped = OrderedDict()
     for item in items:
-        key = item.postazione_cq.nome
+        post_key = item.postazione_cq.nome
         if item.blocco:
-            key = f"{item.postazione_cq.nome} › {item.blocco.nome}"
-        grouped.setdefault(key, []).append(item)
+            post_key = f"{item.postazione_cq.nome} › {item.blocco.nome}"
+        if post_key not in grouped:
+            grouped[post_key] = OrderedDict()
+
+        cat = item.categoria
+        cat_key = cat.nome if cat else 'Altro'
+        if cat_key not in grouped[post_key]:
+            grouped[post_key][cat_key] = {
+                'nome': cat_key,
+                'icona': cat.icona if cat else '',
+                'items': [],
+            }
+        grouped[post_key][cat_key]['items'].append(item)
 
     # Carica compilazioni esistenti
     compilazioni = {}
-    for cc in ChecklistCompilata.objects.filter(sessione=sessione, fase=fase):
+    for cc in ChecklistCompilata.objects.filter(
+        sessione=sessione, fase=fase
+    ).select_related('esito_obj'):
         compilazioni[cc.checklist_item_id] = cc
 
     return render(request, 'turni/checklist.html', {
         'sessione': sessione,
         'fase': fase,
-        'grouped_items': grouped,
+        'grouped': grouped,
         'compilazioni': compilazioni,
     })
 
@@ -624,14 +662,16 @@ def config_checklist(request):
         return redirect('core:home')
 
     items = ChecklistItem.objects.select_related(
-        'postazione_cq', 'blocco'
-    ).order_by('postazione_cq__ordine', 'blocco__ordine', 'ordine')
+        'postazione_cq', 'blocco', 'categoria'
+    ).order_by('postazione_cq__ordine', 'blocco__ordine', 'categoria__ordine', 'ordine')
 
     postazioni = PostazioneCQ.objects.filter(attiva=True).prefetch_related('blocchi').order_by('ordine')
+    categorie = CategoriaChecklist.objects.prefetch_related('esiti').order_by('ordine')
 
     return render(request, 'turni/config_checklist.html', {
         'items': items,
         'postazioni': postazioni,
+        'categorie': categorie,
     })
 
 
@@ -643,6 +683,7 @@ def api_salva_checklist_item(request):
     pk = request.POST.get('id')
     postazione_cq_id = request.POST.get('postazione_cq_id')
     blocco_id = request.POST.get('blocco_id') or None
+    categoria_id = request.POST.get('categoria_id') or None
     nome = request.POST.get('nome', '').strip()
     ordine = int(request.POST.get('ordine', 0))
     attivo = request.POST.get('attivo', '1') == '1'
@@ -656,6 +697,7 @@ def api_salva_checklist_item(request):
         obj = get_object_or_404(ChecklistItem, pk=pk)
         obj.postazione_cq = postazione
         obj.blocco_id = blocco_id if blocco_id else None
+        obj.categoria_id = categoria_id if categoria_id else None
         obj.nome = nome
         obj.ordine = ordine
         obj.attivo = attivo
@@ -664,12 +706,14 @@ def api_salva_checklist_item(request):
         obj = ChecklistItem.objects.create(
             postazione_cq=postazione,
             blocco_id=blocco_id if blocco_id else None,
+            categoria_id=categoria_id if categoria_id else None,
             nome=nome, ordine=ordine, attivo=attivo,
         )
     return _json_ok({
         'id': obj.pk, 'nome': obj.nome,
         'postazione': obj.postazione_cq.nome,
         'blocco': obj.blocco.nome if obj.blocco else '',
+        'categoria': obj.categoria.nome if obj.categoria else '',
     })
 
 
@@ -678,6 +722,81 @@ def api_elimina_checklist_item(request, pk):
     if not utente_nel_gruppo(request.user, 'titolare'):
         return _json_err('Non autorizzato', 403)
     obj = get_object_or_404(ChecklistItem, pk=pk)
+    obj.delete()
+    return _json_ok()
+
+
+# ---------------------------------------------------------------------------
+# CRUD Categorie e Esiti Checklist 5S (titolare)
+# ---------------------------------------------------------------------------
+
+@login_required
+def api_salva_categoria(request):
+    if not utente_nel_gruppo(request.user, 'titolare'):
+        return _json_err('Non autorizzato', 403)
+    pk = request.POST.get('id')
+    nome = request.POST.get('nome', '').strip()
+    icona = request.POST.get('icona', '').strip()
+    ordine = int(request.POST.get('ordine', 0))
+    if not nome:
+        return _json_err('Nome obbligatorio.')
+    if pk:
+        obj = get_object_or_404(CategoriaChecklist, pk=pk)
+        obj.nome = nome
+        obj.icona = icona
+        obj.ordine = ordine
+        obj.save()
+    else:
+        obj = CategoriaChecklist.objects.create(nome=nome, icona=icona, ordine=ordine)
+    return _json_ok({'id': obj.pk, 'nome': obj.nome})
+
+
+@login_required
+def api_elimina_categoria(request, pk):
+    if not utente_nel_gruppo(request.user, 'titolare'):
+        return _json_err('Non autorizzato', 403)
+    obj = get_object_or_404(CategoriaChecklist, pk=pk)
+    if obj.checklist_items.exists():
+        return _json_err('Impossibile eliminare: ci sono voci checklist collegate.')
+    obj.delete()
+    return _json_ok()
+
+
+@login_required
+def api_salva_esito(request):
+    if not utente_nel_gruppo(request.user, 'titolare'):
+        return _json_err('Non autorizzato', 403)
+    pk = request.POST.get('id')
+    categoria_id = request.POST.get('categoria_id')
+    codice = request.POST.get('codice', '').strip()
+    nome = request.POST.get('nome', '').strip()
+    colore = request.POST.get('colore', 'secondary').strip()
+    ordine = int(request.POST.get('ordine', 0))
+    if not nome or not codice or not categoria_id:
+        return _json_err('Categoria, codice e nome obbligatori.')
+    cat = get_object_or_404(CategoriaChecklist, pk=categoria_id)
+    if pk:
+        obj = get_object_or_404(EsitoChecklist, pk=pk)
+        obj.categoria = cat
+        obj.codice = codice
+        obj.nome = nome
+        obj.colore = colore
+        obj.ordine = ordine
+        obj.save()
+    else:
+        obj = EsitoChecklist.objects.create(
+            categoria=cat, codice=codice, nome=nome, colore=colore, ordine=ordine,
+        )
+    return _json_ok({'id': obj.pk, 'nome': obj.nome})
+
+
+@login_required
+def api_elimina_esito(request, pk):
+    if not utente_nel_gruppo(request.user, 'titolare'):
+        return _json_err('Non autorizzato', 403)
+    obj = get_object_or_404(EsitoChecklist, pk=pk)
+    if obj.compilazioni.exists():
+        return _json_err('Impossibile eliminare: ci sono compilazioni che usano questo esito.')
     obj.delete()
     return _json_ok()
 

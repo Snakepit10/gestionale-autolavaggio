@@ -2,6 +2,7 @@ from django.contrib import admin
 from .models import (
     SessioneTurno, PostazioneTurno, ChecklistItem,
     ChecklistCompilata, LavorazioneOperatore,
+    CategoriaChecklist, EsitoChecklist,
 )
 
 
@@ -18,10 +19,21 @@ class PostazioneTurnoAdmin(admin.ModelAdmin):
     list_filter = ['postazione_cq']
 
 
+@admin.register(CategoriaChecklist)
+class CategoriaChecklistAdmin(admin.ModelAdmin):
+    list_display = ['nome', 'icona', 'ordine']
+
+
+@admin.register(EsitoChecklist)
+class EsitoChecklistAdmin(admin.ModelAdmin):
+    list_display = ['categoria', 'codice', 'nome', 'colore', 'ordine']
+    list_filter = ['categoria']
+
+
 @admin.register(ChecklistItem)
 class ChecklistItemAdmin(admin.ModelAdmin):
-    list_display = ['postazione_cq', 'blocco', 'nome', 'ordine', 'attivo']
-    list_filter = ['postazione_cq', 'attivo']
+    list_display = ['postazione_cq', 'blocco', 'categoria', 'nome', 'ordine', 'attivo']
+    list_filter = ['postazione_cq', 'categoria', 'attivo']
 
 
 @admin.register(ChecklistCompilata)

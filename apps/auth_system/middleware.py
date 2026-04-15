@@ -21,6 +21,12 @@ class AuthenticationMiddleware(MiddlewareMixin):
         '/sconti/',
         '/categorie/',
         '/catalogo/',
+        '/cq/',
+        '/turni/',
+        '/finanze/',
+        '/prenotazioni/',
+        '/abbonamenti/',
+        '/clienti/',
     ]
     
     # URL che richiedono autenticazione clienti

@@ -74,11 +74,52 @@ class PostazioneTurno(models.Model):
 
 
 # ---------------------------------------------------------------------------
-# Checklist strumentazione
+# Checklist 5S — categorie e esiti configurabili
+# ---------------------------------------------------------------------------
+
+class CategoriaChecklist(models.Model):
+    """Categoria 5S per la checklist (es. Strumenti, Pulizia, Ordine, ecc.)."""
+    nome = models.CharField(max_length=100, verbose_name='Nome')
+    icona = models.CharField(max_length=50, blank=True, default='',
+        verbose_name='Icona', help_text='Classe Bootstrap icon, es. bi-wrench')
+    ordine = models.PositiveIntegerField(default=0, verbose_name='Ordine')
+
+    class Meta:
+        verbose_name = 'Categoria checklist'
+        verbose_name_plural = 'Categorie checklist'
+        ordering = ['ordine', 'nome']
+
+    def __str__(self):
+        return self.nome
+
+
+class EsitoChecklist(models.Model):
+    """Esito possibile per una categoria checklist (configurabile dal titolare)."""
+    categoria = models.ForeignKey(
+        CategoriaChecklist, on_delete=models.CASCADE, related_name='esiti',
+    )
+    codice = models.SlugField(max_length=30, verbose_name='Codice')
+    nome = models.CharField(max_length=50, verbose_name='Nome')
+    colore = models.CharField(max_length=20, default='secondary',
+        verbose_name='Colore', help_text='Classe Bootstrap: success, danger, warning, info, secondary')
+    ordine = models.PositiveIntegerField(default=0, verbose_name='Ordine')
+
+    class Meta:
+        verbose_name = 'Esito checklist'
+        verbose_name_plural = 'Esiti checklist'
+        ordering = ['categoria__ordine', 'ordine']
+        unique_together = [('categoria', 'codice')]
+
+    def __str__(self):
+        return f"{self.categoria.nome}: {self.nome}"
+
+
+# ---------------------------------------------------------------------------
+# Checklist voci e compilazione
 # ---------------------------------------------------------------------------
 
 class ChecklistItem(models.Model):
-    """Voce di checklist configurabile dal titolare, per postazione/blocco."""
+    """Voce di checklist configurabile dal titolare, per postazione/blocco/categoria."""
     postazione_cq = models.ForeignKey(
         'cq.PostazioneCQ', on_delete=models.CASCADE, related_name='checklist_items',
     )
@@ -87,6 +128,11 @@ class ChecklistItem(models.Model):
         on_delete=models.SET_NULL, related_name='checklist_items',
         help_text='Se vuoto, la voce vale per tutta la postazione',
     )
+    categoria = models.ForeignKey(
+        CategoriaChecklist, null=True, blank=True,
+        on_delete=models.SET_NULL, related_name='checklist_items',
+        verbose_name='Categoria 5S',
+    )
     nome = models.CharField(max_length=200, verbose_name='Voce checklist')
     ordine = models.PositiveIntegerField(default=0, verbose_name='Ordine')
     attivo = models.BooleanField(default=True, verbose_name='Attivo')
@@ -94,11 +140,12 @@ class ChecklistItem(models.Model):
     class Meta:
         verbose_name = 'Voce checklist'
         verbose_name_plural = 'Voci checklist'
-        ordering = ['postazione_cq__ordine', 'blocco__ordine', 'ordine', 'nome']
+        ordering = ['postazione_cq__ordine', 'blocco__ordine', 'categoria__ordine', 'ordine', 'nome']
 
     def __str__(self):
         blocco = f" [{self.blocco.nome}]" if self.blocco else ""
-        return f"{self.postazione_cq.nome}{blocco}: {self.nome}"
+        cat = f" ({self.categoria.nome})" if self.categoria else ""
+        return f"{self.postazione_cq.nome}{blocco}{cat}: {self.nome}"
 
 
 class ChecklistCompilata(models.Model):
@@ -120,6 +167,10 @@ class ChecklistCompilata(models.Model):
     )
     fase = models.CharField(max_length=10, choices=FASE_CHOICES)
     esito = models.CharField(max_length=10, choices=ESITO_CHOICES, default='ok')
+    esito_obj = models.ForeignKey(
+        EsitoChecklist, null=True, blank=True, on_delete=models.SET_NULL,
+        related_name='compilazioni', verbose_name='Esito (5S)',
+    )
     note = models.TextField(blank=True)
     compilato_il = models.DateTimeField(auto_now_add=True)
 
@@ -129,7 +180,8 @@ class ChecklistCompilata(models.Model):
         unique_together = [('sessione', 'checklist_item', 'fase')]
 
     def __str__(self):
-        return f"{self.checklist_item.nome} — {self.get_fase_display()} — {self.get_esito_display()}"
+        esito_nome = self.esito_obj.nome if self.esito_obj else self.get_esito_display()
+        return f"{self.checklist_item.nome} — {self.get_fase_display()} — {esito_nome}"
 
 
 # ---------------------------------------------------------------------------

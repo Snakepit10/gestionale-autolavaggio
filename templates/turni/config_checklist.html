@@ -1,80 +1,254 @@
 {% extends "base.html" %}
 {% load cq_tags %}
 
-{% block title %}Configurazione Checklist Turni{% endblock %}
+{% block title %}Configurazione Checklist 5S{% endblock %}
 
 {% block content %}
 <div class="d-flex justify-content-between align-items-center mb-3">
-  <h5 class="mb-0"><i class="bi bi-clipboard-check"></i> Configurazione Checklist Turni</h5>
-  <button class="btn btn-primary btn-sm" onclick="apriModal()">
-    <i class="bi bi-plus-lg"></i> Nuova Voce
-  </button>
+  <h5 class="mb-0"><i class="bi bi-clipboard-check"></i> Configurazione Checklist 5S</h5>
 </div>
 
-<div class="card">
-  <div class="card-body p-0">
-    <table class="table table-hover mb-0">
-      <thead class="table-light">
-        <tr><th>Postazione</th><th>Blocco</th><th>Voce</th><th>Ord.</th><th>Attivo</th><th></th></tr>
-      </thead>
-      <tbody>
-        {% for item in items %}
-        <tr>
-          <td>{{ item.postazione_cq.nome }}</td>
-          <td>{{ item.blocco.nome|default:"—" }}</td>
-          <td>{{ item.nome }}</td>
-          <td>{{ item.ordine }}</td>
-          <td>{% if item.attivo %}<i class="bi bi-check-circle text-success"></i>{% else %}<i class="bi bi-x-circle text-danger"></i>{% endif %}</td>
-          <td>
-            <button class="btn btn-outline-primary btn-sm py-0" onclick="modifica({{ item.pk }}, '{{ item.nome|escapejs }}', {{ item.postazione_cq_id }}, {{ item.blocco_id|default:'null' }}, {{ item.ordine }}, {{ item.attivo|yesno:'true,false' }})">
-              <i class="bi bi-pencil"></i>
-            </button>
-            <button class="btn btn-outline-danger btn-sm py-0" onclick="elimina({{ item.pk }}, '{{ item.nome|escapejs }}')">
-              <i class="bi bi-trash"></i>
-            </button>
-          </td>
-        </tr>
-        {% empty %}
-        <tr><td colspan="6" class="text-muted text-center py-3">Nessuna voce checklist configurata</td></tr>
-        {% endfor %}
-      </tbody>
-    </table>
+<ul class="nav nav-tabs mb-3" id="configTabs">
+  <li class="nav-item">
+    <button class="nav-link active" data-bs-toggle="tab" data-bs-target="#tab-categorie">
+      <i class="bi bi-folder2"></i> Categorie 5S
+    </button>
+  </li>
+  <li class="nav-item">
+    <button class="nav-link" data-bs-toggle="tab" data-bs-target="#tab-esiti">
+      <i class="bi bi-check2-square"></i> Esiti per Categoria
+    </button>
+  </li>
+  <li class="nav-item">
+    <button class="nav-link" data-bs-toggle="tab" data-bs-target="#tab-voci">
+      <i class="bi bi-list-check"></i> Voci Checklist
+    </button>
+  </li>
+</ul>
+
+<div class="tab-content">
+
+  {# ===== TAB CATEGORIE 5S ===== #}
+  <div class="tab-pane fade show active" id="tab-categorie">
+    <div class="card">
+      <div class="card-header d-flex justify-content-between align-items-center">
+        <span><i class="bi bi-folder2"></i> Categorie 5S</span>
+        <button class="btn btn-primary btn-sm" onclick="apriModalCategoria()"><i class="bi bi-plus-lg"></i> Nuova</button>
+      </div>
+      <div class="card-body p-0">
+        <table class="table table-hover mb-0">
+          <thead class="table-light"><tr><th>Nome</th><th>Icona</th><th>Ord.</th><th>Esiti</th><th></th></tr></thead>
+          <tbody>
+            {% for cat in categorie %}
+            <tr>
+              <td><strong>{{ cat.nome }}</strong></td>
+              <td>{% if cat.icona %}<i class="bi {{ cat.icona }}"></i> <code>{{ cat.icona }}</code>{% else %}—{% endif %}</td>
+              <td>{{ cat.ordine }}</td>
+              <td><span class="badge bg-info">{{ cat.esiti.count }}</span></td>
+              <td>
+                <button class="btn btn-outline-primary btn-sm py-0"
+                        onclick="modificaCategoria({{ cat.pk }}, '{{ cat.nome|escapejs }}', '{{ cat.icona|escapejs }}', {{ cat.ordine }})">
+                  <i class="bi bi-pencil"></i>
+                </button>
+                <button class="btn btn-outline-danger btn-sm py-0"
+                        onclick="eliminaCategoria({{ cat.pk }}, '{{ cat.nome|escapejs }}')">
+                  <i class="bi bi-trash"></i>
+                </button>
+              </td>
+            </tr>
+            {% empty %}
+            <tr><td colspan="5" class="text-muted text-center py-3">Nessuna categoria</td></tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  {# ===== TAB ESITI PER CATEGORIA ===== #}
+  <div class="tab-pane fade" id="tab-esiti">
+    <div class="card">
+      <div class="card-header d-flex justify-content-between align-items-center">
+        <span><i class="bi bi-check2-square"></i> Esiti per Categoria</span>
+        <button class="btn btn-primary btn-sm" onclick="apriModalEsito()"><i class="bi bi-plus-lg"></i> Nuovo</button>
+      </div>
+      <div class="card-body p-0">
+        <table class="table table-hover mb-0">
+          <thead class="table-light"><tr><th>Categoria</th><th>Codice</th><th>Nome</th><th>Colore</th><th>Ord.</th><th></th></tr></thead>
+          <tbody>
+            {% for cat in categorie %}
+            <tr class="table-light">
+              <td colspan="6" class="py-1 px-3 small fw-bold">
+                {% if cat.icona %}<i class="bi {{ cat.icona }}"></i>{% endif %} {{ cat.nome }}
+              </td>
+            </tr>
+            {% for esito in cat.esiti.all %}
+            <tr>
+              <td></td>
+              <td><code>{{ esito.codice }}</code></td>
+              <td>{{ esito.nome }}</td>
+              <td><span class="badge bg-{{ esito.colore }}">{{ esito.colore }}</span></td>
+              <td>{{ esito.ordine }}</td>
+              <td>
+                <button class="btn btn-outline-primary btn-sm py-0"
+                        onclick="modificaEsito({{ esito.pk }}, {{ cat.pk }}, '{{ esito.codice|escapejs }}', '{{ esito.nome|escapejs }}', '{{ esito.colore|escapejs }}', {{ esito.ordine }})">
+                  <i class="bi bi-pencil"></i>
+                </button>
+                <button class="btn btn-outline-danger btn-sm py-0"
+                        onclick="eliminaEsito({{ esito.pk }}, '{{ esito.nome|escapejs }}')">
+                  <i class="bi bi-trash"></i>
+                </button>
+              </td>
+            </tr>
+            {% endfor %}
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  {# ===== TAB VOCI CHECKLIST ===== #}
+  <div class="tab-pane fade" id="tab-voci">
+    <div class="card">
+      <div class="card-header d-flex justify-content-between align-items-center">
+        <span><i class="bi bi-list-check"></i> Voci Checklist</span>
+        <button class="btn btn-primary btn-sm" onclick="apriModalVoce()"><i class="bi bi-plus-lg"></i> Nuova</button>
+      </div>
+      <div class="card-body p-0">
+        <table class="table table-hover mb-0">
+          <thead class="table-light"><tr><th>Postazione</th><th>Blocco</th><th>Categoria</th><th>Voce</th><th>Ord.</th><th>Attivo</th><th></th></tr></thead>
+          <tbody>
+            {% for item in items %}
+            <tr>
+              <td>{{ item.postazione_cq.nome }}</td>
+              <td>{{ item.blocco.nome|default:"—" }}</td>
+              <td>{% if item.categoria %}<span class="badge bg-light text-dark border">{% if item.categoria.icona %}<i class="bi {{ item.categoria.icona }}"></i> {% endif %}{{ item.categoria.nome }}</span>{% else %}—{% endif %}</td>
+              <td>{{ item.nome }}</td>
+              <td>{{ item.ordine }}</td>
+              <td>{% if item.attivo %}<i class="bi bi-check-circle text-success"></i>{% else %}<i class="bi bi-x-circle text-danger"></i>{% endif %}</td>
+              <td>
+                <button class="btn btn-outline-primary btn-sm py-0"
+                        onclick="modificaVoce({{ item.pk }}, '{{ item.nome|escapejs }}', {{ item.postazione_cq_id }}, {{ item.blocco_id|default:'null' }}, {{ item.categoria_id|default:'null' }}, {{ item.ordine }}, {{ item.attivo|yesno:'true,false' }})">
+                  <i class="bi bi-pencil"></i>
+                </button>
+                <button class="btn btn-outline-danger btn-sm py-0"
+                        onclick="eliminaVoce({{ item.pk }}, '{{ item.nome|escapejs }}')">
+                  <i class="bi bi-trash"></i>
+                </button>
+              </td>
+            </tr>
+            {% empty %}
+            <tr><td colspan="7" class="text-muted text-center py-3">Nessuna voce</td></tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+</div>
+
+{# ====== MODALI ====== #}
+
+{# Modal Categoria #}
+<div class="modal fade" id="modalCategoria" tabindex="-1">
+  <div class="modal-dialog modal-sm">
+    <div class="modal-content">
+      <div class="modal-header"><h6 class="modal-title">Categoria 5S</h6><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div>
+      <div class="modal-body">
+        <input type="hidden" id="catId">
+        <div class="mb-2"><label class="form-label small">Nome *</label><input type="text" class="form-control" id="catNome"></div>
+        <div class="mb-2"><label class="form-label small">Icona Bootstrap</label><input type="text" class="form-control" id="catIcona" placeholder="es. bi-wrench"></div>
+        <div class="mb-2"><label class="form-label small">Ordine</label><input type="number" class="form-control" id="catOrdine" value="0"></div>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-secondary btn-sm" data-bs-dismiss="modal">Annulla</button>
+        <button type="button" class="btn btn-primary btn-sm" onclick="salvaCategoria()">Salva</button>
+      </div>
+    </div>
   </div>
 </div>
 
-{# Modal #}
-<div class="modal fade" id="modalChecklist" tabindex="-1">
+{# Modal Esito #}
+<div class="modal fade" id="modalEsito" tabindex="-1">
+  <div class="modal-dialog">
+    <div class="modal-content">
+      <div class="modal-header"><h6 class="modal-title">Esito Checklist</h6><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div>
+      <div class="modal-body">
+        <input type="hidden" id="esitoId">
+        <div class="row g-2">
+          <div class="col-12">
+            <label class="form-label small">Categoria *</label>
+            <select class="form-select" id="esitoCategoria">
+              {% for cat in categorie %}<option value="{{ cat.pk }}">{{ cat.nome }}</option>{% endfor %}
+            </select>
+          </div>
+          <div class="col-6"><label class="form-label small">Codice *</label><input type="text" class="form-control font-monospace" id="esitoCodice" placeholder="es. ok"></div>
+          <div class="col-6"><label class="form-label small">Nome *</label><input type="text" class="form-control" id="esitoNome" placeholder="es. OK"></div>
+          <div class="col-6">
+            <label class="form-label small">Colore *</label>
+            <select class="form-select" id="esitoColore">
+              <option value="success">success (verde)</option>
+              <option value="danger">danger (rosso)</option>
+              <option value="warning">warning (giallo)</option>
+              <option value="info">info (azzurro)</option>
+              <option value="secondary">secondary (grigio)</option>
+              <option value="primary">primary (blu)</option>
+            </select>
+          </div>
+          <div class="col-6"><label class="form-label small">Ordine</label><input type="number" class="form-control" id="esitoOrdine" value="0"></div>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-secondary btn-sm" data-bs-dismiss="modal">Annulla</button>
+        <button type="button" class="btn btn-primary btn-sm" onclick="salvaEsito()">Salva</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+{# Modal Voce Checklist #}
+<div class="modal fade" id="modalVoce" tabindex="-1">
   <div class="modal-dialog">
     <div class="modal-content">
       <div class="modal-header"><h6 class="modal-title">Voce Checklist</h6><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div>
       <div class="modal-body">
         <input type="hidden" id="clId">
-        <div class="mb-2">
-          <label class="form-label small">Postazione *</label>
-          <select class="form-select" id="clPostazione" onchange="filtraBlocchi()">
-            {% for p in postazioni %}
-            <option value="{{ p.pk }}" data-blocchi='[{% for b in p.blocchi.all %}{"id":{{ b.pk }},"nome":"{{ b.nome|escapejs }}"}{% if not forloop.last %},{% endif %}{% endfor %}]'>{{ p.nome }}</option>
-            {% endfor %}
-          </select>
-        </div>
-        <div class="mb-2">
-          <label class="form-label small">Blocco (opzionale)</label>
-          <select class="form-select" id="clBlocco">
-            <option value="">— Tutta la postazione —</option>
-          </select>
-        </div>
         <div class="row g-2">
-          <div class="col-8"><label class="form-label small">Nome voce *</label><input type="text" class="form-control" id="clNome"></div>
-          <div class="col-4"><label class="form-label small">Ordine</label><input type="number" class="form-control" id="clOrdine" value="0"></div>
-        </div>
-        <div class="form-check mt-2">
-          <input class="form-check-input" type="checkbox" id="clAttivo" checked>
-          <label class="form-check-label" for="clAttivo">Attivo</label>
+          <div class="col-md-6">
+            <label class="form-label small">Postazione *</label>
+            <select class="form-select" id="clPostazione" onchange="filtraBlocchi()">
+              {% for p in postazioni %}
+              <option value="{{ p.pk }}" data-blocchi='[{% for b in p.blocchi.all %}{"id":{{ b.pk }},"nome":"{{ b.nome|escapejs }}"}{% if not forloop.last %},{% endif %}{% endfor %}]'>{{ p.nome }}</option>
+              {% endfor %}
+            </select>
+          </div>
+          <div class="col-md-6">
+            <label class="form-label small">Blocco</label>
+            <select class="form-select" id="clBlocco">
+              <option value="">— Tutta la postazione —</option>
+            </select>
+          </div>
+          <div class="col-md-8">
+            <label class="form-label small">Categoria 5S *</label>
+            <select class="form-select" id="clCategoria">
+              {% for cat in categorie %}<option value="{{ cat.pk }}">{% if cat.icona %}<i class="bi {{ cat.icona }}"></i> {% endif %}{{ cat.nome }}</option>{% endfor %}
+            </select>
+          </div>
+          <div class="col-md-4"><label class="form-label small">Ordine</label><input type="number" class="form-control" id="clOrdine" value="0"></div>
+          <div class="col-12"><label class="form-label small">Nome voce *</label><input type="text" class="form-control" id="clNome"></div>
+          <div class="col-12">
+            <div class="form-check">
+              <input class="form-check-input" type="checkbox" id="clAttivo" checked>
+              <label class="form-check-label" for="clAttivo">Attivo</label>
+            </div>
+          </div>
         </div>
       </div>
       <div class="modal-footer">
         <button type="button" class="btn btn-secondary btn-sm" data-bs-dismiss="modal">Annulla</button>
-        <button type="button" class="btn btn-primary btn-sm" onclick="salva()">Salva</button>
+        <button type="button" class="btn btn-primary btn-sm" onclick="salvaVoce()">Salva</button>
       </div>
     </div>
   </div>
@@ -85,60 +259,57 @@
 <script>
 const CSRF = '{{ csrf_token }}';
 
-function apriModal() {
-  document.getElementById('clId').value = '';
-  document.getElementById('clNome').value = '';
-  document.getElementById('clOrdine').value = '0';
-  document.getElementById('clAttivo').checked = true;
-  filtraBlocchi();
-  new bootstrap.Modal(document.getElementById('modalChecklist')).show();
+function apriM(id) { new bootstrap.Modal(document.getElementById(id)).show(); }
+function chiudiM(id) { bootstrap.Modal.getInstance(document.getElementById(id))?.hide(); }
+
+async function apiPost(url, data) {
+  const fd = new FormData();
+  fd.append('csrfmiddlewaretoken', CSRF);
+  for (const [k, v] of Object.entries(data)) fd.append(k, v);
+  const r = await fetch(url, { method: 'POST', body: fd });
+  return r.json();
 }
 
-function modifica(id, nome, postId, bloccoId, ordine, attivo) {
-  document.getElementById('clId').value = id;
-  document.getElementById('clNome').value = nome;
-  document.getElementById('clPostazione').value = postId;
-  document.getElementById('clOrdine').value = ordine;
-  document.getElementById('clAttivo').checked = attivo;
-  filtraBlocchi();
-  if (bloccoId) document.getElementById('clBlocco').value = bloccoId;
-  new bootstrap.Modal(document.getElementById('modalChecklist')).show();
+/* ---- Categorie ---- */
+function apriModalCategoria() { document.getElementById('catId').value=''; document.getElementById('catNome').value=''; document.getElementById('catIcona').value=''; document.getElementById('catOrdine').value='0'; apriM('modalCategoria'); }
+function modificaCategoria(id, nome, icona, ordine) { document.getElementById('catId').value=id; document.getElementById('catNome').value=nome; document.getElementById('catIcona').value=icona; document.getElementById('catOrdine').value=ordine; apriM('modalCategoria'); }
+async function salvaCategoria() {
+  const res = await apiPost('/turni/api/categoria-checklist/salva/', { id: document.getElementById('catId').value, nome: document.getElementById('catNome').value, icona: document.getElementById('catIcona').value, ordine: document.getElementById('catOrdine').value });
+  if (res.ok) { chiudiM('modalCategoria'); location.reload(); } else alert(res.error);
 }
+async function eliminaCategoria(pk, nome) { if (!confirm(`Eliminare "${nome}"?`)) return; const res = await apiPost(`/turni/api/categoria-checklist/${pk}/elimina/`, {}); if (res.ok) location.reload(); else alert(res.error); }
 
+/* ---- Esiti ---- */
+function apriModalEsito() { document.getElementById('esitoId').value=''; document.getElementById('esitoCodice').value=''; document.getElementById('esitoNome').value=''; document.getElementById('esitoColore').value='secondary'; document.getElementById('esitoOrdine').value='0'; apriM('modalEsito'); }
+function modificaEsito(id, catId, codice, nome, colore, ordine) { document.getElementById('esitoId').value=id; document.getElementById('esitoCategoria').value=catId; document.getElementById('esitoCodice').value=codice; document.getElementById('esitoNome').value=nome; document.getElementById('esitoColore').value=colore; document.getElementById('esitoOrdine').value=ordine; apriM('modalEsito'); }
+async function salvaEsito() {
+  const res = await apiPost('/turni/api/esito-checklist/salva/', { id: document.getElementById('esitoId').value, categoria_id: document.getElementById('esitoCategoria').value, codice: document.getElementById('esitoCodice').value, nome: document.getElementById('esitoNome').value, colore: document.getElementById('esitoColore').value, ordine: document.getElementById('esitoOrdine').value });
+  if (res.ok) { chiudiM('modalEsito'); location.reload(); } else alert(res.error);
+}
+async function eliminaEsito(pk, nome) { if (!confirm(`Eliminare "${nome}"?`)) return; const res = await apiPost(`/turni/api/esito-checklist/${pk}/elimina/`, {}); if (res.ok) location.reload(); else alert(res.error); }
+
+/* ---- Voci Checklist ---- */
 function filtraBlocchi() {
   const sel = document.getElementById('clPostazione');
   const opt = sel.selectedOptions[0];
   const blocchi = JSON.parse(opt.dataset.blocchi || '[]');
   const bSel = document.getElementById('clBlocco');
   bSel.innerHTML = '<option value="">— Tutta la postazione —</option>';
-  blocchi.forEach(b => {
-    bSel.innerHTML += `<option value="${b.id}">${b.nome}</option>`;
-  });
+  blocchi.forEach(b => { bSel.innerHTML += `<option value="${b.id}">${b.nome}</option>`; });
 }
-
-async function salva() {
-  const fd = new FormData();
-  fd.append('csrfmiddlewaretoken', CSRF);
-  fd.append('id', document.getElementById('clId').value);
-  fd.append('postazione_cq_id', document.getElementById('clPostazione').value);
-  fd.append('blocco_id', document.getElementById('clBlocco').value);
-  fd.append('nome', document.getElementById('clNome').value);
-  fd.append('ordine', document.getElementById('clOrdine').value);
-  fd.append('attivo', document.getElementById('clAttivo').checked ? '1' : '0');
-  const res = await fetch('/turni/api/checklist-item/salva/', { method: 'POST', body: fd });
-  const data = await res.json();
-  if (data.ok) location.reload();
-  else alert(data.error);
+function apriModalVoce() { document.getElementById('clId').value=''; document.getElementById('clNome').value=''; document.getElementById('clOrdine').value='0'; document.getElementById('clAttivo').checked=true; filtraBlocchi(); apriM('modalVoce'); }
+function modificaVoce(id, nome, postId, bloccoId, catId, ordine, attivo) {
+  document.getElementById('clId').value=id; document.getElementById('clNome').value=nome;
+  document.getElementById('clPostazione').value=postId; filtraBlocchi();
+  if (bloccoId) document.getElementById('clBlocco').value=bloccoId;
+  if (catId) document.getElementById('clCategoria').value=catId;
+  document.getElementById('clOrdine').value=ordine; document.getElementById('clAttivo').checked=attivo;
+  apriM('modalVoce');
 }
-
-async function elimina(pk, nome) {
-  if (!confirm(`Eliminare "${nome}"?`)) return;
-  const fd = new FormData();
-  fd.append('csrfmiddlewaretoken', CSRF);
-  const res = await fetch(`/turni/api/checklist-item/${pk}/elimina/`, { method: 'POST', body: fd });
-  const data = await res.json();
-  if (data.ok) location.reload();
-  else alert(data.error);
+async function salvaVoce() {
+  const res = await apiPost('/turni/api/checklist-item/salva/', { id: document.getElementById('clId').value, postazione_cq_id: document.getElementById('clPostazione').value, blocco_id: document.getElementById('clBlocco').value, categoria_id: document.getElementById('clCategoria').value, nome: document.getElementById('clNome').value, ordine: document.getElementById('clOrdine').value, attivo: document.getElementById('clAttivo').checked ? '1' : '0' });
+  if (res.ok) { chiudiM('modalVoce'); location.reload(); } else alert(res.error);
 }
+async function eliminaVoce(pk, nome) { if (!confirm(`Eliminare "${nome}"?`)) return; const res = await apiPost(`/turni/api/checklist-item/${pk}/elimina/`, {}); if (res.ok) location.reload(); else alert(res.error); }
 </script>
 {% endblock %}

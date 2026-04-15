@@ -24,6 +24,10 @@ urlpatterns = [
     path('configurazione/checklist/', views.config_checklist, name='config_checklist'),
     path('api/checklist-item/salva/', views.api_salva_checklist_item, name='api_checklist_item_salva'),
     path('api/checklist-item/<int:pk>/elimina/', views.api_elimina_checklist_item, name='api_checklist_item_elimina'),
+    path('api/categoria-checklist/salva/', views.api_salva_categoria, name='api_categoria_salva'),
+    path('api/categoria-checklist/<int:pk>/elimina/', views.api_elimina_categoria, name='api_categoria_elimina'),
+    path('api/esito-checklist/salva/', views.api_salva_esito, name='api_esito_salva'),
+    path('api/esito-checklist/<int:pk>/elimina/', views.api_elimina_esito, name='api_esito_elimina'),
 
     # Report
     path('report/', views.report_lavorazioni, name='report_lavorazioni'),
