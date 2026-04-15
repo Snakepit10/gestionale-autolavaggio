@@ -472,26 +472,43 @@ def api_completa_lavoro(request, lav_id):
 
     lav.completa()
 
-    # Aggiorna gli ItemOrdine della PostazioneCQ
+    # Nel flusso coda unica, completare una fase NON completa l'ordine.
+    # L'ordine resta in_lavorazione finche TUTTE le PostazioneCQ attive
+    # (non controllo_finale) hanno una LavorazioneOperatore completata.
     ordine = lav.ordine
-    items = ordine.items.filter(postazione_cq=lav.postazione_cq, stato='in_lavorazione')
-    if not items.exists():
-        items = ordine.items.filter(stato='in_lavorazione')
 
-    now = timezone.now()
-    for item in items:
-        item.stato = 'completato'
-        item.fine_lavorazione = now
-        item.save(update_fields=['stato', 'fine_lavorazione'])
+    # Aggiorna stato ordine a in_lavorazione se era in_attesa
+    if ordine.stato == 'in_attesa':
+        ordine.stato = 'in_lavorazione'
+        ordine.save(update_fields=['stato'])
 
-    # Verifica se tutti gli items dell'ordine sono completati
-    if not ordine.items.exclude(stato='completato').exists():
+    # Verifica se tutte le postazioni hanno completato
+    from apps.cq.models import PostazioneCQ
+    postazioni_richieste = set(
+        PostazioneCQ.objects.filter(
+            attiva=True, is_controllo_finale=False
+        ).values_list('pk', flat=True)
+    )
+    postazioni_completate = set(
+        LavorazioneOperatore.objects.filter(
+            ordine=ordine, stato='completato'
+        ).values_list('postazione_cq_id', flat=True)
+    )
+
+    if postazioni_richieste and postazioni_richieste.issubset(postazioni_completate):
+        # Tutte le fasi completate: completa ordine e items
         ordine.stato = 'completato'
         ordine.save(update_fields=['stato'])
+        now = timezone.now()
+        for item in ordine.items.exclude(stato='completato'):
+            item.stato = 'completato'
+            item.fine_lavorazione = now
+            item.save(update_fields=['stato', 'fine_lavorazione'])
 
     return _json_ok({
         'stato': lav.stato,
         'tempo_netto_min': round(lav.tempo_lavoro_netto_minuti, 1),
+        'ordine_completato': ordine.stato == 'completato',
     })
 
 
