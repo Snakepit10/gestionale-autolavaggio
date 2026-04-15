@@ -189,6 +189,25 @@ class Ordine(models.Model):
                 items_dict[postazione].append(item)
         return items_dict
 
+    def get_stati_postazioni(self):
+        """Restituisce [{sigla, stato, nome}] per ogni postazione dell'ordine."""
+        risultato = {}
+        for item in self.items.all():
+            if not item.postazione_assegnata:
+                continue
+            nome = item.postazione_assegnata.nome
+            if nome not in risultato:
+                # Sigla: prime lettere di ogni parola (max 3 char)
+                sigla = ''.join(w[0].upper() for w in nome.split()[:3])
+                risultato[nome] = {'sigla': sigla, 'stato': 'completato', 'nome': nome}
+            # Priorita: in_lavorazione > in_attesa > completato
+            cur = risultato[nome]['stato']
+            if item.stato == 'in_lavorazione':
+                risultato[nome]['stato'] = 'in_lavorazione'
+            elif item.stato == 'in_attesa' and cur != 'in_lavorazione':
+                risultato[nome]['stato'] = 'in_attesa'
+        return list(risultato.values())
+
 
 class ItemOrdine(models.Model):
     STATO_CHOICES = [
@@ -212,6 +231,12 @@ class ItemOrdine(models.Model):
     stato = models.CharField(max_length=20, choices=STATO_CHOICES, default='in_attesa')
     inizio_lavorazione = models.DateTimeField(null=True, blank=True)
     fine_lavorazione = models.DateTimeField(null=True, blank=True)
+
+    # Tracking operatore che ha aggiunto l'item (per evidenziare in lista ordini)
+    aggiunto_da = models.ForeignKey(
+        'auth.User', null=True, blank=True, on_delete=models.SET_NULL,
+        related_name='items_aggiunti', verbose_name='Aggiunto da operatore',
+    )
     
     class Meta:
         ordering = ['postazione_assegnata', 'id']

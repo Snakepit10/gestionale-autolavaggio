@@ -115,15 +115,24 @@ async function selezionaOrdine(ordineId) {
   if (!data.ok) return;
 
   currentOrdineId = ordineId;
-  renderAreaOperativa(data.ordine, data.lavorazione);
+  renderAreaOperativa(data.ordine, data.lavorazione, data.fasi_completate || []);
 }
 
-function renderAreaOperativa(ordine, lavorazione) {
+// Dati servizi per il form aggiungi item
+const CATEGORIE_SERVIZI = {{ categorie_servizi_json|safe }};
+
+function renderAreaOperativa(ordine, lavorazione, fasiCompletate) {
   const area = document.getElementById('areaOperativa');
 
-  let itemsHtml = ordine.items.map(i =>
-    `<tr><td>${i.servizio_prodotto__titolo}</td><td>${i.quantita}</td><td>&euro;${i.prezzo_unitario}</td><td><span class="badge ${i.stato === 'completato' ? 'bg-success' : i.stato === 'in_lavorazione' ? 'bg-warning' : 'bg-secondary'}">${i.stato}</span></td></tr>`
-  ).join('');
+  let itemsHtml = ordine.items.map(i => {
+    const isAggiunto = i.aggiunto_da__id;
+    const rowClass = isAggiunto ? 'style="background:#fff3cd"' : '';
+    return `<tr ${rowClass}>
+      <td>${i.servizio_prodotto__titolo}${isAggiunto ? ' <i class="bi bi-person-plus text-warning" title="Aggiunto da operatore"></i>' : ''}</td>
+      <td>${i.quantita}</td><td>&euro;${i.prezzo_unitario}</td>
+      <td><span class="badge ${i.stato === 'completato' ? 'bg-success' : i.stato === 'in_lavorazione' ? 'bg-warning' : 'bg-secondary'}">${i.stato}</span></td>
+    </tr>`;
+  }).join('');
 
   let timerHtml = '';
   let buttonsHtml = '';
@@ -153,21 +162,25 @@ function renderAreaOperativa(ordine, lavorazione) {
     buttonsHtml = `<button class="btn btn-primary btn-lavoro" onclick="iniziaLavoro()"><i class="bi bi-play-circle"></i> Inizia Lavoro</button>`;
   }
 
-  // Supplementi
-  let suppHtml = '';
-  {% if supplementi %}
-  suppHtml = `
-    <div class="d-flex gap-2 align-items-center">
-      <select class="form-select form-select-sm" id="supplementoSelect" style="max-width:250px">
-        {% for s in supplementi %}
-        <option value="{{ s.pk }}">{{ s.titolo }} (&euro;{{ s.prezzo }})</option>
-        {% endfor %}
-      </select>
-      <button class="btn btn-outline-warning btn-sm" onclick="aggiungiItem()">
-        <i class="bi bi-plus-circle"></i> Aggiungi
-      </button>
-    </div>`;
-  {% endif %}
+  // Form aggiungi item — select con categorie servizi
+  let optionsHtml = '<option value="">Seleziona servizio...</option>';
+  for (const cat of CATEGORIE_SERVIZI) {
+    optionsHtml += `<optgroup label="${cat.nome}">`;
+    for (const s of cat.servizi) {
+      optionsHtml += `<option value="${s.id}" data-prezzo="${s.prezzo}">${s.titolo} — &euro;${s.prezzo}</option>`;
+    }
+    optionsHtml += '</optgroup>';
+  }
+
+  // Fasi completate
+  let fasiHtml = '';
+  if (fasiCompletate.length > 0) {
+    fasiHtml = `<div class="mb-3"><div class="section-header mb-1"><i class="bi bi-check2-all"></i> Fasi completate</div><div class="d-flex flex-wrap gap-1">`;
+    for (const f of fasiCompletate) {
+      fasiHtml += `<span class="badge bg-success"><i class="bi bi-check-circle"></i> ${f.postazione} — ${f.operatore} (${f.tempo_min}m)</span>`;
+    }
+    fasiHtml += '</div></div>';
+  }
 
   area.innerHTML = `
     <div class="card mb-3">
@@ -189,9 +202,8 @@ function renderAreaOperativa(ordine, lavorazione) {
     </div>
 
     <div class="card mb-3">
-      <div class="card-header py-2 d-flex justify-content-between align-items-center">
-        <span class="section-header"><i class="bi bi-bag-plus"></i> Servizi / Aggiungi Item</span>
-        ${suppHtml}
+      <div class="card-header py-2">
+        <span class="section-header"><i class="bi bi-bag-plus"></i> Servizi</span>
       </div>
       <div class="card-body p-0">
         <table class="table table-sm table-hover mb-0">
@@ -199,19 +211,62 @@ function renderAreaOperativa(ordine, lavorazione) {
           <tbody>${itemsHtml}</tbody>
         </table>
       </div>
+      <div class="card-footer">
+        <div class="row g-2 align-items-end" id="formAggiungiItem">
+          <div class="col-md-5">
+            <label class="form-label small mb-0">Servizio/Prodotto</label>
+            <select class="form-select form-select-sm" id="addItemServizio" onchange="onServizioChange()">
+              ${optionsHtml}
+            </select>
+          </div>
+          <div class="col-md-2">
+            <label class="form-label small mb-0">Qty</label>
+            <input type="number" class="form-control form-control-sm" id="addItemQty" value="1" min="1" onchange="calcolaSubtotaleAdd()">
+          </div>
+          <div class="col-md-2">
+            <label class="form-label small mb-0">Prezzo &euro;</label>
+            <input type="number" class="form-control form-control-sm" id="addItemPrezzo" step="0.01" min="0" onchange="calcolaSubtotaleAdd()">
+          </div>
+          <div class="col-md-1 text-center">
+            <label class="form-label small mb-0">Sub.</label>
+            <div class="fw-bold small" id="addItemSubtotale">&euro;0</div>
+          </div>
+          <div class="col-md-2">
+            <button class="btn btn-success btn-sm w-100" onclick="aggiungiItem()">
+              <i class="bi bi-plus-circle"></i> Aggiungi
+            </button>
+          </div>
+        </div>
+      </div>
     </div>
 
     <div class="card">
       <div class="card-header py-2">
         <span class="section-header"><i class="bi bi-stopwatch"></i> Lavorazione</span>
       </div>
-      <div class="card-body text-center py-4">
+      <div class="card-body text-center py-3">
+        ${fasiHtml}
         ${timerHtml}
         <div class="mt-3">${buttonsHtml}</div>
       </div>
     </div>`;
 
   startTimer();
+}
+
+function onServizioChange() {
+  const sel = document.getElementById('addItemServizio');
+  const opt = sel.selectedOptions[0];
+  const prezzo = opt ? opt.dataset.prezzo || '' : '';
+  document.getElementById('addItemPrezzo').value = prezzo;
+  document.getElementById('addItemQty').value = '1';
+  calcolaSubtotaleAdd();
+}
+
+function calcolaSubtotaleAdd() {
+  const qty = parseInt(document.getElementById('addItemQty').value) || 0;
+  const prezzo = parseFloat(document.getElementById('addItemPrezzo').value) || 0;
+  document.getElementById('addItemSubtotale').textContent = `\u20AC${(qty * prezzo).toFixed(2)}`;
 }
 
 /* ---- Timer ---- */
@@ -297,10 +352,15 @@ async function completaLavoro() {
 
 async function aggiungiItem() {
   if (!currentOrdineId) return;
-  const sel = document.getElementById('supplementoSelect');
-  if (!sel) return;
+  const sel = document.getElementById('addItemServizio');
+  if (!sel || !sel.value) { alert('Seleziona un servizio.'); return; }
+  const qty = parseInt(document.getElementById('addItemQty').value) || 1;
+  const prezzo = parseFloat(document.getElementById('addItemPrezzo').value);
+  if (isNaN(prezzo) || prezzo < 0) { alert('Prezzo non valido.'); return; }
   const data = await apiPost(`/turni/api/ordine/${currentOrdineId}/aggiungi-item/`, {
     servizio_id: parseInt(sel.value),
+    quantita: qty,
+    prezzo: prezzo,
   });
   if (data.ok) {
     selezionaOrdine(currentOrdineId);

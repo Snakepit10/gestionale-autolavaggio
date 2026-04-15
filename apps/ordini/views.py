@@ -522,7 +522,9 @@ class OrdiniListView(LoginRequiredMixin, ListView):
         cliente = self.request.GET.get('cliente')
 
         # Query base per tutti gli ordini
-        queryset = Ordine.objects.select_related('cliente', 'operatore').prefetch_related('items', 'pagamenti')
+        queryset = Ordine.objects.select_related('cliente', 'operatore').prefetch_related(
+            'items__servizio_prodotto', 'items__postazione_assegnata', 'items__aggiunto_da', 'pagamenti'
+        )
 
         # Applica filtri temporali
         if not any([stato, data_da, data_a, cliente]):

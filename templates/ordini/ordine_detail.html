@@ -312,9 +312,14 @@
                                     </thead>
                                     <tbody>
                                         {% for item in items %}
-                                        <tr>
+                                        <tr{% if item.aggiunto_da %} style="background:#fff3cd"{% endif %}>
                                             <td>
                                                 <strong>{{ item.servizio_prodotto.titolo }}</strong>
+                                                {% if item.aggiunto_da %}
+                                                    <span class="badge bg-warning text-dark ms-1" style="font-size:.6rem">
+                                                        <i class="bi bi-person-plus"></i> {{ item.aggiunto_da.get_full_name|default:item.aggiunto_da.username }}
+                                                    </span>
+                                                {% endif %}
                                                 {% if item.servizio_prodotto.descrizione %}
                                                     <br><small class="text-muted">{{ item.servizio_prodotto.descrizione|truncatewords:10 }}</small>
                                                 {% endif %}

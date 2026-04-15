@@ -248,17 +248,22 @@ def dashboard_operatore(request):
         sessione=sessione, stato__in=['in_lavorazione', 'in_pausa']
     ).select_related('ordine', 'postazione_cq', 'blocco').first()
 
-    # Servizi supplemento
-    supplementi = ServizioProdotto.objects.filter(
-        is_supplemento=True, attivo=True
-    )
+    # Servizi per il form aggiungi item (tutti i servizi attivi, raggruppati per categoria)
+    from apps.core.models import Categoria
+    categorie_servizi = []
+    for cat in Categoria.objects.filter(attiva=True).order_by('ordine_visualizzazione'):
+        servizi = list(cat.servizioprodotto_set.filter(attivo=True).values(
+            'id', 'titolo', 'prezzo', 'tipo',
+        ))
+        if servizi:
+            categorie_servizi.append({'nome': cat.nome, 'servizi': servizi})
 
     return render(request, 'turni/dashboard_operatore.html', {
         'sessione': sessione,
         'postazioni_turno': post_turno,
         'ordini_coda': ordini_coda,
         'lavorazione_attiva': lavorazione_attiva,
-        'supplementi': supplementi,
+        'categorie_servizi_json': json.dumps(categorie_servizi, default=str),
     })
 
 
@@ -299,9 +304,9 @@ def chiudi_turno(request):
 @login_required
 def api_ordine_dettaglio(request, ordine_id):
     ordine = get_object_or_404(Ordine, pk=ordine_id)
-    items = list(ordine.items.select_related('servizio_prodotto').values(
+    items = list(ordine.items.select_related('servizio_prodotto', 'aggiunto_da').values(
         'id', 'servizio_prodotto__titolo', 'quantita',
-        'prezzo_unitario', 'stato',
+        'prezzo_unitario', 'stato', 'aggiunto_da__id',
     ))
     cliente_nome = ''
     if ordine.cliente:
@@ -323,6 +328,18 @@ def api_ordine_dettaglio(request, ordine_id):
                 'tempo_pausa_sec': lav.tempo_pausa_totale.total_seconds(),
             }
 
+    # Fasi completate (da tutti gli operatori)
+    fasi_completate = []
+    for lav_c in LavorazioneOperatore.objects.filter(
+        ordine=ordine, stato='completato'
+    ).select_related('postazione_cq', 'sessione__operatore').order_by('inizio'):
+        op = lav_c.sessione.operatore
+        fasi_completate.append({
+            'postazione': lav_c.postazione_cq.nome,
+            'operatore': op.get_full_name() or op.username,
+            'tempo_min': round(lav_c.tempo_lavoro_netto_minuti, 1),
+        })
+
     return _json_ok({
         'ordine': {
             'id': ordine.pk,
@@ -334,6 +351,7 @@ def api_ordine_dettaglio(request, ordine_id):
             'items': items,
         },
         'lavorazione': lavorazione,
+        'fasi_completate': fasi_completate,
     })
 
 
@@ -523,7 +541,14 @@ def api_aggiungi_item(request, ordine_id):
         return _json_err('Ordine annullato.')
 
     servizio_id = data.get('servizio_id')
-    servizio = get_object_or_404(ServizioProdotto, pk=servizio_id, is_supplemento=True, attivo=True)
+    quantita = int(data.get('quantita', 1))
+    prezzo = data.get('prezzo')
+    servizio = get_object_or_404(ServizioProdotto, pk=servizio_id, attivo=True)
+
+    if quantita < 1:
+        return _json_err('Quantita deve essere almeno 1.')
+
+    prezzo_unitario = float(prezzo) if prezzo is not None else float(servizio.prezzo)
 
     # Trova la postazione fisica dell'operatore
     sessione = _get_sessione_attiva(request.user)
@@ -537,9 +562,10 @@ def api_aggiungi_item(request, ordine_id):
     item = ItemOrdine.objects.create(
         ordine=ordine,
         servizio_prodotto=servizio,
-        quantita=1,
-        prezzo_unitario=servizio.prezzo,
+        quantita=quantita,
+        prezzo_unitario=prezzo_unitario,
         postazione_assegnata=postazione_fisica,
+        aggiunto_da=request.user,
     )
 
     # Ricalcola totale ordine

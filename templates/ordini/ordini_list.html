@@ -205,8 +205,8 @@
                                      onclick="apriModalModifica('{{ ordine.pk }}')"
                                      title="Clicca per modificare servizi">
                                     {% for item in ordine.items.all|slice:":3" %}
-                                        <div class="d-flex justify-content-between">
-                                            <span>{{ item.servizio_prodotto.titolo }}</span>
+                                        <div class="d-flex justify-content-between{% if item.aggiunto_da %} text-warning{% endif %}">
+                                            <span>{{ item.servizio_prodotto.titolo }}{% if item.aggiunto_da %} <i class="bi bi-person-plus" style="font-size:.65rem" title="Aggiunto da {{ item.aggiunto_da.get_full_name|default:item.aggiunto_da.username }}"></i>{% endif %}</span>
                                             <span class="text-muted">x{{ item.quantita }}</span>
                                         </div>
                                     {% endfor %}
@@ -299,6 +299,16 @@
                                         <i class="bi bi-x-circle"></i> Annullato
                                     </span>
                                 {% endif %}
+                                {% with stati_post=ordine.get_stati_postazioni %}
+                                {% if stati_post %}
+                                <div class="mt-1">
+                                  {% for ps in stati_post %}
+                                    <span class="badge rounded-pill {% if ps.stato == 'in_attesa' %}bg-primary{% elif ps.stato == 'in_lavorazione' %}bg-warning text-dark{% else %}bg-success{% endif %}"
+                                          style="font-size:.55rem; padding: 2px 5px;" title="{{ ps.nome }}: {{ ps.stato }}">{{ ps.sigla }}</span>
+                                  {% endfor %}
+                                </div>
+                                {% endif %}
+                                {% endwith %}
                             </td>
                             <td>
                                 {% if ordine.tipo_consegna == 'programmata' and ordine.ora_consegna_richiesta %}
@@ -454,8 +464,8 @@
                                      onclick="apriModalModifica('{{ ordine.pk }}')"
                                      title="Clicca per modificare servizi">
                                     {% for item in ordine.items.all|slice:":3" %}
-                                        <div class="d-flex justify-content-between">
-                                            <span>{{ item.servizio_prodotto.titolo }}</span>
+                                        <div class="d-flex justify-content-between{% if item.aggiunto_da %} text-warning{% endif %}">
+                                            <span>{{ item.servizio_prodotto.titolo }}{% if item.aggiunto_da %} <i class="bi bi-person-plus" style="font-size:.65rem" title="Aggiunto da {{ item.aggiunto_da.get_full_name|default:item.aggiunto_da.username }}"></i>{% endif %}</span>
                                             <span class="text-muted">x{{ item.quantita }}</span>
                                         </div>
                                     {% endfor %}
@@ -688,8 +698,8 @@
                                      onclick="apriModalModifica('{{ ordine.pk }}')"
                                      title="Clicca per modificare servizi">
                                     {% for item in ordine.items.all|slice:":3" %}
-                                        <div class="d-flex justify-content-between">
-                                            <span>{{ item.servizio_prodotto.titolo }}</span>
+                                        <div class="d-flex justify-content-between{% if item.aggiunto_da %} text-warning{% endif %}">
+                                            <span>{{ item.servizio_prodotto.titolo }}{% if item.aggiunto_da %} <i class="bi bi-person-plus" style="font-size:.65rem" title="Aggiunto da {{ item.aggiunto_da.get_full_name|default:item.aggiunto_da.username }}"></i>{% endif %}</span>
                                             <span class="text-muted">x{{ item.quantita }}</span>
                                         </div>
                                     {% endfor %}
