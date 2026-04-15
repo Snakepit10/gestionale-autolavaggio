@@ -43,20 +43,27 @@ def _get_postazioni_fisiche(sessione):
 
 
 def _get_coda_ordini(sessione):
-    """Restituisce gli ordini in coda per le postazioni dell'operatore."""
-    postazioni_fisiche_ids = _get_postazioni_fisiche(sessione)
-    if not postazioni_fisiche_ids:
-        return ItemOrdine.objects.none()
-
-    return (
+    """
+    Restituisce gli ordini in coda per le postazioni dell'operatore.
+    Se nessuna PostazioneCQ ha una postazione_fisica collegata,
+    mostra tutti gli ordini in coda come fallback.
+    """
+    base_qs = (
         ItemOrdine.objects.filter(
-            postazione_assegnata_id__in=postazioni_fisiche_ids,
             stato__in=['in_attesa', 'in_lavorazione'],
             ordine__stato__in=['in_attesa', 'in_lavorazione'],
         )
         .select_related('ordine', 'ordine__cliente', 'servizio_prodotto', 'postazione_assegnata')
         .order_by('ordine__numero_progressivo')
     )
+
+    postazioni_fisiche_ids = _get_postazioni_fisiche(sessione)
+    if postazioni_fisiche_ids:
+        # Filtra solo gli ordini sulle postazioni dell'operatore
+        return base_qs.filter(postazione_assegnata_id__in=postazioni_fisiche_ids)
+    else:
+        # Fallback: nessuna postazione fisica configurata, mostra tutti gli ordini in coda
+        return base_qs
 
 
 def _json_ok(data=None, **kwargs):
@@ -360,9 +367,10 @@ def api_inizia_lavoro(request, ordine_id):
 
     postazione_cq = None
     blocco = None
+
+    # Prima prova: match per postazione fisica collegata
     for pt in post_turno:
         if pt.postazione_cq.postazione_fisica_id:
-            # Verifica che l'ordine abbia items su questa postazione
             has_items = ordine.items.filter(
                 postazione_assegnata_id=pt.postazione_cq.postazione_fisica_id,
                 stato__in=['in_attesa', 'in_lavorazione'],
@@ -372,8 +380,16 @@ def api_inizia_lavoro(request, ordine_id):
                 blocco = pt.blocco
                 break
 
+    # Fallback: se nessuna postazione fisica configurata, usa la prima postazione del turno
     if not postazione_cq:
-        return _json_err('Nessun item di questo ordine assegnato alle tue postazioni.')
+        has_pending = ordine.items.filter(stato__in=['in_attesa', 'in_lavorazione']).exists()
+        if has_pending and post_turno.exists():
+            first_pt = post_turno.first()
+            postazione_cq = first_pt.postazione_cq
+            blocco = first_pt.blocco
+
+    if not postazione_cq:
+        return _json_err('Nessun item lavorabile in questo ordine.')
 
     # Crea LavorazioneOperatore
     lav = LavorazioneOperatore.objects.create(
@@ -384,10 +400,14 @@ def api_inizia_lavoro(request, ordine_id):
     )
 
     # Aggiorna ItemOrdine in_attesa → in_lavorazione
-    items_da_avviare = ordine.items.filter(
-        postazione_assegnata=postazione_cq.postazione_fisica,
-        stato='in_attesa',
-    )
+    if postazione_cq.postazione_fisica:
+        items_da_avviare = ordine.items.filter(
+            postazione_assegnata=postazione_cq.postazione_fisica,
+            stato='in_attesa',
+        )
+    else:
+        # Fallback: avvia tutti gli items in_attesa dell'ordine
+        items_da_avviare = ordine.items.filter(stato='in_attesa')
     now = timezone.now()
     for item in items_da_avviare:
         item.stato = 'in_lavorazione'
@@ -462,11 +482,15 @@ def api_completa_lavoro(request, lav_id):
             postazione_assegnata=lav.postazione_cq.postazione_fisica,
             stato='in_lavorazione',
         )
-        now = timezone.now()
-        for item in items:
-            item.stato = 'completato'
-            item.fine_lavorazione = now
-            item.save(update_fields=['stato', 'fine_lavorazione'])
+    else:
+        # Fallback: completa tutti gli items in_lavorazione dell'ordine
+        items = ordine.items.filter(stato='in_lavorazione')
+
+    now = timezone.now()
+    for item in items:
+        item.stato = 'completato'
+        item.fine_lavorazione = now
+        item.save(update_fields=['stato', 'fine_lavorazione'])
 
     # Verifica se tutti gli items dell'ordine sono completati
     if not ordine.items.exclude(stato='completato').exists():
