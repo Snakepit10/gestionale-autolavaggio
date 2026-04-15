@@ -295,30 +295,40 @@ def api_ordine_dettaglio(request, ordine_id):
     if ordine.cliente:
         cliente_nome = str(ordine.cliente)
 
-    # Lavorazioni per questo ordine (dell'operatore corrente)
+    # Lavorazioni attive per questo ordine (dell'operatore corrente, una per blocco)
     sessione = _get_sessione_attiva(request.user)
-    lavorazione = None
+    lavorazione = None  # Prima lavorazione attiva (per il timer principale)
+    lavorazioni_attive = []
     if sessione:
-        lav = LavorazioneOperatore.objects.filter(
+        lavs = LavorazioneOperatore.objects.filter(
             sessione=sessione, ordine=ordine
-        ).exclude(stato='completato').first()
-        if lav:
-            lavorazione = {
+        ).exclude(stato='completato').select_related('postazione_cq', 'blocco')
+        for lav in lavs:
+            lav_data = {
                 'id': lav.pk,
                 'stato': lav.stato,
                 'inizio': lav.inizio.isoformat(),
                 'pausa_inizio': lav.pausa_inizio.isoformat() if lav.pausa_inizio else None,
                 'tempo_pausa_sec': lav.tempo_pausa_totale.total_seconds(),
+                'postazione': lav.postazione_cq.nome,
+                'blocco': lav.blocco.nome if lav.blocco else '',
             }
+            lavorazioni_attive.append(lav_data)
+            if not lavorazione:
+                lavorazione = lav_data
 
     # Fasi completate (da tutti gli operatori)
+    # Fasi completate (da tutti gli operatori, con info blocco)
     fasi_completate = []
     for lav_c in LavorazioneOperatore.objects.filter(
         ordine=ordine, stato='completato'
-    ).select_related('postazione_cq', 'sessione__operatore').order_by('inizio'):
+    ).select_related('postazione_cq', 'blocco', 'sessione__operatore').order_by('inizio'):
         op = lav_c.sessione.operatore
+        label = lav_c.postazione_cq.sigla or lav_c.postazione_cq.nome
+        if lav_c.blocco:
+            label += f" [{lav_c.blocco.nome}]"
         fasi_completate.append({
-            'postazione': lav_c.postazione_cq.nome,
+            'postazione': label,
             'operatore': op.get_full_name() or op.username,
             'tempo_min': round(lav_c.tempo_lavoro_netto_minuti, 1),
         })
@@ -334,6 +344,7 @@ def api_ordine_dettaglio(request, ordine_id):
             'items': items,
         },
         'lavorazione': lavorazione,
+        'lavorazioni_attive': lavorazioni_attive,
         'fasi_completate': fasi_completate,
     })
 
@@ -361,68 +372,50 @@ def api_inizia_lavoro(request, ordine_id):
 
     ordine = get_object_or_404(Ordine, pk=ordine_id)
 
-    # Trova la postazione CQ dell'operatore per questo ordine
-    post_turno = sessione.postazioni.select_related('postazione_cq', 'blocco').all()
+    # Trova le postazioni/blocchi del turno dell'operatore
+    post_turno = list(sessione.postazioni.select_related('postazione_cq', 'blocco').all())
+    if not post_turno:
+        return _json_err('Nessuna postazione assegnata al turno.')
 
-    postazione_cq = None
-    blocco = None
-
-    # Match diretto: item.postazione_cq == postazione del turno
+    # Crea una LavorazioneOperatore per OGNI blocco/postazione del turno
+    # (se l'operatore ha scelto 3 blocchi, crea 3 lavorazioni)
+    lavorazioni_create = []
     for pt in post_turno:
-        has_items = ordine.items.filter(
+        # Evita duplicati: non creare se esiste gia una lavorazione non completata
+        existing = LavorazioneOperatore.objects.filter(
+            sessione=sessione, ordine=ordine,
+            postazione_cq=pt.postazione_cq, blocco=pt.blocco,
+        ).exclude(stato='completato').first()
+        if existing:
+            lavorazioni_create.append(existing)
+            continue
+
+        lav = LavorazioneOperatore.objects.create(
+            sessione=sessione,
+            ordine=ordine,
             postazione_cq=pt.postazione_cq,
-            stato__in=['in_attesa', 'in_lavorazione'],
-        ).exists()
-        if has_items:
-            postazione_cq = pt.postazione_cq
-            blocco = pt.blocco
-            break
+            blocco=pt.blocco,
+        )
+        lavorazioni_create.append(lav)
 
-    # Fallback: prendi la prima postazione del turno se ci sono items lavorabili
-    if not postazione_cq:
-        has_pending = ordine.items.filter(stato__in=['in_attesa', 'in_lavorazione']).exists()
-        if has_pending and post_turno.exists():
-            first_pt = post_turno.first()
-            postazione_cq = first_pt.postazione_cq
-            blocco = first_pt.blocco
+        # CQ integration: auto-crea OperatorePostazioneTurno per ogni blocco
+        OperatorePostazioneTurno.objects.get_or_create(
+            ordine=ordine,
+            postazione=pt.postazione_cq.codice,
+            blocco_codice=pt.blocco.codice if pt.blocco else '',
+            operatore=request.user,
+        )
 
-    if not postazione_cq:
+    if not lavorazioni_create:
         return _json_err('Nessun item lavorabile in questo ordine.')
-
-    # Crea LavorazioneOperatore
-    lav = LavorazioneOperatore.objects.create(
-        sessione=sessione,
-        ordine=ordine,
-        postazione_cq=postazione_cq,
-        blocco=blocco,
-    )
-
-    # Aggiorna ItemOrdine in_attesa → in_lavorazione
-    items_da_avviare = ordine.items.filter(
-        postazione_cq=postazione_cq,
-        stato='in_attesa',
-    )
-    if not items_da_avviare.exists():
-        # Fallback: avvia tutti gli items in_attesa dell'ordine
-        items_da_avviare = ordine.items.filter(stato='in_attesa')
-    now = timezone.now()
-    for item in items_da_avviare:
-        item.stato = 'in_lavorazione'
-        item.inizio_lavorazione = now
-        item.save(update_fields=['stato', 'inizio_lavorazione'])
 
     # Aggiorna stato ordine
     if ordine.stato == 'in_attesa':
         ordine.stato = 'in_lavorazione'
         ordine.save(update_fields=['stato'])
 
-    # CQ integration: auto-crea OperatorePostazioneTurno
-    OperatorePostazioneTurno.objects.get_or_create(
-        ordine=ordine,
-        postazione=postazione_cq.codice,
-        blocco_codice=blocco.codice if blocco else '',
-        operatore=request.user,
-    )
+    # Restituisci la prima lavorazione come riferimento
+    lav = lavorazioni_create[0]
 
     return _json_ok({
         'lavorazione': {
@@ -430,6 +423,7 @@ def api_inizia_lavoro(request, ordine_id):
             'stato': lav.stato,
             'inizio': lav.inizio.isoformat(),
         },
+        'lavorazioni_count': len(lavorazioni_create),
     })
 
 
@@ -482,21 +476,29 @@ def api_completa_lavoro(request, lav_id):
         ordine.stato = 'in_lavorazione'
         ordine.save(update_fields=['stato'])
 
-    # Verifica se tutte le postazioni hanno completato
+    # Verifica se tutte le postazioni (e tutti i blocchi) hanno completato
     from apps.cq.models import PostazioneCQ
-    postazioni_richieste = set(
-        PostazioneCQ.objects.filter(
-            attiva=True, is_controllo_finale=False
-        ).values_list('pk', flat=True)
-    )
-    postazioni_completate = set(
-        LavorazioneOperatore.objects.filter(
-            ordine=ordine, stato='completato'
-        ).values_list('postazione_cq_id', flat=True)
-    )
+    tutte_completate = True
+    for pcq in PostazioneCQ.objects.filter(attiva=True, is_controllo_finale=False).prefetch_related('blocchi'):
+        blocchi = list(pcq.blocchi.all())
+        if blocchi:
+            # Postazione con blocchi: ogni blocco deve avere una lavorazione completata
+            for blocco in blocchi:
+                if not LavorazioneOperatore.objects.filter(
+                    ordine=ordine, postazione_cq=pcq, blocco=blocco, stato='completato'
+                ).exists():
+                    tutte_completate = False
+                    break
+        else:
+            # Postazione senza blocchi: deve avere almeno una lavorazione completata
+            if not LavorazioneOperatore.objects.filter(
+                ordine=ordine, postazione_cq=pcq, stato='completato'
+            ).exists():
+                tutte_completate = False
+        if not tutte_completate:
+            break
 
-    if postazioni_richieste and postazioni_richieste.issubset(postazioni_completate):
-        # Tutte le fasi completate: completa ordine e items
+    if tutte_completate:
         ordine.stato = 'completato'
         ordine.save(update_fields=['stato'])
         now = timezone.now()

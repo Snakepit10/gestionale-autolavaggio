@@ -89,7 +89,7 @@
 <script>
 const CSRF = '{{ csrf_token }}';
 let currentOrdineId = {{ lavorazione_attiva.ordine.pk|default:"null" }};
-let currentLavId = {{ lavorazione_attiva.pk|default:"null" }};
+let currentLavIds = [];  // Array di ID lavorazioni attive (una per blocco)
 let currentLavStato = '{{ lavorazione_attiva.stato|default:"" }}';
 let timerInterval = null;
 let timerStartTime = null;
@@ -108,14 +108,17 @@ async function selezionaOrdine(ordineId) {
   if (!data.ok) return;
 
   currentOrdineId = ordineId;
-  renderAreaOperativa(data.ordine, data.lavorazione, data.fasi_completate || []);
+  renderAreaOperativa(data.ordine, data.lavorazione, data.lavorazioni_attive || [], data.fasi_completate || []);
 }
 
 // Dati servizi per il form aggiungi item
 const CATEGORIE_SERVIZI = {{ categorie_servizi_json|safe }};
 
-function renderAreaOperativa(ordine, lavorazione, fasiCompletate) {
+function renderAreaOperativa(ordine, lavorazione, lavorazioniAttive, fasiCompletate) {
   const area = document.getElementById('areaOperativa');
+
+  // Salva gli ID di tutte le lavorazioni attive
+  currentLavIds = lavorazioniAttive.map(l => l.id);
 
   let itemsHtml = ordine.items.map(i => {
     const isAggiunto = i.aggiunto_da__id;
@@ -130,8 +133,19 @@ function renderAreaOperativa(ordine, lavorazione, fasiCompletate) {
   let timerHtml = '';
   let buttonsHtml = '';
 
+  // Mostra lavorazioni attive per blocco
+  let lavAttivaHtml = '';
+  if (lavorazioniAttive.length > 1) {
+    lavAttivaHtml = '<div class="mb-2 d-flex flex-wrap gap-1">';
+    for (const la of lavorazioniAttive) {
+      const badge = la.stato === 'in_pausa' ? 'bg-warning text-dark' : 'bg-primary';
+      const label = la.blocco ? `${la.postazione} [${la.blocco}]` : la.postazione;
+      lavAttivaHtml += `<span class="badge ${badge}"><i class="bi bi-play-circle"></i> ${label}</span>`;
+    }
+    lavAttivaHtml += '</div>';
+  }
+
   if (lavorazione) {
-    currentLavId = lavorazione.id;
     currentLavStato = lavorazione.stato;
     timerStartTime = new Date(lavorazione.inizio);
     timerPauseSec = lavorazione.tempo_pausa_sec || 0;
@@ -149,7 +163,7 @@ function renderAreaOperativa(ordine, lavorazione, fasiCompletate) {
         <button class="btn btn-success btn-lavoro" onclick="completaLavoro()"><i class="bi bi-check-circle"></i> Fine Lavoro</button>`;
     }
   } else {
-    currentLavId = null;
+    currentLavIds = [];
     currentLavStato = '';
     timerHtml = '<div class="timer-display text-muted" id="timerDisplay">--:--</div>';
     buttonsHtml = `<button class="btn btn-primary btn-lavoro" onclick="iniziaLavoro()"><i class="bi bi-play-circle"></i> Inizia Lavoro</button>`;
@@ -239,6 +253,7 @@ function renderAreaOperativa(ordine, lavorazione, fasiCompletate) {
       </div>
       <div class="card-body text-center py-3">
         ${fasiHtml}
+        ${lavAttivaHtml}
         ${timerHtml}
         <div class="mt-3">${buttonsHtml}</div>
       </div>
@@ -307,40 +322,44 @@ async function iniziaLavoro() {
 }
 
 async function pausaLavoro() {
-  if (!currentLavId) return;
-  const data = await apiPost(`/turni/api/lavorazione/${currentLavId}/pausa/`);
-  if (data.ok) {
-    currentLavStato = 'in_pausa';
-    selezionaOrdine(currentOrdineId);
-  } else alert(data.error);
+  if (!currentLavIds.length) return;
+  // Metti in pausa tutte le lavorazioni attive (una per blocco)
+  for (const lavId of currentLavIds) {
+    await apiPost(`/turni/api/lavorazione/${lavId}/pausa/`);
+  }
+  currentLavStato = 'in_pausa';
+  selezionaOrdine(currentOrdineId);
 }
 
 async function riprendiLavoro() {
-  if (!currentLavId) return;
-  const data = await apiPost(`/turni/api/lavorazione/${currentLavId}/riprendi/`);
-  if (data.ok) {
-    currentLavStato = 'in_lavorazione';
-    selezionaOrdine(currentOrdineId);
-  } else alert(data.error);
+  if (!currentLavIds.length) return;
+  for (const lavId of currentLavIds) {
+    await apiPost(`/turni/api/lavorazione/${lavId}/riprendi/`);
+  }
+  currentLavStato = 'in_lavorazione';
+  selezionaOrdine(currentOrdineId);
 }
 
 async function completaLavoro() {
-  if (!currentLavId) return;
+  if (!currentLavIds.length) return;
   if (!confirm('Confermi fine lavorazione?')) return;
-  const data = await apiPost(`/turni/api/lavorazione/${currentLavId}/completa/`);
-  if (data.ok) {
-    stopTimer();
-    currentLavId = null;
-    currentLavStato = '';
-    aggiornaCoда();
-    // Reset area
-    document.getElementById('areaOperativa').innerHTML = `
-      <div class="empty-state">
-        <i class="bi bi-check-circle fs-1 text-success"></i>
-        <p class="mt-2">Lavorazione completata in ${data.tempo_netto_min} min</p>
-        <p class="text-muted">Seleziona il prossimo ordine dalla coda</p>
-      </div>`;
-  } else alert(data.error);
+  let lastData = null;
+  for (const lavId of currentLavIds) {
+    lastData = await apiPost(`/turni/api/lavorazione/${lavId}/completa/`);
+  }
+  stopTimer();
+  currentLavIds = [];
+  currentLavStato = '';
+  aggiornaCoда();
+  const msg = lastData && lastData.ordine_completato
+    ? 'Ordine completato!'
+    : `Fase completata in ${lastData ? lastData.tempo_netto_min : '?'} min`;
+  document.getElementById('areaOperativa').innerHTML = `
+    <div class="empty-state">
+      <i class="bi bi-check-circle fs-1 text-success"></i>
+      <p class="mt-2">${msg}</p>
+      <p class="text-muted">Seleziona il prossimo ordine dalla coda</p>
+    </div>`;
 }
 
 async function aggiungiItem() {
