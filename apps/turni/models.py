@@ -217,11 +217,20 @@ class VerificaChecklist(models.Model):
 
 
 class SegnalazioneDifetto(models.Model):
-    """Segnalazione difetto rilevato dall'operatore durante la lavorazione."""
+    """
+    Segnalazione difetto rilevato dall'operatore in qualita di CONTROLLORE (catena).
+    L'operatore ha verificato in ingresso, ha trovato un difetto prodotto da un'altra
+    postazione, lo segnala e lo corregge. Il difetto viene attribuito al produttore.
+    L'anello di catena ha funzionato correttamente.
+    """
     GRAVITA_CHOICES = [
         ('bassa', 'Bassa'),
         ('media', 'Media'),
         ('alta', 'Alta'),
+    ]
+    AZIONE_CHOICES = [
+        ('corretto', 'Corretto prima della consegna'),
+        ('segnalato', 'Solo segnalato (non corretto)'),
     ]
     ordine = models.ForeignKey(
         'ordini.Ordine', on_delete=models.CASCADE, related_name='segnalazioni_difetti',
@@ -229,11 +238,20 @@ class SegnalazioneDifetto(models.Model):
     zona = models.CharField(max_length=80, verbose_name='Zona auto')
     tipo_difetto = models.CharField(max_length=80, verbose_name='Tipo difetto')
     gravita = models.CharField(max_length=10, choices=GRAVITA_CHOICES, default='media')
+    azione = models.CharField(max_length=20, choices=AZIONE_CHOICES, default='corretto',
+        verbose_name='Azione intrapresa')
+    # Postazione che ha PRODOTTO il difetto (responsabile)
+    postazione_produttore = models.CharField(max_length=40, blank=True,
+        verbose_name='Postazione produttore',
+        help_text='Codice della postazione responsabile del difetto')
+    # Postazione dell'operatore che ha RILEVATO il difetto (controllore catena)
     postazione_cq = models.ForeignKey(
         'cq.PostazioneCQ', on_delete=models.PROTECT,
+        verbose_name='Rilevato da (postazione)',
     )
     operatore = models.ForeignKey(
         User, on_delete=models.PROTECT, related_name='segnalazioni_difetti',
+        verbose_name='Rilevato da (operatore)',
     )
     note = models.TextField(blank=True)
     data_ora = models.DateTimeField(auto_now_add=True)

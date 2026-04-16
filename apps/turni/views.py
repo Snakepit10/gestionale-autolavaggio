@@ -287,12 +287,24 @@ def dashboard_operatore(request):
         if servizi:
             categorie_servizi.append({'nome': cat.nome, 'servizi': servizi})
 
-    # Zone e difetti mappati alle postazioni dell'operatore (per segnalazione difetti)
+    # Zone dove l'operatore e nella CATENA di controllo (non produttore).
+    # L'operatore controlla in ingresso: se rileva un difetto lo segnala
+    # e il difetto viene attribuito al produttore nella scheda CQ.
     from apps.cq.models import ZonaConfig, ZonaDifettoMapping
-    operatore_post_codici = [pt.postazione_cq.codice for pt in post_turno]
-    zone_operatore = ZonaConfig.objects.filter(
-        attiva=True, postazione_produttore__in=operatore_post_codici
-    ).prefetch_related('difetti_config__tipo_difetto').select_related('categoria')
+    operatore_post_codici = set(pt.postazione_cq.codice for pt in post_turno)
+    # Aggiungi anche i codici dei blocchi
+    for pt in post_turno:
+        if pt.blocco:
+            operatore_post_codici.add(pt.blocco.codice)
+
+    # Filtra zone dove l'operatore e in catena (postazioni_catena e un JSONField lista)
+    zone_operatore = []
+    for zona in ZonaConfig.objects.filter(
+        attiva=True
+    ).prefetch_related('difetti_config__tipo_difetto').select_related('categoria'):
+        catena = zona.postazioni_catena or []
+        if any(cod in operatore_post_codici for cod in catena):
+            zone_operatore.append(zona)
 
     zone_difetti = []
     for zona in zone_operatore:
@@ -305,6 +317,7 @@ def dashboard_operatore(request):
             zone_difetti.append({
                 'codice': zona.codice,
                 'nome': zona.nome,
+                'produttore': zona.postazione_produttore,
                 'categoria': zona.categoria.nome if zona.categoria else '',
                 'tipi': tipi,
             })
@@ -408,7 +421,8 @@ def api_ordine_dettaglio(request, ordine_id):
     # Segnalazioni difetti gia fatte per questo ordine
     segnalazioni = list(SegnalazioneDifetto.objects.filter(
         ordine=ordine
-    ).values('zona', 'tipo_difetto', 'gravita', 'note', 'operatore__first_name', 'operatore__username'))
+    ).values('zona', 'tipo_difetto', 'gravita', 'azione', 'postazione_produttore',
+             'note', 'operatore__first_name', 'operatore__username'))
 
     return _json_ok({
         'ordine': {
@@ -702,12 +716,13 @@ def api_segnala_difetto(request, ordine_id):
         return _json_err('JSON non valido')
 
     ordine = get_object_or_404(Ordine, pk=ordine_id)
-    zona = data.get('zona', '')
+    zona_codice = data.get('zona', '')
     tipo_difetto = data.get('tipo_difetto', '')
     gravita = data.get('gravita', 'media')
+    azione = data.get('azione', 'corretto')
     note = data.get('note', '')
 
-    if not zona or not tipo_difetto:
+    if not zona_codice or not tipo_difetto:
         return _json_err('Zona e tipo difetto obbligatori.')
 
     sessione = _get_sessione_attiva(request.user)
@@ -720,11 +735,18 @@ def api_segnala_difetto(request, ordine_id):
     if not postazione_cq:
         return _json_err('Nessuna postazione assegnata.')
 
+    # Trova il produttore dalla configurazione zona
+    from apps.cq.models import ZonaConfig
+    zona_obj = ZonaConfig.objects.filter(codice=zona_codice).first()
+    postazione_produttore = zona_obj.postazione_produttore if zona_obj else ''
+
     segnalazione = SegnalazioneDifetto.objects.create(
         ordine=ordine,
-        zona=zona,
+        zona=zona_codice,
         tipo_difetto=tipo_difetto,
         gravita=gravita,
+        azione=azione,
+        postazione_produttore=postazione_produttore,
         postazione_cq=postazione_cq,
         operatore=request.user,
         note=note,
@@ -733,6 +755,8 @@ def api_segnala_difetto(request, ordine_id):
         'id': segnalazione.pk,
         'zona': segnalazione.zona_nome,
         'tipo_difetto': segnalazione.tipo_difetto_nome,
+        'produttore': postazione_produttore,
+        'azione': segnalazione.get_azione_display(),
     })
 
 

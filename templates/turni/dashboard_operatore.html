@@ -191,9 +191,15 @@ function renderAreaOperativa(ordine, lavorazione, lavorazioniAttive, fasiComplet
 
     let segnHtml = '';
     if (segnalazioni && segnalazioni.length > 0) {
-      segnHtml = '<div class="mt-2">';
+      segnHtml = '<div class="mt-2 small"><strong>Difetti segnalati:</strong></div><div class="mt-1">';
       for (const s of segnalazioni) {
-        segnHtml += `<span class="badge bg-danger me-1 mb-1"><i class="bi bi-exclamation-triangle"></i> ${s.zona} — ${s.tipo_difetto} (${s.gravita})</span>`;
+        const azioneIcon = s.azione === 'corretto' ? 'bi-check-circle text-success' : 'bi-flag text-warning';
+        segnHtml += `<div class="d-flex align-items-center gap-1 mb-1">
+          <span class="badge bg-danger">${s.zona} — ${s.tipo_difetto}</span>
+          <span class="badge bg-secondary">${s.gravita}</span>
+          <i class="bi ${azioneIcon}" title="${s.azione || ''}"></i>
+          <small class="text-muted">prod: ${s.postazione_produttore || '?'}</small>
+        </div>`;
       }
       segnHtml += '</div>';
     }
@@ -223,8 +229,14 @@ function renderAreaOperativa(ordine, lavorazione, lavorazioniAttive, fasiComplet
             </select>
           </div>
           <div class="col-md-3">
+            <select class="form-select form-select-sm" id="difAzione">
+              <option value="corretto">Corretto</option>
+              <option value="segnalato">Solo segnalato</option>
+            </select>
+          </div>
+          <div class="col-md-3 mt-1">
             <button class="btn btn-danger btn-sm w-100" onclick="segnalaDifetto()">
-              <i class="bi bi-exclamation-triangle"></i> Segnala
+              <i class="bi bi-exclamation-triangle"></i> Segnala difetto
             </button>
           </div>
         </div>
@@ -308,9 +320,10 @@ async function segnalaDifetto() {
   const zona = document.getElementById('difZona').value;
   const tipo = document.getElementById('difTipo').value;
   const gravita = document.getElementById('difGravita').value;
+  const azione = document.getElementById('difAzione').value;
   if (!zona || !tipo) { alert('Seleziona zona e tipo difetto.'); return; }
   const data = await apiPost(`/turni/api/ordine/${currentOrdineId}/segnala-difetto/`, {
-    zona, tipo_difetto: tipo, gravita
+    zona, tipo_difetto: tipo, gravita, azione
   });
   if (data.ok) { selezionaOrdine(currentOrdineId); }
   else alert(data.error);
