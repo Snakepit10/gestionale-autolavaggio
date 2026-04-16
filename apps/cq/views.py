@@ -120,6 +120,27 @@ class SchedaCQCreateView(ResponsabileOTitolareMixin, View):
         difetti_formset = DifettiFormSet(prefix='difetti', queryset=DifettoCQ.objects.none())
         turno_forms = _build_operatori_turno_forms(ordine=ordine)
 
+        # Pre-carica segnalazioni difetti degli operatori come difetti esistenti
+        from apps.turni.models import SegnalazioneDifetto
+        segnalazioni = ordine.segnalazioni_difetti.all()
+        existing_difetti = []
+        for s in segnalazioni:
+            # Mappa azione: corretto → sistemato, segnalato → cliente_informato
+            azione_map = {'corretto': 'sistemato', 'segnalato': 'cliente_informato'}
+            existing_difetti.append({
+                'zona': s.zona,
+                'tipo_difetto': s.tipo_difetto,
+                'gravita': s.gravita,
+                'postazione_responsabile': s.postazione_produttore,
+                'azione_correttiva': azione_map.get(s.azione, 'sistemato'),
+                'note': s.note,
+                'descrizione_altro': '',
+            })
+
+        ctx = _choices_context()
+        if existing_difetti:
+            ctx['existing_difetti_json'] = json.dumps(existing_difetti)
+
         return render(request, self.template_name, {
             'ordine': ordine,
             'ordine_items': ordine.items.select_related('servizio_prodotto').all(),
@@ -128,7 +149,7 @@ class SchedaCQCreateView(ResponsabileOTitolareMixin, View):
             'turno_forms': turno_forms,
             'mode': 'crea',
             'configurazioni_assegnazione': ConfigurazioneAssegnazione.objects.filter(attiva=True),
-            **_choices_context(),
+            **ctx,
         })
 
     @transaction.atomic
