@@ -26,7 +26,7 @@ from apps.cq.models import (
     TipoDifettoConfig, ZonaDifettoMapping,
     PostazioneCQ, BloccoPostazione, ConfigurazioneAssegnazione,
     AssegnazionePreset, get_postazione_choices, get_postazioni_ordinate,
-    get_postazione_nome,
+    get_postazione_nome, get_postazione_blocco_choices,
 )
 from apps.cq.permissions import (
     ResponsabileOTitolareMixin, TitolareRequiredMixin,
@@ -639,6 +639,7 @@ class ConfigurazioneCQView(TitolareRequiredMixin, TemplateView):
         ctx['zone_config'] = ZonaConfig.objects.select_related('categoria').all()
         ctx['tipi_difetto'] = TipoDifettoConfig.objects.select_related('categoria').all()
         ctx['post_choices'] = get_postazione_choices()
+        ctx['post_blocco_choices'] = get_postazione_blocco_choices()
         # Matrice mappings per la tab Mappings
         zone_qs = ZonaConfig.objects.prefetch_related('difetti_config__tipo_difetto').select_related('categoria').all()
         tipi_qs = TipoDifettoConfig.objects.select_related('categoria').filter(attivo=True)

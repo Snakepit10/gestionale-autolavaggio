@@ -454,13 +454,13 @@
             <label class="form-label small">Postazione produttore</label>
             <select class="form-select" id="zProduttore">
               <option value="">— nessuna —</option>
-              {% for v, l in post_choices %}<option value="{{ v }}">{{ l }}</option>{% endfor %}
+              {% for v, l in post_blocco_choices %}<option value="{{ v }}">{{ l }}</option>{% endfor %}
             </select>
           </div>
           <div class="col-md-6">
             <label class="form-label small">Postazioni catena</label>
             <select class="form-select" id="zCatena" multiple>
-              {% for v, l in post_choices %}<option value="{{ v }}">{{ l }}</option>{% endfor %}
+              {% for v, l in post_blocco_choices %}<option value="{{ v }}">{{ l }}</option>{% endfor %}
             </select>
             <div class="form-text">Tieni premuto Ctrl per selezione multipla</div>
           </div>

@@ -345,6 +345,21 @@ def get_postazione_choices():
     return list(Postazione.choices)
 
 
+def get_postazione_blocco_choices():
+    """Restituisce postazioni CQ + blocchi per i dropdown zone (produttore/catena)."""
+    try:
+        choices = []
+        for p in PostazioneCQ.objects.filter(attiva=True).prefetch_related('blocchi').order_by('ordine'):
+            choices.append((p.codice, p.nome))
+            for b in p.blocchi.order_by('ordine'):
+                choices.append((b.codice, f"  ↳ {p.sigla or p.codice} — {b.nome}"))
+        if choices:
+            return choices
+    except Exception:
+        pass
+    return list(Postazione.choices)
+
+
 def get_postazioni_ordinate():
     """Restituisce i codici delle postazioni CQ ordinati."""
     try:
