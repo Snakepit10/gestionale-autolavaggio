@@ -1,18 +1,20 @@
 {% extends "base.html" %}
 {% load cq_tags %}
 
-{% block title %}Storico Checklist{% endblock %}
+{% block title %}Dashboard Checklist 5S{% endblock %}
 
 {% block extra_css %}
 <style>
 .problema-card { background: #fff5f5; border-left: 4px solid #dc3545; }
+.kpi-card .kpi-value { font-size: 2rem; font-weight: 700; }
+.top-voce-bar { height: 8px; border-radius: 4px; background: #dc3545; }
 .verifica-badge { font-size: .7rem; }
 </style>
 {% endblock %}
 
 {% block content %}
 <div class="d-flex justify-content-between align-items-center mb-3">
-  <h5 class="mb-0"><i class="bi bi-clipboard-data"></i> Storico Checklist</h5>
+  <h5 class="mb-0"><i class="bi bi-speedometer2"></i> Dashboard Checklist 5S</h5>
   <div class="btn-group btn-group-sm">
     <a href="?periodo=settimana{% if filtro_operatore %}&operatore={{ filtro_operatore }}{% endif %}{% if filtro_postazione %}&postazione={{ filtro_postazione }}{% endif %}"
        class="btn btn-outline-primary {% if periodo == 'settimana' %}active{% endif %}">Settimana</a>
@@ -43,7 +45,7 @@
         <label class="form-label small mb-0">Postazione</label>
         <select name="postazione" class="form-select form-select-sm">
           <option value="">Tutte</option>
-          {% for p in postazioni %}
+          {% for p in postazioni_filtro %}
             <option value="{{ p.pk }}" {% if filtro_postazione == p.pk|stringformat:"d" %}selected{% endif %}>
               {{ p.nome }}
             </option>
@@ -51,19 +53,118 @@
         </select>
       </div>
       <div class="col-md-4">
-        <button type="submit" class="btn btn-primary btn-sm w-100">
-          <i class="bi bi-funnel"></i> Filtra
-        </button>
+        <button type="submit" class="btn btn-primary btn-sm w-100"><i class="bi bi-funnel"></i> Filtra</button>
       </div>
     </form>
   </div>
 </div>
 
-{# ===== RIQUADRO PROBLEMI ===== #}
+{# ===== KPI CARDS ===== #}
+<div class="row g-3 mb-4">
+  <div class="col-md-3">
+    <div class="card text-center kpi-card">
+      <div class="card-body py-3">
+        <div class="kpi-value text-{% if perc_ok >= 90 %}success{% elif perc_ok >= 70 %}warning{% else %}danger{% endif %}">{{ perc_ok }}%</div>
+        <div class="text-muted small">Tasso OK</div>
+      </div>
+    </div>
+  </div>
+  <div class="col-md-3">
+    <div class="card text-center kpi-card">
+      <div class="card-body py-3">
+        <div class="kpi-value text-danger">{{ n_problemi }}</div>
+        <div class="text-muted small">Problemi rilevati</div>
+      </div>
+    </div>
+  </div>
+  <div class="col-md-3">
+    <div class="card text-center kpi-card">
+      <div class="card-body py-3">
+        <div class="kpi-value text-primary">{{ totale_compilazioni }}</div>
+        <div class="text-muted small">Voci compilate</div>
+      </div>
+    </div>
+  </div>
+  <div class="col-md-3">
+    <div class="card text-center kpi-card">
+      <div class="card-body py-3">
+        <div class="kpi-value text-info">{{ n_verifiche }}</div>
+        <div class="text-muted small">Verifiche effettuate</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="row g-3 mb-4">
+  {# ===== TOP 10 VOCI PROBLEMATICHE ===== #}
+  <div class="col-md-6">
+    <div class="card h-100">
+      <div class="card-header py-2"><i class="bi bi-exclamation-triangle text-danger"></i> Top voci problematiche</div>
+      <div class="card-body py-2">
+        {% for nome, count in top_voci_list %}
+        <div class="d-flex justify-content-between align-items-center mb-2">
+          <span class="small">{{ nome }}</span>
+          <div class="d-flex align-items-center gap-2" style="min-width:120px">
+            <div class="flex-grow-1">
+              <div class="top-voce-bar" style="width:{% widthratio count top_voci_list.0.1 100 %}%"></div>
+            </div>
+            <span class="badge bg-danger">{{ count }}</span>
+          </div>
+        </div>
+        {% empty %}
+        <p class="text-muted text-center small py-3">Nessun problema</p>
+        {% endfor %}
+      </div>
+    </div>
+  </div>
+
+  {# ===== GRAFICI ===== #}
+  <div class="col-md-6">
+    <div class="row g-3">
+      <div class="col-12">
+        <div class="card">
+          <div class="card-header py-2"><i class="bi bi-building"></i> Problemi per postazione</div>
+          <div class="card-body py-2"><canvas id="chartPostazione" height="120"></canvas></div>
+        </div>
+      </div>
+      <div class="col-6">
+        <div class="card">
+          <div class="card-header py-2"><i class="bi bi-pie-chart"></i> Per categoria 5S</div>
+          <div class="card-body py-2"><canvas id="chartCategoria" height="150"></canvas></div>
+        </div>
+      </div>
+      <div class="col-6">
+        <div class="card">
+          <div class="card-header py-2"><i class="bi bi-arrow-left-right"></i> Inizio vs Fine turno</div>
+          <div class="card-body py-2"><canvas id="chartFase" height="150"></canvas></div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+{# ===== PROBLEMI PER OPERATORE ===== #}
+{% if per_operatore_list %}
+<div class="card mb-4">
+  <div class="card-header py-2"><i class="bi bi-people"></i> Problemi per operatore</div>
+  <div class="card-body p-0">
+    <table class="table table-sm table-hover mb-0">
+      <thead class="table-light"><tr><th>Operatore</th><th class="text-center">Problemi</th></tr></thead>
+      <tbody>
+        {% for nome, count in per_operatore_list %}
+        <tr><td>{{ nome }}</td><td class="text-center"><span class="badge bg-danger">{{ count }}</span></td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+{% endif %}
+
+{# ===== DETTAGLIO PROBLEMI ===== #}
 {% if problemi %}
 <div class="card problema-card mb-4">
   <div class="card-header bg-danger text-white py-2">
-    <i class="bi bi-exclamation-triangle"></i> Problemi rilevati
+    <i class="bi bi-exclamation-triangle"></i> Dettaglio problemi
     <span class="badge bg-light text-danger ms-2">{{ problemi|length }}</span>
   </div>
   <div class="card-body p-0">
@@ -75,7 +176,7 @@
         {% for c in problemi %}
         <tr>
           <td class="small">{{ c.compilato_il|date:"d/m H:i" }}</td>
-          <td><span class="badge bg-{{ c.fase|default:'secondary' }}">{{ c.get_fase_display }}</span></td>
+          <td><span class="badge {% if c.fase == 'inizio' %}bg-info{% else %}bg-secondary{% endif %}" style="font-size:.6rem">{{ c.get_fase_display }}</span></td>
           <td class="small">{{ c.sessione.operatore.get_full_name|default:c.sessione.operatore.username }}</td>
           <td class="small">{{ c.checklist_item.postazione_cq.sigla|default:c.checklist_item.postazione_cq.nome }}</td>
           <td class="small">
@@ -96,11 +197,13 @@
           <td>
             {% with v=c.verifiche.first %}
               {% if v %}
-                <span class="badge verifica-badge {% if v.esito_verifica == 'confermato' %}bg-success{% else %}bg-danger{% endif %}">
-                  {{ v.get_esito_verifica_display }}
+                <span class="badge verifica-badge {% if v.esito_verifica == 'confermato' %}bg-success{% else %}bg-danger{% endif %}"
+                      title="{{ v.note }}">
+                  <i class="bi {% if v.esito_verifica == 'confermato' %}bi-check-lg{% else %}bi-x-lg{% endif %}"></i>
+                  {{ v.verificato_da.get_full_name|default:v.verificato_da.username }}
                 </span>
               {% else %}
-                <button class="btn btn-outline-primary btn-sm py-0" style="font-size:.7rem"
+                <button class="btn btn-outline-primary btn-sm py-0" style="font-size:.65rem"
                         onclick="apriVerifica({{ c.pk }}, '{{ c.checklist_item.nome|escapejs }}')">
                   <i class="bi bi-check2-square"></i> Verifica
                 </button>
@@ -114,68 +217,10 @@
   </div>
 </div>
 {% else %}
-<div class="alert alert-success mb-4">
+<div class="alert alert-success">
   <i class="bi bi-check-circle"></i> Nessun problema rilevato nel periodo selezionato.
 </div>
 {% endif %}
-
-{# ===== STORICO COMPLETO ===== #}
-<div class="card">
-  <div class="card-header py-2">
-    <i class="bi bi-clock-history"></i> Storico completo
-    <span class="badge bg-secondary ms-1">{{ compilazioni|length }}</span>
-  </div>
-  <div class="card-body p-0">
-    <table class="table table-sm table-hover mb-0">
-      <thead class="table-light">
-        <tr><th>Data</th><th>Fase</th><th>Operatore</th><th>Postazione</th><th>Categoria</th><th>Voce</th><th>Esito</th><th>Note</th><th>Verifica</th></tr>
-      </thead>
-      <tbody>
-        {% for c in compilazioni %}
-        <tr {% if c.is_problema %}class="table-warning"{% endif %}>
-          <td class="small">{{ c.compilato_il|date:"d/m H:i" }}</td>
-          <td><span class="badge {% if c.fase == 'inizio' %}bg-info{% else %}bg-secondary{% endif %}" style="font-size:.65rem">{{ c.get_fase_display }}</span></td>
-          <td class="small">{{ c.sessione.operatore.get_full_name|default:c.sessione.operatore.username }}</td>
-          <td class="small">{{ c.checklist_item.postazione_cq.sigla|default:c.checklist_item.postazione_cq.nome }}</td>
-          <td class="small">
-            {% if c.checklist_item.categoria %}
-              {% if c.checklist_item.categoria.icona %}<i class="bi {{ c.checklist_item.categoria.icona }}"></i>{% endif %}
-              {{ c.checklist_item.categoria.nome }}
-            {% endif %}
-          </td>
-          <td>{{ c.checklist_item.nome }}</td>
-          <td>
-            {% if c.esito_obj %}
-              <span class="badge bg-{{ c.esito_obj.colore }}">{{ c.esito_obj.nome }}</span>
-            {% else %}
-              <span class="badge bg-{% if c.esito == 'ok' %}success{% elif c.esito == 'na' %}secondary{% else %}danger{% endif %}">{{ c.get_esito_display }}</span>
-            {% endif %}
-          </td>
-          <td class="small text-muted">{{ c.note|default:"" }}</td>
-          <td>
-            {% with v=c.verifiche.first %}
-              {% if v %}
-                <span class="badge verifica-badge {% if v.esito_verifica == 'confermato' %}bg-success{% else %}bg-danger{% endif %}"
-                      title="{{ v.note }}">
-                  <i class="bi {% if v.esito_verifica == 'confermato' %}bi-check-lg{% else %}bi-x-lg{% endif %}"></i>
-                  {{ v.verificato_da.get_full_name|default:v.verificato_da.username }}
-                </span>
-              {% else %}
-                <button class="btn btn-outline-primary btn-sm py-0" style="font-size:.65rem"
-                        onclick="apriVerifica({{ c.pk }}, '{{ c.checklist_item.nome|escapejs }}')">
-                  <i class="bi bi-check2-square"></i>
-                </button>
-              {% endif %}
-            {% endwith %}
-          </td>
-        </tr>
-        {% empty %}
-        <tr><td colspan="9" class="text-muted text-center py-3">Nessuna compilazione nel periodo</td></tr>
-        {% endfor %}
-      </tbody>
-    </table>
-  </div>
-</div>
 
 {# Modal Verifica #}
 <div class="modal fade" id="modalVerifica" tabindex="-1">
@@ -227,20 +272,49 @@ async function salvaVerifica() {
   const id = document.getElementById('verificaId').value;
   const esito = document.querySelector('input[name="verificaEsito"]:checked').value;
   const note = document.getElementById('verificaNote').value;
-
   const fd = new FormData();
   fd.append('csrfmiddlewaretoken', CSRF);
   fd.append('esito_verifica', esito);
   fd.append('note', note);
-
   const res = await fetch(`/turni/api/verifica/${id}/`, { method: 'POST', body: fd });
   const data = await res.json();
-  if (data.ok) {
-    bootstrap.Modal.getInstance(document.getElementById('modalVerifica'))?.hide();
-    location.reload();
-  } else {
-    alert(data.error);
-  }
+  if (data.ok) { bootstrap.Modal.getInstance(document.getElementById('modalVerifica'))?.hide(); location.reload(); }
+  else alert(data.error);
 }
+
+// Grafici
+const perPostazione = {{ per_postazione_json|safe }};
+const perCategoria = {{ per_categoria_json|safe }};
+
+if (perPostazione.length > 0) {
+  new Chart(document.getElementById('chartPostazione'), {
+    type: 'bar',
+    data: {
+      labels: perPostazione.map(p => p[0]),
+      datasets: [{ data: perPostazione.map(p => p[1]), backgroundColor: 'rgba(220,53,69,0.7)', borderWidth: 0 }]
+    },
+    options: { responsive: true, plugins: { legend: { display: false } }, scales: { y: { beginAtZero: true, ticks: { stepSize: 1 } } } }
+  });
+}
+
+if (perCategoria.length > 0) {
+  new Chart(document.getElementById('chartCategoria'), {
+    type: 'doughnut',
+    data: {
+      labels: perCategoria.map(c => c[0]),
+      datasets: [{ data: perCategoria.map(c => c[1]), backgroundColor: ['#dc3545','#ffc107','#0dcaf0','#6c757d','#0d6efd'] }]
+    },
+    options: { responsive: true, plugins: { legend: { position: 'bottom', labels: { font: { size: 10 } } } } }
+  });
+}
+
+new Chart(document.getElementById('chartFase'), {
+  type: 'doughnut',
+  data: {
+    labels: ['Inizio turno', 'Fine turno'],
+    datasets: [{ data: [{{ inizio_count }}, {{ fine_count }}], backgroundColor: ['#0dcaf0','#6c757d'] }]
+  },
+  options: { responsive: true, plugins: { legend: { position: 'bottom', labels: { font: { size: 10 } } } } }
+});
 </script>
 {% endblock %}

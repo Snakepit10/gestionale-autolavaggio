@@ -823,9 +823,15 @@ def storico_checklist(request):
     else:
         data_inizio = oggi.replace(day=1)
 
-    # Query base
+    # Query base — SOLO problemi (esito != ok e != na)
     qs = ChecklistCompilata.objects.filter(
         compilato_il__date__gte=data_inizio,
+    ).exclude(
+        esito_obj__codice__in=['ok', 'na']
+    ).exclude(
+        esito_obj__isnull=True, esito='ok'
+    ).exclude(
+        esito_obj__isnull=True, esito='na'
     ).select_related(
         'sessione__operatore',
         'checklist_item__postazione_cq',
@@ -838,26 +844,76 @@ def storico_checklist(request):
     if postazione_id:
         qs = qs.filter(checklist_item__postazione_cq_id=postazione_id)
 
-    compilazioni = list(qs[:200])
+    problemi = list(qs[:300])
 
-    # Problemi: tutto cio che NON e OK e NON e N/A
-    problemi = [c for c in compilazioni if c.is_problema]
+    # KPI
+    totale_compilazioni = ChecklistCompilata.objects.filter(
+        compilato_il__date__gte=data_inizio
+    ).count()
+    n_problemi = len(problemi)
+    n_verifiche = VerificaChecklist.objects.filter(data_verifica__date__gte=data_inizio).count()
+    perc_ok = round((1 - n_problemi / totale_compilazioni) * 100, 1) if totale_compilazioni > 0 else 100
+
+    # Top 10 voci problematiche
+    top_voci = {}
+    for p in problemi:
+        nome = p.checklist_item.nome
+        top_voci[nome] = top_voci.get(nome, 0) + 1
+    top_voci_list = sorted(top_voci.items(), key=lambda x: -x[1])[:10]
+
+    # Problemi per postazione
+    per_postazione = {}
+    for p in problemi:
+        nome = p.checklist_item.postazione_cq.sigla or p.checklist_item.postazione_cq.nome
+        per_postazione[nome] = per_postazione.get(nome, 0) + 1
+    per_postazione_list = sorted(per_postazione.items(), key=lambda x: -x[1])
+
+    # Problemi per categoria 5S
+    per_categoria = {}
+    for p in problemi:
+        cat = p.checklist_item.categoria
+        nome = cat.nome if cat else 'Altro'
+        per_categoria[nome] = per_categoria.get(nome, 0) + 1
+    per_categoria_list = sorted(per_categoria.items(), key=lambda x: -x[1])
+
+    # Problemi per operatore
+    per_operatore = {}
+    for p in problemi:
+        op = p.sessione.operatore
+        nome = op.get_full_name() or op.username
+        per_operatore[nome] = per_operatore.get(nome, 0) + 1
+    per_operatore_list = sorted(per_operatore.items(), key=lambda x: -x[1])
+
+    # Confronto inizio vs fine turno
+    inizio_count = sum(1 for p in problemi if p.fase == 'inizio')
+    fine_count = sum(1 for p in problemi if p.fase == 'fine')
 
     # Operatori e postazioni per i filtri
     from django.contrib.auth.models import User
     operatori = User.objects.filter(
         groups__name__in=['operatore', 'responsabile', 'titolare']
     ).distinct().order_by('first_name', 'last_name')
-    postazioni = PostazioneCQ.objects.filter(attiva=True).order_by('ordine')
+    postazioni_filtro = PostazioneCQ.objects.filter(attiva=True).order_by('ordine')
 
     return render(request, 'turni/storico_checklist.html', {
-        'compilazioni': compilazioni,
         'problemi': problemi,
         'periodo': periodo,
         'operatori': operatori,
-        'postazioni': postazioni,
+        'postazioni_filtro': postazioni_filtro,
         'filtro_operatore': operatore_id,
         'filtro_postazione': postazione_id,
+        # KPI
+        'totale_compilazioni': totale_compilazioni,
+        'n_problemi': n_problemi,
+        'n_verifiche': n_verifiche,
+        'perc_ok': perc_ok,
+        # Analytics
+        'top_voci_list': top_voci_list,
+        'per_postazione_json': json.dumps(per_postazione_list),
+        'per_categoria_json': json.dumps(per_categoria_list),
+        'per_operatore_list': per_operatore_list,
+        'inizio_count': inizio_count,
+        'fine_count': fine_count,
     })
 
 
