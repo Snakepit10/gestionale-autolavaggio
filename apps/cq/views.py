@@ -147,6 +147,9 @@ class SchedaCQCreateView(ResponsabileOTitolareMixin, View):
             'scheda_form': scheda_form,
             'difetti_formset': difetti_formset,
             'turno_forms': turno_forms,
+            'segnalazioni_operatori': segnalazioni.select_related(
+                'operatore', 'postazione_cq'
+            ),
             'mode': 'crea',
             'configurazioni_assegnazione': ConfigurazioneAssegnazione.objects.filter(attiva=True),
             **ctx,
@@ -219,6 +222,11 @@ class SchedaCQDetailView(QualsivogliaOperatoreMixin, DetailView):
         ctx['punteggi'] = scheda.punteggi.select_related('operatore', 'difetto').all()
         ctx['operatori_turno'] = scheda.ordine.operatori_turno.select_related('operatore').all()
         ctx['is_titolare'] = utente_nel_gruppo(self.request.user, 'titolare')
+        # Storico segnalazioni operatori
+        from apps.turni.models import SegnalazioneDifetto
+        ctx['segnalazioni_operatori'] = SegnalazioneDifetto.objects.filter(
+            ordine=scheda.ordine
+        ).select_related('operatore', 'postazione_cq')
         return ctx
 
 

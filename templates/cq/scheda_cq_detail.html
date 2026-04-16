@@ -204,4 +204,64 @@
     </div>
   </div>
 {% endif %}
+
+{# ===== Storico Segnalazioni Operatori ===== #}
+{% if segnalazioni_operatori %}
+  <div class="card mt-3">
+    <div class="card-header bg-warning bg-opacity-25 py-2">
+      <i class="bi bi-person-check"></i> <strong>Segnalazioni Operatori</strong>
+      <span class="badge bg-warning text-dark ms-1">{{ segnalazioni_operatori|length }}</span>
+      <small class="text-muted ms-2">Difetti rilevati dagli operatori durante la lavorazione</small>
+    </div>
+    <div class="card-body p-0">
+      <table class="table table-sm align-middle mb-0">
+        <thead class="table-light">
+          <tr>
+            <th>Data/Ora</th>
+            <th>Rilevato da</th>
+            <th>Postazione</th>
+            <th>Zona</th>
+            <th>Difetto</th>
+            <th>Gravita</th>
+            <th>Azione</th>
+            <th>Produttore</th>
+            <th>Note</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for s in segnalazioni_operatori %}
+            <tr>
+              <td class="small">{{ s.data_ora|date:"d/m/Y H:i" }}</td>
+              <td>
+                <i class="bi bi-person"></i>
+                {{ s.operatore.get_full_name|default:s.operatore.username }}
+              </td>
+              <td>
+                <span class="badge bg-info">{{ s.postazione_cq.sigla|default:s.postazione_cq.nome }}</span>
+              </td>
+              <td>{{ s.zona_nome }}</td>
+              <td><strong>{{ s.tipo_difetto_nome }}</strong></td>
+              <td>
+                <span class="badge {% if s.gravita == 'alta' %}bg-danger{% elif s.gravita == 'media' %}bg-warning text-dark{% else %}bg-secondary{% endif %}">
+                  {{ s.get_gravita_display }}
+                </span>
+              </td>
+              <td>
+                {% if s.azione == 'corretto' %}
+                  <span class="badge bg-success"><i class="bi bi-check-circle"></i> Corretto</span>
+                {% else %}
+                  <span class="badge bg-warning text-dark"><i class="bi bi-flag"></i> Segnalato</span>
+                {% endif %}
+              </td>
+              <td>
+                <span class="badge bg-danger bg-opacity-75">{{ s.postazione_produttore }}</span>
+              </td>
+              <td class="small text-muted">{{ s.note|default:"" }}</td>
+            </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+{% endif %}
 {% endblock %}

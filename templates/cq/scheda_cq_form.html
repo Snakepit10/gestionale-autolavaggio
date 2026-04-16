@@ -181,6 +181,38 @@
     {% endif %}
   </div>
 
+  {# ---- Segnalazioni operatori (storico) ---- #}
+  {% if segnalazioni_operatori %}
+  <div class="card mb-3">
+    <div class="card-header bg-warning bg-opacity-25 py-2">
+      <i class="bi bi-person-check"></i> <strong>Segnalazioni Operatori</strong>
+      <span class="badge bg-warning text-dark ms-1">{{ segnalazioni_operatori|length }}</span>
+      <small class="text-muted ms-2">Difetti gia rilevati durante la lavorazione — pre-caricati nel form</small>
+    </div>
+    <div class="card-body p-0">
+      <table class="table table-sm mb-0 small">
+        <thead class="table-light">
+          <tr><th>Ora</th><th>Operatore</th><th>Postazione</th><th>Zona</th><th>Difetto</th><th>Gravita</th><th>Azione</th><th>Produttore</th></tr>
+        </thead>
+        <tbody>
+          {% for s in segnalazioni_operatori %}
+          <tr>
+            <td>{{ s.data_ora|date:"H:i" }}</td>
+            <td><i class="bi bi-person"></i> {{ s.operatore.get_full_name|default:s.operatore.username }}</td>
+            <td><span class="badge bg-info" style="font-size:.65rem">{{ s.postazione_cq.sigla|default:s.postazione_cq.nome }}</span></td>
+            <td>{{ s.zona_nome }}</td>
+            <td><strong>{{ s.tipo_difetto_nome }}</strong></td>
+            <td><span class="badge {% if s.gravita == 'alta' %}bg-danger{% elif s.gravita == 'media' %}bg-warning text-dark{% else %}bg-secondary{% endif %}" style="font-size:.6rem">{{ s.get_gravita_display }}</span></td>
+            <td>{% if s.azione == 'corretto' %}<i class="bi bi-check-circle text-success"></i>{% else %}<i class="bi bi-flag text-warning"></i>{% endif %}</td>
+            <td><span class="badge bg-danger bg-opacity-75" style="font-size:.6rem">{{ s.postazione_produttore }}</span></td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+  {% endif %}
+
   {# ---- Operatori in turno ---- #}
   <div class="card">
     <div class="card-header bg-primary text-white fw-semibold py-2 d-flex justify-content-between align-items-center">
