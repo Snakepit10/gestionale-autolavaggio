@@ -91,7 +91,7 @@
                 Ordine #{{ ordine.numero_progressivo }} -
                 {{ ordine.cliente|default:"Anonimo" }} -
                 €{{ ordine.saldo_dovuto }} da incassare
-                <a href="{% url 'ordini:dettaglio' ordine.id %}" class="btn btn-sm btn-outline-danger">Vedi</a>
+                <a href="{% url 'ordini:ordine-detail' ordine.id %}" class="btn btn-sm btn-outline-danger">Vedi</a>
             </li>
             {% endfor %}
         </ul>
