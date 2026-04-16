@@ -19,7 +19,7 @@ from apps.ordini.models import Ordine, ItemOrdine
 from apps.turni.models import (
     SessioneTurno, PostazioneTurno, ChecklistItem,
     ChecklistCompilata, LavorazioneOperatore,
-    CategoriaChecklist, EsitoChecklist,
+    CategoriaChecklist, EsitoChecklist, VerificaChecklist,
 )
 
 
@@ -799,6 +799,92 @@ def api_elimina_esito(request, pk):
         return _json_err('Impossibile eliminare: ci sono compilazioni che usano questo esito.')
     obj.delete()
     return _json_ok()
+
+
+# ---------------------------------------------------------------------------
+# Storico Checklist (responsabile/titolare)
+# ---------------------------------------------------------------------------
+
+@login_required
+def storico_checklist(request):
+    if not utente_nel_gruppo(request.user, 'responsabile', 'titolare'):
+        messages.error(request, 'Accesso riservato.')
+        return redirect('core:home')
+
+    oggi = date.today()
+    periodo = request.GET.get('periodo', 'mese')
+    operatore_id = request.GET.get('operatore')
+    postazione_id = request.GET.get('postazione')
+
+    if periodo == 'settimana':
+        data_inizio = oggi - timedelta(days=7)
+    elif periodo == 'trimestre':
+        data_inizio = oggi - timedelta(days=90)
+    else:
+        data_inizio = oggi.replace(day=1)
+
+    # Query base
+    qs = ChecklistCompilata.objects.filter(
+        compilato_il__date__gte=data_inizio,
+    ).select_related(
+        'sessione__operatore',
+        'checklist_item__postazione_cq',
+        'checklist_item__categoria',
+        'esito_obj',
+    ).prefetch_related('verifiche__verificato_da').order_by('-compilato_il')
+
+    if operatore_id:
+        qs = qs.filter(sessione__operatore_id=operatore_id)
+    if postazione_id:
+        qs = qs.filter(checklist_item__postazione_cq_id=postazione_id)
+
+    compilazioni = list(qs[:200])
+
+    # Problemi: tutto cio che NON e OK e NON e N/A
+    problemi = [c for c in compilazioni if c.is_problema]
+
+    # Operatori e postazioni per i filtri
+    from django.contrib.auth.models import User
+    operatori = User.objects.filter(
+        groups__name__in=['operatore', 'responsabile', 'titolare']
+    ).distinct().order_by('first_name', 'last_name')
+    postazioni = PostazioneCQ.objects.filter(attiva=True).order_by('ordine')
+
+    return render(request, 'turni/storico_checklist.html', {
+        'compilazioni': compilazioni,
+        'problemi': problemi,
+        'periodo': periodo,
+        'operatori': operatori,
+        'postazioni': postazioni,
+        'filtro_operatore': operatore_id,
+        'filtro_postazione': postazione_id,
+    })
+
+
+@login_required
+def api_salva_verifica(request, compilata_id):
+    if not utente_nel_gruppo(request.user, 'responsabile', 'titolare'):
+        return _json_err('Non autorizzato', 403)
+    if request.method != 'POST':
+        return _json_err('Metodo non consentito', 405)
+
+    compilata = get_object_or_404(ChecklistCompilata, pk=compilata_id)
+    esito = request.POST.get('esito_verifica', '')
+    note = request.POST.get('note', '').strip()
+
+    if esito not in ('confermato', 'non_conforme'):
+        return _json_err('Esito non valido.')
+
+    verifica, created = VerificaChecklist.objects.update_or_create(
+        compilata=compilata,
+        verificato_da=request.user,
+        defaults={'esito_verifica': esito, 'note': note},
+    )
+    return _json_ok({
+        'id': verifica.pk,
+        'esito': verifica.get_esito_verifica_display(),
+        'created': created,
+    })
 
 
 # ---------------------------------------------------------------------------

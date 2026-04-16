@@ -29,6 +29,10 @@ urlpatterns = [
     path('api/esito-checklist/salva/', views.api_salva_esito, name='api_esito_salva'),
     path('api/esito-checklist/<int:pk>/elimina/', views.api_elimina_esito, name='api_esito_elimina'),
 
+    # Storico checklist (responsabile/titolare)
+    path('storico-checklist/', views.storico_checklist, name='storico_checklist'),
+    path('api/verifica/<int:compilata_id>/', views.api_salva_verifica, name='api_salva_verifica'),
+
     # Report
     path('report/', views.report_lavorazioni, name='report_lavorazioni'),
     path('report/ordine/<int:ordine_id>/', views.report_ordine_dettaglio, name='report_ordine_dettaglio'),

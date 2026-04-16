@@ -2,7 +2,7 @@ from django.contrib import admin
 from .models import (
     SessioneTurno, PostazioneTurno, ChecklistItem,
     ChecklistCompilata, LavorazioneOperatore,
-    CategoriaChecklist, EsitoChecklist,
+    CategoriaChecklist, EsitoChecklist, VerificaChecklist,
 )
 
 
@@ -38,8 +38,15 @@ class ChecklistItemAdmin(admin.ModelAdmin):
 
 @admin.register(ChecklistCompilata)
 class ChecklistCompilataAdmin(admin.ModelAdmin):
-    list_display = ['sessione', 'checklist_item', 'fase', 'esito', 'compilato_il']
+    list_display = ['sessione', 'checklist_item', 'fase', 'esito', 'esito_obj', 'compilato_il']
     list_filter = ['fase', 'esito']
+
+
+@admin.register(VerificaChecklist)
+class VerificaChecklistAdmin(admin.ModelAdmin):
+    list_display = ['compilata', 'verificato_da', 'esito_verifica', 'data_verifica']
+    list_filter = ['esito_verifica']
+    raw_id_fields = ['compilata']
 
 
 @admin.register(LavorazioneOperatore)

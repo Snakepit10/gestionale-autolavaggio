@@ -183,6 +183,38 @@ class ChecklistCompilata(models.Model):
         esito_nome = self.esito_obj.nome if self.esito_obj else self.get_esito_display()
         return f"{self.checklist_item.nome} — {self.get_fase_display()} — {esito_nome}"
 
+    @property
+    def is_problema(self):
+        """True se l'esito non e OK e non e N/A (indica un problema da evidenziare)."""
+        if self.esito_obj:
+            return self.esito_obj.codice not in ('ok', 'na')
+        return self.esito == 'non_ok'
+
+
+class VerificaChecklist(models.Model):
+    """Verifica a campione effettuata da responsabile/titolare su una compilazione."""
+    ESITO_CHOICES = [
+        ('confermato', 'Confermato'),
+        ('non_conforme', 'Non conforme'),
+    ]
+    compilata = models.ForeignKey(
+        ChecklistCompilata, on_delete=models.CASCADE, related_name='verifiche',
+    )
+    verificato_da = models.ForeignKey(
+        User, on_delete=models.PROTECT, related_name='verifiche_checklist',
+    )
+    esito_verifica = models.CharField(max_length=20, choices=ESITO_CHOICES)
+    note = models.TextField(blank=True)
+    data_verifica = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        verbose_name = 'Verifica checklist'
+        verbose_name_plural = 'Verifiche checklist'
+        ordering = ['-data_verifica']
+
+    def __str__(self):
+        return f"Verifica {self.compilata.checklist_item.nome} — {self.get_esito_verifica_display()}"
+
 
 # ---------------------------------------------------------------------------
 # Lavorazione operatore (tracking tempo per operatore/ordine/fase)

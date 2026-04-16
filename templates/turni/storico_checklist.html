@@ -1,0 +1,246 @@
+{% extends "base.html" %}
+{% load cq_tags %}
+
+{% block title %}Storico Checklist{% endblock %}
+
+{% block extra_css %}
+<style>
+.problema-card { background: #fff5f5; border-left: 4px solid #dc3545; }
+.verifica-badge { font-size: .7rem; }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-3">
+  <h5 class="mb-0"><i class="bi bi-clipboard-data"></i> Storico Checklist</h5>
+  <div class="btn-group btn-group-sm">
+    <a href="?periodo=settimana{% if filtro_operatore %}&operatore={{ filtro_operatore }}{% endif %}{% if filtro_postazione %}&postazione={{ filtro_postazione }}{% endif %}"
+       class="btn btn-outline-primary {% if periodo == 'settimana' %}active{% endif %}">Settimana</a>
+    <a href="?periodo=mese{% if filtro_operatore %}&operatore={{ filtro_operatore }}{% endif %}{% if filtro_postazione %}&postazione={{ filtro_postazione }}{% endif %}"
+       class="btn btn-outline-primary {% if periodo == 'mese' %}active{% endif %}">Mese</a>
+    <a href="?periodo=trimestre{% if filtro_operatore %}&operatore={{ filtro_operatore }}{% endif %}{% if filtro_postazione %}&postazione={{ filtro_postazione }}{% endif %}"
+       class="btn btn-outline-primary {% if periodo == 'trimestre' %}active{% endif %}">Trimestre</a>
+  </div>
+</div>
+
+{# Filtri #}
+<div class="card mb-3">
+  <div class="card-body py-2">
+    <form method="get" class="row g-2 align-items-end">
+      <input type="hidden" name="periodo" value="{{ periodo }}">
+      <div class="col-md-4">
+        <label class="form-label small mb-0">Operatore</label>
+        <select name="operatore" class="form-select form-select-sm">
+          <option value="">Tutti</option>
+          {% for op in operatori %}
+            <option value="{{ op.pk }}" {% if filtro_operatore == op.pk|stringformat:"d" %}selected{% endif %}>
+              {{ op.get_full_name|default:op.username }}
+            </option>
+          {% endfor %}
+        </select>
+      </div>
+      <div class="col-md-4">
+        <label class="form-label small mb-0">Postazione</label>
+        <select name="postazione" class="form-select form-select-sm">
+          <option value="">Tutte</option>
+          {% for p in postazioni %}
+            <option value="{{ p.pk }}" {% if filtro_postazione == p.pk|stringformat:"d" %}selected{% endif %}>
+              {{ p.nome }}
+            </option>
+          {% endfor %}
+        </select>
+      </div>
+      <div class="col-md-4">
+        <button type="submit" class="btn btn-primary btn-sm w-100">
+          <i class="bi bi-funnel"></i> Filtra
+        </button>
+      </div>
+    </form>
+  </div>
+</div>
+
+{# ===== RIQUADRO PROBLEMI ===== #}
+{% if problemi %}
+<div class="card problema-card mb-4">
+  <div class="card-header bg-danger text-white py-2">
+    <i class="bi bi-exclamation-triangle"></i> Problemi rilevati
+    <span class="badge bg-light text-danger ms-2">{{ problemi|length }}</span>
+  </div>
+  <div class="card-body p-0">
+    <table class="table table-sm table-hover mb-0">
+      <thead class="table-light">
+        <tr><th>Data</th><th>Fase</th><th>Operatore</th><th>Postazione</th><th>Categoria</th><th>Voce</th><th>Esito</th><th>Note</th><th>Verifica</th></tr>
+      </thead>
+      <tbody>
+        {% for c in problemi %}
+        <tr>
+          <td class="small">{{ c.compilato_il|date:"d/m H:i" }}</td>
+          <td><span class="badge bg-{{ c.fase|default:'secondary' }}">{{ c.get_fase_display }}</span></td>
+          <td class="small">{{ c.sessione.operatore.get_full_name|default:c.sessione.operatore.username }}</td>
+          <td class="small">{{ c.checklist_item.postazione_cq.sigla|default:c.checklist_item.postazione_cq.nome }}</td>
+          <td class="small">
+            {% if c.checklist_item.categoria %}
+              {% if c.checklist_item.categoria.icona %}<i class="bi {{ c.checklist_item.categoria.icona }}"></i>{% endif %}
+              {{ c.checklist_item.categoria.nome }}
+            {% endif %}
+          </td>
+          <td><strong>{{ c.checklist_item.nome }}</strong></td>
+          <td>
+            {% if c.esito_obj %}
+              <span class="badge bg-{{ c.esito_obj.colore }}">{{ c.esito_obj.nome }}</span>
+            {% else %}
+              <span class="badge bg-danger">{{ c.get_esito_display }}</span>
+            {% endif %}
+          </td>
+          <td class="small text-muted">{{ c.note|default:"" }}</td>
+          <td>
+            {% with v=c.verifiche.first %}
+              {% if v %}
+                <span class="badge verifica-badge {% if v.esito_verifica == 'confermato' %}bg-success{% else %}bg-danger{% endif %}">
+                  {{ v.get_esito_verifica_display }}
+                </span>
+              {% else %}
+                <button class="btn btn-outline-primary btn-sm py-0" style="font-size:.7rem"
+                        onclick="apriVerifica({{ c.pk }}, '{{ c.checklist_item.nome|escapejs }}')">
+                  <i class="bi bi-check2-square"></i> Verifica
+                </button>
+              {% endif %}
+            {% endwith %}
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+{% else %}
+<div class="alert alert-success mb-4">
+  <i class="bi bi-check-circle"></i> Nessun problema rilevato nel periodo selezionato.
+</div>
+{% endif %}
+
+{# ===== STORICO COMPLETO ===== #}
+<div class="card">
+  <div class="card-header py-2">
+    <i class="bi bi-clock-history"></i> Storico completo
+    <span class="badge bg-secondary ms-1">{{ compilazioni|length }}</span>
+  </div>
+  <div class="card-body p-0">
+    <table class="table table-sm table-hover mb-0">
+      <thead class="table-light">
+        <tr><th>Data</th><th>Fase</th><th>Operatore</th><th>Postazione</th><th>Categoria</th><th>Voce</th><th>Esito</th><th>Note</th><th>Verifica</th></tr>
+      </thead>
+      <tbody>
+        {% for c in compilazioni %}
+        <tr {% if c.is_problema %}class="table-warning"{% endif %}>
+          <td class="small">{{ c.compilato_il|date:"d/m H:i" }}</td>
+          <td><span class="badge {% if c.fase == 'inizio' %}bg-info{% else %}bg-secondary{% endif %}" style="font-size:.65rem">{{ c.get_fase_display }}</span></td>
+          <td class="small">{{ c.sessione.operatore.get_full_name|default:c.sessione.operatore.username }}</td>
+          <td class="small">{{ c.checklist_item.postazione_cq.sigla|default:c.checklist_item.postazione_cq.nome }}</td>
+          <td class="small">
+            {% if c.checklist_item.categoria %}
+              {% if c.checklist_item.categoria.icona %}<i class="bi {{ c.checklist_item.categoria.icona }}"></i>{% endif %}
+              {{ c.checklist_item.categoria.nome }}
+            {% endif %}
+          </td>
+          <td>{{ c.checklist_item.nome }}</td>
+          <td>
+            {% if c.esito_obj %}
+              <span class="badge bg-{{ c.esito_obj.colore }}">{{ c.esito_obj.nome }}</span>
+            {% else %}
+              <span class="badge bg-{% if c.esito == 'ok' %}success{% elif c.esito == 'na' %}secondary{% else %}danger{% endif %}">{{ c.get_esito_display }}</span>
+            {% endif %}
+          </td>
+          <td class="small text-muted">{{ c.note|default:"" }}</td>
+          <td>
+            {% with v=c.verifiche.first %}
+              {% if v %}
+                <span class="badge verifica-badge {% if v.esito_verifica == 'confermato' %}bg-success{% else %}bg-danger{% endif %}"
+                      title="{{ v.note }}">
+                  <i class="bi {% if v.esito_verifica == 'confermato' %}bi-check-lg{% else %}bi-x-lg{% endif %}"></i>
+                  {{ v.verificato_da.get_full_name|default:v.verificato_da.username }}
+                </span>
+              {% else %}
+                <button class="btn btn-outline-primary btn-sm py-0" style="font-size:.65rem"
+                        onclick="apriVerifica({{ c.pk }}, '{{ c.checklist_item.nome|escapejs }}')">
+                  <i class="bi bi-check2-square"></i>
+                </button>
+              {% endif %}
+            {% endwith %}
+          </td>
+        </tr>
+        {% empty %}
+        <tr><td colspan="9" class="text-muted text-center py-3">Nessuna compilazione nel periodo</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+
+{# Modal Verifica #}
+<div class="modal fade" id="modalVerifica" tabindex="-1">
+  <div class="modal-dialog modal-sm">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h6 class="modal-title"><i class="bi bi-check2-square"></i> Verifica a campione</h6>
+        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+      </div>
+      <div class="modal-body">
+        <p class="small text-muted mb-2">Voce: <strong id="verificaVoce"></strong></p>
+        <input type="hidden" id="verificaId">
+        <div class="mb-2">
+          <label class="form-label small">Esito verifica *</label>
+          <div class="btn-group w-100" role="group">
+            <input type="radio" class="btn-check" name="verificaEsito" value="confermato" id="vConf" checked>
+            <label class="btn btn-outline-success" for="vConf">Confermato</label>
+            <input type="radio" class="btn-check" name="verificaEsito" value="non_conforme" id="vNonConf">
+            <label class="btn btn-outline-danger" for="vNonConf">Non conforme</label>
+          </div>
+        </div>
+        <div class="mb-2">
+          <label class="form-label small">Note</label>
+          <textarea class="form-control form-control-sm" id="verificaNote" rows="2"></textarea>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-secondary btn-sm" data-bs-dismiss="modal">Annulla</button>
+        <button type="button" class="btn btn-primary btn-sm" onclick="salvaVerifica()">Salva Verifica</button>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+const CSRF = '{{ csrf_token }}';
+
+function apriVerifica(compilataId, voce) {
+  document.getElementById('verificaId').value = compilataId;
+  document.getElementById('verificaVoce').textContent = voce;
+  document.getElementById('verificaNote').value = '';
+  document.querySelector('input[name="verificaEsito"][value="confermato"]').checked = true;
+  new bootstrap.Modal(document.getElementById('modalVerifica')).show();
+}
+
+async function salvaVerifica() {
+  const id = document.getElementById('verificaId').value;
+  const esito = document.querySelector('input[name="verificaEsito"]:checked').value;
+  const note = document.getElementById('verificaNote').value;
+
+  const fd = new FormData();
+  fd.append('csrfmiddlewaretoken', CSRF);
+  fd.append('esito_verifica', esito);
+  fd.append('note', note);
+
+  const res = await fetch(`/turni/api/verifica/${id}/`, { method: 'POST', body: fd });
+  const data = await res.json();
+  if (data.ok) {
+    bootstrap.Modal.getInstance(document.getElementById('modalVerifica'))?.hide();
+    location.reload();
+  } else {
+    alert(data.error);
+  }
+}
+</script>
+{% endblock %}

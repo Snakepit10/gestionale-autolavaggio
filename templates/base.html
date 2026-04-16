@@ -108,8 +108,8 @@
                         </li>
                         {% endif %}
 
-                        {# === Menu SOLO per titolare/admin === #}
-                        {% if user|in_group:"titolare" or user.is_superuser %}
+                        {# === Menu per responsabile/titolare === #}
+                        {% if user|in_group:"titolare" or user|in_group:"responsabile" or user.is_superuser %}
                         <li class="nav-item dropdown">
                             <a class="nav-link dropdown-toggle" href="#" role="button" data-bs-toggle="dropdown">
                                 <i class="bi bi-clock-history"></i> Turni
@@ -118,8 +118,15 @@
                                 <li><a class="dropdown-item" href="{% url 'turni:report_lavorazioni' %}">
                                     <i class="bi bi-graph-up"></i> Report Tempi
                                 </a></li>
+                                <li><a class="dropdown-item" href="{% url 'turni:storico_checklist' %}">
+                                    <i class="bi bi-clipboard-data"></i> Storico Checklist
+                                </a></li>
                             </ul>
                         </li>
+                        {% endif %}
+
+                        {# === Menu SOLO per titolare/admin === #}
+                        {% if user|in_group:"titolare" or user.is_superuser %}
 
                         <li class="nav-item dropdown">
                             <a class="nav-link dropdown-toggle" href="#" role="button" data-bs-toggle="dropdown">
