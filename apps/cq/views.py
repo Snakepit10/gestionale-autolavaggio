@@ -143,11 +143,11 @@ class SchedaCQCreateView(ResponsabileOTitolareMixin, View):
 
         # Pre-carica segnalazioni difetti degli operatori come difetti esistenti
         from apps.turni.models import SegnalazioneDifetto
-        segnalazioni = ordine.segnalazioni_difetti.all()
+        segnalazioni = ordine.segnalazioni_difetti.select_related('operatore', 'postazione_cq').all()
         existing_difetti = []
         for s in segnalazioni:
-            # Mappa azione: corretto → sistemato, segnalato → cliente_informato
             azione_map = {'corretto': 'sistemato', 'segnalato': 'cliente_informato'}
+            op_nome = s.operatore.get_full_name() or s.operatore.username
             existing_difetti.append({
                 'zona': s.zona,
                 'tipo_difetto': s.tipo_difetto,
@@ -156,6 +156,7 @@ class SchedaCQCreateView(ResponsabileOTitolareMixin, View):
                 'azione_correttiva': azione_map.get(s.azione, 'sistemato'),
                 'note': s.note,
                 'descrizione_altro': '',
+                'segnalato_da': f"{op_nome} ({s.postazione_cq.sigla or s.postazione_cq.nome})",
             })
 
         ctx = _choices_context()

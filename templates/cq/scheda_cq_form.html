@@ -181,67 +181,33 @@
     {% endif %}
   </div>
 
-  {# ---- Segnalazioni operatori (storico) ---- #}
-  {% if segnalazioni_operatori %}
-  <div class="card mb-3">
-    <div class="card-header bg-warning bg-opacity-25 py-2">
-      <i class="bi bi-person-check"></i> <strong>Segnalazioni Operatori</strong>
-      <span class="badge bg-warning text-dark ms-1">{{ segnalazioni_operatori|length }}</span>
-      <small class="text-muted ms-2">Difetti gia rilevati durante la lavorazione — pre-caricati nel form</small>
-    </div>
-    <div class="card-body p-0">
-      <table class="table table-sm mb-0 small">
-        <thead class="table-light">
-          <tr><th>Ora</th><th>Operatore</th><th>Postazione</th><th>Zona</th><th>Difetto</th><th>Gravita</th><th>Azione</th><th>Produttore</th></tr>
-        </thead>
-        <tbody>
-          {% for s in segnalazioni_operatori %}
-          <tr>
-            <td>{{ s.data_ora|date:"H:i" }}</td>
-            <td><i class="bi bi-person"></i> {{ s.operatore.get_full_name|default:s.operatore.username }}</td>
-            <td><span class="badge bg-info" style="font-size:.65rem">{{ s.postazione_cq.sigla|default:s.postazione_cq.nome }}</span></td>
-            <td>{{ s.zona_nome }}</td>
-            <td><strong>{{ s.tipo_difetto_nome }}</strong></td>
-            <td><span class="badge {% if s.gravita == 'alta' %}bg-danger{% elif s.gravita == 'media' %}bg-warning text-dark{% else %}bg-secondary{% endif %}" style="font-size:.6rem">{{ s.get_gravita_display }}</span></td>
-            <td>{% if s.azione == 'corretto' %}<i class="bi bi-check-circle text-success"></i>{% else %}<i class="bi bi-flag text-warning"></i>{% endif %}</td>
-            <td><span class="badge bg-danger bg-opacity-75" style="font-size:.6rem">{{ s.postazione_produttore }}</span></td>
-          </tr>
-          {% endfor %}
-        </tbody>
-      </table>
-    </div>
-  </div>
-  {% endif %}
-
-  {# ---- Operatori in turno ---- #}
+  {# ---- Operatori in turno (compatto) ---- #}
   <div class="card">
-    <div class="card-header bg-primary text-white fw-semibold py-2 d-flex justify-content-between align-items-center">
+    <div class="card-header bg-dark text-white py-1 d-flex justify-content-between align-items-center" style="font-size:.85rem">
       <span><i class="bi bi-people"></i> Operatori in turno</span>
       {% if configurazioni_assegnazione %}
-      <div class="d-flex align-items-center gap-2">
-        <select id="presetSelector" class="form-select form-select-sm text-dark" style="max-width:250px">
+      <div class="d-flex align-items-center gap-1">
+        <select id="presetSelector" class="form-select form-select-sm text-dark" style="max-width:180px; font-size:.75rem">
           <option value="">-- Preset --</option>
           {% for cfg in configurazioni_assegnazione %}
             <option value="{{ cfg.pk }}">{{ cfg.nome }}</option>
           {% endfor %}
         </select>
-        <button type="button" class="btn btn-outline-light btn-sm" onclick="applicaPreset()">
-          <i class="bi bi-lightning"></i> Applica
+        <button type="button" class="btn btn-outline-light btn-sm py-0" style="font-size:.7rem" onclick="applicaPreset()">
+          <i class="bi bi-lightning"></i>
         </button>
       </div>
       {% endif %}
     </div>
-    <div class="card-body py-2">
-      <div class="row g-2">
+    <div class="card-body py-1 px-2">
+      <div class="d-flex flex-wrap gap-2">
         {% for form in turno_forms %}
-        <div class="col-md-6 col-xl-4">
-          <div class="border rounded p-2">
-            <div class="fw-semibold text-primary small mb-1">
-              <i class="bi bi-diagram-3"></i> {{ form.postazione_label }}
-            </div>
-            {% for hidden in form.hidden_fields %}{{ hidden }}{% endfor %}
-            <div class="operatori-check-group">{{ form.operatori }}</div>
+        <div class="border rounded px-2 py-1" style="min-width:140px">
+          <div class="fw-semibold text-primary" style="font-size:.7rem">
+            <i class="bi bi-diagram-3"></i> {{ form.postazione_label }}
           </div>
+          {% for hidden in form.hidden_fields %}{{ hidden }}{% endfor %}
+          <div class="operatori-check-group" style="font-size:.75rem">{{ form.operatori }}</div>
         </div>
         {% endfor %}
       </div>
@@ -365,6 +331,37 @@
     </div>
 
   </div>{# fine sezione-difetti #}
+
+  {# ---- Segnalazioni operatori (storico in basso) ---- #}
+  {% if segnalazioni_operatori %}
+  <div class="card">
+    <div class="card-header bg-warning bg-opacity-25 py-1" style="font-size:.85rem">
+      <i class="bi bi-person-check"></i> <strong>Segnalazioni Operatori</strong>
+      <span class="badge bg-warning text-dark ms-1">{{ segnalazioni_operatori|length }}</span>
+    </div>
+    <div class="card-body p-0">
+      <table class="table table-sm mb-0" style="font-size:.75rem">
+        <thead class="table-light">
+          <tr><th>Ora</th><th>Operatore</th><th>Postazione</th><th>Zona</th><th>Difetto</th><th>Gravita</th><th>Azione</th><th>Produttore</th></tr>
+        </thead>
+        <tbody>
+          {% for s in segnalazioni_operatori %}
+          <tr>
+            <td>{{ s.data_ora|date:"H:i" }}</td>
+            <td><i class="bi bi-person"></i> {{ s.operatore.get_full_name|default:s.operatore.username }}</td>
+            <td><span class="badge bg-info" style="font-size:.6rem">{{ s.postazione_cq.sigla|default:s.postazione_cq.nome }}</span></td>
+            <td>{{ s.zona_nome }}</td>
+            <td><strong>{{ s.tipo_difetto_nome }}</strong></td>
+            <td><span class="badge {% if s.gravita == 'alta' %}bg-danger{% elif s.gravita == 'media' %}bg-warning text-dark{% else %}bg-secondary{% endif %}" style="font-size:.55rem">{{ s.get_gravita_display }}</span></td>
+            <td>{% if s.azione == 'corretto' %}<i class="bi bi-check-circle text-success"></i>{% else %}<i class="bi bi-flag text-warning"></i>{% endif %}</td>
+            <td><span class="badge bg-danger bg-opacity-75" style="font-size:.55rem">{{ s.postazione_produttore }}</span></td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+  {% endif %}
 
   {# Contenitore nascosto per i file input delle foto (persistono nel DOM) #}
   <div id="foto-inputs-container" style="display:none"></div>
@@ -605,11 +602,13 @@ function renderCart() {
 
   body.innerHTML = items.map(d => {
     const key = d.key;
+    const segnStr = d.segnalato_da ? `<div class="small text-info mt-1"><i class="bi bi-person-check"></i> Segnalato da: <strong>${d.segnalato_da}</strong></div>` : '';
     return `<div class="cart-item" id="ci-${key}">
-      <div class="d-flex justify-content-between align-items-start mb-2">
+      <div class="d-flex justify-content-between align-items-start mb-1">
         <div>
           <div class="zona-label"><i class="bi bi-map"></i> ${d.zona_nome}</div>
           <div class="tipo-label">${d.tipo_nome}</div>
+          ${segnStr}
         </div>
         <button type="button" class="btn btn-outline-danger btn-sm py-0 px-1"
                 onclick="rimuoviDifetto('${key}')">
@@ -692,6 +691,7 @@ if (EXISTING.length > 0) {
       postazione: d.postazione_responsabile || ZONA_PRODUTTORE[d.zona] || '',
       azione:    d.azione_correttiva        || 'sistemato',
       desc:      d.descrizione_altro        || '',
+      segnalato_da: d.segnalato_da         || '',
     };
     creaFotoInput(key);
     aggiornaContatoriZona(d.zona);
