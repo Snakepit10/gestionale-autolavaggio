@@ -20,6 +20,7 @@ from apps.turni.models import (
     SessioneTurno, PostazioneTurno, ChecklistItem,
     ChecklistCompilata, LavorazioneOperatore,
     CategoriaChecklist, EsitoChecklist, VerificaChecklist,
+    SegnalazioneDifetto,
 )
 
 
@@ -286,12 +287,35 @@ def dashboard_operatore(request):
         if servizi:
             categorie_servizi.append({'nome': cat.nome, 'servizi': servizi})
 
+    # Zone e difetti mappati alle postazioni dell'operatore (per segnalazione difetti)
+    from apps.cq.models import ZonaConfig, ZonaDifettoMapping
+    operatore_post_codici = [pt.postazione_cq.codice for pt in post_turno]
+    zone_operatore = ZonaConfig.objects.filter(
+        attiva=True, postazione_produttore__in=operatore_post_codici
+    ).prefetch_related('difetti_config__tipo_difetto').select_related('categoria')
+
+    zone_difetti = []
+    for zona in zone_operatore:
+        tipi = [
+            {'codice': m.tipo_difetto.codice, 'nome': m.tipo_difetto.nome}
+            for m in zona.difetti_config.select_related('tipo_difetto').all()
+            if m.tipo_difetto.attivo
+        ]
+        if tipi:
+            zone_difetti.append({
+                'codice': zona.codice,
+                'nome': zona.nome,
+                'categoria': zona.categoria.nome if zona.categoria else '',
+                'tipi': tipi,
+            })
+
     return render(request, 'turni/dashboard_operatore.html', {
         'sessione': sessione,
         'postazioni_turno': post_turno,
         'ordini_coda': ordini_coda,
         'lavorazione_attiva': lavorazione_attiva,
         'categorie_servizi_json': json.dumps(categorie_servizi, default=str),
+        'zone_difetti_json': json.dumps(zone_difetti),
     })
 
 
@@ -378,6 +402,14 @@ def api_ordine_dettaglio(request, ordine_id):
             'tempo_min': round(lav_c.tempo_lavoro_netto_minuti, 1),
         })
 
+    # Stato postazioni
+    stati_postazioni = ordine.get_stati_postazioni()
+
+    # Segnalazioni difetti gia fatte per questo ordine
+    segnalazioni = list(SegnalazioneDifetto.objects.filter(
+        ordine=ordine
+    ).values('zona', 'tipo_difetto', 'gravita', 'note', 'operatore__first_name', 'operatore__username'))
+
     return _json_ok({
         'ordine': {
             'id': ordine.pk,
@@ -386,11 +418,15 @@ def api_ordine_dettaglio(request, ordine_id):
             'tipo_auto': ordine.tipo_auto or '',
             'nota': ordine.nota or '',
             'stato': ordine.stato,
+            'tipo_consegna': ordine.tipo_consegna or '',
+            'ora_consegna': ordine.ora_consegna_richiesta.strftime('%H:%M') if ordine.ora_consegna_richiesta else '',
             'items': items,
+            'stati_postazioni': stati_postazioni,
         },
         'lavorazione': lavorazione,
         'lavorazioni_attive': lavorazioni_attive,
         'fasi_completate': fasi_completate,
+        'segnalazioni': segnalazioni,
     })
 
 
@@ -649,6 +685,55 @@ def api_coda_ordini(request):
         ordini_dict[ordine.pk]['servizi'].append(item.servizio_prodotto.titolo)
 
     return _json_ok({'ordini': list(ordini_dict.values())})
+
+
+# ---------------------------------------------------------------------------
+# API: Segnalazione difetto
+# ---------------------------------------------------------------------------
+
+@login_required
+@transaction.atomic
+def api_segnala_difetto(request, ordine_id):
+    if request.method != 'POST':
+        return _json_err('Metodo non consentito', 405)
+    try:
+        data = json.loads(request.body)
+    except json.JSONDecodeError:
+        return _json_err('JSON non valido')
+
+    ordine = get_object_or_404(Ordine, pk=ordine_id)
+    zona = data.get('zona', '')
+    tipo_difetto = data.get('tipo_difetto', '')
+    gravita = data.get('gravita', 'media')
+    note = data.get('note', '')
+
+    if not zona or not tipo_difetto:
+        return _json_err('Zona e tipo difetto obbligatori.')
+
+    sessione = _get_sessione_attiva(request.user)
+    postazione_cq = None
+    if sessione:
+        pt = sessione.postazioni.select_related('postazione_cq').first()
+        if pt:
+            postazione_cq = pt.postazione_cq
+
+    if not postazione_cq:
+        return _json_err('Nessuna postazione assegnata.')
+
+    segnalazione = SegnalazioneDifetto.objects.create(
+        ordine=ordine,
+        zona=zona,
+        tipo_difetto=tipo_difetto,
+        gravita=gravita,
+        postazione_cq=postazione_cq,
+        operatore=request.user,
+        note=note,
+    )
+    return _json_ok({
+        'id': segnalazione.pk,
+        'zona': segnalazione.zona_nome,
+        'tipo_difetto': segnalazione.tipo_difetto_nome,
+    })
 
 
 # ---------------------------------------------------------------------------

@@ -53,7 +53,10 @@
             </span>
           </div>
           {% if entry.ordine.tipo_auto %}
-            <div class="text-muted small"><i class="bi bi-car-front"></i> {{ entry.ordine.tipo_auto }}</div>
+            <div class="fw-bold" style="color:#2c3e50"><i class="bi bi-car-front-fill me-1"></i>{{ entry.ordine.tipo_auto }}</div>
+          {% endif %}
+          {% if entry.ordine.ora_consegna_richiesta %}
+            <div class="text-muted small"><i class="bi bi-clock"></i> Consegna {{ entry.ordine.ora_consegna_richiesta|time:"H:i" }}</div>
           {% endif %}
           <div class="mt-1">
             {% for item in entry.items %}
@@ -108,110 +111,157 @@ async function selezionaOrdine(ordineId) {
   if (!data.ok) return;
 
   currentOrdineId = ordineId;
-  renderAreaOperativa(data.ordine, data.lavorazione, data.lavorazioni_attive || [], data.fasi_completate || []);
+  renderAreaOperativa(data.ordine, data.lavorazione, data.lavorazioni_attive || [], data.fasi_completate || [], data.segnalazioni || []);
 }
 
 // Dati servizi per il form aggiungi item
 const CATEGORIE_SERVIZI = {{ categorie_servizi_json|safe }};
+const ZONE_DIFETTI = {{ zone_difetti_json|safe }};
 
-function renderAreaOperativa(ordine, lavorazione, lavorazioniAttive, fasiCompletate) {
+function renderAreaOperativa(ordine, lavorazione, lavorazioniAttive, fasiCompletate, segnalazioni) {
   const area = document.getElementById('areaOperativa');
-
-  // Salva gli ID di tutte le lavorazioni attive
   currentLavIds = lavorazioniAttive.map(l => l.id);
 
+  // --- Items ---
   let itemsHtml = ordine.items.map(i => {
-    const isAggiunto = i.aggiunto_da__id;
-    const rowClass = isAggiunto ? 'style="background:#fff3cd"' : '';
-    return `<tr ${rowClass}>
-      <td>${i.servizio_prodotto__titolo}${isAggiunto ? ' <i class="bi bi-person-plus text-warning" title="Aggiunto da operatore"></i>' : ''}</td>
+    const isAgg = i.aggiunto_da__id;
+    return `<tr ${isAgg ? 'style="background:#fff3cd"' : ''}>
+      <td>${i.servizio_prodotto__titolo}${isAgg ? ' <i class="bi bi-person-plus text-warning"></i>' : ''}</td>
       <td>${i.quantita}</td><td>&euro;${i.prezzo_unitario}</td>
-      <td><span class="badge ${i.stato === 'completato' ? 'bg-success' : i.stato === 'in_lavorazione' ? 'bg-warning' : 'bg-secondary'}">${i.stato}</span></td>
+      <td><span class="badge ${i.stato==='completato'?'bg-success':i.stato==='in_lavorazione'?'bg-warning':'bg-secondary'}">${i.stato}</span></td>
     </tr>`;
   }).join('');
 
-  let timerHtml = '';
-  let buttonsHtml = '';
-
-  // Mostra lavorazioni attive per blocco
-  let lavAttivaHtml = '';
+  // --- Timer / Buttons ---
+  let timerHtml = '', buttonsHtml = '', lavAttivaHtml = '';
   if (lavorazioniAttive.length > 1) {
     lavAttivaHtml = '<div class="mb-2 d-flex flex-wrap gap-1">';
     for (const la of lavorazioniAttive) {
-      const badge = la.stato === 'in_pausa' ? 'bg-warning text-dark' : 'bg-primary';
-      const label = la.blocco ? `${la.postazione} [${la.blocco}]` : la.postazione;
-      lavAttivaHtml += `<span class="badge ${badge}"><i class="bi bi-play-circle"></i> ${label}</span>`;
+      const cls = la.stato==='in_pausa' ? 'bg-warning text-dark' : 'bg-primary';
+      lavAttivaHtml += `<span class="badge ${cls}"><i class="bi bi-play-circle"></i> ${la.blocco ? la.postazione+' ['+la.blocco+']' : la.postazione}</span>`;
     }
     lavAttivaHtml += '</div>';
   }
-
   if (lavorazione) {
     currentLavStato = lavorazione.stato;
     timerStartTime = new Date(lavorazione.inizio);
     timerPauseSec = lavorazione.tempo_pausa_sec || 0;
-
-    const timerClass = lavorazione.stato === 'in_pausa' ? 'paused' : 'running';
-    timerHtml = `<div class="timer-display ${timerClass}" id="timerDisplay">00:00</div>`;
-
-    if (lavorazione.stato === 'in_lavorazione') {
-      buttonsHtml = `
-        <button class="btn btn-warning btn-lavoro me-2" onclick="pausaLavoro()"><i class="bi bi-pause-circle"></i> Pausa</button>
-        <button class="btn btn-success btn-lavoro" onclick="completaLavoro()"><i class="bi bi-check-circle"></i> Fine Lavoro</button>`;
-    } else if (lavorazione.stato === 'in_pausa') {
-      buttonsHtml = `
-        <button class="btn btn-primary btn-lavoro me-2" onclick="riprendiLavoro()"><i class="bi bi-play-circle"></i> Riprendi</button>
-        <button class="btn btn-success btn-lavoro" onclick="completaLavoro()"><i class="bi bi-check-circle"></i> Fine Lavoro</button>`;
-    }
+    timerHtml = `<div class="timer-display ${lavorazione.stato==='in_pausa'?'paused':'running'}" id="timerDisplay">00:00</div>`;
+    buttonsHtml = lavorazione.stato==='in_lavorazione'
+      ? `<button class="btn btn-warning btn-lavoro me-2" onclick="pausaLavoro()"><i class="bi bi-pause-circle"></i> Pausa</button><button class="btn btn-success btn-lavoro" onclick="completaLavoro()"><i class="bi bi-check-circle"></i> Fine</button>`
+      : `<button class="btn btn-primary btn-lavoro me-2" onclick="riprendiLavoro()"><i class="bi bi-play-circle"></i> Riprendi</button><button class="btn btn-success btn-lavoro" onclick="completaLavoro()"><i class="bi bi-check-circle"></i> Fine</button>`;
   } else {
-    currentLavIds = [];
-    currentLavStato = '';
+    currentLavIds = []; currentLavStato = '';
     timerHtml = '<div class="timer-display text-muted" id="timerDisplay">--:--</div>';
     buttonsHtml = `<button class="btn btn-primary btn-lavoro" onclick="iniziaLavoro()"><i class="bi bi-play-circle"></i> Inizia Lavoro</button>`;
   }
 
-  // Form aggiungi item — select con categorie servizi
-  let optionsHtml = '<option value="">Seleziona servizio...</option>';
+  // --- Add item select ---
+  let optHtml = '<option value="">Seleziona servizio...</option>';
   for (const cat of CATEGORIE_SERVIZI) {
-    optionsHtml += `<optgroup label="${cat.nome}">`;
-    for (const s of cat.servizi) {
-      optionsHtml += `<option value="${s.id}" data-prezzo="${s.prezzo}">${s.titolo} — &euro;${s.prezzo}</option>`;
-    }
-    optionsHtml += '</optgroup>';
+    optHtml += `<optgroup label="${cat.nome}">`;
+    for (const s of cat.servizi) optHtml += `<option value="${s.id}" data-prezzo="${s.prezzo}">${s.titolo} — &euro;${s.prezzo}</option>`;
+    optHtml += '</optgroup>';
   }
 
-  // Fasi completate
+  // --- Stato postazioni ---
+  let statiHtml = '';
+  if (ordine.stati_postazioni && ordine.stati_postazioni.length > 0) {
+    statiHtml = '<div class="d-flex flex-wrap gap-1 mt-2">';
+    for (const sp of ordine.stati_postazioni) {
+      const cls = sp.stato==='completato'?'bg-success':sp.stato==='in_lavorazione'?'bg-warning text-dark':'bg-primary';
+      statiHtml += `<span class="badge ${cls}" title="${sp.nome}: ${sp.stato}" style="font-size:.7rem">${sp.sigla}</span>`;
+    }
+    statiHtml += '</div>';
+  }
+
+  // --- Fasi completate ---
   let fasiHtml = '';
   if (fasiCompletate.length > 0) {
-    fasiHtml = `<div class="mb-3"><div class="section-header mb-1"><i class="bi bi-check2-all"></i> Fasi completate</div><div class="d-flex flex-wrap gap-1">`;
-    for (const f of fasiCompletate) {
-      fasiHtml += `<span class="badge bg-success"><i class="bi bi-check-circle"></i> ${f.postazione} — ${f.operatore} (${f.tempo_min}m)</span>`;
-    }
+    fasiHtml = '<div class="mb-2"><div class="section-header mb-1"><i class="bi bi-check2-all"></i> Fasi completate</div><div class="d-flex flex-wrap gap-1">';
+    for (const f of fasiCompletate) fasiHtml += `<span class="badge bg-success"><i class="bi bi-check-circle"></i> ${f.postazione} — ${f.operatore} (${f.tempo_min}m)</span>`;
     fasiHtml += '</div></div>';
+  }
+
+  // --- Sezione difetti ---
+  let difettiHtml = '';
+  if (ZONE_DIFETTI.length > 0) {
+    let zonaOpts = '<option value="">Seleziona zona...</option>';
+    for (const z of ZONE_DIFETTI) zonaOpts += `<option value="${z.codice}">${z.nome}</option>`;
+
+    let segnHtml = '';
+    if (segnalazioni && segnalazioni.length > 0) {
+      segnHtml = '<div class="mt-2">';
+      for (const s of segnalazioni) {
+        segnHtml += `<span class="badge bg-danger me-1 mb-1"><i class="bi bi-exclamation-triangle"></i> ${s.zona} — ${s.tipo_difetto} (${s.gravita})</span>`;
+      }
+      segnHtml += '</div>';
+    }
+
+    difettiHtml = `
+    <div class="card mb-3 border-danger">
+      <div class="card-header py-2 bg-danger bg-opacity-10">
+        <span class="section-header text-danger"><i class="bi bi-exclamation-triangle"></i> Segnala Difetto</span>
+      </div>
+      <div class="card-body py-2">
+        <div class="row g-2 align-items-end">
+          <div class="col-md-4">
+            <select class="form-select form-select-sm" id="difZona" onchange="onZonaChange()">
+              ${zonaOpts}
+            </select>
+          </div>
+          <div class="col-md-3">
+            <select class="form-select form-select-sm" id="difTipo">
+              <option value="">Tipo difetto...</option>
+            </select>
+          </div>
+          <div class="col-md-2">
+            <select class="form-select form-select-sm" id="difGravita">
+              <option value="bassa">Bassa</option>
+              <option value="media" selected>Media</option>
+              <option value="alta">Alta</option>
+            </select>
+          </div>
+          <div class="col-md-3">
+            <button class="btn btn-danger btn-sm w-100" onclick="segnalaDifetto()">
+              <i class="bi bi-exclamation-triangle"></i> Segnala
+            </button>
+          </div>
+        </div>
+        ${segnHtml}
+      </div>
+    </div>`;
+  }
+
+  // --- Ora consegna ---
+  let consegnaHtml = '';
+  if (ordine.ora_consegna) {
+    consegnaHtml = `<p class="mb-1"><i class="bi bi-clock"></i> <strong>Consegna:</strong> ${ordine.ora_consegna}${ordine.tipo_consegna === 'programmata' ? ' <span class="badge bg-warning text-dark" style="font-size:.65rem">Programmata</span>' : ''}</p>`;
   }
 
   area.innerHTML = `
     <div class="card mb-3">
-      <div class="card-header bg-primary text-white py-2">
-        <i class="bi bi-car-front"></i> Ordine #${ordine.numero}
+      <div class="card-header bg-primary text-white py-2 d-flex justify-content-between align-items-center">
+        <span><i class="bi bi-car-front"></i> Ordine #${ordine.numero}</span>
+        <span class="badge bg-light text-dark">${ordine.stato}</span>
       </div>
       <div class="card-body py-2">
         <div class="row">
           <div class="col-md-6">
-            <p class="mb-1"><strong>Cliente:</strong> ${ordine.cliente || 'N/D'}</p>
-            <p class="mb-1"><strong>Auto:</strong> ${ordine.tipo_auto || 'N/D'}</p>
+            <p class="mb-1"><i class="bi bi-person"></i> <strong>Cliente:</strong> ${ordine.cliente || 'Anonimo'}</p>
+            <p class="mb-1"><i class="bi bi-car-front-fill"></i> <strong>Auto:</strong> ${ordine.tipo_auto || 'N/D'}</p>
+            ${consegnaHtml}
           </div>
           <div class="col-md-6">
-            <p class="mb-1"><strong>Stato:</strong> <span class="badge bg-info">${ordine.stato}</span></p>
-            ${ordine.nota ? `<p class="mb-1"><strong>Note:</strong> ${ordine.nota}</p>` : ''}
+            ${ordine.nota ? `<div class="alert alert-info py-1 px-2 mb-1 small"><i class="bi bi-sticky"></i> ${ordine.nota}</div>` : ''}
+            ${statiHtml}
           </div>
         </div>
       </div>
     </div>
 
     <div class="card mb-3">
-      <div class="card-header py-2">
-        <span class="section-header"><i class="bi bi-bag-plus"></i> Servizi</span>
-      </div>
+      <div class="card-header py-2"><span class="section-header"><i class="bi bi-bag-plus"></i> Servizi</span></div>
       <div class="card-body p-0">
         <table class="table table-sm table-hover mb-0">
           <thead class="table-light"><tr><th>Servizio</th><th>Qty</th><th>Prezzo</th><th>Stato</th></tr></thead>
@@ -219,47 +269,51 @@ function renderAreaOperativa(ordine, lavorazione, lavorazioniAttive, fasiComplet
         </table>
       </div>
       <div class="card-footer">
-        <div class="row g-2 align-items-end" id="formAggiungiItem">
-          <div class="col-md-5">
-            <label class="form-label small mb-0">Servizio/Prodotto</label>
-            <select class="form-select form-select-sm" id="addItemServizio" onchange="onServizioChange()">
-              ${optionsHtml}
-            </select>
-          </div>
-          <div class="col-md-2">
-            <label class="form-label small mb-0">Qty</label>
-            <input type="number" class="form-control form-control-sm" id="addItemQty" value="1" min="1" onchange="calcolaSubtotaleAdd()">
-          </div>
-          <div class="col-md-2">
-            <label class="form-label small mb-0">Prezzo &euro;</label>
-            <input type="number" class="form-control form-control-sm" id="addItemPrezzo" step="0.01" min="0" onchange="calcolaSubtotaleAdd()">
-          </div>
-          <div class="col-md-1 text-center">
-            <label class="form-label small mb-0">Sub.</label>
-            <div class="fw-bold small" id="addItemSubtotale">&euro;0</div>
-          </div>
-          <div class="col-md-2">
-            <button class="btn btn-success btn-sm w-100" onclick="aggiungiItem()">
-              <i class="bi bi-plus-circle"></i> Aggiungi
-            </button>
-          </div>
+        <div class="row g-2 align-items-end">
+          <div class="col-md-5"><select class="form-select form-select-sm" id="addItemServizio" onchange="onServizioChange()">${optHtml}</select></div>
+          <div class="col-md-2"><input type="number" class="form-control form-control-sm" id="addItemQty" value="1" min="1" onchange="calcolaSubtotaleAdd()"></div>
+          <div class="col-md-2"><input type="number" class="form-control form-control-sm" id="addItemPrezzo" step="0.01" min="0" onchange="calcolaSubtotaleAdd()"></div>
+          <div class="col-md-1 text-center"><div class="fw-bold small" id="addItemSubtotale">&euro;0</div></div>
+          <div class="col-md-2"><button class="btn btn-success btn-sm w-100" onclick="aggiungiItem()"><i class="bi bi-plus-circle"></i></button></div>
         </div>
       </div>
     </div>
 
+    ${difettiHtml}
+
     <div class="card">
-      <div class="card-header py-2">
-        <span class="section-header"><i class="bi bi-stopwatch"></i> Lavorazione</span>
-      </div>
+      <div class="card-header py-2"><span class="section-header"><i class="bi bi-stopwatch"></i> Lavorazione</span></div>
       <div class="card-body text-center py-3">
-        ${fasiHtml}
-        ${lavAttivaHtml}
-        ${timerHtml}
+        ${fasiHtml}${lavAttivaHtml}${timerHtml}
         <div class="mt-3">${buttonsHtml}</div>
       </div>
     </div>`;
 
   startTimer();
+}
+
+function onZonaChange() {
+  const zona = document.getElementById('difZona').value;
+  const sel = document.getElementById('difTipo');
+  sel.innerHTML = '<option value="">Tipo difetto...</option>';
+  if (!zona) return;
+  const z = ZONE_DIFETTI.find(zd => zd.codice === zona);
+  if (z) {
+    for (const t of z.tipi) sel.innerHTML += `<option value="${t.codice}">${t.nome}</option>`;
+  }
+}
+
+async function segnalaDifetto() {
+  if (!currentOrdineId) return;
+  const zona = document.getElementById('difZona').value;
+  const tipo = document.getElementById('difTipo').value;
+  const gravita = document.getElementById('difGravita').value;
+  if (!zona || !tipo) { alert('Seleziona zona e tipo difetto.'); return; }
+  const data = await apiPost(`/turni/api/ordine/${currentOrdineId}/segnala-difetto/`, {
+    zona, tipo_difetto: tipo, gravita
+  });
+  if (data.ok) { selezionaOrdine(currentOrdineId); }
+  else alert(data.error);
 }
 
 function onServizioChange() {

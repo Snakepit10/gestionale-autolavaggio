@@ -216,6 +216,49 @@ class VerificaChecklist(models.Model):
         return f"Verifica {self.compilata.checklist_item.nome} — {self.get_esito_verifica_display()}"
 
 
+class SegnalazioneDifetto(models.Model):
+    """Segnalazione difetto rilevato dall'operatore durante la lavorazione."""
+    GRAVITA_CHOICES = [
+        ('bassa', 'Bassa'),
+        ('media', 'Media'),
+        ('alta', 'Alta'),
+    ]
+    ordine = models.ForeignKey(
+        'ordini.Ordine', on_delete=models.CASCADE, related_name='segnalazioni_difetti',
+    )
+    zona = models.CharField(max_length=80, verbose_name='Zona auto')
+    tipo_difetto = models.CharField(max_length=80, verbose_name='Tipo difetto')
+    gravita = models.CharField(max_length=10, choices=GRAVITA_CHOICES, default='media')
+    postazione_cq = models.ForeignKey(
+        'cq.PostazioneCQ', on_delete=models.PROTECT,
+    )
+    operatore = models.ForeignKey(
+        User, on_delete=models.PROTECT, related_name='segnalazioni_difetti',
+    )
+    note = models.TextField(blank=True)
+    data_ora = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        verbose_name = 'Segnalazione difetto'
+        verbose_name_plural = 'Segnalazioni difetti'
+        ordering = ['-data_ora']
+
+    def __str__(self):
+        return f"Difetto {self.zona} — {self.tipo_difetto} — Ordine {self.ordine.numero_progressivo}"
+
+    @property
+    def zona_nome(self):
+        from apps.cq.models import ZonaConfig
+        obj = ZonaConfig.objects.filter(codice=self.zona).first()
+        return obj.nome if obj else self.zona
+
+    @property
+    def tipo_difetto_nome(self):
+        from apps.cq.models import TipoDifettoConfig
+        obj = TipoDifettoConfig.objects.filter(codice=self.tipo_difetto).first()
+        return obj.nome if obj else self.tipo_difetto
+
+
 # ---------------------------------------------------------------------------
 # Lavorazione operatore (tracking tempo per operatore/ordine/fase)
 # ---------------------------------------------------------------------------

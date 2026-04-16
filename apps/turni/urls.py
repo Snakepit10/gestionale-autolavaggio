@@ -18,6 +18,7 @@ urlpatterns = [
     path('api/lavorazione/<int:lav_id>/riprendi/', views.api_riprendi_lavoro, name='api_riprendi_lavoro'),
     path('api/lavorazione/<int:lav_id>/completa/', views.api_completa_lavoro, name='api_completa_lavoro'),
     path('api/ordine/<int:ordine_id>/aggiungi-item/', views.api_aggiungi_item, name='api_aggiungi_item'),
+    path('api/ordine/<int:ordine_id>/segnala-difetto/', views.api_segnala_difetto, name='api_segnala_difetto'),
     path('api/coda/', views.api_coda_ordini, name='api_coda_ordini'),
 
     # Configurazione checklist (titolare)
