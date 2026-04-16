@@ -23,7 +23,8 @@ class Rilevatore(models.TextChoices):
 
 class EsitoCQ(models.TextChoices):
     OK = 'ok', 'OK — nessun difetto'
-    NON_OK = 'non_ok', 'Non OK — difetti rilevati'
+    OK_CON_RILIEVO = 'ok_con_rilievo', 'OK — con rilievo (intercettato e corretto)'
+    NON_OK = 'non_ok', 'Non OK — difetto rilevato in uscita'
 
 
 class StatoScheda(models.TextChoices):
@@ -450,7 +451,7 @@ class SchedaCQ(models.Model):
         related_name='schede_cq_compilate',
         verbose_name='Compilata da',
     )
-    esito = models.CharField(max_length=10, choices=EsitoCQ.choices, verbose_name='Esito')
+    esito = models.CharField(max_length=20, choices=EsitoCQ.choices, verbose_name='Esito')
     data_ora = models.DateTimeField(auto_now_add=True)
     note = models.TextField(blank=True, verbose_name='Note aggiuntive')
     stato = models.CharField(

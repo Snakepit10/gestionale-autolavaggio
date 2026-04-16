@@ -39,15 +39,28 @@ from apps.ordini.models import Ordine
 # Helper: postazioni in ordine di lavoro
 # ---------------------------------------------------------------------------
 
+def _get_operatori_turno_attivi(post_cq, blocco=None):
+    """Trova operatori con sessione turno attiva per questa postazione/blocco."""
+    from apps.turni.models import PostazioneTurno
+    qs = PostazioneTurno.objects.filter(
+        sessione__stato='attivo',
+        postazione_cq=post_cq,
+    ).select_related('sessione__operatore')
+    if blocco:
+        qs = qs.filter(blocco=blocco)
+    else:
+        qs = qs.filter(blocco__isnull=True)
+    return list(qs.values_list('sessione__operatore_id', flat=True))
+
+
 def _build_operatori_turno_forms(request_post=None, ordine=None, scheda=None):
     """
     Costruisce un form OperatoriTurnoForm per ogni postazione/blocco,
-    precompilato con gli operatori esistenti (supporta più operatori per postazione).
-    Se una postazione ha blocchi, genera un form per blocco.
+    precompilato con: 1) assegnazioni manuali esistenti, oppure
+    2) operatori con turno attivo (fallback automatico).
     """
     forms_list = []
     _ordine = scheda.ordine if scheda else ordine
-    postazioni_nome = dict(get_postazione_choices())
     postazioni_db = PostazioneCQ.objects.filter(attiva=True).prefetch_related('blocchi').order_by('ordine')
 
     for post_cq in postazioni_db:
@@ -58,6 +71,8 @@ def _build_operatori_turno_forms(request_post=None, ordine=None, scheda=None):
                 prefix = f'turno_{post_cq.codice}_{blocco.codice}'
                 initial = {'postazione': post_cq.codice, 'blocco_codice': blocco.codice}
 
+                # 1) Assegnazioni manuali esistenti per l'ordine
+                existing_ids = []
                 if _ordine:
                     existing_ids = list(
                         OperatorePostazioneTurno.objects.filter(
@@ -65,8 +80,11 @@ def _build_operatori_turno_forms(request_post=None, ordine=None, scheda=None):
                             blocco_codice=blocco.codice,
                         ).values_list('operatore_id', flat=True)
                     )
-                    if existing_ids:
-                        initial['operatori'] = existing_ids
+                # 2) Fallback: operatori con turno attivo
+                if not existing_ids:
+                    existing_ids = _get_operatori_turno_attivi(post_cq, blocco)
+                if existing_ids:
+                    initial['operatori'] = existing_ids
 
                 form = OperatoriTurnoForm(
                     data=request_post or None,
@@ -80,6 +98,7 @@ def _build_operatori_turno_forms(request_post=None, ordine=None, scheda=None):
             prefix = f'turno_{post_cq.codice}'
             initial = {'postazione': post_cq.codice, 'blocco_codice': ''}
 
+            existing_ids = []
             if _ordine:
                 existing_ids = list(
                     OperatorePostazioneTurno.objects.filter(
@@ -87,8 +106,10 @@ def _build_operatori_turno_forms(request_post=None, ordine=None, scheda=None):
                         blocco_codice='',
                     ).values_list('operatore_id', flat=True)
                 )
-                if existing_ids:
-                    initial['operatori'] = existing_ids
+            if not existing_ids:
+                existing_ids = _get_operatori_turno_attivi(post_cq)
+            if existing_ids:
+                initial['operatori'] = existing_ids
 
             form = OperatoriTurnoForm(
                 data=request_post or None,
@@ -141,6 +162,15 @@ class SchedaCQCreateView(ResponsabileOTitolareMixin, View):
         if existing_difetti:
             ctx['existing_difetti_json'] = json.dumps(existing_difetti)
 
+        # Auto-selezione esito basata sulle segnalazioni
+        esito_suggerito = ''
+        if segnalazioni.exists():
+            has_non_corretto = segnalazioni.filter(azione='segnalato').exists()
+            if has_non_corretto:
+                esito_suggerito = 'non_ok'
+            else:
+                esito_suggerito = 'ok_con_rilievo'
+
         return render(request, self.template_name, {
             'ordine': ordine,
             'ordine_items': ordine.items.select_related('servizio_prodotto').all(),
@@ -150,6 +180,7 @@ class SchedaCQCreateView(ResponsabileOTitolareMixin, View):
             'segnalazioni_operatori': segnalazioni.select_related(
                 'operatore', 'postazione_cq'
             ),
+            'esito_suggerito': esito_suggerito,
             'mode': 'crea',
             'configurazioni_assegnazione': ConfigurazioneAssegnazione.objects.filter(attiva=True),
             **ctx,
@@ -167,7 +198,8 @@ class SchedaCQCreateView(ResponsabileOTitolareMixin, View):
         turno_forms = _build_operatori_turno_forms(request_post=request.POST)
 
         esito = request.POST.get('esito', 'ok')
-        difetti_validi = esito == 'ok' or difetti_formset.is_valid()
+        ha_difetti = esito in ('ok_con_rilievo', 'non_ok')
+        difetti_validi = not ha_difetti or difetti_formset.is_valid()
 
         if scheda_form.is_valid() and difetti_validi:
             scheda = scheda_form.save(commit=False)
@@ -179,7 +211,7 @@ class SchedaCQCreateView(ResponsabileOTitolareMixin, View):
 
             _salva_operatori_turno(turno_forms, ordine)
 
-            if esito == 'non_ok' and difetti_validi:
+            if ha_difetti and difetti_validi:
                 for form in difetti_formset:
                     if form.cleaned_data and not form.cleaned_data.get('DELETE', False):
                         difetto = form.save(commit=False)
@@ -280,7 +312,8 @@ class SchedaCQUpdateView(TitolareRequiredMixin, View):
         turno_forms = _build_operatori_turno_forms(request_post=request.POST)
 
         esito = request.POST.get('esito', scheda.esito)
-        difetti_validi = esito == 'ok' or difetti_formset.is_valid()
+        ha_difetti = esito in ('ok_con_rilievo', 'non_ok')
+        difetti_validi = not ha_difetti or difetti_formset.is_valid()
 
         if scheda_form.is_valid() and difetti_validi:
             scheda = scheda_form.save()
@@ -291,7 +324,7 @@ class SchedaCQUpdateView(TitolareRequiredMixin, View):
 
             # Cancella tutti i difetti esistenti e ricrea da formset
             scheda.difetti.all().delete()
-            if esito == 'non_ok' and difetti_validi:
+            if ha_difetti and difetti_validi:
                 for form in difetti_formset:
                     if form.cleaned_data and not form.cleaned_data.get('DELETE', False):
                         difetto = form.save(commit=False)
