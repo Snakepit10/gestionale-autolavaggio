@@ -15,6 +15,14 @@
 .timer-display.running { color: #198754; }
 .btn-lavoro { padding: .75rem 1.5rem; font-size: 1.1rem; }
 .section-header { font-weight: 600; font-size: .85rem; text-transform: uppercase; letter-spacing: .5px; color: #6c757d; }
+.dif-zona-card { border: 2px solid #dee2e6; border-radius: 8px; padding: 6px 10px; cursor: pointer; transition: all .15s; text-align: center; min-width: 90px; }
+.dif-zona-card:hover { border-color: #dc3545; background: #fff5f5; }
+.dif-zona-card.active { border-color: #dc3545; background: #dc3545; color: #fff; }
+.dif-zona-card.active .text-muted { color: rgba(255,255,255,.7) !important; }
+.dif-tipo-btn { border: 1px solid #dee2e6; border-radius: 6px; padding: 4px 10px; cursor: pointer; font-size: .8rem; transition: all .1s; }
+.dif-tipo-btn:hover { background: #f8d7da; border-color: #dc3545; }
+.dif-grav-pill { cursor: pointer; }
+.dif-grav-pill.active { box-shadow: 0 0 0 2px #000; }
 .empty-state { display: flex; flex-direction: column; align-items: center; justify-content: center; height: 100%; color: #adb5bd; }
 .badge-postazione { font-size: .7rem; }
 </style>
@@ -114,8 +122,8 @@ async function selezionaOrdine(ordineId) {
   renderAreaOperativa(data.ordine, data.lavorazione, data.lavorazioni_attive || [], data.fasi_completate || [], data.segnalazioni || []);
 }
 
-// Dati servizi per il form aggiungi item
-const CATEGORIE_SERVIZI = {{ categorie_servizi_json|safe }};
+// Dati supplementi per il form aggiungi item
+const SUPPLEMENTI = {{ supplementi_json|safe }};
 const ZONE_DIFETTI = {{ zone_difetti_json|safe }};
 
 function renderAreaOperativa(ordine, lavorazione, lavorazioniAttive, fasiCompletate, segnalazioni) {
@@ -156,12 +164,10 @@ function renderAreaOperativa(ordine, lavorazione, lavorazioniAttive, fasiComplet
     buttonsHtml = `<button class="btn btn-primary btn-lavoro" onclick="iniziaLavoro()"><i class="bi bi-play-circle"></i> Inizia Lavoro</button>`;
   }
 
-  // --- Add item select ---
-  let optHtml = '<option value="">Seleziona servizio...</option>';
-  for (const cat of CATEGORIE_SERVIZI) {
-    optHtml += `<optgroup label="${cat.nome}">`;
-    for (const s of cat.servizi) optHtml += `<option value="${s.id}" data-prezzo="${s.prezzo}">${s.titolo} — &euro;${s.prezzo}</option>`;
-    optHtml += '</optgroup>';
+  // --- Add item select (solo supplementi) ---
+  let optHtml = '<option value="">Seleziona supplemento...</option>';
+  for (const s of SUPPLEMENTI) {
+    optHtml += `<option value="${s.id}" data-prezzo="${s.prezzo}">${s.titolo} — &euro;${s.prezzo}</option>`;
   }
 
   // --- Stato postazioni ---
@@ -183,22 +189,28 @@ function renderAreaOperativa(ordine, lavorazione, lavorazioniAttive, fasiComplet
     fasiHtml += '</div></div>';
   }
 
-  // --- Sezione difetti ---
+  // --- Sezione difetti POS-style ---
   let difettiHtml = '';
   if (ZONE_DIFETTI.length > 0) {
-    let zonaOpts = '<option value="">Seleziona zona...</option>';
-    for (const z of ZONE_DIFETTI) zonaOpts += `<option value="${z.codice}">${z.nome}</option>`;
+    // Zone come card cliccabili
+    let zoneCards = '';
+    for (const z of ZONE_DIFETTI) {
+      zoneCards += `<div class="dif-zona-card" data-zona="${z.codice}" onclick="selDifZona('${z.codice}')">
+        <div class="small fw-bold">${z.nome}</div>
+        <div class="text-muted" style="font-size:.6rem">${z.categoria}</div>
+      </div>`;
+    }
 
+    // Segnalazioni gia fatte
     let segnHtml = '';
     if (segnalazioni && segnalazioni.length > 0) {
-      segnHtml = '<div class="mt-2 small"><strong>Difetti segnalati:</strong></div><div class="mt-1">';
+      segnHtml = '<div class="border-top pt-2 mt-2"><div class="small fw-bold mb-1"><i class="bi bi-list-check"></i> Difetti segnalati</div>';
       for (const s of segnalazioni) {
         const azioneIcon = s.azione === 'corretto' ? 'bi-check-circle text-success' : 'bi-flag text-warning';
         segnHtml += `<div class="d-flex align-items-center gap-1 mb-1">
           <span class="badge bg-danger">${s.zona} — ${s.tipo_difetto}</span>
-          <span class="badge bg-secondary">${s.gravita}</span>
-          <i class="bi ${azioneIcon}" title="${s.azione || ''}"></i>
-          <small class="text-muted">prod: ${s.postazione_produttore || '?'}</small>
+          <span class="badge bg-${s.gravita==='alta'?'danger':s.gravita==='media'?'warning':'secondary'}" style="font-size:.6rem">${s.gravita}</span>
+          <i class="bi ${azioneIcon}"></i>
         </div>`;
       }
       segnHtml += '</div>';
@@ -206,38 +218,19 @@ function renderAreaOperativa(ordine, lavorazione, lavorazioniAttive, fasiComplet
 
     difettiHtml = `
     <div class="card mb-3 border-danger">
-      <div class="card-header py-2 bg-danger bg-opacity-10">
-        <span class="section-header text-danger"><i class="bi bi-exclamation-triangle"></i> Segnala Difetto</span>
+      <div class="card-header py-2 bg-danger text-white fw-bold" style="font-size:.85rem">
+        <i class="bi bi-exclamation-triangle"></i> Controllo Qualita — Segnala Difetto
       </div>
       <div class="card-body py-2">
-        <div class="row g-2 align-items-end">
-          <div class="col-md-4">
-            <select class="form-select form-select-sm" id="difZona" onchange="onZonaChange()">
-              ${zonaOpts}
-            </select>
+        <div class="row g-2">
+          <div class="col-md-5">
+            <div class="small text-muted mb-1">Seleziona zona:</div>
+            <div class="d-flex flex-wrap gap-1" id="difZoneContainer">${zoneCards}</div>
           </div>
-          <div class="col-md-3">
-            <select class="form-select form-select-sm" id="difTipo">
-              <option value="">Tipo difetto...</option>
-            </select>
-          </div>
-          <div class="col-md-2">
-            <select class="form-select form-select-sm" id="difGravita">
-              <option value="bassa">Bassa</option>
-              <option value="media" selected>Media</option>
-              <option value="alta">Alta</option>
-            </select>
-          </div>
-          <div class="col-md-3">
-            <select class="form-select form-select-sm" id="difAzione">
-              <option value="corretto">Corretto</option>
-              <option value="segnalato">Solo segnalato</option>
-            </select>
-          </div>
-          <div class="col-md-3 mt-1">
-            <button class="btn btn-danger btn-sm w-100" onclick="segnalaDifetto()">
-              <i class="bi bi-exclamation-triangle"></i> Segnala difetto
-            </button>
+          <div class="col-md-7" id="difPanelContainer">
+            <div class="text-center text-muted py-4 small">
+              <i class="bi bi-hand-index"></i> Seleziona una zona per vedere i difetti
+            </div>
           </div>
         </div>
         ${segnHtml}
@@ -273,7 +266,7 @@ function renderAreaOperativa(ordine, lavorazione, lavorazioniAttive, fasiComplet
     </div>
 
     <div class="card mb-3">
-      <div class="card-header py-2"><span class="section-header"><i class="bi bi-bag-plus"></i> Servizi</span></div>
+      <div class="card-header py-2 bg-dark text-white"><i class="bi bi-bag-plus"></i> Servizi</div>
       <div class="card-body p-0">
         <table class="table table-sm table-hover mb-0">
           <thead class="table-light"><tr><th>Servizio</th><th>Qty</th><th>Prezzo</th><th>Stato</th></tr></thead>
@@ -294,7 +287,7 @@ function renderAreaOperativa(ordine, lavorazione, lavorazioniAttive, fasiComplet
     ${difettiHtml}
 
     <div class="card">
-      <div class="card-header py-2"><span class="section-header"><i class="bi bi-stopwatch"></i> Lavorazione</span></div>
+      <div class="card-header py-2 bg-dark text-white"><i class="bi bi-stopwatch"></i> Lavorazione</div>
       <div class="card-body text-center py-3">
         ${fasiHtml}${lavAttivaHtml}${timerHtml}
         <div class="mt-3">${buttonsHtml}</div>
@@ -304,29 +297,85 @@ function renderAreaOperativa(ordine, lavorazione, lavorazioniAttive, fasiComplet
   startTimer();
 }
 
-function onZonaChange() {
-  const zona = document.getElementById('difZona').value;
-  const sel = document.getElementById('difTipo');
-  sel.innerHTML = '<option value="">Tipo difetto...</option>';
-  if (!zona) return;
-  const z = ZONE_DIFETTI.find(zd => zd.codice === zona);
-  if (z) {
-    for (const t of z.tipi) sel.innerHTML += `<option value="${t.codice}">${t.nome}</option>`;
+/* ---- Difetti POS-style ---- */
+let difZonaAttiva = null;
+
+function selDifZona(codice) {
+  difZonaAttiva = codice;
+  // Evidenzia card attiva
+  document.querySelectorAll('.dif-zona-card').forEach(c => c.classList.remove('active'));
+  const card = document.querySelector(`.dif-zona-card[data-zona="${codice}"]`);
+  if (card) card.classList.add('active');
+
+  // Mostra tipi difetto nel pannello
+  const z = ZONE_DIFETTI.find(zd => zd.codice === codice);
+  const panel = document.getElementById('difPanelContainer');
+  if (!z || !panel) return;
+
+  let html = `<div class="small text-muted mb-1">Tipo difetto per <strong>${z.nome}</strong>:</div>`;
+  html += '<div class="d-flex flex-wrap gap-1 mb-2">';
+  for (const t of z.tipi) {
+    html += `<div class="dif-tipo-btn" onclick="selDifTipo(this, '${t.codice}')">${t.nome}</div>`;
   }
+  html += '</div>';
+
+  // Gravita
+  html += `<div class="d-flex gap-2 align-items-center mb-2">
+    <span class="small text-muted">Gravita:</span>
+    <span class="badge bg-secondary dif-grav-pill" onclick="selGrav(this,'bassa')">Bassa</span>
+    <span class="badge bg-warning text-dark dif-grav-pill active" onclick="selGrav(this,'media')">Media</span>
+    <span class="badge bg-danger dif-grav-pill" onclick="selGrav(this,'alta')">Alta</span>
+  </div>`;
+
+  // Azione
+  html += `<div class="d-flex gap-2 align-items-center mb-2">
+    <span class="small text-muted">Azione:</span>
+    <div class="btn-group btn-group-sm">
+      <input type="radio" class="btn-check" name="difAzione" value="corretto" id="difAzCorr" checked>
+      <label class="btn btn-outline-success btn-sm" for="difAzCorr">Corretto</label>
+      <input type="radio" class="btn-check" name="difAzione" value="segnalato" id="difAzSegn">
+      <label class="btn btn-outline-warning btn-sm" for="difAzSegn">Solo segnalato</label>
+    </div>
+  </div>`;
+
+  html += `<button class="btn btn-danger btn-sm" onclick="inviaDefect()"><i class="bi bi-exclamation-triangle"></i> Conferma segnalazione</button>`;
+  panel.innerHTML = html;
 }
 
-async function segnalaDifetto() {
-  if (!currentOrdineId) return;
-  const zona = document.getElementById('difZona').value;
-  const tipo = document.getElementById('difTipo').value;
-  const gravita = document.getElementById('difGravita').value;
-  const azione = document.getElementById('difAzione').value;
-  if (!zona || !tipo) { alert('Seleziona zona e tipo difetto.'); return; }
+let difTipoAttivo = null;
+function selDifTipo(el, codice) {
+  difTipoAttivo = codice;
+  document.querySelectorAll('.dif-tipo-btn').forEach(b => { b.style.background = ''; b.style.borderColor = '#dee2e6'; b.style.color = ''; });
+  el.style.background = '#dc3545';
+  el.style.borderColor = '#dc3545';
+  el.style.color = '#fff';
+}
+
+let difGravAttiva = 'media';
+function selGrav(el, grav) {
+  difGravAttiva = grav;
+  document.querySelectorAll('.dif-grav-pill').forEach(p => p.classList.remove('active'));
+  el.classList.add('active');
+}
+
+async function inviaDefect() {
+  if (!currentOrdineId || !difZonaAttiva || !difTipoAttivo) {
+    alert('Seleziona zona e tipo difetto.');
+    return;
+  }
+  const azione = document.querySelector('input[name="difAzione"]:checked')?.value || 'corretto';
   const data = await apiPost(`/turni/api/ordine/${currentOrdineId}/segnala-difetto/`, {
-    zona, tipo_difetto: tipo, gravita, azione
+    zona: difZonaAttiva,
+    tipo_difetto: difTipoAttivo,
+    gravita: difGravAttiva,
+    azione: azione,
   });
-  if (data.ok) { selezionaOrdine(currentOrdineId); }
-  else alert(data.error);
+  if (data.ok) {
+    difZonaAttiva = null;
+    difTipoAttivo = null;
+    difGravAttiva = 'media';
+    selezionaOrdine(currentOrdineId);
+  } else alert(data.error);
 }
 
 function onServizioChange() {
@@ -347,7 +396,7 @@ function calcolaSubtotaleAdd() {
 /* ---- Timer ---- */
 function startTimer() {
   stopTimer();
-  if (!timerStartTime || !currentLavId) return;
+  if (!timerStartTime || !currentLavIds.length) return;
 
   timerInterval = setInterval(() => {
     const now = new Date();

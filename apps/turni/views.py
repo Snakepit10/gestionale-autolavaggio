@@ -277,15 +277,12 @@ def dashboard_operatore(request):
         sessione=sessione, stato__in=['in_lavorazione', 'in_pausa']
     ).select_related('ordine', 'postazione_cq', 'blocco').first()
 
-    # Servizi per il form aggiungi item (tutti i servizi attivi, raggruppati per categoria)
-    from apps.core.models import Categoria
-    categorie_servizi = []
-    for cat in Categoria.objects.filter(attiva=True).order_by('ordine_visualizzazione'):
-        servizi = list(cat.servizioprodotto_set.filter(attivo=True).values(
-            'id', 'titolo', 'prezzo', 'tipo',
-        ))
-        if servizi:
-            categorie_servizi.append({'nome': cat.nome, 'servizi': servizi})
+    # Servizi supplemento per il form aggiungi item (solo servizi marcati is_supplemento)
+    supplementi = list(
+        ServizioProdotto.objects.filter(attivo=True, is_supplemento=True).values(
+            'id', 'titolo', 'prezzo',
+        )
+    )
 
     # Zone dove l'operatore e nella CATENA di controllo (non produttore).
     # L'operatore controlla in ingresso: se rileva un difetto lo segnala
@@ -327,7 +324,7 @@ def dashboard_operatore(request):
         'postazioni_turno': post_turno,
         'ordini_coda': ordini_coda,
         'lavorazione_attiva': lavorazione_attiva,
-        'categorie_servizi_json': json.dumps(categorie_servizi, default=str),
+        'supplementi_json': json.dumps(supplementi, default=str),
         'zone_difetti_json': json.dumps(zone_difetti),
     })
 
