@@ -161,9 +161,21 @@ def _checklist_view_inner(request, fase):
     for item in items:
         item.esiti_disponibili = esiti_map.get(item.categoria_id, [])
 
+    # Costruisci mappa subitems per parent_id (serve anche per POST)
+    subitems_map = {}
+    for item in items:
+        if item.parent_id:
+            subitems_map.setdefault(item.parent_id, []).append(item)
+
+    # Insieme di ID parent che hanno subitems (da skippare nel salvataggio)
+    parents_con_subitems = set(subitems_map.keys())
+
     if request.method == 'POST':
         with transaction.atomic():
             for item in items:
+                # Skip parent items che fanno solo da contenitore
+                if item.pk in parents_con_subitems:
+                    continue
                 esito_pk = request.POST.get(f'esito_{item.pk}', '')
                 note = request.POST.get(f'note_{item.pk}', '')
                 esito_obj = None
@@ -193,12 +205,6 @@ def _checklist_view_inner(request, fase):
             messages.success(request, 'Checklist fine turno compilata.')
             return redirect('turni:chiudi_turno')
 
-    # Costruisci mappa subitems per parent_id
-    subitems_map = {}
-    for item in items:
-        if item.parent_id:
-            subitems_map.setdefault(item.parent_id, []).append(item)
-
     # Raggruppa solo items di primo livello; attacca i sub-items come attributo
     from collections import OrderedDict
     grouped = OrderedDict()
@@ -211,17 +217,23 @@ def _checklist_view_inner(request, fase):
         if item.blocco:
             post_key = f"{item.postazione_cq.nome} › {item.blocco.nome}"
         if post_key not in grouped:
-            grouped[post_key] = OrderedDict()
+            color_idx = len(grouped) % 8
+            grouped[post_key] = {
+                'color_idx': color_idx,
+                'sigla': item.postazione_cq.sigla or item.postazione_cq.codice,
+                'blocco_nome': item.blocco.nome if item.blocco else '',
+                'categorie': OrderedDict(),
+            }
 
         cat = item.categoria
         cat_key = cat.nome if cat else 'Altro'
-        if cat_key not in grouped[post_key]:
-            grouped[post_key][cat_key] = {
+        if cat_key not in grouped[post_key]['categorie']:
+            grouped[post_key]['categorie'][cat_key] = {
                 'nome': cat_key,
                 'icona': cat.icona if cat else '',
                 'items': [],
             }
-        grouped[post_key][cat_key]['items'].append(item)
+        grouped[post_key]['categorie'][cat_key]['items'].append(item)
 
     # Carica compilazioni esistenti
     compilazioni = {}
