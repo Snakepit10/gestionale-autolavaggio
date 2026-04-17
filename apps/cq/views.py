@@ -63,7 +63,7 @@ def _build_operatori_turno_forms(request_post=None, ordine=None, scheda=None):
     _ordine = scheda.ordine if scheda else ordine
     postazioni_db = PostazioneCQ.objects.filter(attiva=True).prefetch_related('blocchi').order_by('ordine')
 
-    for post_cq in postazioni_db:
+    for post_idx, post_cq in enumerate(postazioni_db):
         blocchi = list(post_cq.blocchi.order_by('ordine'))
 
         if blocchi:
@@ -93,6 +93,11 @@ def _build_operatori_turno_forms(request_post=None, ordine=None, scheda=None):
                 )
                 form.postazione_label = f"{post_cq.nome} › {blocco.nome}"
                 form.postazione_group = post_cq.nome
+                form.postazione_idx = post_idx
+                form.color_idx = post_idx % 8
+                form.postazione_sigla = post_cq.sigla or post_cq.codice
+                form.is_blocco = True
+                form.blocco_nome = blocco.nome
                 forms_list.append(form)
         else:
             prefix = f'turno_{post_cq.codice}'
@@ -118,6 +123,11 @@ def _build_operatori_turno_forms(request_post=None, ordine=None, scheda=None):
             )
             form.postazione_label = post_cq.nome
             form.postazione_group = post_cq.nome
+            form.postazione_idx = post_idx
+            form.color_idx = post_idx % 8
+            form.postazione_sigla = post_cq.sigla or post_cq.codice
+            form.is_blocco = False
+            form.blocco_nome = ''
             forms_list.append(form)
 
     return forms_list

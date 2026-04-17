@@ -7,16 +7,48 @@
 
 {% block extra_css %}
 <style>
-/* ---- Layout ---- */
+/* ---- Layout: 2 colonne come la cassa ---- */
+.cq-container { height: calc(100vh - 80px); overflow: hidden; }
+.cq-left-panel { height: 100%; overflow-y: auto; background: #f8f9fa; padding: 12px; }
+.cq-right-panel {
+  height: 100%;
+  display: flex; flex-direction: column;
+  background: #fff; padding: 12px;
+  border-left: 1px solid #dee2e6;
+}
+.cq-cart-items { flex: 1; overflow-y: auto; min-height: 200px; }
 .cq-form-container { display: flex; flex-direction: column; gap: 12px; }
+
+@media (max-width: 992px) {
+  .cq-container { height: auto; overflow: visible; }
+  .cq-left-panel, .cq-right-panel { height: auto; border-left: none; }
+}
 
 /* ---- Order details bar ---- */
 .ordine-bar { background: #e7f1ff; border: 1px solid #b6d4fe; border-radius: 10px; padding: 10px 14px; }
 .ordine-bar .badge-servizio { font-size: .78rem; }
 
-/* ---- Operatori turno ---- */
+/* ---- Operatori turno: colori per postazione ---- */
 .operatori-check-group .form-check { display: inline-block; margin-right: 12px; margin-bottom: 4px; }
 .operatori-check-group .form-check-input { width: 1.3em; height: 1.3em; }
+.postazione-card {
+  border: 2px solid; border-radius: 8px; padding: 6px 10px;
+  min-width: 150px;
+  transition: all .15s;
+}
+.postazione-card .postazione-title { font-size: .75rem; font-weight: 700; letter-spacing: .03em; }
+.postazione-card .postazione-blocco { font-size: .68rem; font-weight: 500; opacity: .75; margin-top: -2px; }
+.postazione-card .operatori-check-group { font-size: .78rem; margin-top: 3px; }
+.postazione-card .operatori-check-group label { font-size: .78rem; }
+/* 8 colori per postazione (ciclano) */
+.post-color-0 { background:#e7f3ff; border-color:#0d6efd; color:#0a58ca; }
+.post-color-1 { background:#fff3e0; border-color:#fd7e14; color:#bf5800; }
+.post-color-2 { background:#e8f5e9; border-color:#198754; color:#145c1f; }
+.post-color-3 { background:#e0f7fa; border-color:#0dcaf0; color:#006978; }
+.post-color-4 { background:#f3e5f5; border-color:#6f42c1; color:#6a1b9a; }
+.post-color-5 { background:#ffe7ef; border-color:#d63384; color:#8e1f4e; }
+.post-color-6 { background:#fff8e1; border-color:#ffc107; color:#856404; }
+.post-color-7 { background:#e5f6ef; border-color:#20c997; color:#0c5e3f; }
 
 /* ---- Esito radio ---- */
 .esito-radio-label {
@@ -144,7 +176,9 @@
 {% csrf_token %}
 {{ difetti_formset.management_form }}
 
-<div class="cq-form-container">
+<div class="row g-0 cq-container">
+  <div class="col-lg-8 cq-left-panel">
+    <div class="cq-form-container">
 
   {# ---- Header ordine ---- #}
   <div class="ordine-bar">
@@ -202,12 +236,13 @@
     <div class="card-body py-1 px-2">
       <div class="d-flex flex-wrap gap-2">
         {% for form in turno_forms %}
-        <div class="border rounded px-2 py-1" style="min-width:140px">
-          <div class="fw-semibold text-primary" style="font-size:.7rem">
-            <i class="bi bi-diagram-3"></i> {{ form.postazione_label }}
+        <div class="postazione-card post-color-{{ form.color_idx }}">
+          <div class="postazione-title">
+            <i class="bi bi-diagram-3"></i> {{ form.postazione_sigla }}
+            {% if form.is_blocco %}<span class="postazione-blocco">› {{ form.blocco_nome }}</span>{% endif %}
           </div>
           {% for hidden in form.hidden_fields %}{{ hidden }}{% endfor %}
-          <div class="operatori-check-group" style="font-size:.75rem">{{ form.operatori }}</div>
+          <div class="operatori-check-group">{{ form.operatori }}</div>
         </div>
         {% endfor %}
       </div>
@@ -252,81 +287,59 @@
       <i class="bi bi-exclamation-triangle"></i> Imposta la gravita per ogni difetto segnalato.
     </div>
 
-    <div class="row g-3">
-      {# ===== SINISTRA: Zone + Tipi difetto ===== #}
-      <div class="col-lg-7">
-        <div class="card">
-          <div class="card-header bg-dark text-white fw-semibold py-2">
-            <i class="bi bi-map"></i> Seleziona zona e difetto
-          </div>
-          <div class="card-body p-2">
+    <div class="card">
+      <div class="card-header bg-dark text-white fw-semibold py-2">
+        <i class="bi bi-map"></i> Seleziona zona e difetto
+      </div>
+      <div class="card-body p-2">
 
-            {# Category pills #}
-            <div class="d-flex flex-wrap gap-2 mb-3" id="catPills">
+        {# Category pills #}
+        <div class="d-flex flex-wrap gap-2 mb-3" id="catPills">
+          {% for cat_nome, zone in zone_categorie %}
+          <button type="button" class="cat-pill cat-pill-{{ forloop.counter0 }} {% if forloop.first %}active{% endif %}"
+                  data-cat="{{ forloop.counter0 }}"
+                  onclick="filtraCat({{ forloop.counter0 }})">
+            {{ cat_nome }}
+            <span class="badge bg-danger rounded-pill ms-1 d-none" id="cat-badge-{{ forloop.counter0 }}">0</span>
+          </button>
+          {% endfor %}
+        </div>
+
+        <div class="pos-layout">
+          {# Zone cards #}
+          <div>
+            <div class="text-muted small mb-2 fw-semibold"><i class="bi bi-map-fill"></i> Zone</div>
+            <div id="zonaGrid">
               {% for cat_nome, zone in zone_categorie %}
-              <button type="button" class="cat-pill cat-pill-{{ forloop.counter0 }} {% if forloop.first %}active{% endif %}"
-                      data-cat="{{ forloop.counter0 }}"
-                      onclick="filtraCat({{ forloop.counter0 }})">
-                {{ cat_nome }}
-                <span class="badge bg-danger rounded-pill ms-1 d-none" id="cat-badge-{{ forloop.counter0 }}">0</span>
-              </button>
-              {% endfor %}
-            </div>
-
-            <div class="pos-layout">
-              {# Zone cards #}
-              <div>
-                <div class="text-muted small mb-2 fw-semibold"><i class="bi bi-map-fill"></i> Zone</div>
-                <div id="zonaGrid">
-                  {% for cat_nome, zone in zone_categorie %}
-                  {% with cat_idx=forloop.counter0 %}
-                  <div class="zona-cat-group" data-cat="{{ cat_idx }}"
-                       {% if not forloop.first %}style="display:none"{% endif %}>
-                    <div class="d-flex flex-wrap gap-2">
-                      {% for zona_codice, zona_nome in zone %}
-                      <div class="zona-card zona-card-{{ cat_idx }}" data-zona="{{ zona_codice }}"
-                           onclick="selezionaZona('{{ zona_codice }}', '{{ zona_nome|escapejs }}', {{ cat_idx }})">
-                        {{ zona_nome }}
-                        <span class="zona-badge" id="zbadge-{{ zona_codice }}">0</span>
-                      </div>
-                      {% endfor %}
-                    </div>
+              {% with cat_idx=forloop.counter0 %}
+              <div class="zona-cat-group" data-cat="{{ cat_idx }}"
+                   {% if not forloop.first %}style="display:none"{% endif %}>
+                <div class="d-flex flex-wrap gap-2">
+                  {% for zona_codice, zona_nome in zone %}
+                  <div class="zona-card zona-card-{{ cat_idx }}" data-zona="{{ zona_codice }}"
+                       onclick="selezionaZona('{{ zona_codice }}', '{{ zona_nome|escapejs }}', {{ cat_idx }})">
+                    {{ zona_nome }}
+                    <span class="zona-badge" id="zbadge-{{ zona_codice }}">0</span>
                   </div>
-                  {% endwith %}
                   {% endfor %}
                 </div>
               </div>
-
-              {# Difetto types panel #}
-              <div class="difetto-panel" id="difettoPanel">
-                <div class="difetto-panel-header text-muted small d-flex justify-content-between align-items-center">
-                  <span id="panelZonaNome"><i class="bi bi-hand-index"></i> Seleziona una zona</span>
-                </div>
-                <div class="p-2" id="panelContent">
-                  <p class="text-muted text-center py-4">Clicca una zona per vedere i difetti applicabili</p>
-                </div>
-              </div>
+              {% endwith %}
+              {% endfor %}
             </div>
+          </div>
 
+          {# Difetto types panel #}
+          <div class="difetto-panel" id="difettoPanel">
+            <div class="difetto-panel-header text-muted small d-flex justify-content-between align-items-center">
+              <span id="panelZonaNome"><i class="bi bi-hand-index"></i> Seleziona una zona</span>
+            </div>
+            <div class="p-2" id="panelContent">
+              <p class="text-muted text-center py-4">Clicca una zona per vedere i difetti applicabili</p>
+            </div>
           </div>
         </div>
-      </div>
 
-      {# ===== DESTRA: Carrello difetti (sticky) ===== #}
-      <div class="col-lg-5">
-        <div id="cartCard" style="display:none; position:sticky; top:80px;">
-          <div class="card border-danger">
-            <div class="card-header bg-danger text-white fw-semibold py-2">
-              <i class="bi bi-cart3"></i> Difetti selezionati
-              <span class="badge bg-light text-danger ms-1" id="cartCount">0</span>
-            </div>
-            <div class="card-body p-2" id="cartBody" style="max-height:60vh; overflow-y:auto;"></div>
-          </div>
-        </div>
-        <div id="cartEmpty" class="text-center text-muted py-4">
-          <i class="bi bi-cart3 fs-2"></i>
-          <p class="small mt-2">Nessun difetto selezionato</p>
-        </div>
       </div>
     </div>
 
@@ -377,7 +390,28 @@
     </a>
   </div>
 
-</div>{# cq-form-container #}
+    </div>{# cq-form-container #}
+  </div>{# col-lg-8 left panel #}
+
+  {# ====== PANNELLO DESTRO: Carrello difetti ====== #}
+  <div class="col-lg-4 cq-right-panel">
+    <div class="d-flex justify-content-between align-items-center mb-2">
+      <h5 class="mb-0 text-danger"><i class="bi bi-cart3"></i> Difetti selezionati
+        <span class="badge bg-danger ms-1" id="cartCount">0</span>
+      </h5>
+    </div>
+
+    <div id="cartCard" class="cq-cart-items" style="display:none">
+      <div id="cartBody"></div>
+    </div>
+    <div id="cartEmpty" class="text-center text-muted py-5 cq-cart-items">
+      <i class="bi bi-cart3 display-4"></i>
+      <p class="mt-2">Nessun difetto selezionato</p>
+      <small class="text-muted">Seleziona una zona e un difetto per aggiungerlo al carrello</small>
+    </div>
+  </div>
+
+</div>{# row cq-container #}
 </form>
 {% endblock %}
 
