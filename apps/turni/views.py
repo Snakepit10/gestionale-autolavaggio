@@ -228,9 +228,12 @@ def _checklist_view_inner(request, fase):
         cat = item.categoria
         cat_key = cat.nome if cat else 'Altro'
         if cat_key not in grouped[post_key]['categorie']:
+            # Assegna un color_idx basato sull'ordine/pk della categoria (stabile per categoria)
+            cat_color = (cat.ordine if cat else 99) % 5 if cat else 4
             grouped[post_key]['categorie'][cat_key] = {
                 'nome': cat_key,
                 'icona': cat.icona if cat else '',
+                'color_idx': cat_color,
                 'items': [],
             }
         grouped[post_key]['categorie'][cat_key]['items'].append(item)

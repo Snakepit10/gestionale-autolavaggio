@@ -43,43 +43,65 @@ body { background: #f5f7fa; }
 .post-bg-7 { background: linear-gradient(135deg, #115e59 0%, #14b8a6 100%); }
 
 /* ---- Categoria sections ---- */
-.cat-section { border-top: 1px solid #f0f2f5; }
+.cat-section { border-top: 2px solid #e2e8f0; }
 .cat-section:first-child { border-top: none; }
 .cat-header {
-  background: #f8fafc;
-  padding: 8px 18px;
-  font-weight: 600;
-  font-size: .85rem;
-  color: #475569;
-  border-left: 4px solid #64748b;
+  padding: 10px 20px;
+  font-weight: 700;
+  font-size: .92rem;
+  letter-spacing: .3px;
+  text-transform: uppercase;
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: 10px;
 }
-.cat-header .cat-icon { font-size: 1.05rem; color: #0d6efd; }
+.cat-header .cat-icon { font-size: 1.2rem; }
+.cat-body { padding: 4px 0; }
+
+/* 5 colori per categoria 5S */
+.cat-color-0 .cat-header { background: #dbeafe; color: #1e40af; border-left: 5px solid #3b82f6; }
+.cat-color-0 .cat-body { background: #eff6ff; }
+.cat-color-0 .cat-header .cat-icon { color: #3b82f6; }
+
+.cat-color-1 .cat-header { background: #dcfce7; color: #166534; border-left: 5px solid #22c55e; }
+.cat-color-1 .cat-body { background: #f0fdf4; }
+.cat-color-1 .cat-header .cat-icon { color: #22c55e; }
+
+.cat-color-2 .cat-header { background: #fed7aa; color: #9a3412; border-left: 5px solid #f97316; }
+.cat-color-2 .cat-body { background: #fff7ed; }
+.cat-color-2 .cat-header .cat-icon { color: #f97316; }
+
+.cat-color-3 .cat-header { background: #fecaca; color: #991b1b; border-left: 5px solid #ef4444; }
+.cat-color-3 .cat-body { background: #fef2f2; }
+.cat-color-3 .cat-header .cat-icon { color: #ef4444; }
+
+.cat-color-4 .cat-header { background: #e9d5ff; color: #6b21a8; border-left: 5px solid #a855f7; }
+.cat-color-4 .cat-body { background: #faf5ff; }
+.cat-color-4 .cat-header .cat-icon { color: #a855f7; }
 
 /* ---- Item rows ---- */
 .check-item {
   display: flex;
   align-items: center;
   gap: 16px;
-  padding: 10px 18px;
-  border-top: 1px solid #f0f2f5;
+  padding: 10px 20px;
+  border-top: 1px solid rgba(255,255,255,.5);
   transition: background .1s;
 }
-.check-item:hover { background: #fafbfc; }
+.check-item:hover { background: rgba(255,255,255,.6); }
 .check-item .item-name {
   flex: 1;
   font-size: .92rem;
   color: #1e293b;
+  font-weight: 500;
 }
 .check-item .item-notes {
   width: 180px;
 }
 .check-item .item-notes input {
   font-size: .8rem;
-  border: 1px solid #e2e8f0;
-  background: #f8fafc;
+  border: 1px solid rgba(0,0,0,.08);
+  background: rgba(255,255,255,.7);
 }
 .check-item .item-notes input:focus {
   background: #fff;
@@ -88,42 +110,42 @@ body { background: #f5f7fa; }
 
 /* ---- Parent container (non esitabile) ---- */
 .parent-container {
-  background: linear-gradient(to right, #eff6ff, #f8fafc);
-  padding: 10px 18px;
-  border-top: 1px solid #e0e7ff;
+  background: rgba(255,255,255,.65);
+  padding: 10px 20px;
+  border-top: 1px solid rgba(0,0,0,.06);
+  border-left: 4px solid rgba(0,0,0,.1);
   display: flex;
   align-items: center;
   gap: 10px;
-  font-weight: 600;
-  color: #1e40af;
+  font-weight: 700;
   font-size: .9rem;
+  color: #1e293b;
 }
-.parent-container .folder-icon { color: #3b82f6; font-size: 1.1rem; }
+.parent-container .folder-icon { font-size: 1.1rem; opacity: .75; }
 .parent-container .sub-count {
-  background: #dbeafe;
-  color: #1e40af;
-  padding: 2px 8px;
-  border-radius: 10px;
+  background: rgba(0,0,0,.08);
+  padding: 2px 10px;
+  border-radius: 12px;
   font-size: .7rem;
-  font-weight: 600;
+  font-weight: 700;
+  letter-spacing: .5px;
 }
 
 /* ---- Subitem ---- */
 .subitem {
-  padding-left: 42px !important;
-  background: #fafbfc;
-  border-top: 1px solid #f0f2f5;
+  padding-left: 44px !important;
 }
 .subitem .item-name {
   font-size: .86rem;
-  color: #475569;
+  color: #334155;
+  font-weight: 500;
   position: relative;
 }
 .subitem .item-name::before {
   content: '└';
   position: absolute;
-  left: -16px;
-  color: #94a3b8;
+  left: -18px;
+  color: #64748b;
   font-weight: 400;
 }
 
@@ -226,11 +248,12 @@ input[type="radio"]:checked + .esito-btn.border-primary { background: #2563eb; c
       </div>
 
       {% for cat_name, cat_data in post_data.categorie.items %}
-      <div class="cat-section">
+      <div class="cat-section cat-color-{{ cat_data.color_idx }}">
         <div class="cat-header">
           {% if cat_data.icona %}<i class="bi {{ cat_data.icona }} cat-icon"></i>{% endif %}
           <span>{{ cat_data.nome }}</span>
         </div>
+        <div class="cat-body">
 
         {% for item in cat_data.items %}
           {% if item.subitems_list %}
@@ -278,6 +301,8 @@ input[type="radio"]:checked + .esito-btn.border-primary { background: #2563eb; c
             </div>
           {% endif %}
         {% endfor %}
+
+        </div>{# cat-body #}
       </div>
       {% endfor %}
     </div>
