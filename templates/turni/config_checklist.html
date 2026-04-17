@@ -117,19 +117,27 @@
       </div>
       <div class="card-body p-0">
         <table class="table table-hover mb-0">
-          <thead class="table-light"><tr><th>Postazione</th><th>Blocco</th><th>Categoria</th><th>Voce</th><th>Ord.</th><th>Attivo</th><th></th></tr></thead>
+          <thead class="table-light"><tr><th>Postazione</th><th>Blocco</th><th>Categoria</th><th>Voce</th><th class="text-center">Fase</th><th>Ord.</th><th>Attivo</th><th></th></tr></thead>
           <tbody>
             {% for item in items %}
             <tr>
               <td>{{ item.postazione_cq.nome }}</td>
               <td>{{ item.blocco.nome|default:"—" }}</td>
               <td>{% if item.categoria %}<span class="badge bg-light text-dark border">{% if item.categoria.icona %}<i class="bi {{ item.categoria.icona }}"></i> {% endif %}{{ item.categoria.nome }}</span>{% else %}—{% endif %}</td>
-              <td>{{ item.nome }}</td>
+              <td><strong>{{ item.nome }}</strong>{% if item.subitems_list %} <span class="badge bg-info">{{ item.subitems_list|length }} subitem</span>{% endif %}</td>
+              <td class="text-center">
+                {% if item.in_apertura %}<span class="badge bg-success" title="Apertura">A</span>{% endif %}
+                {% if item.in_chiusura %}<span class="badge bg-warning text-dark" title="Chiusura">C</span>{% endif %}
+              </td>
               <td>{{ item.ordine }}</td>
               <td>{% if item.attivo %}<i class="bi bi-check-circle text-success"></i>{% else %}<i class="bi bi-x-circle text-danger"></i>{% endif %}</td>
-              <td>
+              <td class="text-nowrap">
+                <button class="btn btn-outline-success btn-sm py-0" title="Aggiungi subitem"
+                        onclick="apriSubitem({{ item.pk }}, '{{ item.nome|escapejs }}', {{ item.postazione_cq_id }}, {{ item.blocco_id|default:'null' }}, {{ item.categoria_id|default:'null' }})">
+                  <i class="bi bi-plus-lg"></i>
+                </button>
                 <button class="btn btn-outline-primary btn-sm py-0"
-                        onclick="modificaVoce({{ item.pk }}, '{{ item.nome|escapejs }}', {{ item.postazione_cq_id }}, {{ item.blocco_id|default:'null' }}, {{ item.categoria_id|default:'null' }}, {{ item.ordine }}, {{ item.attivo|yesno:'true,false' }})">
+                        onclick="modificaVoce({{ item.pk }}, '{{ item.nome|escapejs }}', {{ item.postazione_cq_id }}, {{ item.blocco_id|default:'null' }}, {{ item.categoria_id|default:'null' }}, {{ item.ordine }}, {{ item.attivo|yesno:'true,false' }}, null, {{ item.in_apertura|yesno:'true,false' }}, {{ item.in_chiusura|yesno:'true,false' }})">
                   <i class="bi bi-pencil"></i>
                 </button>
                 <button class="btn btn-outline-danger btn-sm py-0"
@@ -138,8 +146,30 @@
                 </button>
               </td>
             </tr>
+            {% for sub in item.subitems_list %}
+            <tr class="table-light">
+              <td colspan="3" class="ps-4 small text-muted"><i class="bi bi-arrow-return-right"></i> <em>subitem di {{ item.nome }}</em></td>
+              <td>&mdash; {{ sub.nome }}</td>
+              <td class="text-center">
+                {% if sub.in_apertura %}<span class="badge bg-success" title="Apertura">A</span>{% endif %}
+                {% if sub.in_chiusura %}<span class="badge bg-warning text-dark" title="Chiusura">C</span>{% endif %}
+              </td>
+              <td>{{ sub.ordine }}</td>
+              <td>{% if sub.attivo %}<i class="bi bi-check-circle text-success"></i>{% else %}<i class="bi bi-x-circle text-danger"></i>{% endif %}</td>
+              <td class="text-nowrap">
+                <button class="btn btn-outline-primary btn-sm py-0"
+                        onclick="modificaVoce({{ sub.pk }}, '{{ sub.nome|escapejs }}', {{ sub.postazione_cq_id }}, {{ sub.blocco_id|default:'null' }}, {{ sub.categoria_id|default:'null' }}, {{ sub.ordine }}, {{ sub.attivo|yesno:'true,false' }}, {{ item.pk }}, {{ sub.in_apertura|yesno:'true,false' }}, {{ sub.in_chiusura|yesno:'true,false' }})">
+                  <i class="bi bi-pencil"></i>
+                </button>
+                <button class="btn btn-outline-danger btn-sm py-0"
+                        onclick="eliminaVoce({{ sub.pk }}, '{{ sub.nome|escapejs }}')">
+                  <i class="bi bi-trash"></i>
+                </button>
+              </td>
+            </tr>
+            {% endfor %}
             {% empty %}
-            <tr><td colspan="7" class="text-muted text-center py-3">Nessuna voce</td></tr>
+            <tr><td colspan="8" class="text-muted text-center py-3">Nessuna voce</td></tr>
             {% endfor %}
           </tbody>
         </table>
@@ -239,6 +269,27 @@
           <div class="col-md-4"><label class="form-label small">Ordine</label><input type="number" class="form-control" id="clOrdine" value="0"></div>
           <div class="col-12"><label class="form-label small">Nome voce *</label><input type="text" class="form-control" id="clNome"></div>
           <div class="col-12">
+            <label class="form-label small">Item padre (opzionale)</label>
+            <select class="form-select" id="clParent">
+              <option value="">— Nessuno (item di primo livello) —</option>
+              {% for p in parent_items %}
+                <option value="{{ p.pk }}">{{ p.postazione_cq.nome }}{% if p.blocco %} [{{ p.blocco.nome }}]{% endif %} — {{ p.nome }}</option>
+              {% endfor %}
+            </select>
+            <small class="text-muted">Se selezionato, questa voce sara un subitem del padre</small>
+          </div>
+          <div class="col-12">
+            <label class="form-label small d-block">Mostra in fase:</label>
+            <div class="form-check form-check-inline">
+              <input class="form-check-input" type="checkbox" id="clApertura" checked>
+              <label class="form-check-label" for="clApertura"><span class="badge bg-success">A</span> Apertura turno</label>
+            </div>
+            <div class="form-check form-check-inline">
+              <input class="form-check-input" type="checkbox" id="clChiusura" checked>
+              <label class="form-check-label" for="clChiusura"><span class="badge bg-warning text-dark">C</span> Chiusura turno</label>
+            </div>
+          </div>
+          <div class="col-12">
             <div class="form-check">
               <input class="form-check-input" type="checkbox" id="clAttivo" checked>
               <label class="form-check-label" for="clAttivo">Attivo</label>
@@ -297,17 +348,58 @@ function filtraBlocchi() {
   bSel.innerHTML = '<option value="">— Tutta la postazione —</option>';
   blocchi.forEach(b => { bSel.innerHTML += `<option value="${b.id}">${b.nome}</option>`; });
 }
-function apriModalVoce() { document.getElementById('clId').value=''; document.getElementById('clNome').value=''; document.getElementById('clOrdine').value='0'; document.getElementById('clAttivo').checked=true; filtraBlocchi(); apriM('modalVoce'); }
-function modificaVoce(id, nome, postId, bloccoId, catId, ordine, attivo) {
-  document.getElementById('clId').value=id; document.getElementById('clNome').value=nome;
-  document.getElementById('clPostazione').value=postId; filtraBlocchi();
+function apriModalVoce() {
+  document.getElementById('clId').value='';
+  document.getElementById('clNome').value='';
+  document.getElementById('clOrdine').value='0';
+  document.getElementById('clAttivo').checked=true;
+  document.getElementById('clApertura').checked=true;
+  document.getElementById('clChiusura').checked=true;
+  document.getElementById('clParent').value='';
+  filtraBlocchi();
+  apriM('modalVoce');
+}
+function apriSubitem(parentId, parentNome, postId, bloccoId, catId) {
+  document.getElementById('clId').value='';
+  document.getElementById('clNome').value='';
+  document.getElementById('clOrdine').value='0';
+  document.getElementById('clAttivo').checked=true;
+  document.getElementById('clApertura').checked=true;
+  document.getElementById('clChiusura').checked=true;
+  document.getElementById('clPostazione').value=postId;
+  filtraBlocchi();
   if (bloccoId) document.getElementById('clBlocco').value=bloccoId;
   if (catId) document.getElementById('clCategoria').value=catId;
-  document.getElementById('clOrdine').value=ordine; document.getElementById('clAttivo').checked=attivo;
+  document.getElementById('clParent').value=parentId;
+  apriM('modalVoce');
+}
+function modificaVoce(id, nome, postId, bloccoId, catId, ordine, attivo, parentId, inApertura, inChiusura) {
+  document.getElementById('clId').value=id;
+  document.getElementById('clNome').value=nome;
+  document.getElementById('clPostazione').value=postId;
+  filtraBlocchi();
+  if (bloccoId) document.getElementById('clBlocco').value=bloccoId;
+  if (catId) document.getElementById('clCategoria').value=catId;
+  document.getElementById('clOrdine').value=ordine;
+  document.getElementById('clAttivo').checked=attivo;
+  document.getElementById('clApertura').checked=(inApertura === undefined) ? true : inApertura;
+  document.getElementById('clChiusura').checked=(inChiusura === undefined) ? true : inChiusura;
+  document.getElementById('clParent').value=parentId || '';
   apriM('modalVoce');
 }
 async function salvaVoce() {
-  const res = await apiPost('/turni/api/checklist-item/salva/', { id: document.getElementById('clId').value, postazione_cq_id: document.getElementById('clPostazione').value, blocco_id: document.getElementById('clBlocco').value, categoria_id: document.getElementById('clCategoria').value, nome: document.getElementById('clNome').value, ordine: document.getElementById('clOrdine').value, attivo: document.getElementById('clAttivo').checked ? '1' : '0' });
+  const res = await apiPost('/turni/api/checklist-item/salva/', {
+    id: document.getElementById('clId').value,
+    postazione_cq_id: document.getElementById('clPostazione').value,
+    blocco_id: document.getElementById('clBlocco').value,
+    categoria_id: document.getElementById('clCategoria').value,
+    parent_id: document.getElementById('clParent').value,
+    nome: document.getElementById('clNome').value,
+    ordine: document.getElementById('clOrdine').value,
+    attivo: document.getElementById('clAttivo').checked ? '1' : '0',
+    in_apertura: document.getElementById('clApertura').checked ? '1' : '0',
+    in_chiusura: document.getElementById('clChiusura').checked ? '1' : '0',
+  });
   if (res.ok) { chiudiM('modalVoce'); location.reload(); } else alert(res.error);
 }
 async function eliminaVoce(pk, nome) { if (!confirm(`Eliminare "${nome}"?`)) return; const res = await apiPost(`/turni/api/checklist-item/${pk}/elimina/`, {}); if (res.ok) location.reload(); else alert(res.error); }

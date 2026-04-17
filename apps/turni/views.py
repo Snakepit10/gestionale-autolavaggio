@@ -133,12 +133,13 @@ def _checklist_view_inner(request, fase):
     post_ids = [pt.postazione_cq_id for pt in post_turno]
     blocco_ids = [pt.blocco_id for pt in post_turno if pt.blocco_id]
 
-    # Carica checklist items per le postazioni del turno
+    # Carica checklist items per le postazioni del turno, filtrati per fase
+    fase_filter = Q(in_apertura=True) if fase == 'inizio' else Q(in_chiusura=True)
     items_qs = ChecklistItem.objects.filter(
         attivo=True, postazione_cq_id__in=post_ids
-    ).filter(
+    ).filter(fase_filter).filter(
         Q(blocco__isnull=True) | Q(blocco_id__in=blocco_ids)
-    ).select_related('postazione_cq', 'blocco', 'categoria').order_by(
+    ).select_related('postazione_cq', 'blocco', 'categoria', 'parent').order_by(
         'postazione_cq__ordine', 'blocco__ordine', 'categoria__ordine', 'ordine'
     )
 
@@ -192,10 +193,20 @@ def _checklist_view_inner(request, fase):
             messages.success(request, 'Checklist fine turno compilata.')
             return redirect('turni:chiudi_turno')
 
-    # Raggruppa items: postazione > categoria > items
+    # Costruisci mappa subitems per parent_id
+    subitems_map = {}
+    for item in items:
+        if item.parent_id:
+            subitems_map.setdefault(item.parent_id, []).append(item)
+
+    # Raggruppa solo items di primo livello; attacca i sub-items come attributo
     from collections import OrderedDict
     grouped = OrderedDict()
     for item in items:
+        if item.parent_id:
+            continue  # skip subitems - verranno mostrati sotto il parent
+        item.subitems_list = subitems_map.get(item.pk, [])
+
         post_key = item.postazione_cq.nome
         if item.blocco:
             post_key = f"{item.postazione_cq.nome} › {item.blocco.nome}"
@@ -767,15 +778,33 @@ def config_checklist(request):
         messages.error(request, 'Accesso riservato al titolare.')
         return redirect('core:home')
 
-    items = ChecklistItem.objects.select_related(
-        'postazione_cq', 'blocco', 'categoria'
-    ).order_by('postazione_cq__ordine', 'blocco__ordine', 'categoria__ordine', 'ordine')
+    all_items = list(ChecklistItem.objects.select_related(
+        'postazione_cq', 'blocco', 'categoria', 'parent'
+    ).order_by('postazione_cq__ordine', 'blocco__ordine', 'categoria__ordine', 'ordine'))
+
+    # Costruisci mappa subitems per padre
+    sub_map = {}
+    for it in all_items:
+        if it.parent_id:
+            sub_map.setdefault(it.parent_id, []).append(it)
+
+    # Solo parent items di primo livello, attacca i subitems
+    items = []
+    for it in all_items:
+        if it.parent_id:
+            continue
+        it.subitems_list = sub_map.get(it.pk, [])
+        items.append(it)
+
+    # Lista parent disponibili per il dropdown (solo top-level)
+    parent_items = [it for it in all_items if it.parent_id is None]
 
     postazioni = PostazioneCQ.objects.filter(attiva=True).prefetch_related('blocchi').order_by('ordine')
     categorie = CategoriaChecklist.objects.prefetch_related('esiti').order_by('ordine')
 
     return render(request, 'turni/config_checklist.html', {
         'items': items,
+        'parent_items': parent_items,
         'postazioni': postazioni,
         'categorie': categorie,
     })
@@ -790,30 +819,48 @@ def api_salva_checklist_item(request):
     postazione_cq_id = request.POST.get('postazione_cq_id')
     blocco_id = request.POST.get('blocco_id') or None
     categoria_id = request.POST.get('categoria_id') or None
+    parent_id = request.POST.get('parent_id') or None
     nome = request.POST.get('nome', '').strip()
     ordine = int(request.POST.get('ordine', 0))
     attivo = request.POST.get('attivo', '1') == '1'
+    in_apertura = request.POST.get('in_apertura', '1') == '1'
+    in_chiusura = request.POST.get('in_chiusura', '1') == '1'
 
     if not nome or not postazione_cq_id:
         return _json_err('Nome e postazione obbligatori.')
+    if not in_apertura and not in_chiusura:
+        return _json_err('Seleziona almeno una fase (apertura o chiusura).')
 
     postazione = get_object_or_404(PostazioneCQ, pk=postazione_cq_id)
+
+    # Verifica parent: non puo essere se stesso e non puo diventare subitem di un subitem
+    if parent_id:
+        parent = get_object_or_404(ChecklistItem, pk=parent_id)
+        if parent.parent_id is not None:
+            return _json_err('Un subitem non puo essere padre di un altro subitem.')
+        if pk and int(pk) == int(parent_id):
+            return _json_err('Un item non puo essere padre di se stesso.')
 
     if pk:
         obj = get_object_or_404(ChecklistItem, pk=pk)
         obj.postazione_cq = postazione
         obj.blocco_id = blocco_id if blocco_id else None
         obj.categoria_id = categoria_id if categoria_id else None
+        obj.parent_id = parent_id if parent_id else None
         obj.nome = nome
         obj.ordine = ordine
         obj.attivo = attivo
+        obj.in_apertura = in_apertura
+        obj.in_chiusura = in_chiusura
         obj.save()
     else:
         obj = ChecklistItem.objects.create(
             postazione_cq=postazione,
             blocco_id=blocco_id if blocco_id else None,
             categoria_id=categoria_id if categoria_id else None,
+            parent_id=parent_id if parent_id else None,
             nome=nome, ordine=ordine, attivo=attivo,
+            in_apertura=in_apertura, in_chiusura=in_chiusura,
         )
     return _json_ok({
         'id': obj.pk, 'nome': obj.nome,

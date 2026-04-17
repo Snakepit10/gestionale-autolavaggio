@@ -119,7 +119,8 @@ class EsitoChecklist(models.Model):
 # ---------------------------------------------------------------------------
 
 class ChecklistItem(models.Model):
-    """Voce di checklist configurabile dal titolare, per postazione/blocco/categoria."""
+    """Voce di checklist configurabile dal titolare, per postazione/blocco/categoria.
+    Supporta sub-items tramite parent self-reference e scelta fase (apertura/chiusura)."""
     postazione_cq = models.ForeignKey(
         'cq.PostazioneCQ', on_delete=models.CASCADE, related_name='checklist_items',
     )
@@ -133,9 +134,23 @@ class ChecklistItem(models.Model):
         on_delete=models.SET_NULL, related_name='checklist_items',
         verbose_name='Categoria 5S',
     )
+    parent = models.ForeignKey(
+        'self', null=True, blank=True,
+        on_delete=models.CASCADE, related_name='subitems',
+        verbose_name='Item padre',
+        help_text='Se impostato, questa voce e un subitem del padre',
+    )
     nome = models.CharField(max_length=200, verbose_name='Voce checklist')
     ordine = models.PositiveIntegerField(default=0, verbose_name='Ordine')
     attivo = models.BooleanField(default=True, verbose_name='Attivo')
+    in_apertura = models.BooleanField(
+        default=True, verbose_name='In apertura turno',
+        help_text='Mostra questa voce nella checklist di inizio turno',
+    )
+    in_chiusura = models.BooleanField(
+        default=True, verbose_name='In chiusura turno',
+        help_text='Mostra questa voce nella checklist di fine turno',
+    )
 
     class Meta:
         verbose_name = 'Voce checklist'
@@ -145,7 +160,16 @@ class ChecklistItem(models.Model):
     def __str__(self):
         blocco = f" [{self.blocco.nome}]" if self.blocco else ""
         cat = f" ({self.categoria.nome})" if self.categoria else ""
-        return f"{self.postazione_cq.nome}{blocco}{cat}: {self.nome}"
+        parent = f" << {self.parent.nome}" if self.parent else ""
+        return f"{self.postazione_cq.nome}{blocco}{cat}: {self.nome}{parent}"
+
+    @property
+    def is_subitem(self):
+        return self.parent_id is not None
+
+    @property
+    def has_subitems(self):
+        return self.subitems.exists()
 
 
 class ChecklistCompilata(models.Model):

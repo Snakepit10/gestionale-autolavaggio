@@ -5,6 +5,10 @@
 <style>
 .cat-header { background: #f8f9fa; border-left: 3px solid #0d6efd; padding: 6px 12px; font-weight: 600; font-size: .85rem; }
 .esito-group .btn { font-size: .75rem; padding: 3px 8px; }
+.subitem-row td { background: #fafbfc !important; font-size: .82rem; }
+.subitem-row td:first-child { padding-left: 32px !important; position: relative; }
+.subitem-row td:first-child::before { content: '↳'; position: absolute; left: 14px; color: #6c757d; }
+.parent-item td:first-child { font-weight: 600; }
 </style>
 {% endblock %}
 
@@ -46,8 +50,12 @@
             <table class="table table-hover mb-0">
               <tbody>
                 {% for item in cat_data.items %}
-                <tr>
-                  <td class="align-middle" style="min-width:200px">{{ item.nome }}</td>
+                <tr class="{% if item.subitems_list %}parent-item{% endif %}">
+                  <td class="align-middle" style="min-width:200px">
+                    {% if item.subitems_list %}<i class="bi bi-folder2-open text-primary me-1"></i>{% endif %}
+                    {{ item.nome }}
+                    {% if item.subitems_list %}<small class="text-muted ms-1">({{ item.subitems_list|length }} subitem)</small>{% endif %}
+                  </td>
                   <td class="align-middle">
                     <div class="btn-group btn-group-sm esito-group flex-wrap" role="group">
                       {% for esito in item.esiti_disponibili %}
@@ -65,6 +73,27 @@
                            name="note_{{ item.pk }}" placeholder="Note...">
                   </td>
                 </tr>
+                {% for sub in item.subitems_list %}
+                <tr class="subitem-row">
+                  <td class="align-middle">{{ sub.nome }}</td>
+                  <td class="align-middle">
+                    <div class="btn-group btn-group-sm esito-group flex-wrap" role="group">
+                      {% for esito in sub.esiti_disponibili %}
+                      <input type="radio" class="btn-check" name="esito_{{ sub.pk }}" value="{{ esito.pk }}"
+                             id="esito_{{ sub.pk }}_{{ esito.pk }}"
+                             {% if forloop.first %}checked{% endif %}>
+                      <label class="btn btn-outline-{{ esito.colore }}" for="esito_{{ sub.pk }}_{{ esito.pk }}">
+                        {{ esito.nome }}
+                      </label>
+                      {% endfor %}
+                    </div>
+                  </td>
+                  <td>
+                    <input type="text" class="form-control form-control-sm"
+                           name="note_{{ sub.pk }}" placeholder="Note...">
+                  </td>
+                </tr>
+                {% endfor %}
                 {% endfor %}
               </tbody>
             </table>
