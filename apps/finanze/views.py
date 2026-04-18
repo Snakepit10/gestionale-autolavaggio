@@ -871,11 +871,11 @@ def report_giornata(request):
             agg['wash_cycles'] += c.wash_cycles
 
         if c.cassa.tracking_washcycles:
-            totale_portali += c.incasso_totale
+            totale_portali += c.vendita_totale
             if c.wash_cycles:
                 wash_cycles_portali += c.wash_cycles
         else:
-            totale_cambia_gettoni += c.incasso_totale
+            totale_cambia_gettoni += c.vendita_totale
 
     totale_self_service = totale_portali + totale_cambia_gettoni
 
