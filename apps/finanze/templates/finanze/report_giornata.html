@@ -84,14 +84,14 @@
       <div class="kpi-tile hero">
         <div class="label">Totale giornata</div>
         <div class="value">&euro;{{ totale_giornata|floatformat:2 }}</div>
-        <div class="sub">Servito + Self service</div>
+        <div class="sub">Servito (incl. non pagati) + Self service</div>
       </div>
     </div>
     <div class="col-6 col-lg-3">
       <div class="kpi-tile success">
         <div class="label">Totale servito</div>
-        <div class="value">&euro;{{ totale_servito|floatformat:2 }}</div>
-        <div class="sub">da pagamenti POS</div>
+        <div class="value">&euro;{{ totale_servito_ordinato|floatformat:2 }}</div>
+        <div class="sub">ordinato &mdash; include non pagati</div>
       </div>
     </div>
     <div class="col-6 col-lg-3">
@@ -102,15 +102,15 @@
       </div>
     </div>
     <div class="col-6 col-lg-3">
-      <div class="kpi-tile warning">
-        <div class="label">WashCycles portali</div>
-        <div class="value">{{ wash_cycles_portali }}</div>
-        <div class="sub">cicli di lavaggio erogati</div>
+      <div class="kpi-tile {% if totale_non_pagato > 0 %}danger{% else %}success{% endif %}">
+        <div class="label">Totale non pagato</div>
+        <div class="value">&euro;{{ totale_non_pagato|floatformat:2 }}</div>
+        <div class="sub">{{ kpis.num_non_pagati }} ordini con saldo dovuto</div>
       </div>
     </div>
   </div>
 
-  {# ====== Seconda riga KPI: dettaglio self service + ordini ====== #}
+  {# ====== Seconda riga KPI: dettaglio self service + corrispettivi ====== #}
   <div class="row g-2 mb-3">
     <div class="col-6 col-lg-3">
       <div class="kpi-tile primary">
@@ -127,21 +127,48 @@
       </div>
     </div>
     <div class="col-6 col-lg-3">
-      <div class="kpi-tile info">
+      <div class="kpi-tile" style="background:#fef3c7; border-left:4px solid #d97706;">
+        <div class="label" style="color:#92400e">Totale corrispettivi</div>
+        <div class="value" style="color:#78350f">&euro;{{ totale_corrispettivi|floatformat:2 }}</div>
+        <div class="sub" style="color:#92400e">
+          Imponibile &euro;{{ imponibile_corrispettivi|floatformat:2 }} &middot; IVA 22% &euro;{{ iva_corrispettivi|floatformat:2 }}
+        </div>
+      </div>
+    </div>
+    <div class="col-6 col-lg-3">
+      <div class="kpi-tile warning">
+        <div class="label">WashCycles portali</div>
+        <div class="value">{{ wash_cycles_portali }}</div>
+        <div class="sub">cicli di lavaggio erogati</div>
+      </div>
+    </div>
+  </div>
+
+  {# ====== Terza riga: ordini + confronto + pie chart ====== #}
+  <div class="row g-2 mb-3">
+    <div class="col-12 col-lg-4">
+      <div class="kpi-tile info h-100">
         <div class="label">Ordini giornata</div>
         <div class="value">{{ kpis.num_ordini }}</div>
         <div class="sub">{{ kpis.num_transazioni }} transazioni &middot; &euro;{{ kpis.scontrino_medio|floatformat:2 }} avg</div>
       </div>
     </div>
-    <div class="col-6 col-lg-3">
-      <div class="kpi-tile {% if kpis.variazione_pct != None and kpis.variazione_pct >= 0 %}success{% elif kpis.variazione_pct != None %}danger{% else %}primary{% endif %}">
+    <div class="col-12 col-lg-4">
+      <div class="kpi-tile {% if kpis.variazione_pct != None and kpis.variazione_pct >= 0 %}success{% elif kpis.variazione_pct != None %}danger{% else %}primary{% endif %} h-100">
         <div class="label">vs ieri</div>
         <div class="value">
           {% if kpis.variazione_pct != None %}
             {% if kpis.variazione_pct >= 0 %}<i class="bi bi-arrow-up"></i> +{{ kpis.variazione_pct|floatformat:1 }}%{% else %}<i class="bi bi-arrow-down"></i> {{ kpis.variazione_pct|floatformat:1 }}%{% endif %}
-          {% else %}—{% endif %}
+          {% else %}&mdash;{% endif %}
         </div>
         <div class="sub">Ieri: &euro;{{ kpis.totale_ieri|floatformat:2 }} &middot; Picco {{ kpis.ora_picco }}</div>
+      </div>
+    </div>
+    <div class="col-12 col-lg-4">
+      <div class="chart-panel h-100">
+        <div class="panel-title"><i class="bi bi-pie-chart text-primary"></i> Totale giornata</div>
+        <div class="panel-sub">Portali &middot; Cambia gettoni &middot; Servito</div>
+        <div class="panel-body" style="position:relative; height:180px;"><canvas id="chartGiornataSplit"></canvas></div>
       </div>
     </div>
   </div>
@@ -452,6 +479,46 @@ const metodi = {{ metodi_chart_json|safe }};
 const categorie = {{ categorie_chart_json|safe }};
 const orarioVals = {{ orario_buckets_json|safe }};
 const orarioCount = {{ orario_counts_json|safe }};
+const giornataSplit = {{ giornata_split_json|safe }};
+
+// ===== Pie chart Totale giornata =====
+const ctxSplit = document.getElementById('chartGiornataSplit');
+if (ctxSplit && giornataSplit.length > 0) {
+  new Chart(ctxSplit, {
+    type: 'doughnut',
+    data: {
+      labels: giornataSplit.map(s => s.label),
+      datasets: [{
+        data: giornataSplit.map(s => s.value),
+        backgroundColor: giornataSplit.map(s => s.color),
+        borderWidth: 0,
+      }]
+    },
+    options: {
+      responsive: true, maintainAspectRatio: false,
+      cutout: '55%',
+      plugins: {
+        legend: { position: 'bottom', labels: { font: { size: 10 }, padding: 6, boxWidth: 10 } },
+        tooltip: {
+          callbacks: {
+            label: (ctx) => {
+              const v = ctx.parsed.toFixed(2);
+              const total = ctx.dataset.data.reduce((a, b) => a + b, 0);
+              const pct = total > 0 ? ((ctx.parsed / total) * 100).toFixed(1) : 0;
+              return `${ctx.label}: €${v} (${pct}%)`;
+            }
+          }
+        }
+      }
+    }
+  });
+} else if (ctxSplit) {
+  const c = ctxSplit.getContext('2d');
+  c.font = '12px sans-serif';
+  c.fillStyle = '#94a3b8';
+  c.textAlign = 'center';
+  c.fillText('Nessun dato', ctxSplit.width / 2, ctxSplit.height / 2);
+}
 
 Chart.defaults.font.family = '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif';
 Chart.defaults.font.size = 11;

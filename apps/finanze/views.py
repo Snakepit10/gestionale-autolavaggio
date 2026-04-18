@@ -879,17 +879,39 @@ def report_giornata(request):
 
     totale_self_service = totale_portali + totale_cambia_gettoni
 
-    # Totale servito = sempre da pagamenti POS (cassa ordini)
+    # Totale servito PAGATO = da pagamenti POS (usato per quadratura: confronto
+    # con contanti+carte realmente incassati).
     if cassa_servito:
-        totale_servito = cassa_servito.totale_incassi_giornalieri
+        totale_servito_pagato = cassa_servito.totale_incassi_giornalieri
     else:
         # Fallback: somma diretta dei pagamenti del giorno se non c'e ChiusuraCassa
-        totale_servito = Pagamento.objects.filter(
+        totale_servito_pagato = Pagamento.objects.filter(
             data_pagamento__date=data
         ).aggregate(s=Sum('importo'))['s'] or Decimal('0.00')
 
-    # Totale giornata = servito + self service
-    totale_giornata = totale_servito + totale_self_service
+    # Totale servito ORDINATO = ordini del giorno esclusi annullati (include
+    # anche non pagati/parziali/differiti). Usato nel badge "Totale servito".
+    _ordini_giorno_qs = Ordine.objects.filter(data_ora__date=data).exclude(stato='annullato')
+    totale_servito_ordinato = _ordini_giorno_qs.aggregate(s=Sum('totale_finale'))['s'] or Decimal('0.00')
+
+    # Totale giornata = servito ordinato (include non pagati) + self service
+    totale_giornata = totale_servito_ordinato + totale_self_service
+
+    # Compat per la sezione quadratura sottostante
+    totale_servito = totale_servito_pagato
+
+    # ==================== CORRISPETTIVI (registratore + automatiche) ====================
+    # Totale corrispettivi = totale registratore + vendita totale casse automatiche
+    # (questi sono i documenti fiscali emessi: scontrino + chiusure cassa).
+    # IVA 22% inclusa nel lordo.
+    totale_corrispettivi = totale_registratore + agg['vendita_totale']
+    IVA_RATE = Decimal('0.22')
+    if totale_corrispettivi > 0:
+        imponibile_corrispettivi = (totale_corrispettivi / (Decimal('1') + IVA_RATE)).quantize(Decimal('0.01'))
+        iva_corrispettivi = totale_corrispettivi - imponibile_corrispettivi
+    else:
+        imponibile_corrispettivi = Decimal('0.00')
+        iva_corrispettivi = Decimal('0.00')
 
     # ==================== ORDINI NON INCASSATI ====================
     ordini_non_pagati = Ordine.objects.filter(
@@ -919,7 +941,9 @@ def report_giornata(request):
         data_pagamento__date=data,
     ).select_related('ordine')
     num_transazioni = pagamenti_giorno.count()
-    scontrino_medio = totale_giornata / num_transazioni if num_transazioni > 0 else Decimal('0.00')
+    # Scontrino medio basato sull'effettivamente incassato (pagato + self service)
+    _totale_incassato = totale_servito_pagato + totale_self_service
+    scontrino_medio = _totale_incassato / num_transazioni if num_transazioni > 0 else Decimal('0.00')
 
     # ==================== METODI DI PAGAMENTO ====================
     metodi_totali = {}
@@ -1056,6 +1080,15 @@ def report_giornata(request):
         'stato': stato_quadratura,
     }
 
+    # ==================== PIE CHART TOTALE GIORNATA ====================
+    # Split: portali / cambia gettoni / servito (ordinato, include non pagati)
+    giornata_split = [
+        {'label': 'Servito', 'value': float(totale_servito_ordinato), 'color': '#10b981'},
+        {'label': 'Portali', 'value': float(totale_portali), 'color': '#3b82f6'},
+        {'label': 'Cambia gettoni', 'value': float(totale_cambia_gettoni), 'color': '#f59e0b'},
+    ]
+    giornata_split = [s for s in giornata_split if s['value'] > 0]
+
     context = {
         'data': data,
         'cassa_servito': cassa_servito,
@@ -1068,6 +1101,13 @@ def report_giornata(request):
         'totale_cambia_gettoni': totale_cambia_gettoni,
         'totale_self_service': totale_self_service,
         'totale_servito': totale_servito,
+        'totale_servito_pagato': totale_servito_pagato,
+        'totale_servito_ordinato': totale_servito_ordinato,
+        'totale_non_pagato': totale_crediti,
+        'totale_corrispettivi': totale_corrispettivi,
+        'imponibile_corrispettivi': imponibile_corrispettivi,
+        'iva_corrispettivi': iva_corrispettivi,
+        'giornata_split_json': json.dumps(giornata_split),
         'wash_cycles_portali': wash_cycles_portali,
         'chiusura_registratore': chiusura_registratore,
         # Quadratura contanti
