@@ -32,6 +32,38 @@
 
     <div class="row g-3">
       <div class="col-lg-7">
+        {% if cassa.modalita_registratore %}
+        {# ========== MODALITA REGISTRATORE SEMPLIFICATA ========== #}
+        <div class="form-section">
+          <h6><i class="bi bi-receipt"></i> Scontrino di chiusura</h6>
+          <p class="text-muted small">
+            <i class="bi bi-info-circle"></i>
+            A fine giornata emetti lo scontrino di chiusura dal registratore di cassa e registra qui il totale delle vendite.
+          </p>
+          <div class="row g-2">
+            <div class="col-md-8">
+              <label class="form-label small">Totale scontrino (vendite giornaliere) *</label>
+              <div class="input-group input-group-lg">
+                <span class="input-group-text">&euro;</span>
+                <input type="number" step="0.01" min="0" class="form-control" name="incasso_totale" id="incasso_totale"
+                       value="{{ chiusura.incasso_totale|default:'0.00' }}" required oninput="calcola()">
+              </div>
+              <small class="text-muted">Totale complessivo emesso dal registratore</small>
+            </div>
+          </div>
+          {# Campi nascosti (sempre 0) #}
+          <input type="hidden" name="incasso_ricarica" id="incasso_ricarica" value="0">
+          <input type="hidden" name="vendita_contante" id="vendita_contante" value="0">
+          <input type="hidden" name="vendita_non_contante" id="vendita_non_contante" value="0">
+          <input type="hidden" name="resto_erogato_reale" id="resto_erogato_reale" value="0">
+        </div>
+
+        <div class="form-section">
+          <h6><i class="bi bi-sticky"></i> Note</h6>
+          <textarea class="form-control" name="note" rows="2">{{ chiusura.note|default:'' }}</textarea>
+        </div>
+        {% else %}
+        {# ========== MODALITA COMPLETA (portali / cambia gettoni) ========== #}
         {# INCASSI #}
         <div class="form-section">
           <h6><i class="bi bi-cash-coin"></i> Incassi</h6>
@@ -106,11 +138,13 @@
           <h6><i class="bi bi-sticky"></i> Note</h6>
           <textarea class="form-control" name="note" rows="2">{{ chiusura.note|default:'' }}</textarea>
         </div>
+        {% endif %}
       </div>
 
       {# CALCOLI LIVE (sticky) #}
       <div class="col-lg-5">
         <div style="position:sticky; top:80px;">
+          {% if not cassa.modalita_registratore %}
           <div class="form-section">
             <h6><i class="bi bi-calculator"></i> Calcoli in tempo reale</h6>
 
@@ -138,6 +172,16 @@
               <small class="text-muted" id="calc_stato">—</small>
             </div>
           </div>
+          {% else %}
+          <div class="form-section" style="background:#f0f9ff">
+            <h6><i class="bi bi-info-circle text-primary"></i> Info controllo</h6>
+            <p class="small text-muted mb-2">Il totale scontrino sara confrontato automaticamente nel <strong>Report giornata</strong> con il totale dei pagamenti registrati dagli ordini POS. Se i due valori coincidono (tolleranza ±0.50) la cassa e in quadra.</p>
+            <div class="calc-row mb-0">
+              <div class="calc-label">Totale scontrino</div>
+              <div class="calc-value" id="calc_incasso_vendita">&euro;0.00</div>
+            </div>
+          </div>
+          {% endif %}
 
           <button type="submit" class="btn btn-primary btn-lg w-100">
             <i class="bi bi-save"></i> {% if mode == 'edit' %}Aggiorna{% else %}Salva chiusura{% endif %}

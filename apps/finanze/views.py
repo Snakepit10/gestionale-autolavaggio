@@ -831,10 +831,10 @@ def report_giornata(request):
     if cassa_servito:
         cassa_servito.ricalcola_totali()
 
-    # Chiusure automatiche
+    # Chiusure automatiche (include registratore servito)
     chiusure_auto = ChiusuraCassaAutomatica.objects.filter(data=data).select_related('cassa').order_by('cassa__ordine')
 
-    # Aggregati casse automatiche
+    # Aggregati casse automatiche (solo NON registratore, ovvero self service)
     agg = {
         'incasso_totale': Decimal('0.00'),
         'incasso_ricarica': Decimal('0.00'),
@@ -845,7 +845,21 @@ def report_giornata(request):
         'resto_erogato_teorico': Decimal('0.00'),
         'wash_cycles': 0,
     }
+
+    # Aggregati per categoria (portali, cambia gettoni, registratore)
+    totale_portali = Decimal('0.00')          # casse con tracking_washcycles=True
+    totale_cambia_gettoni = Decimal('0.00')   # casse automatiche normali (no portali, no registratore)
+    totale_registratore = Decimal('0.00')     # totale scontrino registratore servito
+    wash_cycles_portali = 0
+    chiusura_registratore = None
+
     for c in chiusure_auto:
+        if c.cassa.modalita_registratore:
+            totale_registratore += c.incasso_totale
+            chiusura_registratore = c
+            continue
+
+        # Non-registratore: contribuisce all'aggregato self-service
         agg['incasso_totale'] += c.incasso_totale
         agg['incasso_ricarica'] += c.incasso_ricarica
         agg['incasso_vendita'] += c.incasso_vendita
@@ -856,10 +870,25 @@ def report_giornata(request):
         if c.wash_cycles:
             agg['wash_cycles'] += c.wash_cycles
 
-    # Totale giornata (servito + automatiche)
-    totale_giornata = agg['incasso_totale']
-    if cassa_servito:
-        totale_giornata += cassa_servito.totale_incassi_giornalieri
+        if c.cassa.tracking_washcycles:
+            totale_portali += c.incasso_totale
+            if c.wash_cycles:
+                wash_cycles_portali += c.wash_cycles
+        else:
+            totale_cambia_gettoni += c.incasso_totale
+
+    totale_self_service = totale_portali + totale_cambia_gettoni
+
+    # Totale servito = valore registratore se presente, altrimenti fallback alla ChiusuraCassa POS
+    if chiusura_registratore:
+        totale_servito = totale_registratore
+    elif cassa_servito:
+        totale_servito = cassa_servito.totale_incassi_giornalieri
+    else:
+        totale_servito = Decimal('0.00')
+
+    # Totale giornata = servito + self service
+    totale_giornata = totale_servito + totale_self_service
 
     # ==================== ORDINI NON INCASSATI ====================
     ordini_non_pagati = Ordine.objects.filter(
@@ -999,6 +1028,62 @@ def report_giornata(request):
         'variazione_pct': variazione_pct,
     }
 
+    # ==================== CONTROLLO QUADRATURA CASSA ====================
+    # 1) Servito: totale scontrino registratore vs totale pagamenti POS del giorno
+    totale_pagamenti_pos = Decimal('0.00')
+    if cassa_servito:
+        totale_pagamenti_pos = cassa_servito.totale_incassi_giornalieri
+    quadratura_servito = None
+    if chiusura_registratore:
+        diff_serv = totale_registratore - totale_pagamenti_pos
+        if abs(diff_serv) < Decimal('0.50'):
+            stato_serv = 'ok'
+        elif diff_serv < 0:
+            stato_serv = 'mancante'
+        else:
+            stato_serv = 'eccedente'
+        quadratura_servito = {
+            'scontrino': totale_registratore,
+            'pagamenti_pos': totale_pagamenti_pos,
+            'differenza': diff_serv,
+            'stato': stato_serv,
+        }
+
+    # 2) Cassa fisica (se ChiusuraCassa chiusa con conteggio_reale)
+    quadratura_fisica = None
+    if cassa_servito and cassa_servito.conteggio_cassa_reale is not None:
+        quadratura_fisica = {
+            'teorica': cassa_servito.cassa_teorica_finale,
+            'reale': cassa_servito.conteggio_cassa_reale,
+            'differenza': cassa_servito.differenza_cassa,
+            'stato': cassa_servito.stato_differenza,
+        }
+
+    # 3) Casse automatiche: quante in quadra / quante con differenze
+    quadrature_auto = []
+    for c in chiusure_auto:
+        if c.cassa.modalita_registratore:
+            continue
+        if c.resto_erogato_reale > 0 or abs(c.differenza) > Decimal('0.01'):
+            quadrature_auto.append({
+                'cassa': c.cassa,
+                'teorico': c.resto_erogato_teorico,
+                'reale': c.resto_erogato_reale,
+                'differenza': c.differenza,
+                'stato': c.stato_differenza,
+            })
+
+    # Stato complessivo quadratura
+    all_ok = True
+    if quadratura_servito and quadratura_servito['stato'] != 'ok':
+        all_ok = False
+    if quadratura_fisica and quadratura_fisica['stato'] != 'ok':
+        all_ok = False
+    for q in quadrature_auto:
+        if q['stato'] != 'ok':
+            all_ok = False
+            break
+
     context = {
         'data': data,
         'cassa_servito': cassa_servito,
@@ -1006,6 +1091,19 @@ def report_giornata(request):
         'agg': agg,
         'totale_giornata': totale_giornata,
         'totale_ordinato': totale_ordinato,
+        # Nuovi totali per categoria (richiesti)
+        'totale_portali': totale_portali,
+        'totale_cambia_gettoni': totale_cambia_gettoni,
+        'totale_self_service': totale_self_service,
+        'totale_servito': totale_servito,
+        'wash_cycles_portali': wash_cycles_portali,
+        'chiusura_registratore': chiusura_registratore,
+        # Quadratura
+        'quadratura_servito': quadratura_servito,
+        'quadratura_fisica': quadratura_fisica,
+        'quadrature_auto': quadrature_auto,
+        'quadratura_ok': all_ok,
+        # Resto
         'kpis': kpis,
         'ordini_non_pagati': ordini_non_pagati_list,
         'top_servizi': top_servizi,

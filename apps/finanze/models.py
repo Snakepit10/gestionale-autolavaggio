@@ -18,6 +18,9 @@ class Cassa(models.Model):
     tracking_washcycles = models.BooleanField(default=False,
         verbose_name='Traccia WashCycles',
         help_text='Abilita il campo WashCycles nel form di chiusura')
+    modalita_registratore = models.BooleanField(default=False,
+        verbose_name='Modalita registratore (solo totale scontrino)',
+        help_text='Se attivo, il form di chiusura mostra solo il totale scontrino (no vendite contante/non contante)')
     attiva = models.BooleanField(default=True)
     ordine = models.PositiveIntegerField(default=0, verbose_name='Ordine')
 

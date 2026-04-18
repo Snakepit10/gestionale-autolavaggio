@@ -78,47 +78,158 @@
     </form>
   </div>
 
-  {# ====== KPI Top Row ====== #}
+  {# ====== KPI Top Row: RIEPILOGO RICHIESTO ====== #}
   <div class="row g-2 mb-3">
     <div class="col-6 col-lg-3">
       <div class="kpi-tile hero">
         <div class="label">Totale giornata</div>
         <div class="value">&euro;{{ totale_giornata|floatformat:2 }}</div>
-        {% if kpis.variazione_pct != None %}
-          <div class="sub">
-            {% if kpis.variazione_pct >= 0 %}
-              <i class="bi bi-arrow-up"></i> +{{ kpis.variazione_pct|floatformat:1 }}% vs ieri
-            {% else %}
-              <i class="bi bi-arrow-down"></i> {{ kpis.variazione_pct|floatformat:1 }}% vs ieri
-            {% endif %}
-          </div>
-        {% else %}
-          <div class="sub">vs ieri: &euro;{{ kpis.totale_ieri|floatformat:2 }}</div>
-        {% endif %}
+        <div class="sub">Servito + Self service</div>
       </div>
     </div>
     <div class="col-6 col-lg-3">
-      <div class="kpi-tile primary">
-        <div class="label">Ordini giorno</div>
-        <div class="value">{{ kpis.num_ordini }}</div>
-        <div class="sub">{{ kpis.num_transazioni }} transazioni</div>
+      <div class="kpi-tile success">
+        <div class="label">Totale servito</div>
+        <div class="value">&euro;{{ totale_servito|floatformat:2 }}</div>
+        <div class="sub">{% if chiusura_registratore %}da scontrino registratore{% else %}da pagamenti POS{% endif %}</div>
       </div>
     </div>
     <div class="col-6 col-lg-3">
       <div class="kpi-tile info">
-        <div class="label">Scontrino medio</div>
-        <div class="value">&euro;{{ kpis.scontrino_medio|floatformat:2 }}</div>
-        <div class="sub">Ora di picco: {{ kpis.ora_picco }}</div>
+        <div class="label">Totale self service</div>
+        <div class="value">&euro;{{ totale_self_service|floatformat:2 }}</div>
+        <div class="sub">Portali + Cambia gettoni</div>
       </div>
     </div>
     <div class="col-6 col-lg-3">
       <div class="kpi-tile warning">
         <div class="label">WashCycles portali</div>
-        <div class="value">{{ agg.wash_cycles }}</div>
+        <div class="value">{{ wash_cycles_portali }}</div>
         <div class="sub">cicli di lavaggio erogati</div>
       </div>
     </div>
   </div>
+
+  {# ====== Seconda riga KPI: dettaglio self service + ordini ====== #}
+  <div class="row g-2 mb-3">
+    <div class="col-6 col-lg-3">
+      <div class="kpi-tile primary">
+        <div class="label">Totale portali</div>
+        <div class="value">&euro;{{ totale_portali|floatformat:2 }}</div>
+        <div class="sub">Blu + Azzurro</div>
+      </div>
+    </div>
+    <div class="col-6 col-lg-3">
+      <div class="kpi-tile primary">
+        <div class="label">Totale cambia gettoni</div>
+        <div class="value">&euro;{{ totale_cambia_gettoni|floatformat:2 }}</div>
+        <div class="sub">solo cambia gettoni</div>
+      </div>
+    </div>
+    <div class="col-6 col-lg-3">
+      <div class="kpi-tile info">
+        <div class="label">Ordini giornata</div>
+        <div class="value">{{ kpis.num_ordini }}</div>
+        <div class="sub">{{ kpis.num_transazioni }} transazioni &middot; &euro;{{ kpis.scontrino_medio|floatformat:2 }} avg</div>
+      </div>
+    </div>
+    <div class="col-6 col-lg-3">
+      <div class="kpi-tile {% if kpis.variazione_pct != None and kpis.variazione_pct >= 0 %}success{% elif kpis.variazione_pct != None %}danger{% else %}primary{% endif %}">
+        <div class="label">vs ieri</div>
+        <div class="value">
+          {% if kpis.variazione_pct != None %}
+            {% if kpis.variazione_pct >= 0 %}<i class="bi bi-arrow-up"></i> +{{ kpis.variazione_pct|floatformat:1 }}%{% else %}<i class="bi bi-arrow-down"></i> {{ kpis.variazione_pct|floatformat:1 }}%{% endif %}
+          {% else %}—{% endif %}
+        </div>
+        <div class="sub">Ieri: &euro;{{ kpis.totale_ieri|floatformat:2 }} &middot; Picco {{ kpis.ora_picco }}</div>
+      </div>
+    </div>
+  </div>
+
+  {# ====== CONTROLLO QUADRATURA CASSA ====== #}
+  {% if quadratura_servito or quadratura_fisica or quadrature_auto %}
+  <div class="chart-panel mb-3">
+    <div class="panel-title">
+      <i class="bi bi-shield-check {% if quadratura_ok %}text-success{% else %}text-danger{% endif %}"></i>
+      Controllo quadratura cassa
+      <span class="badge {% if quadratura_ok %}bg-success{% else %}bg-danger{% endif %} ms-2">
+        {% if quadratura_ok %}Tutto OK{% else %}Differenze rilevate{% endif %}
+      </span>
+    </div>
+    <div class="panel-sub">Verifica che i soldi siano in regola a fine giornata</div>
+    <div class="panel-body">
+      <div class="row g-2">
+
+        {% if quadratura_servito %}
+        <div class="col-md-6">
+          <div class="border rounded p-3 h-100" style="background:{% if quadratura_servito.stato == 'ok' %}#f0fdf4{% else %}#fef2f2{% endif %}">
+            <h6 class="small text-uppercase fw-bold mb-2"><i class="bi bi-shop"></i> Servito (scontrino vs POS)</h6>
+            <div class="d-flex justify-content-between small"><span class="text-muted">Scontrino registratore:</span><strong>&euro;{{ quadratura_servito.scontrino|floatformat:2 }}</strong></div>
+            <div class="d-flex justify-content-between small"><span class="text-muted">Totale pagamenti POS:</span><strong>&euro;{{ quadratura_servito.pagamenti_pos|floatformat:2 }}</strong></div>
+            <hr class="my-2">
+            <div class="d-flex justify-content-between">
+              <span class="fw-bold">Differenza:</span>
+              <span class="fw-bold {% if quadratura_servito.stato == 'ok' %}text-success{% else %}text-danger{% endif %}">
+                &euro;{{ quadratura_servito.differenza|floatformat:2 }}
+                <small>({{ quadratura_servito.stato }})</small>
+              </span>
+            </div>
+          </div>
+        </div>
+        {% endif %}
+
+        {% if quadratura_fisica %}
+        <div class="col-md-6">
+          <div class="border rounded p-3 h-100" style="background:{% if quadratura_fisica.stato == 'ok' %}#f0fdf4{% else %}#fef2f2{% endif %}">
+            <h6 class="small text-uppercase fw-bold mb-2"><i class="bi bi-cash-stack"></i> Cassa fisica (contanti)</h6>
+            <div class="d-flex justify-content-between small"><span class="text-muted">Cassa teorica:</span><strong>&euro;{{ quadratura_fisica.teorica|floatformat:2 }}</strong></div>
+            <div class="d-flex justify-content-between small"><span class="text-muted">Conteggio reale:</span><strong>&euro;{{ quadratura_fisica.reale|floatformat:2 }}</strong></div>
+            <hr class="my-2">
+            <div class="d-flex justify-content-between">
+              <span class="fw-bold">Differenza:</span>
+              <span class="fw-bold {% if quadratura_fisica.stato == 'ok' %}text-success{% else %}text-danger{% endif %}">
+                &euro;{{ quadratura_fisica.differenza|floatformat:2 }}
+                <small>({{ quadratura_fisica.stato }})</small>
+              </span>
+            </div>
+          </div>
+        </div>
+        {% endif %}
+
+        {% if quadrature_auto %}
+        <div class="col-12">
+          <div class="border rounded p-3" style="background:#fffbeb">
+            <h6 class="small text-uppercase fw-bold mb-2"><i class="bi bi-robot"></i> Casse automatiche con differenze</h6>
+            <table class="table table-sm mb-0 small">
+              <thead><tr><th>Cassa</th><th class="text-end">Resto teorico</th><th class="text-end">Resto reale</th><th class="text-end">Differenza</th><th>Stato</th></tr></thead>
+              <tbody>
+                {% for q in quadrature_auto %}
+                <tr>
+                  <td>{{ q.cassa.nome }}</td>
+                  <td class="text-end">&euro;{{ q.teorico|floatformat:2 }}</td>
+                  <td class="text-end">&euro;{{ q.reale|floatformat:2 }}</td>
+                  <td class="text-end fw-bold {% if q.stato == 'ok' %}text-success{% else %}text-danger{% endif %}">&euro;{{ q.differenza|floatformat:2 }}</td>
+                  <td><span class="badge {% if q.stato == 'ok' %}bg-success{% elif q.stato == 'mancante' %}bg-danger{% else %}bg-warning text-dark{% endif %}">{{ q.stato }}</span></td>
+                </tr>
+                {% endfor %}
+              </tbody>
+            </table>
+          </div>
+        </div>
+        {% endif %}
+
+      </div>
+
+      <div class="alert alert-info small mt-3 mb-0">
+        <i class="bi bi-info-circle"></i> <strong>Come funziona il controllo?</strong>
+        Il sistema confronta 3 livelli: (1) <strong>scontrino registratore vs pagamenti POS</strong> del servito,
+        (2) <strong>conteggio fisico dei contanti</strong> vs cassa teorica (fondo + incassi − uscite),
+        (3) per le casse automatiche, <strong>resto erogato teorico vs resto reale</strong>.
+        Se tutti e 3 i controlli sono OK (tolleranza &plusmn;&euro;0.50) la cassa e in quadra.
+      </div>
+    </div>
+  </div>
+  {% endif %}
 
   {# ====== Crediti alert ====== #}
   {% if kpis.num_non_pagati > 0 or kpis.num_crediti_vecchi > 0 %}
