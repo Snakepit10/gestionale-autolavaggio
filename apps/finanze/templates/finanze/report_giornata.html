@@ -91,7 +91,7 @@
       <div class="kpi-tile success">
         <div class="label">Totale servito</div>
         <div class="value">&euro;{{ totale_servito|floatformat:2 }}</div>
-        <div class="sub">{% if chiusura_registratore %}da scontrino registratore{% else %}da pagamenti POS{% endif %}</div>
+        <div class="sub">da pagamenti POS</div>
       </div>
     </div>
     <div class="col-6 col-lg-3">
@@ -146,106 +146,102 @@
     </div>
   </div>
 
-  {# ====== CONTROLLO QUADRATURA CASSA ====== #}
-  {% if quadratura_servito or quadratura_fisica or quadrature_auto %}
+  {# ====== CONTROLLO QUADRATURA CONTANTI ====== #}
+  {% if quadratura.disponibile %}
   <div class="chart-panel mb-3">
     <div class="panel-title">
-      <i class="bi bi-shield-check {% if quadratura_ok %}text-success{% else %}text-danger{% endif %}"></i>
-      Controllo quadratura cassa
-      <span class="badge {% if quadratura_ok %}bg-success{% else %}bg-danger{% endif %} ms-2">
-        {% if quadratura_ok %}Tutto OK{% else %}Differenze rilevate{% endif %}
-      </span>
+      <i class="bi bi-cash-stack {% if quadratura.stato_totale == 'ok' %}text-success{% elif quadratura.stato_totale == 'non_conteggiato' %}text-muted{% else %}text-danger{% endif %}"></i>
+      Quadratura contanti — conteggio fisico per cassa
+      {% if quadratura.stato_totale == 'ok' %}
+        <span class="badge bg-success ms-2">In quadra</span>
+      {% elif quadratura.stato_totale == 'non_conteggiato' %}
+        <span class="badge bg-secondary ms-2">Conteggio incompleto</span>
+      {% else %}
+        <span class="badge bg-danger ms-2">Differenze rilevate</span>
+      {% endif %}
     </div>
-    <div class="panel-sub">Verifica che i soldi siano in regola a fine giornata</div>
+    <div class="panel-sub">Per ogni cassa, conta fisicamente i contanti a fine giornata e confrontali con il teorico</div>
     <div class="panel-body">
-      <div class="row g-2">
-
-        {% if quadratura_servito %}
-        <div class="col-md-6">
-          <div class="border rounded p-3 h-100" style="background:{% if quadratura_servito.stato == 'ok' %}#f0fdf4{% else %}#fef2f2{% endif %}">
-            <h6 class="small text-uppercase fw-bold mb-2"><i class="bi bi-shop"></i> Servito (scontrino vs POS)</h6>
-            <div class="d-flex justify-content-between small"><span class="text-muted">Scontrino registratore:</span><strong>&euro;{{ quadratura_servito.scontrino|floatformat:2 }}</strong></div>
-            <div class="d-flex justify-content-between small"><span class="text-muted">Totale pagamenti POS:</span><strong>&euro;{{ quadratura_servito.pagamenti_pos|floatformat:2 }}</strong></div>
-            <hr class="my-2">
-            <div class="d-flex justify-content-between">
-              <span class="fw-bold">Differenza:</span>
-              <span class="fw-bold {% if quadratura_servito.stato == 'ok' %}text-success{% else %}text-danger{% endif %}">
-                &euro;{{ quadratura_servito.differenza|floatformat:2 }}
-                <small>({{ quadratura_servito.stato }})</small>
-              </span>
-            </div>
-          </div>
-        </div>
-        {% endif %}
-
-        {% if quadratura_fisica %}
-        <div class="col-md-6">
-          <div class="border rounded p-3 h-100" style="background:{% if quadratura_fisica.stato == 'ok' %}#f0fdf4{% else %}#fef2f2{% endif %}">
-            <h6 class="small text-uppercase fw-bold mb-2"><i class="bi bi-cash-stack"></i> Cassa fisica (contanti)</h6>
-            <div class="d-flex justify-content-between small"><span class="text-muted">Cassa teorica:</span><strong>&euro;{{ quadratura_fisica.teorica|floatformat:2 }}</strong></div>
-            <div class="d-flex justify-content-between small"><span class="text-muted">Conteggio reale:</span><strong>&euro;{{ quadratura_fisica.reale|floatformat:2 }}</strong></div>
-            <hr class="my-2">
-            <div class="d-flex justify-content-between">
-              <span class="fw-bold">Differenza:</span>
-              <span class="fw-bold {% if quadratura_fisica.stato == 'ok' %}text-success{% else %}text-danger{% endif %}">
-                &euro;{{ quadratura_fisica.differenza|floatformat:2 }}
-                <small>({{ quadratura_fisica.stato }})</small>
-              </span>
-            </div>
-          </div>
-        </div>
-        {% endif %}
-
-        {% if quadrature_auto %}
-        <div class="col-12">
-          <div class="border rounded p-3" style="background:#fffbeb">
-            <h6 class="small text-uppercase fw-bold mb-2"><i class="bi bi-robot"></i> Casse automatiche con differenze</h6>
-            <table class="table table-sm mb-0 small">
-              <thead><tr><th>Cassa</th><th class="text-end">Resto teorico</th><th class="text-end">Resto reale</th><th class="text-end">Differenza</th><th>Stato</th></tr></thead>
-              <tbody>
-                {% for q in quadrature_auto %}
-                <tr>
-                  <td>{{ q.cassa.nome }}</td>
-                  <td class="text-end">&euro;{{ q.teorico|floatformat:2 }}</td>
-                  <td class="text-end">&euro;{{ q.reale|floatformat:2 }}</td>
-                  <td class="text-end fw-bold {% if q.stato == 'ok' %}text-success{% else %}text-danger{% endif %}">&euro;{{ q.differenza|floatformat:2 }}</td>
-                  <td><span class="badge {% if q.stato == 'ok' %}bg-success{% elif q.stato == 'mancante' %}bg-danger{% else %}bg-warning text-dark{% endif %}">{{ q.stato }}</span></td>
-                </tr>
-                {% endfor %}
-              </tbody>
-            </table>
-          </div>
-        </div>
-        {% endif %}
-
+      <div class="table-responsive">
+        <table class="table table-sm mb-0">
+          <thead class="table-light">
+            <tr>
+              <th>Cassa</th>
+              <th class="text-end">Contanti teorici</th>
+              <th class="text-end">Contanti reali (conteggiati)</th>
+              <th class="text-end">Differenza</th>
+              <th>Stato</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for r in quadratura.righe %}
+            <tr {% if r.stato != 'ok' and r.stato != 'non_conteggiato' %}class="table-danger"{% endif %}>
+              <td>
+                {% if r.is_servito %}<i class="bi bi-shop text-primary"></i>{% else %}<i class="bi bi-robot text-info"></i>{% endif %}
+                <strong>{{ r.nome }}</strong>
+                {% if r.numero %}<small class="text-muted">n. {{ r.numero }}</small>{% endif %}
+              </td>
+              <td class="text-end">&euro;{{ r.teorico|floatformat:2 }}</td>
+              <td class="text-end">
+                {% if r.reale is None %}
+                  <span class="text-muted fst-italic">non conteggiato</span>
+                {% else %}
+                  &euro;{{ r.reale|floatformat:2 }}
+                {% endif %}
+              </td>
+              <td class="text-end fw-bold {% if r.stato == 'ok' %}text-success{% elif r.stato == 'non_conteggiato' %}text-muted{% else %}text-danger{% endif %}">
+                {% if r.differenza is not None %}&euro;{{ r.differenza|floatformat:2 }}{% else %}—{% endif %}
+              </td>
+              <td>
+                {% if r.stato == 'ok' %}<span class="badge bg-success">OK</span>
+                {% elif r.stato == 'non_conteggiato' %}<span class="badge bg-secondary">Da conteggiare</span>
+                {% elif r.stato == 'mancante' %}<span class="badge bg-danger">Mancante</span>
+                {% else %}<span class="badge bg-warning text-dark">Eccedente</span>{% endif %}
+              </td>
+            </tr>
+            {% endfor %}
+          </tbody>
+          <tfoot class="table-light fw-bold">
+            <tr>
+              <td>TOTALE CONTANTI</td>
+              <td class="text-end">&euro;{{ quadratura.totale_teorico|floatformat:2 }}</td>
+              <td class="text-end">
+                {% if quadratura.totale_reale is not None %}
+                  &euro;{{ quadratura.totale_reale|floatformat:2 }}
+                {% else %}
+                  <span class="text-muted fst-italic">incompleto</span>
+                {% endif %}
+              </td>
+              <td class="text-end {% if quadratura.stato_totale == 'ok' %}text-success{% elif quadratura.stato_totale == 'non_conteggiato' %}text-muted{% else %}text-danger{% endif %}">
+                {% if quadratura.totale_differenza is not None %}&euro;{{ quadratura.totale_differenza|floatformat:2 }}{% else %}—{% endif %}
+              </td>
+              <td>
+                {% if quadratura.stato_totale == 'ok' %}<span class="badge bg-success">In quadra</span>
+                {% elif quadratura.stato_totale == 'non_conteggiato' %}<span class="badge bg-secondary">Incompleto</span>
+                {% elif quadratura.stato_totale == 'mancante' %}<span class="badge bg-danger">Mancante</span>
+                {% else %}<span class="badge bg-warning text-dark">Eccedente</span>{% endif %}
+              </td>
+            </tr>
+          </tfoot>
+        </table>
       </div>
 
       <div class="alert alert-info small mt-3 mb-0">
-        <i class="bi bi-info-circle"></i> <strong>Come funziona il controllo?</strong>
-        Il sistema confronta 3 livelli: (1) <strong>scontrino registratore vs pagamenti POS</strong> del servito,
-        (2) <strong>conteggio fisico dei contanti</strong> vs cassa teorica (fondo + incassi − uscite),
-        (3) per le casse automatiche, <strong>resto erogato teorico vs resto reale</strong>.
-        Se tutti e 3 i controlli sono OK (tolleranza &plusmn;&euro;0.50) la cassa e in quadra.
+        <i class="bi bi-info-circle"></i> <strong>Come funziona?</strong>
+        A fine giornata apri fisicamente ogni cassa e conta i contanti presenti. Inserisci il valore conteggiato nel form di chiusura della cassa. Il sistema calcola automaticamente la differenza con il teorico e mostra la quadratura complessiva (tolleranza &plusmn;&euro;0.50). Se la riga "TOTALE CONTANTI" e verde, non mancano soldi.
       </div>
     </div>
   </div>
   {% endif %}
 
   {# ====== Crediti alert ====== #}
-  {% if kpis.num_non_pagati > 0 or kpis.num_crediti_vecchi > 0 %}
+  {% if kpis.num_non_pagati > 0 %}
   <div class="row g-2 mb-3">
-    <div class="col-md-6">
+    <div class="col-12">
       <div class="kpi-tile danger" style="background: linear-gradient(135deg, #fee2e2 0%, #fef2f2 100%);">
         <div class="label"><i class="bi bi-exclamation-triangle"></i> Ordini NON incassati oggi</div>
         <div class="value">{{ kpis.num_non_pagati }}</div>
         <div class="sub">Crediti da riscuotere: <strong>&euro;{{ kpis.totale_crediti|floatformat:2 }}</strong></div>
-      </div>
-    </div>
-    <div class="col-md-6">
-      <div class="kpi-tile warning" style="background: linear-gradient(135deg, #fef3c7 0%, #fffbeb 100%);">
-        <div class="label"><i class="bi bi-clock-history"></i> Crediti pregressi</div>
-        <div class="value">{{ kpis.num_crediti_vecchi }}</div>
-        <div class="sub">Totale: <strong>&euro;{{ kpis.totale_crediti_vecchi|floatformat:2 }}</strong></div>
       </div>
     </div>
   </div>

@@ -742,6 +742,9 @@ def chiusura_automatica_create(request, cassa_id):
                 resto_erogato_reale=Decimal(request.POST.get('resto_erogato_reale') or '0'),
                 note=request.POST.get('note', ''),
             )
+            cont = request.POST.get('contanti_conteggiati')
+            if cont not in (None, ''):
+                chiusura.contanti_conteggiati = Decimal(cont)
             if cassa.tracking_washcycles:
                 wc = request.POST.get('wash_cycles')
                 if wc:
@@ -787,6 +790,8 @@ def chiusura_automatica_edit(request, pk):
             chiusura.vendita_non_contante = Decimal(request.POST.get('vendita_non_contante') or '0')
             chiusura.resto_erogato_reale = Decimal(request.POST.get('resto_erogato_reale') or '0')
             chiusura.note = request.POST.get('note', '')
+            cont = request.POST.get('contanti_conteggiati')
+            chiusura.contanti_conteggiati = Decimal(cont) if cont not in (None, '') else None
             if chiusura.cassa.tracking_washcycles:
                 wc = request.POST.get('wash_cycles')
                 chiusura.wash_cycles = int(wc) if wc else None
@@ -879,13 +884,14 @@ def report_giornata(request):
 
     totale_self_service = totale_portali + totale_cambia_gettoni
 
-    # Totale servito = valore registratore se presente, altrimenti fallback alla ChiusuraCassa POS
-    if chiusura_registratore:
-        totale_servito = totale_registratore
-    elif cassa_servito:
+    # Totale servito = sempre da pagamenti POS (cassa ordini)
+    if cassa_servito:
         totale_servito = cassa_servito.totale_incassi_giornalieri
     else:
-        totale_servito = Decimal('0.00')
+        # Fallback: somma diretta dei pagamenti del giorno se non c'e ChiusuraCassa
+        totale_servito = Pagamento.objects.filter(
+            data_pagamento__date=data
+        ).aggregate(s=Sum('importo'))['s'] or Decimal('0.00')
 
     # Totale giornata = servito + self service
     totale_giornata = totale_servito + totale_self_service
@@ -906,18 +912,6 @@ def report_giornata(request):
             'saldo': saldo,
             'cliente': str(o.cliente) if o.cliente else 'Anonimo',
         })
-
-    # Ordini non incassati di giorni precedenti (storico)
-    ordini_vecchi_non_pagati = Ordine.objects.filter(
-        data_ora__date__lt=data,
-        stato_pagamento__in=['non_pagato', 'parziale', 'differito'],
-    ).exclude(stato='annullato').count()
-    totale_crediti_storici = Decimal('0.00')
-    for o in Ordine.objects.filter(
-        data_ora__date__lt=data,
-        stato_pagamento__in=['non_pagato', 'parziale', 'differito'],
-    ).exclude(stato='annullato'):
-        totale_crediti_storici += o.saldo_dovuto
 
     # ==================== ORDINI E PAGAMENTI DEL GIORNO ====================
     ordini_giorno = Ordine.objects.filter(
@@ -1022,67 +1016,99 @@ def report_giornata(request):
         'ora_picco': ora_picco or '—',
         'num_non_pagati': len(ordini_non_pagati_list),
         'totale_crediti': totale_crediti,
-        'num_crediti_vecchi': ordini_vecchi_non_pagati,
-        'totale_crediti_vecchi': totale_crediti_storici,
         'totale_ieri': totale_ieri,
         'variazione_pct': variazione_pct,
     }
 
-    # ==================== CONTROLLO QUADRATURA CASSA ====================
-    # 1) Servito: totale scontrino registratore vs totale pagamenti POS del giorno
-    totale_pagamenti_pos = Decimal('0.00')
+    # ==================== QUADRATURA CONTANTI PER CASSA ====================
+    # Riepilogo contanti fisici di ogni cassa (servito + automatiche)
+    quadratura_righe = []
+    totale_contanti_teorico = Decimal('0.00')
+    totale_contanti_reale = Decimal('0.00')
+    qualcosa_da_conteggiare = False
+    tutto_conteggiato = True
+
+    # Riga cassa servito
     if cassa_servito:
-        totale_pagamenti_pos = cassa_servito.totale_incassi_giornalieri
-    quadratura_servito = None
-    if chiusura_registratore:
-        diff_serv = totale_registratore - totale_pagamenti_pos
-        if abs(diff_serv) < Decimal('0.50'):
-            stato_serv = 'ok'
-        elif diff_serv < 0:
-            stato_serv = 'mancante'
+        teorico_servito = cassa_servito.cassa_teorica_finale
+        reale_servito = cassa_servito.conteggio_cassa_reale
+        if reale_servito is None:
+            tutto_conteggiato = False
+            stato = 'non_conteggiato'
+            diff = None
         else:
-            stato_serv = 'eccedente'
-        quadratura_servito = {
-            'scontrino': totale_registratore,
-            'pagamenti_pos': totale_pagamenti_pos,
-            'differenza': diff_serv,
-            'stato': stato_serv,
-        }
+            diff = reale_servito - teorico_servito
+            if abs(diff) < Decimal('0.50'):
+                stato = 'ok'
+            elif diff < 0:
+                stato = 'mancante'
+            else:
+                stato = 'eccedente'
+            totale_contanti_reale += reale_servito
+        totale_contanti_teorico += teorico_servito
+        qualcosa_da_conteggiare = True
+        quadratura_righe.append({
+            'nome': 'Cassa Servito',
+            'numero': '',
+            'teorico': teorico_servito,
+            'reale': reale_servito,
+            'differenza': diff,
+            'stato': stato,
+            'is_servito': True,
+        })
 
-    # 2) Cassa fisica (se ChiusuraCassa chiusa con conteggio_reale)
-    quadratura_fisica = None
-    if cassa_servito and cassa_servito.conteggio_cassa_reale is not None:
-        quadratura_fisica = {
-            'teorica': cassa_servito.cassa_teorica_finale,
-            'reale': cassa_servito.conteggio_cassa_reale,
-            'differenza': cassa_servito.differenza_cassa,
-            'stato': cassa_servito.stato_differenza,
-        }
-
-    # 3) Casse automatiche: quante in quadra / quante con differenze
-    quadrature_auto = []
+    # Righe casse automatiche (escluso registratore)
     for c in chiusure_auto:
         if c.cassa.modalita_registratore:
             continue
-        if c.resto_erogato_reale > 0 or abs(c.differenza) > Decimal('0.01'):
-            quadrature_auto.append({
-                'cassa': c.cassa,
-                'teorico': c.resto_erogato_teorico,
-                'reale': c.resto_erogato_reale,
-                'differenza': c.differenza,
-                'stato': c.stato_differenza,
-            })
+        teorico = c.contanti_teorici
+        reale = c.contanti_conteggiati
+        if reale is None:
+            tutto_conteggiato = False
+            stato = 'non_conteggiato'
+            diff = None
+        else:
+            diff = reale - teorico
+            if abs(diff) < Decimal('0.50'):
+                stato = 'ok'
+            elif diff < 0:
+                stato = 'mancante'
+            else:
+                stato = 'eccedente'
+            totale_contanti_reale += reale
+        totale_contanti_teorico += teorico
+        qualcosa_da_conteggiare = True
+        quadratura_righe.append({
+            'nome': c.cassa.nome,
+            'numero': c.cassa.numero,
+            'teorico': teorico,
+            'reale': reale,
+            'differenza': diff,
+            'stato': stato,
+            'is_servito': False,
+        })
 
-    # Stato complessivo quadratura
-    all_ok = True
-    if quadratura_servito and quadratura_servito['stato'] != 'ok':
-        all_ok = False
-    if quadratura_fisica and quadratura_fisica['stato'] != 'ok':
-        all_ok = False
-    for q in quadrature_auto:
-        if q['stato'] != 'ok':
-            all_ok = False
-            break
+    # Differenza totale
+    totale_differenza = totale_contanti_reale - totale_contanti_teorico if tutto_conteggiato else None
+    if tutto_conteggiato and totale_differenza is not None:
+        if abs(totale_differenza) < Decimal('0.50'):
+            stato_totale = 'ok'
+        elif totale_differenza < 0:
+            stato_totale = 'mancante'
+        else:
+            stato_totale = 'eccedente'
+    else:
+        stato_totale = 'non_conteggiato'
+
+    quadratura = {
+        'righe': quadratura_righe,
+        'totale_teorico': totale_contanti_teorico,
+        'totale_reale': totale_contanti_reale if tutto_conteggiato else None,
+        'totale_differenza': totale_differenza,
+        'stato_totale': stato_totale,
+        'tutto_conteggiato': tutto_conteggiato,
+        'disponibile': qualcosa_da_conteggiare,
+    }
 
     context = {
         'data': data,
@@ -1098,11 +1124,8 @@ def report_giornata(request):
         'totale_servito': totale_servito,
         'wash_cycles_portali': wash_cycles_portali,
         'chiusura_registratore': chiusura_registratore,
-        # Quadratura
-        'quadratura_servito': quadratura_servito,
-        'quadratura_fisica': quadratura_fisica,
-        'quadrature_auto': quadrature_auto,
-        'quadratura_ok': all_ok,
+        # Quadratura contanti
+        'quadratura': quadratura,
         # Resto
         'kpis': kpis,
         'ordini_non_pagati': ordini_non_pagati_list,

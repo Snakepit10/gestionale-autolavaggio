@@ -395,6 +395,14 @@ class ChiusuraCassaAutomatica(models.Model):
         help_text='Conteggio reale del resto erogato (per verificare con il teorico)',
     )
 
+    # Conteggio fisico dei contanti presenti nella cassa a fine giornata
+    contanti_conteggiati = models.DecimalField(
+        max_digits=10, decimal_places=2, null=True, blank=True,
+        validators=[MinValueValidator(Decimal('0.00'))],
+        verbose_name='Contanti conteggiati (fine giornata)',
+        help_text='Somma fisica dei contanti presenti nella cassa a fine giornata',
+    )
+
     # WashCycles (solo per portali)
     wash_cycles = models.PositiveIntegerField(
         null=True, blank=True,
@@ -441,6 +449,39 @@ class ChiusuraCassaAutomatica(models.Model):
     def stato_differenza(self):
         """Stato della differenza (ok, mancante, eccedente)."""
         diff = self.differenza
+        if abs(diff) < Decimal('0.50'):
+            return 'ok'
+        elif diff < 0:
+            return 'mancante'
+        else:
+            return 'eccedente'
+
+    @property
+    def contanti_teorici(self):
+        """Teorico dei contanti fisici rimasti nella cassa a fine giornata.
+
+        Per una cassa automatica: contanti entrati (vendita contante) meno il
+        resto erogato. Se non ci sono dati di vendita contante (es. registratore),
+        fallback all'incasso vendita.
+        """
+        if self.cassa.modalita_registratore:
+            # Registratore: i contanti incassati servito sono tutto l'incasso totale
+            return self.incasso_totale
+        # Cassa automatica: contanti entrati - resto erogato
+        return self.vendita_contante - self.resto_erogato_teorico
+
+    @property
+    def differenza_contanti(self):
+        """Differenza tra contanti conteggiati e teorici. None se non ancora conteggiati."""
+        if self.contanti_conteggiati is None:
+            return None
+        return self.contanti_conteggiati - self.contanti_teorici
+
+    @property
+    def stato_contanti(self):
+        diff = self.differenza_contanti
+        if diff is None:
+            return 'non_conteggiato'
         if abs(diff) < Decimal('0.50'):
             return 'ok'
         elif diff < 0:
