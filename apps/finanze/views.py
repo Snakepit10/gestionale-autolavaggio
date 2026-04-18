@@ -823,7 +823,7 @@ def chiusura_automatica_conferma(request, pk):
 @login_required
 @user_passes_test(is_staff_user)
 def report_giornata(request):
-    """Report aggregato del giorno: cassa servito + tutte le automatiche."""
+    """Report aggregato del giorno: cassa servito + tutte le automatiche + analisi."""
     data = _parse_data(request)
 
     # Cassa servito
@@ -861,11 +861,159 @@ def report_giornata(request):
     if cassa_servito:
         totale_giornata += cassa_servito.totale_incassi_giornalieri
 
+    # ==================== ORDINI NON INCASSATI ====================
+    ordini_non_pagati = Ordine.objects.filter(
+        data_ora__date=data,
+        stato_pagamento__in=['non_pagato', 'parziale', 'differito'],
+    ).exclude(stato='annullato').select_related('cliente').order_by('-data_ora')
+
+    totale_crediti = Decimal('0.00')
+    ordini_non_pagati_list = []
+    for o in ordini_non_pagati:
+        saldo = o.saldo_dovuto
+        totale_crediti += saldo
+        ordini_non_pagati_list.append({
+            'ordine': o,
+            'saldo': saldo,
+            'cliente': str(o.cliente) if o.cliente else 'Anonimo',
+        })
+
+    # Ordini non incassati di giorni precedenti (storico)
+    ordini_vecchi_non_pagati = Ordine.objects.filter(
+        data_ora__date__lt=data,
+        stato_pagamento__in=['non_pagato', 'parziale', 'differito'],
+    ).exclude(stato='annullato').count()
+    totale_crediti_storici = Decimal('0.00')
+    for o in Ordine.objects.filter(
+        data_ora__date__lt=data,
+        stato_pagamento__in=['non_pagato', 'parziale', 'differito'],
+    ).exclude(stato='annullato'):
+        totale_crediti_storici += o.saldo_dovuto
+
+    # ==================== ORDINI E PAGAMENTI DEL GIORNO ====================
+    ordini_giorno = Ordine.objects.filter(
+        data_ora__date=data,
+    ).exclude(stato='annullato')
+    num_ordini = ordini_giorno.count()
+    totale_ordinato = ordini_giorno.aggregate(s=Sum('totale_finale'))['s'] or Decimal('0.00')
+
+    pagamenti_giorno = Pagamento.objects.filter(
+        data_pagamento__date=data,
+    ).select_related('ordine')
+    num_transazioni = pagamenti_giorno.count()
+    scontrino_medio = totale_giornata / num_transazioni if num_transazioni > 0 else Decimal('0.00')
+
+    # ==================== METODI DI PAGAMENTO ====================
+    metodi_totali = {}
+    for p in pagamenti_giorno:
+        m = p.metodo or 'altro'
+        metodi_totali[m] = metodi_totali.get(m, Decimal('0.00')) + p.importo
+
+    # Label piu leggibili
+    metodi_labels = {
+        'contanti': 'Contanti', 'carta': 'Carta', 'bancomat': 'Bancomat',
+        'bonifico': 'Bonifico', 'assegno': 'Assegno', 'abbonamento': 'Abbonamento',
+        'altro': 'Altro',
+    }
+    metodi_chart = sorted(
+        [(metodi_labels.get(k, k.title()), float(v)) for k, v in metodi_totali.items()],
+        key=lambda x: -x[1]
+    )
+
+    # ==================== TOP SERVIZI PER FATTURATO ====================
+    items_pagati = ItemOrdine.objects.filter(
+        ordine__data_ora__date=data,
+        ordine__stato_pagamento='pagato',
+    ).select_related('servizio_prodotto__categoria')
+
+    servizi_stats = {}
+    categorie_stats = {}
+    for item in items_pagati:
+        sp = item.servizio_prodotto
+        nome = sp.titolo
+        servizi_stats.setdefault(nome, {
+            'nome': nome,
+            'categoria': sp.categoria.nome if sp.categoria else '—',
+            'quantita': 0,
+            'fatturato': Decimal('0.00'),
+        })
+        servizi_stats[nome]['quantita'] += item.quantita
+        servizi_stats[nome]['fatturato'] += item.subtotale
+
+        if sp.categoria:
+            cn = sp.categoria.nome
+            categorie_stats.setdefault(cn, {
+                'nome': cn, 'quantita': 0, 'fatturato': Decimal('0.00'),
+            })
+            categorie_stats[cn]['quantita'] += item.quantita
+            categorie_stats[cn]['fatturato'] += item.subtotale
+
+    top_servizi = sorted(servizi_stats.values(), key=lambda x: -x['fatturato'])[:10]
+    top_categorie = sorted(categorie_stats.values(), key=lambda x: -x['fatturato'])
+
+    # Chart data servizi
+    servizi_chart = [
+        {'nome': s['nome'], 'fatturato': float(s['fatturato']), 'quantita': s['quantita']}
+        for s in top_servizi
+    ]
+    categorie_chart = [
+        {'nome': c['nome'], 'fatturato': float(c['fatturato']), 'quantita': c['quantita']}
+        for c in top_categorie
+    ]
+
+    # ==================== TREND ORARIO ====================
+    # Suddivide i pagamenti in 24 bucket orari
+    orario_buckets = [0.0] * 24
+    orario_counts = [0] * 24
+    for p in pagamenti_giorno:
+        h = p.data_pagamento.hour
+        orario_buckets[h] += float(p.importo)
+        orario_counts[h] += 1
+
+    # Ora di picco
+    ora_picco = None
+    if any(orario_buckets):
+        ora_picco_h = orario_buckets.index(max(orario_buckets))
+        ora_picco = f"{ora_picco_h:02d}:00"
+
+    # ==================== CONFRONTO GIORNO PRECEDENTE ====================
+    ieri = data - timedelta(days=1)
+    pag_ieri = Pagamento.objects.filter(data_pagamento__date=ieri).aggregate(s=Sum('importo'))['s'] or Decimal('0.00')
+    chiusure_auto_ieri = ChiusuraCassaAutomatica.objects.filter(data=ieri).aggregate(s=Sum('incasso_totale'))['s'] or Decimal('0.00')
+    totale_ieri = pag_ieri + chiusure_auto_ieri
+    variazione_pct = None
+    if totale_ieri > 0:
+        variazione_pct = float((totale_giornata - totale_ieri) / totale_ieri * 100)
+
+    # ==================== KPI GENERALI ====================
+    kpis = {
+        'num_ordini': num_ordini,
+        'num_transazioni': num_transazioni,
+        'scontrino_medio': scontrino_medio,
+        'ora_picco': ora_picco or '—',
+        'num_non_pagati': len(ordini_non_pagati_list),
+        'totale_crediti': totale_crediti,
+        'num_crediti_vecchi': ordini_vecchi_non_pagati,
+        'totale_crediti_vecchi': totale_crediti_storici,
+        'totale_ieri': totale_ieri,
+        'variazione_pct': variazione_pct,
+    }
+
     context = {
         'data': data,
         'cassa_servito': cassa_servito,
         'chiusure_auto': chiusure_auto,
         'agg': agg,
         'totale_giornata': totale_giornata,
+        'totale_ordinato': totale_ordinato,
+        'kpis': kpis,
+        'ordini_non_pagati': ordini_non_pagati_list,
+        'top_servizi': top_servizi,
+        'top_categorie': top_categorie,
+        'metodi_chart_json': json.dumps(metodi_chart),
+        'servizi_chart_json': json.dumps(servizi_chart),
+        'categorie_chart_json': json.dumps(categorie_chart),
+        'orario_buckets_json': json.dumps(orario_buckets),
+        'orario_counts_json': json.dumps(orario_counts),
     }
     return render(request, 'finanze/report_giornata.html', context)

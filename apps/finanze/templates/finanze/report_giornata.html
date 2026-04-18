@@ -3,133 +3,425 @@
 
 {% block extra_css %}
 <style>
-.section-box { background: #fff; border: 1px solid #e2e8f0; border-radius: 10px; padding: 18px; margin-bottom: 16px; }
-.section-box h5 { color: #1e293b; font-weight: 700; margin-bottom: 14px; }
-.mini-kpi { display: flex; justify-content: space-between; padding: 6px 0; border-bottom: 1px solid #f1f5f9; font-size: .92rem; }
-.mini-kpi:last-child { border-bottom: none; }
-.mini-kpi .label { color: #64748b; }
-.mini-kpi .value { font-weight: 700; color: #1e293b; }
-.grand-total { background: linear-gradient(135deg, #0f766e 0%, #14b8a6 100%); color: #fff; padding: 18px; border-radius: 10px; }
-.grand-total .val { font-size: 2rem; font-weight: 800; }
+.dash-page { background: #f0f2f5; min-height: 100vh; margin: -1rem; padding: 1.2rem; }
+.dash-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px; }
+.dash-header h4 { font-weight: 700; color: #1a1a2e; margin: 0; }
+
+/* KPI tiles */
+.kpi-tile { background: #fff; border-radius: 10px; padding: 14px 16px; box-shadow: 0 1px 3px rgba(0,0,0,.05); height: 100%; }
+.kpi-tile .label { font-size: .7rem; text-transform: uppercase; letter-spacing: .6px; color: #8a94a6; font-weight: 700; }
+.kpi-tile .value { font-size: 1.7rem; font-weight: 800; line-height: 1.1; margin-top: 4px; color: #1e293b; }
+.kpi-tile .sub { font-size: .72rem; color: #94a3b8; margin-top: 2px; }
+.kpi-tile.success .value { color: #16a34a; }
+.kpi-tile.danger .value { color: #dc2626; }
+.kpi-tile.warning .value { color: #d97706; }
+.kpi-tile.primary .value { color: #2563eb; }
+.kpi-tile.info .value { color: #0891b2; }
+.kpi-tile.hero { background: linear-gradient(135deg, #0f766e 0%, #14b8a6 100%); color: #fff; }
+.kpi-tile.hero .label, .kpi-tile.hero .value, .kpi-tile.hero .sub { color: #fff; }
+.kpi-tile.hero .sub { opacity: .85; }
+
+.trend-up { color: #16a34a; }
+.trend-down { color: #dc2626; }
+
+/* Chart panels */
+.chart-panel { background: #fff; border-radius: 10px; box-shadow: 0 1px 3px rgba(0,0,0,.05); height: 100%; overflow: hidden; }
+.chart-panel .panel-title { font-size: .78rem; font-weight: 700; color: #475569; padding: 14px 18px 4px; text-transform: uppercase; letter-spacing: .6px; display: flex; align-items: center; gap: 8px; }
+.chart-panel .panel-sub { font-size: .75rem; color: #94a3b8; padding: 0 18px 8px; }
+.chart-panel .panel-body { padding: 4px 14px 14px; }
+
+/* Tables */
+.data-table { font-size: .82rem; }
+.data-table th { font-size: .68rem; text-transform: uppercase; letter-spacing: .4px; color: #64748b; font-weight: 600; }
+.data-table td { vertical-align: middle; }
+
+/* Credit alert */
+.credit-alert { background: linear-gradient(135deg, #fee2e2 0%, #fca5a5 100%); color: #7f1d1d; border-radius: 10px; padding: 16px 18px; }
+
+/* Ranked list */
+.ranked-item { display: flex; align-items: center; padding: 10px 18px; border-bottom: 1px solid #f1f5f9; }
+.ranked-item:last-child { border-bottom: none; }
+.ranked-item .rank { width: 24px; height: 24px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: .72rem; font-weight: 700; color: #fff; flex-shrink: 0; }
+.ranked-item .info { flex: 1; margin-left: 12px; min-width: 0; }
+.ranked-item .info .name { font-weight: 600; color: #1e293b; font-size: .88rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.ranked-item .info .cat { font-size: .7rem; color: #94a3b8; }
+.ranked-item .bar { width: 100px; margin: 0 12px; flex-shrink: 0; }
+.ranked-item .bar-fill { height: 6px; border-radius: 3px; background: linear-gradient(90deg, #3b82f6, #0ea5e9); }
+.ranked-item .value { font-weight: 800; color: #1e293b; font-size: .9rem; min-width: 72px; text-align: right; flex-shrink: 0; }
+.rank-1 { background: #f59e0b; }
+.rank-2 { background: #94a3b8; }
+.rank-3 { background: #cd7f32; }
+.rank-n { background: #64748b; }
+
+.filter-bar { background: #fff; border-radius: 10px; padding: 10px 16px; box-shadow: 0 1px 3px rgba(0,0,0,.05); margin-bottom: 14px; }
 </style>
 {% endblock %}
 
 {% block content %}
-<div class="container py-4">
+<div class="dash-page">
 
-  <div class="d-flex justify-content-between align-items-center mb-3">
-    <h4 class="mb-0"><i class="bi bi-file-earmark-bar-graph"></i> Report giornata</h4>
+  {# ====== Header ====== #}
+  <div class="dash-header">
+    <h4><i class="bi bi-file-earmark-bar-graph me-2"></i>Report Giornata — {{ data|date:"d/m/Y" }}</h4>
+    <div class="d-flex gap-2">
+      <a href="{% url 'finanze:chiusura_automatica_list' %}?data={{ data|date:'Y-m-d' }}" class="btn btn-sm btn-outline-primary"><i class="bi bi-robot"></i> Casse automatiche</a>
+      <a href="{% url 'finanze:dashboard' %}" class="btn btn-sm btn-outline-secondary"><i class="bi bi-arrow-left"></i> Dashboard</a>
+    </div>
+  </div>
+
+  {# ====== Filter ====== #}
+  <div class="filter-bar">
     <form method="get" class="d-flex gap-2 align-items-center">
-      <label class="small mb-0">Data:</label>
-      <input type="date" name="data" class="form-control form-control-sm" value="{{ data|date:'Y-m-d' }}">
-      <button type="submit" class="btn btn-primary btn-sm"><i class="bi bi-funnel"></i></button>
+      <i class="bi bi-calendar text-muted"></i>
+      <input type="date" name="data" class="form-control form-control-sm border-0 bg-light" value="{{ data|date:'Y-m-d' }}" style="max-width:180px">
+      <button type="submit" class="btn btn-dark btn-sm"><i class="bi bi-funnel"></i> Filtra</button>
     </form>
   </div>
 
-  {# TOTALE GIORNATA #}
-  <div class="grand-total mb-3 d-flex justify-content-between align-items-center">
-    <div>
-      <div class="small opacity-75 text-uppercase">Totale giornata (tutte le casse)</div>
-      <div class="val">&euro;{{ totale_giornata|floatformat:2 }}</div>
-    </div>
-    <div class="text-end">
-      <div class="small opacity-75 text-uppercase">WashCycles portali</div>
-      <div class="val">{{ agg.wash_cycles }}</div>
-    </div>
-  </div>
-
-  <div class="row g-3">
-    {# CASSA SERVITO #}
-    <div class="col-lg-6">
-      <div class="section-box h-100">
-        <h5><i class="bi bi-shop"></i> Cassa Servito</h5>
-        {% if cassa_servito %}
-          <div class="mini-kpi"><span class="label">Numero ordini</span><span class="value">{{ cassa_servito.num_ordini_giorno }}</span></div>
-          <div class="mini-kpi"><span class="label">Totale contanti</span><span class="value">&euro;{{ cassa_servito.totale_incassi_contanti|floatformat:2 }}</span></div>
-          <div class="mini-kpi"><span class="label">Totale carte</span><span class="value">&euro;{{ cassa_servito.totale_carte|floatformat:2 }}</span></div>
-          <div class="mini-kpi"><span class="label">Totale bancomat</span><span class="value">&euro;{{ cassa_servito.totale_bancomat|floatformat:2 }}</span></div>
-          <div class="mini-kpi"><span class="label">Totale bonifici</span><span class="value">&euro;{{ cassa_servito.totale_bonifici|floatformat:2 }}</span></div>
-          <div class="mini-kpi"><span class="label">Totale altro</span><span class="value">&euro;{{ cassa_servito.totale_altro|floatformat:2 }}</span></div>
-          <div class="mini-kpi"><span class="label"><strong>Totale incassi</strong></span><span class="value text-success">&euro;{{ cassa_servito.totale_incassi_giornalieri|floatformat:2 }}</span></div>
-          <div class="mini-kpi"><span class="label">Cassa teorica finale</span><span class="value">&euro;{{ cassa_servito.cassa_teorica_finale|floatformat:2 }}</span></div>
-          {% if cassa_servito.conteggio_cassa_reale %}
-          <div class="mini-kpi"><span class="label">Conteggio reale</span><span class="value">&euro;{{ cassa_servito.conteggio_cassa_reale|floatformat:2 }}</span></div>
-          <div class="mini-kpi"><span class="label">Differenza</span>
-            <span class="value {% if cassa_servito.stato_differenza == 'ok' %}text-success{% else %}text-danger{% endif %}">&euro;{{ cassa_servito.differenza_cassa|floatformat:2 }}</span>
+  {# ====== KPI Top Row ====== #}
+  <div class="row g-2 mb-3">
+    <div class="col-6 col-lg-3">
+      <div class="kpi-tile hero">
+        <div class="label">Totale giornata</div>
+        <div class="value">&euro;{{ totale_giornata|floatformat:2 }}</div>
+        {% if kpis.variazione_pct != None %}
+          <div class="sub">
+            {% if kpis.variazione_pct >= 0 %}
+              <i class="bi bi-arrow-up"></i> +{{ kpis.variazione_pct|floatformat:1 }}% vs ieri
+            {% else %}
+              <i class="bi bi-arrow-down"></i> {{ kpis.variazione_pct|floatformat:1 }}% vs ieri
+            {% endif %}
           </div>
-          {% endif %}
         {% else %}
-          <p class="text-muted">Nessuna chiusura cassa servito per questa data.</p>
-          <a href="{% url 'finanze:dashboard' %}" class="btn btn-outline-primary btn-sm"><i class="bi bi-plus-circle"></i> Apri cassa</a>
+          <div class="sub">vs ieri: &euro;{{ kpis.totale_ieri|floatformat:2 }}</div>
         {% endif %}
       </div>
     </div>
-
-    {# AGGREGATO CASSE AUTOMATICHE #}
-    <div class="col-lg-6">
-      <div class="section-box h-100">
-        <h5><i class="bi bi-robot"></i> Casse Automatiche (totale)</h5>
-        <div class="mini-kpi"><span class="label">Incasso totale</span><span class="value">&euro;{{ agg.incasso_totale|floatformat:2 }}</span></div>
-        <div class="mini-kpi"><span class="label">Incasso ricarica</span><span class="value">&euro;{{ agg.incasso_ricarica|floatformat:2 }}</span></div>
-        <div class="mini-kpi"><span class="label">Incasso vendita</span><span class="value">&euro;{{ agg.incasso_vendita|floatformat:2 }}</span></div>
-        <div class="mini-kpi"><span class="label">Vendita contante</span><span class="value">&euro;{{ agg.vendita_contante|floatformat:2 }}</span></div>
-        <div class="mini-kpi"><span class="label">Vendita non contante</span><span class="value">&euro;{{ agg.vendita_non_contante|floatformat:2 }}</span></div>
-        <div class="mini-kpi"><span class="label"><strong>Vendita totale</strong></span><span class="value text-success">&euro;{{ agg.vendita_totale|floatformat:2 }}</span></div>
-        <div class="mini-kpi"><span class="label">Resto erogato teorico</span><span class="value">&euro;{{ agg.resto_erogato_teorico|floatformat:2 }}</span></div>
-        <div class="mini-kpi"><span class="label">WashCycles</span><span class="value">{{ agg.wash_cycles }}</span></div>
+    <div class="col-6 col-lg-3">
+      <div class="kpi-tile primary">
+        <div class="label">Ordini giorno</div>
+        <div class="value">{{ kpis.num_ordini }}</div>
+        <div class="sub">{{ kpis.num_transazioni }} transazioni</div>
+      </div>
+    </div>
+    <div class="col-6 col-lg-3">
+      <div class="kpi-tile info">
+        <div class="label">Scontrino medio</div>
+        <div class="value">&euro;{{ kpis.scontrino_medio|floatformat:2 }}</div>
+        <div class="sub">Ora di picco: {{ kpis.ora_picco }}</div>
+      </div>
+    </div>
+    <div class="col-6 col-lg-3">
+      <div class="kpi-tile warning">
+        <div class="label">WashCycles portali</div>
+        <div class="value">{{ agg.wash_cycles }}</div>
+        <div class="sub">cicli di lavaggio erogati</div>
       </div>
     </div>
   </div>
 
-  {# DETTAGLIO PER CASSA AUTOMATICA #}
-  <div class="section-box">
-    <h5><i class="bi bi-list-ul"></i> Dettaglio casse automatiche</h5>
-    {% if chiusure_auto %}
-    <table class="table table-sm">
-      <thead class="table-light">
-        <tr>
-          <th>Cassa</th>
-          <th class="text-end">Incasso tot.</th>
-          <th class="text-end">Ricarica</th>
-          <th class="text-end">Inc. vendita</th>
-          <th class="text-end">V. contante</th>
-          <th class="text-end">V. non cont.</th>
-          <th class="text-end">V. totale</th>
-          <th class="text-end">Resto teo.</th>
-          <th class="text-center">WashCycles</th>
-          <th></th>
-        </tr>
-      </thead>
-      <tbody>
-        {% for c in chiusure_auto %}
-        <tr>
-          <td><strong>{{ c.cassa.nome }}</strong>{% if c.cassa.numero %} <small class="text-muted">{{ c.cassa.numero }}</small>{% endif %}</td>
-          <td class="text-end">&euro;{{ c.incasso_totale|floatformat:2 }}</td>
-          <td class="text-end">&euro;{{ c.incasso_ricarica|floatformat:2 }}</td>
-          <td class="text-end">&euro;{{ c.incasso_vendita|floatformat:2 }}</td>
-          <td class="text-end">&euro;{{ c.vendita_contante|floatformat:2 }}</td>
-          <td class="text-end">&euro;{{ c.vendita_non_contante|floatformat:2 }}</td>
-          <td class="text-end"><strong>&euro;{{ c.vendita_totale|floatformat:2 }}</strong></td>
-          <td class="text-end">&euro;{{ c.resto_erogato_teorico|floatformat:2 }}</td>
-          <td class="text-center">{{ c.wash_cycles|default:"—" }}</td>
-          <td><a href="{% url 'finanze:chiusura_automatica_detail' c.pk %}" class="btn btn-outline-primary btn-sm py-0"><i class="bi bi-eye"></i></a></td>
-        </tr>
-        {% endfor %}
-      </tbody>
-    </table>
-    {% else %}
-    <p class="text-muted mb-0">Nessuna chiusura automatica registrata per questa data.</p>
-    {% endif %}
+  {# ====== Crediti alert ====== #}
+  {% if kpis.num_non_pagati > 0 or kpis.num_crediti_vecchi > 0 %}
+  <div class="row g-2 mb-3">
+    <div class="col-md-6">
+      <div class="kpi-tile danger" style="background: linear-gradient(135deg, #fee2e2 0%, #fef2f2 100%);">
+        <div class="label"><i class="bi bi-exclamation-triangle"></i> Ordini NON incassati oggi</div>
+        <div class="value">{{ kpis.num_non_pagati }}</div>
+        <div class="sub">Crediti da riscuotere: <strong>&euro;{{ kpis.totale_crediti|floatformat:2 }}</strong></div>
+      </div>
+    </div>
+    <div class="col-md-6">
+      <div class="kpi-tile warning" style="background: linear-gradient(135deg, #fef3c7 0%, #fffbeb 100%);">
+        <div class="label"><i class="bi bi-clock-history"></i> Crediti pregressi</div>
+        <div class="value">{{ kpis.num_crediti_vecchi }}</div>
+        <div class="sub">Totale: <strong>&euro;{{ kpis.totale_crediti_vecchi|floatformat:2 }}</strong></div>
+      </div>
+    </div>
+  </div>
+  {% endif %}
+
+  {# ====== Grafici riga 1 ====== #}
+  <div class="row g-2 mb-3">
+    {# Trend orario #}
+    <div class="col-lg-8">
+      <div class="chart-panel">
+        <div class="panel-title"><i class="bi bi-graph-up text-primary"></i> Andamento orario</div>
+        <div class="panel-sub">Incassi distribuiti nelle 24 ore</div>
+        <div class="panel-body"><canvas id="chartTrend" height="80"></canvas></div>
+      </div>
+    </div>
+
+    {# Metodi di pagamento #}
+    <div class="col-lg-4">
+      <div class="chart-panel">
+        <div class="panel-title"><i class="bi bi-credit-card text-info"></i> Metodi di pagamento</div>
+        <div class="panel-sub">Distribuzione incassi</div>
+        <div class="panel-body"><canvas id="chartMetodi" height="220"></canvas></div>
+      </div>
+    </div>
   </div>
 
-  <div>
-    <a href="{% url 'finanze:chiusura_automatica_list' %}?data={{ data|date:'Y-m-d' }}" class="btn btn-outline-primary">
-      <i class="bi bi-cash-stack"></i> Gestisci casse automatiche
-    </a>
-    <a href="{% url 'finanze:dashboard' %}" class="btn btn-outline-secondary">
-      <i class="bi bi-arrow-left"></i> Dashboard finanze
-    </a>
+  {# ====== Grafici riga 2 ====== #}
+  <div class="row g-2 mb-3">
+    {# Top servizi #}
+    <div class="col-lg-7">
+      <div class="chart-panel">
+        <div class="panel-title"><i class="bi bi-trophy text-warning"></i> Top servizi per fatturato</div>
+        <div class="panel-sub">Servizi piu venduti del giorno (ordini pagati)</div>
+        <div class="panel-body" style="padding-top:8px">
+          {% for s in top_servizi %}
+          <div class="ranked-item">
+            <div class="rank {% if forloop.counter == 1 %}rank-1{% elif forloop.counter == 2 %}rank-2{% elif forloop.counter == 3 %}rank-3{% else %}rank-n{% endif %}">{{ forloop.counter }}</div>
+            <div class="info">
+              <div class="name">{{ s.nome }}</div>
+              <div class="cat">{{ s.categoria }} &middot; {{ s.quantita }} pz</div>
+            </div>
+            <div class="bar">
+              <div class="bar-fill" style="width:{% widthratio s.fatturato top_servizi.0.fatturato 100 %}%"></div>
+            </div>
+            <div class="value">&euro;{{ s.fatturato|floatformat:2 }}</div>
+          </div>
+          {% empty %}
+          <div class="text-muted text-center py-4">Nessun servizio venduto oggi</div>
+          {% endfor %}
+        </div>
+      </div>
+    </div>
+
+    {# Categorie #}
+    <div class="col-lg-5">
+      <div class="chart-panel">
+        <div class="panel-title"><i class="bi bi-grid text-success"></i> Fatturato per categoria</div>
+        <div class="panel-sub">Confronto categorie</div>
+        <div class="panel-body"><canvas id="chartCategorie" height="240"></canvas></div>
+      </div>
+    </div>
   </div>
+
+  {# ====== Dettagli cassa servito + automatiche ====== #}
+  <div class="row g-2 mb-3">
+    <div class="col-lg-6">
+      <div class="chart-panel h-100">
+        <div class="panel-title"><i class="bi bi-shop text-primary"></i> Cassa Servito</div>
+        <div class="panel-body">
+          {% if cassa_servito %}
+            <div class="row g-2 small">
+              <div class="col-6"><div class="text-muted">Contanti</div><div class="fw-bold">&euro;{{ cassa_servito.totale_incassi_contanti|floatformat:2 }}</div></div>
+              <div class="col-6"><div class="text-muted">Carte</div><div class="fw-bold">&euro;{{ cassa_servito.totale_carte|floatformat:2 }}</div></div>
+              <div class="col-6"><div class="text-muted">Bancomat</div><div class="fw-bold">&euro;{{ cassa_servito.totale_bancomat|floatformat:2 }}</div></div>
+              <div class="col-6"><div class="text-muted">Bonifici</div><div class="fw-bold">&euro;{{ cassa_servito.totale_bonifici|floatformat:2 }}</div></div>
+              <div class="col-6"><div class="text-muted">Altro</div><div class="fw-bold">&euro;{{ cassa_servito.totale_altro|floatformat:2 }}</div></div>
+              <div class="col-6"><div class="text-muted">Cassa teorica</div><div class="fw-bold">&euro;{{ cassa_servito.cassa_teorica_finale|floatformat:2 }}</div></div>
+              <div class="col-12 border-top pt-2 mt-1"><div class="text-muted">Totale incassi</div><div class="fs-5 fw-bold text-success">&euro;{{ cassa_servito.totale_incassi_giornalieri|floatformat:2 }}</div></div>
+            </div>
+          {% else %}
+            <p class="text-muted mb-0">Nessuna chiusura cassa servito per questa data.</p>
+          {% endif %}
+        </div>
+      </div>
+    </div>
+
+    <div class="col-lg-6">
+      <div class="chart-panel h-100">
+        <div class="panel-title"><i class="bi bi-robot text-info"></i> Casse Automatiche (aggregato)</div>
+        <div class="panel-body">
+          <div class="row g-2 small">
+            <div class="col-6"><div class="text-muted">Incasso totale</div><div class="fw-bold">&euro;{{ agg.incasso_totale|floatformat:2 }}</div></div>
+            <div class="col-6"><div class="text-muted">Incasso ricarica</div><div class="fw-bold">&euro;{{ agg.incasso_ricarica|floatformat:2 }}</div></div>
+            <div class="col-6"><div class="text-muted">Incasso vendita</div><div class="fw-bold">&euro;{{ agg.incasso_vendita|floatformat:2 }}</div></div>
+            <div class="col-6"><div class="text-muted">Vendita contante</div><div class="fw-bold">&euro;{{ agg.vendita_contante|floatformat:2 }}</div></div>
+            <div class="col-6"><div class="text-muted">Vendita non cont.</div><div class="fw-bold">&euro;{{ agg.vendita_non_contante|floatformat:2 }}</div></div>
+            <div class="col-6"><div class="text-muted">Vendita totale</div><div class="fw-bold text-success">&euro;{{ agg.vendita_totale|floatformat:2 }}</div></div>
+            <div class="col-12 border-top pt-2 mt-1"><div class="text-muted">Resto teorico</div><div class="fs-5 fw-bold">&euro;{{ agg.resto_erogato_teorico|floatformat:2 }}</div></div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  {# ====== Dettaglio casse automatiche ====== #}
+  {% if chiusure_auto %}
+  <div class="chart-panel mb-3">
+    <div class="panel-title"><i class="bi bi-list-ul"></i> Dettaglio chiusure casse automatiche</div>
+    <div class="table-responsive">
+      <table class="table table-sm data-table mb-0">
+        <thead class="table-light">
+          <tr>
+            <th>Cassa</th>
+            <th class="text-end">Incasso tot.</th>
+            <th class="text-end">Ricarica</th>
+            <th class="text-end">Inc. vendita</th>
+            <th class="text-end">V. contante</th>
+            <th class="text-end">V. non cont.</th>
+            <th class="text-end">V. totale</th>
+            <th class="text-end">Resto teo.</th>
+            <th class="text-center">WashCycles</th>
+            <th></th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for c in chiusure_auto %}
+          <tr>
+            <td><strong>{{ c.cassa.nome }}</strong>{% if c.cassa.numero %} <small class="text-muted">{{ c.cassa.numero }}</small>{% endif %}</td>
+            <td class="text-end">&euro;{{ c.incasso_totale|floatformat:2 }}</td>
+            <td class="text-end">&euro;{{ c.incasso_ricarica|floatformat:2 }}</td>
+            <td class="text-end">&euro;{{ c.incasso_vendita|floatformat:2 }}</td>
+            <td class="text-end">&euro;{{ c.vendita_contante|floatformat:2 }}</td>
+            <td class="text-end">&euro;{{ c.vendita_non_contante|floatformat:2 }}</td>
+            <td class="text-end"><strong>&euro;{{ c.vendita_totale|floatformat:2 }}</strong></td>
+            <td class="text-end">&euro;{{ c.resto_erogato_teorico|floatformat:2 }}</td>
+            <td class="text-center">{{ c.wash_cycles|default:"—" }}</td>
+            <td><a href="{% url 'finanze:chiusura_automatica_detail' c.pk %}" class="btn btn-outline-primary btn-sm py-0"><i class="bi bi-eye"></i></a></td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+  {% endif %}
+
+  {# ====== Ordini non incassati ====== #}
+  {% if ordini_non_pagati %}
+  <div class="chart-panel mb-3">
+    <div class="panel-title text-danger"><i class="bi bi-exclamation-triangle"></i> Ordini non incassati del giorno ({{ ordini_non_pagati|length }})</div>
+    <div class="panel-sub">Totale crediti da riscuotere: <strong>&euro;{{ kpis.totale_crediti|floatformat:2 }}</strong></div>
+    <div class="table-responsive">
+      <table class="table table-sm data-table mb-0">
+        <thead class="table-light">
+          <tr>
+            <th>Ordine</th><th>Ora</th><th>Cliente</th><th>Stato</th><th class="text-end">Totale</th><th class="text-end">Pagato</th><th class="text-end">Saldo dovuto</th><th></th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for e in ordini_non_pagati %}
+          <tr>
+            <td><strong>#{{ e.ordine.numero_progressivo|slice:"-4:" }}</strong></td>
+            <td>{{ e.ordine.data_ora|date:"H:i" }}</td>
+            <td>{{ e.cliente }}</td>
+            <td><span class="badge {% if e.ordine.stato_pagamento == 'non_pagato' %}bg-danger{% elif e.ordine.stato_pagamento == 'parziale' %}bg-warning text-dark{% else %}bg-info{% endif %}">{{ e.ordine.get_stato_pagamento_display }}</span></td>
+            <td class="text-end">&euro;{{ e.ordine.totale_finale|floatformat:2 }}</td>
+            <td class="text-end">&euro;{{ e.ordine.importo_pagato|floatformat:2 }}</td>
+            <td class="text-end fw-bold text-danger">&euro;{{ e.saldo|floatformat:2 }}</td>
+            <td><a href="{% url 'ordini:ordine-detail' e.ordine.pk %}" class="btn btn-outline-danger btn-sm py-0"><i class="bi bi-eye"></i></a></td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+  {% endif %}
 
 </div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+const COLORS = ['#3b82f6', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6', '#ec4899', '#14b8a6', '#f97316', '#06b6d4', '#a855f7'];
+const metodi = {{ metodi_chart_json|safe }};
+const categorie = {{ categorie_chart_json|safe }};
+const orarioVals = {{ orario_buckets_json|safe }};
+const orarioCount = {{ orario_counts_json|safe }};
+
+Chart.defaults.font.family = '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif';
+Chart.defaults.font.size = 11;
+
+// ===== Trend orario =====
+const ctxTrend = document.getElementById('chartTrend');
+if (ctxTrend) {
+  new Chart(ctxTrend, {
+    type: 'bar',
+    data: {
+      labels: Array.from({length: 24}, (_, i) => `${String(i).padStart(2,'0')}:00`),
+      datasets: [{
+        label: 'Incassi (€)',
+        data: orarioVals,
+        backgroundColor: 'rgba(59, 130, 246, 0.85)',
+        borderRadius: 4,
+        borderSkipped: false,
+      }]
+    },
+    options: {
+      responsive: true, maintainAspectRatio: false,
+      plugins: {
+        legend: { display: false },
+        tooltip: {
+          callbacks: {
+            label: (ctx) => {
+              const v = ctx.parsed.y.toFixed(2);
+              const n = orarioCount[ctx.dataIndex] || 0;
+              return `€${v} (${n} transazioni)`;
+            }
+          }
+        }
+      },
+      scales: {
+        x: { grid: { display: false } },
+        y: { beginAtZero: true, grid: { color: '#f1f5f9' }, ticks: { callback: v => '€' + v } }
+      }
+    }
+  });
+}
+
+// ===== Metodi pagamento (doughnut) =====
+const ctxMetodi = document.getElementById('chartMetodi');
+if (ctxMetodi && metodi.length > 0) {
+  new Chart(ctxMetodi, {
+    type: 'doughnut',
+    data: {
+      labels: metodi.map(m => m[0]),
+      datasets: [{
+        data: metodi.map(m => m[1]),
+        backgroundColor: COLORS,
+        borderWidth: 0,
+      }]
+    },
+    options: {
+      responsive: true, maintainAspectRatio: false,
+      cutout: '60%',
+      plugins: {
+        legend: { position: 'bottom', labels: { font: { size: 10 }, padding: 8, boxWidth: 12 } },
+        tooltip: {
+          callbacks: {
+            label: (ctx) => {
+              const v = ctx.parsed.toFixed(2);
+              const total = ctx.dataset.data.reduce((a, b) => a + b, 0);
+              const pct = total > 0 ? ((ctx.parsed / total) * 100).toFixed(1) : 0;
+              return `${ctx.label}: €${v} (${pct}%)`;
+            }
+          }
+        }
+      }
+    }
+  });
+} else if (ctxMetodi) {
+  ctxMetodi.getContext('2d').fillText('Nessun dato', 40, 40);
+}
+
+// ===== Categorie (horizontal bar) =====
+const ctxCat = document.getElementById('chartCategorie');
+if (ctxCat && categorie.length > 0) {
+  new Chart(ctxCat, {
+    type: 'bar',
+    data: {
+      labels: categorie.map(c => c.nome),
+      datasets: [{
+        label: 'Fatturato (€)',
+        data: categorie.map(c => c.fatturato),
+        backgroundColor: categorie.map((_, i) => COLORS[i % COLORS.length]),
+        borderRadius: 4,
+        borderSkipped: false,
+      }]
+    },
+    options: {
+      indexAxis: 'y',
+      responsive: true, maintainAspectRatio: false,
+      plugins: { legend: { display: false } },
+      scales: {
+        x: { beginAtZero: true, grid: { color: '#f1f5f9' }, ticks: { callback: v => '€' + v } },
+        y: { grid: { display: false } }
+      }
+    }
+  });
+}
+</script>
 {% endblock %}
