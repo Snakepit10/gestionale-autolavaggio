@@ -146,93 +146,117 @@
     </div>
   </div>
 
-  {# ====== CONTROLLO QUADRATURA CONTANTI ====== #}
-  {% if quadratura.disponibile %}
+  {# ====== QUADRATURA GIORNALIERA COMPLESSIVA ====== #}
   <div class="chart-panel mb-3">
     <div class="panel-title">
-      <i class="bi bi-cash-stack {% if quadratura.stato_totale == 'ok' %}text-success{% elif quadratura.stato_totale == 'non_conteggiato' %}text-muted{% else %}text-danger{% endif %}"></i>
-      Quadratura contanti — conteggio fisico per cassa
-      {% if quadratura.stato_totale == 'ok' %}
+      <i class="bi bi-cash-stack {% if quadratura.stato == 'ok' %}text-success{% elif quadratura.stato == 'non_rilevato' %}text-muted{% else %}text-danger{% endif %}"></i>
+      Quadratura giornaliera &mdash; scassettamento unificato
+      {% if quadratura.stato == 'ok' %}
         <span class="badge bg-success ms-2">In quadra</span>
-      {% elif quadratura.stato_totale == 'non_conteggiato' %}
-        <span class="badge bg-secondary ms-2">Conteggio incompleto</span>
+      {% elif quadratura.stato == 'non_rilevato' %}
+        <span class="badge bg-secondary ms-2">Non ancora inserita</span>
+      {% elif quadratura.stato == 'mancante' %}
+        <span class="badge bg-danger ms-2">Mancante</span>
       {% else %}
-        <span class="badge bg-danger ms-2">Differenze rilevate</span>
+        <span class="badge bg-warning text-dark ms-2">Eccedente</span>
       {% endif %}
+      <a href="{% url 'finanze:quadratura_form' %}?data={{ data|date:'Y-m-d' }}" class="btn btn-sm btn-outline-primary ms-auto">
+        <i class="bi bi-pencil"></i>
+        {% if quadratura.obj %}Modifica{% else %}Inserisci{% endif %} quadratura
+      </a>
     </div>
-    <div class="panel-sub">Per ogni cassa, conta fisicamente i contanti a fine giornata e confrontali con il teorico</div>
+    <div class="panel-sub">Conta tutti i contanti scassettati + totale lettore carte servito, confronta con vendita self-service + ordini POS</div>
     <div class="panel-body">
-      <div class="table-responsive">
-        <table class="table table-sm mb-0">
-          <thead class="table-light">
-            <tr>
-              <th>Cassa</th>
-              <th class="text-end">Contanti teorici</th>
-              <th class="text-end">Contanti reali (conteggiati)</th>
-              <th class="text-end">Differenza</th>
-              <th>Stato</th>
-            </tr>
-          </thead>
-          <tbody>
-            {% for r in quadratura.righe %}
-            <tr {% if r.stato != 'ok' and r.stato != 'non_conteggiato' %}class="table-danger"{% endif %}>
-              <td>
-                {% if r.is_servito %}<i class="bi bi-shop text-primary"></i>{% else %}<i class="bi bi-robot text-info"></i>{% endif %}
-                <strong>{{ r.nome }}</strong>
-                {% if r.numero %}<small class="text-muted">n. {{ r.numero }}</small>{% endif %}
-              </td>
-              <td class="text-end">&euro;{{ r.teorico|floatformat:2 }}</td>
-              <td class="text-end">
-                {% if r.reale is None %}
-                  <span class="text-muted fst-italic">non conteggiato</span>
-                {% else %}
-                  &euro;{{ r.reale|floatformat:2 }}
-                {% endif %}
-              </td>
-              <td class="text-end fw-bold {% if r.stato == 'ok' %}text-success{% elif r.stato == 'non_conteggiato' %}text-muted{% else %}text-danger{% endif %}">
-                {% if r.differenza is not None %}&euro;{{ r.differenza|floatformat:2 }}{% else %}—{% endif %}
-              </td>
-              <td>
-                {% if r.stato == 'ok' %}<span class="badge bg-success">OK</span>
-                {% elif r.stato == 'non_conteggiato' %}<span class="badge bg-secondary">Da conteggiare</span>
-                {% elif r.stato == 'mancante' %}<span class="badge bg-danger">Mancante</span>
-                {% else %}<span class="badge bg-warning text-dark">Eccedente</span>{% endif %}
-              </td>
-            </tr>
-            {% endfor %}
-          </tbody>
-          <tfoot class="table-light fw-bold">
-            <tr>
-              <td>TOTALE CONTANTI</td>
-              <td class="text-end">&euro;{{ quadratura.totale_teorico|floatformat:2 }}</td>
-              <td class="text-end">
-                {% if quadratura.totale_reale is not None %}
-                  &euro;{{ quadratura.totale_reale|floatformat:2 }}
-                {% else %}
-                  <span class="text-muted fst-italic">incompleto</span>
-                {% endif %}
-              </td>
-              <td class="text-end {% if quadratura.stato_totale == 'ok' %}text-success{% elif quadratura.stato_totale == 'non_conteggiato' %}text-muted{% else %}text-danger{% endif %}">
-                {% if quadratura.totale_differenza is not None %}&euro;{{ quadratura.totale_differenza|floatformat:2 }}{% else %}—{% endif %}
-              </td>
-              <td>
-                {% if quadratura.stato_totale == 'ok' %}<span class="badge bg-success">In quadra</span>
-                {% elif quadratura.stato_totale == 'non_conteggiato' %}<span class="badge bg-secondary">Incompleto</span>
-                {% elif quadratura.stato_totale == 'mancante' %}<span class="badge bg-danger">Mancante</span>
-                {% else %}<span class="badge bg-warning text-dark">Eccedente</span>{% endif %}
-              </td>
-            </tr>
-          </tfoot>
-        </table>
+
+      {% if quadratura.obj %}
+      <div class="row g-3">
+        {# Reale #}
+        <div class="col-md-6">
+          <div class="p-3" style="background:#f8fafc; border-radius:8px; border-left:4px solid #0ea5e9;">
+            <div class="text-muted small fw-bold text-uppercase mb-2"><i class="bi bi-eye"></i> Rilevato (reale)</div>
+            <div class="d-flex justify-content-between small mb-1">
+              <span>Contanti totali conteggiati</span>
+              <span class="fw-bold">&euro;{{ quadratura.obj.contanti_totali|floatformat:2 }}</span>
+            </div>
+            <div class="d-flex justify-content-between small mb-1">
+              <span>Lettore carte servito (POS)</span>
+              <span class="fw-bold">&euro;{{ quadratura.obj.lettore_carte_servito|floatformat:2 }}</span>
+            </div>
+            <div class="d-flex justify-content-between small mb-2 text-danger">
+              <span>&minus; Fondo cassa iniziale</span>
+              <span class="fw-bold">&minus;&euro;{{ quadratura.fondo_cassa_iniziale|floatformat:2 }}</span>
+            </div>
+            <div class="d-flex justify-content-between border-top pt-2">
+              <span class="fw-bold">Totale reale</span>
+              <span class="fs-5 fw-bold text-primary">&euro;{{ quadratura.totale_reale|floatformat:2 }}</span>
+            </div>
+          </div>
+        </div>
+
+        {# Teorico #}
+        <div class="col-md-6">
+          <div class="p-3" style="background:#f8fafc; border-radius:8px; border-left:4px solid #14b8a6;">
+            <div class="text-muted small fw-bold text-uppercase mb-2"><i class="bi bi-calculator"></i> Atteso (teorico)</div>
+            <div class="d-flex justify-content-between small mb-1">
+              <span>Vendita self-service (automatiche)</span>
+              <span class="fw-bold">&euro;{{ quadratura.vendita_self_service|floatformat:2 }}</span>
+            </div>
+            <div class="d-flex justify-content-between small mb-2">
+              <span>Totale servito (ordini POS)</span>
+              <span class="fw-bold">&euro;{{ quadratura.totale_servito|floatformat:2 }}</span>
+            </div>
+            <div class="d-flex justify-content-between border-top pt-2">
+              <span class="fw-bold">Totale teorico</span>
+              <span class="fs-5 fw-bold" style="color:#0f766e">&euro;{{ quadratura.totale_teorico|floatformat:2 }}</span>
+            </div>
+          </div>
+        </div>
+
+        {# Differenza #}
+        <div class="col-12">
+          <div class="p-3 d-flex justify-content-between align-items-center" style="background:{% if quadratura.stato == 'ok' %}#f0fdf4{% else %}#fef2f2{% endif %}; border-radius:8px; border-left:4px solid {% if quadratura.stato == 'ok' %}#16a34a{% else %}#dc2626{% endif %};">
+            <div>
+              <div class="text-muted small fw-bold text-uppercase">Differenza (reale &minus; teorico)</div>
+              <div class="fs-3 fw-bold {% if quadratura.stato == 'ok' %}text-success{% else %}text-danger{% endif %}">
+                {% if quadratura.differenza >= 0 %}+{% endif %}&euro;{{ quadratura.differenza|floatformat:2 }}
+              </div>
+            </div>
+            <div>
+              {% if quadratura.stato == 'ok' %}
+                <span class="badge bg-success fs-6"><i class="bi bi-check-circle"></i> In quadra (tolleranza &plusmn;&euro;0.50)</span>
+              {% elif quadratura.stato == 'mancante' %}
+                <span class="badge bg-danger fs-6"><i class="bi bi-exclamation-triangle"></i> Mancano &euro;{{ quadratura.differenza|floatformat:2|slice:"1:" }}</span>
+              {% else %}
+                <span class="badge bg-warning text-dark fs-6"><i class="bi bi-exclamation-triangle"></i> Eccedenza di &euro;{{ quadratura.differenza|floatformat:2 }}</span>
+              {% endif %}
+            </div>
+          </div>
+        </div>
       </div>
 
-      <div class="alert alert-info small mt-3 mb-0">
-        <i class="bi bi-info-circle"></i> <strong>Come funziona?</strong>
-        A fine giornata apri fisicamente ogni cassa e conta i contanti presenti. Inserisci il valore conteggiato nel form di chiusura della cassa. Il sistema calcola automaticamente la differenza con il teorico e mostra la quadratura complessiva (tolleranza &plusmn;&euro;0.50). Se la riga "TOTALE CONTANTI" e verde, non mancano soldi.
+      {% if quadratura.obj.note %}
+      <div class="alert alert-light small mt-3 mb-0">
+        <i class="bi bi-sticky"></i> <strong>Note:</strong> {{ quadratura.obj.note|linebreaksbr }}
       </div>
+      {% endif %}
+
+      {% else %}
+      <div class="text-center py-4">
+        <i class="bi bi-inbox" style="font-size:2.5rem; color:#cbd5e1;"></i>
+        <p class="text-muted mb-3 mt-2">Quadratura non ancora inserita per questa data.</p>
+        <a href="{% url 'finanze:quadratura_form' %}?data={{ data|date:'Y-m-d' }}" class="btn btn-primary">
+          <i class="bi bi-plus-circle"></i> Inserisci quadratura
+        </a>
+        <div class="alert alert-info small mt-3 mb-0 text-start">
+          <strong>Teorico atteso per oggi:</strong>
+          vendita self-service &euro;{{ quadratura.vendita_self_service|floatformat:2 }}
+          + servito POS &euro;{{ quadratura.totale_servito|floatformat:2 }}
+          = <strong>&euro;{{ quadratura.totale_teorico|floatformat:2 }}</strong>
+        </div>
+      </div>
+      {% endif %}
     </div>
   </div>
-  {% endif %}
 
   {# ====== Crediti alert ====== #}
   {% if kpis.num_non_pagati > 0 %}

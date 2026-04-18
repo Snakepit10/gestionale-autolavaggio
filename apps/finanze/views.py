@@ -8,7 +8,7 @@ from datetime import datetime, timedelta
 from decimal import Decimal
 import json
 
-from .models import ChiusuraCassa, MovimentoCassa, Cassa, ChiusuraCassaAutomatica
+from .models import ChiusuraCassa, MovimentoCassa, Cassa, ChiusuraCassaAutomatica, QuadraturaGiornaliera
 from apps.ordini.models import Pagamento, Ordine, ItemOrdine
 from apps.core.models import Categoria
 
@@ -742,9 +742,6 @@ def chiusura_automatica_create(request, cassa_id):
                 resto_erogato_reale=Decimal(request.POST.get('resto_erogato_reale') or '0'),
                 note=request.POST.get('note', ''),
             )
-            cont = request.POST.get('contanti_conteggiati')
-            if cont not in (None, ''):
-                chiusura.contanti_conteggiati = Decimal(cont)
             if cassa.tracking_washcycles:
                 wc = request.POST.get('wash_cycles')
                 if wc:
@@ -790,8 +787,6 @@ def chiusura_automatica_edit(request, pk):
             chiusura.vendita_non_contante = Decimal(request.POST.get('vendita_non_contante') or '0')
             chiusura.resto_erogato_reale = Decimal(request.POST.get('resto_erogato_reale') or '0')
             chiusura.note = request.POST.get('note', '')
-            cont = request.POST.get('contanti_conteggiati')
-            chiusura.contanti_conteggiati = Decimal(cont) if cont not in (None, '') else None
             if chiusura.cassa.tracking_washcycles:
                 wc = request.POST.get('wash_cycles')
                 chiusura.wash_cycles = int(wc) if wc else None
@@ -1020,94 +1015,45 @@ def report_giornata(request):
         'variazione_pct': variazione_pct,
     }
 
-    # ==================== QUADRATURA CONTANTI PER CASSA ====================
-    # Riepilogo contanti fisici di ogni cassa (servito + automatiche)
-    quadratura_righe = []
-    totale_contanti_teorico = Decimal('0.00')
-    totale_contanti_reale = Decimal('0.00')
-    qualcosa_da_conteggiare = False
-    tutto_conteggiato = True
+    # ==================== QUADRATURA GIORNALIERA COMPLESSIVA ====================
+    # L'operatore scassetta TUTTE le casse automatiche + registratore,
+    # conta tutti i contanti insieme + lettore carte POS servito.
+    # Totale reale vs Totale teorico = vendita self-service + totale servito POS.
+    quadratura_obj = QuadraturaGiornaliera.objects.filter(data=data).first()
 
-    # Riga cassa servito
-    if cassa_servito:
-        teorico_servito = cassa_servito.cassa_teorica_finale
-        reale_servito = cassa_servito.conteggio_cassa_reale
-        if reale_servito is None:
-            tutto_conteggiato = False
-            stato = 'non_conteggiato'
-            diff = None
-        else:
-            diff = reale_servito - teorico_servito
-            if abs(diff) < Decimal('0.50'):
-                stato = 'ok'
-            elif diff < 0:
-                stato = 'mancante'
-            else:
-                stato = 'eccedente'
-            totale_contanti_reale += reale_servito
-        totale_contanti_teorico += teorico_servito
-        qualcosa_da_conteggiare = True
-        quadratura_righe.append({
-            'nome': 'Cassa Servito',
-            'numero': '',
-            'teorico': teorico_servito,
-            'reale': reale_servito,
-            'differenza': diff,
-            'stato': stato,
-            'is_servito': True,
-        })
+    vendita_self_service = agg['vendita_totale']
+    totale_teorico = vendita_self_service + totale_servito
 
-    # Righe casse automatiche (escluso registratore)
-    for c in chiusure_auto:
-        if c.cassa.modalita_registratore:
-            continue
-        teorico = c.contanti_teorici
-        reale = c.contanti_conteggiati
-        if reale is None:
-            tutto_conteggiato = False
-            stato = 'non_conteggiato'
-            diff = None
-        else:
-            diff = reale - teorico
-            if abs(diff) < Decimal('0.50'):
-                stato = 'ok'
-            elif diff < 0:
-                stato = 'mancante'
-            else:
-                stato = 'eccedente'
-            totale_contanti_reale += reale
-        totale_contanti_teorico += teorico
-        qualcosa_da_conteggiare = True
-        quadratura_righe.append({
-            'nome': c.cassa.nome,
-            'numero': c.cassa.numero,
-            'teorico': teorico,
-            'reale': reale,
-            'differenza': diff,
-            'stato': stato,
-            'is_servito': False,
-        })
+    # Fondo cassa iniziale del servito (va sottratto dal reale perche gia presente
+    # nella cassa all'apertura, non rappresenta incasso della giornata).
+    fondo_cassa_iniziale = cassa_servito.fondo_cassa_iniziale if cassa_servito else Decimal('0.00')
 
-    # Differenza totale
-    totale_differenza = totale_contanti_reale - totale_contanti_teorico if tutto_conteggiato else None
-    if tutto_conteggiato and totale_differenza is not None:
-        if abs(totale_differenza) < Decimal('0.50'):
-            stato_totale = 'ok'
-        elif totale_differenza < 0:
-            stato_totale = 'mancante'
+    if quadratura_obj:
+        lordo_reale = quadratura_obj.contanti_totali + quadratura_obj.lettore_carte_servito
+        totale_reale = lordo_reale - fondo_cassa_iniziale
+        differenza_quadratura = totale_reale - totale_teorico
+        if abs(differenza_quadratura) < Decimal('0.50'):
+            stato_quadratura = 'ok'
+        elif differenza_quadratura < 0:
+            stato_quadratura = 'mancante'
         else:
-            stato_totale = 'eccedente'
+            stato_quadratura = 'eccedente'
     else:
-        stato_totale = 'non_conteggiato'
+        lordo_reale = None
+        totale_reale = None
+        differenza_quadratura = None
+        stato_quadratura = 'non_rilevato'
 
     quadratura = {
-        'righe': quadratura_righe,
-        'totale_teorico': totale_contanti_teorico,
-        'totale_reale': totale_contanti_reale if tutto_conteggiato else None,
-        'totale_differenza': totale_differenza,
-        'stato_totale': stato_totale,
-        'tutto_conteggiato': tutto_conteggiato,
-        'disponibile': qualcosa_da_conteggiare,
+        'obj': quadratura_obj,
+        'vendita_self_service': vendita_self_service,
+        'totale_servito': totale_servito,
+        'totale_teorico': totale_teorico,
+        'fondo_cassa_iniziale': fondo_cassa_iniziale,
+        'lordo_reale': lordo_reale,
+        'totale_reale': totale_reale,
+        'differenza': differenza_quadratura,
+        'stato': stato_quadratura,
     }
 
     context = {
@@ -1138,3 +1084,39 @@ def report_giornata(request):
         'orario_counts_json': json.dumps(orario_counts),
     }
     return render(request, 'finanze/report_giornata.html', context)
+
+
+@login_required
+@user_passes_test(is_staff_user)
+def quadratura_form(request):
+    """Form per inserire/modificare la quadratura giornaliera complessiva."""
+    data = _parse_data(request)
+    quadratura = QuadraturaGiornaliera.objects.filter(data=data).first()
+    cassa_servito = ChiusuraCassa.objects.filter(data=data).first()
+    fondo_cassa_iniziale = cassa_servito.fondo_cassa_iniziale if cassa_servito else Decimal('0.00')
+
+    if request.method == 'POST':
+        try:
+            contanti = Decimal(request.POST.get('contanti_totali') or '0')
+            lettore = Decimal(request.POST.get('lettore_carte_servito') or '0')
+            note = request.POST.get('note', '')
+            QuadraturaGiornaliera.objects.update_or_create(
+                data=data,
+                defaults={
+                    'contanti_totali': contanti,
+                    'lettore_carte_servito': lettore,
+                    'note': note,
+                    'operatore': request.user,
+                },
+            )
+            messages.success(request, f"Quadratura del {data.strftime('%d/%m/%Y')} salvata.")
+            from django.urls import reverse
+            return redirect(f"{reverse('finanze:report_giornata')}?data={data.strftime('%Y-%m-%d')}")
+        except (ValueError, TypeError) as e:
+            messages.error(request, f"Dati non validi: {e}")
+
+    return render(request, 'finanze/quadratura_form.html', {
+        'data': data,
+        'quadratura': quadratura,
+        'fondo_cassa_iniziale': fondo_cassa_iniziale,
+    })

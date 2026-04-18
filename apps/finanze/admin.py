@@ -1,6 +1,18 @@
 from django.contrib import admin
 from django.utils.html import format_html
-from .models import ChiusuraCassa, MovimentoCassa, Cassa, ChiusuraCassaAutomatica
+from .models import ChiusuraCassa, MovimentoCassa, Cassa, ChiusuraCassaAutomatica, QuadraturaGiornaliera
+
+
+@admin.register(QuadraturaGiornaliera)
+class QuadraturaGiornalieraAdmin(admin.ModelAdmin):
+    list_display = ['data', 'contanti_totali', 'lettore_carte_servito', 'totale_reale_display', 'operatore', 'aggiornato_il']
+    list_filter = ['data']
+    readonly_fields = ['creato_il', 'aggiornato_il']
+    date_hierarchy = 'data'
+
+    def totale_reale_display(self, obj):
+        return f"€{obj.totale_reale:.2f}"
+    totale_reale_display.short_description = "Totale reale"
 
 
 @admin.register(Cassa)

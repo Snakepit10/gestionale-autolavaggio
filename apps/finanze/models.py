@@ -458,33 +458,55 @@ class ChiusuraCassaAutomatica(models.Model):
 
     @property
     def contanti_teorici(self):
-        """Teorico dei contanti fisici rimasti nella cassa a fine giornata.
-
-        Per una cassa automatica: contanti entrati (vendita contante) meno il
-        resto erogato. Se non ci sono dati di vendita contante (es. registratore),
-        fallback all'incasso vendita.
-        """
+        """Contanti teorici: vendita contante - resto erogato."""
         if self.cassa.modalita_registratore:
-            # Registratore: i contanti incassati servito sono tutto l'incasso totale
             return self.incasso_totale
-        # Cassa automatica: contanti entrati - resto erogato
         return self.vendita_contante - self.resto_erogato_teorico
 
-    @property
-    def differenza_contanti(self):
-        """Differenza tra contanti conteggiati e teorici. None se non ancora conteggiati."""
-        if self.contanti_conteggiati is None:
-            return None
-        return self.contanti_conteggiati - self.contanti_teorici
+
+# ---------------------------------------------------------------------------
+# Quadratura giornaliera complessiva (scassettamento)
+# ---------------------------------------------------------------------------
+
+class QuadraturaGiornaliera(models.Model):
+    """
+    Quadratura a fine giornata.
+    L'operatore scassetta tutte le casse automatiche + il registratore e conta
+    TUTTI i contanti insieme + il totale del lettore carte del servito.
+    Il totale viene confrontato con la vendita totale self-service + ordini POS pagati.
+    """
+    data = models.DateField(unique=True, default=timezone.now)
+
+    contanti_totali = models.DecimalField(
+        max_digits=10, decimal_places=2, default=Decimal('0.00'),
+        validators=[MinValueValidator(Decimal('0.00'))],
+        verbose_name='Contanti totali conteggiati',
+        help_text='Somma di tutto il contante scassettato dalle casse automatiche e dal registratore',
+    )
+    lettore_carte_servito = models.DecimalField(
+        max_digits=10, decimal_places=2, default=Decimal('0.00'),
+        validators=[MinValueValidator(Decimal('0.00'))],
+        verbose_name='Totale lettore carte POS servito',
+        help_text='Totale riportato dal terminale POS (lettore carte) del servito',
+    )
+    note = models.TextField(blank=True)
+    operatore = models.ForeignKey(
+        User, on_delete=models.SET_NULL, null=True, blank=True,
+        related_name='quadrature_giornaliere',
+    )
+
+    creato_il = models.DateTimeField(auto_now_add=True)
+    aggiornato_il = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        verbose_name = 'Quadratura giornaliera'
+        verbose_name_plural = 'Quadrature giornaliere'
+        ordering = ['-data']
+
+    def __str__(self):
+        return f"Quadratura {self.data.strftime('%d/%m/%Y')}"
 
     @property
-    def stato_contanti(self):
-        diff = self.differenza_contanti
-        if diff is None:
-            return 'non_conteggiato'
-        if abs(diff) < Decimal('0.50'):
-            return 'ok'
-        elif diff < 0:
-            return 'mancante'
-        else:
-            return 'eccedente'
+    def totale_reale(self):
+        """Totale rilevato fisicamente dall'operatore."""
+        return self.contanti_totali + self.lettore_carte_servito
