@@ -25,4 +25,14 @@ urlpatterns = [
 
     # Analisi vendite
     path('analisi/', views.analisi_vendite, name='analisi_vendite'),
+
+    # Casse automatiche (cambia gettoni, portali)
+    path('casse-automatiche/', views.chiusura_automatica_list, name='chiusura_automatica_list'),
+    path('casse-automatiche/crea/<int:cassa_id>/', views.chiusura_automatica_create, name='chiusura_automatica_create'),
+    path('casse-automatiche/<int:pk>/', views.chiusura_automatica_detail, name='chiusura_automatica_detail'),
+    path('casse-automatiche/<int:pk>/modifica/', views.chiusura_automatica_edit, name='chiusura_automatica_edit'),
+    path('casse-automatiche/<int:pk>/conferma/', views.chiusura_automatica_conferma, name='chiusura_automatica_conferma'),
+
+    # Report giornata
+    path('report-giornata/', views.report_giornata, name='report_giornata'),
 ]

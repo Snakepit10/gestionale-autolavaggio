@@ -134,8 +134,15 @@
                             </a>
                             <ul class="dropdown-menu">
                                 <li><a class="dropdown-item" href="{% url 'finanze:dashboard' %}">
-                                    <i class="bi bi-cash-stack"></i> Dashboard Cassa
+                                    <i class="bi bi-cash-stack"></i> Dashboard Cassa Servito
                                 </a></li>
+                                <li><a class="dropdown-item" href="{% url 'finanze:chiusura_automatica_list' %}">
+                                    <i class="bi bi-robot"></i> Chiusure Casse Automatiche
+                                </a></li>
+                                <li><a class="dropdown-item" href="{% url 'finanze:report_giornata' %}">
+                                    <i class="bi bi-file-earmark-bar-graph"></i> Report Giornata
+                                </a></li>
+                                <li><hr class="dropdown-divider"></li>
                                 <li><a class="dropdown-item" href="{% url 'finanze:storico_chiusure' %}">
                                     <i class="bi bi-clock-history"></i> Storico Chiusure
                                 </a></li>

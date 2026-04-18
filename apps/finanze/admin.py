@@ -1,6 +1,29 @@
 from django.contrib import admin
 from django.utils.html import format_html
-from .models import ChiusuraCassa, MovimentoCassa
+from .models import ChiusuraCassa, MovimentoCassa, Cassa, ChiusuraCassaAutomatica
+
+
+@admin.register(Cassa)
+class CassaAdmin(admin.ModelAdmin):
+    list_display = ['nome', 'numero', 'tipo', 'tracking_washcycles', 'attiva', 'ordine']
+    list_filter = ['tipo', 'attiva']
+    list_editable = ['attiva', 'ordine']
+
+
+@admin.register(ChiusuraCassaAutomatica)
+class ChiusuraCassaAutomaticaAdmin(admin.ModelAdmin):
+    list_display = ['data', 'cassa', 'incasso_totale', 'incasso_vendita_display',
+                    'vendita_totale_display', 'wash_cycles', 'confermata']
+    list_filter = ['data', 'cassa', 'confermata']
+    readonly_fields = ['data_ora_chiusura', 'creato_il', 'aggiornato_il']
+
+    def incasso_vendita_display(self, obj):
+        return f"€{obj.incasso_vendita:.2f}"
+    incasso_vendita_display.short_description = "Incasso vendita"
+
+    def vendita_totale_display(self, obj):
+        return f"€{obj.vendita_totale:.2f}"
+    vendita_totale_display.short_description = "Vendita totale"
 
 
 @admin.register(ChiusuraCassa)

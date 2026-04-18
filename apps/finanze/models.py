@@ -5,6 +5,33 @@ from django.core.validators import MinValueValidator
 from decimal import Decimal
 
 
+class Cassa(models.Model):
+    """Anagrafica delle casse gestite dall'autolavaggio."""
+    TIPO_CHOICES = [
+        ('servito', 'Servito (ordini POS)'),
+        ('automatica', 'Cassa automatica'),
+    ]
+    nome = models.CharField(max_length=100, verbose_name='Nome')
+    numero = models.CharField(max_length=20, blank=True, verbose_name='Numero',
+        help_text='Numero identificativo della cassa (es. 11057)')
+    tipo = models.CharField(max_length=20, choices=TIPO_CHOICES)
+    tracking_washcycles = models.BooleanField(default=False,
+        verbose_name='Traccia WashCycles',
+        help_text='Abilita il campo WashCycles nel form di chiusura')
+    attiva = models.BooleanField(default=True)
+    ordine = models.PositiveIntegerField(default=0, verbose_name='Ordine')
+
+    class Meta:
+        verbose_name = 'Cassa'
+        verbose_name_plural = 'Casse'
+        ordering = ['ordine', 'nome']
+
+    def __str__(self):
+        if self.numero:
+            return f"{self.nome} (n. {self.numero})"
+        return self.nome
+
+
 class ChiusuraCassa(models.Model):
     """Gestisce l'apertura e chiusura giornaliera della cassa"""
 
@@ -285,3 +312,135 @@ class MovimentoCassa(models.Model):
         super().save(*args, **kwargs)
         # Ricalcola i totali della chiusura cassa
         self.chiusura_cassa.ricalcola_totali()
+
+
+# ---------------------------------------------------------------------------
+# Estensione ChiusuraCassa (proprieta aggregate)
+# ---------------------------------------------------------------------------
+
+def _num_ordini_giorno(self):
+    from apps.ordini.models import Ordine
+    return Ordine.objects.filter(data_ora__date=self.data).count()
+
+
+def _num_washcycles_giorno(self):
+    """Conta i washcycles venduti (items con servizio 'washcycle' o simili).
+    Euristico: item che hanno un servizio il cui nome contiene 'wash' o 'lavaggio'."""
+    from apps.ordini.models import ItemOrdine
+    return ItemOrdine.objects.filter(
+        ordine__data_ora__date=self.data,
+        servizio_prodotto__tipo='servizio',
+    ).count()
+
+
+def _totale_incassi_giorno(self):
+    """Somma di tutti i metodi di pagamento del giorno (servito)."""
+    return self.totale_incassi_giornalieri
+
+
+ChiusuraCassa.num_ordini_giorno = property(_num_ordini_giorno)
+ChiusuraCassa.num_washcycles_giorno = property(_num_washcycles_giorno)
+
+
+# ---------------------------------------------------------------------------
+# Chiusura giornaliera casse automatiche (cambia gettoni, portali)
+# ---------------------------------------------------------------------------
+
+class ChiusuraCassaAutomatica(models.Model):
+    """Chiusura giornaliera di una cassa automatica (cambia gettoni, portale blu/azzurro)."""
+    cassa = models.ForeignKey(
+        Cassa, on_delete=models.PROTECT,
+        related_name='chiusure_automatiche',
+        limit_choices_to={'tipo': 'automatica'},
+    )
+    data = models.DateField(default=timezone.now)
+    data_ora_chiusura = models.DateTimeField(auto_now_add=True)
+    operatore = models.ForeignKey(
+        User, on_delete=models.SET_NULL, null=True,
+        related_name='chiusure_automatiche',
+    )
+
+    # Incassi
+    incasso_totale = models.DecimalField(
+        max_digits=10, decimal_places=2, default=Decimal('0.00'),
+        validators=[MinValueValidator(Decimal('0.00'))],
+        verbose_name='Incasso totale',
+    )
+    incasso_ricarica = models.DecimalField(
+        max_digits=10, decimal_places=2, default=Decimal('0.00'),
+        validators=[MinValueValidator(Decimal('0.00'))],
+        verbose_name='Incasso ricarica',
+    )
+
+    # Vendite
+    vendita_contante = models.DecimalField(
+        max_digits=10, decimal_places=2, default=Decimal('0.00'),
+        validators=[MinValueValidator(Decimal('0.00'))],
+        verbose_name='Vendita contante',
+    )
+    vendita_non_contante = models.DecimalField(
+        max_digits=10, decimal_places=2, default=Decimal('0.00'),
+        validators=[MinValueValidator(Decimal('0.00'))],
+        verbose_name='Vendita non contante',
+    )
+
+    # Verifica fisica (opzionale)
+    resto_erogato_reale = models.DecimalField(
+        max_digits=10, decimal_places=2, default=Decimal('0.00'),
+        validators=[MinValueValidator(Decimal('0.00'))],
+        verbose_name='Resto erogato reale (verifica fisica)',
+        help_text='Conteggio reale del resto erogato (per verificare con il teorico)',
+    )
+
+    # WashCycles (solo per portali)
+    wash_cycles = models.PositiveIntegerField(
+        null=True, blank=True,
+        verbose_name='WashCycles',
+        help_text='Numero di cicli di lavaggio erogati (solo per i portali)',
+    )
+
+    note = models.TextField(blank=True)
+    confermata = models.BooleanField(default=False)
+
+    creato_il = models.DateTimeField(auto_now_add=True)
+    aggiornato_il = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        verbose_name = 'Chiusura cassa automatica'
+        verbose_name_plural = 'Chiusure casse automatiche'
+        ordering = ['-data', 'cassa__ordine']
+        unique_together = [('cassa', 'data')]
+
+    def __str__(self):
+        return f"{self.cassa} — {self.data.strftime('%d/%m/%Y')}"
+
+    @property
+    def incasso_vendita(self):
+        """Incasso dalle vendite = incasso totale - incasso ricarica."""
+        return self.incasso_totale - self.incasso_ricarica
+
+    @property
+    def vendita_totale(self):
+        """Vendita totale = contante + non contante."""
+        return self.vendita_contante + self.vendita_non_contante
+
+    @property
+    def resto_erogato_teorico(self):
+        """Resto erogato teorico = incasso vendita - vendita totale."""
+        return self.incasso_vendita - self.vendita_totale
+
+    @property
+    def differenza(self):
+        """Differenza tra resto erogato reale e teorico."""
+        return self.resto_erogato_reale - self.resto_erogato_teorico
+
+    @property
+    def stato_differenza(self):
+        """Stato della differenza (ok, mancante, eccedente)."""
+        diff = self.differenza
+        if abs(diff) < Decimal('0.50'):
+            return 'ok'
+        elif diff < 0:
+            return 'mancante'
+        else:
+            return 'eccedente'

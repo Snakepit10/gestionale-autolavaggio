@@ -8,7 +8,7 @@ from datetime import datetime, timedelta
 from decimal import Decimal
 import json
 
-from .models import ChiusuraCassa, MovimentoCassa
+from .models import ChiusuraCassa, MovimentoCassa, Cassa, ChiusuraCassaAutomatica
 from apps.ordini.models import Pagamento, Ordine, ItemOrdine
 from apps.core.models import Categoria
 
@@ -665,3 +665,207 @@ def analisi_vendite(request):
     }
 
     return render(request, 'finanze/analisi_vendite.html', context)
+
+
+# ---------------------------------------------------------------------------
+# Chiusure casse automatiche (cambia gettoni, portali)
+# ---------------------------------------------------------------------------
+
+def _parse_data(request, default=None):
+    data_str = request.GET.get('data')
+    if data_str:
+        try:
+            return datetime.strptime(data_str, '%Y-%m-%d').date()
+        except ValueError:
+            pass
+    return default or timezone.now().date()
+
+
+@login_required
+@user_passes_test(is_staff_user)
+def chiusura_automatica_list(request):
+    """Lista casse automatiche del giorno con stato chiusura."""
+    data = _parse_data(request)
+    casse_auto = Cassa.objects.filter(tipo='automatica', attiva=True).order_by('ordine')
+
+    # Mappa chiusure esistenti per il giorno
+    chiusure = {
+        c.cassa_id: c for c in ChiusuraCassaAutomatica.objects.filter(data=data)
+    }
+
+    casse_data = []
+    totale_incasso = Decimal('0.00')
+    totale_wash_cycles = 0
+
+    for cassa in casse_auto:
+        chiusura = chiusure.get(cassa.pk)
+        if chiusura:
+            totale_incasso += chiusura.incasso_totale
+            if chiusura.wash_cycles:
+                totale_wash_cycles += chiusura.wash_cycles
+        casse_data.append({
+            'cassa': cassa,
+            'chiusura': chiusura,
+        })
+
+    context = {
+        'data': data,
+        'casse_data': casse_data,
+        'totale_incasso': totale_incasso,
+        'totale_wash_cycles': totale_wash_cycles,
+    }
+    return render(request, 'finanze/chiusura_automatica_list.html', context)
+
+
+@login_required
+@user_passes_test(is_staff_user)
+def chiusura_automatica_create(request, cassa_id):
+    """Form di chiusura per una cassa automatica."""
+    cassa = get_object_or_404(Cassa, pk=cassa_id, tipo='automatica', attiva=True)
+    data = _parse_data(request)
+
+    # Se esiste gia una chiusura per oggi, redirect al detail
+    esistente = ChiusuraCassaAutomatica.objects.filter(cassa=cassa, data=data).first()
+    if esistente:
+        return redirect('finanze:chiusura_automatica_detail', pk=esistente.pk)
+
+    if request.method == 'POST':
+        try:
+            chiusura = ChiusuraCassaAutomatica(
+                cassa=cassa,
+                data=data,
+                operatore=request.user,
+                incasso_totale=Decimal(request.POST.get('incasso_totale') or '0'),
+                incasso_ricarica=Decimal(request.POST.get('incasso_ricarica') or '0'),
+                vendita_contante=Decimal(request.POST.get('vendita_contante') or '0'),
+                vendita_non_contante=Decimal(request.POST.get('vendita_non_contante') or '0'),
+                resto_erogato_reale=Decimal(request.POST.get('resto_erogato_reale') or '0'),
+                note=request.POST.get('note', ''),
+            )
+            if cassa.tracking_washcycles:
+                wc = request.POST.get('wash_cycles')
+                if wc:
+                    chiusura.wash_cycles = int(wc)
+            chiusura.save()
+            messages.success(request, f"Chiusura {cassa} del {data.strftime('%d/%m/%Y')} salvata.")
+            return redirect('finanze:chiusura_automatica_detail', pk=chiusura.pk)
+        except (ValueError, TypeError) as e:
+            messages.error(request, f"Dati non validi: {e}")
+
+    context = {
+        'cassa': cassa,
+        'data': data,
+        'mode': 'create',
+    }
+    return render(request, 'finanze/chiusura_automatica_form.html', context)
+
+
+@login_required
+@user_passes_test(is_staff_user)
+def chiusura_automatica_detail(request, pk):
+    """Dettaglio chiusura automatica."""
+    chiusura = get_object_or_404(ChiusuraCassaAutomatica, pk=pk)
+    return render(request, 'finanze/chiusura_automatica_detail.html', {
+        'chiusura': chiusura,
+    })
+
+
+@login_required
+@user_passes_test(is_staff_user)
+def chiusura_automatica_edit(request, pk):
+    """Modifica chiusura automatica (solo se non confermata)."""
+    chiusura = get_object_or_404(ChiusuraCassaAutomatica, pk=pk)
+    if chiusura.confermata:
+        messages.warning(request, "Chiusura confermata, non modificabile.")
+        return redirect('finanze:chiusura_automatica_detail', pk=pk)
+
+    if request.method == 'POST':
+        try:
+            chiusura.incasso_totale = Decimal(request.POST.get('incasso_totale') or '0')
+            chiusura.incasso_ricarica = Decimal(request.POST.get('incasso_ricarica') or '0')
+            chiusura.vendita_contante = Decimal(request.POST.get('vendita_contante') or '0')
+            chiusura.vendita_non_contante = Decimal(request.POST.get('vendita_non_contante') or '0')
+            chiusura.resto_erogato_reale = Decimal(request.POST.get('resto_erogato_reale') or '0')
+            chiusura.note = request.POST.get('note', '')
+            if chiusura.cassa.tracking_washcycles:
+                wc = request.POST.get('wash_cycles')
+                chiusura.wash_cycles = int(wc) if wc else None
+            chiusura.save()
+            messages.success(request, "Chiusura aggiornata.")
+            return redirect('finanze:chiusura_automatica_detail', pk=pk)
+        except (ValueError, TypeError) as e:
+            messages.error(request, f"Dati non validi: {e}")
+
+    return render(request, 'finanze/chiusura_automatica_form.html', {
+        'chiusura': chiusura,
+        'cassa': chiusura.cassa,
+        'data': chiusura.data,
+        'mode': 'edit',
+    })
+
+
+@login_required
+@user_passes_test(is_staff_user)
+def chiusura_automatica_conferma(request, pk):
+    """Conferma chiusura automatica (blocco modifiche)."""
+    chiusura = get_object_or_404(ChiusuraCassaAutomatica, pk=pk)
+    if request.method == 'POST':
+        password = request.POST.get('password', '')
+        if not request.user.check_password(password):
+            messages.error(request, "Password non corretta.")
+            return redirect('finanze:chiusura_automatica_detail', pk=pk)
+        chiusura.confermata = True
+        chiusura.save(update_fields=['confermata'])
+        messages.success(request, "Chiusura confermata e bloccata.")
+    return redirect('finanze:chiusura_automatica_detail', pk=pk)
+
+
+@login_required
+@user_passes_test(is_staff_user)
+def report_giornata(request):
+    """Report aggregato del giorno: cassa servito + tutte le automatiche."""
+    data = _parse_data(request)
+
+    # Cassa servito
+    cassa_servito = ChiusuraCassa.objects.filter(data=data).first()
+    if cassa_servito:
+        cassa_servito.ricalcola_totali()
+
+    # Chiusure automatiche
+    chiusure_auto = ChiusuraCassaAutomatica.objects.filter(data=data).select_related('cassa').order_by('cassa__ordine')
+
+    # Aggregati casse automatiche
+    agg = {
+        'incasso_totale': Decimal('0.00'),
+        'incasso_ricarica': Decimal('0.00'),
+        'incasso_vendita': Decimal('0.00'),
+        'vendita_contante': Decimal('0.00'),
+        'vendita_non_contante': Decimal('0.00'),
+        'vendita_totale': Decimal('0.00'),
+        'resto_erogato_teorico': Decimal('0.00'),
+        'wash_cycles': 0,
+    }
+    for c in chiusure_auto:
+        agg['incasso_totale'] += c.incasso_totale
+        agg['incasso_ricarica'] += c.incasso_ricarica
+        agg['incasso_vendita'] += c.incasso_vendita
+        agg['vendita_contante'] += c.vendita_contante
+        agg['vendita_non_contante'] += c.vendita_non_contante
+        agg['vendita_totale'] += c.vendita_totale
+        agg['resto_erogato_teorico'] += c.resto_erogato_teorico
+        if c.wash_cycles:
+            agg['wash_cycles'] += c.wash_cycles
+
+    # Totale giornata (servito + automatiche)
+    totale_giornata = agg['incasso_totale']
+    if cassa_servito:
+        totale_giornata += cassa_servito.totale_incassi_giornalieri
+
+    context = {
+        'data': data,
+        'cassa_servito': cassa_servito,
+        'chiusure_auto': chiusure_auto,
+        'agg': agg,
+        'totale_giornata': totale_giornata,
+    }
+    return render(request, 'finanze/report_giornata.html', context)

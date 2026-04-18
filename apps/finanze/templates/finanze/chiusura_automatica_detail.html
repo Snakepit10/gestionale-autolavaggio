@@ -1,0 +1,98 @@
+{% extends "base.html" %}
+{% block title %}Chiusura {{ chiusura.cassa.nome }} — {{ chiusura.data|date:"d/m/Y" }}{% endblock %}
+
+{% block extra_css %}
+<style>
+.kpi-box { background: #fff; border: 1px solid #e2e8f0; border-radius: 8px; padding: 14px 16px; }
+.kpi-label { font-size: .7rem; text-transform: uppercase; letter-spacing: .5px; color: #64748b; font-weight: 600; }
+.kpi-value { font-size: 1.4rem; font-weight: 700; color: #1e293b; }
+.kpi-box.highlight { background: linear-gradient(135deg, #1e5bb8 0%, #3b82f6 100%); color: #fff; border: none; }
+.kpi-box.highlight .kpi-label, .kpi-box.highlight .kpi-value { color: #fff; }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="container py-4">
+
+  <div class="d-flex justify-content-between align-items-center mb-3">
+    <div>
+      <h4 class="mb-0">
+        <i class="bi bi-cash-stack"></i> {{ chiusura.cassa.nome }}
+        {% if chiusura.cassa.numero %}<small class="text-muted">n. {{ chiusura.cassa.numero }}</small>{% endif %}
+      </h4>
+      <small class="text-muted">Chiusura del <strong>{{ chiusura.data|date:"d/m/Y" }}</strong> — registrata il {{ chiusura.data_ora_chiusura|date:"d/m/Y H:i" }} da {{ chiusura.operatore|default:"—" }}</small>
+    </div>
+    <div class="d-flex gap-2">
+      {% if not chiusura.confermata %}
+        <a href="{% url 'finanze:chiusura_automatica_edit' chiusura.pk %}" class="btn btn-outline-primary btn-sm"><i class="bi bi-pencil"></i> Modifica</a>
+      {% endif %}
+      <a href="{% url 'finanze:chiusura_automatica_list' %}?data={{ chiusura.data|date:'Y-m-d' }}" class="btn btn-outline-secondary btn-sm"><i class="bi bi-arrow-left"></i> Indietro</a>
+    </div>
+  </div>
+
+  {% if chiusura.confermata %}
+  <div class="alert alert-success py-2"><i class="bi bi-lock"></i> Chiusura confermata e bloccata.</div>
+  {% endif %}
+
+  <div class="row g-2 mb-3">
+    <div class="col-md-3"><div class="kpi-box"><div class="kpi-label">Incasso totale</div><div class="kpi-value">&euro;{{ chiusura.incasso_totale|floatformat:2 }}</div></div></div>
+    <div class="col-md-3"><div class="kpi-box"><div class="kpi-label">Incasso ricarica</div><div class="kpi-value">&euro;{{ chiusura.incasso_ricarica|floatformat:2 }}</div></div></div>
+    <div class="col-md-3"><div class="kpi-box highlight"><div class="kpi-label">Incasso vendita</div><div class="kpi-value">&euro;{{ chiusura.incasso_vendita|floatformat:2 }}</div></div></div>
+    {% if chiusura.cassa.tracking_washcycles %}
+    <div class="col-md-3"><div class="kpi-box" style="background:#0dcaf0; color:#fff; border:none"><div class="kpi-label" style="color:#fff">WashCycles</div><div class="kpi-value" style="color:#fff">{{ chiusura.wash_cycles|default:"—" }}</div></div></div>
+    {% endif %}
+  </div>
+
+  <div class="row g-2 mb-3">
+    <div class="col-md-3"><div class="kpi-box"><div class="kpi-label">Vendita contante</div><div class="kpi-value">&euro;{{ chiusura.vendita_contante|floatformat:2 }}</div></div></div>
+    <div class="col-md-3"><div class="kpi-box"><div class="kpi-label">Vendita non contante</div><div class="kpi-value">&euro;{{ chiusura.vendita_non_contante|floatformat:2 }}</div></div></div>
+    <div class="col-md-3"><div class="kpi-box highlight"><div class="kpi-label">Vendita totale</div><div class="kpi-value">&euro;{{ chiusura.vendita_totale|floatformat:2 }}</div></div></div>
+    <div class="col-md-3"><div class="kpi-box"><div class="kpi-label">Resto erogato teorico</div><div class="kpi-value">&euro;{{ chiusura.resto_erogato_teorico|floatformat:2 }}</div></div></div>
+  </div>
+
+  <div class="card mb-3">
+    <div class="card-header">Verifica fisica</div>
+    <div class="card-body">
+      <div class="row">
+        <div class="col-md-4"><strong>Resto erogato reale:</strong> &euro;{{ chiusura.resto_erogato_reale|floatformat:2 }}</div>
+        <div class="col-md-4"><strong>Resto erogato teorico:</strong> &euro;{{ chiusura.resto_erogato_teorico|floatformat:2 }}</div>
+        <div class="col-md-4">
+          <strong>Differenza:</strong>
+          {% with diff=chiusura.differenza stato=chiusura.stato_differenza %}
+          <span class="badge {% if stato == 'ok' %}bg-success{% elif stato == 'mancante' %}bg-danger{% else %}bg-warning text-dark{% endif %}">
+            &euro;{{ diff|floatformat:2 }} ({{ stato }})
+          </span>
+          {% endwith %}
+        </div>
+      </div>
+    </div>
+  </div>
+
+  {% if chiusura.note %}
+  <div class="card mb-3">
+    <div class="card-header">Note</div>
+    <div class="card-body"><p class="mb-0">{{ chiusura.note|linebreaks }}</p></div>
+  </div>
+  {% endif %}
+
+  {% if not chiusura.confermata %}
+  <div class="card border-danger">
+    <div class="card-header bg-danger text-white">Conferma definitiva</div>
+    <div class="card-body">
+      <p class="small text-muted">Confermando la chiusura non sara piu modificabile. Richiesta password per conferma.</p>
+      <form method="post" action="{% url 'finanze:chiusura_automatica_conferma' chiusura.pk %}" class="row g-2 align-items-end">
+        {% csrf_token %}
+        <div class="col-md-6">
+          <label class="form-label small">Password</label>
+          <input type="password" name="password" class="form-control" required>
+        </div>
+        <div class="col-md-3">
+          <button type="submit" class="btn btn-danger w-100"><i class="bi bi-lock"></i> Conferma</button>
+        </div>
+      </form>
+    </div>
+  </div>
+  {% endif %}
+
+</div>
+{% endblock %}

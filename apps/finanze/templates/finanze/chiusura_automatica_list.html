@@ -1,0 +1,95 @@
+{% extends "base.html" %}
+{% block title %}Chiusure Casse Automatiche{% endblock %}
+
+{% block extra_css %}
+<style>
+.cassa-card { transition: transform .15s, box-shadow .15s; }
+.cassa-card:hover { transform: translateY(-2px); box-shadow: 0 4px 12px rgba(0,0,0,.1); }
+.cassa-badge { font-family: 'Courier New', monospace; letter-spacing: 1px; }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="container py-4">
+
+  <div class="d-flex justify-content-between align-items-center mb-3">
+    <h4 class="mb-0"><i class="bi bi-collection"></i> Chiusure Casse Automatiche</h4>
+    <form method="get" class="d-flex gap-2 align-items-center">
+      <label class="small mb-0">Data:</label>
+      <input type="date" name="data" class="form-control form-control-sm" value="{{ data|date:'Y-m-d' }}">
+      <button type="submit" class="btn btn-primary btn-sm"><i class="bi bi-funnel"></i></button>
+    </form>
+  </div>
+
+  <div class="row g-3 mb-3">
+    <div class="col-md-6">
+      <div class="card bg-primary text-white">
+        <div class="card-body py-2">
+          <div class="small opacity-75">Incasso totale casse automatiche</div>
+          <div class="fs-3 fw-bold">&euro;{{ totale_incasso|floatformat:2 }}</div>
+        </div>
+      </div>
+    </div>
+    <div class="col-md-6">
+      <div class="card bg-info text-white">
+        <div class="card-body py-2">
+          <div class="small opacity-75">WashCycles totali</div>
+          <div class="fs-3 fw-bold">{{ totale_wash_cycles }}</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="row g-3">
+    {% for entry in casse_data %}
+    <div class="col-md-6 col-lg-4">
+      <div class="card cassa-card h-100">
+        <div class="card-header bg-light d-flex justify-content-between align-items-center">
+          <span class="fw-bold"><i class="bi bi-cash-stack"></i> {{ entry.cassa.nome }}</span>
+          {% if entry.cassa.numero %}
+          <span class="badge bg-secondary cassa-badge">n. {{ entry.cassa.numero }}</span>
+          {% endif %}
+        </div>
+        <div class="card-body">
+          {% if entry.chiusura %}
+            <div class="mb-2">
+              <span class="badge bg-success"><i class="bi bi-check-circle"></i> Chiusa</span>
+              {% if entry.chiusura.confermata %}<span class="badge bg-dark">Confermata</span>{% endif %}
+            </div>
+            <ul class="list-unstyled small mb-2">
+              <li><strong>Incasso:</strong> &euro;{{ entry.chiusura.incasso_totale|floatformat:2 }}</li>
+              <li><strong>Vendita:</strong> &euro;{{ entry.chiusura.vendita_totale|floatformat:2 }}</li>
+              {% if entry.cassa.tracking_washcycles %}
+              <li><strong>WashCycles:</strong> {{ entry.chiusura.wash_cycles|default:"—" }}</li>
+              {% endif %}
+            </ul>
+            <a href="{% url 'finanze:chiusura_automatica_detail' entry.chiusura.pk %}" class="btn btn-outline-primary btn-sm w-100">
+              <i class="bi bi-eye"></i> Dettaglio
+            </a>
+          {% else %}
+            <div class="mb-2">
+              <span class="badge bg-warning text-dark"><i class="bi bi-clock"></i> Da chiudere</span>
+            </div>
+            <p class="text-muted small mb-2">Nessuna chiusura registrata per questa cassa.</p>
+            <a href="{% url 'finanze:chiusura_automatica_create' entry.cassa.pk %}?data={{ data|date:'Y-m-d' }}" class="btn btn-primary btn-sm w-100">
+              <i class="bi bi-plus-circle"></i> Effettua chiusura
+            </a>
+          {% endif %}
+        </div>
+      </div>
+    </div>
+    {% empty %}
+    <div class="col-12"><div class="alert alert-info">Nessuna cassa automatica configurata.</div></div>
+    {% endfor %}
+  </div>
+
+  <div class="mt-3">
+    <a href="{% url 'finanze:report_giornata' %}?data={{ data|date:'Y-m-d' }}" class="btn btn-outline-dark">
+      <i class="bi bi-file-earmark-bar-graph"></i> Report giornata completo
+    </a>
+    <a href="{% url 'finanze:dashboard' %}" class="btn btn-outline-secondary">
+      <i class="bi bi-arrow-left"></i> Torna alla dashboard
+    </a>
+  </div>
+</div>
+{% endblock %}
