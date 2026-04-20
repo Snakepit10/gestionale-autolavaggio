@@ -489,6 +489,12 @@ class QuadraturaGiornaliera(models.Model):
         verbose_name='Totale lettore carte POS servito',
         help_text='Totale riportato dal terminale POS (lettore carte) del servito',
     )
+    fondo_cassa_iniziale = models.DecimalField(
+        max_digits=10, decimal_places=2, default=Decimal('0.00'),
+        validators=[MinValueValidator(Decimal('0.00'))],
+        verbose_name='Fondo cassa iniziale',
+        help_text='Contanti gia presenti in cassa all\'inizio della giornata (verra sottratto dal totale reale)',
+    )
     note = models.TextField(blank=True)
     operatore = models.ForeignKey(
         User, on_delete=models.SET_NULL, null=True, blank=True,
@@ -508,5 +514,5 @@ class QuadraturaGiornaliera(models.Model):
 
     @property
     def totale_reale(self):
-        """Totale rilevato fisicamente dall'operatore."""
-        return self.contanti_totali + self.lettore_carte_servito
+        """Totale netto rilevato: contanti + carte - fondo cassa iniziale."""
+        return self.contanti_totali + self.lettore_carte_servito - self.fondo_cassa_iniziale

@@ -5,7 +5,7 @@ from .models import ChiusuraCassa, MovimentoCassa, Cassa, ChiusuraCassaAutomatic
 
 @admin.register(QuadraturaGiornaliera)
 class QuadraturaGiornalieraAdmin(admin.ModelAdmin):
-    list_display = ['data', 'contanti_totali', 'lettore_carte_servito', 'totale_reale_display', 'operatore', 'aggiornato_il']
+    list_display = ['data', 'contanti_totali', 'lettore_carte_servito', 'fondo_cassa_iniziale', 'totale_reale_display', 'operatore', 'aggiornato_il']
     list_filter = ['data']
     readonly_fields = ['creato_il', 'aggiornato_il']
     date_hierarchy = 'data'

@@ -1051,13 +1051,10 @@ def report_giornata(request):
     vendita_self_service = agg['vendita_totale']
     totale_teorico = vendita_self_service + totale_servito
 
-    # Fondo cassa iniziale del servito (va sottratto dal reale perche gia presente
-    # nella cassa all'apertura, non rappresenta incasso della giornata).
-    fondo_cassa_iniziale = cassa_servito.fondo_cassa_iniziale if cassa_servito else Decimal('0.00')
-
     if quadratura_obj:
+        fondo_cassa_iniziale = quadratura_obj.fondo_cassa_iniziale
         lordo_reale = quadratura_obj.contanti_totali + quadratura_obj.lettore_carte_servito
-        totale_reale = lordo_reale - fondo_cassa_iniziale
+        totale_reale = quadratura_obj.totale_reale
         differenza_quadratura = totale_reale - totale_teorico
         if abs(differenza_quadratura) < Decimal('0.50'):
             stato_quadratura = 'ok'
@@ -1066,6 +1063,7 @@ def report_giornata(request):
         else:
             stato_quadratura = 'eccedente'
     else:
+        fondo_cassa_iniziale = Decimal('0.00')
         lordo_reale = None
         totale_reale = None
         differenza_quadratura = None
@@ -1138,19 +1136,19 @@ def quadratura_form(request):
     """Form per inserire/modificare la quadratura giornaliera complessiva."""
     data = _parse_data(request)
     quadratura = QuadraturaGiornaliera.objects.filter(data=data).first()
-    cassa_servito = ChiusuraCassa.objects.filter(data=data).first()
-    fondo_cassa_iniziale = cassa_servito.fondo_cassa_iniziale if cassa_servito else Decimal('0.00')
 
     if request.method == 'POST':
         try:
             contanti = Decimal(request.POST.get('contanti_totali') or '0')
             lettore = Decimal(request.POST.get('lettore_carte_servito') or '0')
+            fondo = Decimal(request.POST.get('fondo_cassa_iniziale') or '0')
             note = request.POST.get('note', '')
             QuadraturaGiornaliera.objects.update_or_create(
                 data=data,
                 defaults={
                     'contanti_totali': contanti,
                     'lettore_carte_servito': lettore,
+                    'fondo_cassa_iniziale': fondo,
                     'note': note,
                     'operatore': request.user,
                 },
@@ -1167,5 +1165,4 @@ def quadratura_form(request):
         'data_next': data + timedelta(days=1),
         'oggi': timezone.now().date(),
         'quadratura': quadratura,
-        'fondo_cassa_iniziale': fondo_cassa_iniziale,
     })
