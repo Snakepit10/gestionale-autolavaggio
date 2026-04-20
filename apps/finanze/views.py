@@ -710,6 +710,9 @@ def chiusura_automatica_list(request):
 
     context = {
         'data': data,
+        'data_prev': data - timedelta(days=1),
+        'data_next': data + timedelta(days=1),
+        'oggi': timezone.now().date(),
         'casse_data': casse_data,
         'totale_incasso': totale_incasso,
         'totale_wash_cycles': totale_wash_cycles,
@@ -1091,6 +1094,9 @@ def report_giornata(request):
 
     context = {
         'data': data,
+        'data_prev': data - timedelta(days=1),
+        'data_next': data + timedelta(days=1),
+        'oggi': timezone.now().date(),
         'cassa_servito': cassa_servito,
         'chiusure_auto': chiusure_auto,
         'agg': agg,
@@ -1157,6 +1163,9 @@ def quadratura_form(request):
 
     return render(request, 'finanze/quadratura_form.html', {
         'data': data,
+        'data_prev': data - timedelta(days=1),
+        'data_next': data + timedelta(days=1),
+        'oggi': timezone.now().date(),
         'quadratura': quadratura,
         'fondo_cassa_iniziale': fondo_cassa_iniziale,
     })

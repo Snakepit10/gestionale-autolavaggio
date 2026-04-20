@@ -69,13 +69,20 @@
     </div>
   </div>
 
-  {# ====== Filter ====== #}
-  <div class="filter-bar">
-    <form method="get" class="d-flex gap-2 align-items-center">
-      <i class="bi bi-calendar text-muted"></i>
-      <input type="date" name="data" class="form-control form-control-sm border-0 bg-light" value="{{ data|date:'Y-m-d' }}" style="max-width:180px">
-      <button type="submit" class="btn btn-dark btn-sm"><i class="bi bi-funnel"></i> Filtra</button>
-    </form>
+  {# ====== Filter + navigazione giorni ====== #}
+  <div class="filter-bar d-flex gap-2 align-items-center flex-wrap">
+    <i class="bi bi-calendar text-muted"></i>
+    <strong class="me-2">{{ data|date:"l d/m/Y" }}</strong>
+    <a href="?data={{ data_prev|date:'Y-m-d' }}" class="btn btn-outline-secondary btn-sm" title="Giorno precedente">
+      <i class="bi bi-chevron-left"></i>
+    </a>
+    <input type="date" id="dateNav" class="form-control form-control-sm border-0 bg-light"
+           value="{{ data|date:'Y-m-d' }}" style="max-width:160px"
+           onchange="location.href='?data='+this.value">
+    <a href="?data={{ data_next|date:'Y-m-d' }}" class="btn btn-outline-secondary btn-sm" title="Giorno successivo">
+      <i class="bi bi-chevron-right"></i>
+    </a>
+    <a href="?data={{ oggi|date:'Y-m-d' }}" class="btn btn-outline-primary btn-sm">Oggi</a>
   </div>
 
   {# ====== KPI Top Row: RIEPILOGO RICHIESTO ====== #}

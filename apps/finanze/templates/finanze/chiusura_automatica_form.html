@@ -27,6 +27,23 @@
     </a>
   </div>
 
+  {# Banner data chiusura — permette di registrare scontrini anche per giorni precedenti #}
+  <div class="alert {% if mode == 'create' %}alert-warning{% else %}alert-info{% endif %} d-flex align-items-center justify-content-between mb-3">
+    <div>
+      <i class="bi bi-calendar-event"></i>
+      <strong>Data chiusura:</strong> {{ data|date:"l d/m/Y" }}
+      {% if mode == 'create' %}
+        <small class="text-muted d-block mt-1">Puoi cambiare la data qui sotto per registrare una chiusura di un giorno passato.</small>
+      {% endif %}
+    </div>
+    {% if mode == 'create' %}
+    <div class="d-flex gap-1 align-items-center">
+      <input type="date" id="dateNav" class="form-control form-control-sm" value="{{ data|date:'Y-m-d' }}" style="width:160px;"
+             onchange="location.href='?data='+this.value">
+    </div>
+    {% endif %}
+  </div>
+
   <form method="post">
     {% csrf_token %}
 

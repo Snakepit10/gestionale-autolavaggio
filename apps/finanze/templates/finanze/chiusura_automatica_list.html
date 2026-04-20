@@ -12,13 +12,22 @@
 {% block content %}
 <div class="container py-4">
 
-  <div class="d-flex justify-content-between align-items-center mb-3">
-    <h4 class="mb-0"><i class="bi bi-collection"></i> Chiusure Casse Automatiche</h4>
-    <form method="get" class="d-flex gap-2 align-items-center">
-      <label class="small mb-0">Data:</label>
-      <input type="date" name="data" class="form-control form-control-sm" value="{{ data|date:'Y-m-d' }}">
-      <button type="submit" class="btn btn-primary btn-sm"><i class="bi bi-funnel"></i></button>
-    </form>
+  <div class="d-flex justify-content-between align-items-center mb-3 flex-wrap gap-2">
+    <h4 class="mb-0">
+      <i class="bi bi-collection"></i> Chiusure Casse Automatiche
+      <small class="text-muted d-block d-md-inline ms-md-2">{{ data|date:"l d/m/Y" }}</small>
+    </h4>
+    <div class="d-flex gap-1 align-items-center">
+      <a href="?data={{ data_prev|date:'Y-m-d' }}" class="btn btn-outline-secondary btn-sm" title="Giorno precedente">
+        <i class="bi bi-chevron-left"></i>
+      </a>
+      <input type="date" id="dateNav" class="form-control form-control-sm" value="{{ data|date:'Y-m-d' }}" style="width:160px;"
+             onchange="location.href='?data='+this.value">
+      <a href="?data={{ data_next|date:'Y-m-d' }}" class="btn btn-outline-secondary btn-sm" title="Giorno successivo">
+        <i class="bi bi-chevron-right"></i>
+      </a>
+      <a href="?data={{ oggi|date:'Y-m-d' }}" class="btn btn-outline-primary btn-sm">Oggi</a>
+    </div>
   </div>
 
   <div class="row g-3 mb-3">
