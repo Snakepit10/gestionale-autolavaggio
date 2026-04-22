@@ -5,11 +5,54 @@
 
 {% block title %}Gestione Ordini - Gestionale Autolavaggio{% endblock %}
 
+{% block extra_css %}
+<style>
+/* ===== Modern Ordini page ===== */
+.page-header { display:flex; justify-content:space-between; align-items:center; margin-bottom:1.5rem; flex-wrap:wrap; gap:.75rem; }
+.page-header h1 { font-size:1.6rem; font-weight:700; color:#1a1a2e; margin:0; }
+.page-header .btn { border-radius:8px; font-weight:500; }
+
+/* Section card: no colored header, clean with left accent */
+.section-card { background:#fff; border:1px solid #e5e7eb; border-radius:12px; box-shadow:0 1px 2px rgba(0,0,0,.04); margin-bottom:1.25rem; overflow:hidden; }
+.section-card .section-title { padding:14px 20px; display:flex; align-items:center; justify-content:space-between; border-bottom:1px solid #f1f5f9; }
+.section-card .section-title .label { display:flex; align-items:center; gap:10px; font-weight:600; color:#1e293b; font-size:.98rem; }
+.section-card .section-title .label i { font-size:1.05rem; }
+.section-card .section-title .count { background:#f1f5f9; color:#475569; font-size:.78rem; font-weight:600; padding:2px 10px; border-radius:20px; }
+.section-card.accent-blue { border-left:4px solid #3b82f6; }
+.section-card.accent-amber { border-left:4px solid #f59e0b; }
+.section-card.accent-green { border-left:4px solid #10b981; }
+.section-card.accent-blue .section-title .label i { color:#3b82f6; }
+.section-card.accent-amber .section-title .label i { color:#f59e0b; }
+.section-card.accent-green .section-title .label i { color:#10b981; }
+.section-card .section-body { padding: 0; }
+
+/* Modern tables */
+.section-card table { margin-bottom:0; }
+.section-card table thead th { background:#f8fafc; color:#64748b; font-size:.72rem; text-transform:uppercase; letter-spacing:.4px; font-weight:600; border-bottom:1px solid #e2e8f0; padding: 12px 14px; }
+.section-card table tbody td { padding: 12px 14px; border-color:#f1f5f9; vertical-align:middle; }
+.section-card table tbody tr { transition: background .12s; }
+.section-card table tbody tr:hover { background:#fafbfc; }
+
+/* Filter card light */
+.filter-card { background:#fff; border:1px solid #e5e7eb; border-radius:12px; padding:14px 18px; margin-bottom:1.25rem; box-shadow:0 1px 2px rgba(0,0,0,.04); }
+
+/* Empty states cleaner */
+.empty-state { padding: 2.5rem 1rem; text-align:center; color:#94a3b8; }
+.empty-state i { font-size:2.5rem; opacity:.5; }
+.empty-state h5 { color:#64748b; margin-top:.75rem; font-weight:600; }
+
+/* Modal header clean */
+.modal .modal-header.modal-clean { background:#fff; color:#1e293b; border-bottom:1px solid #f1f5f9; }
+.modal .modal-header.modal-clean .modal-title { font-weight:600; }
+.modal .modal-header.modal-clean .btn-close { filter:none; }
+</style>
+{% endblock %}
+
 {% block content %}
-<div class="d-flex justify-content-between align-items-center mb-4">
+<div class="page-header">
     <h1><i class="bi bi-receipt"></i> Gestione Ordini</h1>
-    <div>
-        <a href="{% url 'ordini:ordini-non-pagati' %}" class="btn btn-warning me-2">
+    <div class="d-flex gap-2">
+        <a href="{% url 'ordini:ordini-non-pagati' %}" class="btn btn-outline-warning">
             <i class="bi bi-exclamation-triangle"></i> Non Pagati
         </a>
         <a href="{% url 'ordini:cassa' %}" class="btn btn-primary">
@@ -52,9 +95,9 @@
       <form id="formCheckin" method="post" action="">
         {% csrf_token %}
         <input type="hidden" name="next" value="ordini">
-        <div class="modal-header bg-primary text-white">
-          <h5 class="modal-title"><i class="bi bi-check2-square"></i> Check-in prenotazione</h5>
-          <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+        <div class="modal-header modal-clean">
+          <h5 class="modal-title"><i class="bi bi-check2-square text-primary"></i> Check-in prenotazione</h5>
+          <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
         </div>
         <div class="modal-body">
           <div class="row g-3">
@@ -88,6 +131,13 @@
               <input type="text" name="tipo_auto" id="ckTipoAuto" class="form-control" placeholder="es. Utilitaria, SUV, Furgone">
             </div>
             <div class="col-md-6">
+              <label class="form-label">Tipo consegna</label>
+              <select name="tipo_consegna" id="ckTipoConsegna" class="form-select" onchange="ckToggleOra()">
+                <option value="immediata" selected>Immediata</option>
+                <option value="programmata">Programmata (ora specifica)</option>
+              </select>
+            </div>
+            <div class="col-md-6" id="ckOraWrap" style="display:none;">
               <label class="form-label">Ora consegna richiesta</label>
               <input type="time" name="ora_consegna_richiesta" id="ckOraConsegna" class="form-control">
             </div>
@@ -112,6 +162,19 @@
 </div>
 
 <script>
+function ckToggleOra() {
+  const sel = document.getElementById('ckTipoConsegna');
+  const wrap = document.getElementById('ckOraWrap');
+  const input = document.getElementById('ckOraConsegna');
+  if (sel.value === 'programmata') {
+    wrap.style.display = '';
+    input.required = true;
+  } else {
+    wrap.style.display = 'none';
+    input.required = false;
+    input.value = '';
+  }
+}
 (function(){
   const modal = document.getElementById('modalCheckin');
   if (!modal) return;
@@ -131,63 +194,61 @@
       ? '<span class="badge bg-success">Confermata</span>'
       : (stato === 'in_attesa' ? '<span class="badge bg-warning text-dark">In attesa</span>' : stato);
     document.getElementById('ckTipoAuto').value = btn.getAttribute('data-tipo-auto') || '';
-    document.getElementById('ckOraConsegna').value = btn.getAttribute('data-ora') || '';
+    // Default: tipo consegna immediata, ora vuota
+    document.getElementById('ckTipoConsegna').value = 'immediata';
+    document.getElementById('ckOraConsegna').value = '';
+    ckToggleOra();
   });
 })();
 </script>
 
 <!-- Filtri -->
-<div class="card mb-4">
-    <div class="card-body">
-        <form method="get" class="row g-3">
-            <div class="col-md-3">
-                <label class="form-label">Stato Ordine:</label>
-                <select name="stato" class="form-select">
-                    <option value="">Tutti gli stati</option>
-                    <option value="in_attesa" {% if request.GET.stato == 'in_attesa' %}selected{% endif %}>In Attesa</option>
-                    <option value="in_lavorazione" {% if request.GET.stato == 'in_lavorazione' %}selected{% endif %}>In Lavorazione</option>
-                    <option value="completato" {% if request.GET.stato == 'completato' %}selected{% endif %}>Completato</option>
-                    <option value="annullato" {% if request.GET.stato == 'annullato' %}selected{% endif %}>Annullato</option>
-                </select>
+<div class="filter-card">
+    <form method="get" class="row g-2 align-items-end">
+        <div class="col-md-3">
+            <label class="form-label small text-muted mb-1">Stato</label>
+            <select name="stato" class="form-select form-select-sm">
+                <option value="">Tutti</option>
+                <option value="in_attesa" {% if request.GET.stato == 'in_attesa' %}selected{% endif %}>In Attesa</option>
+                <option value="in_lavorazione" {% if request.GET.stato == 'in_lavorazione' %}selected{% endif %}>In Lavorazione</option>
+                <option value="completato" {% if request.GET.stato == 'completato' %}selected{% endif %}>Completato</option>
+                <option value="annullato" {% if request.GET.stato == 'annullato' %}selected{% endif %}>Annullato</option>
+            </select>
+        </div>
+        <div class="col-md-3">
+            <label class="form-label small text-muted mb-1">Data da</label>
+            <input type="date" name="data_da" class="form-control form-control-sm" value="{{ request.GET.data_da }}">
+        </div>
+        <div class="col-md-3">
+            <label class="form-label small text-muted mb-1">Data a</label>
+            <input type="date" name="data_a" class="form-control form-control-sm" value="{{ request.GET.data_a }}">
+        </div>
+        <div class="col-md-3">
+            <div class="d-flex gap-2">
+                <button type="submit" class="btn btn-dark btn-sm flex-grow-1">
+                    <i class="bi bi-funnel"></i> Filtra
+                </button>
+                <a href="{% url 'ordini:ordini-list' %}" class="btn btn-outline-secondary btn-sm">
+                    <i class="bi bi-arrow-clockwise"></i>
+                </a>
             </div>
-            <div class="col-md-3">
-                <label class="form-label">Data da:</label>
-                <input type="date" name="data_da" class="form-control" value="{{ request.GET.data_da }}">
-            </div>
-            <div class="col-md-3">
-                <label class="form-label">Data a:</label>
-                <input type="date" name="data_a" class="form-control" value="{{ request.GET.data_a }}">
-            </div>
-            <div class="col-md-3">
-                <label class="form-label">&nbsp;</label>
-                <div class="d-flex gap-2">
-                    <button type="submit" class="btn btn-primary">
-                        <i class="bi bi-search"></i> Filtra
-                    </button>
-                    <a href="{% url 'ordini:ordini-list' %}" class="btn btn-outline-secondary">
-                        <i class="bi bi-arrow-clockwise"></i>
-                    </a>
-                </div>
-            </div>
-        </form>
-    </div>
+        </div>
+    </form>
 </div>
 
 <!-- Vista Ordini -->
 <div>
         <!-- Ordini Attivi -->
-        <div class="card mb-4">
-            <div class="card-header bg-primary text-white">
-                <h5 class="mb-0">
-                    <i class="bi bi-list-check"></i> Ordini Attivi
-                    <span class="badge bg-light text-primary ms-2">{{ ordini_attivi|length }}</span>
-                </h5>
+        <div class="section-card accent-blue">
+            <div class="section-title">
+                <div class="label"><i class="bi bi-list-check"></i> Ordini Attivi</div>
+                <span class="count">{{ ordini_attivi|length }}</span>
             </div>
-            <div class="card-body">
+            <div class="section-body">
                 {% if ordini_attivi %}
                     <div class="table-responsive">
-                        <table class="table table-hover table-striped">
-                            <thead class="table-dark">
+                        <table class="table table-hover">
+                            <thead>
                                 <tr>
                                     <th style="width:30px"></th>
                                     <th>N° Ordine</th>
@@ -428,28 +489,26 @@
                 </table>
             </div>
         {% else %}
-            <div class="text-center py-5">
-                <i class="bi bi-hourglass display-1 text-muted"></i>
-                <h5 class="text-muted mt-3">Nessun Ordine Attivo</h5>
-                <p class="text-muted">Non ci sono ordini in attesa o in lavorazione.</p>
+            <div class="empty-state">
+                <i class="bi bi-hourglass"></i>
+                <h5>Nessun Ordine Attivo</h5>
+                <p class="mb-0">Non ci sono ordini in attesa o in lavorazione.</p>
             </div>
         {% endif %}
             </div>
         </div>
 
         <!-- Ordini Da Ritirare -->
-        <div class="card">
-            <div class="card-header bg-warning text-white">
-                <h5 class="mb-0">
-                    <i class="bi bi-car-front"></i> Da Ritirare
-                    <span class="badge bg-light text-warning ms-2">{{ ordini_da_ritirare.count }}</span>
-                </h5>
+        <div class="section-card accent-amber">
+            <div class="section-title">
+                <div class="label"><i class="bi bi-car-front"></i> Da Ritirare</div>
+                <span class="count">{{ ordini_da_ritirare.count }}</span>
             </div>
-            <div class="card-body">
+            <div class="section-body">
                 {% if ordini_da_ritirare %}
                     <div class="table-responsive">
-                        <table class="table table-hover table-striped">
-                            <thead class="table-dark">
+                        <table class="table table-hover">
+                            <thead>
                                 <tr>
                                     <th>N° Ordine</th>
                                     <th>Data/Ora</th>
@@ -662,28 +721,26 @@
                 </table>
             </div>
         {% else %}
-            <div class="text-center py-5">
-                <i class="bi bi-car-front display-1 text-muted"></i>
-                <h5 class="text-muted mt-3">Nessun Ordine da Ritirare</h5>
-                <p class="text-muted">Non ci sono ordini completati in attesa di ritiro.</p>
+            <div class="empty-state">
+                <i class="bi bi-car-front"></i>
+                <h5>Nessun Ordine da Ritirare</h5>
+                <p class="mb-0">Non ci sono ordini completati in attesa di ritiro.</p>
             </div>
         {% endif %}
             </div>
         </div>
 
         <!-- Ordini Completati -->
-        <div class="card">
-            <div class="card-header bg-success text-white">
-                <h5 class="mb-0">
-                    <i class="bi bi-check-circle"></i> Ordini Completati
-                    <span class="badge bg-light text-success ms-2">{{ ordini_completati.count }}</span>
-                </h5>
+        <div class="section-card accent-green">
+            <div class="section-title">
+                <div class="label"><i class="bi bi-check-circle"></i> Ordini Completati</div>
+                <span class="count">{{ ordini_completati.count }}</span>
             </div>
-            <div class="card-body">
+            <div class="section-body">
                 {% if ordini_completati %}
                     <div class="table-responsive">
-                        <table class="table table-hover table-striped">
-                            <thead class="table-dark">
+                        <table class="table table-hover">
+                            <thead>
                                 <tr>
                                     <th>N° Ordine</th>
                                     <th>Data/Ora</th>
@@ -898,10 +955,10 @@
                 </table>
             </div>
         {% else %}
-            <div class="text-center py-5">
-                <i class="bi bi-check-circle display-1 text-muted"></i>
-                <h5 class="text-muted mt-3">Nessun Ordine Completato</h5>
-                <p class="text-muted">Non ci sono ancora ordini completati.</p>
+            <div class="empty-state">
+                <i class="bi bi-check-circle"></i>
+                <h5>Nessun Ordine Completato</h5>
+                <p class="mb-0">Non ci sono ancora ordini completati.</p>
             </div>
         {% endif %}
             </div>

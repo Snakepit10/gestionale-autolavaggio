@@ -1159,6 +1159,7 @@ def checkin_prenotazione(request, pk):
             servizi_ids = request.POST.get('servizi_ids', '').strip()
             tipo_auto_modificato = request.POST.get('tipo_auto', '').strip()
             ora_consegna_richiesta = request.POST.get('ora_consegna_richiesta', '').strip()
+            tipo_consegna_modificato = request.POST.get('tipo_consegna', '').strip()
             note_interne = request.POST.get('note_interne', '').strip()
             
             # Gestione cliente
@@ -1233,8 +1234,15 @@ def checkin_prenotazione(request, pk):
             # Converte prenotazione in ordine
             ordine = prenotazione.converti_in_ordine(request.user)
             
-            # Aggiorna l'ordine con i dati modificabili
-            if ora_consegna_richiesta:
+            # Aggiorna tipo consegna (default immediata dal modal cassa)
+            if tipo_consegna_modificato in ('immediata', 'programmata'):
+                ordine.tipo_consegna = tipo_consegna_modificato
+                if tipo_consegna_modificato == 'immediata':
+                    # Svuota ora consegna richiesta per consegna immediata
+                    ordine.ora_consegna_richiesta = None
+
+            # Aggiorna l'ordine con l'ora consegna (solo se programmata)
+            if ora_consegna_richiesta and ordine.tipo_consegna == 'programmata':
                 from datetime import datetime
                 try:
                     ora_obj = datetime.strptime(ora_consegna_richiesta, '%H:%M').time()
