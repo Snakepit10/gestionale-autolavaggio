@@ -453,7 +453,7 @@
                   {# Solo totale scontrino #}
                   <label class="form-label small mb-1">Totale scontrino (&euro;)</label>
                   <input type="number" step="0.01" min="0" name="incasso_totale" class="form-control form-control-sm mb-2"
-                         value="{{ entry.chiusura.incasso_totale|default:'0.00' }}" required>
+                         value="{% if entry.chiusura %}{{ entry.chiusura.incasso_totale|stringformat:'.2f' }}{% else %}0.00{% endif %}" required>
                   <input type="hidden" name="incasso_ricarica" value="0">
                   <input type="hidden" name="vendita_contante" value="0">
                   <input type="hidden" name="vendita_non_contante" value="0">
@@ -464,33 +464,33 @@
                     <div class="col-6">
                       <label class="form-label small mb-0">Incasso tot.</label>
                       <input type="number" step="0.01" min="0" name="incasso_totale" class="form-control form-control-sm"
-                             value="{{ entry.chiusura.incasso_totale|default:'0.00' }}" required>
+                             value="{% if entry.chiusura %}{{ entry.chiusura.incasso_totale|stringformat:'.2f' }}{% else %}0.00{% endif %}" required>
                     </div>
                     <div class="col-6">
                       <label class="form-label small mb-0">Ricarica</label>
                       <input type="number" step="0.01" min="0" name="incasso_ricarica" class="form-control form-control-sm"
-                             value="{{ entry.chiusura.incasso_ricarica|default:'0.00' }}">
+                             value="{% if entry.chiusura %}{{ entry.chiusura.incasso_ricarica|stringformat:'.2f' }}{% else %}0.00{% endif %}">
                     </div>
                     <div class="col-6">
                       <label class="form-label small mb-0">V. contante</label>
                       <input type="number" step="0.01" min="0" name="vendita_contante" class="form-control form-control-sm"
-                             value="{{ entry.chiusura.vendita_contante|default:'0.00' }}" required>
+                             value="{% if entry.chiusura %}{{ entry.chiusura.vendita_contante|stringformat:'.2f' }}{% else %}0.00{% endif %}" required>
                     </div>
                     <div class="col-6">
                       <label class="form-label small mb-0">V. non cont.</label>
                       <input type="number" step="0.01" min="0" name="vendita_non_contante" class="form-control form-control-sm"
-                             value="{{ entry.chiusura.vendita_non_contante|default:'0.00' }}">
+                             value="{% if entry.chiusura %}{{ entry.chiusura.vendita_non_contante|stringformat:'.2f' }}{% else %}0.00{% endif %}">
                     </div>
                     <div class="col-6">
                       <label class="form-label small mb-0">Resto reale</label>
                       <input type="number" step="0.01" min="0" name="resto_erogato_reale" class="form-control form-control-sm"
-                             value="{{ entry.chiusura.resto_erogato_reale|default:'0.00' }}">
+                             value="{% if entry.chiusura %}{{ entry.chiusura.resto_erogato_reale|stringformat:'.2f' }}{% else %}0.00{% endif %}">
                     </div>
                     {% if entry.cassa.tracking_washcycles %}
                     <div class="col-6">
                       <label class="form-label small mb-0">WashCycles</label>
                       <input type="number" min="0" name="wash_cycles" class="form-control form-control-sm"
-                             value="{{ entry.chiusura.wash_cycles|default:'' }}">
+                             value="{% if entry.chiusura.wash_cycles %}{{ entry.chiusura.wash_cycles }}{% endif %}">
                     </div>
                     {% endif %}
                   </div>

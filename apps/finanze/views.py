@@ -844,7 +844,12 @@ def report_giornata(request):
         cassa_servito.ricalcola_totali()
 
     # Chiusure automatiche (include registratore servito)
-    chiusure_auto = ChiusuraCassaAutomatica.objects.filter(data=data).select_related('cassa').order_by('cassa__ordine')
+    # Forziamo la valutazione a lista per evitare re-query multiple.
+    chiusure_auto = list(
+        ChiusuraCassaAutomatica.objects.filter(data=data)
+        .select_related('cassa')
+        .order_by('cassa__ordine')
+    )
 
     # Tutte le casse automatiche attive + relativa chiusura del giorno (per form inline)
     casse_attive = Cassa.objects.filter(tipo='automatica', attiva=True).order_by('ordine')
