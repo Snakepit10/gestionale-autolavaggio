@@ -1207,18 +1207,17 @@ function aprePrenotazione() {
     const totaleEl = document.getElementById('totale-finale');
     document.getElementById('prenota-totale').textContent = totaleEl ? totaleEl.textContent : '€0.00';
 
-    // Default: domani alle 09:00
+    // Default: oggi alle 09:00
     const dataInput = document.getElementById('prenota-data');
     const oraInput = document.getElementById('prenota-ora');
+    const oggiStr = new Date().toISOString().split('T')[0];
     if (!dataInput.value) {
-        const d = new Date();
-        d.setDate(d.getDate() + 1);
-        dataInput.value = d.toISOString().split('T')[0];
+        dataInput.value = oggiStr;
     }
     if (!oraInput.value) {
         oraInput.value = '09:00';
     }
-    dataInput.min = new Date().toISOString().split('T')[0];
+    dataInput.min = oggiStr;
 
     const modal = new bootstrap.Modal(document.getElementById('modalPrenota'));
     modal.show();
