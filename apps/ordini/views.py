@@ -735,8 +735,11 @@ class OrdiniListView(LoginRequiredMixin, ListView):
 
         # Prenotazioni di oggi ancora da fare checkin
         from apps.prenotazioni.models import Prenotazione
+        from datetime import datetime as _dt
         oggi = timezone.now().date()
-        context['prenotazioni_upcoming'] = (
+        now_local = timezone.localtime(timezone.now())
+
+        prenotazioni_qs = (
             Prenotazione.objects
             .filter(
                 slot__data=oggi,
@@ -747,6 +750,33 @@ class OrdiniListView(LoginRequiredMixin, ListView):
             .prefetch_related('servizi')
             .order_by('slot__ora_inizio')
         )
+
+        # Annota ciascuna con delta_minuti e categoria ritardo/urgenza
+        prenotazioni_list = []
+        for p in prenotazioni_qs:
+            slot_dt = timezone.make_aware(_dt.combine(p.slot.data, p.slot.ora_inizio))
+            delta_min = int((slot_dt - now_local).total_seconds() // 60)
+            # Categorie di stato temporale:
+            # - late_heavy: in ritardo > 15 min
+            # - late: in ritardo 0-15 min
+            # - imminent: nei prossimi 15 min
+            # - soon: nei prossimi 15-60 min
+            # - future: oltre 60 min
+            if delta_min <= -16:
+                cat = 'late_heavy'
+            elif delta_min <= 0:
+                cat = 'late'
+            elif delta_min <= 15:
+                cat = 'imminent'
+            elif delta_min <= 60:
+                cat = 'soon'
+            else:
+                cat = 'future'
+            p.delta_min = delta_min
+            p.status_cat = cat
+            prenotazioni_list.append(p)
+
+        context['prenotazioni_upcoming'] = prenotazioni_list
         context['today'] = oggi
 
         return context

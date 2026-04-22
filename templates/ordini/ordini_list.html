@@ -45,6 +45,61 @@
 .modal .modal-header.modal-clean { background:#fff; color:#1e293b; border-bottom:1px solid #f1f5f9; }
 .modal .modal-header.modal-clean .modal-title { font-weight:600; }
 .modal .modal-header.modal-clean .btn-close { filter:none; }
+
+/* ===== Prenotazione badges: sistema colori ritardo/urgenza ===== */
+.pren-badge {
+    display: inline-flex; align-items: center; gap: 8px;
+    padding: 6px 12px; border-radius: 999px;
+    font-size: .82rem; font-weight: 500;
+    border: 2px solid transparent;
+    background: #fff; color: #1e293b;
+    text-decoration: none; cursor: pointer;
+    transition: all .15s;
+}
+.pren-badge:hover { transform: translateY(-1px); box-shadow: 0 4px 10px rgba(0,0,0,.08); }
+.pren-badge .time-pill {
+    display: inline-flex; align-items: center; gap: 4px;
+    padding: 3px 10px; border-radius: 999px;
+    font-size: .78rem; font-weight: 700;
+    background: rgba(0,0,0,.06); color: #1e293b;
+}
+.pren-badge .cliente-name { font-weight: 600; }
+.pren-badge .tipo-auto { color: #64748b; font-size: .78rem; }
+.pren-badge .delta-label { font-size: .7rem; font-weight: 700; padding: 2px 8px; border-radius: 999px; }
+
+/* Future: > 60 min */
+.pren-badge.cat-future { border-color: #cbd5e1; background: #f8fafc; }
+.pren-badge.cat-future .time-pill { background: #e2e8f0; color: #475569; }
+.pren-badge.cat-future .delta-label { background: #e2e8f0; color: #475569; }
+
+/* Soon: 15-60 min */
+.pren-badge.cat-soon { border-color: #60a5fa; background: #eff6ff; }
+.pren-badge.cat-soon .time-pill { background: #3b82f6; color: #fff; }
+.pren-badge.cat-soon .delta-label { background: #dbeafe; color: #1e40af; }
+
+/* Imminent: 0-15 min (prossimo arrivo) */
+.pren-badge.cat-imminent { border-color: #f59e0b; background: #fffbeb; }
+.pren-badge.cat-imminent .time-pill { background: #f59e0b; color: #fff; }
+.pren-badge.cat-imminent .delta-label { background: #fef3c7; color: #92400e; }
+
+/* Late: 0-15 min di ritardo */
+.pren-badge.cat-late { border-color: #fb923c; background: #fff7ed; }
+.pren-badge.cat-late .time-pill { background: #ea580c; color: #fff; }
+.pren-badge.cat-late .delta-label { background: #ffedd5; color: #9a3412; }
+
+/* Late heavy: > 15 min di ritardo (pulsa) */
+.pren-badge.cat-late_heavy { border-color: #dc2626; background: #fef2f2; animation: pren-pulse 1.6s ease-in-out infinite; }
+.pren-badge.cat-late_heavy .time-pill { background: #dc2626; color: #fff; }
+.pren-badge.cat-late_heavy .delta-label { background: #fee2e2; color: #7f1d1d; font-weight: 800; }
+
+@keyframes pren-pulse {
+    0%, 100% { box-shadow: 0 0 0 0 rgba(220, 38, 38, .35); }
+    50% { box-shadow: 0 0 0 6px rgba(220, 38, 38, 0); }
+}
+
+/* Legenda */
+.pren-legend { display: flex; flex-wrap: wrap; gap: 10px; margin-bottom: .5rem; font-size: .72rem; color: #64748b; }
+.pren-legend .dot { display:inline-block; width:10px; height:10px; border-radius:50%; margin-right:4px; vertical-align:middle; }
 </style>
 {% endblock %}
 
@@ -63,11 +118,17 @@
 
 <!-- Prenotazioni di oggi (badge cliccabili per check-in) -->
 {% if prenotazioni_upcoming %}
+<div class="pren-legend">
+    <span><span class="dot" style="background:#cbd5e1"></span>oltre 1h</span>
+    <span><span class="dot" style="background:#3b82f6"></span>entro 1h</span>
+    <span><span class="dot" style="background:#f59e0b"></span>imminente (&lt;15 min)</span>
+    <span><span class="dot" style="background:#ea580c"></span>in ritardo</span>
+    <span><span class="dot" style="background:#dc2626"></span>ritardo grave (&gt;15 min)</span>
+</div>
 <div class="d-flex flex-wrap gap-2 mb-4">
     {% for p in prenotazioni_upcoming %}
     <button type="button"
-            class="btn btn-outline-primary btn-sm d-flex align-items-center gap-2 prenotazione-badge"
-            style="border-width:2px;"
+            class="pren-badge cat-{{ p.status_cat }}"
             data-bs-toggle="modal"
             data-bs-target="#modalCheckin"
             data-pk="{{ p.pk }}"
@@ -77,12 +138,26 @@
             data-tipo-auto="{{ p.tipo_auto|default:'' }}"
             data-servizi="{% for s in p.servizi.all %}{{ s.titolo }}{% if not forloop.last %}, {% endif %}{% endfor %}"
             data-durata="{{ p.durata_stimata_minuti|default:'' }}"
-            data-stato="{{ p.stato }}">
-        <span class="badge bg-primary">{{ p.slot.ora_inizio|time:"H:i" }}</span>
-        <span class="fw-bold">{{ p.cliente }}</span>
-        {% if p.tipo_auto %}<small class="text-muted">&middot; {{ p.tipo_auto }}</small>{% endif %}
+            data-stato="{{ p.stato }}"
+            title="{% if p.delta_min < 0 %}In ritardo di {{ p.delta_min|stringformat:'d'|cut:'-' }} min{% elif p.delta_min == 0 %}Ora{% else %}Tra {{ p.delta_min }} min{% endif %}">
+        <span class="time-pill">
+            <i class="bi bi-clock"></i> {{ p.slot.ora_inizio|time:"H:i" }}
+        </span>
+        <span class="cliente-name">{{ p.cliente }}</span>
+        {% if p.tipo_auto %}<span class="tipo-auto">&middot; {{ p.tipo_auto }}</span>{% endif %}
+        <span class="delta-label">
+            {% if p.delta_min < 0 %}
+                <i class="bi bi-exclamation-triangle-fill"></i>
+                {{ p.delta_min|stringformat:'d'|cut:'-' }} min fa
+            {% elif p.delta_min == 0 %}
+                <i class="bi bi-bell-fill"></i> ora
+            {% elif p.delta_min < 60 %}
+                <i class="bi bi-hourglass-split"></i> tra {{ p.delta_min }}'
+            {% else %}
+                <i class="bi bi-calendar-event"></i> tra {{ p.delta_min }}'
+            {% endif %}
+        </span>
         {% if p.stato == 'in_attesa' %}<span class="badge bg-warning text-dark">in attesa</span>{% endif %}
-        <i class="bi bi-arrow-right-circle"></i>
     </button>
     {% endfor %}
 </div>
