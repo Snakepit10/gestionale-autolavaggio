@@ -1222,7 +1222,7 @@ function confermaPrenotazione() {
             // Svuota carrello lato client
             carrello = {};
             clienteSelezionato = null;
-            aggiornaCarrelloView && aggiornaCarrelloView();
+            if (typeof aggiornaCarrello === 'function') aggiornaCarrello();
             setTimeout(() => window.location.reload(), 800);
         } else {
             AutolavaggioJS.showToast(data.error || 'Errore nella creazione della prenotazione', 'danger');

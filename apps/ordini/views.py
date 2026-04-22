@@ -733,20 +733,21 @@ class OrdiniListView(LoginRequiredMixin, ListView):
             'totale_incassato': totale_contanti + totale_carte,
         }
 
-        # Prenotazioni del giorno (ancora da fare checkin)
+        # Prenotazioni upcoming (oggi + future) ancora da fare checkin
         from apps.prenotazioni.models import Prenotazione
         oggi = timezone.now().date()
-        context['prenotazioni_oggi'] = (
+        context['prenotazioni_upcoming'] = (
             Prenotazione.objects
             .filter(
-                slot__data=oggi,
+                slot__data__gte=oggi,
                 stato__in=['confermata', 'in_attesa'],
                 ordine__isnull=True,
             )
             .select_related('cliente', 'slot')
             .prefetch_related('servizi')
-            .order_by('slot__ora_inizio')
+            .order_by('slot__data', 'slot__ora_inizio')
         )
+        context['today'] = oggi
 
         return context
 
