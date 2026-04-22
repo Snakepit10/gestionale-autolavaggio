@@ -352,19 +352,21 @@
         </div>
         
         <div class="carrello-footer">
-            <!-- Sconti -->
-            <div class="mb-1">
-                <label class="form-label small">Sconto</label>
-                <select class="form-select form-select-sm" id="sconto-select" onchange="applicaSconto()">
-                    <option value="">Nessun sconto</option>
-                    {% for sconto in sconti %}
-                    <option value="{{ sconto.id }}" data-tipo="{{ sconto.tipo_sconto }}" data-valore="{{ sconto.valore }}">
-                        {{ sconto.titolo }} 
-                        ({% if sconto.tipo_sconto == 'percentuale' %}{{ sconto.valore }}%{% else %}€{{ sconto.valore }}{% endif %})
-                    </option>
-                    {% endfor %}
-                </select>
+            <!-- Cliente (selezione rapida) -->
+            <div class="mb-2">
+                <button class="btn btn-primary btn-sm w-100" onclick="mostraModalCliente()">
+                    <i class="bi bi-person-plus"></i> Cliente
+                </button>
             </div>
+            <!-- Sconto hidden per non rompere JS applicaSconto/riferimenti -->
+            <select id="sconto-select" class="d-none" onchange="applicaSconto()">
+                <option value="">Nessun sconto</option>
+                {% for sconto in sconti %}
+                <option value="{{ sconto.id }}" data-tipo="{{ sconto.tipo_sconto }}" data-valore="{{ sconto.valore }}">
+                    {{ sconto.titolo }}
+                </option>
+                {% endfor %}
+            </select>
             
             <!-- Tempo Attesa -->
             <div id="tempo-attesa" class="tempo-attesa mb-2 d-none">
@@ -421,18 +423,9 @@
                     <button class="btn btn-success btn-sm" id="btn-completa-ordine" onclick="completaOrdine()" disabled>
                         <i class="bi bi-check-circle"></i> Completa Ordine
                     </button>
-                    <div class="row g-1">
-                        <div class="col-6">
-                            <button class="btn btn-primary btn-sm w-100" onclick="mostraModalCliente()">
-                                <i class="bi bi-person-plus"></i> Cliente
-                            </button>
-                        </div>
-                        <div class="col-6">
-                            <button class="btn btn-info btn-sm w-100" onclick="aprePrenotazione()">
-                                <i class="bi bi-calendar-plus"></i> Prenota
-                            </button>
-                        </div>
-                    </div>
+                    <button class="btn btn-info btn-sm w-100" onclick="aprePrenotazione()">
+                        <i class="bi bi-calendar-plus"></i> Prenota
+                    </button>
                 </div>
             </div>
         </div>
@@ -1219,7 +1212,6 @@ function confermaPrenotazione() {
 
     AutolavaggioJS.fetchWithCSRF('/ordini/api/crea-prenotazione/', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(payload),
     })
     .then(r => r.json())
