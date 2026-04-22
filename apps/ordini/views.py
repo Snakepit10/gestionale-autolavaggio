@@ -601,6 +601,58 @@ def crea_prenotazione_da_carrello(request):
         return JsonResponse({'error': str(e)}, status=500)
 
 
+@login_required
+def slot_giornata_api(request):
+    """Ritorna tutti gli slot configurati per una data (con disponibilita).
+
+    Usato dal modale Prenota della cassa per mostrare la disponibilita
+    a colpo d'occhio. Include anche gli slot passati/pieni con il
+    rispettivo stato cosi l'UI puo colorarli.
+    """
+    from apps.prenotazioni.models import SlotPrenotazione, ConfigurazioneSlot
+    from datetime import datetime as _dt
+
+    data_str = request.GET.get('data')
+    if not data_str:
+        return JsonResponse({'error': 'Parametro data mancante'}, status=400)
+    try:
+        data_richiesta = _dt.strptime(data_str, '%Y-%m-%d').date()
+    except ValueError:
+        return JsonResponse({'error': 'Formato data non valido'}, status=400)
+
+    # Genera slot da configurazione se non esistono
+    giorno_settimana = data_richiesta.weekday()
+    for config in ConfigurazioneSlot.objects.filter(giorno_settimana=giorno_settimana, attivo=True):
+        config.genera_slot_per_data(data_richiesta)
+
+    now_local = timezone.localtime(timezone.now())
+    is_oggi = data_richiesta == now_local.date()
+
+    slot_qs = SlotPrenotazione.objects.filter(data=data_richiesta).order_by('ora_inizio')
+    result = []
+    for s in slot_qs:
+        posti_liberi = max(0, s.max_prenotazioni - s.prenotazioni_attuali)
+        is_past = is_oggi and s.ora_inizio < now_local.time()
+        if is_past:
+            av = 'past'
+        elif posti_liberi <= 0:
+            av = 'full'
+        elif posti_liberi < s.max_prenotazioni:
+            av = 'partial'
+        else:
+            av = 'free'
+        result.append({
+            'id': s.id,
+            'ora_inizio': s.ora_inizio.strftime('%H:%M'),
+            'ora_fine': s.ora_fine.strftime('%H:%M'),
+            'max': s.max_prenotazioni,
+            'attuali': s.prenotazioni_attuali,
+            'posti_liberi': posti_liberi,
+            'av': av,
+        })
+    return JsonResponse({'data': data_richiesta.isoformat(), 'slot': result})
+
+
 class OrdiniListView(LoginRequiredMixin, ListView):
     model = Ordine
     template_name = 'ordini/ordini_list.html'
@@ -778,6 +830,15 @@ class OrdiniListView(LoginRequiredMixin, ListView):
 
         context['prenotazioni_upcoming'] = prenotazioni_list
         context['today'] = oggi
+
+        # Servizi disponibili per modifica dentro modal check-in
+        from apps.core.models import ServizioProdotto
+        context['servizi_disponibili'] = (
+            ServizioProdotto.objects
+            .filter(attivo=True, tipo='servizio')
+            .select_related('categoria')
+            .order_by('categoria__nome', 'titolo')
+        )
 
         return context
 

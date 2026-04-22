@@ -28,7 +28,10 @@
 
 /* Modern tables */
 .section-card table { margin-bottom:0; }
-.section-card table thead th { background:#f8fafc; color:#64748b; font-size:.72rem; text-transform:uppercase; letter-spacing:.4px; font-weight:600; border-bottom:1px solid #e2e8f0; padding: 12px 14px; }
+.section-card table thead th { background:#eef2f7; color:#475569; font-size:.72rem; text-transform:uppercase; letter-spacing:.4px; font-weight:600; border-bottom:1px solid #dbe2ea; padding: 12px 14px; }
+.section-card.accent-blue table thead th { background:#eff6ff; color:#1e40af; border-bottom-color:#dbeafe; }
+.section-card.accent-amber table thead th { background:#fffbeb; color:#92400e; border-bottom-color:#fef3c7; }
+.section-card.accent-green table thead th { background:#f0fdf4; color:#14532d; border-bottom-color:#dcfce7; }
 .section-card table tbody td { padding: 12px 14px; border-color:#f1f5f9; vertical-align:middle; }
 .section-card table tbody tr { transition: background .12s; }
 .section-card table tbody tr:hover { background:#fafbfc; }
@@ -100,6 +103,31 @@
 /* Legenda */
 .pren-legend { display: flex; flex-wrap: wrap; gap: 10px; margin-bottom: .5rem; font-size: .72rem; color: #64748b; }
 .pren-legend .dot { display:inline-block; width:10px; height:10px; border-radius:50%; margin-right:4px; vertical-align:middle; }
+
+/* Checkbox servizi nel modal checkin */
+.ck-servizio-label {
+    display: inline-flex; align-items: center;
+    padding: 4px 10px; border-radius: 999px;
+    background: #fff; border: 1px solid #e2e8f0;
+    font-size: .82rem; user-select: none;
+    transition: all .12s;
+}
+.ck-servizio-label:hover { border-color: #3b82f6; background: #eff6ff; }
+.ck-servizio-label:has(input:checked) { border-color: #10b981; background: #ecfdf5; color: #065f46; font-weight: 600; }
+
+/* Slot availability grid nel modal prenota cassa */
+.slot-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(80px, 1fr)); gap: 6px; max-height: 180px; overflow-y: auto; padding: 4px; background: #f8fafc; border-radius: 8px; }
+.slot-pill { padding: 8px 6px; border-radius: 8px; text-align: center; font-size: .78rem; cursor: pointer; border: 2px solid transparent; transition: all .12s; user-select: none; }
+.slot-pill .slot-ora { font-weight: 700; font-size: .88rem; }
+.slot-pill .slot-info { font-size: .68rem; opacity: .8; }
+.slot-pill.av-free { background: #dcfce7; color: #166534; border-color: #bbf7d0; }
+.slot-pill.av-free:hover { border-color: #22c55e; }
+.slot-pill.av-partial { background: #fef3c7; color: #92400e; border-color: #fde68a; }
+.slot-pill.av-partial:hover { border-color: #f59e0b; }
+.slot-pill.av-full { background: #fee2e2; color: #7f1d1d; border-color: #fecaca; cursor: not-allowed; opacity: .75; }
+.slot-pill.av-past { background: #e5e7eb; color: #9ca3af; border-color: #e5e7eb; cursor: not-allowed; opacity: .6; }
+.slot-pill.selected { border-color: #1e40af !important; box-shadow: 0 0 0 2px rgba(30, 64, 175, .2); background: #dbeafe !important; color: #1e3a8a !important; }
+.slot-grid-empty { padding: 16px; text-align: center; color: #94a3b8; font-size: .82rem; }
 </style>
 {% endblock %}
 
@@ -137,6 +165,7 @@
             data-cliente="{{ p.cliente }}"
             data-tipo-auto="{{ p.tipo_auto|default:'' }}"
             data-servizi="{% for s in p.servizi.all %}{{ s.titolo }}{% if not forloop.last %}, {% endif %}{% endfor %}"
+            data-servizi-ids="{% for s in p.servizi.all %}{{ s.id }}{% if not forloop.last %},{% endif %}{% endfor %}"
             data-durata="{{ p.durata_stimata_minuti|default:'' }}"
             data-stato="{{ p.stato }}"
             title="{% if p.delta_min < 0 %}In ritardo di {{ p.delta_min|stringformat:'d'|cut:'-' }} min{% elif p.delta_min == 0 %}Ora{% else %}Tra {{ p.delta_min }} min{% endif %}">
@@ -193,8 +222,27 @@
               <div id="ckStato" class="fs-6">&mdash;</div>
             </div>
             <div class="col-12">
-              <label class="form-label small fw-bold text-muted">Servizi prenotati</label>
-              <div id="ckServizi" class="fs-6 text-secondary">&mdash;</div>
+              <label class="form-label small fw-bold text-muted d-flex justify-content-between align-items-center">
+                <span>Servizi prenotati</span>
+                <span class="text-muted" style="font-weight:400;">selezionabili &mdash; modifica se necessario</span>
+              </label>
+              <div id="ckServiziBox" class="border rounded p-2" style="max-height:200px; overflow-y:auto; background:#f8fafc;">
+                {% regroup servizi_disponibili by categoria as categorie_list %}
+                {% for cat in categorie_list %}
+                <div class="mb-2">
+                  <div class="text-muted small fw-bold mb-1">{{ cat.grouper|default:"Altro" }}</div>
+                  <div class="d-flex flex-wrap gap-1">
+                    {% for s in cat.list %}
+                    <label class="form-check ck-servizio-label" style="cursor:pointer;">
+                      <input type="checkbox" class="form-check-input ck-servizio-chk me-1" value="{{ s.id }}" data-titolo="{{ s.titolo }}">
+                      <span class="form-check-label small">{{ s.titolo }} <span class="text-muted">&euro;{{ s.prezzo }}</span></span>
+                    </label>
+                    {% endfor %}
+                  </div>
+                </div>
+                {% endfor %}
+              </div>
+              <input type="hidden" name="servizi_ids" id="ckServiziIds">
             </div>
           </div>
 
@@ -227,9 +275,14 @@
             Confermando, la prenotazione viene convertita in <strong>ordine</strong>. Il cliente e i servizi restano quelli gia prenotati.
           </div>
         </div>
-        <div class="modal-footer">
-          <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Annulla</button>
-          <button type="submit" class="btn btn-success"><i class="bi bi-check-circle"></i> Conferma check-in</button>
+        <div class="modal-footer justify-content-between">
+          <button type="button" class="btn btn-outline-danger" id="ckBtnElimina" onclick="ckEliminaPrenotazione()">
+            <i class="bi bi-trash"></i> Elimina prenotazione
+          </button>
+          <div>
+            <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Annulla</button>
+            <button type="submit" class="btn btn-success"><i class="bi bi-check-circle"></i> Conferma check-in</button>
+          </div>
         </div>
       </form>
     </div>
@@ -237,6 +290,8 @@
 </div>
 
 <script>
+let ckPrenotazionePk = null;
+
 function ckToggleOra() {
   const sel = document.getElementById('ckTipoConsegna');
   const wrap = document.getElementById('ckOraWrap');
@@ -250,6 +305,33 @@ function ckToggleOra() {
     input.value = '';
   }
 }
+function ckSyncServiziIds() {
+    const selected = Array.from(document.querySelectorAll('.ck-servizio-chk:checked')).map(c => c.value);
+    document.getElementById('ckServiziIds').value = selected.join(',');
+}
+
+function ckEliminaPrenotazione() {
+    if (!ckPrenotazionePk) return;
+    if (!confirm('Eliminare definitivamente questa prenotazione? L\'operazione non e reversibile.')) return;
+
+    const csrftoken = document.querySelector('#formCheckin [name=csrfmiddlewaretoken]').value;
+    fetch(`/prenotazioni/admin/${ckPrenotazionePk}/cancella/`, {
+        method: 'POST',
+        headers: { 'X-CSRFToken': csrftoken, 'Content-Type': 'application/json' },
+        credentials: 'same-origin',
+    })
+    .then(r => r.json())
+    .then(data => {
+        if (data.success) {
+            bootstrap.Modal.getInstance(document.getElementById('modalCheckin')).hide();
+            setTimeout(() => window.location.reload(), 400);
+        } else {
+            alert(data.error || 'Errore durante l\'eliminazione');
+        }
+    })
+    .catch(err => { console.error(err); alert('Errore di rete'); });
+}
+
 (function(){
   const modal = document.getElementById('modalCheckin');
   if (!modal) return;
@@ -257,12 +339,12 @@ function ckToggleOra() {
     const btn = event.relatedTarget;
     if (!btn) return;
     const pk = btn.getAttribute('data-pk');
+    ckPrenotazionePk = pk;
     const form = document.getElementById('formCheckin');
     form.action = `/prenotazioni/admin/${pk}/checkin/?next=ordini`;
     document.getElementById('ckCodice').textContent = btn.getAttribute('data-codice') || '—';
     document.getElementById('ckOra').textContent = btn.getAttribute('data-ora') || '—';
     document.getElementById('ckCliente').textContent = btn.getAttribute('data-cliente') || '—';
-    document.getElementById('ckServizi').textContent = btn.getAttribute('data-servizi') || '—';
     const stato = btn.getAttribute('data-stato') || '—';
     const statoEl = document.getElementById('ckStato');
     statoEl.innerHTML = stato === 'confermata'
@@ -273,6 +355,18 @@ function ckToggleOra() {
     document.getElementById('ckTipoConsegna').value = 'immediata';
     document.getElementById('ckOraConsegna').value = '';
     ckToggleOra();
+
+    // Precheck servizi correnti
+    const serviziIds = (btn.getAttribute('data-servizi-ids') || '').split(',').filter(Boolean);
+    document.querySelectorAll('.ck-servizio-chk').forEach(chk => {
+        chk.checked = serviziIds.includes(chk.value);
+    });
+    ckSyncServiziIds();
+  });
+
+  // Sync servizi_ids hidden quando l'utente cambia i checkbox
+  document.querySelectorAll('.ck-servizio-chk').forEach(chk => {
+    chk.addEventListener('change', ckSyncServiziIds);
   });
 })();
 </script>
