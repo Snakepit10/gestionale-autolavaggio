@@ -18,59 +18,136 @@
     </div>
 </div>
 
-<!-- Card Statistiche (solo per admin) -->
-{% if user.is_staff or user.is_superuser %}
-<div class="row mb-4">
-    <div class="col-md-3">
-        <div class="card border-primary">
-            <div class="card-body text-center">
-                <h6 class="card-subtitle mb-2 text-muted">
-                    <i class="bi bi-cash-stack"></i> Totale Ordini
-                </h6>
-                <h3 class="card-title text-primary mb-0">
-                    €{{ statistiche.totale_ordini|floatformat:2 }}
-                </h3>
-            </div>
-        </div>
+<!-- Prenotazioni del giorno (badge cliccabili per check-in) -->
+<div class="card mb-4 border-primary">
+    <div class="card-header bg-primary bg-opacity-10 d-flex justify-content-between align-items-center">
+        <h6 class="mb-0 text-primary fw-bold">
+            <i class="bi bi-calendar-check"></i> Prenotazioni di oggi
+            <span class="badge bg-primary ms-2">{{ prenotazioni_oggi|length }}</span>
+        </h6>
+        <small class="text-muted">Clicca una prenotazione per effettuare il check-in</small>
     </div>
-    <div class="col-md-3">
-        <div class="card border-success">
-            <div class="card-body text-center">
-                <h6 class="card-subtitle mb-2 text-muted">
-                    <i class="bi bi-wallet2"></i> Incassato Contanti
-                </h6>
-                <h3 class="card-title text-success mb-0">
-                    €{{ statistiche.totale_contanti|floatformat:2 }}
-                </h3>
-            </div>
+    <div class="card-body">
+        {% if prenotazioni_oggi %}
+        <div class="d-flex flex-wrap gap-2">
+            {% for p in prenotazioni_oggi %}
+            <button type="button"
+                    class="btn btn-outline-primary btn-sm d-flex align-items-center gap-2 prenotazione-badge"
+                    style="border-width:2px;"
+                    data-bs-toggle="modal"
+                    data-bs-target="#modalCheckin"
+                    data-pk="{{ p.pk }}"
+                    data-codice="{{ p.codice_prenotazione|default:'' }}"
+                    data-ora="{{ p.slot.ora_inizio|time:'H:i' }}"
+                    data-cliente="{{ p.cliente }}"
+                    data-tipo-auto="{{ p.tipo_auto|default:'' }}"
+                    data-servizi="{% for s in p.servizi.all %}{{ s.titolo }}{% if not forloop.last %}, {% endif %}{% endfor %}"
+                    data-durata="{{ p.durata_stimata_minuti|default:'' }}"
+                    data-stato="{{ p.stato }}">
+                <span class="badge bg-primary">{{ p.slot.ora_inizio|time:"H:i" }}</span>
+                <span class="fw-bold">{{ p.cliente }}</span>
+                {% if p.tipo_auto %}<small class="text-muted">&middot; {{ p.tipo_auto }}</small>{% endif %}
+                {% if p.stato == 'in_attesa' %}<span class="badge bg-warning text-dark">in attesa</span>{% endif %}
+                <i class="bi bi-arrow-right-circle"></i>
+            </button>
+            {% endfor %}
         </div>
-    </div>
-    <div class="col-md-3">
-        <div class="card border-info">
-            <div class="card-body text-center">
-                <h6 class="card-subtitle mb-2 text-muted">
-                    <i class="bi bi-credit-card"></i> Incassato Carte
-                </h6>
-                <h3 class="card-title text-info mb-0">
-                    €{{ statistiche.totale_carte|floatformat:2 }}
-                </h3>
-            </div>
-        </div>
-    </div>
-    <div class="col-md-3">
-        <div class="card border-danger">
-            <div class="card-body text-center">
-                <h6 class="card-subtitle mb-2 text-muted">
-                    <i class="bi bi-exclamation-triangle"></i> Non Incassato
-                </h6>
-                <h3 class="card-title text-danger mb-0">
-                    €{{ statistiche.totale_non_incassato|floatformat:2 }}
-                </h3>
-            </div>
-        </div>
+        {% else %}
+        <p class="text-muted mb-0 text-center py-2"><i class="bi bi-info-circle"></i> Nessuna prenotazione da gestire per oggi</p>
+        {% endif %}
     </div>
 </div>
-{% endif %}
+
+<!-- Modal Check-in Prenotazione -->
+<div class="modal fade" id="modalCheckin" tabindex="-1" aria-hidden="true">
+  <div class="modal-dialog modal-lg">
+    <div class="modal-content">
+      <form id="formCheckin" method="post" action="">
+        {% csrf_token %}
+        <input type="hidden" name="next" value="ordini">
+        <div class="modal-header bg-primary text-white">
+          <h5 class="modal-title"><i class="bi bi-check2-square"></i> Check-in prenotazione</h5>
+          <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+        </div>
+        <div class="modal-body">
+          <div class="row g-3">
+            <div class="col-md-6">
+              <label class="form-label small fw-bold text-muted">Codice</label>
+              <div id="ckCodice" class="fs-6">&mdash;</div>
+            </div>
+            <div class="col-md-6">
+              <label class="form-label small fw-bold text-muted">Orario</label>
+              <div id="ckOra" class="fs-6">&mdash;</div>
+            </div>
+            <div class="col-md-6">
+              <label class="form-label small fw-bold text-muted">Cliente</label>
+              <div id="ckCliente" class="fs-6">&mdash;</div>
+            </div>
+            <div class="col-md-6">
+              <label class="form-label small fw-bold text-muted">Stato</label>
+              <div id="ckStato" class="fs-6">&mdash;</div>
+            </div>
+            <div class="col-12">
+              <label class="form-label small fw-bold text-muted">Servizi prenotati</label>
+              <div id="ckServizi" class="fs-6 text-secondary">&mdash;</div>
+            </div>
+          </div>
+
+          <hr>
+
+          <div class="row g-3">
+            <div class="col-md-6">
+              <label class="form-label">Tipo auto</label>
+              <input type="text" name="tipo_auto" id="ckTipoAuto" class="form-control" placeholder="es. Utilitaria, SUV, Furgone">
+            </div>
+            <div class="col-md-6">
+              <label class="form-label">Ora consegna richiesta</label>
+              <input type="time" name="ora_consegna_richiesta" id="ckOraConsegna" class="form-control">
+            </div>
+            <div class="col-12">
+              <label class="form-label">Note interne (opzionale)</label>
+              <textarea name="note_interne" class="form-control" rows="2" placeholder="Note aggiuntive da salvare sull'ordine"></textarea>
+            </div>
+          </div>
+
+          <div class="alert alert-info small mt-3 mb-0">
+            <i class="bi bi-info-circle"></i>
+            Confermando, la prenotazione viene convertita in <strong>ordine</strong>. Il cliente e i servizi restano quelli gia prenotati.
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Annulla</button>
+          <button type="submit" class="btn btn-success"><i class="bi bi-check-circle"></i> Conferma check-in</button>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>
+
+<script>
+(function(){
+  const modal = document.getElementById('modalCheckin');
+  if (!modal) return;
+  modal.addEventListener('show.bs.modal', function(event){
+    const btn = event.relatedTarget;
+    if (!btn) return;
+    const pk = btn.getAttribute('data-pk');
+    const form = document.getElementById('formCheckin');
+    form.action = `/prenotazioni/admin/${pk}/checkin/?next=ordini`;
+    document.getElementById('ckCodice').textContent = btn.getAttribute('data-codice') || '—';
+    document.getElementById('ckOra').textContent = btn.getAttribute('data-ora') || '—';
+    document.getElementById('ckCliente').textContent = btn.getAttribute('data-cliente') || '—';
+    document.getElementById('ckServizi').textContent = btn.getAttribute('data-servizi') || '—';
+    const stato = btn.getAttribute('data-stato') || '—';
+    const statoEl = document.getElementById('ckStato');
+    statoEl.innerHTML = stato === 'confermata'
+      ? '<span class="badge bg-success">Confermata</span>'
+      : (stato === 'in_attesa' ? '<span class="badge bg-warning text-dark">In attesa</span>' : stato);
+    document.getElementById('ckTipoAuto').value = btn.getAttribute('data-tipo-auto') || '';
+    document.getElementById('ckOraConsegna').value = btn.getAttribute('data-ora') || '';
+  });
+})();
+</script>
 
 <!-- Filtri -->
 <div class="card mb-4">

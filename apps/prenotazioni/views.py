@@ -1269,6 +1269,9 @@ def checkin_prenotazione(request, pk):
             messages.error(request, f'Errore nel check-in: {str(e)}')
     
     # Determina dove reindirizzare
+    next_target = request.POST.get('next') or request.GET.get('next')
+    if next_target == 'ordini':
+        return redirect('ordini:ordini-list')
     if 'from_checkin' in request.GET:
         return redirect('prenotazioni:checkin-prenotazioni')
     else:
