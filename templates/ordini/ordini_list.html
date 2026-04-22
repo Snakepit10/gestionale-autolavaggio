@@ -18,47 +18,32 @@
     </div>
 </div>
 
-<!-- Prenotazioni upcoming (badge cliccabili per check-in) -->
-<div class="card mb-4 border-primary">
-    <div class="card-header bg-primary bg-opacity-10 d-flex justify-content-between align-items-center">
-        <h6 class="mb-0 text-primary fw-bold">
-            <i class="bi bi-calendar-check"></i> Prenotazioni
-            <span class="badge bg-primary ms-2">{{ prenotazioni_upcoming|length }}</span>
-        </h6>
-        <small class="text-muted">Clicca una prenotazione per effettuare il check-in</small>
-    </div>
-    <div class="card-body">
-        {% if prenotazioni_upcoming %}
-        <div class="d-flex flex-wrap gap-2">
-            {% for p in prenotazioni_upcoming %}
-            <button type="button"
-                    class="btn btn-outline-primary btn-sm d-flex align-items-center gap-2 prenotazione-badge"
-                    style="border-width:2px;"
-                    data-bs-toggle="modal"
-                    data-bs-target="#modalCheckin"
-                    data-pk="{{ p.pk }}"
-                    data-codice="{{ p.codice_prenotazione|default:'' }}"
-                    data-ora="{{ p.slot.ora_inizio|time:'H:i' }}"
-                    data-cliente="{{ p.cliente }}"
-                    data-tipo-auto="{{ p.tipo_auto|default:'' }}"
-                    data-servizi="{% for s in p.servizi.all %}{{ s.titolo }}{% if not forloop.last %}, {% endif %}{% endfor %}"
-                    data-durata="{{ p.durata_stimata_minuti|default:'' }}"
-                    data-stato="{{ p.stato }}">
-                <span class="badge {% if p.slot.data == today %}bg-primary{% else %}bg-secondary{% endif %}">
-                    {% if p.slot.data != today %}{{ p.slot.data|date:"d/m" }} {% endif %}{{ p.slot.ora_inizio|time:"H:i" }}
-                </span>
-                <span class="fw-bold">{{ p.cliente }}</span>
-                {% if p.tipo_auto %}<small class="text-muted">&middot; {{ p.tipo_auto }}</small>{% endif %}
-                {% if p.stato == 'in_attesa' %}<span class="badge bg-warning text-dark">in attesa</span>{% endif %}
-                <i class="bi bi-arrow-right-circle"></i>
-            </button>
-            {% endfor %}
-        </div>
-        {% else %}
-        <p class="text-muted mb-0 text-center py-2"><i class="bi bi-info-circle"></i> Nessuna prenotazione da gestire</p>
-        {% endif %}
-    </div>
+<!-- Prenotazioni di oggi (badge cliccabili per check-in) -->
+{% if prenotazioni_upcoming %}
+<div class="d-flex flex-wrap gap-2 mb-4">
+    {% for p in prenotazioni_upcoming %}
+    <button type="button"
+            class="btn btn-outline-primary btn-sm d-flex align-items-center gap-2 prenotazione-badge"
+            style="border-width:2px;"
+            data-bs-toggle="modal"
+            data-bs-target="#modalCheckin"
+            data-pk="{{ p.pk }}"
+            data-codice="{{ p.codice_prenotazione|default:'' }}"
+            data-ora="{{ p.slot.ora_inizio|time:'H:i' }}"
+            data-cliente="{{ p.cliente }}"
+            data-tipo-auto="{{ p.tipo_auto|default:'' }}"
+            data-servizi="{% for s in p.servizi.all %}{{ s.titolo }}{% if not forloop.last %}, {% endif %}{% endfor %}"
+            data-durata="{{ p.durata_stimata_minuti|default:'' }}"
+            data-stato="{{ p.stato }}">
+        <span class="badge bg-primary">{{ p.slot.ora_inizio|time:"H:i" }}</span>
+        <span class="fw-bold">{{ p.cliente }}</span>
+        {% if p.tipo_auto %}<small class="text-muted">&middot; {{ p.tipo_auto }}</small>{% endif %}
+        {% if p.stato == 'in_attesa' %}<span class="badge bg-warning text-dark">in attesa</span>{% endif %}
+        <i class="bi bi-arrow-right-circle"></i>
+    </button>
+    {% endfor %}
 </div>
+{% endif %}
 
 <!-- Modal Check-in Prenotazione -->
 <div class="modal fade" id="modalCheckin" tabindex="-1" aria-hidden="true">
