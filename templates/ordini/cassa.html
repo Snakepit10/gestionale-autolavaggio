@@ -26,10 +26,10 @@
 }
 
 .carrello-items {
-    flex: 1;
+    flex: 0 1 auto;
     overflow-y: auto;
-    min-height: 300px;
-    max-height: none;
+    min-height: 80px;
+    max-height: 50vh;
 }
 
 .item-card {
@@ -428,8 +428,8 @@
                             </button>
                         </div>
                         <div class="col-6">
-                            <button class="btn btn-info btn-sm w-100" onclick="calcolaTempoAttesa()">
-                                <i class="bi bi-clock"></i> Tempo
+                            <button class="btn btn-info btn-sm w-100" onclick="aprePrenotazione()">
+                                <i class="bi bi-calendar-plus"></i> Prenota
                             </button>
                         </div>
                     </div>
@@ -672,6 +672,47 @@
             <div class="modal-footer">
                 <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Annulla</button>
                 <button type="button" class="btn btn-primary" onclick="selezionaCliente()">Conferma</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Modal Prenotazione -->
+<div class="modal fade" id="modalPrenota" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header bg-info text-white">
+                <h5 class="modal-title"><i class="bi bi-calendar-plus"></i> Crea prenotazione</h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <div class="alert alert-light small mb-3" id="prenota-summary">
+                    <div><strong>Cliente:</strong> <span id="prenota-cliente" class="text-muted">&mdash;</span></div>
+                    <div><strong>Servizi:</strong> <span id="prenota-servizi" class="text-muted">&mdash;</span></div>
+                    <div><strong>Tipo auto:</strong> <span id="prenota-auto" class="text-muted">&mdash;</span></div>
+                    <div><strong>Totale stimato:</strong> <span id="prenota-totale" class="text-muted">&mdash;</span></div>
+                </div>
+                <div class="row g-2">
+                    <div class="col-md-6">
+                        <label class="form-label">Data prenotazione *</label>
+                        <input type="date" class="form-control" id="prenota-data" required>
+                    </div>
+                    <div class="col-md-6">
+                        <label class="form-label">Ora *</label>
+                        <input type="time" class="form-control" id="prenota-ora" required>
+                    </div>
+                </div>
+                <div class="alert alert-info small mt-3 mb-0">
+                    <i class="bi bi-info-circle"></i>
+                    Verranno utilizzati cliente, servizi, tipo auto e note gia inseriti nel carrello.
+                    Dopo la conferma il carrello verra svuotato.
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Annulla</button>
+                <button type="button" class="btn btn-info text-white" onclick="confermaPrenotazione()">
+                    <i class="bi bi-check-circle"></i> Conferma prenotazione
+                </button>
             </div>
         </div>
     </div>
@@ -1114,6 +1155,91 @@ function calcolaTempoAttesa() {
         }
     })
     .catch(error => console.error('Errore:', error));
+}
+
+// Prenotazione dalla cassa
+function aprePrenotazione() {
+    if (Object.keys(carrello).length === 0) {
+        AutolavaggioJS.showToast('Aggiungi servizi al carrello prima di prenotare', 'warning');
+        return;
+    }
+    if (!clienteSelezionato) {
+        AutolavaggioJS.showToast('Seleziona un cliente prima di prenotare', 'warning');
+        mostraModalCliente();
+        return;
+    }
+
+    // Popola summary
+    const clienteNome = document.getElementById('cliente-nome')?.textContent || clienteSelezionato.nome || '—';
+    document.getElementById('prenota-cliente').textContent = clienteNome;
+
+    const serviziNomi = Object.values(carrello)
+        .filter(i => i.tipo === 'servizio')
+        .map(i => `${i.titolo} x${i.quantita}`);
+    document.getElementById('prenota-servizi').textContent = serviziNomi.length ? serviziNomi.join(', ') : 'Nessun servizio';
+
+    const tipoAuto = document.getElementById('tipo-auto').value.trim();
+    document.getElementById('prenota-auto').textContent = tipoAuto || '—';
+
+    const totaleEl = document.getElementById('totale-finale');
+    document.getElementById('prenota-totale').textContent = totaleEl ? totaleEl.textContent : '€0.00';
+
+    // Default: domani alle 09:00
+    const dataInput = document.getElementById('prenota-data');
+    const oraInput = document.getElementById('prenota-ora');
+    if (!dataInput.value) {
+        const d = new Date();
+        d.setDate(d.getDate() + 1);
+        dataInput.value = d.toISOString().split('T')[0];
+    }
+    if (!oraInput.value) {
+        oraInput.value = '09:00';
+    }
+    dataInput.min = new Date().toISOString().split('T')[0];
+
+    const modal = new bootstrap.Modal(document.getElementById('modalPrenota'));
+    modal.show();
+}
+
+function confermaPrenotazione() {
+    const dataVal = document.getElementById('prenota-data').value;
+    const oraVal = document.getElementById('prenota-ora').value;
+    if (!dataVal || !oraVal) {
+        AutolavaggioJS.showToast('Inserisci data e ora della prenotazione', 'warning');
+        return;
+    }
+
+    const payload = {
+        data: dataVal,
+        ora: oraVal,
+        cliente_id: clienteSelezionato ? clienteSelezionato.id : null,
+        tipo_auto: document.getElementById('tipo-auto').value.trim(),
+        nota: document.getElementById('note-ordine').value.trim(),
+    };
+
+    AutolavaggioJS.fetchWithCSRF('/ordini/api/crea-prenotazione/', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload),
+    })
+    .then(r => r.json())
+    .then(data => {
+        if (data.success) {
+            AutolavaggioJS.showToast(`Prenotazione creata: ${data.codice_prenotazione}`, 'success');
+            bootstrap.Modal.getInstance(document.getElementById('modalPrenota')).hide();
+            // Svuota carrello lato client
+            carrello = {};
+            clienteSelezionato = null;
+            aggiornaCarrelloView && aggiornaCarrelloView();
+            setTimeout(() => window.location.reload(), 800);
+        } else {
+            AutolavaggioJS.showToast(data.error || 'Errore nella creazione della prenotazione', 'danger');
+        }
+    })
+    .catch(err => {
+        console.error(err);
+        AutolavaggioJS.showToast('Errore di rete', 'danger');
+    });
 }
 
 // Gestione cliente

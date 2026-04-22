@@ -503,6 +503,104 @@ def completa_ordine(request):
         return JsonResponse({'error': str(e)}, status=500)
 
 
+@login_required
+@transaction.atomic
+def crea_prenotazione_da_carrello(request):
+    """Crea una Prenotazione partendo dal carrello della cassa.
+
+    Usa cliente/tipo_auto/note gia inseriti nella cassa + data/ora
+    ricevute dal modale Prenota. Svuota il carrello al successo.
+    """
+    if request.method != 'POST':
+        return JsonResponse({'error': 'Metodo non permesso'}, status=405)
+
+    try:
+        from apps.prenotazioni.models import Prenotazione, SlotPrenotazione
+        from datetime import datetime, timedelta
+
+        data = json.loads(request.body)
+
+        # Valida carrello
+        carrello = request.session.get('carrello', {})
+        if not carrello:
+            return JsonResponse({'error': 'Carrello vuoto'}, status=400)
+
+        # Cliente obbligatorio per una prenotazione
+        cliente_id = data.get('cliente_id')
+        if not cliente_id:
+            return JsonResponse({'error': 'Seleziona un cliente prima di prenotare'}, status=400)
+        cliente = get_object_or_404(Cliente, id=cliente_id)
+
+        # Data e ora obbligatorie
+        data_str = data.get('data')
+        ora_str = data.get('ora')
+        if not data_str or not ora_str:
+            return JsonResponse({'error': 'Data e ora sono obbligatorie'}, status=400)
+
+        try:
+            data_prenotazione = datetime.strptime(data_str, '%Y-%m-%d').date()
+            ora_inizio = datetime.strptime(ora_str, '%H:%M').time()
+        except ValueError:
+            return JsonResponse({'error': 'Formato data/ora non valido'}, status=400)
+
+        # Servizi dal carrello
+        servizi_ids = [
+            int(item['id']) for item in carrello.values()
+            if item.get('tipo') == 'servizio'
+        ]
+        if not servizi_ids:
+            return JsonResponse({'error': 'Il carrello non contiene servizi prenotabili'}, status=400)
+
+        servizi_qs = ServizioProdotto.objects.filter(id__in=servizi_ids)
+        durata_totale = sum(s.durata_minuti for s in servizi_qs) or 30
+
+        # Slot: get_or_create per la coppia data/ora
+        ora_fine_dt = datetime.combine(data_prenotazione, ora_inizio) + timedelta(minutes=durata_totale)
+        slot, _created = SlotPrenotazione.objects.get_or_create(
+            data=data_prenotazione,
+            ora_inizio=ora_inizio,
+            defaults={
+                'ora_fine': ora_fine_dt.time(),
+                'max_prenotazioni': 99,  # slot manuale da cassa: nessun limite rigido
+                'prenotazioni_attuali': 0,
+                'disponibile': True,
+            },
+        )
+
+        # Crea prenotazione
+        nota = (data.get('nota') or '').strip()
+        tipo_auto = (data.get('tipo_auto') or '').strip()
+        prenotazione = Prenotazione.objects.create(
+            cliente=cliente,
+            slot=slot,
+            durata_stimata_minuti=durata_totale,
+            stato='confermata',
+            tipo_auto=tipo_auto,
+            nota_interna=nota,
+        )
+        prenotazione.servizi.set(servizi_qs)
+
+        # Svuota carrello
+        if 'carrello' in request.session:
+            del request.session['carrello']
+        if 'sconto_applicato' in request.session:
+            del request.session['sconto_applicato']
+        request.session.modified = True
+
+        return JsonResponse({
+            'success': True,
+            'prenotazione_id': prenotazione.id,
+            'codice_prenotazione': prenotazione.codice_prenotazione,
+            'data': data_prenotazione.strftime('%d/%m/%Y'),
+            'ora': ora_inizio.strftime('%H:%M'),
+        })
+
+    except Exception as e:
+        import traceback
+        traceback.print_exc()
+        return JsonResponse({'error': str(e)}, status=500)
+
+
 class OrdiniListView(LoginRequiredMixin, ListView):
     model = Ordine
     template_name = 'ordini/ordini_list.html'

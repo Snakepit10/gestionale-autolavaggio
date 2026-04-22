@@ -15,6 +15,7 @@ urlpatterns = [
     path('api/applica-sconto/', views.applica_sconto, name='applica-sconto'),
     path('api/calcola-tempo-attesa/', views.calcola_tempo_attesa, name='calcola-tempo-attesa'),
     path('api/completa-ordine/', views.completa_ordine, name='completa-ordine'),
+    path('api/crea-prenotazione/', views.crea_prenotazione_da_carrello, name='crea-prenotazione-carrello'),
     
     # Gestione Ordini
     path('', views.OrdiniListView.as_view(), name='ordini-list'),
