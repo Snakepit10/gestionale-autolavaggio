@@ -35,6 +35,8 @@ urlpatterns = [
 
     # Report giornata
     path('report-giornata/', views.report_giornata, name='report_giornata'),
+    # Report periodo (aggregato multi-giorno)
+    path('report-periodo/', views.report_periodo, name='report_periodo'),
 
     # Quadratura giornaliera (scassettamento unificato)
     path('quadratura/', views.quadratura_form, name='quadratura_form'),

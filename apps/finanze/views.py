@@ -751,6 +751,11 @@ def chiusura_automatica_create(request, cassa_id):
                     chiusura.wash_cycles = int(wc)
             chiusura.save()
             messages.success(request, f"Chiusura {cassa} del {data.strftime('%d/%m/%Y')} salvata.")
+            # Redirect preferibilmente al report giornata (flusso integrato)
+            next_url = request.POST.get('next') or request.GET.get('next')
+            if next_url == 'report':
+                from django.urls import reverse
+                return redirect(f"{reverse('finanze:report_giornata')}?data={data.strftime('%Y-%m-%d')}")
             return redirect('finanze:chiusura_automatica_detail', pk=chiusura.pk)
         except (ValueError, TypeError) as e:
             messages.error(request, f"Dati non validi: {e}")
@@ -795,6 +800,10 @@ def chiusura_automatica_edit(request, pk):
                 chiusura.wash_cycles = int(wc) if wc else None
             chiusura.save()
             messages.success(request, "Chiusura aggiornata.")
+            next_url = request.POST.get('next') or request.GET.get('next')
+            if next_url == 'report':
+                from django.urls import reverse
+                return redirect(f"{reverse('finanze:report_giornata')}?data={chiusura.data.strftime('%Y-%m-%d')}")
             return redirect('finanze:chiusura_automatica_detail', pk=pk)
         except (ValueError, TypeError) as e:
             messages.error(request, f"Dati non validi: {e}")
@@ -836,6 +845,14 @@ def report_giornata(request):
 
     # Chiusure automatiche (include registratore servito)
     chiusure_auto = ChiusuraCassaAutomatica.objects.filter(data=data).select_related('cassa').order_by('cassa__ordine')
+
+    # Tutte le casse automatiche attive + relativa chiusura del giorno (per form inline)
+    casse_attive = Cassa.objects.filter(tipo='automatica', attiva=True).order_by('ordine')
+    _chiusure_by_cassa = {c.cassa_id: c for c in chiusure_auto}
+    casse_form_data = [
+        {'cassa': ca, 'chiusura': _chiusure_by_cassa.get(ca.pk)}
+        for ca in casse_attive
+    ]
 
     # Aggregati casse automatiche (solo NON registratore, ovvero self service)
     agg = {
@@ -1097,6 +1114,7 @@ def report_giornata(request):
         'oggi': timezone.now().date(),
         'cassa_servito': cassa_servito,
         'chiusure_auto': chiusure_auto,
+        'casse_form_data': casse_form_data,
         'agg': agg,
         'totale_giornata': totale_giornata,
         'totale_ordinato': totale_ordinato,
@@ -1166,3 +1184,340 @@ def quadratura_form(request):
         'oggi': timezone.now().date(),
         'quadratura': quadratura,
     })
+
+
+# ---------------------------------------------------------------------------
+# Report periodo (aggregato multi-giorno)
+# ---------------------------------------------------------------------------
+
+def _compute_periodo(preset, data_inizio_str, data_fine_str, oggi):
+    """Calcola (data_inizio, data_fine, preset_attivo) in base ai parametri."""
+    if preset == 'oggi':
+        return oggi, oggi, 'oggi'
+    if preset == 'ieri':
+        ieri = oggi - timedelta(days=1)
+        return ieri, ieri, 'ieri'
+    if preset == '7gg':
+        return oggi - timedelta(days=6), oggi, '7gg'
+    if preset == '30gg':
+        return oggi - timedelta(days=29), oggi, '30gg'
+    if preset == 'mese_corrente':
+        return oggi.replace(day=1), oggi, 'mese_corrente'
+    if preset == 'mese_scorso':
+        primo_mese = oggi.replace(day=1)
+        ultimo_scorso = primo_mese - timedelta(days=1)
+        primo_scorso = ultimo_scorso.replace(day=1)
+        return primo_scorso, ultimo_scorso, 'mese_scorso'
+    if preset == 'anno_corrente':
+        return oggi.replace(month=1, day=1), oggi, 'anno_corrente'
+    # personalizzato o default
+    if data_inizio_str and data_fine_str:
+        try:
+            di = datetime.strptime(data_inizio_str, '%Y-%m-%d').date()
+            df = datetime.strptime(data_fine_str, '%Y-%m-%d').date()
+            if df < di:
+                di, df = df, di
+            return di, df, 'personalizzato'
+        except ValueError:
+            pass
+    # Default: ultimi 7 giorni
+    return oggi - timedelta(days=6), oggi, '7gg'
+
+
+@login_required
+@user_passes_test(is_staff_user)
+def report_periodo(request):
+    """Report aggregato su un range di date con KPI business-oriented."""
+    oggi = timezone.now().date()
+    preset = request.GET.get('preset')
+    di_str = request.GET.get('data_inizio')
+    df_str = request.GET.get('data_fine')
+    data_inizio, data_fine, preset_attivo = _compute_periodo(preset, di_str, df_str, oggi)
+
+    giorni_periodo = (data_fine - data_inizio).days + 1
+
+    # ==================== AGGREGATI ORDINI ====================
+    ordini_qs = Ordine.objects.filter(
+        data_ora__date__gte=data_inizio,
+        data_ora__date__lte=data_fine,
+    ).exclude(stato='annullato')
+    num_ordini = ordini_qs.count()
+    totale_servito_ordinato = ordini_qs.aggregate(s=Sum('totale_finale'))['s'] or Decimal('0.00')
+
+    # Non pagati
+    non_pagati_qs = ordini_qs.filter(stato_pagamento__in=['non_pagato', 'parziale', 'differito'])
+    num_non_pagati = non_pagati_qs.count()
+    totale_non_pagato = Decimal('0.00')
+    for o in non_pagati_qs:
+        totale_non_pagato += o.saldo_dovuto
+
+    # ==================== AGGREGATI PAGAMENTI ====================
+    pagamenti_qs = Pagamento.objects.filter(
+        data_pagamento__date__gte=data_inizio,
+        data_pagamento__date__lte=data_fine,
+    )
+    totale_servito_pagato = pagamenti_qs.aggregate(s=Sum('importo'))['s'] or Decimal('0.00')
+    num_transazioni = pagamenti_qs.count()
+
+    # Metodi pagamento
+    metodi_totali = {}
+    for p in pagamenti_qs.values('metodo').annotate(tot=Sum('importo')):
+        metodi_totali[p['metodo'] or 'altro'] = p['tot'] or Decimal('0.00')
+
+    metodi_labels = {
+        'contanti': 'Contanti', 'carta': 'Carta', 'bancomat': 'Bancomat',
+        'bonifico': 'Bonifico', 'assegno': 'Assegno', 'abbonamento': 'Abbonamento',
+        'altro': 'Altro',
+    }
+    metodi_chart = sorted(
+        [(metodi_labels.get(k, k.title()), float(v)) for k, v in metodi_totali.items()],
+        key=lambda x: -x[1]
+    )
+
+    # ==================== AGGREGATI CHIUSURE AUTOMATICHE ====================
+    chiusure_qs = ChiusuraCassaAutomatica.objects.filter(
+        data__gte=data_inizio, data__lte=data_fine,
+    ).select_related('cassa')
+
+    totale_portali = Decimal('0.00')
+    totale_cambia_gettoni = Decimal('0.00')
+    totale_registratore = Decimal('0.00')
+    totale_wash_cycles = 0
+    vendita_self_service = Decimal('0.00')
+
+    for c in chiusure_qs:
+        if c.cassa.modalita_registratore:
+            totale_registratore += c.incasso_totale
+            continue
+        vendita_self_service += c.vendita_totale
+        if c.cassa.tracking_washcycles:
+            totale_portali += c.vendita_totale
+            if c.wash_cycles:
+                totale_wash_cycles += c.wash_cycles
+        else:
+            totale_cambia_gettoni += c.vendita_totale
+
+    totale_self_service = totale_portali + totale_cambia_gettoni
+
+    # ==================== TOTALI E KPI ====================
+    fatturato_totale = totale_servito_ordinato + totale_self_service
+    fatturato_medio_giornaliero = fatturato_totale / giorni_periodo if giorni_periodo > 0 else Decimal('0.00')
+    scontrino_medio = (totale_servito_pagato + totale_self_service) / num_transazioni if num_transazioni > 0 else Decimal('0.00')
+
+    # Corrispettivi fiscali
+    totale_corrispettivi = totale_registratore + vendita_self_service
+    IVA_RATE = Decimal('0.22')
+    if totale_corrispettivi > 0:
+        imponibile_corrispettivi = (totale_corrispettivi / (Decimal('1') + IVA_RATE)).quantize(Decimal('0.01'))
+        iva_corrispettivi = totale_corrispettivi - imponibile_corrispettivi
+    else:
+        imponibile_corrispettivi = Decimal('0.00')
+        iva_corrispettivi = Decimal('0.00')
+
+    # % incasso
+    totale_incassato = totale_servito_pagato + totale_self_service
+    pct_incasso = float(totale_incassato / fatturato_totale * 100) if fatturato_totale > 0 else 100.0
+
+    # ==================== CONFRONTO PERIODO PRECEDENTE ====================
+    data_inizio_prev = data_inizio - timedelta(days=giorni_periodo)
+    data_fine_prev = data_inizio - timedelta(days=1)
+    fatturato_prev_ordini = Ordine.objects.filter(
+        data_ora__date__gte=data_inizio_prev,
+        data_ora__date__lte=data_fine_prev,
+    ).exclude(stato='annullato').aggregate(s=Sum('totale_finale'))['s'] or Decimal('0.00')
+    vendita_prev_auto = Decimal('0.00')
+    for c in ChiusuraCassaAutomatica.objects.filter(
+        data__gte=data_inizio_prev, data__lte=data_fine_prev,
+    ).select_related('cassa'):
+        if not c.cassa.modalita_registratore:
+            vendita_prev_auto += c.vendita_totale
+    fatturato_prev = fatturato_prev_ordini + vendita_prev_auto
+    variazione_pct = float((fatturato_totale - fatturato_prev) / fatturato_prev * 100) if fatturato_prev > 0 else None
+
+    # ==================== QUADRATURA AGGREGATA ====================
+    quadrature_qs = QuadraturaGiornaliera.objects.filter(
+        data__gte=data_inizio, data__lte=data_fine,
+    )
+    giorni_ok = 0
+    giorni_diff = 0
+    giorni_rilevati = 0
+    differenza_cumulativa = Decimal('0.00')
+    giorno_peggiore = None
+    peggiore_abs = Decimal('0.00')
+
+    # Indice pre-calcolato: teorico per giorno
+    for q in quadrature_qs:
+        # Ricalcola teorico per quel giorno
+        day_ordini = Ordine.objects.filter(
+            data_ora__date=q.data
+        ).exclude(stato='annullato').aggregate(s=Sum('totale_finale'))['s'] or Decimal('0.00')
+        day_pag = Pagamento.objects.filter(
+            data_pagamento__date=q.data
+        ).aggregate(s=Sum('importo'))['s'] or Decimal('0.00')
+        day_self = Decimal('0.00')
+        for c in ChiusuraCassaAutomatica.objects.filter(data=q.data).select_related('cassa'):
+            if not c.cassa.modalita_registratore:
+                day_self += c.vendita_totale
+        day_teorico = day_self + day_pag
+        day_diff = q.totale_reale - day_teorico
+        differenza_cumulativa += day_diff
+        giorni_rilevati += 1
+        if abs(day_diff) < Decimal('0.50'):
+            giorni_ok += 1
+        else:
+            giorni_diff += 1
+            if abs(day_diff) > peggiore_abs:
+                peggiore_abs = abs(day_diff)
+                giorno_peggiore = {'data': q.data, 'differenza': day_diff}
+    giorni_non_rilevati = giorni_periodo - giorni_rilevati
+
+    # ==================== TOP SERVIZI E CATEGORIE ====================
+    items_qs = ItemOrdine.objects.filter(
+        ordine__data_ora__date__gte=data_inizio,
+        ordine__data_ora__date__lte=data_fine,
+        ordine__stato_pagamento='pagato',
+    ).select_related('servizio_prodotto__categoria')
+
+    servizi_stats = {}
+    categorie_stats = {}
+    for item in items_qs:
+        sp = item.servizio_prodotto
+        servizi_stats.setdefault(sp.titolo, {
+            'nome': sp.titolo,
+            'categoria': sp.categoria.nome if sp.categoria else '—',
+            'quantita': 0, 'fatturato': Decimal('0.00'),
+        })
+        servizi_stats[sp.titolo]['quantita'] += item.quantita
+        servizi_stats[sp.titolo]['fatturato'] += item.subtotale
+        if sp.categoria:
+            categorie_stats.setdefault(sp.categoria.nome, {
+                'nome': sp.categoria.nome, 'quantita': 0, 'fatturato': Decimal('0.00'),
+            })
+            categorie_stats[sp.categoria.nome]['quantita'] += item.quantita
+            categorie_stats[sp.categoria.nome]['fatturato'] += item.subtotale
+
+    top_servizi = sorted(servizi_stats.values(), key=lambda x: -x['fatturato'])[:10]
+    top_categorie = sorted(categorie_stats.values(), key=lambda x: -x['fatturato'])
+    categorie_chart = [
+        {'nome': c['nome'], 'fatturato': float(c['fatturato']), 'quantita': c['quantita']}
+        for c in top_categorie
+    ]
+
+    # ==================== TREND GIORNALIERO ====================
+    trend_labels = []
+    trend_servito = []
+    trend_portali = []
+    trend_cambia = []
+    trend_washcycles = []
+
+    # Pre-indicizza per data
+    ord_by_day = {}
+    for row in ordini_qs.values('data_ora__date').annotate(s=Sum('totale_finale')):
+        ord_by_day[row['data_ora__date']] = row['s'] or Decimal('0.00')
+
+    auto_by_day = {}  # {date: {'portali': X, 'cambia': Y, 'washcycles': Z}}
+    for c in chiusure_qs:
+        if c.cassa.modalita_registratore:
+            continue
+        d = c.data
+        auto_by_day.setdefault(d, {'portali': Decimal('0.00'), 'cambia': Decimal('0.00'), 'washcycles': 0})
+        if c.cassa.tracking_washcycles:
+            auto_by_day[d]['portali'] += c.vendita_totale
+            if c.wash_cycles:
+                auto_by_day[d]['washcycles'] += c.wash_cycles
+        else:
+            auto_by_day[d]['cambia'] += c.vendita_totale
+
+    d = data_inizio
+    while d <= data_fine:
+        trend_labels.append(d.strftime('%d/%m'))
+        trend_servito.append(float(ord_by_day.get(d, Decimal('0.00'))))
+        a = auto_by_day.get(d, {'portali': Decimal('0.00'), 'cambia': Decimal('0.00'), 'washcycles': 0})
+        trend_portali.append(float(a['portali']))
+        trend_cambia.append(float(a['cambia']))
+        trend_washcycles.append(a['washcycles'])
+        d += timedelta(days=1)
+
+    # ==================== FATTURATO PER GIORNO SETTIMANA ====================
+    # 0=lun ... 6=dom
+    giorni_settimana_labels = ['Lun', 'Mar', 'Mer', 'Gio', 'Ven', 'Sab', 'Dom']
+    giorni_settimana_tot = [0.0] * 7
+    for i, label in enumerate(trend_labels):
+        d_date = data_inizio + timedelta(days=i)
+        giorni_settimana_tot[d_date.weekday()] += trend_servito[i] + trend_portali[i] + trend_cambia[i]
+
+    # Giorno di picco
+    max_idx = trend_servito and max(range(len(trend_servito)),
+        key=lambda i: trend_servito[i] + trend_portali[i] + trend_cambia[i])
+    giorno_picco = None
+    if trend_servito:
+        pk_date = data_inizio + timedelta(days=max_idx)
+        pk_tot = trend_servito[max_idx] + trend_portali[max_idx] + trend_cambia[max_idx]
+        if pk_tot > 0:
+            giorno_picco = {'data': pk_date, 'totale': pk_tot}
+
+    # ==================== DISTRIBUZIONE ORARIA MEDIA ====================
+    ore_buckets = [0.0] * 24
+    for p in pagamenti_qs:
+        ore_buckets[p.data_pagamento.hour] += float(p.importo)
+    ora_picco = None
+    if any(ore_buckets):
+        h = ore_buckets.index(max(ore_buckets))
+        ora_picco = f"{h:02d}:00"
+
+    washcycles_per_giorno = totale_wash_cycles / giorni_periodo if giorni_periodo > 0 else 0
+
+    context = {
+        'data_inizio': data_inizio,
+        'data_fine': data_fine,
+        'giorni_periodo': giorni_periodo,
+        'preset_attivo': preset_attivo,
+        # Hero
+        'fatturato_totale': fatturato_totale,
+        'fatturato_medio_giornaliero': fatturato_medio_giornaliero,
+        'num_ordini': num_ordini,
+        'scontrino_medio': scontrino_medio,
+        'variazione_pct': variazione_pct,
+        'fatturato_prev': fatturato_prev,
+        # Canali
+        'totale_servito_ordinato': totale_servito_ordinato,
+        'totale_servito_pagato': totale_servito_pagato,
+        'totale_portali': totale_portali,
+        'totale_cambia_gettoni': totale_cambia_gettoni,
+        'totale_registratore': totale_registratore,
+        'totale_self_service': totale_self_service,
+        # Fiscali
+        'totale_corrispettivi': totale_corrispettivi,
+        'iva_corrispettivi': iva_corrispettivi,
+        'imponibile_corrispettivi': imponibile_corrispettivi,
+        # Volumi
+        'totale_wash_cycles': totale_wash_cycles,
+        'washcycles_per_giorno': washcycles_per_giorno,
+        'giorno_picco': giorno_picco,
+        'ora_picco': ora_picco or '—',
+        # Crediti
+        'totale_non_pagato': totale_non_pagato,
+        'num_non_pagati': num_non_pagati,
+        'pct_incasso': pct_incasso,
+        # Quadratura
+        'giorni_ok': giorni_ok,
+        'giorni_diff': giorni_diff,
+        'giorni_non_rilevati': giorni_non_rilevati,
+        'differenza_cumulativa': differenza_cumulativa,
+        'giorno_peggiore': giorno_peggiore,
+        # Top
+        'top_servizi': top_servizi,
+        'top_categorie': top_categorie,
+        # Chart data JSON
+        'trend_labels_json': json.dumps(trend_labels),
+        'trend_servito_json': json.dumps(trend_servito),
+        'trend_portali_json': json.dumps(trend_portali),
+        'trend_cambia_json': json.dumps(trend_cambia),
+        'trend_washcycles_json': json.dumps(trend_washcycles),
+        'giorni_settimana_labels_json': json.dumps(giorni_settimana_labels),
+        'giorni_settimana_tot_json': json.dumps(giorni_settimana_tot),
+        'ore_buckets_json': json.dumps(ore_buckets),
+        'metodi_chart_json': json.dumps(metodi_chart),
+        'categorie_chart_json': json.dumps(categorie_chart),
+    }
+    return render(request, 'finanze/report_periodo.html', context)

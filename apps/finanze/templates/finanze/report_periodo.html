@@ -1,0 +1,412 @@
+{% extends "base.html" %}
+{% block title %}Report Periodo {{ data_inizio|date:"d/m" }} - {{ data_fine|date:"d/m/Y" }}{% endblock %}
+
+{% block extra_css %}
+<style>
+.dash-page { background: #f0f2f5; min-height: 100vh; margin: -1rem; padding: 1.2rem; }
+.dash-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px; flex-wrap: wrap; gap: 8px; }
+.dash-header h4 { font-weight: 700; color: #1a1a2e; margin: 0; }
+
+.kpi-tile { background: #fff; border-radius: 10px; padding: 14px 16px; box-shadow: 0 1px 3px rgba(0,0,0,.05); height: 100%; }
+.kpi-tile .label { font-size: .7rem; text-transform: uppercase; letter-spacing: .6px; color: #8a94a6; font-weight: 700; }
+.kpi-tile .value { font-size: 1.6rem; font-weight: 800; line-height: 1.1; margin-top: 4px; color: #1e293b; }
+.kpi-tile .sub { font-size: .72rem; color: #94a3b8; margin-top: 2px; }
+.kpi-tile.success .value { color: #16a34a; }
+.kpi-tile.danger .value { color: #dc2626; }
+.kpi-tile.warning .value { color: #d97706; }
+.kpi-tile.primary .value { color: #2563eb; }
+.kpi-tile.info .value { color: #0891b2; }
+.kpi-tile.hero { background: linear-gradient(135deg, #0f766e 0%, #14b8a6 100%); color: #fff; }
+.kpi-tile.hero .label, .kpi-tile.hero .value, .kpi-tile.hero .sub { color: #fff; }
+.kpi-tile.hero .sub { opacity: .85; }
+
+.chart-panel { background: #fff; border-radius: 10px; box-shadow: 0 1px 3px rgba(0,0,0,.05); height: 100%; overflow: hidden; }
+.chart-panel .panel-title { font-size: .78rem; font-weight: 700; color: #475569; padding: 14px 18px 4px; text-transform: uppercase; letter-spacing: .6px; display: flex; align-items: center; gap: 8px; }
+.chart-panel .panel-sub { font-size: .75rem; color: #94a3b8; padding: 0 18px 8px; }
+.chart-panel .panel-body { padding: 4px 14px 14px; }
+
+.preset-bar { background: #fff; border-radius: 10px; padding: 10px 14px; box-shadow: 0 1px 3px rgba(0,0,0,.05); margin-bottom: 14px; display: flex; gap: 6px; flex-wrap: wrap; align-items: center; }
+.preset-bar .preset-btn { font-size: .82rem; padding: 4px 12px; border-radius: 6px; border: 1px solid #e2e8f0; background: #f8fafc; color: #475569; text-decoration: none; transition: all .15s; }
+.preset-bar .preset-btn:hover { background: #e2e8f0; }
+.preset-bar .preset-btn.active { background: #0f766e; color: #fff; border-color: #0f766e; }
+
+.ranked-item { display: flex; align-items: center; padding: 8px 18px; border-bottom: 1px solid #f1f5f9; }
+.ranked-item:last-child { border-bottom: none; }
+.ranked-item .rank { width: 22px; height: 22px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: .7rem; font-weight: 700; color: #fff; flex-shrink: 0; }
+.ranked-item .info { flex: 1; margin-left: 10px; min-width: 0; }
+.ranked-item .info .name { font-weight: 600; color: #1e293b; font-size: .85rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.ranked-item .info .cat { font-size: .68rem; color: #94a3b8; }
+.ranked-item .value { font-weight: 800; color: #1e293b; font-size: .85rem; min-width: 72px; text-align: right; flex-shrink: 0; }
+.rank-1 { background: #f59e0b; } .rank-2 { background: #94a3b8; } .rank-3 { background: #cd7f32; } .rank-n { background: #64748b; }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="dash-page">
+
+  {# ====== Header ====== #}
+  <div class="dash-header">
+    <h4><i class="bi bi-graph-up-arrow me-2"></i>Report Periodo &mdash; {{ data_inizio|date:"d/m/Y" }} &rarr; {{ data_fine|date:"d/m/Y" }} <small class="text-muted">({{ giorni_periodo }} {% if giorni_periodo == 1 %}giorno{% else %}giorni{% endif %})</small></h4>
+    <div>
+      <a href="{% url 'finanze:report_giornata' %}?data={{ data_fine|date:'Y-m-d' }}" class="btn btn-sm btn-outline-primary"><i class="bi bi-calendar-day"></i> Report giornata</a>
+    </div>
+  </div>
+
+  {# ====== Preset bar ====== #}
+  <div class="preset-bar">
+    <i class="bi bi-funnel text-muted me-1"></i>
+    <a href="?preset=oggi" class="preset-btn {% if preset_attivo == 'oggi' %}active{% endif %}">Oggi</a>
+    <a href="?preset=ieri" class="preset-btn {% if preset_attivo == 'ieri' %}active{% endif %}">Ieri</a>
+    <a href="?preset=7gg" class="preset-btn {% if preset_attivo == '7gg' %}active{% endif %}">Ultimi 7 giorni</a>
+    <a href="?preset=30gg" class="preset-btn {% if preset_attivo == '30gg' %}active{% endif %}">Ultimi 30 giorni</a>
+    <a href="?preset=mese_corrente" class="preset-btn {% if preset_attivo == 'mese_corrente' %}active{% endif %}">Mese corrente</a>
+    <a href="?preset=mese_scorso" class="preset-btn {% if preset_attivo == 'mese_scorso' %}active{% endif %}">Mese scorso</a>
+    <a href="?preset=anno_corrente" class="preset-btn {% if preset_attivo == 'anno_corrente' %}active{% endif %}">Anno</a>
+    <form method="get" class="d-flex gap-1 ms-auto align-items-center">
+      <input type="date" name="data_inizio" class="form-control form-control-sm" value="{{ data_inizio|date:'Y-m-d' }}" style="max-width:150px;">
+      <span>&rarr;</span>
+      <input type="date" name="data_fine" class="form-control form-control-sm" value="{{ data_fine|date:'Y-m-d' }}" style="max-width:150px;">
+      <button type="submit" class="btn btn-dark btn-sm"><i class="bi bi-search"></i></button>
+    </form>
+  </div>
+
+  {# ====== HERO KPIs ====== #}
+  <div class="row g-2 mb-3">
+    <div class="col-6 col-lg-3">
+      <div class="kpi-tile hero">
+        <div class="label">Fatturato totale</div>
+        <div class="value">&euro;{{ fatturato_totale|floatformat:2 }}</div>
+        <div class="sub">
+          {% if variazione_pct != None %}
+            {% if variazione_pct >= 0 %}<i class="bi bi-arrow-up"></i> +{{ variazione_pct|floatformat:1 }}%{% else %}<i class="bi bi-arrow-down"></i> {{ variazione_pct|floatformat:1 }}%{% endif %}
+            vs periodo prec. (&euro;{{ fatturato_prev|floatformat:2 }})
+          {% else %}&mdash;{% endif %}
+        </div>
+      </div>
+    </div>
+    <div class="col-6 col-lg-3">
+      <div class="kpi-tile primary">
+        <div class="label">Media giornaliera</div>
+        <div class="value">&euro;{{ fatturato_medio_giornaliero|floatformat:2 }}</div>
+        <div class="sub">su {{ giorni_periodo }} giorni</div>
+      </div>
+    </div>
+    <div class="col-6 col-lg-3">
+      <div class="kpi-tile info">
+        <div class="label">N. ordini</div>
+        <div class="value">{{ num_ordini }}</div>
+        <div class="sub">&euro;{{ scontrino_medio|floatformat:2 }} scontrino medio</div>
+      </div>
+    </div>
+    <div class="col-6 col-lg-3">
+      <div class="kpi-tile {% if pct_incasso >= 95 %}success{% elif pct_incasso >= 80 %}warning{% else %}danger{% endif %}">
+        <div class="label">% Incasso</div>
+        <div class="value">{{ pct_incasso|floatformat:1 }}%</div>
+        <div class="sub">Incassato / Fatturato</div>
+      </div>
+    </div>
+  </div>
+
+  {# ====== CANALI ====== #}
+  <h6 class="text-muted text-uppercase fw-bold mb-2" style="font-size:.72rem; letter-spacing:.5px;">Canali</h6>
+  <div class="row g-2 mb-3">
+    <div class="col-6 col-lg-3">
+      <div class="kpi-tile success">
+        <div class="label">Servito</div>
+        <div class="value">&euro;{{ totale_servito_ordinato|floatformat:2 }}</div>
+        <div class="sub">ordinato (incl. non pagati)</div>
+      </div>
+    </div>
+    <div class="col-6 col-lg-3">
+      <div class="kpi-tile primary">
+        <div class="label">Portali</div>
+        <div class="value">&euro;{{ totale_portali|floatformat:2 }}</div>
+        <div class="sub">vendita totale</div>
+      </div>
+    </div>
+    <div class="col-6 col-lg-3">
+      <div class="kpi-tile primary">
+        <div class="label">Cambia gettoni</div>
+        <div class="value">&euro;{{ totale_cambia_gettoni|floatformat:2 }}</div>
+        <div class="sub">vendita totale</div>
+      </div>
+    </div>
+    <div class="col-6 col-lg-3">
+      <div class="kpi-tile warning">
+        <div class="label">Registratore fiscale</div>
+        <div class="value">&euro;{{ totale_registratore|floatformat:2 }}</div>
+        <div class="sub">scontrini servito</div>
+      </div>
+    </div>
+  </div>
+
+  {# ====== FISCALI + VOLUMI ====== #}
+  <h6 class="text-muted text-uppercase fw-bold mb-2" style="font-size:.72rem; letter-spacing:.5px;">Fiscali e volumi</h6>
+  <div class="row g-2 mb-3">
+    <div class="col-12 col-lg-4">
+      <div class="kpi-tile" style="background:#fef3c7; border-left:4px solid #d97706;">
+        <div class="label" style="color:#92400e">Corrispettivi totali</div>
+        <div class="value" style="color:#78350f">&euro;{{ totale_corrispettivi|floatformat:2 }}</div>
+        <div class="sub" style="color:#92400e">Imp. &euro;{{ imponibile_corrispettivi|floatformat:2 }} &middot; IVA 22% &euro;{{ iva_corrispettivi|floatformat:2 }}</div>
+      </div>
+    </div>
+    <div class="col-6 col-lg-4">
+      <div class="kpi-tile info">
+        <div class="label">WashCycles</div>
+        <div class="value">{{ totale_wash_cycles }}</div>
+        <div class="sub">{{ washcycles_per_giorno|floatformat:1 }}/giorno in media</div>
+      </div>
+    </div>
+    <div class="col-6 col-lg-4">
+      <div class="kpi-tile primary">
+        <div class="label">Giorno di picco</div>
+        <div class="value">
+          {% if giorno_picco %}&euro;{{ giorno_picco.totale|floatformat:2 }}{% else %}&mdash;{% endif %}
+        </div>
+        <div class="sub">
+          {% if giorno_picco %}{{ giorno_picco.data|date:"l d/m" }} &middot; ora picco {{ ora_picco }}{% else %}Nessun dato{% endif %}
+        </div>
+      </div>
+    </div>
+  </div>
+
+  {# ====== CREDITI + QUADRATURA ====== #}
+  <h6 class="text-muted text-uppercase fw-bold mb-2" style="font-size:.72rem; letter-spacing:.5px;">Crediti e quadratura</h6>
+  <div class="row g-2 mb-3">
+    <div class="col-6 col-lg-3">
+      <div class="kpi-tile {% if totale_non_pagato > 0 %}danger{% else %}success{% endif %}">
+        <div class="label">Non pagato</div>
+        <div class="value">&euro;{{ totale_non_pagato|floatformat:2 }}</div>
+        <div class="sub">{{ num_non_pagati }} ordini con saldo dovuto</div>
+      </div>
+    </div>
+    <div class="col-6 col-lg-3">
+      <div class="kpi-tile success">
+        <div class="label">Giorni in quadra</div>
+        <div class="value">{{ giorni_ok }}<small class="text-muted">/{{ giorni_periodo }}</small></div>
+        <div class="sub">quadratura OK</div>
+      </div>
+    </div>
+    <div class="col-6 col-lg-3">
+      <div class="kpi-tile {% if giorni_diff > 0 %}danger{% else %}success{% endif %}">
+        <div class="label">Differenze rilevate</div>
+        <div class="value">{{ giorni_diff }}</div>
+        <div class="sub">{{ giorni_non_rilevati }} giorni non rilevati</div>
+      </div>
+    </div>
+    <div class="col-6 col-lg-3">
+      <div class="kpi-tile {% if differenza_cumulativa < 0 %}danger{% elif differenza_cumulativa > 0 %}warning{% else %}success{% endif %}">
+        <div class="label">Differenza cumulativa</div>
+        <div class="value">
+          {% if differenza_cumulativa >= 0 %}+{% endif %}&euro;{{ differenza_cumulativa|floatformat:2 }}
+        </div>
+        <div class="sub">
+          {% if giorno_peggiore %}
+          Peggiore: <a href="{% url 'finanze:report_giornata' %}?data={{ giorno_peggiore.data|date:'Y-m-d' }}" class="text-decoration-none">{{ giorno_peggiore.data|date:"d/m" }}</a> ({{ giorno_peggiore.differenza|floatformat:2 }})
+          {% else %}&mdash;{% endif %}
+        </div>
+      </div>
+    </div>
+  </div>
+
+  {# ====== TREND GIORNALIERO ====== #}
+  <div class="row g-2 mb-3">
+    <div class="col-12">
+      <div class="chart-panel">
+        <div class="panel-title"><i class="bi bi-graph-up text-primary"></i> Fatturato per giorno (split canali)</div>
+        <div class="panel-sub">Servito + Portali + Cambia gettoni in stack</div>
+        <div class="panel-body"><canvas id="chartTrendDaily" height="70"></canvas></div>
+      </div>
+    </div>
+  </div>
+
+  {# ====== WEEKDAY + METODI ====== #}
+  <div class="row g-2 mb-3">
+    <div class="col-lg-6">
+      <div class="chart-panel">
+        <div class="panel-title"><i class="bi bi-calendar-week text-success"></i> Fatturato per giorno settimana</div>
+        <div class="panel-sub">Totale aggregato Lun-Dom</div>
+        <div class="panel-body"><canvas id="chartWeekday" height="180"></canvas></div>
+      </div>
+    </div>
+    <div class="col-lg-6">
+      <div class="chart-panel">
+        <div class="panel-title"><i class="bi bi-credit-card text-info"></i> Metodi di pagamento</div>
+        <div class="panel-sub">Distribuzione sul periodo</div>
+        <div class="panel-body"><canvas id="chartMetodi" height="180"></canvas></div>
+      </div>
+    </div>
+  </div>
+
+  {# ====== WASHCYCLES + ORE ====== #}
+  <div class="row g-2 mb-3">
+    <div class="col-lg-6">
+      <div class="chart-panel">
+        <div class="panel-title"><i class="bi bi-droplet text-primary"></i> Trend WashCycles</div>
+        <div class="panel-sub">Cicli erogati per giorno</div>
+        <div class="panel-body"><canvas id="chartWashcycles" height="180"></canvas></div>
+      </div>
+    </div>
+    <div class="col-lg-6">
+      <div class="chart-panel">
+        <div class="panel-title"><i class="bi bi-clock text-warning"></i> Distribuzione oraria</div>
+        <div class="panel-sub">Pagamenti aggregati per ora del giorno</div>
+        <div class="panel-body"><canvas id="chartOre" height="180"></canvas></div>
+      </div>
+    </div>
+  </div>
+
+  {# ====== TOP SERVIZI + CATEGORIE ====== #}
+  <div class="row g-2 mb-3">
+    <div class="col-lg-7">
+      <div class="chart-panel">
+        <div class="panel-title"><i class="bi bi-trophy text-warning"></i> Top servizi per fatturato</div>
+        <div class="panel-sub">Top 10 del periodo (ordini pagati)</div>
+        <div class="panel-body" style="padding-top:8px;">
+          {% for s in top_servizi %}
+          <div class="ranked-item">
+            <div class="rank {% if forloop.counter == 1 %}rank-1{% elif forloop.counter == 2 %}rank-2{% elif forloop.counter == 3 %}rank-3{% else %}rank-n{% endif %}">{{ forloop.counter }}</div>
+            <div class="info">
+              <div class="name">{{ s.nome }}</div>
+              <div class="cat">{{ s.categoria }} &middot; {{ s.quantita }} pz</div>
+            </div>
+            <div class="value">&euro;{{ s.fatturato|floatformat:2 }}</div>
+          </div>
+          {% empty %}
+          <div class="text-muted text-center py-4">Nessun servizio venduto nel periodo</div>
+          {% endfor %}
+        </div>
+      </div>
+    </div>
+    <div class="col-lg-5">
+      <div class="chart-panel">
+        <div class="panel-title"><i class="bi bi-grid text-success"></i> Fatturato per categoria</div>
+        <div class="panel-sub">Confronto categorie</div>
+        <div class="panel-body"><canvas id="chartCategorie" height="220"></canvas></div>
+      </div>
+    </div>
+  </div>
+
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+const COLORS = ['#3b82f6', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6', '#ec4899', '#14b8a6', '#f97316', '#06b6d4', '#a855f7'];
+const trendLabels = {{ trend_labels_json|safe }};
+const trendServito = {{ trend_servito_json|safe }};
+const trendPortali = {{ trend_portali_json|safe }};
+const trendCambia = {{ trend_cambia_json|safe }};
+const trendWashcycles = {{ trend_washcycles_json|safe }};
+const weekdayLabels = {{ giorni_settimana_labels_json|safe }};
+const weekdayTot = {{ giorni_settimana_tot_json|safe }};
+const oreBuckets = {{ ore_buckets_json|safe }};
+const metodi = {{ metodi_chart_json|safe }};
+const categorie = {{ categorie_chart_json|safe }};
+
+Chart.defaults.font.family = '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif';
+Chart.defaults.font.size = 11;
+
+// ===== Trend giornaliero stacked =====
+const ctxTD = document.getElementById('chartTrendDaily');
+if (ctxTD) {
+  new Chart(ctxTD, {
+    type: 'bar',
+    data: {
+      labels: trendLabels,
+      datasets: [
+        { label: 'Servito', data: trendServito, backgroundColor: '#10b981', borderRadius: 3 },
+        { label: 'Portali', data: trendPortali, backgroundColor: '#3b82f6', borderRadius: 3 },
+        { label: 'Cambia gettoni', data: trendCambia, backgroundColor: '#f59e0b', borderRadius: 3 },
+      ]
+    },
+    options: {
+      responsive: true, maintainAspectRatio: false,
+      plugins: { legend: { position: 'bottom' }, tooltip: { mode: 'index', callbacks: { label: (c) => `${c.dataset.label}: €${c.parsed.y.toFixed(2)}` } } },
+      scales: {
+        x: { stacked: true, grid: { display: false } },
+        y: { stacked: true, beginAtZero: true, grid: { color: '#f1f5f9' }, ticks: { callback: v => '€' + v } }
+      }
+    }
+  });
+}
+
+// ===== Weekday =====
+const ctxWD = document.getElementById('chartWeekday');
+if (ctxWD) {
+  new Chart(ctxWD, {
+    type: 'bar',
+    data: { labels: weekdayLabels, datasets: [{ label: 'Fatturato', data: weekdayTot, backgroundColor: '#16a34a', borderRadius: 4 }] },
+    options: {
+      responsive: true, maintainAspectRatio: false,
+      plugins: { legend: { display: false }, tooltip: { callbacks: { label: (c) => `€${c.parsed.y.toFixed(2)}` } } },
+      scales: { x: { grid: { display: false } }, y: { beginAtZero: true, grid: { color: '#f1f5f9' }, ticks: { callback: v => '€' + v } } }
+    }
+  });
+}
+
+// ===== Metodi (doughnut) =====
+const ctxM = document.getElementById('chartMetodi');
+if (ctxM && metodi.length > 0) {
+  new Chart(ctxM, {
+    type: 'doughnut',
+    data: { labels: metodi.map(m => m[0]), datasets: [{ data: metodi.map(m => m[1]), backgroundColor: COLORS, borderWidth: 0 }] },
+    options: {
+      responsive: true, maintainAspectRatio: false, cutout: '55%',
+      plugins: {
+        legend: { position: 'right', labels: { font: { size: 10 }, padding: 6, boxWidth: 10 } },
+        tooltip: { callbacks: { label: (c) => { const t = c.dataset.data.reduce((a,b)=>a+b,0); const p = t>0?((c.parsed/t)*100).toFixed(1):0; return `${c.label}: €${c.parsed.toFixed(2)} (${p}%)`; } } }
+      }
+    }
+  });
+}
+
+// ===== Washcycles trend =====
+const ctxWC = document.getElementById('chartWashcycles');
+if (ctxWC) {
+  new Chart(ctxWC, {
+    type: 'line',
+    data: { labels: trendLabels, datasets: [{ label: 'WashCycles', data: trendWashcycles, borderColor: '#3b82f6', backgroundColor: 'rgba(59,130,246,.1)', fill: true, tension: .3, pointRadius: 3 }] },
+    options: {
+      responsive: true, maintainAspectRatio: false,
+      plugins: { legend: { display: false } },
+      scales: { x: { grid: { display: false } }, y: { beginAtZero: true, grid: { color: '#f1f5f9' } } }
+    }
+  });
+}
+
+// ===== Ore =====
+const ctxO = document.getElementById('chartOre');
+if (ctxO) {
+  new Chart(ctxO, {
+    type: 'bar',
+    data: {
+      labels: Array.from({length: 24}, (_, i) => `${String(i).padStart(2,'0')}`),
+      datasets: [{ label: 'Incassi', data: oreBuckets, backgroundColor: 'rgba(245,158,11,.85)', borderRadius: 3 }]
+    },
+    options: {
+      responsive: true, maintainAspectRatio: false,
+      plugins: { legend: { display: false }, tooltip: { callbacks: { label: (c) => `€${c.parsed.y.toFixed(2)}` } } },
+      scales: { x: { grid: { display: false } }, y: { beginAtZero: true, grid: { color: '#f1f5f9' }, ticks: { callback: v => '€' + v } } }
+    }
+  });
+}
+
+// ===== Categorie =====
+const ctxC = document.getElementById('chartCategorie');
+if (ctxC && categorie.length > 0) {
+  new Chart(ctxC, {
+    type: 'bar',
+    data: {
+      labels: categorie.map(c => c.nome),
+      datasets: [{ data: categorie.map(c => c.fatturato), backgroundColor: categorie.map((_, i) => COLORS[i % COLORS.length]), borderRadius: 4 }]
+    },
+    options: {
+      indexAxis: 'y', responsive: true, maintainAspectRatio: false,
+      plugins: { legend: { display: false } },
+      scales: { x: { beginAtZero: true, grid: { color: '#f1f5f9' }, ticks: { callback: v => '€' + v } }, y: { grid: { display: false } } }
+    }
+  });
+}
+</script>
+{% endblock %}

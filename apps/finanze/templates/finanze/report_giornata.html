@@ -64,8 +64,7 @@
   <div class="dash-header">
     <h4><i class="bi bi-file-earmark-bar-graph me-2"></i>Report Giornata — {{ data|date:"d/m/Y" }}</h4>
     <div class="d-flex gap-2">
-      <a href="{% url 'finanze:chiusura_automatica_list' %}?data={{ data|date:'Y-m-d' }}" class="btn btn-sm btn-outline-primary"><i class="bi bi-robot"></i> Casse automatiche</a>
-      <a href="{% url 'finanze:dashboard' %}" class="btn btn-sm btn-outline-secondary"><i class="bi bi-arrow-left"></i> Dashboard</a>
+      <a href="{% url 'finanze:report_periodo' %}" class="btn btn-sm btn-outline-primary"><i class="bi bi-graph-up-arrow"></i> Report periodo</a>
     </div>
   </div>
 
@@ -404,46 +403,113 @@
     </div>
   </div>
 
-  {# ====== Dettaglio casse automatiche ====== #}
-  {% if chiusure_auto %}
+  {# ====== Inserimento chiusure casse automatiche (inline) ====== #}
   <div class="chart-panel mb-3">
-    <div class="panel-title"><i class="bi bi-list-ul"></i> Dettaglio chiusure casse automatiche</div>
-    <div class="table-responsive">
-      <table class="table table-sm data-table mb-0">
-        <thead class="table-light">
-          <tr>
-            <th>Cassa</th>
-            <th class="text-end">Incasso tot.</th>
-            <th class="text-end">Ricarica</th>
-            <th class="text-end">Inc. vendita</th>
-            <th class="text-end">V. contante</th>
-            <th class="text-end">V. non cont.</th>
-            <th class="text-end">V. totale</th>
-            <th class="text-end">Resto teo.</th>
-            <th class="text-center">WashCycles</th>
-            <th></th>
-          </tr>
-        </thead>
-        <tbody>
-          {% for c in chiusure_auto %}
-          <tr>
-            <td><strong>{{ c.cassa.nome }}</strong>{% if c.cassa.numero %} <small class="text-muted">{{ c.cassa.numero }}</small>{% endif %}</td>
-            <td class="text-end">&euro;{{ c.incasso_totale|floatformat:2 }}</td>
-            <td class="text-end">&euro;{{ c.incasso_ricarica|floatformat:2 }}</td>
-            <td class="text-end">&euro;{{ c.incasso_vendita|floatformat:2 }}</td>
-            <td class="text-end">&euro;{{ c.vendita_contante|floatformat:2 }}</td>
-            <td class="text-end">&euro;{{ c.vendita_non_contante|floatformat:2 }}</td>
-            <td class="text-end"><strong>&euro;{{ c.vendita_totale|floatformat:2 }}</strong></td>
-            <td class="text-end">&euro;{{ c.resto_erogato_teorico|floatformat:2 }}</td>
-            <td class="text-center">{{ c.wash_cycles|default:"—" }}</td>
-            <td><a href="{% url 'finanze:chiusura_automatica_detail' c.pk %}" class="btn btn-outline-primary btn-sm py-0"><i class="bi bi-eye"></i></a></td>
-          </tr>
-          {% endfor %}
-        </tbody>
-      </table>
+    <div class="panel-title"><i class="bi bi-cash-register"></i> Chiusure casse automatiche</div>
+    <div class="panel-sub">Inserisci o aggiorna i dati di chiusura di ogni cassa per questa giornata</div>
+    <div class="panel-body">
+      <div class="row g-3">
+        {% for entry in casse_form_data %}
+        <div class="col-md-6 col-xl-4">
+          <div class="border rounded p-3 h-100" style="background:#fafbfc;">
+            <div class="d-flex justify-content-between align-items-start mb-2">
+              <div>
+                <strong>{% if entry.cassa.modalita_registratore %}<i class="bi bi-receipt text-warning"></i>{% elif entry.cassa.tracking_washcycles %}<i class="bi bi-droplet text-primary"></i>{% else %}<i class="bi bi-coin text-info"></i>{% endif %} {{ entry.cassa.nome }}</strong>
+                {% if entry.cassa.numero %}<small class="text-muted d-block">n. {{ entry.cassa.numero }}</small>{% endif %}
+              </div>
+              <div>
+                {% if entry.chiusura %}
+                  {% if entry.chiusura.confermata %}
+                    <span class="badge bg-dark">Confermata</span>
+                  {% else %}
+                    <span class="badge bg-success">Salvata</span>
+                  {% endif %}
+                {% else %}
+                  <span class="badge bg-warning text-dark">Da chiudere</span>
+                {% endif %}
+              </div>
+            </div>
+
+            {% if entry.chiusura.confermata %}
+              {# Read-only #}
+              <ul class="list-unstyled small mb-0">
+                <li><strong>Incasso tot.:</strong> &euro;{{ entry.chiusura.incasso_totale|floatformat:2 }}</li>
+                {% if not entry.cassa.modalita_registratore %}
+                <li><strong>Ricarica:</strong> &euro;{{ entry.chiusura.incasso_ricarica|floatformat:2 }}</li>
+                <li><strong>Vendita totale:</strong> &euro;{{ entry.chiusura.vendita_totale|floatformat:2 }}</li>
+                {% if entry.cassa.tracking_washcycles %}
+                <li><strong>WashCycles:</strong> {{ entry.chiusura.wash_cycles|default:"—" }}</li>
+                {% endif %}
+                {% endif %}
+              </ul>
+            {% else %}
+              {# Form inline #}
+              <form method="post"
+                    action="{% if entry.chiusura %}{% url 'finanze:chiusura_automatica_edit' entry.chiusura.pk %}{% else %}{% url 'finanze:chiusura_automatica_create' entry.cassa.pk %}?data={{ data|date:'Y-m-d' }}{% endif %}">
+                {% csrf_token %}
+                <input type="hidden" name="next" value="report">
+
+                {% if entry.cassa.modalita_registratore %}
+                  {# Solo totale scontrino #}
+                  <label class="form-label small mb-1">Totale scontrino (&euro;)</label>
+                  <input type="number" step="0.01" min="0" name="incasso_totale" class="form-control form-control-sm mb-2"
+                         value="{{ entry.chiusura.incasso_totale|default:'0.00' }}" required>
+                  <input type="hidden" name="incasso_ricarica" value="0">
+                  <input type="hidden" name="vendita_contante" value="0">
+                  <input type="hidden" name="vendita_non_contante" value="0">
+                  <input type="hidden" name="resto_erogato_reale" value="0">
+                {% else %}
+                  {# Modalita completa #}
+                  <div class="row g-1">
+                    <div class="col-6">
+                      <label class="form-label small mb-0">Incasso tot.</label>
+                      <input type="number" step="0.01" min="0" name="incasso_totale" class="form-control form-control-sm"
+                             value="{{ entry.chiusura.incasso_totale|default:'0.00' }}" required>
+                    </div>
+                    <div class="col-6">
+                      <label class="form-label small mb-0">Ricarica</label>
+                      <input type="number" step="0.01" min="0" name="incasso_ricarica" class="form-control form-control-sm"
+                             value="{{ entry.chiusura.incasso_ricarica|default:'0.00' }}">
+                    </div>
+                    <div class="col-6">
+                      <label class="form-label small mb-0">V. contante</label>
+                      <input type="number" step="0.01" min="0" name="vendita_contante" class="form-control form-control-sm"
+                             value="{{ entry.chiusura.vendita_contante|default:'0.00' }}" required>
+                    </div>
+                    <div class="col-6">
+                      <label class="form-label small mb-0">V. non cont.</label>
+                      <input type="number" step="0.01" min="0" name="vendita_non_contante" class="form-control form-control-sm"
+                             value="{{ entry.chiusura.vendita_non_contante|default:'0.00' }}">
+                    </div>
+                    <div class="col-6">
+                      <label class="form-label small mb-0">Resto reale</label>
+                      <input type="number" step="0.01" min="0" name="resto_erogato_reale" class="form-control form-control-sm"
+                             value="{{ entry.chiusura.resto_erogato_reale|default:'0.00' }}">
+                    </div>
+                    {% if entry.cassa.tracking_washcycles %}
+                    <div class="col-6">
+                      <label class="form-label small mb-0">WashCycles</label>
+                      <input type="number" min="0" name="wash_cycles" class="form-control form-control-sm"
+                             value="{{ entry.chiusura.wash_cycles|default:'' }}">
+                    </div>
+                    {% endif %}
+                  </div>
+                {% endif %}
+
+                <button type="submit" class="btn btn-primary btn-sm w-100 mt-2">
+                  <i class="bi bi-save"></i>
+                  {% if entry.chiusura %}Aggiorna{% else %}Salva{% endif %}
+                </button>
+              </form>
+            {% endif %}
+          </div>
+        </div>
+        {% empty %}
+        <div class="col-12"><div class="alert alert-info mb-0">Nessuna cassa automatica configurata.</div></div>
+        {% endfor %}
+      </div>
     </div>
   </div>
-  {% endif %}
 
   {# ====== Ordini non incassati ====== #}
   {% if ordini_non_pagati %}
