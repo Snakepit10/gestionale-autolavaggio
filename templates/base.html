@@ -274,19 +274,65 @@
     
     {% block extra_js %}{% endblock %}
 
-    <!-- PWA Service Worker registration -->
+    <!-- PWA Service Worker registration + update toast -->
     <script>
-    if ('serviceWorker' in navigator) {
+    (function () {
+        if (!('serviceWorker' in navigator)) return;
+
+        function showUpdateToast(reg) {
+            // Toast Bootstrap se disponibile, altrimenti banner sticky
+            var existing = document.getElementById('pwa-update-toast');
+            if (existing) return;
+            var html = ''
+                + '<div id="pwa-update-toast" style="position:fixed;bottom:20px;left:50%;transform:translateX(-50%);'
+                + 'background:#0d6efd;color:#fff;padding:12px 18px;border-radius:10px;box-shadow:0 6px 20px rgba(0,0,0,.18);'
+                + 'z-index:9999;display:flex;align-items:center;gap:10px;font-size:.95rem;">'
+                + '<i class="bi bi-arrow-clockwise"></i>'
+                + '<span>Nuova versione disponibile</span>'
+                + '<button id="pwa-update-btn" style="background:#fff;color:#0d6efd;border:0;padding:6px 14px;border-radius:6px;font-weight:600;cursor:pointer;">Ricarica</button>'
+                + '<button id="pwa-update-dismiss" style="background:transparent;color:#fff;border:0;padding:6px;cursor:pointer;font-size:1.2rem;">&times;</button>'
+                + '</div>';
+            document.body.insertAdjacentHTML('beforeend', html);
+            document.getElementById('pwa-update-btn').addEventListener('click', function () {
+                if (reg && reg.waiting) {
+                    reg.waiting.postMessage({ type: 'SKIP_WAITING' });
+                }
+                window.location.reload();
+            });
+            document.getElementById('pwa-update-dismiss').addEventListener('click', function () {
+                var t = document.getElementById('pwa-update-toast');
+                if (t) t.remove();
+            });
+        }
+
         window.addEventListener('load', function () {
             navigator.serviceWorker.register('/service-worker.js', { scope: '/' })
                 .then(function (reg) {
-                    if (reg && reg.scope) console.log('SW registered with scope:', reg.scope);
+                    if (!reg) return;
+                    if (reg.waiting) {
+                        showUpdateToast(reg);
+                    }
+                    reg.addEventListener('updatefound', function () {
+                        var nw = reg.installing;
+                        if (!nw) return;
+                        nw.addEventListener('statechange', function () {
+                            if (nw.state === 'installed' && navigator.serviceWorker.controller) {
+                                showUpdateToast(reg);
+                            }
+                        });
+                    });
                 })
-                .catch(function (err) {
-                    console.warn('SW registration failed:', err);
-                });
+                .catch(function (err) { console.warn('SW registration failed:', err); });
+
+            // Reload quando il nuovo SW prende il controllo
+            var refreshing = false;
+            navigator.serviceWorker.addEventListener('controllerchange', function () {
+                if (refreshing) return;
+                refreshing = true;
+                window.location.reload();
+            });
         });
-    }
+    })();
     </script>
 </body>
 </html>

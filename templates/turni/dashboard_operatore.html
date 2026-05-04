@@ -3,28 +3,126 @@
 
 {% block extra_css %}
 <style>
+/* ============ Layout base ============ */
 .dashboard-container { height: calc(100vh - 80px); overflow: hidden; }
 .panel-left { height: 100%; overflow-y: auto; border-right: 2px solid #dee2e6; }
 .panel-right { height: 100%; overflow-y: auto; }
-.ordine-card { cursor: pointer; transition: all .15s; border-left: 4px solid transparent; }
-.ordine-card:hover { background: #f0f4ff; }
+
+/* ============ Coda ordini ============ */
+.ordine-card {
+    cursor: pointer;
+    transition: background .12s, border-color .12s;
+    border-left: 4px solid transparent;
+    min-height: 56px;
+    padding: 10px 12px !important;
+}
+.ordine-card:active { background: #e8f0fe; }
 .ordine-card.active { border-left-color: var(--bs-primary); background: #e8f0fe; }
 .ordine-card.in-lavorazione { border-left-color: #ffc107; background: #fff8e1; }
-.timer-display { font-family: 'Courier New', monospace; font-size: 3rem; font-weight: bold; letter-spacing: 2px; }
+
+/* ============ Timer ============ */
+.timer-display {
+    font-family: 'Courier New', monospace;
+    font-size: 2.5rem;
+    font-weight: bold;
+    letter-spacing: 2px;
+    line-height: 1.1;
+}
 .timer-display.paused { color: #ffc107; }
 .timer-display.running { color: #198754; }
-.btn-lavoro { padding: .75rem 1.5rem; font-size: 1.1rem; }
-.section-header { font-weight: 600; font-size: .85rem; text-transform: uppercase; letter-spacing: .5px; color: #6c757d; }
-.dif-zona-card { border: 2px solid #dee2e6; border-radius: 8px; padding: 6px 10px; cursor: pointer; transition: all .15s; text-align: center; min-width: 90px; }
-.dif-zona-card:hover { border-color: #dc3545; background: #fff5f5; }
+
+/* ============ Bottoni azione (touch-friendly) ============ */
+.btn-lavoro {
+    padding: .85rem 1.6rem;
+    font-size: 1.1rem;
+    min-height: 52px;
+    font-weight: 600;
+}
+
+.section-header {
+    font-weight: 600;
+    font-size: .85rem;
+    text-transform: uppercase;
+    letter-spacing: .5px;
+    color: #6c757d;
+}
+
+/* ============ Sezione difetti (touch-friendly) ============ */
+.dif-zona-card {
+    border: 2px solid #dee2e6;
+    border-radius: 10px;
+    padding: 12px 14px;
+    cursor: pointer;
+    transition: border-color .12s, background .12s;
+    text-align: center;
+    min-width: 110px;
+    min-height: 56px;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+}
+.dif-zona-card:active { border-color: #dc3545; background: #fff5f5; }
 .dif-zona-card.active { border-color: #dc3545; background: #dc3545; color: #fff; }
-.dif-zona-card.active .text-muted { color: rgba(255,255,255,.7) !important; }
-.dif-tipo-btn { border: 1px solid #dee2e6; border-radius: 6px; padding: 4px 10px; cursor: pointer; font-size: .8rem; transition: all .1s; }
-.dif-tipo-btn:hover { background: #f8d7da; border-color: #dc3545; }
-.dif-grav-pill { cursor: pointer; }
-.dif-grav-pill.active { box-shadow: 0 0 0 2px #000; }
-.empty-state { display: flex; flex-direction: column; align-items: center; justify-content: center; height: 100%; color: #adb5bd; }
-.badge-postazione { font-size: .7rem; }
+.dif-zona-card.active .text-muted { color: rgba(255,255,255,.85) !important; }
+.dif-zona-card .small { font-size: .92rem; }
+
+.dif-tipo-btn {
+    border: 1px solid #dee2e6;
+    border-radius: 8px;
+    padding: 10px 14px;
+    cursor: pointer;
+    font-size: .95rem;
+    min-height: 44px;
+    transition: background .1s, border-color .1s;
+    background: #fff;
+    user-select: none;
+}
+.dif-tipo-btn:active { background: #f8d7da; border-color: #dc3545; }
+.dif-tipo-btn.active { background: #dc3545; color: #fff; border-color: #dc3545; }
+
+.dif-grav-pill {
+    cursor: pointer;
+    padding: 8px 14px;
+    font-size: .92rem;
+    min-height: 40px;
+}
+.dif-grav-pill.active { box-shadow: 0 0 0 3px #000; }
+
+.empty-state {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    height: 100%;
+    color: #adb5bd;
+}
+.badge-postazione { font-size: .8rem; padding: 6px 10px; }
+
+/* ============ Tablet 10-11" landscape (1024-1366) ============ */
+@media (min-width: 992px) and (max-width: 1366px) {
+    .timer-display { font-size: 2.2rem; }
+    .btn-lavoro { padding: .9rem 1.4rem; font-size: 1.05rem; }
+    .ordine-card { padding: 12px !important; }
+    .dif-zona-card { min-width: 100px; padding: 10px 12px; }
+    .dif-tipo-btn { padding: 12px 14px; font-size: .95rem; }
+    /* Coda non troppo stretta */
+    .panel-left { padding-right: 8px !important; }
+}
+
+/* ============ Tablet portrait / piccolo (sotto 992) ============ */
+@media (max-width: 991.98px) {
+    .dashboard-container { height: auto; overflow: visible; }
+    .panel-left, .panel-right { height: auto; border-right: 0; }
+    .panel-left { border-bottom: 2px solid #dee2e6; }
+    .timer-display { font-size: 2rem; }
+}
+
+/* ============ Hover solo per dispositivi che hanno hover vero ============ */
+@media (hover: hover) and (pointer: fine) {
+    .ordine-card:hover { background: #f0f4ff; }
+    .dif-zona-card:hover { border-color: #dc3545; background: #fff5f5; }
+    .dif-tipo-btn:hover { background: #f8d7da; border-color: #dc3545; }
+}
 </style>
 {% endblock %}
 

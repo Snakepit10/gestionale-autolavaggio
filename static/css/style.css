@@ -15,6 +15,24 @@
 body {
     font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
     background-color: #f5f6fa;
+    /* PWA / touch: elimina delay 300ms su tap su mobile/tablet */
+    touch-action: manipulation;
+}
+
+/* Touch-friendly su elementi interattivi */
+button, a, [role="button"], .btn,
+input[type="checkbox"], input[type="radio"],
+.form-check-input, .form-select, .form-control,
+[data-bs-toggle], [onclick] {
+    touch-action: manipulation;
+}
+
+/* PWA standalone: usa l'intera viewport e gestisci safe area iOS */
+@media (display-mode: standalone) {
+    body {
+        padding-top: env(safe-area-inset-top);
+        padding-bottom: env(safe-area-inset-bottom);
+    }
 }
 
 .navbar-brand {

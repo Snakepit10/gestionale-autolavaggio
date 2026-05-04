@@ -1,16 +1,30 @@
 // Service Worker per PWA Autolavaggio
-const CACHE_NAME = 'autolavaggio-cache-v2';
-const OFFLINE_CACHE = 'autolavaggio-offline-v2';
+// Ascolta messaggi dal client (es. SKIP_WAITING via update toast)
+self.addEventListener('message', (event) => {
+    if (event.data && event.data.type === 'SKIP_WAITING') {
+        self.skipWaiting();
+    }
+});
 
-// File da cachare per il funzionamento offline
+const CACHE_NAME = 'autolavaggio-cache-v3';
+const OFFLINE_CACHE = 'autolavaggio-offline-v3';
+
+// File essenziali da pre-cachare per funzionamento offline
+// (cache.addAll e' atomico: se UNO fallisce, tutto fallisce)
 const CACHE_URLS = [
     '/',
-    '/ordini/cassa/mobile/',
     '/static/manifest.json',
-    '/static/css/bootstrap.min.css',
-    '/static/js/bootstrap.bundle.min.js',
+    '/static/css/style.css',
+    '/static/js/app.js',
+    '/static/icons/icon-192x192.png',
+    '/static/icons/icon-512x512.png',
+];
+
+// Asset CDN: pre-fetch best-effort (non bloccano l'install)
+const CDN_URLS = [
     'https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css',
-    'https://cdn.jsdelivr.net/npm/bootstrap-icons@1.10.0/font/bootstrap-icons.css'
+    'https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js',
+    'https://cdn.jsdelivr.net/npm/bootstrap-icons@1.10.0/font/bootstrap-icons.css',
 ];
 
 // Pagina offline fallback
@@ -22,19 +36,17 @@ self.addEventListener('install', (event) => {
     
     event.waitUntil(
         Promise.all([
-            // Cache principale
-            caches.open(CACHE_NAME).then((cache) => {
-                console.log('Service Worker: Cache principale aperta');
-                return cache.addAll(CACHE_URLS);
-            }),
-            // Cache offline
-            caches.open(OFFLINE_CACHE).then((cache) => {
-                console.log('Service Worker: Cache offline aperta');
-                return cache.add(OFFLINE_PAGE);
-            })
+            // Cache principale (atomica: addAll fallisce se uno solo fallisce)
+            caches.open(CACHE_NAME).then((cache) => cache.addAll(CACHE_URLS)),
+            // Cache offline page
+            caches.open(OFFLINE_CACHE).then((cache) => cache.add(OFFLINE_PAGE)),
+            // CDN best-effort: ogni URL e' add() singolo, fallimenti non bloccano install
+            caches.open(CACHE_NAME).then((cache) =>
+                Promise.allSettled(CDN_URLS.map((u) => cache.add(u).catch(() => null)))
+            ),
         ])
     );
-    
+
     // Forza l'attivazione del nuovo service worker
     self.skipWaiting();
 });
