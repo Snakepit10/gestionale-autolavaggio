@@ -1,12 +1,13 @@
 {
-  "name": "Autolavaggio Cassa Mobile",
-  "short_name": "Cassa Mobile",
-  "description": "App mobile per gestione ordini autolavaggio",
-  "start_url": "/ordini/cassa/mobile/",
+  "name": "Gestionale Autolavaggio",
+  "short_name": "Autolavaggio",
+  "id": "/",
+  "description": "Gestionale per autolavaggio: ordini, prenotazioni, finanze, controllo qualita",
+  "start_url": "/",
   "display": "standalone",
   "background_color": "#ffffff",
-  "theme_color": "#007bff",
-  "orientation": "portrait",
+  "theme_color": "#0d6efd",
+  "orientation": "any",
   "scope": "/",
   "icons": [
     {

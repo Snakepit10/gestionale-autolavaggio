@@ -1,6 +1,6 @@
 // Service Worker per PWA Autolavaggio
-const CACHE_NAME = 'autolavaggio-cache-v1';
-const OFFLINE_CACHE = 'autolavaggio-offline-v1';
+const CACHE_NAME = 'autolavaggio-cache-v2';
+const OFFLINE_CACHE = 'autolavaggio-offline-v2';
 
 // File da cachare per il funzionamento offline
 const CACHE_URLS = [
@@ -62,14 +62,48 @@ self.addEventListener('activate', (event) => {
 });
 
 // Intercettazione delle richieste
+// Path che il SW NON deve intercettare (network-only o lasciate al browser)
+const NETWORK_ONLY_PREFIXES = [
+    '/admin/',           // Django admin (sessione cookie)
+    '/auth/',            // login/logout
+    '/health/',          // health check Railway
+    '/clienti/cerca/',   // autocomplete cliente in cassa
+];
+
+const NETWORK_ONLY_PATTERNS = [
+    /\/api\//,           // tutte le API (dynamic)
+    /\/ws\//,            // WebSocket upgrade
+    /\?.*csrf/i,         // qualsiasi query con csrf
+];
+
+function shouldBypassSW(url, request) {
+    // Bypass: protocolli non http(s) e WebSocket
+    if (!request.url.startsWith('http')) return true;
+    // Bypass: metodi non-GET (POST/PUT/DELETE non vanno cached)
+    if (request.method !== 'GET') return true;
+    // Bypass: cross-origin (CDN bootstrap, ecc.) — gestito comunque dal browser
+    if (url.origin !== self.location.origin) return false; // lascia handleFetch decidere
+    // Bypass: prefissi
+    for (const p of NETWORK_ONLY_PREFIXES) {
+        if (url.pathname.startsWith(p)) return true;
+    }
+    // Bypass: pattern API/WS
+    for (const re of NETWORK_ONLY_PATTERNS) {
+        if (re.test(url.pathname) || re.test(url.search)) return true;
+    }
+    return false;
+}
+
 self.addEventListener('fetch', (event) => {
     const request = event.request;
     const url = new URL(request.url);
-    
-    // Gestisci solo richieste HTTP/HTTPS
-    if (request.url.startsWith('http')) {
-        event.respondWith(handleFetch(request));
+
+    if (shouldBypassSW(url, request)) {
+        // Lascia al browser senza intercettazione
+        return;
     }
+
+    event.respondWith(handleFetch(request));
 });
 
 async function handleFetch(request) {
