@@ -74,24 +74,28 @@ html, body { overflow: hidden !important; height: 100%; background: #fff; }
     color: #6c757d;
 }
 
-/* ============ Sezione difetti (touch-friendly) ============ */
-.dif-zona-card {
+/* ============ Sezione difetti CQ (compatta) ============ */
+.dif-zona-chip {
     border: 2px solid #dee2e6;
-    border-radius: 10px;
-    padding: 12px 14px;
+    border-radius: 999px;
+    padding: 8px 14px;
     cursor: pointer;
-    transition: border-color .12s, background .12s;
-    text-align: center;
-    min-width: 110px;
-    min-height: 56px;
-    display: flex;
-    flex-direction: column;
-    justify-content: center;
+    transition: border-color .12s, background .12s, color .12s;
+    background: #fff;
+    color: #495057;
+    font-size: .9rem;
+    font-weight: 500;
+    min-height: 40px;
+    line-height: 1;
+    user-select: none;
 }
-.dif-zona-card:active { border-color: #dc3545; background: #fff5f5; }
-.dif-zona-card.active { border-color: #dc3545; background: #dc3545; color: #fff; }
-.dif-zona-card.active .text-muted { color: rgba(255,255,255,.85) !important; }
-.dif-zona-card .small { font-size: .92rem; }
+.dif-zona-chip:active { border-color: #dc3545; background: #fff5f5; }
+.dif-zona-chip.active { border-color: #dc3545; background: #dc3545; color: #fff; }
+
+/* Toggle chevron CQ */
+.cq-toggle .cq-chevron { transition: transform .2s; }
+.cq-toggle[aria-expanded="true"] .cq-chevron { transform: rotate(180deg); }
+.cq-toggle:focus { box-shadow: none !important; outline: none; }
 
 .dif-tipo-btn {
     border: 1px solid #dee2e6;
@@ -102,6 +106,7 @@ html, body { overflow: hidden !important; height: 100%; background: #fff; }
     min-height: 44px;
     transition: background .1s, border-color .1s;
     background: #fff;
+    color: #495057;
     user-select: none;
 }
 .dif-tipo-btn:active { background: #f8d7da; border-color: #dc3545; }
@@ -130,7 +135,7 @@ html, body { overflow: hidden !important; height: 100%; background: #fff; }
     .timer-display { font-size: 2.2rem; }
     .btn-lavoro { padding: .9rem 1.4rem; font-size: 1.05rem; }
     .ordine-card { padding: 12px !important; }
-    .dif-zona-card { min-width: 100px; padding: 10px 12px; }
+    .dif-zona-chip { padding: 8px 12px; font-size: .88rem; }
     .dif-tipo-btn { padding: 12px 14px; font-size: .95rem; }
     /* Coda non troppo stretta */
     .panel-left { padding-right: 8px !important; }
@@ -162,8 +167,7 @@ html, body { overflow: hidden !important; height: 100%; background: #fff; }
     /* Phone: testo piu compatto */
     .timer-display { font-size: 1.7rem; letter-spacing: 1px; }
     .btn-lavoro { padding: .8rem 1rem; font-size: 1rem; min-height: 48px; }
-    .dif-zona-card { min-width: 80px; padding: 8px 10px; min-height: 48px; }
-    .dif-zona-card .small { font-size: .82rem; }
+    .dif-zona-chip { padding: 6px 10px; font-size: .82rem; min-height: 36px; }
     .dif-tipo-btn { font-size: .88rem; padding: 8px 10px; }
     .panel-right .card-header { padding: 8px 12px; font-size: .9rem; }
     .panel-right .card-body { padding: .75rem; }
@@ -183,7 +187,7 @@ html, body { overflow: hidden !important; height: 100%; background: #fff; }
 /* ============ Hover solo per dispositivi che hanno hover vero ============ */
 @media (hover: hover) and (pointer: fine) {
     .ordine-card:hover { background: #f0f4ff; }
-    .dif-zona-card:hover { border-color: #dc3545; background: #fff5f5; }
+    .dif-zona-chip:hover { border-color: #dc3545; background: #fff5f5; }
     .dif-tipo-btn:hover { background: #f8d7da; border-color: #dc3545; }
 }
 </style>
@@ -375,51 +379,49 @@ function renderAreaOperativa(ordine, lavorazione, lavorazioniAttive, fasiComplet
     fasiHtml += '</div></div>';
   }
 
-  // --- Sezione difetti POS-style ---
+  // --- Sezione difetti CQ (collapsible compact) ---
   let difettiHtml = '';
   if (ZONE_DIFETTI.length > 0) {
-    // Zone come card cliccabili
+    // Zone come pill compatte (no categoria visibile, solo title)
     let zoneCards = '';
     for (const z of ZONE_DIFETTI) {
-      zoneCards += `<div class="dif-zona-card" data-zona="${z.codice}" onclick="selDifZona('${z.codice}')">
-        <div class="small fw-bold">${z.nome}</div>
-        <div class="text-muted" style="font-size:.6rem">${z.categoria}</div>
-      </div>`;
+      zoneCards += `<button type="button" class="dif-zona-chip" data-zona="${z.codice}" title="${z.categoria}" onclick="selDifZona('${z.codice}')">${z.nome}</button>`;
     }
 
-    // Segnalazioni gia fatte
+    // Segnalazioni gia fatte (compact list)
     let segnHtml = '';
-    if (segnalazioni && segnalazioni.length > 0) {
-      segnHtml = '<div class="border-top pt-2 mt-2"><div class="small fw-bold mb-1"><i class="bi bi-list-check"></i> Difetti segnalati</div>';
+    const segnCount = segnalazioni ? segnalazioni.length : 0;
+    if (segnCount > 0) {
+      segnHtml = '<div class="border-top pt-2 mt-2"><div class="small fw-bold mb-1"><i class="bi bi-list-check"></i> Difetti segnalati</div><div class="d-flex flex-wrap gap-1">';
       for (const s of segnalazioni) {
-        const azioneIcon = s.azione === 'corretto' ? 'bi-check-circle text-success' : 'bi-flag text-warning';
-        segnHtml += `<div class="d-flex align-items-center gap-1 mb-1">
-          <span class="badge bg-danger">${s.zona} — ${s.tipo_difetto}</span>
-          <span class="badge bg-${s.gravita==='alta'?'danger':s.gravita==='media'?'warning':'secondary'}" style="font-size:.6rem">${s.gravita}</span>
-          <i class="bi ${azioneIcon}"></i>
-        </div>`;
+        const azioneIcon = s.azione === 'corretto' ? 'bi-check-circle' : 'bi-flag';
+        const gravCls = s.gravita==='alta'?'bg-danger':s.gravita==='media'?'bg-warning text-dark':'bg-secondary';
+        segnHtml += `<span class="badge ${gravCls}" title="${s.gravita} - ${s.azione}"><i class="bi ${azioneIcon}"></i> ${s.zona} ${s.tipo_difetto}</span>`;
       }
-      segnHtml += '</div>';
+      segnHtml += '</div></div>';
     }
+
+    const countBadge = segnCount > 0 ? `<span class="badge bg-light text-danger ms-2">${segnCount}</span>` : '';
 
     difettiHtml = `
     <div class="card mb-3 border-danger">
-      <div class="card-header py-2 bg-danger text-white fw-bold" style="font-size:.85rem">
-        <i class="bi bi-exclamation-triangle"></i> Controllo Qualita — Segnala Difetto
-      </div>
-      <div class="card-body py-2">
-        <div class="row g-2">
-          <div class="col-md-5">
-            <div class="small text-muted mb-1">Seleziona zona:</div>
-            <div class="d-flex flex-wrap gap-1" id="difZoneContainer">${zoneCards}</div>
-          </div>
-          <div class="col-md-7" id="difPanelContainer">
-            <div class="text-center text-muted py-4 small">
-              <i class="bi bi-hand-index"></i> Seleziona una zona per vedere i difetti
+      <button type="button" class="cq-toggle card-header py-2 bg-danger text-white fw-bold w-100 border-0 d-flex justify-content-between align-items-center"
+              data-bs-toggle="collapse" data-bs-target="#cqBody" aria-expanded="false"
+              style="font-size:.9rem; cursor:pointer;">
+        <span><i class="bi bi-exclamation-triangle"></i> Controllo Qualita ${countBadge}</span>
+        <i class="bi bi-chevron-down cq-chevron"></i>
+      </button>
+      <div id="cqBody" class="collapse">
+        <div class="card-body py-2">
+          <div class="small text-muted mb-1">Seleziona zona:</div>
+          <div class="d-flex flex-wrap gap-1 mb-2" id="difZoneContainer">${zoneCards}</div>
+          <div id="difPanelContainer" class="border-top pt-2 mt-1">
+            <div class="text-muted small py-2">
+              <i class="bi bi-hand-index"></i> Seleziona una zona per vedere i tipi di difetto
             </div>
           </div>
+          ${segnHtml}
         </div>
-        ${segnHtml}
       </div>
     </div>`;
   }
@@ -452,6 +454,14 @@ function renderAreaOperativa(ordine, lavorazione, lavorazioniAttive, fasiComplet
     </div>
 
     <div class="card mb-3">
+      <div class="card-header py-2 bg-dark text-white"><i class="bi bi-stopwatch"></i> Lavorazione</div>
+      <div class="card-body text-center py-3">
+        ${fasiHtml}${lavAttivaHtml}${timerHtml}
+        <div class="mt-3">${buttonsHtml}</div>
+      </div>
+    </div>
+
+    <div class="card mb-3">
       <div class="card-header py-2 bg-dark text-white"><i class="bi bi-bag-plus"></i> Servizi</div>
       <div class="card-body p-0">
         <table class="table table-sm table-hover mb-0">
@@ -470,15 +480,7 @@ function renderAreaOperativa(ordine, lavorazione, lavorazioniAttive, fasiComplet
       </div>
     </div>
 
-    ${difettiHtml}
-
-    <div class="card">
-      <div class="card-header py-2 bg-dark text-white"><i class="bi bi-stopwatch"></i> Lavorazione</div>
-      <div class="card-body text-center py-3">
-        ${fasiHtml}${lavAttivaHtml}${timerHtml}
-        <div class="mt-3">${buttonsHtml}</div>
-      </div>
-    </div>`;
+    ${difettiHtml}`;
 
   startTimer();
 }
@@ -488,12 +490,12 @@ let difZonaAttiva = null;
 
 function selDifZona(codice) {
   difZonaAttiva = codice;
-  // Evidenzia card attiva
-  document.querySelectorAll('.dif-zona-card').forEach(c => c.classList.remove('active'));
-  const card = document.querySelector(`.dif-zona-card[data-zona="${codice}"]`);
-  if (card) card.classList.add('active');
+  // Evidenzia chip attiva
+  document.querySelectorAll('.dif-zona-chip').forEach(c => c.classList.remove('active'));
+  const chip = document.querySelector(`.dif-zona-chip[data-zona="${codice}"]`);
+  if (chip) chip.classList.add('active');
 
-  // Mostra tipi difetto nel pannello
+  // Mostra tipi difetto nel pannello inline
   const z = ZONE_DIFETTI.find(zd => zd.codice === codice);
   const panel = document.getElementById('difPanelContainer');
   if (!z || !panel) return;
@@ -501,40 +503,33 @@ function selDifZona(codice) {
   let html = `<div class="small text-muted mb-1">Tipo difetto per <strong>${z.nome}</strong>:</div>`;
   html += '<div class="d-flex flex-wrap gap-1 mb-2">';
   for (const t of z.tipi) {
-    html += `<div class="dif-tipo-btn" onclick="selDifTipo(this, '${t.codice}')">${t.nome}</div>`;
+    html += `<button type="button" class="dif-tipo-btn" onclick="selDifTipo(this, '${t.codice}')">${t.nome}</button>`;
   }
   html += '</div>';
 
-  // Gravita
-  html += `<div class="d-flex gap-2 align-items-center mb-2">
+  html += `<div class="d-flex flex-wrap gap-2 align-items-center mb-2">
     <span class="small text-muted">Gravita:</span>
     <span class="badge bg-secondary dif-grav-pill" onclick="selGrav(this,'bassa')">Bassa</span>
     <span class="badge bg-warning text-dark dif-grav-pill active" onclick="selGrav(this,'media')">Media</span>
     <span class="badge bg-danger dif-grav-pill" onclick="selGrav(this,'alta')">Alta</span>
-  </div>`;
-
-  // Azione
-  html += `<div class="d-flex gap-2 align-items-center mb-2">
-    <span class="small text-muted">Azione:</span>
+    <span class="small text-muted ms-2">Azione:</span>
     <div class="btn-group btn-group-sm">
       <input type="radio" class="btn-check" name="difAzione" value="corretto" id="difAzCorr" checked>
       <label class="btn btn-outline-success btn-sm" for="difAzCorr">Corretto</label>
       <input type="radio" class="btn-check" name="difAzione" value="segnalato" id="difAzSegn">
-      <label class="btn btn-outline-warning btn-sm" for="difAzSegn">Solo segnalato</label>
+      <label class="btn btn-outline-warning btn-sm" for="difAzSegn">Segnalato</label>
     </div>
+    <button class="btn btn-danger btn-sm ms-auto" onclick="inviaDefect()"><i class="bi bi-check-circle"></i> Conferma</button>
   </div>`;
 
-  html += `<button class="btn btn-danger btn-sm" onclick="inviaDefect()"><i class="bi bi-exclamation-triangle"></i> Conferma segnalazione</button>`;
   panel.innerHTML = html;
 }
 
 let difTipoAttivo = null;
 function selDifTipo(el, codice) {
   difTipoAttivo = codice;
-  document.querySelectorAll('.dif-tipo-btn').forEach(b => { b.style.background = ''; b.style.borderColor = '#dee2e6'; b.style.color = ''; });
-  el.style.background = '#dc3545';
-  el.style.borderColor = '#dc3545';
-  el.style.color = '#fff';
+  document.querySelectorAll('.dif-tipo-btn').forEach(b => b.classList.remove('active'));
+  el.classList.add('active');
 }
 
 let difGravAttiva = 'media';
