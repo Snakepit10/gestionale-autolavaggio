@@ -153,7 +153,14 @@
       <div class="kpi-card status-{{ kpi_status.dpmo }}">
         <div class="label">DPMO (Six Sigma)</div>
         <div class="value">{{ dpmo|stringformat:'d' }}</div>
-        <div class="sub">{{ num_ordini_completati }} ordini &times; {{ opportunita|add:0 }} opp.</div>
+        <div class="sub" title="Difetti / Opportunita totali x 1M. Opp. = ordini completati x zone CQ attive">
+          {{ totale_difetti }} difetti / {{ opportunita }} opp.
+          {% if dpmo <= 3.4 %}<span class="badge bg-success">6&sigma;</span>
+          {% elif dpmo <= 233 %}<span class="badge bg-success">5&sigma;</span>
+          {% elif dpmo <= 6210 %}<span class="badge bg-success">4&sigma;</span>
+          {% elif dpmo <= 66807 %}<span class="badge bg-warning text-dark">3&sigma;</span>
+          {% else %}<span class="badge bg-danger">&lt;3&sigma;</span>{% endif %}
+        </div>
       </div>
     </div>
     <div class="col-6 col-lg-3">
