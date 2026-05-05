@@ -26,7 +26,6 @@
 .servizio-pick.selected { border-color: #0d6efd; background: #eff6ff; box-shadow: 0 4px 12px rgba(13,110,253,.15); }
 .servizio-pick .titolo { font-weight: 700; color: #1e293b; }
 .servizio-pick .meta { font-size: .82rem; color: #64748b; }
-.servizio-pick .prezzo { font-size: 1.2rem; font-weight: 800; color: #0d6efd; flex-shrink: 0; }
 .servizio-pick .check { font-size: 1.3rem; color: #cbd5e1; flex-shrink: 0; }
 .servizio-pick.selected .check { color: #0d6efd; }
 
@@ -53,7 +52,6 @@
     border-radius: 14px;
     margin-bottom: 16px;
 }
-.bk-summary .totale { font-size: 2rem; font-weight: 800; }
 
 .bk-actions { position: sticky; bottom: 0; padding: 12px 0; background: linear-gradient(180deg, transparent, #f8fafc 30%); margin-top: 24px; }
 @media (max-width: 575.98px) {
@@ -96,16 +94,17 @@
                 {% for s in cat.list %}
                 <div class="servizio-pick"
                      data-id="{{ s.id }}"
-                     data-prezzo="{{ s.prezzo }}"
                      data-titolo="{{ s.titolo|escape }}"
                      data-durata="{{ s.durata_minuti|default:30 }}"
                      onclick="toggleServizio(this)">
-                    <div>
+                    <div class="flex-grow-1">
                         <div class="titolo">{{ s.titolo }}</div>
-                        <div class="meta"><i class="bi bi-clock"></i> {{ s.durata_minuti|default:"30" }} min</div>
+                        {% if s.descrizione %}
+                        <div class="meta">{{ s.descrizione|truncatewords:20 }}</div>
+                        {% endif %}
+                        <div class="meta"><i class="bi bi-clock"></i> circa {{ s.durata_minuti|default:"30" }} min</div>
                     </div>
                     <div class="d-flex align-items-center gap-2">
-                        <div class="prezzo">&euro;{{ s.prezzo }}</div>
                         <i class="bi bi-circle check"></i>
                     </div>
                 </div>
@@ -157,17 +156,16 @@
         <p class="text-muted">Aggiungi qualche dettaglio e conferma.</p>
 
         <div class="bk-summary">
-            <div class="small opacity-75 fw-bold">Riepilogo</div>
+            <div class="small opacity-75 fw-bold">Riepilogo prenotazione</div>
             <div id="rec-data" class="fs-5 fw-bold mt-1"></div>
-            <div id="rec-servizi" class="small mt-2 mb-2 opacity-90"></div>
-            <div class="d-flex justify-content-between align-items-end mt-2 pt-2 border-top border-light border-opacity-25">
-                <div>
-                    <div class="small opacity-75">Totale stimato</div>
-                    <div class="totale" id="rec-totale">&euro;0</div>
-                </div>
-                <div class="small opacity-90 text-end">
-                    <div id="rec-durata"></div>
-                </div>
+            <div class="small opacity-75 mt-3 fw-bold">Servizi richiesti</div>
+            <div id="rec-servizi-list" class="mt-1"></div>
+            <div class="small opacity-90 mt-3 pt-2 border-top border-light border-opacity-25">
+                <i class="bi bi-clock"></i>
+                Durata stimata: <span id="rec-durata">--</span>
+            </div>
+            <div class="small opacity-75 mt-2">
+                Il prezzo finale verra comunicato al ritiro.
             </div>
         </div>
 
@@ -220,7 +218,6 @@ function toggleServizio(el) {
     } else {
         serviziSelezionati.push({
             id: id,
-            prezzo: parseFloat(el.dataset.prezzo),
             titolo: el.dataset.titolo,
             durata: parseInt(el.dataset.durata),
         });
@@ -285,14 +282,16 @@ function selSlot(el) {
 }
 
 function renderRiepilogo() {
-    const totale = serviziSelezionati.reduce((a, s) => a + s.prezzo, 0);
     const durata = serviziSelezionati.reduce((a, s) => a + s.durata, 0);
     document.getElementById('rec-data').textContent =
         `${dataSelezionata.split('-').reverse().join('/')} alle ${oraSelezionata}`;
-    document.getElementById('rec-servizi').textContent =
-        serviziSelezionati.map(s => s.titolo).join(' · ');
-    document.getElementById('rec-totale').innerHTML = '&euro;' + totale.toFixed(2);
-    document.getElementById('rec-durata').textContent = `~ ${durata} min`;
+    const list = document.getElementById('rec-servizi-list');
+    list.innerHTML = serviziSelezionati.map(s =>
+        `<div class="d-flex align-items-center gap-2 mb-1">
+            <i class="bi bi-check-circle-fill"></i> ${s.titolo}
+        </div>`
+    ).join('');
+    document.getElementById('rec-durata').textContent = `circa ${durata} min`;
 }
 
 function confermaPrenotazione() {
