@@ -79,6 +79,9 @@
                             <th>Prezzo</th>
                             <th>Durata</th>
                             <th>Stato</th>
+                            <th class="text-center" title="Visibile al cliente nel catalogo prenotabile">
+                                <i class="bi bi-globe2"></i> Pubblico
+                            </th>
                             <th class="text-center">Azioni</th>
                         </tr>
                     </thead>
@@ -126,6 +129,15 @@
                                 {% else %}
                                     <span class="badge bg-danger">Inattivo</span>
                                 {% endif %}
+                            </td>
+                            <td class="text-center">
+                                <div class="form-check form-switch d-inline-block" title="{% if item.mostra_pubblico %}Visibile al cliente nel catalogo prenotabile. Click per nascondere{% else %}Nascosto al cliente. Click per renderlo prenotabile{% endif %}">
+                                    <input class="form-check-input toggle-pubblico"
+                                           type="checkbox"
+                                           data-pk="{{ item.pk }}"
+                                           {% if item.mostra_pubblico %}checked{% endif %}
+                                           style="cursor:pointer; width:2.5em; height:1.4em;">
+                                </div>
                             </td>
                             <td class="text-center">
                                 <div class="btn-group" role="group">
@@ -211,6 +223,42 @@ document.addEventListener('DOMContentLoaded', function() {
         searchTimeout = setTimeout(() => {
             form.submit();
         }, 500);
+    });
+
+    // Toggle 'Mostra al pubblico' inline
+    function getCookie(name) {
+        const m = document.cookie.match('(^|;)\\s*' + name + '=([^;]+)');
+        return m ? m[2] : '';
+    }
+    document.querySelectorAll('.toggle-pubblico').forEach(chk => {
+        chk.addEventListener('change', function() {
+            const pk = this.dataset.pk;
+            const wasChecked = !this.checked;  // valore prima del flip
+            fetch(`/catalogo/${pk}/toggle-pubblico/`, {
+                method: 'POST',
+                headers: {
+                    'X-CSRFToken': getCookie('csrftoken'),
+                    'Content-Type': 'application/json',
+                },
+                credentials: 'same-origin',
+            })
+            .then(r => r.json())
+            .then(d => {
+                if (d.ok) {
+                    this.checked = d.mostra_pubblico;
+                    this.closest('.form-check').title = d.mostra_pubblico
+                        ? 'Visibile al cliente nel catalogo prenotabile. Click per nascondere'
+                        : 'Nascosto al cliente. Click per renderlo prenotabile';
+                } else {
+                    this.checked = wasChecked;
+                    alert(d.error || 'Errore');
+                }
+            })
+            .catch(() => {
+                this.checked = wasChecked;
+                alert('Errore di rete');
+            });
+        });
     });
 });
 </script>

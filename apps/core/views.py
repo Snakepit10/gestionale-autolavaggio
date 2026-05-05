@@ -419,3 +419,22 @@ def servizi_api(request):
         })
     return JsonResponse(data, safe=False)
 
+
+@login_required
+def toggle_mostra_pubblico(request, pk):
+    """AJAX: flip ServizioProdotto.mostra_pubblico.
+
+    Solo staff puo togliere/mettere il flag.
+    """
+    if request.method != 'POST':
+        return JsonResponse({'error': 'Metodo non permesso'}, status=405)
+    if not (request.user.is_staff or request.user.is_superuser):
+        return JsonResponse({'error': 'Non autorizzato'}, status=403)
+    try:
+        sp = ServizioProdotto.objects.get(pk=pk)
+    except ServizioProdotto.DoesNotExist:
+        return JsonResponse({'error': 'Servizio non trovato'}, status=404)
+    sp.mostra_pubblico = not sp.mostra_pubblico
+    sp.save(update_fields=['mostra_pubblico'])
+    return JsonResponse({'ok': True, 'mostra_pubblico': sp.mostra_pubblico})
+

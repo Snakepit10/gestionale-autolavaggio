@@ -17,6 +17,7 @@ urlpatterns = [
     path('catalogo/nuovo/', views.CatalogoCreateView.as_view(), name='catalogo-create'),
     path('catalogo/<int:pk>/modifica/', views.CatalogoUpdateView.as_view(), name='catalogo-update'),
     path('catalogo/<int:pk>/elimina/', views.CatalogoDeleteView.as_view(), name='catalogo-delete'),
+    path('catalogo/<int:pk>/toggle-pubblico/', views.toggle_mostra_pubblico, name='catalogo-toggle-pubblico'),
     
     # CRUD Sconti
     path('sconti/', views.ScontiListView.as_view(), name='sconti-list'),
