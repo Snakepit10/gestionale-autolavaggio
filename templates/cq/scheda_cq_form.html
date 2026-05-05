@@ -567,6 +567,9 @@ window.addTipo = function(zona, tipo, tipoNome, richiedeDesc) {
 /* ------------------------------------------------------------------ */
 function creaFotoInput(key) {
   const container = document.getElementById('foto-inputs-container');
+
+  // Input principale (file picker generico) - serve come storage del file
+  // perche e' quello che viene poi inviato al backend
   const inp = document.createElement('input');
   inp.type = 'file';
   inp.id   = 'foto-input-' + key;
@@ -574,6 +577,32 @@ function creaFotoInput(key) {
   inp.style.display = 'none';
   inp.addEventListener('change', function() { aggiornaFotoPreview(key, this); });
   container.appendChild(inp);
+
+  // Input camera-only (capture environment): usato dal bottone 'Scatta foto'.
+  // Quando l'utente scatta, la foto viene copiata nell'input principale.
+  const camInp = document.createElement('input');
+  camInp.type = 'file';
+  camInp.id = 'foto-cam-' + key;
+  camInp.accept = 'image/*';
+  camInp.setAttribute('capture', 'environment');
+  camInp.style.display = 'none';
+  camInp.addEventListener('change', function() {
+    if (this.files && this.files[0]) {
+      // Trasferisci il file nell'input principale (DataTransfer per
+      // copiare i file fra input)
+      try {
+        const dt = new DataTransfer();
+        dt.items.add(this.files[0]);
+        inp.files = dt.files;
+      } catch (e) {
+        // Fallback: rinomina l'input cam come principale (browser molto vecchi)
+        console.warn('DataTransfer non supportato, fallback', e);
+      }
+      aggiornaFotoPreview(key, inp);
+      this.value = '';  // svuota l'input cam per permettere scatti successivi
+    }
+  });
+  container.appendChild(camInp);
 }
 
 function aggiornaFotoPreview(key, input) {
@@ -675,8 +704,11 @@ function renderCart() {
                oninput="setDesc('${key}', this.value)">
       </div>` : ''}
       <div class="d-flex align-items-center flex-wrap gap-1">
-        <label for="foto-input-${key}" class="btn btn-outline-secondary btn-sm foto-btn" style="cursor:pointer">
-          <i class="bi bi-camera"></i> Foto
+        <label for="foto-cam-${key}" class="btn btn-outline-primary btn-sm foto-btn" style="cursor:pointer" title="Scatta una foto con la fotocamera">
+          <i class="bi bi-camera-fill"></i> Scatta
+        </label>
+        <label for="foto-input-${key}" class="btn btn-outline-secondary btn-sm foto-btn" style="cursor:pointer" title="Carica un'immagine dalla galleria">
+          <i class="bi bi-image"></i> Galleria
         </label>
         <div id="foto-preview-${key}" class="d-inline-flex align-items-center"></div>
       </div>
@@ -687,9 +719,11 @@ function renderCart() {
 window.rimuoviDifetto = function(key) {
   const zona = zonaFromKey(key);
   delete selezioni[key];
-  // Rimuovi il file input dal DOM
+  // Rimuovi entrambi i file input dal DOM (principale + cam)
   const inp = document.getElementById('foto-input-' + key);
   if (inp) inp.remove();
+  const camInp = document.getElementById('foto-cam-' + key);
+  if (camInp) camInp.remove();
   aggiornaContatoriZona(zona);
   renderCart();
   if (zonaAttiva === zona) renderPanel(zona);
