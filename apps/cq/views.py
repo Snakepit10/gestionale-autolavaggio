@@ -1391,7 +1391,7 @@ def analytics_cq(request):
 
     # ---------- Filtri options ----------
     postazioni_choices = list(PostazioneCQ.objects.filter(attiva=True).values('codice', 'nome'))
-    categorie_difetto = list(CategoriaDifetto.objects.filter(attiva=True).values('id', 'nome'))
+    categorie_difetto = list(CategoriaDifetto.objects.all().order_by('ordine', 'nome').values('id', 'nome'))
     operatori_choices = list(
         User.objects.filter(schede_cq_compilate__isnull=False).distinct()
         .values('id', 'first_name', 'last_name', 'username')
