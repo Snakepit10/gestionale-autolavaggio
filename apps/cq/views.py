@@ -1089,30 +1089,42 @@ def api_applica_preset(request, pk):
 
 
 # ===========================================================================
-# Dashboard Analitica KPI (Kaizen)
+# Dashboard Analitica KPI (Kaizen) - unifica DifettoCQ + SegnalazioneDifetto
 # ===========================================================================
+
+def _full_name_or_username(u):
+    if not u:
+        return ''
+    name = (u.get_full_name() or '').strip()
+    return name or (u.username or '')
+
 
 @login_required
 def analytics_cq(request):
     """Dashboard KPI completa per analisi qualita e Kaizen.
 
+    Fonti unificate:
+      - DifettoCQ (compilati nelle schede CQ finali)
+      - SegnalazioneDifetto (segnalati dagli operatori nei turni)
+
     Filtri (querystring):
       - data_da, data_a (YYYY-MM-DD)
-      - postazione (PostazioneCQ.codice)
+      - postazione (codice postazione responsabile/produttore)
       - categoria_difetto (CategoriaDifetto.id)
       - gravita (bassa|media|alta)
       - operatore (User.id)
-      - export=csv (scarica CSV invece di renderizzare)
+      - sorgente (scheda_cq|turno|'')
+      - export=csv
     """
     from datetime import datetime, timedelta
-    from collections import defaultdict
+    from collections import Counter, defaultdict
     import csv
     from django.http import HttpResponse
-    from django.db.models import Count, Q
     from apps.ordini.models import Ordine
+    from apps.turni.models import SegnalazioneDifetto
 
-    # ---------- Parse filtri ----------
     today = timezone.now().date()
+
     def _parse_d(s, default):
         try:
             return datetime.strptime(s, '%Y-%m-%d').date() if s else default
@@ -1125,90 +1137,149 @@ def analytics_cq(request):
     categoria_difetto_id = request.GET.get('categoria_difetto') or ''
     gravita_filter = request.GET.get('gravita') or ''
     operatore_id = request.GET.get('operatore') or ''
+    sorgente_filter = request.GET.get('sorgente') or ''
 
-    # Periodo precedente di pari durata
     delta_days = (data_a - data_da).days + 1
     data_da_prev = data_da - timedelta(days=delta_days)
     data_a_prev = data_da - timedelta(days=1)
 
-    # ---------- Querysets base ----------
-    schede_qs = SchedaCQ.objects.filter(
-        data_ora__date__gte=data_da, data_ora__date__lte=data_a,
-    )
-    difetti_qs = DifettoCQ.objects.filter(
-        scheda__data_ora__date__gte=data_da, scheda__data_ora__date__lte=data_a,
-    ).select_related('scheda', 'scheda__ordine', 'scheda__ordine__cliente', 'scheda__compilata_da')
-
-    if postazione_filter:
-        difetti_qs = difetti_qs.filter(postazione_responsabile=postazione_filter)
-    if gravita_filter:
-        difetti_qs = difetti_qs.filter(gravita=gravita_filter)
-    if operatore_id:
-        difetti_qs = difetti_qs.filter(scheda__compilata_da_id=operatore_id)
-        schede_qs = schede_qs.filter(compilata_da_id=operatore_id)
-
-    # Filtro categoria_difetto: ricava codici tipo da CategoriaDifetto -> TipoDifettoConfig
+    # Filtro categoria difetto: ricava codici tipo
+    codici_tipi_filtro = None
     if categoria_difetto_id:
-        codici_tipi = list(
+        codici_tipi_filtro = set(
             TipoDifettoConfig.objects.filter(
                 categoria_id=categoria_difetto_id, attivo=True
             ).values_list('codice', flat=True)
         )
-        if codici_tipi:
-            difetti_qs = difetti_qs.filter(tipo_difetto__in=codici_tipi)
-        else:
-            difetti_qs = difetti_qs.none()
 
-    # ---------- Export CSV ----------
+    # ------------------------------------------------------------------
+    # Helper: carica e normalizza difetti del periodo specificato
+    # ------------------------------------------------------------------
+    def _load_defects(d_da, d_a):
+        out = []
+        # 1. DifettoCQ
+        cq_qs = DifettoCQ.objects.filter(
+            scheda__data_ora__date__gte=d_da, scheda__data_ora__date__lte=d_a,
+        ).select_related(
+            'scheda', 'scheda__ordine', 'scheda__ordine__cliente',
+            'scheda__compilata_da',
+        )
+        for d in cq_qs:
+            sc = d.scheda
+            out.append({
+                'data_ora': sc.data_ora,
+                'zona': d.zona,
+                'tipo': d.tipo_difetto,
+                'gravita': d.gravita,
+                'postazione': d.postazione_responsabile or '',
+                'azione': d.azione_correttiva,
+                'azione_implementata': d.azione_correttiva == 'sistemato',
+                'compilatore_id': sc.compilata_da_id,
+                'compilatore_nome': _full_name_or_username(sc.compilata_da),
+                'ordine': sc.ordine,
+                'sorgente': 'scheda_cq',
+            })
+
+        # 2. SegnalazioneDifetto (turni)
+        sg_qs = SegnalazioneDifetto.objects.filter(
+            data_ora__date__gte=d_da, data_ora__date__lte=d_a,
+        ).select_related('ordine', 'ordine__cliente', 'operatore', 'postazione_cq')
+        for s in sg_qs:
+            out.append({
+                'data_ora': s.data_ora,
+                'zona': s.zona,
+                'tipo': s.tipo_difetto,
+                'gravita': s.gravita,
+                'postazione': s.postazione_produttore or '',
+                'azione': s.azione,
+                'azione_implementata': s.azione == 'corretto',
+                'compilatore_id': s.operatore_id,
+                'compilatore_nome': _full_name_or_username(s.operatore),
+                'ordine': s.ordine,
+                'sorgente': 'turno',
+            })
+        return out
+
+    def _apply_filters(items):
+        out = items
+        if sorgente_filter:
+            out = [d for d in out if d['sorgente'] == sorgente_filter]
+        if postazione_filter:
+            out = [d for d in out if d['postazione'] == postazione_filter]
+        if gravita_filter:
+            out = [d for d in out if d['gravita'] == gravita_filter]
+        if operatore_id:
+            try:
+                op_id_int = int(operatore_id)
+                out = [d for d in out if d['compilatore_id'] == op_id_int]
+            except (TypeError, ValueError):
+                pass
+        if codici_tipi_filtro is not None:
+            out = [d for d in out if d['tipo'] in codici_tipi_filtro]
+        return out
+
+    defects = _apply_filters(_load_defects(data_da, data_a))
+    defects_prev = _apply_filters(_load_defects(data_da_prev, data_a_prev))
+
+    # ------------------------------------------------------------------
+    # Schede CQ (per FTR / % OK) - solo SchedaCQ
+    # ------------------------------------------------------------------
+    schede_qs = SchedaCQ.objects.filter(
+        data_ora__date__gte=data_da, data_ora__date__lte=data_a,
+    )
+    if operatore_id:
+        try:
+            schede_qs = schede_qs.filter(compilata_da_id=int(operatore_id))
+        except (TypeError, ValueError):
+            pass
+
+    # ------------------------------------------------------------------
+    # Export CSV
+    # ------------------------------------------------------------------
     if request.GET.get('export') == 'csv':
+        zone_dict = {z.codice: z.nome for z in ZonaConfig.objects.all()}
+        tipi_dict = {t.codice: t.nome for t in TipoDifettoConfig.objects.all()}
+        post_dict = {p.codice: p.nome for p in PostazioneCQ.objects.all()}
         response = HttpResponse(content_type='text/csv; charset=utf-8')
         response['Content-Disposition'] = (
             f'attachment; filename="analytics_cq_{data_da}_{data_a}.csv"'
         )
-        # BOM per Excel
         response.write('\ufeff')
         writer = csv.writer(response, delimiter=';')
         writer.writerow([
-            'Data', 'Ora', 'Ordine', 'Cliente', 'Zona', 'Tipo Difetto',
-            'Gravita', 'Postazione Responsabile', 'Azione', 'Compilatore', 'Rilevato Da',
+            'Data', 'Ora', 'Fonte', 'Ordine', 'Cliente', 'Zona', 'Tipo Difetto',
+            'Gravita', 'Postazione', 'Azione', 'Compilatore/Rilevatore',
         ])
-        for d in difetti_qs.order_by('-scheda__data_ora')[:5000]:
-            sc = d.scheda
+        for d in sorted(defects, key=lambda x: x['data_ora'], reverse=True)[:5000]:
+            ord_obj = d['ordine']
             writer.writerow([
-                sc.data_ora.strftime('%d/%m/%Y'),
-                sc.data_ora.strftime('%H:%M'),
-                sc.ordine.numero_progressivo if sc.ordine else '',
-                str(sc.ordine.cliente) if sc.ordine and sc.ordine.cliente else '',
-                d.zona, d.tipo_difetto, d.gravita,
-                d.postazione_responsabile,
-                d.azione_correttiva,
-                sc.compilata_da.get_full_name() if sc.compilata_da else '',
-                sc.rilevato_da or '',
+                d['data_ora'].strftime('%d/%m/%Y'),
+                d['data_ora'].strftime('%H:%M'),
+                'Scheda CQ' if d['sorgente'] == 'scheda_cq' else 'Turno',
+                ord_obj.numero_progressivo if ord_obj else '',
+                str(ord_obj.cliente) if ord_obj and ord_obj.cliente else '',
+                zone_dict.get(d['zona'], d['zona']),
+                tipi_dict.get(d['tipo'], d['tipo']),
+                d['gravita'],
+                post_dict.get(d['postazione'], d['postazione']),
+                d['azione'],
+                d['compilatore_nome'],
             ])
         return response
 
-    # ---------- KPI volumi ----------
+    # ------------------------------------------------------------------
+    # KPI
+    # ------------------------------------------------------------------
+    totale_difetti = len(defects)
+    totale_difetti_prev = len(defects_prev)
     totale_schede = schede_qs.count()
-    totale_difetti = difetti_qs.count()
     schede_ok = schede_qs.filter(esito='ok').count()
     schede_non_ok = schede_qs.filter(esito='non_ok').count()
     schede_ok_rilievo = schede_qs.filter(esito='ok_con_rilievo').count()
     perc_ok = (schede_ok / totale_schede * 100) if totale_schede else 0
-    ftr_rate = perc_ok  # First Time Right = % schede 'ok' (no rilievi)
+    ftr_rate = perc_ok
 
-    # ---------- Periodo precedente per confronto ----------
-    schede_prev_qs = SchedaCQ.objects.filter(
-        data_ora__date__gte=data_da_prev, data_ora__date__lte=data_a_prev,
-    )
-    difetti_prev_qs = DifettoCQ.objects.filter(
-        scheda__data_ora__date__gte=data_da_prev,
-        scheda__data_ora__date__lte=data_a_prev,
-    )
-    if operatore_id:
-        difetti_prev_qs = difetti_prev_qs.filter(scheda__compilata_da_id=operatore_id)
-    totale_difetti_prev = difetti_prev_qs.count()
-
-    # Indice miglioramento continuo: variazione %
+    # Variazione vs periodo precedente
     if totale_difetti_prev > 0:
         variazione_pct = ((totale_difetti - totale_difetti_prev) / totale_difetti_prev) * 100
     elif totale_difetti > 0:
@@ -1216,167 +1287,148 @@ def analytics_cq(request):
     else:
         variazione_pct = 0.0
 
-    # ---------- DPMO (Six Sigma) ----------
-    # Opportunita = N. ordini completati x N. zone configurate
+    # DPMO
     num_ordini_completati = Ordine.objects.filter(
         stato='completato',
         data_ora__date__gte=data_da, data_ora__date__lte=data_a,
     ).count()
     num_zone = ZonaConfig.objects.filter(attiva=True).count() or 1
     opportunita = num_ordini_completati * num_zone
-    if opportunita > 0:
-        dpmo = round(totale_difetti / opportunita * 1_000_000)
-    else:
-        dpmo = 0
+    dpmo = round(totale_difetti / opportunita * 1_000_000) if opportunita > 0 else 0
 
-    # ---------- Distribuzione gravita ----------
-    grav_counts = (
-        difetti_qs.values('gravita').annotate(n=Count('id')).order_by()
-    )
-    grav_map = {g['gravita']: g['n'] for g in grav_counts}
+    # ------------------------------------------------------------------
+    # Aggregazioni
+    # ------------------------------------------------------------------
+    grav_count = Counter(d['gravita'] for d in defects)
     grav_data = {
-        'bassa': grav_map.get('bassa', 0),
-        'media': grav_map.get('media', 0),
-        'alta': grav_map.get('alta', 0),
+        'bassa': grav_count.get('bassa', 0),
+        'media': grav_count.get('media', 0),
+        'alta': grav_count.get('alta', 0),
     }
 
-    # ---------- Pareto top 10 tipologie ----------
-    tipi_counts = list(
-        difetti_qs.values('tipo_difetto').annotate(n=Count('id')).order_by('-n')[:10]
-    )
-    # Risolvi nomi
+    # Pareto top 10 tipi
     tipi_dict = {t.codice: t.nome for t in TipoDifettoConfig.objects.all()}
-    pareto_data = []
+    tipi_count = Counter(d['tipo'] for d in defects).most_common(10)
+    totale_top = sum(c for _, c in tipi_count) or 1
     cumulativo = 0
-    totale_top = sum(t['n'] for t in tipi_counts) or 1
-    for t in tipi_counts:
-        cumulativo += t['n']
+    pareto_data = []
+    for t_cod, n in tipi_count:
+        cumulativo += n
         pareto_data.append({
-            'tipo': tipi_dict.get(t['tipo_difetto'], t['tipo_difetto']),
-            'count': t['n'],
-            'pct': round(t['n'] / totale_top * 100, 1),
+            'tipo': tipi_dict.get(t_cod, t_cod),
+            'count': n,
+            'pct': round(n / totale_top * 100, 1),
             'cumulativo_pct': round(cumulativo / totale_top * 100, 1),
         })
 
-    # ---------- Distribuzione zone ----------
-    zone_counts = list(
-        difetti_qs.values('zona').annotate(n=Count('id')).order_by('-n')[:10]
-    )
+    # Top zone
     zone_dict = {z.codice: z.nome for z in ZonaConfig.objects.all()}
-    zone_chart = [
-        {'zona': zone_dict.get(z['zona'], z['zona']), 'count': z['n']}
-        for z in zone_counts
-    ]
+    zone_count = Counter(d['zona'] for d in defects).most_common(10)
+    zone_chart = [{'zona': zone_dict.get(z, z), 'count': n} for z, n in zone_count]
 
-    # ---------- Distribuzione postazioni ----------
-    post_counts = list(
-        difetti_qs.values('postazione_responsabile').annotate(n=Count('id')).order_by('-n')
-    )
+    # Postazioni
     post_dict = {p.codice: p.nome for p in PostazioneCQ.objects.all()}
-    post_chart = [
-        {'postazione': post_dict.get(p['postazione_responsabile'], p['postazione_responsabile']), 'count': p['n']}
-        for p in post_counts
-    ]
+    post_count = Counter(d['postazione'] for d in defects if d['postazione']).most_common()
+    post_chart = [{'postazione': post_dict.get(p, p), 'count': n} for p, n in post_count]
 
-    # ---------- Trend giornaliero ----------
-    trend = defaultdict(int)
-    for d in difetti_qs.values('scheda__data_ora__date').annotate(n=Count('id')):
-        trend[d['scheda__data_ora__date']] = d['n']
+    # Trend giornaliero (corrente + precedente)
+    trend_curr = defaultdict(int)
+    for d in defects:
+        trend_curr[d['data_ora'].date()] += 1
+    trend_prev = defaultdict(int)
+    for d in defects_prev:
+        trend_prev[d['data_ora'].date()] += 1
     trend_labels, trend_values = [], []
     cur = data_da
     while cur <= data_a:
         trend_labels.append(cur.strftime('%d/%m'))
-        trend_values.append(trend.get(cur, 0))
+        trend_values.append(trend_curr.get(cur, 0))
         cur += timedelta(days=1)
-
-    # Trend periodo precedente
-    trend_prev = defaultdict(int)
-    for d in difetti_prev_qs.values('scheda__data_ora__date').annotate(n=Count('id')):
-        trend_prev[d['scheda__data_ora__date']] = d['n']
     trend_values_prev = []
     cur = data_da_prev
     while cur <= data_a_prev:
         trend_values_prev.append(trend_prev.get(cur, 0))
         cur += timedelta(days=1)
 
-    # ---------- Heatmap giorno settimana x ora ----------
+    # Heatmap giorno settimana x ora
     heatmap = [[0] * 24 for _ in range(7)]
-    for d in difetti_qs.values('scheda__data_ora'):
-        dt = d['scheda__data_ora']
+    for d in defects:
+        dt = d['data_ora']
         if dt:
             wd = dt.weekday()
             hr = timezone.localtime(dt).hour if timezone.is_aware(dt) else dt.hour
             heatmap[wd][hr] += 1
     heatmap_max = max((max(row) for row in heatmap), default=0)
 
-    # ---------- Difetti ricorrenti ----------
-    ricorrenti = list(
-        difetti_qs.values('zona', 'tipo_difetto', 'postazione_responsabile')
-        .annotate(n=Count('id'))
-        .filter(n__gt=1)
-        .order_by('-n')[:15]
+    # Difetti ricorrenti: stessa (zona, tipo, postazione)
+    rec_keys = Counter(
+        (d['zona'], d['tipo'], d['postazione']) for d in defects
     )
-    for r in ricorrenti:
-        r['zona_nome'] = zone_dict.get(r['zona'], r['zona'])
-        r['tipo_nome'] = tipi_dict.get(r['tipo_difetto'], r['tipo_difetto'])
-        r['post_nome'] = post_dict.get(r['postazione_responsabile'], r['postazione_responsabile'])
+    ricorrenti = []
+    for (z, t, p), n in sorted(rec_keys.items(), key=lambda x: -x[1]):
+        if n <= 1:
+            continue
+        ricorrenti.append({
+            'zona_nome': zone_dict.get(z, z),
+            'tipo_nome': tipi_dict.get(t, t),
+            'post_nome': post_dict.get(p, p),
+            'n': n,
+        })
+        if len(ricorrenti) >= 15:
+            break
     num_ricorrenti = len(ricorrenti)
 
-    # ---------- % Azione: corretti vs solo segnalati ----------
-    azione_counts = (
-        difetti_qs.values('azione_correttiva').annotate(n=Count('id')).order_by()
-    )
-    azione_map = {a['azione_correttiva']: a['n'] for a in azione_counts}
-    sistemati = azione_map.get('sistemato', 0)
+    # % azioni implementate (sistemato + corretto)
+    sistemati = sum(1 for d in defects if d['azione_implementata'])
     perc_implementate = (sistemati / totale_difetti * 100) if totale_difetti else 0
 
-    # ---------- Per operatore ----------
-    op_counts = list(
-        difetti_qs.values(
-            'scheda__compilata_da_id', 'scheda__compilata_da__first_name',
-            'scheda__compilata_da__last_name', 'scheda__compilata_da__username',
-        )
-        .annotate(n=Count('id'))
-        .order_by('-n')[:15]
-    )
-    operatori_chart = []
-    for o in op_counts:
-        nome = (f"{o['scheda__compilata_da__first_name']} "
-                f"{o['scheda__compilata_da__last_name']}").strip() or \
-               o['scheda__compilata_da__username'] or '-'
-        operatori_chart.append({'operatore': nome, 'count': o['n']})
+    # Per operatore
+    op_count = Counter(
+        (d['compilatore_id'], d['compilatore_nome']) for d in defects
+    ).most_common(15)
+    operatori_chart = [
+        {'operatore': nome or '-', 'count': n}
+        for (_id, nome), n in op_count
+    ]
 
-    # ---------- Tabella dettagli (paginata) ----------
+    # ------------------------------------------------------------------
+    # Tabella dettagli (paginata)
+    # ------------------------------------------------------------------
     from django.core.paginator import Paginator
+    sorted_defects = sorted(defects, key=lambda x: x['data_ora'], reverse=True)
+    paginator = Paginator(sorted_defects, 25)
     page = int(request.GET.get('page', 1) or 1)
-    table_qs = difetti_qs.order_by('-scheda__data_ora')
-    paginator = Paginator(table_qs, 25)
     page_obj = paginator.get_page(page)
     table_rows = []
     for d in page_obj:
-        sc = d.scheda
+        ord_obj = d['ordine']
         table_rows.append({
-            'data': sc.data_ora,
-            'ordine': sc.ordine.numero_progressivo if sc.ordine else '',
-            'cliente': str(sc.ordine.cliente) if sc.ordine and sc.ordine.cliente else 'Anonimo',
-            'zona': zone_dict.get(d.zona, d.zona),
-            'tipo': tipi_dict.get(d.tipo_difetto, d.tipo_difetto),
-            'gravita': d.gravita,
-            'postazione': post_dict.get(d.postazione_responsabile, d.postazione_responsabile),
-            'azione': d.get_azione_correttiva_display() if hasattr(d, 'get_azione_correttiva_display') else d.azione_correttiva,
-            'compilatore': sc.compilata_da.get_full_name() if sc.compilata_da and sc.compilata_da.get_full_name() else (sc.compilata_da.username if sc.compilata_da else ''),
-            'ordine_pk': sc.ordine.pk if sc.ordine else None,
+            'data': d['data_ora'],
+            'sorgente': d['sorgente'],
+            'ordine': ord_obj.numero_progressivo if ord_obj else '',
+            'cliente': str(ord_obj.cliente) if ord_obj and ord_obj.cliente else 'Anonimo',
+            'zona': zone_dict.get(d['zona'], d['zona']),
+            'tipo': tipi_dict.get(d['tipo'], d['tipo']),
+            'gravita': d['gravita'],
+            'postazione': post_dict.get(d['postazione'], d['postazione']),
+            'azione': d['azione'],
+            'compilatore': d['compilatore_nome'],
+            'ordine_pk': ord_obj.pk if ord_obj else None,
         })
 
-    # ---------- Soglie semaforiche ----------
+    # ------------------------------------------------------------------
+    # Soglie semaforiche
+    # ------------------------------------------------------------------
     def _stato_perc_ok(v):
         if v >= 90: return 'ok'
         if v >= 75: return 'warn'
         return 'danger'
+
     def _stato_dpmo(v):
         if v <= 6210: return 'ok'
         if v <= 66807: return 'warn'
         return 'danger'
+
     def _stato_var(v):
         if v <= -5: return 'ok'
         if v <= 5: return 'warn'
@@ -1389,11 +1441,19 @@ def analytics_cq(request):
         'variazione': _stato_var(variazione_pct),
     }
 
-    # ---------- Filtri options ----------
+    # Counts per fonte (info pannello)
+    n_da_schede = sum(1 for d in defects if d['sorgente'] == 'scheda_cq')
+    n_da_turno = sum(1 for d in defects if d['sorgente'] == 'turno')
+
+    # ------------------------------------------------------------------
+    # Filtri options
+    # ------------------------------------------------------------------
     postazioni_choices = list(PostazioneCQ.objects.filter(attiva=True).values('codice', 'nome'))
     categorie_difetto = list(CategoriaDifetto.objects.all().order_by('ordine', 'nome').values('id', 'nome'))
     operatori_choices = list(
-        User.objects.filter(schede_cq_compilate__isnull=False).distinct()
+        User.objects.filter(
+            Q(schede_cq_compilate__isnull=False) | Q(segnalazioni_difetti__isnull=False)
+        ).distinct()
         .values('id', 'first_name', 'last_name', 'username')
         .order_by('first_name', 'last_name')
     )
@@ -1417,6 +1477,9 @@ def analytics_cq(request):
         'sistemati': sistemati,
         'num_ricorrenti': num_ricorrenti,
         'kpi_status': kpi_status,
+        'n_da_schede': n_da_schede,
+        'n_da_turno': n_da_turno,
+        # Charts
         'grav_data_json': json.dumps(grav_data),
         'pareto_data_json': json.dumps(pareto_data),
         'zone_chart_json': json.dumps(zone_chart),
@@ -1427,15 +1490,21 @@ def analytics_cq(request):
         'heatmap_json': json.dumps(heatmap),
         'heatmap_max': heatmap_max,
         'operatori_chart_json': json.dumps(operatori_chart),
+        # Tabella + ricorrenti
         'ricorrenti': ricorrenti,
         'table_rows': table_rows,
         'page_obj': page_obj,
+        # Filtri
         'postazione_filter': postazione_filter,
         'categoria_difetto_id': categoria_difetto_id,
         'gravita_filter': gravita_filter,
         'operatore_id': operatore_id,
+        'sorgente_filter': sorgente_filter,
         'postazioni_choices': postazioni_choices,
         'categorie_difetto': categorie_difetto,
         'operatori_choices': operatori_choices,
     }
+
+    # Q (per Q.objects above)
     return render(request, 'cq/analytics_cq.html', context)
+

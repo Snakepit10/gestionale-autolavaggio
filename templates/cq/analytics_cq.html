@@ -114,6 +114,16 @@
         </select>
       </div>
     </div>
+    <div class="row g-2 mt-1">
+      <div class="col-md-3">
+        <label class="form-label">Fonte difetto</label>
+        <select name="sorgente" class="form-select form-select-sm">
+          <option value="">Entrambe (schede CQ + turni)</option>
+          <option value="scheda_cq" {% if sorgente_filter == 'scheda_cq' %}selected{% endif %}>Solo schede CQ ({{ n_da_schede }})</option>
+          <option value="turno" {% if sorgente_filter == 'turno' %}selected{% endif %}>Solo turni ({{ n_da_turno }})</option>
+        </select>
+      </div>
+    </div>
     <div class="d-flex gap-2 mt-2">
       <button class="btn btn-dark btn-sm" type="submit"><i class="bi bi-funnel"></i> Filtra</button>
       <a class="btn btn-outline-secondary btn-sm" href="{% url 'cq:analytics' %}"><i class="bi bi-arrow-clockwise"></i> Reset</a>
@@ -286,6 +296,7 @@
         <thead>
           <tr>
             <th>Data</th>
+            <th>Fonte</th>
             <th>Ordine</th>
             <th>Cliente</th>
             <th>Zona</th>
@@ -293,7 +304,7 @@
             <th>Gravita</th>
             <th>Postazione</th>
             <th>Azione</th>
-            <th>Compilatore</th>
+            <th>Operatore</th>
             <th></th>
           </tr>
         </thead>
@@ -301,6 +312,13 @@
           {% for r in table_rows %}
           <tr>
             <td>{{ r.data|date:"d/m H:i" }}</td>
+            <td>
+              {% if r.sorgente == 'scheda_cq' %}
+                <span class="badge bg-primary"><i class="bi bi-clipboard-check"></i> Scheda CQ</span>
+              {% else %}
+                <span class="badge bg-success"><i class="bi bi-broadcast"></i> Turno</span>
+              {% endif %}
+            </td>
             <td><strong>#{{ r.ordine|slice:"-6:" }}</strong></td>
             <td>{{ r.cliente }}</td>
             <td>{{ r.zona }}</td>
@@ -310,13 +328,15 @@
             <td><small class="text-muted">{{ r.azione }}</small></td>
             <td>{{ r.compilatore }}</td>
             <td>
-              {% if r.ordine_pk %}
-                <a href="{% url 'cq:scheda_detail' ordine_pk=r.ordine_pk %}" class="btn btn-outline-primary btn-sm py-0"><i class="bi bi-eye"></i></a>
+              {% if r.ordine_pk and r.sorgente == 'scheda_cq' %}
+                <a href="{% url 'cq:scheda_detail' ordine_pk=r.ordine_pk %}" class="btn btn-outline-primary btn-sm py-0" title="Apri scheda"><i class="bi bi-eye"></i></a>
+              {% elif r.ordine_pk %}
+                <a href="{% url 'ordini:ordine-detail' r.ordine_pk %}" class="btn btn-outline-secondary btn-sm py-0" title="Apri ordine"><i class="bi bi-eye"></i></a>
               {% endif %}
             </td>
           </tr>
           {% empty %}
-          <tr><td colspan="10" class="text-center py-4 text-muted">Nessun difetto nel periodo selezionato</td></tr>
+          <tr><td colspan="11" class="text-center py-4 text-muted">Nessun difetto nel periodo selezionato</td></tr>
           {% endfor %}
         </tbody>
       </table>

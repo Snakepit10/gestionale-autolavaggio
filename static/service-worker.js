@@ -6,8 +6,8 @@ self.addEventListener('message', (event) => {
     }
 });
 
-const CACHE_NAME = 'autolavaggio-cache-v4';
-const OFFLINE_CACHE = 'autolavaggio-offline-v4';
+const CACHE_NAME = 'autolavaggio-cache-v5';
+const OFFLINE_CACHE = 'autolavaggio-offline-v5';
 
 // File essenziali da pre-cachare per funzionamento offline
 // (cache.addAll e' atomico: se UNO fallisce, tutto fallisce)
@@ -83,6 +83,7 @@ const NETWORK_ONLY_PREFIXES = [
     '/turni/',           // dashboard operatore: dati live (coda, completate)
     '/ordini/cassa',     // POS: stato carrello sempre fresco
     '/postazioni/',      // dashboard postazioni: ordini live
+    '/cq/analytics',     // analytics KPI: dati live (segnalazioni in tempo reale)
 ];
 
 const NETWORK_ONLY_PATTERNS = [
