@@ -1,0 +1,465 @@
+{% extends "base.html" %}
+{% block title %}Analytics CQ - Kaizen{% endblock %}
+
+{% block extra_css %}
+<style>
+.analytics-page { background: #f0f2f5; min-height: 100vh; margin: -1rem; padding: 1.2rem; }
+.kpi-card { background: #fff; border-radius: 12px; padding: 16px 18px; box-shadow: 0 1px 3px rgba(0,0,0,.05); border-left: 5px solid #cbd5e1; height: 100%; }
+.kpi-card .label { font-size: .72rem; text-transform: uppercase; letter-spacing: .6px; color: #8a94a6; font-weight: 700; }
+.kpi-card .value { font-size: 1.9rem; font-weight: 800; line-height: 1.1; margin-top: 6px; color: #1e293b; }
+.kpi-card .sub { font-size: .75rem; color: #94a3b8; margin-top: 4px; }
+.kpi-card.status-ok { border-left-color: #16a34a; }
+.kpi-card.status-ok .value { color: #16a34a; }
+.kpi-card.status-warn { border-left-color: #f59e0b; }
+.kpi-card.status-warn .value { color: #d97706; }
+.kpi-card.status-danger { border-left-color: #dc2626; }
+.kpi-card.status-danger .value { color: #dc2626; }
+.kpi-card.hero { background: linear-gradient(135deg, #1e3a8a, #3b82f6); border-left: none; color: #fff; }
+.kpi-card.hero .label, .kpi-card.hero .value, .kpi-card.hero .sub { color: #fff; opacity: .95; }
+
+.chart-panel { background: #fff; border-radius: 12px; box-shadow: 0 1px 3px rgba(0,0,0,.05); height: 100%; overflow: hidden; }
+.chart-panel .panel-title { padding: 14px 18px 4px; font-size: .82rem; font-weight: 700; color: #475569; text-transform: uppercase; letter-spacing: .6px; display: flex; align-items: center; gap: 8px; }
+.chart-panel .panel-sub { padding: 0 18px 8px; font-size: .75rem; color: #94a3b8; }
+.chart-panel .panel-body { padding: 4px 14px 14px; }
+
+.filter-bar { background: #fff; border-radius: 12px; padding: 14px 18px; box-shadow: 0 1px 3px rgba(0,0,0,.05); margin-bottom: 14px; }
+.filter-bar .form-label { font-size: .7rem; text-transform: uppercase; color: #64748b; font-weight: 600; letter-spacing: .4px; margin-bottom: 4px; }
+
+.heatmap-grid { display: grid; grid-template-columns: 60px repeat(24, 1fr); gap: 2px; font-size: .65rem; }
+.heatmap-grid .hm-h { text-align: center; color: #94a3b8; font-weight: 600; padding: 2px 0; }
+.heatmap-grid .hm-d { font-weight: 600; color: #475569; padding: 6px 4px; display: flex; align-items: center; }
+.heatmap-grid .hm-c { aspect-ratio: 1; border-radius: 3px; display: flex; align-items: center; justify-content: center; font-weight: 600; color: #1e293b; }
+
+.grav-pill { display: inline-flex; align-items: center; gap: 4px; padding: 2px 8px; border-radius: 999px; font-size: .72rem; font-weight: 600; }
+.grav-pill.alta { background: #fee2e2; color: #991b1b; }
+.grav-pill.media { background: #fef3c7; color: #92400e; }
+.grav-pill.bassa { background: #e2e8f0; color: #475569; }
+
+.data-table { font-size: .85rem; }
+.data-table thead th { background: #f8fafc; font-size: .72rem; text-transform: uppercase; letter-spacing: .4px; color: #64748b; font-weight: 600; padding: 10px 12px; }
+.data-table tbody td { padding: 10px 12px; border-color: #f1f5f9; vertical-align: middle; }
+
+.ricorrente-card { background: #fff7ed; border: 1px solid #fed7aa; border-radius: 8px; padding: 10px 12px; }
+
+.section-title { font-size: 1rem; font-weight: 700; color: #1a1a2e; margin: 16px 0 10px; }
+
+@media (max-width: 768px) {
+  .heatmap-grid { font-size: .55rem; grid-template-columns: 40px repeat(24, 1fr); }
+}
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="analytics-page">
+
+  <div class="d-flex justify-content-between align-items-center mb-3 flex-wrap gap-2">
+    <h4 class="mb-0"><i class="bi bi-graph-up-arrow"></i> Analytics CQ &mdash; Kaizen</h4>
+    <div class="d-flex gap-2">
+      <a href="?{% for k, v in request.GET.items %}{% if k != 'export' %}{{ k }}={{ v }}&amp;{% endif %}{% endfor %}export=csv" class="btn btn-outline-success btn-sm">
+        <i class="bi bi-file-earmark-spreadsheet"></i> CSV
+      </a>
+      <a href="{% url 'cq:dashboard' %}" class="btn btn-outline-secondary btn-sm">
+        <i class="bi bi-speedometer2"></i> Dashboard
+      </a>
+    </div>
+  </div>
+
+  {# ====== Filtri ====== #}
+  <form method="get" class="filter-bar">
+    <div class="row g-2">
+      <div class="col-md-2">
+        <label class="form-label">Data da</label>
+        <input type="date" name="data_da" value="{{ data_da|date:'Y-m-d' }}" class="form-control form-control-sm">
+      </div>
+      <div class="col-md-2">
+        <label class="form-label">Data a</label>
+        <input type="date" name="data_a" value="{{ data_a|date:'Y-m-d' }}" class="form-control form-control-sm">
+      </div>
+      <div class="col-md-2">
+        <label class="form-label">Postazione</label>
+        <select name="postazione" class="form-select form-select-sm">
+          <option value="">Tutte</option>
+          {% for p in postazioni_choices %}
+            <option value="{{ p.codice }}" {% if postazione_filter == p.codice %}selected{% endif %}>{{ p.nome }}</option>
+          {% endfor %}
+        </select>
+      </div>
+      <div class="col-md-2">
+        <label class="form-label">Categoria difetto</label>
+        <select name="categoria_difetto" class="form-select form-select-sm">
+          <option value="">Tutte</option>
+          {% for c in categorie_difetto %}
+            <option value="{{ c.id }}" {% if categoria_difetto_id == c.id|stringformat:'s' %}selected{% endif %}>{{ c.nome }}</option>
+          {% endfor %}
+        </select>
+      </div>
+      <div class="col-md-2">
+        <label class="form-label">Gravita</label>
+        <select name="gravita" class="form-select form-select-sm">
+          <option value="">Tutte</option>
+          <option value="bassa" {% if gravita_filter == 'bassa' %}selected{% endif %}>Bassa</option>
+          <option value="media" {% if gravita_filter == 'media' %}selected{% endif %}>Media</option>
+          <option value="alta" {% if gravita_filter == 'alta' %}selected{% endif %}>Alta</option>
+        </select>
+      </div>
+      <div class="col-md-2">
+        <label class="form-label">Operatore</label>
+        <select name="operatore" class="form-select form-select-sm">
+          <option value="">Tutti</option>
+          {% for o in operatori_choices %}
+            <option value="{{ o.id }}" {% if operatore_id == o.id|stringformat:'s' %}selected{% endif %}>
+              {{ o.first_name }} {{ o.last_name|default:o.username }}
+            </option>
+          {% endfor %}
+        </select>
+      </div>
+    </div>
+    <div class="d-flex gap-2 mt-2">
+      <button class="btn btn-dark btn-sm" type="submit"><i class="bi bi-funnel"></i> Filtra</button>
+      <a class="btn btn-outline-secondary btn-sm" href="{% url 'cq:analytics' %}"><i class="bi bi-arrow-clockwise"></i> Reset</a>
+      <span class="text-muted small ms-auto align-self-center">
+        Confronto: {{ data_da_prev|date:"d/m/Y" }} &mdash; {{ data_a_prev|date:"d/m/Y" }}
+      </span>
+    </div>
+  </form>
+
+  {# ====== KPI Cards ====== #}
+  <div class="row g-2 mb-3">
+    <div class="col-6 col-lg-3">
+      <div class="kpi-card hero">
+        <div class="label">Totale difetti</div>
+        <div class="value">{{ totale_difetti }}</div>
+        <div class="sub">su {{ totale_schede }} schede &middot; {{ num_ricorrenti }} ricorrenti</div>
+      </div>
+    </div>
+    <div class="col-6 col-lg-3">
+      <div class="kpi-card status-{{ kpi_status.perc_ok }}">
+        <div class="label">% Schede OK</div>
+        <div class="value">{{ perc_ok }}%</div>
+        <div class="sub">{{ schede_ok }} OK / {{ schede_non_ok }} NON OK / {{ schede_ok_rilievo }} con rilievo</div>
+      </div>
+    </div>
+    <div class="col-6 col-lg-3">
+      <div class="kpi-card status-{{ kpi_status.dpmo }}">
+        <div class="label">DPMO (Six Sigma)</div>
+        <div class="value">{{ dpmo|stringformat:'d' }}</div>
+        <div class="sub">{{ num_ordini_completati }} ordini &times; {{ opportunita|add:0 }} opp.</div>
+      </div>
+    </div>
+    <div class="col-6 col-lg-3">
+      <div class="kpi-card status-{{ kpi_status.variazione }}">
+        <div class="label">Vs periodo precedente</div>
+        <div class="value">
+          {% if variazione_pct > 0 %}<i class="bi bi-arrow-up"></i> +{% endif %}{{ variazione_pct }}%
+        </div>
+        <div class="sub">prima: {{ totale_difetti_prev }} difetti</div>
+      </div>
+    </div>
+  </div>
+
+  {# Seconda riga KPI #}
+  <div class="row g-2 mb-3">
+    <div class="col-6 col-lg-3">
+      <div class="kpi-card status-{{ kpi_status.ftr }}">
+        <div class="label">First Time Right (FTR)</div>
+        <div class="value">{{ ftr_rate }}%</div>
+        <div class="sub">% lavaggi senza difetti al 1&deg; passaggio</div>
+      </div>
+    </div>
+    <div class="col-6 col-lg-3">
+      <div class="kpi-card">
+        <div class="label">Difetti corretti</div>
+        <div class="value">{{ perc_implementate }}%</div>
+        <div class="sub">{{ sistemati }} sistemati su {{ totale_difetti }}</div>
+      </div>
+    </div>
+    <div class="col-6 col-lg-3">
+      <div class="kpi-card">
+        <div class="label">Difetti ricorrenti</div>
+        <div class="value">{{ num_ricorrenti }}</div>
+        <div class="sub">stessa zona+tipo+postazione &gt; 1 volta</div>
+      </div>
+    </div>
+    <div class="col-6 col-lg-3">
+      <div class="kpi-card">
+        <div class="label">Periodo analizzato</div>
+        <div class="value" style="font-size:1.1rem">{{ data_da|date:"d/m" }} &mdash; {{ data_a|date:"d/m/Y" }}</div>
+        <div class="sub">{{ totale_schede }} schede compilate</div>
+      </div>
+    </div>
+  </div>
+
+  {# ====== Trend lineare con confronto periodo precedente ====== #}
+  <div class="row g-2 mb-3">
+    <div class="col-lg-8">
+      <div class="chart-panel">
+        <div class="panel-title"><i class="bi bi-graph-up text-primary"></i> Trend giornaliero</div>
+        <div class="panel-sub">Periodo corrente vs periodo precedente di pari durata</div>
+        <div class="panel-body"><canvas id="chartTrend" height="80"></canvas></div>
+      </div>
+    </div>
+    <div class="col-lg-4">
+      <div class="chart-panel">
+        <div class="panel-title"><i class="bi bi-pie-chart text-warning"></i> Distribuzione gravita</div>
+        <div class="panel-sub">Codice colore severita</div>
+        <div class="panel-body"><canvas id="chartGravita" height="180"></canvas></div>
+      </div>
+    </div>
+  </div>
+
+  {# ====== Pareto + Zone ====== #}
+  <div class="row g-2 mb-3">
+    <div class="col-lg-7">
+      <div class="chart-panel">
+        <div class="panel-title"><i class="bi bi-bar-chart-fill text-danger"></i> Pareto top 10 tipologie difetti</div>
+        <div class="panel-sub">Frequenza assoluta + linea cumulativa (regola 80/20)</div>
+        <div class="panel-body"><canvas id="chartPareto" height="220"></canvas></div>
+      </div>
+    </div>
+    <div class="col-lg-5">
+      <div class="chart-panel">
+        <div class="panel-title"><i class="bi bi-geo-alt text-info"></i> Top zone</div>
+        <div class="panel-sub">Zone auto piu problematiche</div>
+        <div class="panel-body"><canvas id="chartZone" height="220"></canvas></div>
+      </div>
+    </div>
+  </div>
+
+  {# ====== Postazioni + Operatori + Heatmap ====== #}
+  <div class="row g-2 mb-3">
+    <div class="col-lg-4">
+      <div class="chart-panel">
+        <div class="panel-title"><i class="bi bi-tools text-secondary"></i> Distribuzione postazioni</div>
+        <div class="panel-sub">Postazione responsabile del difetto</div>
+        <div class="panel-body"><canvas id="chartPostazioni" height="200"></canvas></div>
+      </div>
+    </div>
+    <div class="col-lg-4">
+      <div class="chart-panel">
+        <div class="panel-title"><i class="bi bi-people text-success"></i> Segnalazioni per operatore</div>
+        <div class="panel-sub">Cultura del reporting (non penalizzare)</div>
+        <div class="panel-body"><canvas id="chartOperatori" height="200"></canvas></div>
+      </div>
+    </div>
+    <div class="col-lg-4">
+      <div class="chart-panel h-100">
+        <div class="panel-title"><i class="bi bi-clock text-primary"></i> Heatmap giorno&times;ora</div>
+        <div class="panel-sub">Identifica fasce critiche</div>
+        <div class="panel-body" style="overflow-x:auto">
+          <div id="heatmapHost"></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  {# ====== Difetti ricorrenti ====== #}
+  {% if ricorrenti %}
+  <div class="chart-panel mb-3">
+    <div class="panel-title"><i class="bi bi-arrow-repeat text-warning"></i> Difetti ricorrenti</div>
+    <div class="panel-sub">Indicatore Kaizen: stesso problema (zona + tipo + postazione) ripetuto nel periodo</div>
+    <div class="panel-body">
+      <div class="row g-2">
+        {% for r in ricorrenti %}
+        <div class="col-md-6 col-lg-4">
+          <div class="ricorrente-card">
+            <div class="d-flex justify-content-between align-items-center">
+              <strong>{{ r.zona_nome }} &middot; {{ r.tipo_nome }}</strong>
+              <span class="badge bg-warning text-dark">x{{ r.n }}</span>
+            </div>
+            <div class="small text-muted mt-1"><i class="bi bi-tools"></i> {{ r.post_nome }}</div>
+          </div>
+        </div>
+        {% endfor %}
+      </div>
+    </div>
+  </div>
+  {% endif %}
+
+  {# ====== Tabella dettagli ====== #}
+  <div class="chart-panel mb-3">
+    <div class="panel-title">
+      <i class="bi bi-list-ul"></i> Dettaglio difetti
+      <span class="badge bg-light text-secondary ms-2">{{ page_obj.paginator.count }} righe</span>
+    </div>
+    <div class="table-responsive">
+      <table class="table data-table mb-0">
+        <thead>
+          <tr>
+            <th>Data</th>
+            <th>Ordine</th>
+            <th>Cliente</th>
+            <th>Zona</th>
+            <th>Tipo difetto</th>
+            <th>Gravita</th>
+            <th>Postazione</th>
+            <th>Azione</th>
+            <th>Compilatore</th>
+            <th></th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for r in table_rows %}
+          <tr>
+            <td>{{ r.data|date:"d/m H:i" }}</td>
+            <td><strong>#{{ r.ordine|slice:"-6:" }}</strong></td>
+            <td>{{ r.cliente }}</td>
+            <td>{{ r.zona }}</td>
+            <td>{{ r.tipo }}</td>
+            <td><span class="grav-pill {{ r.gravita }}">{{ r.gravita }}</span></td>
+            <td>{{ r.postazione }}</td>
+            <td><small class="text-muted">{{ r.azione }}</small></td>
+            <td>{{ r.compilatore }}</td>
+            <td>
+              {% if r.ordine_pk %}
+                <a href="{% url 'cq:scheda_detail' ordine_pk=r.ordine_pk %}" class="btn btn-outline-primary btn-sm py-0"><i class="bi bi-eye"></i></a>
+              {% endif %}
+            </td>
+          </tr>
+          {% empty %}
+          <tr><td colspan="10" class="text-center py-4 text-muted">Nessun difetto nel periodo selezionato</td></tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+    {% if page_obj.has_other_pages %}
+    <div class="d-flex justify-content-center align-items-center gap-2 py-3">
+      {% if page_obj.has_previous %}
+        <a class="btn btn-outline-secondary btn-sm" href="?page={{ page_obj.previous_page_number }}{% for k, v in request.GET.items %}{% if k != 'page' %}&amp;{{ k }}={{ v }}{% endif %}{% endfor %}"><i class="bi bi-chevron-left"></i></a>
+      {% endif %}
+      <span class="small text-muted">Pagina {{ page_obj.number }} / {{ page_obj.paginator.num_pages }}</span>
+      {% if page_obj.has_next %}
+        <a class="btn btn-outline-secondary btn-sm" href="?page={{ page_obj.next_page_number }}{% for k, v in request.GET.items %}{% if k != 'page' %}&amp;{{ k }}={{ v }}{% endif %}{% endfor %}"><i class="bi bi-chevron-right"></i></a>
+      {% endif %}
+    </div>
+    {% endif %}
+  </div>
+
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+const TREND_LABELS = {{ trend_labels_json|safe }};
+const TREND_VALUES = {{ trend_values_json|safe }};
+const TREND_VALUES_PREV = {{ trend_values_prev_json|safe }};
+const GRAV_DATA = {{ grav_data_json|safe }};
+const PARETO_DATA = {{ pareto_data_json|safe }};
+const ZONE_CHART = {{ zone_chart_json|safe }};
+const POST_CHART = {{ post_chart_json|safe }};
+const OPERATORI_CHART = {{ operatori_chart_json|safe }};
+const HEATMAP = {{ heatmap_json|safe }};
+const HEATMAP_MAX = {{ heatmap_max }};
+
+Chart.defaults.font.family = '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif';
+Chart.defaults.font.size = 11;
+
+// ===== Trend =====
+new Chart(document.getElementById('chartTrend'), {
+  type: 'line',
+  data: {
+    labels: TREND_LABELS,
+    datasets: [
+      { label: 'Periodo corrente', data: TREND_VALUES, borderColor: '#3b82f6', backgroundColor: 'rgba(59,130,246,.15)', fill: true, tension: .3, borderWidth: 2 },
+      { label: 'Periodo precedente', data: TREND_VALUES_PREV, borderColor: '#94a3b8', borderDash: [5,5], fill: false, tension: .3, borderWidth: 2 },
+    ]
+  },
+  options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { position: 'bottom' } }, scales: { y: { beginAtZero: true } } }
+});
+
+// ===== Gravita doughnut =====
+new Chart(document.getElementById('chartGravita'), {
+  type: 'doughnut',
+  data: {
+    labels: ['Bassa', 'Media', 'Alta'],
+    datasets: [{ data: [GRAV_DATA.bassa, GRAV_DATA.media, GRAV_DATA.alta], backgroundColor: ['#94a3b8','#f59e0b','#dc2626'], borderWidth: 0 }]
+  },
+  options: { responsive: true, maintainAspectRatio: false, cutout: '55%', plugins: { legend: { position: 'bottom' } } }
+});
+
+// ===== Pareto =====
+new Chart(document.getElementById('chartPareto'), {
+  data: {
+    labels: PARETO_DATA.map(p => p.tipo),
+    datasets: [
+      { type: 'bar', label: 'Frequenza', data: PARETO_DATA.map(p => p.count), backgroundColor: '#dc2626', borderRadius: 4, yAxisID: 'y' },
+      { type: 'line', label: 'Cumulativo %', data: PARETO_DATA.map(p => p.cumulativo_pct), borderColor: '#1e40af', backgroundColor: 'rgba(30,64,175,.1)', tension: .2, yAxisID: 'y1', pointRadius: 4, borderWidth: 2 },
+    ]
+  },
+  options: {
+    responsive: true, maintainAspectRatio: false,
+    plugins: { legend: { position: 'bottom' } },
+    scales: {
+      y: { beginAtZero: true, position: 'left', title: { display: true, text: 'Frequenza' } },
+      y1: { beginAtZero: true, max: 100, position: 'right', grid: { drawOnChartArea: false }, title: { display: true, text: '% cumulativo' } },
+    }
+  }
+});
+
+// ===== Zone =====
+new Chart(document.getElementById('chartZone'), {
+  type: 'bar',
+  data: {
+    labels: ZONE_CHART.map(z => z.zona),
+    datasets: [{ data: ZONE_CHART.map(z => z.count), backgroundColor: '#0ea5e9', borderRadius: 4 }]
+  },
+  options: { indexAxis: 'y', responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false } }, scales: { x: { beginAtZero: true } } }
+});
+
+// ===== Postazioni =====
+new Chart(document.getElementById('chartPostazioni'), {
+  type: 'bar',
+  data: {
+    labels: POST_CHART.map(p => p.postazione),
+    datasets: [{ data: POST_CHART.map(p => p.count), backgroundColor: '#64748b', borderRadius: 4 }]
+  },
+  options: { indexAxis: 'y', responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false } }, scales: { x: { beginAtZero: true } } }
+});
+
+// ===== Operatori =====
+new Chart(document.getElementById('chartOperatori'), {
+  type: 'bar',
+  data: {
+    labels: OPERATORI_CHART.map(o => o.operatore),
+    datasets: [{ data: OPERATORI_CHART.map(o => o.count), backgroundColor: '#10b981', borderRadius: 4 }]
+  },
+  options: { indexAxis: 'y', responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false } }, scales: { x: { beginAtZero: true } } }
+});
+
+// ===== Heatmap (custom HTML grid) =====
+(function(){
+  const giorni = ['Lun','Mar','Mer','Gio','Ven','Sab','Dom'];
+  const host = document.getElementById('heatmapHost');
+  if (!host) return;
+  const grid = document.createElement('div');
+  grid.className = 'heatmap-grid';
+  // Header (vuoto per allineamento + 24 ore)
+  const blank = document.createElement('div'); grid.appendChild(blank);
+  for (let h = 0; h < 24; h++) {
+    const c = document.createElement('div');
+    c.className = 'hm-h';
+    c.textContent = (h % 3 === 0) ? String(h).padStart(2, '0') : '';
+    grid.appendChild(c);
+  }
+  // Righe
+  HEATMAP.forEach((row, di) => {
+    const lab = document.createElement('div');
+    lab.className = 'hm-d';
+    lab.textContent = giorni[di];
+    grid.appendChild(lab);
+    row.forEach((v, hi) => {
+      const cell = document.createElement('div');
+      cell.className = 'hm-c';
+      cell.title = `${giorni[di]} ${String(hi).padStart(2,'0')}:00 - ${v} difetti`;
+      const intensity = HEATMAP_MAX > 0 ? v / HEATMAP_MAX : 0;
+      const alpha = intensity === 0 ? 0.05 : 0.2 + intensity * 0.8;
+      cell.style.background = `rgba(220, 38, 38, ${alpha})`;
+      cell.style.color = intensity > 0.5 ? '#fff' : '#1e293b';
+      cell.textContent = v > 0 ? v : '';
+      grid.appendChild(cell);
+    });
+  });
+  host.innerHTML = '';
+  host.appendChild(grid);
+})();
+</script>
+{% endblock %}

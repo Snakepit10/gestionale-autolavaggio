@@ -9,8 +9,11 @@ urlpatterns = [
     path('ordine/<int:ordine_pk>/scheda/', views.SchedaCQDetailView.as_view(), name='scheda_detail'),
     path('ordine/<int:ordine_pk>/scheda/modifica/', views.SchedaCQUpdateView.as_view(), name='scheda_modifica'),
 
-    # Dashboard analitica
+    # Dashboard analitica (legacy)
     path('dashboard/', views.DashboardCQView.as_view(), name='dashboard'),
+
+    # Analytics avanzata KPI/Kaizen
+    path('analytics/', views.analytics_cq, name='analytics'),
 
     # Report mensile (titolari)
     path('report/<int:anno>/<int:mese>/', views.ReportMensileView.as_view(), name='report_mensile'),
