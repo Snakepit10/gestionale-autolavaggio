@@ -50,12 +50,11 @@ def root_redirect(request):
 
 def landing(request):
     """Landing page pubblica con CTA login/registrazione/prenotazione."""
-    # Servizi vetrina (top 6)
     servizi = (
         ServizioProdotto.objects
         .filter(attivo=True, tipo='servizio', is_supplemento=False)
         .select_related('categoria')
-        .order_by('categoria__ordine', 'titolo')[:6]
+        .order_by('categoria__ordine_visualizzazione', 'titolo')[:6]
     )
     return render(request, 'clients/landing.html', {
         'servizi': servizi,
@@ -132,16 +131,12 @@ def booking(request):
 
     Anonimi possono vedere il catalogo, ma per prenotare serve login.
     """
-    categorie_pub = (
-        Categoria.objects.filter(attiva=True, mostra_catalogo=True)
-        if hasattr(Categoria, 'mostra_catalogo')
-        else Categoria.objects.filter(attiva=True)
-    )
+    categorie_pub = Categoria.objects.filter(attiva=True).order_by('ordine_visualizzazione', 'nome')
     servizi = (
         ServizioProdotto.objects
         .filter(attivo=True, tipo='servizio', is_supplemento=False)
         .select_related('categoria')
-        .order_by('categoria__ordine', 'titolo')
+        .order_by('categoria__ordine_visualizzazione', 'titolo')
     )
     return render(request, 'clients/booking.html', {
         'categorie': categorie_pub,
