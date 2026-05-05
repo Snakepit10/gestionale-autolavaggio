@@ -6,13 +6,14 @@ self.addEventListener('message', (event) => {
     }
 });
 
-const CACHE_NAME = 'autolavaggio-cache-v5';
-const OFFLINE_CACHE = 'autolavaggio-offline-v5';
+const CACHE_NAME = 'autolavaggio-cache-v6';
+const OFFLINE_CACHE = 'autolavaggio-offline-v6';
 
 // File essenziali da pre-cachare per funzionamento offline
 // (cache.addAll e' atomico: se UNO fallisce, tutto fallisce)
+// NOTA: '/' NON va precached perche e' una redirect dinamica (HomeView
+// dispatch in base al ruolo dell'utente). Va sempre alla rete.
 const CACHE_URLS = [
-    '/',
     '/static/manifest.json',
     '/static/css/style.css',
     '/static/js/app.js',
@@ -54,22 +55,28 @@ self.addEventListener('install', (event) => {
 // Attivazione del Service Worker
 self.addEventListener('activate', (event) => {
     console.log('Service Worker: Attivazione in corso...');
-    
+
     event.waitUntil(
-        caches.keys().then((cacheNames) => {
-            return Promise.all(
-                cacheNames.map((cacheName) => {
-                    // Elimina cache vecchie
-                    if (cacheName !== CACHE_NAME && cacheName !== OFFLINE_CACHE) {
-                        console.log('Service Worker: Eliminazione cache vecchia:', cacheName);
-                        return caches.delete(cacheName);
-                    }
-                })
-            );
-        })
+        Promise.all([
+            // 1. Elimina cache vecchie con CACHE_NAME diverso
+            caches.keys().then((cacheNames) =>
+                Promise.all(
+                    cacheNames.map((cacheName) => {
+                        if (cacheName !== CACHE_NAME && cacheName !== OFFLINE_CACHE) {
+                            console.log('SW: elimina cache vecchia:', cacheName);
+                            return caches.delete(cacheName);
+                        }
+                    })
+                )
+            ),
+            // 2. Difensivo: pulisci eventuali entry residue di '/' nelle
+            //    cache attuali (per chi aveva v3/v4/v5 con root precached).
+            caches.open(CACHE_NAME).then((cache) =>
+                cache.delete('/').catch(() => null)
+            ),
+        ])
     );
-    
-    // Prendi il controllo di tutte le pagine
+
     self.clients.claim();
 });
 
@@ -99,6 +106,8 @@ function shouldBypassSW(url, request) {
     if (request.method !== 'GET') return true;
     // Bypass: cross-origin (CDN bootstrap, ecc.) — gestito comunque dal browser
     if (url.origin !== self.location.origin) return false; // lascia handleFetch decidere
+    // Bypass: root '/' (redirect dinamica HomeView, mai precachare)
+    if (url.pathname === '/') return true;
     // Bypass: prefissi
     for (const p of NETWORK_ONLY_PREFIXES) {
         if (url.pathname.startsWith(p)) return true;
