@@ -37,16 +37,26 @@ def _get_sessione_attiva(user):
 
 def _get_coda_ordini(sessione):
     """
-    Restituisce gli items in coda (coda unica).
-    Ogni ordine appare nella coda di tutti gli operatori.
+    Restituisce gli items in coda per l'operatore della sessione.
+    Esclude gli ordini per cui l'operatore ha gia almeno una
+    LavorazioneOperatore completata (sono in 'lavorazioni completate').
     """
+    ordini_completati_da_me_ids = list(
+        LavorazioneOperatore.objects.filter(
+            sessione=sessione, stato='completato'
+        ).values_list('ordine_id', flat=True).distinct()
+    )
+
+    qs = ItemOrdine.objects.filter(
+        stato__in=['in_attesa', 'in_lavorazione'],
+        ordine__stato__in=['in_attesa', 'in_lavorazione'],
+        servizio_prodotto__tipo='servizio',
+    )
+    if ordini_completati_da_me_ids:
+        qs = qs.exclude(ordine_id__in=ordini_completati_da_me_ids)
+
     return (
-        ItemOrdine.objects.filter(
-            stato__in=['in_attesa', 'in_lavorazione'],
-            ordine__stato__in=['in_attesa', 'in_lavorazione'],
-            servizio_prodotto__tipo='servizio',
-        )
-        .select_related('ordine', 'ordine__cliente', 'servizio_prodotto')
+        qs.select_related('ordine', 'ordine__cliente', 'servizio_prodotto')
         .annotate(
             has_priority=Case(
                 When(ordine__priorita__gt=0, then=0),

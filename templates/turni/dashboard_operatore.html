@@ -903,16 +903,9 @@ async function completaLavoro() {
   stopTimer();
   currentLavIds = [];
   currentLavStato = '';
-  aggiornaCoда();
-  const msg = lastData && lastData.ordine_completato
-    ? 'Ordine completato!'
-    : `Fase completata in ${lastData ? lastData.tempo_netto_min : '?'} min`;
-  document.getElementById('areaOperativa').innerHTML = `
-    <div class="empty-state">
-      <i class="bi bi-check-circle fs-1 text-success"></i>
-      <p class="mt-2">${msg}</p>
-      <p class="text-muted">Seleziona il prossimo ordine dalla coda</p>
-    </div>`;
+  // Reload pagina per aggiornare coda e sezione completate.
+  // L'ordine appena chiuso esce dalla coda attiva e compare in basso fra i completati.
+  window.location.reload();
 }
 
 /* ---- Polling coda ---- */
