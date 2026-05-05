@@ -171,35 +171,55 @@
     </div>
 </section>
 
-{# ========== Servizi vetrina ========== #}
-{% if servizi %}
+{# ========== I nostri servizi (discorsivo) ========== #}
 <section class="pub-section">
-    <div class="container">
-        <div class="d-flex justify-content-between align-items-end mb-4 flex-wrap gap-2">
-            <div>
-                <h2 class="mb-1">I nostri servizi</h2>
-                <p class="lead mb-0">Una selezione di quello che offriamo.</p>
-            </div>
-            <a href="{% url 'clients:booking' %}" class="btn-cta btn-cta-outline">Vedi tutti &rarr;</a>
+    <div class="container" style="max-width:880px">
+        <div class="text-center mb-4">
+            <h2 class="mb-1">I nostri servizi</h2>
+            <p class="lead">Pulizia auto su misura, dal lavaggio rapido al trattamento completo.</p>
         </div>
-        <div class="servizi-grid">
-            {% for s in servizi %}
-            <div class="servizio-card">
-                <div class="categoria">{{ s.categoria.nome|default:"Servizio" }}</div>
-                <div class="titolo">{{ s.titolo }}</div>
-                <div class="d-flex justify-content-between align-items-end mt-2">
-                    <div>
-                        <div class="prezzo">&euro;{{ s.prezzo }}</div>
-                        <div class="durata"><i class="bi bi-clock"></i> {{ s.durata_minuti|default:"30" }} min</div>
-                    </div>
-                    <a href="{% url 'clients:booking' %}" class="btn btn-sm btn-primary">Prenota</a>
-                </div>
+        <div class="row g-3">
+            <div class="col-md-4 text-center">
+                <i class="bi bi-droplet" style="font-size:2.4rem;color:#0d6efd"></i>
+                <h6 class="mt-2 fw-bold">Lavaggio esterno</h6>
+                <p class="text-muted small mb-0">
+                    Carrozzeria, cerchi e vetri puliti a fondo con prodotti professionali
+                    rispettosi della vernice.
+                </p>
             </div>
-            {% endfor %}
+            <div class="col-md-4 text-center">
+                <i class="bi bi-house" style="font-size:2.4rem;color:#0d6efd"></i>
+                <h6 class="mt-2 fw-bold">Pulizia interni</h6>
+                <p class="text-muted small mb-0">
+                    Aspirazione tappetini e moquette, pulizia plance, vetri interni e
+                    sanificazione abitacolo.
+                </p>
+            </div>
+            <div class="col-md-4 text-center">
+                <i class="bi bi-stars" style="font-size:2.4rem;color:#0d6efd"></i>
+                <h6 class="mt-2 fw-bold">Trattamenti completi</h6>
+                <p class="text-muted small mb-0">
+                    Pacchetti combinati di lavaggio esterno, pulizia interni e
+                    finitura per un risultato impeccabile.
+                </p>
+            </div>
+        </div>
+        <div class="text-center mt-4">
+            {% if user.is_authenticated %}
+                <a href="{% url 'clients:booking' %}" class="btn-cta">
+                    <i class="bi bi-calendar-plus"></i> Vedi disponibilita e prenota
+                </a>
+            {% else %}
+                <a href="{% url 'auth:client-login' %}" class="btn-cta">
+                    <i class="bi bi-box-arrow-in-right"></i> Accedi per prenotare
+                </a>
+                <p class="text-muted small mt-2 mb-0">
+                    Catalogo dettagliato e prenotazioni disponibili per i clienti registrati.
+                </p>
+            {% endif %}
         </div>
     </div>
 </section>
-{% endif %}
 
 {# ========== CTA finale ========== #}
 <div class="container">

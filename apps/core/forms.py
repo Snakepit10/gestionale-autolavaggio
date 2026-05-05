@@ -25,7 +25,8 @@ class ServizioProdottoForm(forms.ModelForm):
         fields = [
             'titolo', 'tipo', 'categoria', 'prezzo', 'descrizione',
             'durata_minuti', 'postazioni', 'quantita_disponibile',
-            'quantita_minima_alert', 'codice_prodotto', 'attivo'
+            'quantita_minima_alert', 'codice_prodotto', 'attivo',
+            'is_supplemento', 'mostra_pubblico',
         ]
         widgets = {
             'descrizione': forms.Textarea(attrs={'rows': 3}),
@@ -47,6 +48,8 @@ class ServizioProdottoForm(forms.ModelForm):
             Div(
                 Field('descrizione'),
                 Field('attivo'),
+                Field('is_supplemento'),
+                Field('mostra_pubblico'),
                 css_class='col-md-6'
             ),
             Div(

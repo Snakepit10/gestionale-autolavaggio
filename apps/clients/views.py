@@ -49,16 +49,12 @@ def root_redirect(request):
 
 
 def landing(request):
-    """Landing page pubblica con CTA login/registrazione/prenotazione."""
-    servizi = (
-        ServizioProdotto.objects
-        .filter(attivo=True, tipo='servizio', is_supplemento=False)
-        .select_related('categoria')
-        .order_by('categoria__ordine_visualizzazione', 'titolo')[:6]
-    )
-    return render(request, 'clients/landing.html', {
-        'servizi': servizi,
-    })
+    """Landing page pubblica con CTA login/registrazione/prenotazione.
+
+    Non espone item ne' prezzi: presenta i servizi come testo discorsivo
+    discreto. Per il catalogo dettagliato l'utente deve essere loggato.
+    """
+    return render(request, 'clients/landing.html', {})
 
 
 def register(request):
@@ -129,12 +125,17 @@ def dashboard(request):
 def booking(request):
     """Catalogo + form prenotazione cliente.
 
-    Anonimi possono vedere il catalogo, ma per prenotare serve login.
+    Anonimo: vede solo descrizione discorsiva + CTA accedi/registrati.
+    Loggato: vede catalogo dettagliato (filtrato su mostra_pubblico=True)
+    e il wizard di prenotazione con slot disponibili.
     """
+    if not request.user.is_authenticated:
+        return render(request, 'clients/booking_anon.html', {})
+
     categorie_pub = Categoria.objects.filter(attiva=True).order_by('ordine_visualizzazione', 'nome')
     servizi = (
         ServizioProdotto.objects
-        .filter(attivo=True, tipo='servizio', is_supplemento=False)
+        .filter(attivo=True, tipo='servizio', is_supplemento=False, mostra_pubblico=True)
         .select_related('categoria')
         .order_by('categoria__ordine_visualizzazione', 'titolo')
     )
@@ -219,7 +220,7 @@ def crea_prenotazione_pub(request):
 
     servizi = list(
         ServizioProdotto.objects.filter(
-            id__in=servizi_ids, attivo=True, tipo='servizio'
+            id__in=servizi_ids, attivo=True, tipo='servizio', mostra_pubblico=True
         )
     )
     if not servizi:

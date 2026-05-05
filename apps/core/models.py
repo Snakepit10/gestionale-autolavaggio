@@ -96,6 +96,11 @@ class ServizioProdotto(models.Model):
         verbose_name='Supplemento operatore',
         help_text='Se attivo, disponibile come supplemento dalla dashboard operatore (es. sporco eccessivo)',
     )
+    mostra_pubblico = models.BooleanField(
+        default=False,
+        verbose_name='Mostra al pubblico (lato cliente)',
+        help_text='Se attivo, il servizio appare nel catalogo prenotabile dei clienti (/app/servizi/)',
+    )
     creato_il = models.DateTimeField(auto_now_add=True)
     aggiornato_il = models.DateTimeField(auto_now=True)
 

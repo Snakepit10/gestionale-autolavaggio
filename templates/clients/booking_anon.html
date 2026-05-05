@@ -1,0 +1,47 @@
+{% extends "clients/base_public.html" %}
+{% block title %}Prenota un servizio &mdash; Autolavaggio{% endblock %}
+{% block nav_booking %}active{% endblock %}
+
+{% block content %}
+<div class="container py-5" style="max-width:680px">
+
+    <div class="text-center mb-4">
+        <i class="bi bi-calendar-plus" style="font-size:3rem;color:#0d6efd"></i>
+        <h2 class="fw-bold mt-2">Prenota il tuo lavaggio</h2>
+        <p class="text-muted">
+            Per visualizzare il catalogo dettagliato e gli slot disponibili e prenotare
+            il tuo servizio, accedi o crea un account gratuito.
+        </p>
+    </div>
+
+    <div class="pub-card mb-3">
+        <h5 class="fw-bold"><i class="bi bi-droplet text-primary"></i> Cosa offriamo</h5>
+        <p class="mb-2">
+            Servizi di pulizia auto professionali pensati per ogni esigenza:
+            dal lavaggio rapido carrozzeria al pacchetto completo con pulizia
+            interni e trattamenti specifici.
+        </p>
+        <p class="text-muted small mb-0">
+            Il listino dei servizi e gli slot prenotabili sono visibili dopo
+            l'accesso. Tutte le prenotazioni ricevono un codice univoco e
+            possono essere gestite dalla tua area cliente.
+        </p>
+    </div>
+
+    <div class="d-grid gap-2">
+        <a href="{% url 'auth:client-login' %}" class="btn-cta justify-content-center">
+            <i class="bi bi-box-arrow-in-right"></i> Accedi
+        </a>
+        <a href="{% url 'clients:register' %}" class="btn-cta btn-cta-outline justify-content-center">
+            <i class="bi bi-person-plus"></i> Crea un account gratuito
+        </a>
+    </div>
+
+    <div class="text-center mt-4">
+        <a href="{% url 'clients:landing' %}" class="text-muted small text-decoration-none">
+            <i class="bi bi-arrow-left"></i> Torna alla home
+        </a>
+    </div>
+
+</div>
+{% endblock %}
