@@ -1,12 +1,39 @@
 {% extends "base.html" %}
-{% block title %}Dashboard Operatore{% endblock %}
+{% block title %}Il mio turno{% endblock %}
+
+{# ===== Override: niente navbar, niente alerts, niente padding main ===== #}
+{% block navbar %}{% endblock %}
+{% block alerts %}{% endblock %}
+{% block main_class %}dashboard-main p-0{% endblock %}
 
 {% block extra_css %}
 <style>
+/* ============ Kiosk full-screen ============ */
+html, body { overflow: hidden !important; height: 100%; background: #fff; }
+.dashboard-main { padding: 0 !important; margin: 0; }
+
 /* ============ Layout base ============ */
-.dashboard-container { height: calc(100vh - 80px); overflow: hidden; }
+.dashboard-container {
+    height: 100vh;
+    height: 100dvh;
+    overflow: hidden;
+}
 .panel-left { height: 100%; overflow-y: auto; border-right: 2px solid #dee2e6; }
 .panel-right { height: 100%; overflow-y: auto; }
+
+/* Mini-bar utente in alto */
+.turno-topbar {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 6px 12px;
+    background: #f8f9fa;
+    border-bottom: 1px solid #dee2e6;
+    font-size: .85rem;
+    min-height: 36px;
+}
+.turno-topbar .user-info { color: #495057; font-weight: 500; }
+.turno-topbar .btn-sm { padding: .25rem .5rem; }
 
 /* ============ Coda ordini ============ */
 .ordine-card {
@@ -109,12 +136,48 @@
     .panel-left { padding-right: 8px !important; }
 }
 
-/* ============ Tablet portrait / piccolo (sotto 992) ============ */
-@media (max-width: 991.98px) {
-    .dashboard-container { height: auto; overflow: visible; }
-    .panel-left, .panel-right { height: auto; border-right: 0; }
-    .panel-left { border-bottom: 2px solid #dee2e6; }
+/* ============ Tablet portrait (768-991) ============ */
+@media (min-width: 768px) and (max-width: 991.98px) {
+    .panel-left { border-right: 0; border-bottom: 2px solid #dee2e6; }
     .timer-display { font-size: 2rem; }
+}
+
+/* ============ Smartphone (sotto 768) — master/detail ============ */
+@media (max-width: 767.98px) {
+    .dashboard-container { height: 100vh; height: 100dvh; overflow: hidden; position: relative; }
+    .panel-left, .panel-right {
+        position: absolute;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        border-right: 0;
+        background: #fff;
+        z-index: 1;
+    }
+    .panel-right { display: none; }
+    body.show-detail .panel-left { display: none; }
+    body.show-detail .panel-right { display: block; }
+    .btn-back-coda { display: inline-flex !important; align-items: center; gap: 6px; }
+    /* Phone: testo piu compatto */
+    .timer-display { font-size: 1.7rem; letter-spacing: 1px; }
+    .btn-lavoro { padding: .8rem 1rem; font-size: 1rem; min-height: 48px; }
+    .dif-zona-card { min-width: 80px; padding: 8px 10px; min-height: 48px; }
+    .dif-zona-card .small { font-size: .82rem; }
+    .dif-tipo-btn { font-size: .88rem; padding: 8px 10px; }
+    .panel-right .card-header { padding: 8px 12px; font-size: .9rem; }
+    .panel-right .card-body { padding: .75rem; }
+    .turno-topbar { font-size: .8rem; }
+}
+
+/* Bottone back-coda visibile solo su mobile */
+.btn-back-coda { display: none; }
+
+/* ============ Phone landscape (max-height ridotto) ============ */
+@media (orientation: landscape) and (max-height: 500px) {
+    .timer-display { font-size: 1.6rem; }
+    .btn-lavoro { padding: .6rem 1rem; min-height: 44px; font-size: .95rem; }
+    .turno-topbar { min-height: 28px; padding: 2px 10px; }
 }
 
 /* ============ Hover solo per dispositivi che hanno hover vero ============ */
@@ -127,19 +190,24 @@
 {% endblock %}
 
 {% block content %}
-<div class="container-fluid p-0">
+<div class="container-fluid p-0 position-relative">
   <div class="row g-0 dashboard-container">
 
     {# ===== LEFT PANEL: Coda ordini ===== #}
-    <div class="col-md-4 panel-left p-3">
+    <div class="col-md-4 panel-left">
+      <div class="turno-topbar">
+        <span class="user-info">
+          <i class="bi bi-person-circle"></i>
+          {{ user.get_full_name|default:user.username }}
+        </span>
+        <a href="{% url 'turni:checklist_fine' %}" class="btn btn-outline-danger btn-sm" title="Fine turno">
+          <i class="bi bi-box-arrow-right"></i> Fine turno
+        </a>
+      </div>
+      <div class="p-3">
       <div class="d-flex justify-content-between align-items-center mb-3">
         <h6 class="mb-0"><i class="bi bi-list-ol"></i> Coda Ordini</h6>
-        <div>
-          <span class="badge bg-primary" id="codaCount">{{ ordini_coda|length }}</span>
-          <a href="{% url 'turni:checklist_fine' %}" class="btn btn-outline-danger btn-sm ms-2" title="Fine turno">
-            <i class="bi bi-box-arrow-right"></i>
-          </a>
-        </div>
+        <span class="badge bg-primary" id="codaCount">{{ ordini_coda|length }}</span>
       </div>
 
       <div id="codaContainer">
@@ -177,10 +245,15 @@
         </div>
         {% endfor %}
       </div>
+      </div>{# /p-3 #}
     </div>
 
     {# ===== RIGHT PANEL: Area operativa ===== #}
     <div class="col-md-8 panel-right p-3">
+
+      <button class="btn btn-light btn-back-coda mb-2" onclick="tornaAllaCoda()">
+        <i class="bi bi-arrow-left"></i> Torna alla coda
+      </button>
 
       <div id="areaOperativa">
         <div class="empty-state">
@@ -204,6 +277,17 @@ let timerInterval = null;
 let timerStartTime = null;
 let timerPauseSec = 0;
 
+/* ---- Switch master/detail su smartphone ---- */
+function isMobileLayout() {
+  return window.matchMedia('(max-width: 767.98px)').matches;
+}
+function showDetailMobile() {
+  if (isMobileLayout()) document.body.classList.add('show-detail');
+}
+function tornaAllaCoda() {
+  document.body.classList.remove('show-detail');
+}
+
 /* ---- Seleziona ordine dalla coda ---- */
 async function selezionaOrdine(ordineId) {
   // Evidenzia nella coda
@@ -218,7 +302,11 @@ async function selezionaOrdine(ordineId) {
 
   currentOrdineId = ordineId;
   renderAreaOperativa(data.ordine, data.lavorazione, data.lavorazioni_attive || [], data.fasi_completate || [], data.segnalazioni || []);
+  showDetailMobile();
 }
+
+/* Se al load c'e' gia un ordine selezionato, mostra detail su mobile */
+if (currentOrdineId) showDetailMobile();
 
 // Dati supplementi per il form aggiungi item
 const SUPPLEMENTI = {{ supplementi_json|safe }};

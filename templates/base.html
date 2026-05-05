@@ -27,6 +27,7 @@
     {% block extra_css %}{% endblock %}
 </head>
 <body>
+    {% block navbar %}
     <!-- Navigation -->
     <nav class="navbar navbar-expand-lg navbar-dark bg-primary">
         <div class="container-fluid">
@@ -214,7 +215,9 @@
             </div>
         </div>
     </nav>
+    {% endblock %}
 
+    {% block alerts %}
     <!-- Alert per prodotti sotto scorta -->
     {% if user.is_authenticated %}
         <div id="alert-scorte" class="alert alert-warning alert-dismissible fade show d-none" role="alert">
@@ -235,9 +238,10 @@
             {% endfor %}
         </div>
     {% endif %}
+    {% endblock %}
 
     <!-- Main Content -->
-    <main class="container-fluid py-3">
+    <main class="{% block main_class %}container-fluid py-3{% endblock %}">
         {% block content %}{% endblock %}
     </main>
 
