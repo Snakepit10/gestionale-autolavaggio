@@ -171,15 +171,18 @@ def slot_disponibili_pub(request):
     ).order_by('ora_inizio')
     out = []
     for s in slot_qs:
-        posti_liberi = max(0, s.max_prenotazioni - s.prenotazioni_attuali)
+        # Lato cliente: ogni slot e' esclusivo. Se gia esiste UNA
+        # prenotazione attiva per quella fascia oraria, non e' piu
+        # selezionabile (indipendentemente da max_prenotazioni interno).
+        if s.prenotazioni_attuali > 0:
+            continue
         is_past = is_oggi and s.ora_inizio < now.time()
-        if is_past or posti_liberi <= 0:
-            continue  # Per il cliente mostra solo slot prenotabili
+        if is_past:
+            continue
         out.append({
             'id': s.id,
             'ora_inizio': s.ora_inizio.strftime('%H:%M'),
             'ora_fine': s.ora_fine.strftime('%H:%M'),
-            'posti_liberi': posti_liberi,
         })
     return JsonResponse({'slot': out})
 
@@ -238,8 +241,13 @@ def crea_prenotazione_pub(request):
             'disponibile': True,
         },
     )
-    if slot.posti_disponibili <= 0:
-        return JsonResponse({'error': 'Slot non piu disponibile'}, status=400)
+    # Lato cliente lo slot e' esclusivo: se ha gia almeno una
+    # prenotazione attiva, non e' piu disponibile (anche se il suo
+    # max_prenotazioni interno consentirebbe altri).
+    if slot.prenotazioni_attuali > 0:
+        return JsonResponse({
+            'error': 'Slot non piu disponibile, e\' stato appena prenotato. Scegli un altro orario.',
+        }, status=400)
 
     prenotazione = Prenotazione.objects.create(
         cliente=cliente,
