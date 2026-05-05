@@ -345,11 +345,21 @@ def dashboard_operatore(request):
                 'tipi': tipi,
             })
 
+    # Lavorazioni completate dall'operatore in questa sessione
+    lavorazioni_completate = (
+        LavorazioneOperatore.objects.filter(
+            sessione=sessione, stato='completato'
+        )
+        .select_related('ordine', 'ordine__cliente', 'postazione_cq', 'blocco')
+        .order_by('-fine')[:20]
+    )
+
     return render(request, 'turni/dashboard_operatore.html', {
         'sessione': sessione,
         'postazioni_turno': post_turno,
         'ordini_coda': ordini_coda,
         'lavorazione_attiva': lavorazione_attiva,
+        'lavorazioni_completate': lavorazioni_completate,
         'supplementi_json': json.dumps(supplementi, default=str),
         'zone_difetti_json': json.dumps(zone_difetti),
     })

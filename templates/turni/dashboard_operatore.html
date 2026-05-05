@@ -116,6 +116,23 @@ html, body { overflow: hidden !important; height: 100%; background: #fff; }
     color: #6c757d;
 }
 
+/* ============ Lavorazioni completate (sotto coda) ============ */
+.completate-section {
+    border-top: 1px dashed #cbd5e1;
+    padding-top: 14px;
+}
+.completata-card {
+    cursor: pointer;
+    border: 1px solid #d1fae5;
+    border-left: 4px solid #10b981;
+    border-radius: 8px;
+    background: #f0fdf4;
+    transition: background .12s, box-shadow .12s;
+    opacity: .85;
+}
+.completata-card .completata-body { padding: 8px 12px; }
+.completata-card:hover { background: #dcfce7; opacity: 1; box-shadow: 0 2px 6px rgba(16, 185, 129, .15); }
+
 /* ============ Chip supplementi (Aggiungi al servizio) ============ */
 .suppl-chip {
     display: inline-flex;
@@ -141,6 +158,45 @@ html, body { overflow: hidden !important; height: 100%; background: #fff; }
     font-size: .82rem;
     padding: 2px 8px;
     border-radius: 999px;
+}
+
+/* ============ Carrello supplementi ============ */
+.suppl-cart {
+    background: #f8fafc;
+    border-radius: 8px;
+    padding: 10px 12px;
+    margin-top: 8px;
+}
+.suppl-cart-list { display: flex; flex-direction: column; gap: 6px; }
+.suppl-cart-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+    padding: 6px 8px;
+    background: #fff;
+    border-radius: 6px;
+    border: 1px solid #e2e8f0;
+}
+.suppl-cart-info { flex: 1; min-width: 0; }
+.suppl-cart-titolo { font-weight: 600; color: #1e293b; }
+.suppl-cart-controls { display: flex; align-items: center; gap: 6px; flex-shrink: 0; }
+.suppl-cart-qty {
+    min-width: 28px;
+    text-align: center;
+    font-weight: 700;
+    font-size: 1rem;
+}
+.suppl-cart-subtotale {
+    min-width: 64px;
+    text-align: right;
+    font-weight: 700;
+    color: #16a34a;
+}
+@media (max-width: 575.98px) {
+    .suppl-cart-row { flex-wrap: wrap; }
+    .suppl-cart-info { width: 100%; }
+    .suppl-cart-controls { width: 100%; justify-content: space-between; }
 }
 
 /* ============ Sezione difetti CQ (compatta) ============ */
@@ -352,6 +408,42 @@ html, body { overflow: hidden !important; height: 100%; background: #fff; }
         </div>
         {% endfor %}
       </div>
+
+      {# ===== Lavorazioni completate (sotto la coda) ===== #}
+      {% if lavorazioni_completate %}
+      <div class="completate-section mt-4">
+        <div class="d-flex justify-content-between align-items-center mb-2">
+          <h6 class="mb-0 text-success"><i class="bi bi-check2-circle"></i> Lavorazioni completate</h6>
+          <span class="badge bg-success">{{ lavorazioni_completate|length }}</span>
+        </div>
+        <div id="completateContainer">
+          {% for lav in lavorazioni_completate %}
+          <div class="card completata-card mb-2"
+               data-ordine-id="{{ lav.ordine.pk }}"
+               onclick="selezionaOrdine({{ lav.ordine.pk }})">
+            <div class="completata-body">
+              <div class="d-flex justify-content-between align-items-center">
+                <div>
+                  <strong class="text-success">#{{ lav.ordine.numero_progressivo|slice:"-4:" }}</strong>
+                  {% if lav.ordine.cliente %}
+                    <span class="ms-1 small">{{ lav.ordine.cliente }}</span>
+                  {% endif %}
+                </div>
+                <small class="text-muted">
+                  <i class="bi bi-clock"></i> {{ lav.fine|date:"H:i" }}
+                </small>
+              </div>
+              <div class="small text-muted mt-1">
+                <i class="bi bi-tools"></i>
+                {{ lav.postazione_cq.nome }}{% if lav.blocco %} &middot; {{ lav.blocco.nome }}{% endif %}
+                &middot; {{ lav.tempo_lavoro_netto_minuti|floatformat:0 }} min
+              </div>
+            </div>
+          </div>
+          {% endfor %}
+        </div>
+      </div>
+      {% endif %}
       </div>{# /p-3 #}
     </div>
 
@@ -397,9 +489,14 @@ function tornaAllaCoda() {
 
 /* ---- Seleziona ordine dalla coda ---- */
 async function selezionaOrdine(ordineId) {
-  // Evidenzia nella coda
-  document.querySelectorAll('.ordine-card').forEach(c => c.classList.remove('active'));
-  const card = document.querySelector(`.ordine-card[data-ordine-id="${ordineId}"]`);
+  // Cambio ordine: svuota carrello supplementi pendente
+  if (typeof currentOrdineId !== 'undefined' && currentOrdineId !== ordineId) {
+    supplCart = {};
+  }
+
+  // Evidenzia nella coda (sia ordini attivi sia completate)
+  document.querySelectorAll('.ordine-card, .completata-card').forEach(c => c.classList.remove('active'));
+  const card = document.querySelector(`.ordine-card[data-ordine-id="${ordineId}"], .completata-card[data-ordine-id="${ordineId}"]`);
   if (card) card.classList.add('active');
 
   // Carica dettaglio
@@ -423,11 +520,11 @@ function renderAreaOperativa(ordine, lavorazione, lavorazioniAttive, fasiComplet
   const area = document.getElementById('areaOperativa');
   currentLavIds = lavorazioniAttive.map(l => l.id);
 
-  // --- Chip supplementi (click per aggiungere) ---
+  // --- Chip supplementi (click per aggiungere al carrello) ---
   let supplChipsHtml = '';
   if (SUPPLEMENTI && SUPPLEMENTI.length > 0) {
     supplChipsHtml = SUPPLEMENTI.map(s =>
-      `<button type="button" class="suppl-chip" onclick="aggiungiSupplemento(${s.id})" title="Aggiungi al servizio">
+      `<button type="button" class="suppl-chip" onclick="addCarrelloSuppl(${s.id})" title="Aggiungi al carrello">
         <span class="suppl-titolo">${s.titolo}</span>
         <span class="suppl-prezzo">&euro;${parseFloat(s.prezzo).toFixed(2)}</span>
       </button>`
@@ -436,11 +533,11 @@ function renderAreaOperativa(ordine, lavorazione, lavorazioniAttive, fasiComplet
     supplChipsHtml = '<div class="text-muted small">Nessun supplemento configurato.</div>';
   }
 
-  // --- Eventuali supplementi gia aggiunti dall'operatore (riepilogo compatto) ---
+  // --- Eventuali supplementi gia aggiunti all'ordine (riepilogo compatto) ---
   let supplAggHtml = '';
   const itemsAggiunti = ordine.items.filter(i => i.aggiunto_da__id);
   if (itemsAggiunti.length > 0) {
-    supplAggHtml = '<div class="border-top pt-2 mt-2"><div class="small text-muted mb-1"><i class="bi bi-check2-circle"></i> Aggiunti</div><div class="d-flex flex-wrap gap-1">';
+    supplAggHtml = '<div class="border-top pt-2 mt-2"><div class="small text-muted mb-1"><i class="bi bi-check2-circle"></i> Gia aggiunti</div><div class="d-flex flex-wrap gap-1">';
     for (const i of itemsAggiunti) {
       supplAggHtml += `<span class="badge bg-warning text-dark"><i class="bi bi-plus-circle"></i> ${i.servizio_prodotto__titolo} x${i.quantita}</span>`;
     }
@@ -542,6 +639,7 @@ function renderAreaOperativa(ordine, lavorazione, lavorazioniAttive, fasiComplet
       <div class="card-header py-2 bg-dark text-white"><i class="bi bi-bag-plus"></i> Aggiungi supplementi</div>
       <div class="card-body py-2">
         <div class="d-flex flex-wrap gap-2" id="supplChipsContainer">${supplChipsHtml}</div>
+        <div id="supplCartContainer"></div>
         ${supplAggHtml}
       </div>
     </div>
@@ -625,18 +723,111 @@ async function inviaDefect() {
   } else alert(data.error);
 }
 
-async function aggiungiSupplemento(id) {
+/* ---- Carrello supplementi ---- */
+let supplCart = {};  // { servizio_id: quantita }
+
+function addCarrelloSuppl(id) {
   if (!currentOrdineId) return;
-  const s = SUPPLEMENTI.find(x => x.id === id);
-  if (!s) return;
-  const data = await apiPost(`/turni/api/ordine/${currentOrdineId}/aggiungi-item/`, {
-    servizio_id: id,
-    quantita: 1,
-    prezzo: parseFloat(s.prezzo),
-  });
-  if (data.ok) {
+  supplCart[id] = (supplCart[id] || 0) + 1;
+  renderSupplCart();
+}
+
+function modSupplQty(id, delta) {
+  supplCart[id] = (supplCart[id] || 0) + delta;
+  if (supplCart[id] <= 0) delete supplCart[id];
+  renderSupplCart();
+}
+
+function rimuoviSuppl(id) {
+  delete supplCart[id];
+  renderSupplCart();
+}
+
+function svuotaCarrelloSuppl() {
+  supplCart = {};
+  renderSupplCart();
+}
+
+function renderSupplCart() {
+  const cont = document.getElementById('supplCartContainer');
+  if (!cont) return;
+  const keys = Object.keys(supplCart);
+  if (keys.length === 0) {
+    cont.innerHTML = '';
+    return;
+  }
+  let totale = 0;
+  let rows = '';
+  for (const k of keys) {
+    const s = SUPPLEMENTI.find(x => x.id === parseInt(k));
+    if (!s) continue;
+    const qty = supplCart[k];
+    const subtotale = parseFloat(s.prezzo) * qty;
+    totale += subtotale;
+    rows += `<div class="suppl-cart-row">
+      <div class="suppl-cart-info">
+        <span class="suppl-cart-titolo">${s.titolo}</span>
+        <small class="text-muted ms-2">&euro;${parseFloat(s.prezzo).toFixed(2)} cad.</small>
+      </div>
+      <div class="suppl-cart-controls">
+        <button type="button" class="btn btn-outline-secondary btn-sm" onclick="modSupplQty(${k}, -1)" title="Diminuisci">
+          <i class="bi bi-dash"></i>
+        </button>
+        <span class="suppl-cart-qty">${qty}</span>
+        <button type="button" class="btn btn-outline-secondary btn-sm" onclick="modSupplQty(${k}, 1)" title="Aumenta">
+          <i class="bi bi-plus"></i>
+        </button>
+        <span class="suppl-cart-subtotale">&euro;${subtotale.toFixed(2)}</span>
+        <button type="button" class="btn btn-outline-danger btn-sm" onclick="rimuoviSuppl(${k})" title="Rimuovi">
+          <i class="bi bi-trash"></i>
+        </button>
+      </div>
+    </div>`;
+  }
+
+  cont.innerHTML = `
+    <div class="suppl-cart border-top pt-2 mt-2">
+      <div class="d-flex justify-content-between align-items-center mb-2">
+        <span class="small fw-bold text-muted"><i class="bi bi-cart"></i> Carrello aggiunte</span>
+        <span class="small fw-bold">Totale: &euro;${totale.toFixed(2)}</span>
+      </div>
+      <div class="suppl-cart-list">${rows}</div>
+      <div class="d-flex gap-2 mt-2 justify-content-end">
+        <button type="button" class="btn btn-outline-secondary btn-sm" onclick="svuotaCarrelloSuppl()">
+          <i class="bi bi-x-circle"></i> Annulla
+        </button>
+        <button type="button" class="btn btn-success btn-sm" onclick="confermaCarrelloSuppl()">
+          <i class="bi bi-check-circle"></i> Conferma e aggiungi
+        </button>
+      </div>
+    </div>`;
+}
+
+async function confermaCarrelloSuppl() {
+  if (!currentOrdineId) return;
+  const keys = Object.keys(supplCart);
+  if (keys.length === 0) return;
+
+  // Invio sequenziale (l'API esistente accetta un item alla volta)
+  let ok = true;
+  for (const k of keys) {
+    const s = SUPPLEMENTI.find(x => x.id === parseInt(k));
+    if (!s) continue;
+    const data = await apiPost(`/turni/api/ordine/${currentOrdineId}/aggiungi-item/`, {
+      servizio_id: parseInt(k),
+      quantita: supplCart[k],
+      prezzo: parseFloat(s.prezzo),
+    });
+    if (!data.ok) {
+      alert(data.error || 'Errore aggiunta supplemento');
+      ok = false;
+      break;
+    }
+  }
+  if (ok) {
+    supplCart = {};
     selezionaOrdine(currentOrdineId);
-  } else alert(data.error);
+  }
 }
 
 /* ---- Timer ---- */
