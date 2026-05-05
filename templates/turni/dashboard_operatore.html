@@ -38,14 +38,56 @@ html, body { overflow: hidden !important; height: 100%; background: #fff; }
 /* ============ Coda ordini ============ */
 .ordine-card {
     cursor: pointer;
-    transition: background .12s, border-color .12s;
+    transition: background .15s, border-color .15s, box-shadow .15s, transform .15s;
+    border: 1px solid #e2e8f0;
     border-left: 4px solid transparent;
-    min-height: 56px;
-    padding: 10px 12px !important;
+    border-radius: 10px;
+    background: #fff;
+    position: relative;
 }
-.ordine-card:active { background: #e8f0fe; }
-.ordine-card.active { border-left-color: var(--bs-primary); background: #e8f0fe; }
-.ordine-card.in-lavorazione { border-left-color: #ffc107; background: #fff8e1; }
+.ordine-card .ordine-card-body { padding: 12px 14px; }
+
+/* Stato selezionato - molto evidente */
+.ordine-card.active {
+    border-color: #0d6efd;
+    border-left-color: #0d6efd;
+    border-left-width: 6px;
+    background: linear-gradient(135deg, #eff6ff 0%, #dbeafe 100%);
+    box-shadow: 0 4px 14px rgba(13, 110, 253, .25);
+    transform: translateX(2px);
+}
+.ordine-card.active::before {
+    content: '';
+    position: absolute;
+    top: 8px; right: 8px;
+    width: 10px; height: 10px;
+    background: #0d6efd;
+    border-radius: 50%;
+    box-shadow: 0 0 0 0 rgba(13, 110, 253, .6);
+    animation: ordine-active-pulse 1.8s ease-in-out infinite;
+}
+
+/* Sovrascrive active quando in lavorazione */
+.ordine-card.in-lavorazione {
+    border-left-color: #f59e0b;
+    background: linear-gradient(135deg, #fffbeb 0%, #fef3c7 100%);
+    box-shadow: 0 2px 8px rgba(245, 158, 11, .2);
+}
+.ordine-card.active.in-lavorazione {
+    border-color: #f59e0b;
+    border-left-color: #f59e0b;
+    border-left-width: 6px;
+    box-shadow: 0 4px 14px rgba(245, 158, 11, .35);
+}
+.ordine-card.active.in-lavorazione::before {
+    background: #f59e0b;
+    box-shadow: 0 0 0 0 rgba(245, 158, 11, .6);
+}
+
+@keyframes ordine-active-pulse {
+    0%, 100% { box-shadow: 0 0 0 0 rgba(13, 110, 253, .6); }
+    50% { box-shadow: 0 0 0 8px rgba(13, 110, 253, 0); }
+}
 
 /* ============ Timer ============ */
 .timer-display {
@@ -216,30 +258,63 @@ html, body { overflow: hidden !important; height: 100%; background: #fff; }
 
       <div id="codaContainer">
         {% for entry in ordini_coda %}
-        <div class="card ordine-card mb-2 p-2 {% if lavorazione_attiva and lavorazione_attiva.ordine_id == entry.ordine.pk %}active in-lavorazione{% endif %}"
+        <div class="card ordine-card mb-2 {% if lavorazione_attiva and lavorazione_attiva.ordine_id == entry.ordine.pk %}active in-lavorazione{% endif %}"
              data-ordine-id="{{ entry.ordine.pk }}"
              onclick="selezionaOrdine({{ entry.ordine.pk }})">
-          <div class="d-flex justify-content-between align-items-start">
-            <div>
-              <strong class="text-primary">#{{ entry.ordine.numero_progressivo|slice:"-4:" }}</strong>
-              {% if entry.ordine.cliente %}
-                <span class="text-muted ms-1 small">{{ entry.ordine.cliente }}</span>
-              {% endif %}
+          <div class="ordine-card-body">
+            <div class="d-flex justify-content-between align-items-start">
+              <div class="flex-grow-1 me-2">
+                <div class="d-flex align-items-center gap-2 flex-wrap">
+                  <strong class="text-primary fs-6">#{{ entry.ordine.numero_progressivo|slice:"-4:" }}</strong>
+                  {% if entry.ordine.cliente %}
+                    <span class="fw-semibold">{{ entry.ordine.cliente }}</span>
+                  {% else %}
+                    <span class="text-muted small">Anonimo</span>
+                  {% endif %}
+                </div>
+              </div>
+              <span class="badge {% if entry.ordine.stato == 'in_lavorazione' %}bg-warning text-dark{% else %}bg-secondary{% endif %}">
+                {{ entry.ordine.stato }}
+              </span>
             </div>
-            <span class="badge {% if entry.ordine.stato == 'in_lavorazione' %}bg-warning{% else %}bg-secondary{% endif %} badge-postazione">
-              {{ entry.ordine.stato }}
-            </span>
-          </div>
-          {% if entry.ordine.tipo_auto %}
-            <div class="fw-bold" style="color:#2c3e50"><i class="bi bi-car-front-fill me-1"></i>{{ entry.ordine.tipo_auto }}</div>
-          {% endif %}
-          {% if entry.ordine.ora_consegna_richiesta %}
-            <div class="text-muted small"><i class="bi bi-clock"></i> Consegna {{ entry.ordine.ora_consegna_richiesta|time:"H:i" }}</div>
-          {% endif %}
-          <div class="mt-1">
-            {% for item in entry.items %}
-              <span class="badge bg-light text-dark border me-1 small">{{ item.servizio_prodotto.titolo }}</span>
-            {% endfor %}
+
+            {% if entry.ordine.tipo_auto %}
+              <div class="mt-1 fw-semibold" style="color:#2c3e50">
+                <i class="bi bi-car-front-fill me-1"></i>{{ entry.ordine.tipo_auto }}
+              </div>
+            {% endif %}
+
+            {% if entry.ordine.ora_consegna_richiesta %}
+              <div class="text-muted small mt-1">
+                <i class="bi bi-clock"></i> Consegna {{ entry.ordine.ora_consegna_richiesta|time:"H:i" }}
+                {% if entry.ordine.tipo_consegna == 'programmata' %}
+                  <span class="badge bg-warning text-dark ms-1" style="font-size:.65rem">Programmata</span>
+                {% endif %}
+              </div>
+            {% endif %}
+
+            {% if entry.ordine.nota %}
+              <div class="alert alert-info py-1 px-2 mb-0 mt-2 small">
+                <i class="bi bi-sticky"></i> {{ entry.ordine.nota }}
+              </div>
+            {% endif %}
+
+            <div class="mt-2 d-flex flex-wrap gap-1">
+              {% for item in entry.items %}
+                <span class="badge bg-light text-dark border small">{{ item.servizio_prodotto.titolo }}</span>
+              {% endfor %}
+            </div>
+
+            {% with stati=entry.ordine.get_stati_postazioni %}
+              {% if stati %}
+                <div class="mt-2 d-flex flex-wrap gap-1">
+                  {% for sp in stati %}
+                    <span class="badge {% if sp.stato == 'completato' %}bg-success{% elif sp.stato == 'in_lavorazione' %}bg-warning text-dark{% else %}bg-primary{% endif %}"
+                          title="{{ sp.nome }}: {{ sp.stato }}" style="font-size:.7rem">{{ sp.sigla }}</span>
+                  {% endfor %}
+                </div>
+              {% endif %}
+            {% endwith %}
           </div>
         </div>
         {% empty %}
@@ -360,17 +435,6 @@ function renderAreaOperativa(ordine, lavorazione, lavorazioniAttive, fasiComplet
     optHtml += `<option value="${s.id}" data-prezzo="${s.prezzo}">${s.titolo} — &euro;${s.prezzo}</option>`;
   }
 
-  // --- Stato postazioni ---
-  let statiHtml = '';
-  if (ordine.stati_postazioni && ordine.stati_postazioni.length > 0) {
-    statiHtml = '<div class="d-flex flex-wrap gap-1 mt-2">';
-    for (const sp of ordine.stati_postazioni) {
-      const cls = sp.stato==='completato'?'bg-success':sp.stato==='in_lavorazione'?'bg-warning text-dark':'bg-primary';
-      statiHtml += `<span class="badge ${cls}" title="${sp.nome}: ${sp.stato}" style="font-size:.7rem">${sp.sigla}</span>`;
-    }
-    statiHtml += '</div>';
-  }
-
   // --- Fasi completate ---
   let fasiHtml = '';
   if (fasiCompletate.length > 0) {
@@ -426,35 +490,12 @@ function renderAreaOperativa(ordine, lavorazione, lavorazioniAttive, fasiComplet
     </div>`;
   }
 
-  // --- Ora consegna ---
-  let consegnaHtml = '';
-  if (ordine.ora_consegna) {
-    consegnaHtml = `<p class="mb-1"><i class="bi bi-clock"></i> <strong>Consegna:</strong> ${ordine.ora_consegna}${ordine.tipo_consegna === 'programmata' ? ' <span class="badge bg-warning text-dark" style="font-size:.65rem">Programmata</span>' : ''}</p>`;
-  }
-
   area.innerHTML = `
     <div class="card mb-3">
-      <div class="card-header bg-primary text-white py-2 d-flex justify-content-between align-items-center">
-        <span><i class="bi bi-car-front"></i> Ordine #${ordine.numero}</span>
+      <div class="card-header py-2 bg-dark text-white d-flex justify-content-between align-items-center">
+        <span><i class="bi bi-stopwatch"></i> Lavorazione &mdash; #${ordine.numero}</span>
         <span class="badge bg-light text-dark">${ordine.stato}</span>
       </div>
-      <div class="card-body py-2">
-        <div class="row">
-          <div class="col-md-6">
-            <p class="mb-1"><i class="bi bi-person"></i> <strong>Cliente:</strong> ${ordine.cliente || 'Anonimo'}</p>
-            <p class="mb-1"><i class="bi bi-car-front-fill"></i> <strong>Auto:</strong> ${ordine.tipo_auto || 'N/D'}</p>
-            ${consegnaHtml}
-          </div>
-          <div class="col-md-6">
-            ${ordine.nota ? `<div class="alert alert-info py-1 px-2 mb-1 small"><i class="bi bi-sticky"></i> ${ordine.nota}</div>` : ''}
-            ${statiHtml}
-          </div>
-        </div>
-      </div>
-    </div>
-
-    <div class="card mb-3">
-      <div class="card-header py-2 bg-dark text-white"><i class="bi bi-stopwatch"></i> Lavorazione</div>
       <div class="card-body text-center py-3">
         ${fasiHtml}${lavAttivaHtml}${timerHtml}
         <div class="mt-3">${buttonsHtml}</div>
