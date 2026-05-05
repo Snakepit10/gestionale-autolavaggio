@@ -1095,7 +1095,26 @@ async function completaLavoro() {
   currentLavStato = '';
   // Reload pagina per aggiornare coda e sezione completate.
   // L'ordine appena chiuso esce dalla coda attiva e compare in basso fra i completati.
-  window.location.reload();
+  // Aggiungo cache-buster per forzare network anche se il SW sta restituendo cache.
+  await invalidateDashboardCache();
+  window.location.href = window.location.pathname + '?_t=' + Date.now();
+}
+
+// Cancella la cache del SW per la pagina dashboard prima del reload
+async function invalidateDashboardCache() {
+  try {
+    if (!('caches' in window)) return;
+    const keys = await caches.keys();
+    for (const k of keys) {
+      const cache = await caches.open(k);
+      const reqs = await cache.keys();
+      for (const r of reqs) {
+        if (r.url.includes('/turni/dashboard')) {
+          await cache.delete(r);
+        }
+      }
+    }
+  } catch(e) { /* ignora errori cache */ }
 }
 
 /* ---- Polling coda ---- */
