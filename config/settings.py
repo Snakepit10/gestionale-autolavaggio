@@ -51,6 +51,7 @@ INSTALLED_APPS = [
     'apps.api',
     'apps.cq',
     'apps.turni',
+    'apps.clients',
     # 'apps.reportistica',  # Temporarily disabled due to pandas dependency
     # 'apps.shop',
 ]

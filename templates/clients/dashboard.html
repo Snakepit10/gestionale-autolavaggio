@@ -1,0 +1,130 @@
+{% extends "clients/base_public.html" %}
+{% block title %}Area cliente &mdash; {{ cliente.nome }}{% endblock %}
+{% block nav_area %}active{% endblock %}
+
+{% block content %}
+<div class="container py-4">
+
+    <div class="d-flex justify-content-between align-items-center mb-4 flex-wrap gap-2">
+        <div>
+            <h3 class="mb-0" style="font-weight:800">Ciao {{ cliente.nome }} 👋</h3>
+            <p class="text-muted mb-0">Bentornato. Ecco il riepilogo del tuo account.</p>
+        </div>
+        <a href="{% url 'clients:booking' %}" class="btn-cta">
+            <i class="bi bi-calendar-plus"></i> Nuova prenotazione
+        </a>
+    </div>
+
+    {# KPI cards #}
+    <div class="row g-2 mb-4">
+        <div class="col-6 col-md-3">
+            <div class="pub-card text-center">
+                <div class="text-muted small fw-bold text-uppercase">Prenotazioni</div>
+                <div class="fs-3 fw-bold text-primary">{{ prenotazioni_prossime|length }}</div>
+                <small class="text-muted">in arrivo</small>
+            </div>
+        </div>
+        <div class="col-6 col-md-3">
+            <div class="pub-card text-center">
+                <div class="text-muted small fw-bold text-uppercase">Punti fedelta</div>
+                <div class="fs-3 fw-bold text-warning">{{ punti_totali }}</div>
+                <small class="text-muted">disponibili</small>
+            </div>
+        </div>
+        <div class="col-12 col-md-6">
+            <div class="pub-card">
+                <div class="text-muted small fw-bold text-uppercase mb-1">Account</div>
+                <div class="fw-bold">{{ cliente.nome_completo }}</div>
+                <div class="small text-muted">{{ cliente.email }} &middot; {{ cliente.telefono }}</div>
+            </div>
+        </div>
+    </div>
+
+    {# Prenotazioni prossime #}
+    <h5 class="mb-3 fw-bold"><i class="bi bi-calendar-event text-primary"></i> Prossime prenotazioni</h5>
+    {% if prenotazioni_prossime %}
+        <div class="row g-2 mb-4">
+        {% for p in prenotazioni_prossime %}
+        <div class="col-md-6">
+            <div class="pub-card">
+                <div class="d-flex justify-content-between align-items-start mb-2">
+                    <div>
+                        <div class="fs-5 fw-bold text-primary">
+                            <i class="bi bi-calendar3"></i> {{ p.slot.data|date:"d/m/Y" }} &middot; {{ p.slot.ora_inizio|time:"H:i" }}
+                        </div>
+                        <small class="text-muted">Codice: <strong>{{ p.codice_prenotazione }}</strong></small>
+                    </div>
+                    <span class="badge bg-{% if p.stato == 'confermata' %}success{% else %}warning text-dark{% endif %}">
+                        {{ p.get_stato_display }}
+                    </span>
+                </div>
+                <div class="d-flex flex-wrap gap-1 mb-2">
+                    {% for s in p.servizi.all %}
+                    <span class="badge bg-light text-dark border">{{ s.titolo }}</span>
+                    {% endfor %}
+                </div>
+                {% if p.tipo_auto %}
+                <div class="small text-muted"><i class="bi bi-car-front"></i> {{ p.tipo_auto }}</div>
+                {% endif %}
+                {% if p.can_be_cancelled %}
+                <button class="btn btn-sm btn-outline-danger mt-2"
+                        onclick="annullaPrenotazione({{ p.pk }})">
+                    <i class="bi bi-x-circle"></i> Annulla
+                </button>
+                {% endif %}
+            </div>
+        </div>
+        {% endfor %}
+        </div>
+    {% else %}
+        <div class="pub-card text-center py-5 mb-4">
+            <i class="bi bi-calendar-x" style="font-size:2.5rem; color:#cbd5e1"></i>
+            <p class="text-muted mb-3 mt-2">Non hai prenotazioni future.</p>
+            <a href="{% url 'clients:booking' %}" class="btn-cta">
+                <i class="bi bi-calendar-plus"></i> Prenota ora
+            </a>
+        </div>
+    {% endif %}
+
+    {# Storico #}
+    {% if prenotazioni_passate %}
+    <h5 class="mb-3 fw-bold"><i class="bi bi-clock-history text-secondary"></i> Storico</h5>
+    <div class="pub-card p-0">
+        <ul class="list-group list-group-flush">
+            {% for p in prenotazioni_passate %}
+            <li class="list-group-item d-flex justify-content-between align-items-center">
+                <div>
+                    <div class="fw-bold">{{ p.slot.data|date:"d/m/Y" }} &middot; {{ p.slot.ora_inizio|time:"H:i" }}</div>
+                    <small class="text-muted">
+                        {% for s in p.servizi.all %}{{ s.titolo }}{% if not forloop.last %}, {% endif %}{% endfor %}
+                    </small>
+                </div>
+                <span class="badge bg-secondary">{{ p.get_stato_display }}</span>
+            </li>
+            {% endfor %}
+        </ul>
+    </div>
+    {% endif %}
+
+</div>
+
+<script>
+function annullaPrenotazione(pk) {
+    if (!confirm('Confermi annullamento della prenotazione?')) return;
+    const csrfToken = document.querySelector('[name=csrfmiddlewaretoken]')?.value
+        || document.cookie.split('; ').find(r => r.startsWith('csrftoken='))?.split('=')[1];
+    fetch(`/app/annulla/${pk}/`, {
+        method: 'POST',
+        headers: { 'X-CSRFToken': csrfToken, 'Content-Type': 'application/json' },
+        credentials: 'same-origin',
+    })
+    .then(r => r.json())
+    .then(d => {
+        if (d.ok) location.reload();
+        else alert(d.error || 'Errore');
+    });
+}
+</script>
+
+<form style="display:none">{% csrf_token %}</form>
+{% endblock %}

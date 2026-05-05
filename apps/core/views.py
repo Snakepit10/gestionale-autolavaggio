@@ -15,9 +15,22 @@ from .forms import (
 )
 
 
-class HomeView(LoginRequiredMixin, TemplateView):
+class HomeView(TemplateView):
+    """Home dispatch:
+    - Anonimo: redirect alla landing pubblica clienti
+    - Cliente loggato (ha .cliente): redirect alla sua dashboard
+    - Staff/admin: home dashboard staff esistente
+    """
     template_name = 'core/home.html'
-    
+
+    def dispatch(self, request, *args, **kwargs):
+        from django.shortcuts import redirect
+        if not request.user.is_authenticated:
+            return redirect('clients:landing')
+        if hasattr(request.user, 'cliente') and not (request.user.is_staff or request.user.is_superuser):
+            return redirect('clients:dashboard')
+        return super().dispatch(request, *args, **kwargs)
+
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
         from datetime import date, datetime, timedelta

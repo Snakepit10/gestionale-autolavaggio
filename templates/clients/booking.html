@@ -1,0 +1,325 @@
+{% extends "clients/base_public.html" %}
+{% block title %}Prenota un servizio &mdash; Autolavaggio{% endblock %}
+{% block nav_booking %}active{% endblock %}
+
+{% block extra_css %}
+<style>
+.bk-step { display: none; }
+.bk-step.active { display: block; }
+.bk-progress { display: flex; gap: 4px; margin-bottom: 24px; }
+.bk-progress .pi { flex: 1; height: 6px; background: #e2e8f0; border-radius: 3px; }
+.bk-progress .pi.done { background: #0d6efd; }
+
+.servizio-pick {
+    background: #fff;
+    border: 2px solid #e2e8f0;
+    border-radius: 12px;
+    padding: 14px;
+    cursor: pointer;
+    transition: all .15s;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 12px;
+}
+.servizio-pick:active { transform: scale(.98); }
+.servizio-pick.selected { border-color: #0d6efd; background: #eff6ff; box-shadow: 0 4px 12px rgba(13,110,253,.15); }
+.servizio-pick .titolo { font-weight: 700; color: #1e293b; }
+.servizio-pick .meta { font-size: .82rem; color: #64748b; }
+.servizio-pick .prezzo { font-size: 1.2rem; font-weight: 800; color: #0d6efd; flex-shrink: 0; }
+.servizio-pick .check { font-size: 1.3rem; color: #cbd5e1; flex-shrink: 0; }
+.servizio-pick.selected .check { color: #0d6efd; }
+
+.slot-pick {
+    background: #fff;
+    border: 2px solid #e2e8f0;
+    border-radius: 8px;
+    padding: 10px 8px;
+    text-align: center;
+    cursor: pointer;
+    font-weight: 600;
+    color: #1e293b;
+    transition: all .12s;
+    user-select: none;
+}
+.slot-pick:active { transform: scale(.97); }
+.slot-pick.selected { border-color: #0d6efd; background: #0d6efd; color: #fff; box-shadow: 0 4px 12px rgba(13,110,253,.25); }
+.slot-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(80px, 1fr)); gap: 8px; }
+
+.bk-summary {
+    background: linear-gradient(135deg, #0d6efd 0%, #14b8a6 100%);
+    color: #fff;
+    padding: 20px;
+    border-radius: 14px;
+    margin-bottom: 16px;
+}
+.bk-summary .totale { font-size: 2rem; font-weight: 800; }
+
+.bk-actions { position: sticky; bottom: 0; padding: 12px 0; background: linear-gradient(180deg, transparent, #f8fafc 30%); margin-top: 24px; }
+@media (max-width: 575.98px) {
+    .bk-actions { bottom: 60px; }  /* Sopra bottom nav */
+}
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="container py-4" style="max-width:760px">
+
+    {% if not user.is_authenticated %}
+    <div class="alert alert-info">
+        <i class="bi bi-info-circle"></i>
+        Per completare una prenotazione devi avere un account.
+        <a href="{% url 'auth:client-login' %}" class="alert-link">Accedi</a>
+        o
+        <a href="{% url 'clients:register' %}" class="alert-link">registrati</a>.
+    </div>
+    {% endif %}
+
+    {# Progress 3 step #}
+    <div class="bk-progress">
+        <div class="pi done" id="pi-1"></div>
+        <div class="pi" id="pi-2"></div>
+        <div class="pi" id="pi-3"></div>
+    </div>
+
+    {# ========== STEP 1: Servizi ========== #}
+    <section class="bk-step active" data-step="1">
+        <h3 class="fw-bold mb-1">1. Scegli i servizi</h3>
+        <p class="text-muted">Seleziona uno o piu servizi. Puoi cambiare quando vuoi.</p>
+
+        {% regroup servizi by categoria as categorie_raggruppate %}
+        {% for cat in categorie_raggruppate %}
+            <h6 class="mt-4 mb-2 text-uppercase text-muted small fw-bold">
+                {{ cat.grouper.nome|default:"Servizi" }}
+            </h6>
+            <div class="d-flex flex-column gap-2">
+                {% for s in cat.list %}
+                <div class="servizio-pick"
+                     data-id="{{ s.id }}"
+                     data-prezzo="{{ s.prezzo }}"
+                     data-titolo="{{ s.titolo|escape }}"
+                     data-durata="{{ s.durata_minuti|default:30 }}"
+                     onclick="toggleServizio(this)">
+                    <div>
+                        <div class="titolo">{{ s.titolo }}</div>
+                        <div class="meta"><i class="bi bi-clock"></i> {{ s.durata_minuti|default:"30" }} min</div>
+                    </div>
+                    <div class="d-flex align-items-center gap-2">
+                        <div class="prezzo">&euro;{{ s.prezzo }}</div>
+                        <i class="bi bi-circle check"></i>
+                    </div>
+                </div>
+                {% endfor %}
+            </div>
+        {% empty %}
+            <div class="alert alert-light">Nessun servizio disponibile al momento.</div>
+        {% endfor %}
+
+        <div class="bk-actions">
+            <button class="btn-cta w-100 justify-content-center" id="btn-step2" disabled onclick="goStep(2)">
+                Avanti <i class="bi bi-arrow-right"></i>
+            </button>
+        </div>
+    </section>
+
+    {# ========== STEP 2: Data e ora ========== #}
+    <section class="bk-step" data-step="2">
+        <h3 class="fw-bold mb-1">2. Quando preferisci?</h3>
+        <p class="text-muted">Scegli data e fascia oraria disponibile.</p>
+
+        <div class="mb-3">
+            <label class="form-label small fw-bold text-muted">Data</label>
+            <input type="date" class="form-control form-control-lg" id="bk-data" onchange="caricaSlot()">
+        </div>
+
+        <div class="mb-3">
+            <label class="form-label small fw-bold text-muted">Slot disponibili</label>
+            <div id="bk-slot-container" class="slot-grid">
+                <div class="text-muted small text-center py-3" style="grid-column:1/-1">
+                    Seleziona prima una data
+                </div>
+            </div>
+        </div>
+
+        <div class="d-flex gap-2 bk-actions">
+            <button class="btn btn-outline-secondary flex-grow-0" onclick="goStep(1)">
+                <i class="bi bi-arrow-left"></i>
+            </button>
+            <button class="btn-cta flex-grow-1 justify-content-center" id="btn-step3" disabled onclick="goStep(3)">
+                Avanti <i class="bi bi-arrow-right"></i>
+            </button>
+        </div>
+    </section>
+
+    {# ========== STEP 3: Conferma ========== #}
+    <section class="bk-step" data-step="3">
+        <h3 class="fw-bold mb-1">3. Conferma</h3>
+        <p class="text-muted">Aggiungi qualche dettaglio e conferma.</p>
+
+        <div class="bk-summary">
+            <div class="small opacity-75 fw-bold">Riepilogo</div>
+            <div id="rec-data" class="fs-5 fw-bold mt-1"></div>
+            <div id="rec-servizi" class="small mt-2 mb-2 opacity-90"></div>
+            <div class="d-flex justify-content-between align-items-end mt-2 pt-2 border-top border-light border-opacity-25">
+                <div>
+                    <div class="small opacity-75">Totale stimato</div>
+                    <div class="totale" id="rec-totale">&euro;0</div>
+                </div>
+                <div class="small opacity-90 text-end">
+                    <div id="rec-durata"></div>
+                </div>
+            </div>
+        </div>
+
+        <div class="mb-3">
+            <label class="form-label small fw-bold text-muted">Tipo auto (opzionale)</label>
+            <input type="text" class="form-control" id="bk-tipo-auto" placeholder="es. Fiat 500 nera">
+        </div>
+
+        <div class="mb-3">
+            <label class="form-label small fw-bold text-muted">Note (opzionale)</label>
+            <textarea class="form-control" id="bk-nota" rows="2" placeholder="Eventuali richieste particolari"></textarea>
+        </div>
+
+        <div class="d-flex gap-2 bk-actions">
+            <button class="btn btn-outline-secondary flex-grow-0" onclick="goStep(2)">
+                <i class="bi bi-arrow-left"></i>
+            </button>
+            {% if user.is_authenticated %}
+            <button class="btn-cta flex-grow-1 justify-content-center" onclick="confermaPrenotazione()">
+                <i class="bi bi-check-circle"></i> Conferma prenotazione
+            </button>
+            {% else %}
+            <a href="{% url 'auth:client-login' %}?next={% url 'clients:booking' %}" class="btn-cta flex-grow-1 justify-content-center">
+                <i class="bi bi-box-arrow-in-right"></i> Accedi per confermare
+            </a>
+            {% endif %}
+        </div>
+    </section>
+</div>
+
+<form style="display:none">{% csrf_token %}</form>
+
+<script>
+let serviziSelezionati = [];
+let dataSelezionata = '';
+let oraSelezionata = '';
+
+function getCsrf() {
+    return document.querySelector('[name=csrfmiddlewaretoken]')?.value
+        || document.cookie.split('; ').find(r => r.startsWith('csrftoken='))?.split('=')[1];
+}
+
+function toggleServizio(el) {
+    const id = parseInt(el.dataset.id);
+    const idx = serviziSelezionati.findIndex(s => s.id === id);
+    if (idx >= 0) {
+        serviziSelezionati.splice(idx, 1);
+        el.classList.remove('selected');
+        el.querySelector('.check').className = 'bi bi-circle check';
+    } else {
+        serviziSelezionati.push({
+            id: id,
+            prezzo: parseFloat(el.dataset.prezzo),
+            titolo: el.dataset.titolo,
+            durata: parseInt(el.dataset.durata),
+        });
+        el.classList.add('selected');
+        el.querySelector('.check').className = 'bi bi-check-circle-fill check';
+    }
+    document.getElementById('btn-step2').disabled = serviziSelezionati.length === 0;
+}
+
+function goStep(n) {
+    document.querySelectorAll('.bk-step').forEach(s => s.classList.remove('active'));
+    document.querySelector(`.bk-step[data-step="${n}"]`).classList.add('active');
+    for (let i = 1; i <= 3; i++) {
+        const pi = document.getElementById('pi-' + i);
+        if (pi) pi.classList.toggle('done', i <= n);
+    }
+    if (n === 2) {
+        // Default oggi
+        const inp = document.getElementById('bk-data');
+        if (!inp.value) {
+            const t = new Date();
+            inp.value = t.toISOString().split('T')[0];
+            inp.min = inp.value;
+            caricaSlot();
+        }
+    }
+    if (n === 3) renderRiepilogo();
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+}
+
+function caricaSlot() {
+    const data = document.getElementById('bk-data').value;
+    if (!data) return;
+    dataSelezionata = data;
+    oraSelezionata = '';
+    document.getElementById('btn-step3').disabled = true;
+
+    const cont = document.getElementById('bk-slot-container');
+    cont.innerHTML = '<div class="text-muted small text-center py-3" style="grid-column:1/-1">Caricamento...</div>';
+
+    fetch(`/app/api/slot/?data=${data}`, { credentials: 'same-origin' })
+        .then(r => r.json())
+        .then(d => {
+            if (!d.slot || !d.slot.length) {
+                cont.innerHTML = '<div class="text-muted small text-center py-3" style="grid-column:1/-1">Nessuno slot disponibile per questa data. Prova un altro giorno.</div>';
+                return;
+            }
+            cont.innerHTML = d.slot.map(s =>
+                `<div class="slot-pick" data-ora="${s.ora_inizio}" onclick="selSlot(this)">${s.ora_inizio}</div>`
+            ).join('');
+        })
+        .catch(() => {
+            cont.innerHTML = '<div class="text-danger small text-center py-3" style="grid-column:1/-1">Errore caricamento slot</div>';
+        });
+}
+
+function selSlot(el) {
+    document.querySelectorAll('.slot-pick').forEach(s => s.classList.remove('selected'));
+    el.classList.add('selected');
+    oraSelezionata = el.dataset.ora;
+    document.getElementById('btn-step3').disabled = false;
+}
+
+function renderRiepilogo() {
+    const totale = serviziSelezionati.reduce((a, s) => a + s.prezzo, 0);
+    const durata = serviziSelezionati.reduce((a, s) => a + s.durata, 0);
+    document.getElementById('rec-data').textContent =
+        `${dataSelezionata.split('-').reverse().join('/')} alle ${oraSelezionata}`;
+    document.getElementById('rec-servizi').textContent =
+        serviziSelezionati.map(s => s.titolo).join(' · ');
+    document.getElementById('rec-totale').innerHTML = '&euro;' + totale.toFixed(2);
+    document.getElementById('rec-durata').textContent = `~ ${durata} min`;
+}
+
+function confermaPrenotazione() {
+    const payload = {
+        data: dataSelezionata,
+        ora: oraSelezionata,
+        servizi: serviziSelezionati.map(s => s.id),
+        tipo_auto: document.getElementById('bk-tipo-auto').value,
+        nota: document.getElementById('bk-nota').value,
+    };
+
+    fetch('/app/api/prenota/', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'X-CSRFToken': getCsrf() },
+        credentials: 'same-origin',
+        body: JSON.stringify(payload),
+    })
+    .then(r => r.json())
+    .then(d => {
+        if (d.ok) {
+            alert(`Prenotazione confermata!\nCodice: ${d.codice}\nData: ${d.data} alle ${d.ora}`);
+            window.location.href = d.redirect;
+        } else {
+            alert(d.error || 'Errore prenotazione');
+        }
+    })
+    .catch(() => alert('Errore di rete'));
+}
+</script>
+{% endblock %}

@@ -1,0 +1,200 @@
+{% load static %}
+<!DOCTYPE html>
+<html lang="it">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+    <title>{% block title %}Autolavaggio &mdash; Lavaggio auto professionale{% endblock %}</title>
+
+    <!-- Bootstrap 5 + Icons -->
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.10.0/font/bootstrap-icons.css" rel="stylesheet">
+    <link href="{% static 'css/style.css' %}" rel="stylesheet">
+
+    <!-- PWA -->
+    <link rel="manifest" href="{% static 'manifest.json' %}">
+    <meta name="theme-color" content="#0d6efd">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="default">
+    <meta name="apple-mobile-web-app-title" content="Autolavaggio">
+    <link rel="apple-touch-icon" href="{% static 'icons/apple-touch-icon.png' %}">
+    <link rel="icon" type="image/png" sizes="192x192" href="{% static 'icons/icon-192x192.png' %}">
+    <link rel="shortcut icon" href="{% static 'favicon.ico' %}">
+
+    <style>
+    :root {
+        --pub-primary: #0d6efd;
+        --pub-primary-dark: #0a58ca;
+        --pub-accent: #14b8a6;
+        --pub-bg: #f8fafc;
+        --pub-text: #1e293b;
+    }
+    body {
+        font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+        background: var(--pub-bg);
+        color: var(--pub-text);
+        touch-action: manipulation;
+    }
+    /* Header pubblico */
+    .pub-header {
+        background: #fff;
+        border-bottom: 1px solid #e2e8f0;
+        position: sticky;
+        top: 0;
+        z-index: 100;
+        backdrop-filter: blur(8px);
+    }
+    .pub-header .container { display: flex; align-items: center; justify-content: space-between; padding: 12px 16px; }
+    .pub-brand { font-size: 1.15rem; font-weight: 800; color: var(--pub-primary); text-decoration: none; display: flex; align-items: center; gap: 8px; }
+    .pub-brand i { font-size: 1.4rem; }
+    .pub-nav { display: flex; gap: 8px; align-items: center; }
+    .pub-nav a { padding: 8px 14px; border-radius: 8px; font-weight: 500; text-decoration: none; color: var(--pub-text); font-size: .92rem; }
+    .pub-nav a:hover { background: #f1f5f9; }
+    .pub-nav a.btn-primary { background: var(--pub-primary); color: #fff; }
+    .pub-nav a.btn-primary:hover { background: var(--pub-primary-dark); }
+
+    /* Bottom nav mobile */
+    .pub-bottom-nav { display: none; }
+    @media (max-width: 575.98px) {
+        .pub-nav .hide-mobile { display: none; }
+        .pub-bottom-nav {
+            display: flex;
+            position: fixed;
+            bottom: 0; left: 0; right: 0;
+            background: #fff;
+            border-top: 1px solid #e2e8f0;
+            z-index: 100;
+            padding: 6px env(safe-area-inset-right) calc(6px + env(safe-area-inset-bottom)) env(safe-area-inset-left);
+        }
+        .pub-bottom-nav a {
+            flex: 1;
+            text-align: center;
+            padding: 8px 4px;
+            text-decoration: none;
+            color: #64748b;
+            font-size: .68rem;
+            font-weight: 600;
+        }
+        .pub-bottom-nav a i { display: block; font-size: 1.3rem; margin-bottom: 2px; }
+        .pub-bottom-nav a.active { color: var(--pub-primary); }
+        body { padding-bottom: 70px; }
+    }
+
+    /* Footer */
+    .pub-footer { background: #1e293b; color: #cbd5e1; padding: 32px 16px; margin-top: 48px; text-align: center; font-size: .88rem; }
+    .pub-footer a { color: #93c5fd; text-decoration: none; }
+
+    /* Buttons */
+    .btn-cta {
+        background: var(--pub-primary);
+        color: #fff;
+        border: 0;
+        padding: 14px 28px;
+        border-radius: 12px;
+        font-weight: 600;
+        font-size: 1.05rem;
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+        text-decoration: none;
+        transition: transform .15s, box-shadow .15s;
+    }
+    .btn-cta:hover { transform: translateY(-2px); box-shadow: 0 8px 22px rgba(13, 110, 253, .35); color: #fff; }
+    .btn-cta.btn-cta-outline { background: transparent; color: var(--pub-primary); border: 2px solid var(--pub-primary); }
+    .btn-cta.btn-cta-outline:hover { background: var(--pub-primary); color: #fff; }
+
+    /* Cards */
+    .pub-card { background: #fff; border-radius: 14px; padding: 20px; box-shadow: 0 2px 6px rgba(0,0,0,.06); transition: transform .15s, box-shadow .15s; }
+    .pub-card:hover { transform: translateY(-2px); box-shadow: 0 8px 22px rgba(0,0,0,.08); }
+
+    /* Section */
+    .pub-section { padding: 48px 16px; }
+    .pub-section h2 { font-weight: 800; font-size: 1.8rem; margin-bottom: 12px; color: var(--pub-text); }
+    .pub-section .lead { font-size: 1.05rem; color: #64748b; }
+
+    @media (max-width: 575.98px) {
+        .pub-section { padding: 32px 16px; }
+        .pub-section h2 { font-size: 1.5rem; }
+    }
+    </style>
+
+    {% block extra_css %}{% endblock %}
+</head>
+<body class="{% block body_class %}{% endblock %}">
+
+{% block header %}
+<header class="pub-header">
+    <div class="container">
+        <a href="{% url 'clients:landing' %}" class="pub-brand">
+            <i class="bi bi-droplet-fill"></i> Autolavaggio
+        </a>
+        <nav class="pub-nav">
+            <a href="{% url 'clients:booking' %}" class="hide-mobile">Servizi</a>
+            {% if user.is_authenticated %}
+                <a href="{% url 'clients:dashboard' %}" class="hide-mobile">Area cliente</a>
+                <a href="{% url 'auth:client-logout' %}">Esci</a>
+            {% else %}
+                <a href="{% url 'auth:client-login' %}" class="hide-mobile">Accedi</a>
+                <a href="{% url 'clients:register' %}" class="btn-primary">Registrati</a>
+            {% endif %}
+        </nav>
+    </div>
+</header>
+{% endblock %}
+
+{% if messages %}
+<div class="container py-2">
+    {% for message in messages %}
+    <div class="alert alert-{{ message.tags|default:'info' }} alert-dismissible fade show mb-2" role="alert">
+        {{ message }}
+        <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+    </div>
+    {% endfor %}
+</div>
+{% endif %}
+
+<main>
+    {% block content %}{% endblock %}
+</main>
+
+{% block bottom_nav %}
+<nav class="pub-bottom-nav">
+    <a href="{% url 'clients:landing' %}" class="{% block nav_home %}{% endblock %}">
+        <i class="bi bi-house"></i> Home
+    </a>
+    <a href="{% url 'clients:booking' %}" class="{% block nav_booking %}{% endblock %}">
+        <i class="bi bi-calendar-plus"></i> Prenota
+    </a>
+    {% if user.is_authenticated %}
+    <a href="{% url 'clients:dashboard' %}" class="{% block nav_area %}{% endblock %}">
+        <i class="bi bi-person-circle"></i> Area
+    </a>
+    {% else %}
+    <a href="{% url 'auth:client-login' %}" class="{% block nav_login %}{% endblock %}">
+        <i class="bi bi-box-arrow-in-right"></i> Accedi
+    </a>
+    {% endif %}
+</nav>
+{% endblock %}
+
+<footer class="pub-footer">
+    <div>
+        <strong>Autolavaggio</strong> &middot; Pulizia auto professionale<br>
+        <small>&copy; 2026 &middot; <a href="{% url 'clients:landing' %}">Home</a> &middot; <a href="{% url 'clients:booking' %}">Servizi</a></small>
+    </div>
+</footer>
+
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+
+<!-- PWA SW -->
+<script>
+if ('serviceWorker' in navigator) {
+    window.addEventListener('load', function () {
+        navigator.serviceWorker.register('/service-worker.js', { scope: '/' });
+    });
+}
+</script>
+
+{% block extra_js %}{% endblock %}
+</body>
+</html>

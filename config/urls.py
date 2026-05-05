@@ -45,7 +45,10 @@ urlpatterns = [
     # Sistema di Autenticazione
     path('auth/', include('apps.auth_system.urls')),
 
-    # Core URLs essenziali
+    # Lato cliente (frontend pubblico PWA): landing, register, booking, dashboard
+    path('app/', include('apps.clients.urls')),
+
+    # Core URLs essenziali (dashboard staff su /, gestisce dispatch interno)
     path('', include('apps.core.urls')),
     path('clienti/', include('apps.clienti.urls')),
     path('ordini/', include('apps.ordini.urls')),
