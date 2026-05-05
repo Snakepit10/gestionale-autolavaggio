@@ -121,17 +121,31 @@ html, body { overflow: hidden !important; height: 100%; background: #fff; }
     border-top: 1px dashed #cbd5e1;
     padding-top: 14px;
 }
-.completata-card {
-    cursor: pointer;
-    border: 1px solid #d1fae5;
-    border-left: 4px solid #10b981;
-    border-radius: 8px;
+.ordine-card.completata-card {
+    border-color: #d1fae5;
+    border-left-color: #10b981;
     background: #f0fdf4;
-    transition: background .12s, box-shadow .12s;
-    opacity: .85;
+    opacity: .9;
 }
-.completata-card .completata-body { padding: 8px 12px; }
-.completata-card:hover { background: #dcfce7; opacity: 1; box-shadow: 0 2px 6px rgba(16, 185, 129, .15); }
+.ordine-card.completata-card:hover { background: #dcfce7; opacity: 1; }
+.ordine-card.completata-card.active {
+    border-color: #10b981;
+    border-left-color: #10b981;
+    border-left-width: 6px;
+    background: linear-gradient(135deg, #ecfdf5 0%, #d1fae5 100%);
+    box-shadow: 0 4px 14px rgba(16, 185, 129, .25);
+    opacity: 1;
+}
+.ordine-card.completata-card.active::before {
+    background: #10b981;
+    box-shadow: 0 0 0 0 rgba(16, 185, 129, .6);
+    animation: ordine-active-pulse-green 1.8s ease-in-out infinite;
+}
+.completata-meta { font-size: .72rem; color: #6b7280; }
+@keyframes ordine-active-pulse-green {
+    0%, 100% { box-shadow: 0 0 0 0 rgba(16, 185, 129, .6); }
+    50% { box-shadow: 0 0 0 8px rgba(16, 185, 129, 0); }
+}
 
 /* ============ Chip supplementi (Aggiungi al servizio) ============ */
 .suppl-chip {
@@ -237,13 +251,54 @@ html, body { overflow: hidden !important; height: 100%; background: #fff; }
 .dif-tipo-btn:active { background: #f8d7da; border-color: #dc3545; }
 .dif-tipo-btn.active { background: #dc3545; color: #fff; border-color: #dc3545; }
 
+/* Gravita: outline neutrale, fill solo quando selezionato */
 .dif-grav-pill {
     cursor: pointer;
     padding: 8px 14px;
-    font-size: .92rem;
+    font-size: .9rem;
+    font-weight: 600;
     min-height: 40px;
+    border-radius: 999px;
+    background: #fff;
+    color: #6b7280;
+    border: 2px solid #d1d5db;
+    transition: all .12s;
+    user-select: none;
 }
-.dif-grav-pill.active { box-shadow: 0 0 0 3px #000; }
+.dif-grav-pill[data-grav="bassa"]:hover { border-color: #6b7280; color: #374151; }
+.dif-grav-pill[data-grav="media"]:hover { border-color: #f59e0b; color: #92400e; }
+.dif-grav-pill[data-grav="alta"]:hover { border-color: #dc2626; color: #991b1b; }
+.dif-grav-pill[data-grav="bassa"].active {
+    background: #6b7280; color: #fff; border-color: #6b7280;
+    box-shadow: 0 0 0 3px rgba(107, 114, 128, .25);
+}
+.dif-grav-pill[data-grav="media"].active {
+    background: #f59e0b; color: #fff; border-color: #f59e0b;
+    box-shadow: 0 0 0 3px rgba(245, 158, 11, .25);
+}
+.dif-grav-pill[data-grav="alta"].active {
+    background: #dc2626; color: #fff; border-color: #dc2626;
+    box-shadow: 0 0 0 3px rgba(220, 38, 38, .25);
+}
+
+/* Carrello difetti CQ */
+.dif-cart {
+    background: #fff5f5;
+    border-radius: 8px;
+    padding: 10px 12px;
+}
+.dif-cart-list { display: flex; flex-direction: column; gap: 6px; }
+.dif-cart-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+    padding: 6px 10px;
+    background: #fff;
+    border-radius: 6px;
+    border: 1px solid #fecaca;
+    font-size: .88rem;
+}
 
 .empty-state {
     display: flex;
@@ -418,25 +473,68 @@ html, body { overflow: hidden !important; height: 100%; background: #fff; }
         </div>
         <div id="completateContainer">
           {% for lav in lavorazioni_completate %}
-          <div class="card completata-card mb-2"
+          <div class="card ordine-card completata-card mb-2"
                data-ordine-id="{{ lav.ordine.pk }}"
                onclick="selezionaOrdine({{ lav.ordine.pk }})">
-            <div class="completata-body">
-              <div class="d-flex justify-content-between align-items-center">
-                <div>
-                  <strong class="text-success">#{{ lav.ordine.numero_progressivo|slice:"-4:" }}</strong>
-                  {% if lav.ordine.cliente %}
-                    <span class="ms-1 small">{{ lav.ordine.cliente }}</span>
+            <div class="ordine-card-body">
+              <div class="d-flex justify-content-between align-items-start">
+                <div class="flex-grow-1 me-2">
+                  <div class="d-flex align-items-center gap-2 flex-wrap">
+                    <strong class="text-success fs-6">#{{ lav.ordine.numero_progressivo|slice:"-4:" }}</strong>
+                    {% if lav.ordine.cliente %}
+                      <span class="fw-semibold">{{ lav.ordine.cliente }}</span>
+                    {% else %}
+                      <span class="text-muted small">Anonimo</span>
+                    {% endif %}
+                  </div>
+                </div>
+                <span class="badge bg-success">
+                  <i class="bi bi-check2"></i> {{ lav.fine|date:"H:i" }}
+                </span>
+              </div>
+
+              {% if lav.ordine.tipo_auto %}
+                <div class="mt-1 fw-semibold" style="color:#2c3e50">
+                  <i class="bi bi-car-front-fill me-1"></i>{{ lav.ordine.tipo_auto }}
+                </div>
+              {% endif %}
+
+              {% if lav.ordine.ora_consegna_richiesta %}
+                <div class="text-muted small mt-1">
+                  <i class="bi bi-clock"></i> Consegna {{ lav.ordine.ora_consegna_richiesta|time:"H:i" }}
+                  {% if lav.ordine.tipo_consegna == 'programmata' %}
+                    <span class="badge bg-warning text-dark ms-1" style="font-size:.65rem">Programmata</span>
                   {% endif %}
                 </div>
-                <small class="text-muted">
-                  <i class="bi bi-clock"></i> {{ lav.fine|date:"H:i" }}
-                </small>
+              {% endif %}
+
+              {% if lav.ordine.nota %}
+                <div class="alert alert-info py-1 px-2 mb-0 mt-2 small">
+                  <i class="bi bi-sticky"></i> {{ lav.ordine.nota }}
+                </div>
+              {% endif %}
+
+              <div class="mt-2 d-flex flex-wrap gap-1">
+                {% for item in lav.ordine.items.all %}
+                  <span class="badge bg-light text-dark border small">{{ item.servizio_prodotto.titolo }}</span>
+                {% endfor %}
               </div>
-              <div class="small text-muted mt-1">
+
+              {% with stati=lav.ordine.get_stati_postazioni %}
+                {% if stati %}
+                  <div class="mt-2 d-flex flex-wrap gap-1">
+                    {% for sp in stati %}
+                      <span class="badge {% if sp.stato == 'completato' %}bg-success{% elif sp.stato == 'in_lavorazione' %}bg-warning text-dark{% else %}bg-primary{% endif %}"
+                            title="{{ sp.nome }}: {{ sp.stato }}" style="font-size:.7rem">{{ sp.sigla }}</span>
+                    {% endfor %}
+                  </div>
+                {% endif %}
+              {% endwith %}
+
+              <div class="completata-meta mt-2 pt-2 border-top">
                 <i class="bi bi-tools"></i>
                 {{ lav.postazione_cq.nome }}{% if lav.blocco %} &middot; {{ lav.blocco.nome }}{% endif %}
-                &middot; {{ lav.tempo_lavoro_netto_minuti|floatformat:0 }} min
+                <span class="ms-2"><i class="bi bi-stopwatch"></i> {{ lav.tempo_lavoro_netto_minuti|floatformat:0 }} min</span>
               </div>
             </div>
           </div>
@@ -489,9 +587,10 @@ function tornaAllaCoda() {
 
 /* ---- Seleziona ordine dalla coda ---- */
 async function selezionaOrdine(ordineId) {
-  // Cambio ordine: svuota carrello supplementi pendente
+  // Cambio ordine: svuota carrelli pendenti (supplementi e difetti)
   if (typeof currentOrdineId !== 'undefined' && currentOrdineId !== ordineId) {
-    supplCart = {};
+    if (typeof supplCart !== 'undefined') supplCart = {};
+    if (typeof defectCart !== 'undefined') defectCart = [];
   }
 
   // Evidenzia nella coda (sia ordini attivi sia completate)
@@ -603,12 +702,12 @@ function renderAreaOperativa(ordine, lavorazione, lavorazioniAttive, fasiComplet
     difettiHtml = `
     <div class="card mb-3 border-danger">
       <button type="button" class="cq-toggle card-header py-2 bg-danger text-white fw-bold w-100 border-0 d-flex justify-content-between align-items-center"
-              data-bs-toggle="collapse" data-bs-target="#cqBody" aria-expanded="false"
+              data-bs-toggle="collapse" data-bs-target="#cqBody" aria-expanded="true"
               style="font-size:.9rem; cursor:pointer;">
         <span><i class="bi bi-exclamation-triangle"></i> Controllo Qualita ${countBadge}</span>
         <i class="bi bi-chevron-down cq-chevron"></i>
       </button>
-      <div id="cqBody" class="collapse">
+      <div id="cqBody" class="collapse show">
         <div class="card-body py-2">
           <div class="small text-muted mb-1">Seleziona zona:</div>
           <div class="d-flex flex-wrap gap-1 mb-2" id="difZoneContainer">${zoneCards}</div>
@@ -617,6 +716,7 @@ function renderAreaOperativa(ordine, lavorazione, lavorazioniAttive, fasiComplet
               <i class="bi bi-hand-index"></i> Seleziona una zona per vedere i tipi di difetto
             </div>
           </div>
+          <div id="difCartContainer"></div>
           ${segnHtml}
         </div>
       </div>
@@ -649,17 +749,25 @@ function renderAreaOperativa(ordine, lavorazione, lavorazioniAttive, fasiComplet
   startTimer();
 }
 
-/* ---- Difetti POS-style ---- */
+/* ---- Difetti CQ con pattern carrello ---- */
 let difZonaAttiva = null;
+let difTipoAttivo = null;
+let difTipoNome = '';
+let difGravAttiva = null;  // bassa/media/alta - non preselezionato
+let difAzioneAttiva = 'corretto';
+let defectCart = [];  // [{zona, zona_nome, tipo_codice, tipo_nome, gravita, azione}]
 
 function selDifZona(codice) {
   difZonaAttiva = codice;
-  // Evidenzia chip attiva
+  difTipoAttivo = null;
+  difTipoNome = '';
+  difGravAttiva = null;
+  difAzioneAttiva = 'corretto';
+
   document.querySelectorAll('.dif-zona-chip').forEach(c => c.classList.remove('active'));
   const chip = document.querySelector(`.dif-zona-chip[data-zona="${codice}"]`);
   if (chip) chip.classList.add('active');
 
-  // Mostra tipi difetto nel pannello inline
   const z = ZONE_DIFETTI.find(zd => zd.codice === codice);
   const panel = document.getElementById('difPanelContainer');
   if (!z || !panel) return;
@@ -667,60 +775,142 @@ function selDifZona(codice) {
   let html = `<div class="small text-muted mb-1">Tipo difetto per <strong>${z.nome}</strong>:</div>`;
   html += '<div class="d-flex flex-wrap gap-1 mb-2">';
   for (const t of z.tipi) {
-    html += `<button type="button" class="dif-tipo-btn" onclick="selDifTipo(this, '${t.codice}')">${t.nome}</button>`;
+    html += `<button type="button" class="dif-tipo-btn" data-codice="${t.codice}" data-nome="${t.nome}" onclick="selDifTipo(this)">${t.nome}</button>`;
   }
   html += '</div>';
 
   html += `<div class="d-flex flex-wrap gap-2 align-items-center mb-2">
     <span class="small text-muted">Gravita:</span>
-    <span class="badge bg-secondary dif-grav-pill" onclick="selGrav(this,'bassa')">Bassa</span>
-    <span class="badge bg-warning text-dark dif-grav-pill active" onclick="selGrav(this,'media')">Media</span>
-    <span class="badge bg-danger dif-grav-pill" onclick="selGrav(this,'alta')">Alta</span>
+    <button type="button" class="dif-grav-pill" data-grav="bassa" onclick="selGrav(this,'bassa')">Bassa</button>
+    <button type="button" class="dif-grav-pill" data-grav="media" onclick="selGrav(this,'media')">Media</button>
+    <button type="button" class="dif-grav-pill" data-grav="alta" onclick="selGrav(this,'alta')">Alta</button>
     <span class="small text-muted ms-2">Azione:</span>
     <div class="btn-group btn-group-sm">
-      <input type="radio" class="btn-check" name="difAzione" value="corretto" id="difAzCorr" checked>
+      <input type="radio" class="btn-check" name="difAzione" value="corretto" id="difAzCorr" checked onchange="difAzioneAttiva='corretto'">
       <label class="btn btn-outline-success btn-sm" for="difAzCorr">Corretto</label>
-      <input type="radio" class="btn-check" name="difAzione" value="segnalato" id="difAzSegn">
+      <input type="radio" class="btn-check" name="difAzione" value="segnalato" id="difAzSegn" onchange="difAzioneAttiva='segnalato'">
       <label class="btn btn-outline-warning btn-sm" for="difAzSegn">Segnalato</label>
     </div>
-    <button class="btn btn-danger btn-sm ms-auto" onclick="inviaDefect()"><i class="bi bi-check-circle"></i> Conferma</button>
+    <button class="btn btn-outline-danger btn-sm ms-auto" onclick="aggiungiDifettoAlCarrello()">
+      <i class="bi bi-plus-circle"></i> Aggiungi al carrello
+    </button>
   </div>`;
 
   panel.innerHTML = html;
 }
 
-let difTipoAttivo = null;
-function selDifTipo(el, codice) {
-  difTipoAttivo = codice;
+function selDifTipo(el) {
+  difTipoAttivo = el.dataset.codice;
+  difTipoNome = el.dataset.nome;
   document.querySelectorAll('.dif-tipo-btn').forEach(b => b.classList.remove('active'));
   el.classList.add('active');
 }
 
-let difGravAttiva = 'media';
 function selGrav(el, grav) {
   difGravAttiva = grav;
   document.querySelectorAll('.dif-grav-pill').forEach(p => p.classList.remove('active'));
   el.classList.add('active');
 }
 
-async function inviaDefect() {
+function aggiungiDifettoAlCarrello() {
   if (!currentOrdineId || !difZonaAttiva || !difTipoAttivo) {
     alert('Seleziona zona e tipo difetto.');
     return;
   }
-  const azione = document.querySelector('input[name="difAzione"]:checked')?.value || 'corretto';
-  const data = await apiPost(`/turni/api/ordine/${currentOrdineId}/segnala-difetto/`, {
+  if (!difGravAttiva) {
+    alert('Seleziona la gravita.');
+    return;
+  }
+  const z = ZONE_DIFETTI.find(zd => zd.codice === difZonaAttiva);
+  defectCart.push({
     zona: difZonaAttiva,
-    tipo_difetto: difTipoAttivo,
+    zona_nome: z ? z.nome : difZonaAttiva,
+    tipo_codice: difTipoAttivo,
+    tipo_nome: difTipoNome,
     gravita: difGravAttiva,
-    azione: azione,
+    azione: difAzioneAttiva,
   });
-  if (data.ok) {
-    difZonaAttiva = null;
-    difTipoAttivo = null;
-    difGravAttiva = 'media';
+  // Reset selezioni per il prossimo difetto
+  difTipoAttivo = null;
+  difTipoNome = '';
+  difGravAttiva = null;
+  difAzioneAttiva = 'corretto';
+  document.querySelectorAll('.dif-tipo-btn, .dif-grav-pill').forEach(b => b.classList.remove('active'));
+  const radio = document.getElementById('difAzCorr');
+  if (radio) radio.checked = true;
+  renderDefectCart();
+}
+
+function rimuoviDifettoCart(idx) {
+  defectCart.splice(idx, 1);
+  renderDefectCart();
+}
+
+function svuotaDefectCart() {
+  defectCart = [];
+  renderDefectCart();
+}
+
+function renderDefectCart() {
+  const cont = document.getElementById('difCartContainer');
+  if (!cont) return;
+  if (defectCart.length === 0) {
+    cont.innerHTML = '';
+    return;
+  }
+  let rows = '';
+  defectCart.forEach((d, i) => {
+    const gravBadge = d.gravita === 'alta' ? 'bg-danger' : d.gravita === 'media' ? 'bg-warning text-dark' : 'bg-secondary';
+    const azIcon = d.azione === 'corretto' ? 'bi-check-circle' : 'bi-flag';
+    rows += `<div class="dif-cart-row">
+      <div class="flex-grow-1">
+        <strong>${d.zona_nome}</strong> &middot; ${d.tipo_nome}
+        <span class="badge ${gravBadge} ms-1">${d.gravita}</span>
+        <i class="bi ${azIcon} ms-1"></i>
+      </div>
+      <button type="button" class="btn btn-outline-danger btn-sm" onclick="rimuoviDifettoCart(${i})" title="Rimuovi">
+        <i class="bi bi-trash"></i>
+      </button>
+    </div>`;
+  });
+
+  cont.innerHTML = `
+    <div class="dif-cart border-top pt-2 mt-2">
+      <div class="d-flex justify-content-between align-items-center mb-2">
+        <span class="small fw-bold text-muted"><i class="bi bi-cart"></i> Difetti in segnalazione (${defectCart.length})</span>
+      </div>
+      <div class="dif-cart-list">${rows}</div>
+      <div class="d-flex gap-2 mt-2 justify-content-end">
+        <button type="button" class="btn btn-outline-secondary btn-sm" onclick="svuotaDefectCart()">
+          <i class="bi bi-x-circle"></i> Annulla
+        </button>
+        <button type="button" class="btn btn-danger btn-sm" onclick="confermaDefectCart()">
+          <i class="bi bi-check-circle"></i> Conferma segnalazioni
+        </button>
+      </div>
+    </div>`;
+}
+
+async function confermaDefectCart() {
+  if (!currentOrdineId || defectCart.length === 0) return;
+  let ok = true;
+  for (const d of defectCart) {
+    const data = await apiPost(`/turni/api/ordine/${currentOrdineId}/segnala-difetto/`, {
+      zona: d.zona,
+      tipo_difetto: d.tipo_codice,
+      gravita: d.gravita,
+      azione: d.azione,
+    });
+    if (!data.ok) {
+      alert(data.error || 'Errore segnalazione difetto');
+      ok = false;
+      break;
+    }
+  }
+  if (ok) {
+    defectCart = [];
     selezionaOrdine(currentOrdineId);
-  } else alert(data.error);
+  }
 }
 
 /* ---- Carrello supplementi ---- */

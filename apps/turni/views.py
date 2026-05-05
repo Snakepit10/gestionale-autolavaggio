@@ -361,6 +361,7 @@ def dashboard_operatore(request):
             sessione=sessione, stato='completato'
         )
         .select_related('ordine', 'ordine__cliente', 'postazione_cq', 'blocco')
+        .prefetch_related('ordine__items__servizio_prodotto')
         .order_by('-fine')[:20]
     )
 
