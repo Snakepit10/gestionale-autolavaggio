@@ -27,23 +27,61 @@ class CassaView(LoginRequiredMixin, TemplateView):
     
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
-        
+
         # Categorie e servizi/prodotti
         context['categorie'] = Categoria.objects.filter(attiva=True)
-        context['servizi_prodotti'] = ServizioProdotto.objects.filter(attivo=True).select_related('categoria')
-        
+        servizi_qs = ServizioProdotto.objects.filter(attivo=True).select_related('categoria')
+        context['servizi_prodotti'] = servizi_qs
+
+        # Item preferiti per l'utente corrente
+        from .models import ItemPreferito
+        preferiti_ids = set(
+            ItemPreferito.objects.filter(user=self.request.user)
+            .values_list('servizio_prodotto_id', flat=True)
+        )
+        context['preferiti_ids'] = preferiti_ids
+        context['preferiti'] = [s for s in servizi_qs if s.id in preferiti_ids]
+
         # Sconti disponibili
         context['sconti'] = Sconto.objects.filter(attivo=True)
-        
+
         # Form cliente veloce
         context['cliente_form'] = ClienteQuickForm()
-        
+
         # Ordini recenti
         context['ordini_recenti'] = Ordine.objects.filter(
             operatore=self.request.user
         ).order_by('-data_ora')[:10]
-        
+
         return context
+
+
+@login_required
+def toggle_preferito(request):
+    """Toggle item preferito per l'utente corrente.
+
+    POST {servizio_id: <int>} -> JSON {ok, is_preferito}
+    """
+    if request.method != 'POST':
+        return JsonResponse({'error': 'Metodo non permesso'}, status=405)
+
+    try:
+        from .models import ItemPreferito
+        data = json.loads(request.body)
+        servizio_id = int(data.get('servizio_id', 0))
+        if not servizio_id:
+            return JsonResponse({'error': 'servizio_id mancante'}, status=400)
+
+        preferito, created = ItemPreferito.objects.get_or_create(
+            user=request.user, servizio_prodotto_id=servizio_id
+        )
+        if not created:
+            # Esisteva: rimuovi
+            preferito.delete()
+            return JsonResponse({'ok': True, 'is_preferito': False})
+        return JsonResponse({'ok': True, 'is_preferito': True})
+    except Exception as e:
+        return JsonResponse({'error': str(e)}, status=500)
 
 
 class CassaMobileView(LoginRequiredMixin, TemplateView):

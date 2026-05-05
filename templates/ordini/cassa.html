@@ -219,6 +219,39 @@
 }
 
 /* Colori per le card degli item */
+/* ==== Stella preferiti su item-card ==== */
+.item-card { position: relative; }
+.btn-fav {
+    position: absolute;
+    top: 4px;
+    right: 4px;
+    width: 28px;
+    height: 28px;
+    padding: 0;
+    border: none;
+    background: rgba(255, 255, 255, .85);
+    border-radius: 50%;
+    color: #cbd5e1;
+    font-size: .9rem;
+    line-height: 1;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    z-index: 5;
+    transition: transform .15s, color .15s, background .15s;
+}
+.btn-fav:hover { transform: scale(1.15); color: #f59e0b; }
+.btn-fav.active { color: #f59e0b; background: rgba(255, 251, 235, .95); }
+.btn-fav.active:hover { color: #d97706; }
+
+.item-card.is-preferito { box-shadow: 0 0 0 1px #f59e0b inset; }
+
+/* ==== Preferiti section header ==== */
+.preferiti-header {
+    background: linear-gradient(135deg, #f59e0b 0%, #fbbf24 100%);
+}
+
 .item-card[data-categoria="1"] { background-color: rgba(255, 107, 107, 0.1); border-color: #ff6b6b; }
 .item-card[data-categoria="2"] { background-color: rgba(78, 205, 196, 0.1); border-color: #4ecdc4; }
 .item-card[data-categoria="3"] { background-color: rgba(69, 183, 209, 0.1); border-color: #45b7d1; }
@@ -302,6 +335,35 @@
         
         <!-- Catalogo organizzato per categoria -->
         <div id="catalogo-grid">
+
+            <!-- Sezione Preferiti (in alto) -->
+            <div class="categoria-sezione preferiti-sezione mb-4" data-categoria="preferiti" {% if not preferiti %}style="display:none"{% endif %}>
+                <div class="d-flex align-items-center mb-3">
+                    <div class="categoria-header p-2 rounded me-3 preferiti-header" style="color:white">
+                        <h6 class="mb-0 fw-bold"><i class="bi bi-star-fill"></i> Preferiti</h6>
+                    </div>
+                    <small class="text-muted preferiti-count">{{ preferiti|length }} elementi</small>
+                </div>
+                <div class="row g-1 mb-3" id="preferiti-grid">
+                    {% for item in preferiti %}
+                    <div class="col-sm-6 col-md-4 col-lg-3 catalogo-item preferito-clone" data-categoria="{{ item.categoria.id }}" data-id="{{ item.id }}">
+                        <div class="card item-card {{ item.tipo }} is-preferito" data-id="{{ item.id }}" data-categoria="{{ item.categoria.id }}" onclick="aggiungiAlCarrello({{ item.id }})">
+                            <button type="button" class="btn-fav active" onclick="event.stopPropagation(); togglePreferito({{ item.id }})" title="Rimuovi dai preferiti">
+                                <i class="bi bi-star-fill"></i>
+                            </button>
+                            <div class="card-body text-center p-2">
+                                <h6 class="card-title mb-1">{{ item.titolo }}</h6>
+                                <div class="text-primary fw-bold small">&euro;{{ item.prezzo }}</div>
+                                {% if item.tipo == 'servizio' %}
+                                    <small class="text-muted d-block" style="font-size:.7rem;">{{ item.durata_minuti }}min</small>
+                                {% endif %}
+                            </div>
+                        </div>
+                    </div>
+                    {% endfor %}
+                </div>
+            </div>
+
             {% regroup servizi_prodotti by categoria as categorie_raggruppate %}
             {% for categoria_group in categorie_raggruppate %}
                 <div class="categoria-sezione mb-4" data-categoria="{{ categoria_group.grouper.id }}">
@@ -312,12 +374,17 @@
                         </div>
                         <small class="text-muted">{{ categoria_group.list|length }} elementi</small>
                     </div>
-                    
+
                     <!-- Card della categoria -->
                     <div class="row g-1 mb-3">
                         {% for item in categoria_group.list %}
-                        <div class="col-sm-6 col-md-4 col-lg-3 catalogo-item" data-categoria="{{ item.categoria.id }}">
-                            <div class="card item-card {{ item.tipo }}" data-id="{{ item.id }}" data-categoria="{{ item.categoria.id }}" onclick="aggiungiAlCarrello({{ item.id }})">
+                        <div class="col-sm-6 col-md-4 col-lg-3 catalogo-item" data-categoria="{{ item.categoria.id }}" data-id="{{ item.id }}">
+                            <div class="card item-card {{ item.tipo }}{% if item.id in preferiti_ids %} is-preferito{% endif %}" data-id="{{ item.id }}" data-categoria="{{ item.categoria.id }}" onclick="aggiungiAlCarrello({{ item.id }})">
+                                <button type="button" class="btn-fav{% if item.id in preferiti_ids %} active{% endif %}"
+                                        onclick="event.stopPropagation(); togglePreferito({{ item.id }})"
+                                        title="{% if item.id in preferiti_ids %}Rimuovi dai preferiti{% else %}Aggiungi ai preferiti{% endif %}">
+                                    <i class="bi {% if item.id in preferiti_ids %}bi-star-fill{% else %}bi-star{% endif %}"></i>
+                                </button>
                                 <div class="card-body text-center p-2">
                                     <h6 class="card-title mb-1">{{ item.titolo }}</h6>
                                     <div class="text-primary fw-bold small">€{{ item.prezzo }}</div>
@@ -854,6 +921,67 @@ function sincronizzaStatoSelected() {
 }
 
 // Gestione carrello
+// ==== Preferiti: toggle star + sposta in/da sezione preferiti ====
+async function togglePreferito(servizioId) {
+    try {
+        const res = await AutolavaggioJS.fetchWithCSRF('/ordini/api/toggle-preferito/', {
+            method: 'POST',
+            body: JSON.stringify({ servizio_id: servizioId }),
+        });
+        const data = await res.json();
+        if (!data.ok) {
+            AutolavaggioJS.showToast(data.error || 'Errore preferito', 'danger');
+            return;
+        }
+        aggiornaUIPreferito(servizioId, data.is_preferito);
+    } catch (e) {
+        console.error(e);
+        AutolavaggioJS.showToast('Errore di rete', 'danger');
+    }
+}
+
+function aggiornaUIPreferito(servizioId, isPreferito) {
+    // Aggiorna tutte le card con questo id (sia in catalogo che in sezione preferiti)
+    document.querySelectorAll(`.item-card[data-id="${servizioId}"]`).forEach(card => {
+        if (isPreferito) {
+            card.classList.add('is-preferito');
+        } else {
+            card.classList.remove('is-preferito');
+        }
+        const star = card.querySelector('.btn-fav i');
+        const btn = card.querySelector('.btn-fav');
+        if (star) star.className = isPreferito ? 'bi bi-star-fill' : 'bi bi-star';
+        if (btn) {
+            btn.classList.toggle('active', isPreferito);
+            btn.title = isPreferito ? 'Rimuovi dai preferiti' : 'Aggiungi ai preferiti';
+        }
+    });
+
+    const sezione = document.querySelector('.preferiti-sezione');
+    const grid = document.getElementById('preferiti-grid');
+    if (!sezione || !grid) return;
+
+    if (isPreferito) {
+        // Clona la card originale (qualsiasi non-preferito-clone) nella sezione preferiti
+        const sourceCol = document.querySelector(`.catalogo-item:not(.preferito-clone)[data-id="${servizioId}"]`);
+        if (sourceCol && !grid.querySelector(`.catalogo-item[data-id="${servizioId}"]`)) {
+            const clone = sourceCol.cloneNode(true);
+            clone.classList.add('preferito-clone');
+            grid.appendChild(clone);
+        }
+    } else {
+        // Rimuovi dalla sezione preferiti
+        const cloneCol = grid.querySelector(`.catalogo-item[data-id="${servizioId}"]`);
+        if (cloneCol) cloneCol.remove();
+    }
+
+    // Mostra/nascondi sezione e aggiorna conteggio
+    const count = grid.querySelectorAll('.catalogo-item').length;
+    sezione.style.display = count > 0 ? '' : 'none';
+    const countEl = sezione.querySelector('.preferiti-count');
+    if (countEl) countEl.textContent = count + ' element' + (count === 1 ? 'o' : 'i');
+}
+
 function aggiungiAlCarrello(servizioId) {
     // Aggiungi effetto visivo alla card
     const card = event.currentTarget;

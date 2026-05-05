@@ -425,3 +425,28 @@ class ConfigurazionePianificazione(models.Model):
             }
         )
         return config
+
+
+class ItemPreferito(models.Model):
+    """Servizio/prodotto marcato come preferito da un operatore.
+
+    Mostrato in alto nel catalogo della cassa per l'utente che lo
+    ha messo nei preferiti (per-utente, non globale).
+    """
+    user = models.ForeignKey(
+        User, on_delete=models.CASCADE, related_name='items_preferiti'
+    )
+    servizio_prodotto = models.ForeignKey(
+        'core.ServizioProdotto', on_delete=models.CASCADE,
+        related_name='preferiti_per_user'
+    )
+    creato_il = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        unique_together = [('user', 'servizio_prodotto')]
+        verbose_name = 'Item preferito'
+        verbose_name_plural = 'Items preferiti'
+        ordering = ['-creato_il']
+
+    def __str__(self):
+        return f"{self.user.username} - {self.servizio_prodotto.titolo}"
