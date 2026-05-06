@@ -35,7 +35,7 @@ def _safe_send(subject: str, body: str, to_email: str | None) -> bool:
         return False
 
 
-def email_prenotazione_ricevuta(prenotazione) -> bool:
+def email_prenotazione_ricevuta(prenotazione, to_email: str | None = None) -> bool:
     cliente = prenotazione.cliente
     nome = (cliente.nome or cliente.cognome or '').strip() or 'Cliente'
     data = prenotazione.slot.data.strftime('%d/%m/%Y')
@@ -52,7 +52,7 @@ def email_prenotazione_ricevuta(prenotazione) -> bool:
         f"Riceverai una nuova email all'esito.\n\n"
         f"Grazie!"
     )
-    return _safe_send('Prenotazione ricevuta - in attesa di conferma', body, cliente.email)
+    return _safe_send('Prenotazione ricevuta - in attesa di conferma', body, to_email or cliente.email)
 
 
 def email_prenotazione_confermata(prenotazione) -> bool:

@@ -277,6 +277,24 @@ def crea_prenotazione_pub(request):
 
             if existing_cliente:
                 cliente = existing_cliente
+                # Aggiorna campi mancanti / cambiati. Mai sovrascrivere
+                # email se gia presente con una differente (potrebbe
+                # essere account di un altro cliente con lo stesso tel).
+                changed = []
+                if email and not cliente.email:
+                    cliente.email = email
+                    changed.append('email')
+                if telefono and not cliente.telefono:
+                    cliente.telefono = telefono
+                    changed.append('telefono')
+                if not cliente.nome and nome:
+                    cliente.nome = nome
+                    changed.append('nome')
+                if not cliente.cognome and cognome:
+                    cliente.cognome = cognome
+                    changed.append('cognome')
+                if changed:
+                    cliente.save(update_fields=changed)
             else:
                 cliente = Cliente.objects.create(
                     tipo='privato',
@@ -297,6 +315,11 @@ def crea_prenotazione_pub(request):
                 )
                 cliente.user = user_creato
                 cliente.save(update_fields=['user'])
+
+            # Memorizza email scelta per la prenotazione (potrebbe
+            # differire da cliente.email se cliente esisteva gia con
+            # email diversa). Usata per la notifica.
+            email_per_notifica = email or cliente.email or ''
 
     # ---------- Slot ----------
     ora_fine_dt = datetime.combine(data_p, ora_inizio) + timedelta(minutes=durata)
@@ -329,8 +352,19 @@ def crea_prenotazione_pub(request):
     if user_creato:
         auth_login(request, user_creato)
 
-    # Email cliente
-    email_prenotazione_ricevuta(prenotazione)
+    # Email cliente: usa email fornita nel form (se guest), altrimenti
+    # quella del cliente. Logga sempre quale viene usata.
+    import logging
+    log = logging.getLogger(__name__)
+    email_target = (
+        email if email
+        else (cliente.email if cliente else None)
+    )
+    log.info(
+        'Prenotazione %s creata. Invio email a: %s (cliente.email=%s)',
+        prenotazione.codice_prenotazione, email_target, cliente.email,
+    )
+    email_prenotazione_ricevuta(prenotazione, to_email=email_target)
 
     # Notifica WebSocket realtime agli operatori (gruppo 'ordini_list')
     try:
