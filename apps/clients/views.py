@@ -8,6 +8,7 @@
 import json
 from datetime import datetime, timedelta
 
+from django.conf import settings
 from django.contrib import messages
 from django.contrib.auth import login
 from django.contrib.auth.decorators import login_required
@@ -362,6 +363,64 @@ def crea_prenotazione_pub(request):
         'stato': 'in_attesa',
         'redirect': reverse('clients:dashboard') if (request.user.is_authenticated or user_creato) else reverse('clients:landing'),
     })
+
+
+@login_required
+def test_email(request):
+    """Diagnostico: invia un'email di test al destinatario indicato.
+
+    GET /app/api/test-email/?to=tuoemail@dominio.it
+
+    Solo staff. Risponde con dettagli sull'esito (backend usato, errore
+    eventuale, configurazione attiva). Utile per verificare la
+    configurazione SMTP in produzione.
+    """
+    if not (request.user.is_staff or request.user.is_superuser):
+        return JsonResponse({'error': 'Solo staff'}, status=403)
+    to = request.GET.get('to') or request.user.email
+    if not to:
+        return JsonResponse({
+            'error': 'Specifica ?to=email o assicurati che il tuo user abbia un\'email',
+            'config': _email_config_info(),
+        }, status=400)
+    from django.core.mail import send_mail
+    info = _email_config_info()
+    try:
+        sent = send_mail(
+            'Test email da Autolavaggio',
+            'Se ricevi questa email la configurazione SMTP funziona correttamente.',
+            settings.DEFAULT_FROM_EMAIL,
+            [to],
+            fail_silently=False,
+        )
+        return JsonResponse({
+            'ok': bool(sent),
+            'sent_count': sent,
+            'to': to,
+            'config': info,
+            'note': 'Con backend console (DEBUG=True) le email vanno solo in stdout, non arrivano davvero.',
+        })
+    except Exception as e:
+        return JsonResponse({
+            'ok': False,
+            'error': str(e),
+            'error_type': type(e).__name__,
+            'to': to,
+            'config': info,
+        }, status=500)
+
+
+def _email_config_info():
+    return {
+        'EMAIL_BACKEND': getattr(settings, 'EMAIL_BACKEND', None),
+        'EMAIL_HOST': getattr(settings, 'EMAIL_HOST', None),
+        'EMAIL_PORT': getattr(settings, 'EMAIL_PORT', None),
+        'EMAIL_USE_TLS': getattr(settings, 'EMAIL_USE_TLS', None),
+        'EMAIL_HOST_USER': getattr(settings, 'EMAIL_HOST_USER', '') or '(vuoto)',
+        'EMAIL_HOST_PASSWORD_SET': bool(getattr(settings, 'EMAIL_HOST_PASSWORD', '')),
+        'DEFAULT_FROM_EMAIL': getattr(settings, 'DEFAULT_FROM_EMAIL', None),
+        'DEBUG': settings.DEBUG,
+    }
 
 
 @login_required

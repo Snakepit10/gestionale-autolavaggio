@@ -6,23 +6,32 @@ configurato via env vars.
 
 Phase 2 (futuro): SMS via Twilio, WhatsApp via Twilio/Meta Cloud API.
 """
+import logging
 from django.conf import settings
 from django.core.mail import send_mail
+
+logger = logging.getLogger(__name__)
 
 
 def _safe_send(subject: str, body: str, to_email: str | None) -> bool:
     if not to_email:
+        logger.warning('Email skipped: destinatario vuoto (subject=%s)', subject)
         return False
     try:
-        send_mail(
+        sent = send_mail(
             subject,
             body,
             settings.DEFAULT_FROM_EMAIL,
             [to_email],
-            fail_silently=True,
+            fail_silently=False,  # log full error instead of swallow
         )
-        return True
-    except Exception:
+        if sent:
+            logger.info('Email inviata a %s: %s', to_email, subject)
+            return True
+        logger.warning('send_mail ha ritornato 0 per %s (%s)', to_email, subject)
+        return False
+    except Exception as e:
+        logger.error('Errore invio email a %s (subject=%s): %s', to_email, subject, e, exc_info=True)
         return False
 
 
