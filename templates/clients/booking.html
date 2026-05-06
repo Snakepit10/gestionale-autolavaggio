@@ -63,6 +63,16 @@
 {% block content %}
 <div class="container py-4" style="max-width:760px">
 
+    {% if user.is_authenticated and user.is_staff %}
+    <div class="alert alert-warning mb-3">
+        <i class="bi bi-exclamation-triangle"></i>
+        <strong>Sei loggato come operatore.</strong>
+        Questa pagina e' destinata ai clienti. Per prenotare come cliente,
+        <a href="{% url 'auth:operator-logout' %}" class="alert-link">esci dal tuo account</a>
+        o apri il sito da una finestra incognito.
+    </div>
+    {% endif %}
+
     {# Progress 4 step #}
     <div class="bk-progress">
         <div class="pi done" id="pi-1"></div>

@@ -251,6 +251,15 @@ def crea_prenotazione_pub(request):
     user_creato = None
     if request.user.is_authenticated and hasattr(request.user, 'cliente'):
         cliente = request.user.cliente
+    elif request.user.is_authenticated:
+        # Loggato ma NON cliente (operatore/staff). Non permettere il
+        # flusso guest (sostituirebbe la sessione) e segnala chiaramente.
+        return JsonResponse({
+            'error': (
+                'Sei loggato come operatore. Esci dal tuo account per '
+                'prenotare come cliente, oppure usa un altro browser/incognito.'
+            ),
+        }, status=403)
     else:
         # Guest: serve almeno nome+cognome+(email o telefono)
         if not nome or not cognome:
