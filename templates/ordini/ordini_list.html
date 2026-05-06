@@ -255,6 +255,107 @@ function prenProponiOrario(pk, vecchiaData, vecchiaOra) {
 </script>
 {% endif %}
 
+{# ====== Realtime WS listener: nuova prenotazione cliente ====== #}
+<div id="newReservationToast" class="position-fixed top-0 end-0 p-3" style="z-index:1100; display:none;">
+    <div class="toast show border-warning" style="min-width:320px;">
+        <div class="toast-header bg-warning bg-opacity-25">
+            <i class="bi bi-bell-fill text-warning me-2"></i>
+            <strong class="me-auto">Nuova prenotazione</strong>
+            <small id="newResTime" class="text-muted"></small>
+            <button type="button" class="btn-close" onclick="document.getElementById('newReservationToast').style.display='none'"></button>
+        </div>
+        <div class="toast-body">
+            <div id="newResContent"></div>
+            <button class="btn btn-warning btn-sm mt-2" onclick="location.reload()">
+                <i class="bi bi-arrow-clockwise"></i> Aggiorna pagina
+            </button>
+        </div>
+    </div>
+</div>
+
+<audio id="newResSound" preload="auto" style="display:none">
+    <source src="data:audio/wav;base64,UklGRl9vT19XQVZFZm10IBAAAAABAAEAQB8AAEAfAAABAAgAZGF0YQ==" type="audio/wav">
+</audio>
+
+<script>
+(function() {
+    if (!('WebSocket' in window)) return;
+    const proto = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+    let ws;
+    let reconnectTimer;
+
+    function connect() {
+        try {
+            ws = new WebSocket(`${proto}//${window.location.host}/ws/ordini/`);
+        } catch (e) { console.warn('WS init failed', e); return; }
+
+        ws.addEventListener('message', function(ev) {
+            try {
+                const data = JSON.parse(ev.data);
+                if (data.type === 'nuova_prenotazione') {
+                    showNewReservationToast(data);
+                }
+            } catch (e) { /* ignore */ }
+        });
+        ws.addEventListener('close', function() {
+            clearTimeout(reconnectTimer);
+            reconnectTimer = setTimeout(connect, 3000);
+        });
+        ws.addEventListener('error', function() {
+            try { ws.close(); } catch (e) {}
+        });
+    }
+
+    function showNewReservationToast(data) {
+        const wrap = document.getElementById('newReservationToast');
+        const content = document.getElementById('newResContent');
+        const time = document.getElementById('newResTime');
+        const servizi = (data.servizi || []).join(', ');
+        content.innerHTML = `
+            <div class="fw-bold">${data.cliente || 'Cliente'}</div>
+            <div class="small text-muted">
+                <i class="bi bi-calendar3"></i> ${data.data} alle ${data.ora}
+            </div>
+            ${servizi ? `<div class="small mt-1">${servizi}</div>` : ''}
+            ${data.tipo_auto ? `<div class="small text-muted"><i class="bi bi-car-front"></i> ${data.tipo_auto}</div>` : ''}
+            <div class="small text-muted mt-1">Codice: <code>${data.codice}</code></div>
+        `;
+        const now = new Date();
+        time.textContent = `ora ${String(now.getHours()).padStart(2,'0')}:${String(now.getMinutes()).padStart(2,'0')}`;
+        wrap.style.display = 'block';
+
+        // Vibrazione + suono se permesso
+        try { if (navigator.vibrate) navigator.vibrate([200, 80, 200]); } catch (e) {}
+        try {
+            const audio = document.getElementById('newResSound');
+            if (audio) audio.play().catch(() => {});
+        } catch (e) {}
+
+        // Notifica desktop se abilitato
+        try {
+            if ('Notification' in window && Notification.permission === 'granted') {
+                new Notification('Nuova prenotazione cliente', {
+                    body: `${data.cliente} - ${data.data} alle ${data.ora}`,
+                    icon: '/static/icons/icon-192x192.png',
+                    tag: 'pren-' + data.prenotazione_id,
+                });
+            } else if ('Notification' in window && Notification.permission !== 'denied') {
+                Notification.requestPermission();
+            }
+        } catch (e) {}
+    }
+
+    connect();
+    // Richiedi permesso notifiche al primo gesto
+    document.addEventListener('click', function once() {
+        if ('Notification' in window && Notification.permission === 'default') {
+            Notification.requestPermission();
+        }
+        document.removeEventListener('click', once);
+    }, { once: true });
+})();
+</script>
+
 <!-- Prenotazioni di oggi (badge cliccabili per check-in) -->
 {% if prenotazioni_upcoming %}
 <div class="pren-legend">

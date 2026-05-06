@@ -144,6 +144,24 @@ class OrdiniConsumer(AsyncWebsocketConsumer):
             'ordine': event.get('ordine')  # Per compatibilità con vecchi messaggi
         }))
 
+    async def nuova_prenotazione(self, event):
+        """Notifica realtime: nuova prenotazione cliente in_attesa.
+
+        Inviata da apps/clients/views.py::crea_prenotazione_pub quando
+        un cliente (anonimo o loggato) richiede una prenotazione.
+        """
+        await self.send(text_data=json.dumps({
+            'type': 'nuova_prenotazione',
+            'prenotazione_id': event.get('prenotazione_id'),
+            'codice': event.get('codice'),
+            'cliente': event.get('cliente'),
+            'data': event.get('data'),
+            'ora': event.get('ora'),
+            'servizi': event.get('servizi'),
+            'tipo_auto': event.get('tipo_auto'),
+            'timestamp': event.get('timestamp'),
+        }))
+
     async def ordine_modificato(self, event):
         await self.send(text_data=json.dumps({
             'type': 'ordine_modificato',
