@@ -35,6 +35,24 @@ def _safe_send(subject: str, body: str, to_email: str | None) -> bool:
         return False
 
 
+def _email_target(prenotazione, override: str | None = None) -> str:
+    """Determina email destinazione per le notifiche di una prenotazione.
+
+    Priorita: override esplicito > email_contatto salvato sulla Prenotazione
+    > cliente.email > user.email.
+    """
+    if override:
+        return override
+    if getattr(prenotazione, 'email_contatto', '') :
+        return prenotazione.email_contatto
+    cliente = prenotazione.cliente
+    if cliente and cliente.email:
+        return cliente.email
+    if cliente and cliente.user_id and cliente.user.email:
+        return cliente.user.email
+    return ''
+
+
 def email_prenotazione_ricevuta(prenotazione, to_email: str | None = None) -> bool:
     cliente = prenotazione.cliente
     nome = (cliente.nome or cliente.cognome or '').strip() or 'Cliente'
@@ -52,7 +70,11 @@ def email_prenotazione_ricevuta(prenotazione, to_email: str | None = None) -> bo
         f"Riceverai una nuova email all'esito.\n\n"
         f"Grazie!"
     )
-    return _safe_send('Prenotazione ricevuta - in attesa di conferma', body, to_email or cliente.email)
+    return _safe_send(
+        'Prenotazione ricevuta - in attesa di conferma',
+        body,
+        _email_target(prenotazione, override=to_email),
+    )
 
 
 def email_prenotazione_confermata(prenotazione) -> bool:
@@ -68,7 +90,7 @@ def email_prenotazione_confermata(prenotazione) -> bool:
         f"- Codice: {prenotazione.codice_prenotazione}\n\n"
         f"Ti aspettiamo. Per modifiche o annullamenti contattaci."
     )
-    return _safe_send('Prenotazione confermata', body, cliente.email)
+    return _safe_send('Prenotazione confermata', body, _email_target(prenotazione))
 
 
 def email_prenotazione_rifiutata(prenotazione, motivo: str = '') -> bool:
@@ -88,7 +110,7 @@ def email_prenotazione_rifiutata(prenotazione, motivo: str = '') -> bool:
         f"Ti invitiamo a riprovare scegliendo un'altra fascia oraria sul nostro sito.\n"
         f"Ci scusiamo per il disagio."
     )
-    return _safe_send('Prenotazione non confermata', body, cliente.email)
+    return _safe_send('Prenotazione non confermata', body, _email_target(prenotazione))
 
 
 def email_prenotazione_modificata(prenotazione, vecchia_data: str, vecchia_ora: str) -> bool:
@@ -107,4 +129,4 @@ def email_prenotazione_modificata(prenotazione, vecchia_data: str, vecchia_ora: 
         f"Se la nuova fascia non ti va bene, contattaci o annulla la "
         f"prenotazione dalla tua area cliente."
     )
-    return _safe_send('Prenotazione riprogrammata', body, cliente.email)
+    return _safe_send('Prenotazione riprogrammata', body, _email_target(prenotazione))

@@ -338,6 +338,12 @@ def crea_prenotazione_pub(request):
         }, status=400)
 
     # ---------- Crea prenotazione in attesa di conferma operatore ----------
+    # email/telefono di contatto: usa quelli inseriti dal guest, oppure
+    # quelli del Cliente esistente. Salvati sulla Prenotazione cosi le
+    # notifiche future arrivano sempre all'indirizzo giusto.
+    contact_email = email or (cliente.email or '')
+    contact_telefono = telefono or (cliente.telefono or '')
+
     prenotazione = Prenotazione.objects.create(
         cliente=cliente,
         slot=slot,
@@ -345,6 +351,8 @@ def crea_prenotazione_pub(request):
         stato='in_attesa',
         tipo_auto=tipo_auto,
         nota_cliente=nota,
+        email_contatto=contact_email,
+        telefono_contatto=contact_telefono,
     )
     prenotazione.servizi.set(servizi)
 

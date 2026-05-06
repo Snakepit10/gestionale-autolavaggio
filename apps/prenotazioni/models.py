@@ -125,7 +125,14 @@ class Prenotazione(models.Model):
     nota_cliente = models.TextField(blank=True)
     nota_interna = models.TextField(blank=True)
     tipo_auto = models.CharField(max_length=200, blank=True, help_text="Modello e colore dell'auto")
-    
+
+    # Contatti specifici per QUESTA prenotazione (separati da cliente.email
+    # per gestire guest che riusano un Cliente esistente con email diversa)
+    email_contatto = models.EmailField(blank=True, default='',
+        help_text='Email a cui inviare le notifiche di questa prenotazione')
+    telefono_contatto = models.CharField(max_length=20, blank=True, default='',
+        help_text='Telefono di contatto per questa prenotazione')
+
     # Notifiche
     promemoria_inviato = models.BooleanField(default=False)
     
