@@ -17,6 +17,7 @@ from django.http import JsonResponse
 from django.shortcuts import redirect, render
 from django.urls import reverse
 from django.utils import timezone
+from django.views.decorators.csrf import ensure_csrf_cookie
 from django.views.decorators.http import require_POST
 
 from apps.clienti.models import Cliente
@@ -123,6 +124,7 @@ def dashboard(request):
     })
 
 
+@ensure_csrf_cookie
 def booking(request):
     """Catalogo + wizard prenotazione cliente (lazy-register).
 

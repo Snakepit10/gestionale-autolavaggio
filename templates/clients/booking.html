@@ -253,8 +253,12 @@ let dataSelezionata = '';
 let oraSelezionata = '';
 
 function getCsrf() {
-    return document.querySelector('[name=csrfmiddlewaretoken]')?.value
-        || document.cookie.split('; ').find(r => r.startsWith('csrftoken='))?.split('=')[1];
+    // Preferisci il cookie csrftoken (autoritativo per Django).
+    // Fallback al form input solo se il cookie non e' presente.
+    const fromCookie = document.cookie.split('; ')
+        .find(r => r.startsWith('csrftoken='));
+    if (fromCookie) return fromCookie.split('=')[1];
+    return document.querySelector('[name=csrfmiddlewaretoken]')?.value || '';
 }
 
 function toggleServizio(el) {
