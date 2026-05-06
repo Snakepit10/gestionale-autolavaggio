@@ -18,6 +18,11 @@ urlpatterns = [
     path('api/crea-prenotazione/', views.crea_prenotazione_da_carrello, name='crea-prenotazione-carrello'),
     path('api/slot-giornata/', views.slot_giornata_api, name='slot-giornata'),
     path('api/toggle-preferito/', views.toggle_preferito, name='toggle-preferito'),
+
+    # Gestione prenotazioni cliente in attesa
+    path('api/prenotazione/<int:pk>/accetta/', views.prenotazione_accetta, name='prenotazione-accetta'),
+    path('api/prenotazione/<int:pk>/rifiuta/', views.prenotazione_rifiuta, name='prenotazione-rifiuta'),
+    path('api/prenotazione/<int:pk>/proponi/', views.prenotazione_proponi_orario, name='prenotazione-proponi'),
     
     # Gestione Ordini
     path('', views.OrdiniListView.as_view(), name='ordini-list'),

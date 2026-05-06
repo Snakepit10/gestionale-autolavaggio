@@ -829,11 +829,13 @@ class OrdiniListView(LoginRequiredMixin, ListView):
         oggi = timezone.now().date()
         now_local = timezone.localtime(timezone.now())
 
+        # Solo confermate: le 'in_attesa' vanno nella sezione separata
+        # 'Prenotazioni da confermare'
         prenotazioni_qs = (
             Prenotazione.objects
             .filter(
                 slot__data=oggi,
-                stato__in=['confermata', 'in_attesa'],
+                stato='confermata',
                 ordine__isnull=True,
             )
             .select_related('cliente', 'slot')
@@ -868,6 +870,21 @@ class OrdiniListView(LoginRequiredMixin, ListView):
 
         context['prenotazioni_upcoming'] = prenotazioni_list
         context['today'] = oggi
+
+        # Prenotazioni cliente IN ATTESA di conferma (lato app cliente)
+        # Mostra tutte (oggi + future) cosi l'operatore puo gestirle subito
+        prenotazioni_da_confermare = (
+            Prenotazione.objects
+            .filter(
+                stato='in_attesa',
+                slot__data__gte=oggi,
+                ordine__isnull=True,
+            )
+            .select_related('cliente', 'slot')
+            .prefetch_related('servizi')
+            .order_by('slot__data', 'slot__ora_inizio')
+        )
+        context['prenotazioni_da_confermare'] = prenotazioni_da_confermare
 
         # Servizi disponibili per modifica dentro modal check-in
         from apps.core.models import ServizioProdotto
@@ -2249,3 +2266,127 @@ def aggiorna_priorita_ordini(request):
         return JsonResponse({'success': True, 'count': len(ordini_ids)})
     except (json.JSONDecodeError, ValueError) as e:
         return JsonResponse({'success': False, 'error': str(e)}, status=400)
+
+
+# ===========================================================================
+# Gestione prenotazioni cliente in attesa (lato operatore)
+# ===========================================================================
+
+@login_required
+def prenotazione_accetta(request, pk):
+    """Operatore conferma una prenotazione cliente in attesa."""
+    if request.method != 'POST':
+        return JsonResponse({'error': 'Metodo non permesso'}, status=405)
+    from apps.prenotazioni.models import Prenotazione
+    from apps.clients.notifications import email_prenotazione_confermata
+
+    p = get_object_or_404(Prenotazione, pk=pk)
+    if p.stato != 'in_attesa':
+        return JsonResponse({'error': f'Prenotazione gia in stato {p.stato}'}, status=400)
+
+    p.stato = 'confermata'
+    p.save(update_fields=['stato'])
+    if hasattr(p.slot, 'aggiorna_contatori'):
+        p.slot.aggiorna_contatori()
+
+    email_prenotazione_confermata(p)
+    return JsonResponse({
+        'ok': True,
+        'codice': p.codice_prenotazione,
+        'cliente_email': p.cliente.email or '',
+    })
+
+
+@login_required
+def prenotazione_rifiuta(request, pk):
+    """Operatore rifiuta una prenotazione cliente in attesa.
+
+    Body JSON: {motivo: 'opzionale'}
+    """
+    if request.method != 'POST':
+        return JsonResponse({'error': 'Metodo non permesso'}, status=405)
+    from apps.prenotazioni.models import Prenotazione
+    from apps.clients.notifications import email_prenotazione_rifiutata
+
+    p = get_object_or_404(Prenotazione, pk=pk)
+    if p.stato != 'in_attesa':
+        return JsonResponse({'error': f'Prenotazione gia in stato {p.stato}'}, status=400)
+
+    motivo = ''
+    if request.body:
+        try:
+            motivo = (json.loads(request.body).get('motivo') or '').strip()
+        except json.JSONDecodeError:
+            motivo = ''
+
+    if hasattr(p, 'annulla'):
+        p.annulla(motivo or 'Rifiutata dall\'operatore')
+    else:
+        p.stato = 'annullata'
+        p.save(update_fields=['stato'])
+
+    email_prenotazione_rifiutata(p, motivo)
+    return JsonResponse({'ok': True})
+
+
+@login_required
+def prenotazione_proponi_orario(request, pk):
+    """Operatore modifica data/ora di una prenotazione in attesa.
+
+    Body JSON: {data: 'YYYY-MM-DD', ora: 'HH:MM'}
+    Notifica il cliente via email del cambio.
+    """
+    if request.method != 'POST':
+        return JsonResponse({'error': 'Metodo non permesso'}, status=405)
+    from apps.prenotazioni.models import Prenotazione, SlotPrenotazione
+    from apps.clients.notifications import email_prenotazione_modificata
+    from datetime import datetime as _dt, timedelta as _td
+
+    p = get_object_or_404(Prenotazione, pk=pk)
+    if p.stato != 'in_attesa':
+        return JsonResponse({'error': f'Prenotazione gia in stato {p.stato}'}, status=400)
+
+    try:
+        body = json.loads(request.body)
+        data_str = body.get('data')
+        ora_str = body.get('ora')
+        nuova_data = _dt.strptime(data_str, '%Y-%m-%d').date()
+        nuova_ora = _dt.strptime(ora_str, '%H:%M').time()
+    except (json.JSONDecodeError, ValueError, TypeError):
+        return JsonResponse({'error': 'Data/ora non valide'}, status=400)
+
+    vecchia_data = p.slot.data.strftime('%d/%m/%Y')
+    vecchia_ora = p.slot.ora_inizio.strftime('%H:%M')
+
+    # get_or_create slot nuovo
+    durata = p.durata_stimata_minuti or 30
+    ora_fine_dt = _dt.combine(nuova_data, nuova_ora) + _td(minutes=durata)
+    nuovo_slot, _ = SlotPrenotazione.objects.get_or_create(
+        data=nuova_data, ora_inizio=nuova_ora,
+        defaults={
+            'ora_fine': ora_fine_dt.time(),
+            'max_prenotazioni': 1,
+            'prenotazioni_attuali': 0,
+            'disponibile': True,
+        },
+    )
+
+    vecchio_slot = p.slot
+    p.slot = nuovo_slot
+    # Confermiamo automaticamente quando l'operatore propone un orario:
+    # significa che ha trovato la disponibilita.
+    p.stato = 'confermata'
+    p.save(update_fields=['slot', 'stato'])
+
+    # Aggiorna contatori vecchio + nuovo slot
+    if hasattr(vecchio_slot, 'aggiorna_contatori'):
+        vecchio_slot.aggiorna_contatori()
+    if hasattr(nuovo_slot, 'aggiorna_contatori'):
+        nuovo_slot.aggiorna_contatori()
+
+    email_prenotazione_modificata(p, vecchia_data, vecchia_ora)
+    return JsonResponse({
+        'ok': True,
+        'data': nuova_data.strftime('%d/%m/%Y'),
+        'ora': nuova_ora.strftime('%H:%M'),
+    })

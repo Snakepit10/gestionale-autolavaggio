@@ -144,6 +144,117 @@
     </div>
 </div>
 
+<!-- Prenotazioni cliente DA CONFERMARE (in attesa) -->
+{% if prenotazioni_da_confermare %}
+<div class="card mb-4 border-warning shadow-sm">
+    <div class="card-header bg-warning bg-opacity-10 d-flex align-items-center justify-content-between">
+        <h6 class="mb-0 text-warning fw-bold">
+            <i class="bi bi-bell-fill"></i> Prenotazioni cliente da confermare
+            <span class="badge bg-warning text-dark ms-2">{{ prenotazioni_da_confermare|length }}</span>
+        </h6>
+        <small class="text-muted">Richieste in attesa dalla PWA cliente</small>
+    </div>
+    <div class="card-body">
+        <div class="row g-2">
+            {% for p in prenotazioni_da_confermare %}
+            <div class="col-md-6">
+                <div class="border rounded p-3 h-100" style="background:#fffbeb;">
+                    <div class="d-flex justify-content-between align-items-start mb-2">
+                        <div>
+                            <strong class="text-warning">
+                                <i class="bi bi-clock"></i> {{ p.slot.data|date:"d/m/Y" }} alle {{ p.slot.ora_inizio|time:"H:i" }}
+                            </strong>
+                            <br>
+                            <span class="fw-bold">{{ p.cliente }}</span>
+                            {% if p.cliente.telefono %}
+                                &middot; <a href="tel:{{ p.cliente.telefono }}" class="text-decoration-none small">
+                                    <i class="bi bi-telephone"></i> {{ p.cliente.telefono }}
+                                </a>
+                            {% endif %}
+                            {% if p.cliente.email %}
+                                <br><small class="text-muted"><i class="bi bi-envelope"></i> {{ p.cliente.email }}</small>
+                            {% endif %}
+                        </div>
+                        <span class="badge bg-light text-dark border">#{{ p.codice_prenotazione }}</span>
+                    </div>
+
+                    {% if p.tipo_auto %}
+                        <div class="small mb-1"><i class="bi bi-car-front"></i> {{ p.tipo_auto }}</div>
+                    {% endif %}
+
+                    <div class="d-flex flex-wrap gap-1 mb-2">
+                        {% for s in p.servizi.all %}
+                            <span class="badge bg-light text-dark border small">{{ s.titolo }}</span>
+                        {% endfor %}
+                    </div>
+
+                    {% if p.nota_cliente %}
+                        <div class="alert alert-light py-1 px-2 mb-2 small">
+                            <i class="bi bi-sticky"></i> {{ p.nota_cliente }}
+                        </div>
+                    {% endif %}
+
+                    <div class="d-flex flex-wrap gap-2 mt-2">
+                        <button class="btn btn-success btn-sm" onclick="prenAccetta({{ p.pk }})">
+                            <i class="bi bi-check-circle"></i> Accetta
+                        </button>
+                        <button class="btn btn-outline-warning btn-sm"
+                                onclick="prenProponiOrario({{ p.pk }}, '{{ p.slot.data|date:'Y-m-d' }}', '{{ p.slot.ora_inizio|time:'H:i' }}')">
+                            <i class="bi bi-clock-history"></i> Cambia orario
+                        </button>
+                        <button class="btn btn-outline-danger btn-sm" onclick="prenRifiuta({{ p.pk }})">
+                            <i class="bi bi-x-circle"></i> Rifiuta
+                        </button>
+                    </div>
+                </div>
+            </div>
+            {% endfor %}
+        </div>
+    </div>
+</div>
+
+<form id="prenCsrfForm" style="display:none">{% csrf_token %}</form>
+
+<script>
+function _prenCsrf() {
+    return document.querySelector('#prenCsrfForm [name=csrfmiddlewaretoken]').value;
+}
+function _prenPost(url, body) {
+    return fetch(url, {
+        method: 'POST',
+        headers: { 'X-CSRFToken': _prenCsrf(), 'Content-Type': 'application/json' },
+        credentials: 'same-origin',
+        body: body ? JSON.stringify(body) : '{}',
+    }).then(r => r.json());
+}
+function prenAccetta(pk) {
+    if (!confirm('Confermi questa prenotazione? Il cliente verra notificato via email.')) return;
+    _prenPost(`/ordini/api/prenotazione/${pk}/accetta/`).then(d => {
+        if (d.ok) { alert('Prenotazione confermata. Cliente notificato.'); location.reload(); }
+        else alert(d.error || 'Errore');
+    });
+}
+function prenRifiuta(pk) {
+    const motivo = prompt('Motivo del rifiuto (opzionale, sara incluso nella email al cliente):');
+    if (motivo === null) return;  // annulla
+    _prenPost(`/ordini/api/prenotazione/${pk}/rifiuta/`, { motivo: motivo }).then(d => {
+        if (d.ok) { alert('Prenotazione rifiutata. Cliente notificato.'); location.reload(); }
+        else alert(d.error || 'Errore');
+    });
+}
+function prenProponiOrario(pk, vecchiaData, vecchiaOra) {
+    const data = prompt('Nuova data (YYYY-MM-DD):', vecchiaData);
+    if (!data) return;
+    const ora = prompt('Nuovo orario (HH:MM):', vecchiaOra);
+    if (!ora) return;
+    _prenPost(`/ordini/api/prenotazione/${pk}/proponi/`, { data, ora }).then(d => {
+        if (d.ok) { alert(`Prenotazione spostata al ${d.data} alle ${d.ora}. Cliente notificato.`); location.reload(); }
+        else alert(d.error || 'Errore');
+    });
+}
+</script>
+{% endif %}
+
 <!-- Prenotazioni di oggi (badge cliccabili per check-in) -->
 {% if prenotazioni_upcoming %}
 <div class="pren-legend">

@@ -123,15 +123,13 @@ def dashboard(request):
 
 
 def booking(request):
-    """Catalogo + form prenotazione cliente.
+    """Catalogo + wizard prenotazione cliente (lazy-register).
 
-    Anonimo: vede solo descrizione discorsiva + CTA accedi/registrati.
-    Loggato: vede catalogo dettagliato (filtrato su mostra_pubblico=True)
-    e il wizard di prenotazione con slot disponibili.
+    Sia anonimi che loggati vedono lo stesso wizard. Anonimi devono
+    inserire i dati personali nello step 3 e possono opzionalmente
+    creare un account con password nello step 4. Loggati saltano
+    direttamente alla conferma.
     """
-    if not request.user.is_authenticated:
-        return render(request, 'clients/booking_anon.html', {})
-
     categorie_pub = Categoria.objects.filter(attiva=True).order_by('ordine_visualizzazione', 'nome')
     servizi = (
         ServizioProdotto.objects
@@ -145,7 +143,6 @@ def booking(request):
     })
 
 
-@login_required
 def slot_disponibili_pub(request):
     """API JSON: slot disponibili per data (riusa logica esistente)."""
     data_str = request.GET.get('data')
@@ -187,17 +184,26 @@ def slot_disponibili_pub(request):
     return JsonResponse({'slot': out})
 
 
-@login_required
 @require_POST
 def crea_prenotazione_pub(request):
-    """Crea prenotazione cliente.
+    """Crea prenotazione cliente con flusso lazy-register.
 
-    Body JSON: {data, ora, servizi: [id, id], tipo_auto, nota}
+    Body JSON:
+        {
+          data, ora,
+          servizi: [id, ...],
+          tipo_auto, nota,
+          # Se NON loggato:
+          nome, cognome, email, telefono,
+          password (opzionale: se presente crea User)
+        }
+
+    Nasce sempre con stato='in_attesa' (richiede conferma operatore).
     """
-    if not _is_cliente(request.user):
-        return JsonResponse({'error': 'Devi essere un cliente per prenotare'}, status=403)
-
-    cliente = request.user.cliente
+    from django.contrib.auth.models import User
+    from django.contrib.auth import login as auth_login
+    from django.db import transaction
+    from .notifications import email_prenotazione_ricevuta
 
     try:
         body = json.loads(request.body)
@@ -209,6 +215,13 @@ def crea_prenotazione_pub(request):
     servizi_ids = body.get('servizi') or []
     tipo_auto = (body.get('tipo_auto') or '').strip()
     nota = (body.get('nota') or '').strip()
+
+    # Dati personali (servono se non loggato)
+    nome = (body.get('nome') or '').strip()
+    cognome = (body.get('cognome') or '').strip()
+    email = (body.get('email') or '').strip().lower()
+    telefono = (body.get('telefono') or '').strip()
+    password = body.get('password') or ''  # opzionale, no strip su pw
 
     if not data_str or not ora_str:
         return JsonResponse({'error': 'Data e ora obbligatorie'}, status=400)
@@ -230,7 +243,59 @@ def crea_prenotazione_pub(request):
         return JsonResponse({'error': 'Servizi non trovati'}, status=400)
     durata = sum(s.durata_minuti or 30 for s in servizi)
 
-    # get_or_create slot
+    # ---------- Determina cliente ----------
+    cliente = None
+    user_creato = None
+    if request.user.is_authenticated and hasattr(request.user, 'cliente'):
+        cliente = request.user.cliente
+    else:
+        # Guest: serve almeno nome+cognome+(email o telefono)
+        if not nome or not cognome:
+            return JsonResponse({'error': 'Nome e cognome obbligatori'}, status=400)
+        if not email and not telefono:
+            return JsonResponse({'error': 'Email o telefono obbligatori'}, status=400)
+
+        # Verifica email duplicata (User o Cliente). Se utente vuole pw,
+        # ma email e' gia registrata, gli dice di fare login.
+        if email and password:
+            if User.objects.filter(email__iexact=email).exists():
+                return JsonResponse({
+                    'error': 'Email gia registrata. Accedi prima di prenotare.',
+                    'duplicate_email': True,
+                }, status=400)
+
+        with transaction.atomic():
+            # Tenta riuso Cliente esistente per email/telefono
+            existing_cliente = None
+            if email:
+                existing_cliente = Cliente.objects.filter(email__iexact=email).first()
+            if not existing_cliente and telefono:
+                existing_cliente = Cliente.objects.filter(telefono=telefono).first()
+
+            if existing_cliente:
+                cliente = existing_cliente
+            else:
+                cliente = Cliente.objects.create(
+                    tipo='privato',
+                    nome=nome,
+                    cognome=cognome,
+                    email=email or None,
+                    telefono=telefono,
+                )
+
+            # Se richiesto crea User per accesso futuro
+            if password and email and not cliente.user_id:
+                user_creato = User.objects.create_user(
+                    username=email,
+                    email=email,
+                    first_name=nome,
+                    last_name=cognome,
+                    password=password,
+                )
+                cliente.user = user_creato
+                cliente.save(update_fields=['user'])
+
+    # ---------- Slot ----------
     ora_fine_dt = datetime.combine(data_p, ora_inizio) + timedelta(minutes=durata)
     slot, _ = SlotPrenotazione.objects.get_or_create(
         data=data_p, ora_inizio=ora_inizio,
@@ -241,30 +306,36 @@ def crea_prenotazione_pub(request):
             'disponibile': True,
         },
     )
-    # Lato cliente lo slot e' esclusivo: se ha gia almeno una
-    # prenotazione attiva, non e' piu disponibile (anche se il suo
-    # max_prenotazioni interno consentirebbe altri).
     if slot.prenotazioni_attuali > 0:
         return JsonResponse({
             'error': 'Slot non piu disponibile, e\' stato appena prenotato. Scegli un altro orario.',
         }, status=400)
 
+    # ---------- Crea prenotazione in attesa di conferma operatore ----------
     prenotazione = Prenotazione.objects.create(
         cliente=cliente,
         slot=slot,
         durata_stimata_minuti=durata,
-        stato='confermata',
+        stato='in_attesa',
         tipo_auto=tipo_auto,
         nota_cliente=nota,
     )
     prenotazione.servizi.set(servizi)
+
+    # Auto-login se ha appena creato un User
+    if user_creato:
+        auth_login(request, user_creato)
+
+    # Email cliente
+    email_prenotazione_ricevuta(prenotazione)
 
     return JsonResponse({
         'ok': True,
         'codice': prenotazione.codice_prenotazione,
         'data': data_p.strftime('%d/%m/%Y'),
         'ora': ora_inizio.strftime('%H:%M'),
-        'redirect': reverse('clients:dashboard'),
+        'stato': 'in_attesa',
+        'redirect': reverse('clients:dashboard') if (request.user.is_authenticated or user_creato) else reverse('clients:landing'),
     })
 
 
