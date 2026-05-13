@@ -1496,7 +1496,7 @@ def report_periodo(request):
     # Tenta di recuperare dati meteo Open-Meteo. Best-effort: se l'API
     # non risponde la sezione meteo nel template viene nascosta.
     from .weather import fetch_weather_range, correlate_revenue_weather
-    from .lag_analysis import lag_correlation_series, analyze_holidays
+    from .lag_analysis import lag_correlation_series
     weather = fetch_weather_range(data_inizio, data_fine)
     fatturato_per_giorno = [
         trend_servito[i] + trend_portali[i] + trend_cambia[i]
@@ -1531,9 +1531,6 @@ def report_periodo(request):
             'precipitation': lag_correlation_series(weather_precip, fatturato_per_giorno, lags),
             'sunshine_hours': lag_correlation_series(weather_sun, fatturato_per_giorno, lags),
         }
-
-    # Holiday analysis (sempre disponibile, indipendente da meteo)
-    holiday_analysis = analyze_holidays(data_inizio, data_fine, fatturato_per_giorno)
 
     # ==================== CAMBIA GETTONI (piste + accessori) ====================
     # Fatturato per giorno settimana
@@ -1660,16 +1657,6 @@ def report_periodo(request):
             'precipitation': [x['corr'] for x in weather_lag.get('precipitation', [])],
             'sunshine_hours': [x['corr'] for x in weather_lag.get('sunshine_hours', [])],
         }) if weather_lag else 'null',
-        # Holiday analysis
-        'holiday_analysis': holiday_analysis,
-        'holiday_categories_json': json.dumps([
-            {'label': c['label'], 'media': c['media'], 'count': c['count']}
-            for c in holiday_analysis['categories']
-        ]),
-        'holiday_lag_json': json.dumps({
-            'lags': [x['lag'] for x in holiday_analysis['lag_corr']],
-            'corr': [x['corr'] for x in holiday_analysis['lag_corr']],
-        }),
         'giorni_settimana_labels_json': json.dumps(giorni_settimana_labels),
         'giorni_settimana_tot_json': json.dumps(giorni_settimana_tot),
         'ore_buckets_json': json.dumps(ore_buckets),
