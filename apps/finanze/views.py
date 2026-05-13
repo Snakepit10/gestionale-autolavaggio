@@ -1492,6 +1492,25 @@ def report_periodo(request):
         gs_wc_servito[wd] += trend_wc_servito[i]
         gs_wc_self[wd] += trend_wc_self[i]
 
+    # ==================== CAMBIA GETTONI (piste + accessori) ====================
+    # Fatturato per giorno settimana
+    gs_cambia = [0.0] * 7
+    for i in range(len(trend_labels)):
+        d_date = data_inizio + timedelta(days=i)
+        gs_cambia[d_date.weekday()] += trend_cambia[i]
+
+    media_cambia_giornaliera = (
+        float(totale_cambia_gettoni) / giorni_periodo if giorni_periodo > 0 else 0.0
+    )
+    # Picco settimana (giorno con piu cambia)
+    if any(gs_cambia):
+        wd_picco_idx = gs_cambia.index(max(gs_cambia))
+        wd_picco_label = ['Lunedi', 'Martedi', 'Mercoledi', 'Giovedi', 'Venerdi', 'Sabato', 'Domenica'][wd_picco_idx]
+        wd_picco_val = gs_cambia[wd_picco_idx]
+    else:
+        wd_picco_label = '-'
+        wd_picco_val = 0.0
+
     # ==================== FATTURATO PER GIORNO SETTIMANA ====================
     # 0=lun ... 6=dom
     giorni_settimana_labels = ['Lun', 'Mar', 'Mer', 'Gio', 'Ven', 'Sab', 'Dom']
@@ -1578,6 +1597,11 @@ def report_periodo(request):
         'gs_wc_aggregato_json': json.dumps(gs_wc_aggregato),
         'gs_wc_servito_json': json.dumps(gs_wc_servito),
         'gs_wc_self_json': json.dumps(gs_wc_self),
+        # Cambia gettoni (piste + accessori)
+        'media_cambia_giornaliera': media_cambia_giornaliera,
+        'wd_picco_cambia_label': wd_picco_label,
+        'wd_picco_cambia_val': wd_picco_val,
+        'gs_cambia_json': json.dumps(gs_cambia),
         'giorni_settimana_labels_json': json.dumps(giorni_settimana_labels),
         'giorni_settimana_tot_json': json.dumps(giorni_settimana_tot),
         'ore_buckets_json': json.dumps(ore_buckets),

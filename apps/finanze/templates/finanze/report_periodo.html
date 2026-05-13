@@ -363,6 +363,56 @@
     </div>
   </div>
 
+  {# ====== Cambia gettoni: piste + accessori ====== #}
+  <div class="row g-2 mb-3 mt-1">
+    <div class="col-12">
+      <h5 class="fw-bold text-muted text-uppercase" style="font-size:.85rem; letter-spacing:.5px;">
+        <i class="bi bi-coin text-warning"></i> Cambia gettoni &mdash; piste e accessori
+      </h5>
+    </div>
+  </div>
+
+  <div class="row g-2 mb-3">
+    <div class="col-6 col-lg-4">
+      <div class="kpi-tile warning">
+        <div class="label">Totale cambia gettoni</div>
+        <div class="value">&euro;{{ totale_cambia_gettoni|floatformat:2 }}</div>
+        <div class="sub">vendita totale del periodo</div>
+      </div>
+    </div>
+    <div class="col-6 col-lg-4">
+      <div class="kpi-tile primary">
+        <div class="label">Media giornaliera</div>
+        <div class="value">&euro;{{ media_cambia_giornaliera|floatformat:2 }}</div>
+        <div class="sub">{{ giorni_periodo }} giorni nel periodo</div>
+      </div>
+    </div>
+    <div class="col-12 col-lg-4">
+      <div class="kpi-tile success">
+        <div class="label">Giorno migliore</div>
+        <div class="value" style="font-size:1.3rem">{{ wd_picco_cambia_label }}</div>
+        <div class="sub">&euro;{{ wd_picco_cambia_val|floatformat:2 }} cumulati</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="row g-2 mb-3">
+    <div class="col-lg-6">
+      <div class="chart-panel">
+        <div class="panel-title"><i class="bi bi-bar-chart text-warning"></i> Fatturato per giorno settimana &mdash; cambia gettoni</div>
+        <div class="panel-sub">Distribuzione vendite piste + accessori sui giorni</div>
+        <div class="panel-body"><canvas id="chartCambiaWeekday" height="180"></canvas></div>
+      </div>
+    </div>
+    <div class="col-lg-6">
+      <div class="chart-panel">
+        <div class="panel-title"><i class="bi bi-graph-up text-warning"></i> Trend fatturato &mdash; cambia gettoni</div>
+        <div class="panel-sub">Andamento giornaliero nel periodo</div>
+        <div class="panel-body"><canvas id="chartCambiaTrend" height="180"></canvas></div>
+      </div>
+    </div>
+  </div>
+
 </div>
 {% endblock %}
 
@@ -380,6 +430,7 @@ const trendWcSelf = {{ trend_wc_self_json|safe }};
 const gsWcAggregato = {{ gs_wc_aggregato_json|safe }};
 const gsWcServito = {{ gs_wc_servito_json|safe }};
 const gsWcSelf = {{ gs_wc_self_json|safe }};
+const gsCambia = {{ gs_cambia_json|safe }};
 const weekdayLabels = {{ giorni_settimana_labels_json|safe }};
 const weekdayTot = {{ giorni_settimana_tot_json|safe }};
 const oreBuckets = {{ ore_buckets_json|safe }};
@@ -564,6 +615,40 @@ if (ctxWcTS) {
       responsive: true, maintainAspectRatio: false,
       plugins: { legend: { display: false } },
       scales: { y: { beginAtZero: true, grid: { color: '#f1f5f9' }, ticks: { precision: 0 } } }
+    }
+  });
+}
+
+// ===== Cambia gettoni per giorno settimana =====
+const ctxCW = document.getElementById('chartCambiaWeekday');
+if (ctxCW) {
+  new Chart(ctxCW, {
+    type: 'bar',
+    data: {
+      labels: weekdayLabels,
+      datasets: [{ data: gsCambia, backgroundColor: '#f59e0b', borderRadius: 4 }]
+    },
+    options: {
+      responsive: true, maintainAspectRatio: false,
+      plugins: { legend: { display: false }, tooltip: { callbacks: { label: (c) => '€' + c.parsed.y.toFixed(2) } } },
+      scales: { x: { grid: { display: false } }, y: { beginAtZero: true, grid: { color: '#f1f5f9' }, ticks: { callback: v => '€' + v } } }
+    }
+  });
+}
+
+// ===== Trend cambia gettoni =====
+const ctxCT = document.getElementById('chartCambiaTrend');
+if (ctxCT) {
+  new Chart(ctxCT, {
+    type: 'line',
+    data: {
+      labels: trendLabels,
+      datasets: [{ label: 'Cambia gettoni', data: trendCambia, borderColor: '#f59e0b', backgroundColor: 'rgba(245,158,11,.15)', fill: true, tension: .3, borderWidth: 2 }]
+    },
+    options: {
+      responsive: true, maintainAspectRatio: false,
+      plugins: { legend: { display: false }, tooltip: { callbacks: { label: (c) => '€' + c.parsed.y.toFixed(2) } } },
+      scales: { y: { beginAtZero: true, grid: { color: '#f1f5f9' }, ticks: { callback: v => '€' + v } } }
     }
   });
 }
