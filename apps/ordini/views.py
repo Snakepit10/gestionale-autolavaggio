@@ -953,24 +953,15 @@ def registra_pagamento(request, pk):
                     operatore=request.user
                 )
 
-                # Notifica WebSocket alla lista ordini
-                try:
-                    from channels.layers import get_channel_layer
-                    from asgiref.sync import async_to_sync
-
-                    channel_layer = get_channel_layer()
-                    if channel_layer:
-                        async_to_sync(channel_layer.group_send)(
-                            'ordini_list',
-                            {
-                                'type': 'pagamento_aggiunto',
-                                'ordine_id': ordine.id,
-                                'numero_progressivo': ordine.numero_progressivo,
-                                'timestamp': timezone.now().isoformat()
-                            }
-                        )
-                except Exception as e:
-                    print(f'Errore WebSocket: {e}')
+                # Notifica WebSocket alla lista ordini (con timeout
+                # duro: se Redis e' lento NON blocca la response)
+                from apps.api.notify import notify_group
+                notify_group('ordini_list', {
+                    'type': 'pagamento_aggiunto',
+                    'ordine_id': ordine.id,
+                    'numero_progressivo': ordine.numero_progressivo,
+                    'timestamp': timezone.now().isoformat(),
+                })
 
                 return JsonResponse({
                     'success': True,

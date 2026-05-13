@@ -384,29 +384,19 @@ def crea_prenotazione_pub(request):
     email_prenotazione_ricevuta(prenotazione, to_email=email_target)
 
     # Notifica WebSocket realtime agli operatori (gruppo 'ordini_list')
-    try:
-        from channels.layers import get_channel_layer
-        from asgiref.sync import async_to_sync
-        channel_layer = get_channel_layer()
-        if channel_layer:
-            async_to_sync(channel_layer.group_send)(
-                'ordini_list',
-                {
-                    'type': 'nuova_prenotazione',
-                    'prenotazione_id': prenotazione.id,
-                    'codice': prenotazione.codice_prenotazione,
-                    'cliente': str(cliente),
-                    'data': data_p.strftime('%d/%m/%Y'),
-                    'ora': ora_inizio.strftime('%H:%M'),
-                    'servizi': [s.titolo for s in servizi],
-                    'tipo_auto': tipo_auto,
-                    'timestamp': timezone.now().isoformat(),
-                },
-            )
-    except Exception as e:
-        # Non bloccare la risposta se WebSocket fallisce (Redis down ecc)
-        import logging
-        logging.getLogger(__name__).warning(f'WS notify failed: {e}')
+    # con timeout duro per non bloccare la risposta se Redis e' lento.
+    from apps.api.notify import notify_group
+    notify_group('ordini_list', {
+        'type': 'nuova_prenotazione',
+        'prenotazione_id': prenotazione.id,
+        'codice': prenotazione.codice_prenotazione,
+        'cliente': str(cliente),
+        'data': data_p.strftime('%d/%m/%Y'),
+        'ora': ora_inizio.strftime('%H:%M'),
+        'servizi': [s.titolo for s in servizi],
+        'tipo_auto': tipo_auto,
+        'timestamp': timezone.now().isoformat(),
+    })
 
     return JsonResponse({
         'ok': True,
