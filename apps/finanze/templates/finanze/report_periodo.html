@@ -413,6 +413,52 @@
     </div>
   </div>
 
+  {# ====== Meteo Licata vs Fatturato ====== #}
+  {% if weather_available %}
+  <div class="row g-2 mb-3 mt-1">
+    <div class="col-12">
+      <h5 class="fw-bold text-muted text-uppercase" style="font-size:.85rem; letter-spacing:.5px;">
+        <i class="bi bi-cloud-sun text-primary"></i> Meteo Licata &mdash; correlazione con fatturato
+      </h5>
+      <small class="text-muted">Dati storici Open-Meteo. La correlazione di Pearson va da -1 (inverso) a +1 (proporzionale).</small>
+    </div>
+  </div>
+
+  <div class="row g-2 mb-3">
+    <div class="col-6 col-lg-4">
+      <div class="kpi-tile {% if weather_corr.temp_max != None and weather_corr.temp_max > 0.3 %}success{% elif weather_corr.temp_max != None and weather_corr.temp_max < -0.3 %}danger{% else %}primary{% endif %}">
+        <div class="label">Correlazione temperatura max</div>
+        <div class="value">{% if weather_corr.temp_max == None %}n/d{% else %}{{ weather_corr.temp_max }}{% endif %}</div>
+        <div class="sub">+1 fa caldo &rArr; piu fatturato</div>
+      </div>
+    </div>
+    <div class="col-6 col-lg-4">
+      <div class="kpi-tile {% if weather_corr.precipitation != None and weather_corr.precipitation < -0.3 %}success{% elif weather_corr.precipitation != None and weather_corr.precipitation > 0.3 %}danger{% else %}primary{% endif %}">
+        <div class="label">Correlazione pioggia</div>
+        <div class="value">{% if weather_corr.precipitation == None %}n/d{% else %}{{ weather_corr.precipitation }}{% endif %}</div>
+        <div class="sub">-1 piove &rArr; piu fatturato (pulizia successiva)</div>
+      </div>
+    </div>
+    <div class="col-12 col-lg-4">
+      <div class="kpi-tile {% if weather_corr.sunshine_hours != None and weather_corr.sunshine_hours > 0.3 %}success{% elif weather_corr.sunshine_hours != None and weather_corr.sunshine_hours < -0.3 %}danger{% else %}primary{% endif %}">
+        <div class="label">Correlazione ore di sole</div>
+        <div class="value">{% if weather_corr.sunshine_hours == None %}n/d{% else %}{{ weather_corr.sunshine_hours }}{% endif %}</div>
+        <div class="sub">+1 sole &rArr; piu fatturato</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="row g-2 mb-3">
+    <div class="col-12">
+      <div class="chart-panel">
+        <div class="panel-title"><i class="bi bi-thermometer-half text-primary"></i> Fatturato vs Meteo</div>
+        <div class="panel-sub">Fatturato giornaliero sovrapposto a temperatura max e precipitazioni</div>
+        <div class="panel-body"><canvas id="chartMeteo" height="220"></canvas></div>
+      </div>
+    </div>
+  </div>
+  {% endif %}
+
 </div>
 {% endblock %}
 
@@ -431,6 +477,11 @@ const gsWcAggregato = {{ gs_wc_aggregato_json|safe }};
 const gsWcServito = {{ gs_wc_servito_json|safe }};
 const gsWcSelf = {{ gs_wc_self_json|safe }};
 const gsCambia = {{ gs_cambia_json|safe }};
+{% if weather_available %}
+const weatherTempMax = {{ weather_temp_max_json|safe }};
+const weatherPrecip = {{ weather_precip_json|safe }};
+const fatturatoPerGiorno = {{ fatturato_per_giorno_json|safe }};
+{% endif %}
 const weekdayLabels = {{ giorni_settimana_labels_json|safe }};
 const weekdayTot = {{ giorni_settimana_tot_json|safe }};
 const oreBuckets = {{ ore_buckets_json|safe }};
@@ -574,6 +625,7 @@ if (ctxWcTA) {
       labels: trendLabels,
       datasets: [
         { label: 'Aggregato', data: trendWcAggregato, borderColor: '#0891b2', backgroundColor: 'rgba(8,145,178,.15)', fill: true, tension: .3, borderWidth: 2 },
+        { label: 'Self', data: trendWcSelf, borderColor: '#10b981', fill: false, tension: .3, borderWidth: 2 },
         { label: 'Servito', data: trendWcServito, borderColor: '#f59e0b', borderDash: [5,5], fill: false, tension: .3, borderWidth: 2 },
       ]
     },
@@ -652,5 +704,63 @@ if (ctxCT) {
     }
   });
 }
+
+{% if weather_available %}
+// ===== Meteo Licata vs Fatturato =====
+const ctxMeteo = document.getElementById('chartMeteo');
+if (ctxMeteo) {
+  new Chart(ctxMeteo, {
+    data: {
+      labels: trendLabels,
+      datasets: [
+        {
+          type: 'bar', label: 'Fatturato (€)',
+          data: fatturatoPerGiorno,
+          backgroundColor: 'rgba(59,130,246,.55)',
+          borderRadius: 3, yAxisID: 'y',
+        },
+        {
+          type: 'line', label: 'Temp. max (°C)',
+          data: weatherTempMax,
+          borderColor: '#ef4444',
+          backgroundColor: 'rgba(239,68,68,.1)',
+          fill: false, tension: .3, borderWidth: 2,
+          yAxisID: 'y1', spanGaps: true,
+        },
+        {
+          type: 'line', label: 'Pioggia (mm)',
+          data: weatherPrecip,
+          borderColor: '#0891b2',
+          backgroundColor: 'rgba(8,145,178,.15)',
+          fill: true, tension: .3, borderWidth: 2,
+          yAxisID: 'y2', spanGaps: true,
+        },
+      ]
+    },
+    options: {
+      responsive: true, maintainAspectRatio: false,
+      plugins: { legend: { position: 'bottom' } },
+      scales: {
+        y: {
+          beginAtZero: true, position: 'left',
+          grid: { color: '#f1f5f9' },
+          title: { display: true, text: 'Fatturato €' },
+          ticks: { callback: v => '€' + v }
+        },
+        y1: {
+          position: 'right', grid: { drawOnChartArea: false },
+          title: { display: true, text: '°C' },
+          ticks: { callback: v => v + '°' }
+        },
+        y2: {
+          display: false,
+          beginAtZero: true,
+          max: Math.max(20, Math.max(...weatherPrecip.filter(v => v != null)) * 2 || 20),
+        },
+      }
+    }
+  });
+}
+{% endif %}
 </script>
 {% endblock %}

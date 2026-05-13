@@ -1492,6 +1492,33 @@ def report_periodo(request):
         gs_wc_servito[wd] += trend_wc_servito[i]
         gs_wc_self[wd] += trend_wc_self[i]
 
+    # ==================== METEO LICATA + CORRELAZIONE FATTURATO ====================
+    # Tenta di recuperare dati meteo Open-Meteo. Best-effort: se l'API
+    # non risponde la sezione meteo nel template viene nascosta.
+    from .weather import fetch_weather_range, correlate_revenue_weather
+    weather = fetch_weather_range(data_inizio, data_fine)
+    fatturato_per_giorno = [
+        trend_servito[i] + trend_portali[i] + trend_cambia[i]
+        for i in range(len(trend_labels))
+    ]
+    weather_corr = correlate_revenue_weather(fatturato_per_giorno, weather) if weather else {}
+
+    # Allinea le serie meteo all'array trend_labels (giorno per giorno).
+    # Se weather ha buchi, riempi con null per Chart.js.
+    weather_temp_max = []
+    weather_precip = []
+    weather_sun = []
+    if weather:
+        wmap_tmax = dict(zip(weather['dates'], weather['temp_max']))
+        wmap_pr = dict(zip(weather['dates'], weather['precipitation']))
+        wmap_sun = dict(zip(weather['dates'], weather['sunshine_hours']))
+        d = data_inizio
+        while d <= data_fine:
+            weather_temp_max.append(wmap_tmax.get(d))
+            weather_precip.append(wmap_pr.get(d))
+            weather_sun.append(wmap_sun.get(d))
+            d += timedelta(days=1)
+
     # ==================== CAMBIA GETTONI (piste + accessori) ====================
     # Fatturato per giorno settimana
     gs_cambia = [0.0] * 7
@@ -1602,6 +1629,13 @@ def report_periodo(request):
         'wd_picco_cambia_label': wd_picco_label,
         'wd_picco_cambia_val': wd_picco_val,
         'gs_cambia_json': json.dumps(gs_cambia),
+        # Meteo + correlazione fatturato
+        'weather_available': bool(weather),
+        'weather_corr': weather_corr,
+        'weather_temp_max_json': json.dumps(weather_temp_max),
+        'weather_precip_json': json.dumps(weather_precip),
+        'weather_sun_json': json.dumps(weather_sun),
+        'fatturato_per_giorno_json': json.dumps(fatturato_per_giorno),
         'giorni_settimana_labels_json': json.dumps(giorni_settimana_labels),
         'giorni_settimana_tot_json': json.dumps(giorni_settimana_tot),
         'ore_buckets_json': json.dumps(ore_buckets),
