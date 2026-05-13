@@ -1443,6 +1443,55 @@ def report_periodo(request):
         trend_washcycles.append(a['washcycles'])
         d += timedelta(days=1)
 
+    # ==================== WASHCYCLES: AGGREGATO / SERVITO / SELF ====================
+    # Aggregato = totale wash_cycles erogati dai portali (trend_washcycles)
+    # Servito   = quantita totale di item 'lavaggio completo' venduti dal
+    #             servito (sono i washcycles attivati dall'operatore per
+    #             clienti che hanno ordinato un lavaggio completo)
+    # Self      = aggregato - servito (clienti che hanno usato il portale
+    #             autonomamente con token/abbonamento)
+    from apps.ordini.models import ItemOrdine
+    servito_by_day = {}
+    servito_items_qs = (
+        ItemOrdine.objects.filter(
+            ordine__data_ora__date__gte=data_inizio,
+            ordine__data_ora__date__lte=data_fine,
+            servizio_prodotto__titolo__icontains='lavaggio completo',
+        )
+        .exclude(ordine__stato='annullato')
+        .values('ordine__data_ora__date')
+        .annotate(qty=Sum('quantita'))
+    )
+    for row in servito_items_qs:
+        d = row['ordine__data_ora__date']
+        servito_by_day[d] = int(row['qty'] or 0)
+
+    trend_wc_aggregato = list(trend_washcycles)  # alias semantico
+    trend_wc_servito = []
+    trend_wc_self = []
+    d = data_inizio
+    while d <= data_fine:
+        agg = servito_by_day.get(d, 0)
+        trend_wc_servito.append(agg)
+        d += timedelta(days=1)
+    for i in range(len(trend_wc_aggregato)):
+        trend_wc_self.append(max(0, trend_wc_aggregato[i] - trend_wc_servito[i]))
+
+    totale_wc_aggregato = sum(trend_wc_aggregato)
+    totale_wc_servito = sum(trend_wc_servito)
+    totale_wc_self = sum(trend_wc_self)
+
+    # Per giorno della settimana (0=lun ... 6=dom)
+    gs_wc_aggregato = [0] * 7
+    gs_wc_servito = [0] * 7
+    gs_wc_self = [0] * 7
+    for i in range(len(trend_labels)):
+        d_date = data_inizio + timedelta(days=i)
+        wd = d_date.weekday()
+        gs_wc_aggregato[wd] += trend_wc_aggregato[i]
+        gs_wc_servito[wd] += trend_wc_servito[i]
+        gs_wc_self[wd] += trend_wc_self[i]
+
     # ==================== FATTURATO PER GIORNO SETTIMANA ====================
     # 0=lun ... 6=dom
     giorni_settimana_labels = ['Lun', 'Mar', 'Mer', 'Gio', 'Ven', 'Sab', 'Dom']
@@ -1519,6 +1568,16 @@ def report_periodo(request):
         'trend_portali_json': json.dumps(trend_portali),
         'trend_cambia_json': json.dumps(trend_cambia),
         'trend_washcycles_json': json.dumps(trend_washcycles),
+        # Washcycles aggregato/servito/self
+        'totale_wc_aggregato': totale_wc_aggregato,
+        'totale_wc_servito': totale_wc_servito,
+        'totale_wc_self': totale_wc_self,
+        'trend_wc_aggregato_json': json.dumps(trend_wc_aggregato),
+        'trend_wc_servito_json': json.dumps(trend_wc_servito),
+        'trend_wc_self_json': json.dumps(trend_wc_self),
+        'gs_wc_aggregato_json': json.dumps(gs_wc_aggregato),
+        'gs_wc_servito_json': json.dumps(gs_wc_servito),
+        'gs_wc_self_json': json.dumps(gs_wc_self),
         'giorni_settimana_labels_json': json.dumps(giorni_settimana_labels),
         'giorni_settimana_tot_json': json.dumps(giorni_settimana_tot),
         'ore_buckets_json': json.dumps(ore_buckets),

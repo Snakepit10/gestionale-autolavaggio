@@ -287,6 +287,82 @@
     </div>
   </div>
 
+  {# ====== Washcycles: aggregato / servito / self ====== #}
+  <div class="row g-2 mb-3 mt-1">
+    <div class="col-12">
+      <h5 class="fw-bold text-muted text-uppercase" style="font-size:.85rem; letter-spacing:.5px;">
+        <i class="bi bi-droplet-fill text-info"></i> Washcycles &mdash; analisi self vs servito
+      </h5>
+    </div>
+  </div>
+
+  <div class="row g-2 mb-3">
+    <div class="col-6 col-lg-3">
+      <div class="kpi-tile info">
+        <div class="label">Aggregato</div>
+        <div class="value">{{ totale_wc_aggregato }}</div>
+        <div class="sub">washcycles totali erogati dai portali</div>
+      </div>
+    </div>
+    <div class="col-6 col-lg-3">
+      <div class="kpi-tile warning">
+        <div class="label">Servito</div>
+        <div class="value">{{ totale_wc_servito }}</div>
+        <div class="sub">attivati da operatore (lavaggio completo)</div>
+      </div>
+    </div>
+    <div class="col-6 col-lg-3">
+      <div class="kpi-tile success">
+        <div class="label">Self</div>
+        <div class="value">{{ totale_wc_self }}</div>
+        <div class="sub">attivati direttamente dai clienti</div>
+      </div>
+    </div>
+    <div class="col-6 col-lg-3">
+      <div class="kpi-tile primary">
+        <div class="label">% Self</div>
+        <div class="value">
+          {% if totale_wc_aggregato %}{{ totale_wc_self|floatformat:0 }}/{{ totale_wc_aggregato|floatformat:0 }}{% else %}-{% endif %}
+        </div>
+        <div class="sub">incidenza self sul totale</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="row g-2 mb-3">
+    <div class="col-lg-6">
+      <div class="chart-panel">
+        <div class="panel-title"><i class="bi bi-bar-chart text-info"></i> Washcycles per giorno settimana &mdash; aggregato</div>
+        <div class="panel-sub">Self + servito combinati</div>
+        <div class="panel-body"><canvas id="chartWcWeekdayAgg" height="180"></canvas></div>
+      </div>
+    </div>
+    <div class="col-lg-6">
+      <div class="chart-panel">
+        <div class="panel-title"><i class="bi bi-graph-up text-info"></i> Trend washcycles &mdash; aggregato</div>
+        <div class="panel-sub">Per giorno nel periodo</div>
+        <div class="panel-body"><canvas id="chartWcTrendAgg" height="180"></canvas></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="row g-2 mb-3">
+    <div class="col-lg-6">
+      <div class="chart-panel">
+        <div class="panel-title"><i class="bi bi-bar-chart text-success"></i> Washcycles per giorno settimana &mdash; self</div>
+        <div class="panel-sub">Solo clienti che hanno attivato il portale autonomamente</div>
+        <div class="panel-body"><canvas id="chartWcWeekdaySelf" height="180"></canvas></div>
+      </div>
+    </div>
+    <div class="col-lg-6">
+      <div class="chart-panel">
+        <div class="panel-title"><i class="bi bi-graph-up text-success"></i> Trend washcycles &mdash; self</div>
+        <div class="panel-sub">Per giorno nel periodo</div>
+        <div class="panel-body"><canvas id="chartWcTrendSelf" height="180"></canvas></div>
+      </div>
+    </div>
+  </div>
+
 </div>
 {% endblock %}
 
@@ -298,6 +374,12 @@ const trendServito = {{ trend_servito_json|safe }};
 const trendPortali = {{ trend_portali_json|safe }};
 const trendCambia = {{ trend_cambia_json|safe }};
 const trendWashcycles = {{ trend_washcycles_json|safe }};
+const trendWcAggregato = {{ trend_wc_aggregato_json|safe }};
+const trendWcServito = {{ trend_wc_servito_json|safe }};
+const trendWcSelf = {{ trend_wc_self_json|safe }};
+const gsWcAggregato = {{ gs_wc_aggregato_json|safe }};
+const gsWcServito = {{ gs_wc_servito_json|safe }};
+const gsWcSelf = {{ gs_wc_self_json|safe }};
 const weekdayLabels = {{ giorni_settimana_labels_json|safe }};
 const weekdayTot = {{ giorni_settimana_tot_json|safe }};
 const oreBuckets = {{ ore_buckets_json|safe }};
@@ -405,6 +487,83 @@ if (ctxC && categorie.length > 0) {
       indexAxis: 'y', responsive: true, maintainAspectRatio: false,
       plugins: { legend: { display: false } },
       scales: { x: { beginAtZero: true, grid: { color: '#f1f5f9' }, ticks: { callback: v => '€' + v } }, y: { grid: { display: false } } }
+    }
+  });
+}
+
+// ===== Washcycles per giorno settimana - aggregato =====
+const ctxWcWA = document.getElementById('chartWcWeekdayAgg');
+if (ctxWcWA) {
+  new Chart(ctxWcWA, {
+    type: 'bar',
+    data: {
+      labels: weekdayLabels,
+      datasets: [
+        { label: 'Servito', data: gsWcServito, backgroundColor: '#f59e0b', borderRadius: 3 },
+        { label: 'Self', data: gsWcSelf, backgroundColor: '#10b981', borderRadius: 3 },
+      ]
+    },
+    options: {
+      responsive: true, maintainAspectRatio: false,
+      plugins: { legend: { position: 'bottom' }, tooltip: { mode: 'index' } },
+      scales: {
+        x: { stacked: true, grid: { display: false } },
+        y: { stacked: true, beginAtZero: true, grid: { color: '#f1f5f9' }, ticks: { precision: 0 } }
+      }
+    }
+  });
+}
+
+// ===== Trend washcycles - aggregato =====
+const ctxWcTA = document.getElementById('chartWcTrendAgg');
+if (ctxWcTA) {
+  new Chart(ctxWcTA, {
+    type: 'line',
+    data: {
+      labels: trendLabels,
+      datasets: [
+        { label: 'Aggregato', data: trendWcAggregato, borderColor: '#0891b2', backgroundColor: 'rgba(8,145,178,.15)', fill: true, tension: .3, borderWidth: 2 },
+        { label: 'Servito', data: trendWcServito, borderColor: '#f59e0b', borderDash: [5,5], fill: false, tension: .3, borderWidth: 2 },
+      ]
+    },
+    options: {
+      responsive: true, maintainAspectRatio: false,
+      plugins: { legend: { position: 'bottom' } },
+      scales: { y: { beginAtZero: true, grid: { color: '#f1f5f9' }, ticks: { precision: 0 } } }
+    }
+  });
+}
+
+// ===== Washcycles per giorno settimana - self =====
+const ctxWcWS = document.getElementById('chartWcWeekdaySelf');
+if (ctxWcWS) {
+  new Chart(ctxWcWS, {
+    type: 'bar',
+    data: {
+      labels: weekdayLabels,
+      datasets: [{ data: gsWcSelf, backgroundColor: '#10b981', borderRadius: 3 }]
+    },
+    options: {
+      responsive: true, maintainAspectRatio: false,
+      plugins: { legend: { display: false } },
+      scales: { x: { grid: { display: false } }, y: { beginAtZero: true, grid: { color: '#f1f5f9' }, ticks: { precision: 0 } } }
+    }
+  });
+}
+
+// ===== Trend washcycles - self =====
+const ctxWcTS = document.getElementById('chartWcTrendSelf');
+if (ctxWcTS) {
+  new Chart(ctxWcTS, {
+    type: 'line',
+    data: {
+      labels: trendLabels,
+      datasets: [{ label: 'Self', data: trendWcSelf, borderColor: '#10b981', backgroundColor: 'rgba(16,185,129,.15)', fill: true, tension: .3, borderWidth: 2 }]
+    },
+    options: {
+      responsive: true, maintainAspectRatio: false,
+      plugins: { legend: { display: false } },
+      scales: { y: { beginAtZero: true, grid: { color: '#f1f5f9' }, ticks: { precision: 0 } } }
     }
   });
 }
