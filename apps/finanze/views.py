@@ -1450,7 +1450,7 @@ def report_periodo(request):
     #             clienti che hanno ordinato un lavaggio completo)
     # Self      = aggregato - servito (clienti che hanno usato il portale
     #             autonomamente con token/abbonamento)
-    from apps.ordini.models import ItemOrdine
+    # ItemOrdine e' gia importato a top file (riga 12)
     servito_by_day = {}
     servito_items_qs = (
         ItemOrdine.objects.filter(
