@@ -462,43 +462,31 @@ def completa_ordine(request):
                 print(f'Errore stampa scontrino: {str(e)}')  # Log invece di messages
         
         # Invia notifica WebSocket alle postazioni e alla lista ordini
-        try:
-            from channels.layers import get_channel_layer
-            from asgiref.sync import async_to_sync
-
-            channel_layer = get_channel_layer()
-            if channel_layer:
-                # Notifica alle postazioni
-                for item in ordine.items.all():
-                    if item.postazione_assegnata:
-                        async_to_sync(channel_layer.group_send)(
-                            f'postazione_{item.postazione_assegnata.id}',
-                            {
-                                'type': 'nuovo_ordine',
-                                'ordine': {
-                                    'id': ordine.id,
-                                    'numero_progressivo': ordine.numero_progressivo,
-                                    'cliente': str(ordine.cliente) if ordine.cliente else 'Anonimo',
-                                    'items': [{
-                                        'servizio': item.servizio_prodotto.titolo,
-                                        'quantita': item.quantita
-                                    } for item in ordine.items.filter(postazione_assegnata=item.postazione_assegnata)]
-                                }
-                            }
-                        )
-
-                # Notifica alla lista ordini per aggiornamento automatico
-                async_to_sync(channel_layer.group_send)(
-                    'ordini_list',
+        # (timeout duro: se Redis e' lento NON blocca la response)
+        from apps.api.notify import notify_group
+        for item in ordine.items.all():
+            if item.postazione_assegnata:
+                notify_group(
+                    f'postazione_{item.postazione_assegnata.id}',
                     {
                         'type': 'nuovo_ordine',
-                        'ordine_id': ordine.id,
-                        'numero_progressivo': ordine.numero_progressivo,
-                        'timestamp': timezone.now().isoformat()
-                    }
+                        'ordine': {
+                            'id': ordine.id,
+                            'numero_progressivo': ordine.numero_progressivo,
+                            'cliente': str(ordine.cliente) if ordine.cliente else 'Anonimo',
+                            'items': [{
+                                'servizio': item.servizio_prodotto.titolo,
+                                'quantita': item.quantita,
+                            } for item in ordine.items.filter(postazione_assegnata=item.postazione_assegnata)],
+                        },
+                    },
                 )
-        except Exception as e:
-            print(f'Errore invio notifica WebSocket: {str(e)}')
+        notify_group('ordini_list', {
+            'type': 'nuovo_ordine',
+            'ordine_id': ordine.id,
+            'numero_progressivo': ordine.numero_progressivo,
+            'timestamp': timezone.now().isoformat(),
+        })
         
         # Calcola resto solo se c'è stato un pagamento
         resto = 0
@@ -1118,51 +1106,30 @@ def cambia_stato_ordine(request, pk):
             print(f"Ordine {ordine.numero_progressivo} cambiato da {vecchio_stato} a {nuovo_stato} da {request.user}")
             
             # Notifica WebSocket alle dashboard delle postazioni e lista ordini
-            try:
-                from channels.layers import get_channel_layer
-                from asgiref.sync import async_to_sync
-                
-                channel_layer = get_channel_layer()
-                if channel_layer:
-                    # Notifica tutte le postazioni che hanno items di questo ordine
-                    postazioni_coinvolte = set()
-                    for item in ordine.items.all():
-                        if item.postazione_assegnata:
-                            postazioni_coinvolte.add(item.postazione_assegnata.id)
-                    
-                    # Invia notifica a ogni postazione coinvolta
-                    for postazione_id in postazioni_coinvolte:
-                        async_to_sync(channel_layer.group_send)(
-                            f'postazione_{postazione_id}',
-                            {
-                                'type': 'order_status_update',
-                                'ordine_id': ordine.id,
-                                'numero_progressivo': ordine.numero_progressivo,
-                                'vecchio_stato': vecchio_stato,
-                                'nuovo_stato': nuovo_stato,
-                                'timestamp': timezone.now().isoformat()
-                            }
-                        )
-                    
-                    # Notifica anche la lista ordini generale
-                    async_to_sync(channel_layer.group_send)(
-                        'ordini_list',
-                        {
-                            'type': 'order_status_update',
-                            'ordine_id': ordine.id,
-                            'numero_progressivo': ordine.numero_progressivo,
-                            'vecchio_stato': vecchio_stato,
-                            'nuovo_stato': nuovo_stato,
-                            'stato_display': ordine.get_stato_display(),
-                            'timestamp': timezone.now().isoformat()
-                        }
-                    )
-            except ImportError:
-                # Django Channels non installato, ignora
-                pass
-            except Exception as e:
-                # Errore WebSocket, ma non bloccare l'aggiornamento
-                print(f'Errore WebSocket: {e}')
+            # (timeout duro: se Redis e' lento NON blocca la response)
+            from apps.api.notify import notify_group
+            postazioni_coinvolte = set()
+            for item in ordine.items.all():
+                if item.postazione_assegnata:
+                    postazioni_coinvolte.add(item.postazione_assegnata.id)
+            for postazione_id in postazioni_coinvolte:
+                notify_group(f'postazione_{postazione_id}', {
+                    'type': 'order_status_update',
+                    'ordine_id': ordine.id,
+                    'numero_progressivo': ordine.numero_progressivo,
+                    'vecchio_stato': vecchio_stato,
+                    'nuovo_stato': nuovo_stato,
+                    'timestamp': timezone.now().isoformat(),
+                })
+            notify_group('ordini_list', {
+                'type': 'order_status_update',
+                'ordine_id': ordine.id,
+                'numero_progressivo': ordine.numero_progressivo,
+                'vecchio_stato': vecchio_stato,
+                'nuovo_stato': nuovo_stato,
+                'stato_display': ordine.get_stato_display(),
+                'timestamp': timezone.now().isoformat(),
+            })
             
             return JsonResponse({
                 'success': True,
@@ -1420,25 +1387,15 @@ def modifica_ordine(request, pk):
                 # Log dell'operazione
                 print(f"Ordine {ordine.numero_progressivo} modificato da {request.user}: {', '.join(cambiamenti)}")
 
-                # Notifica WebSocket alla lista ordini per qualsiasi modifica
+                # Notifica WebSocket alla lista ordini (con timeout duro)
                 if cambiamenti:
-                    try:
-                        from channels.layers import get_channel_layer
-                        from asgiref.sync import async_to_sync
-
-                        channel_layer = get_channel_layer()
-                        if channel_layer:
-                            async_to_sync(channel_layer.group_send)(
-                                'ordini_list',
-                                {
-                                    'type': 'ordine_modificato',
-                                    'ordine_id': ordine.id,
-                                    'numero_progressivo': ordine.numero_progressivo,
-                                    'timestamp': timezone.now().isoformat()
-                                }
-                            )
-                    except Exception as e:
-                        print(f'Errore WebSocket: {e}')
+                    from apps.api.notify import notify_group
+                    notify_group('ordini_list', {
+                        'type': 'ordine_modificato',
+                        'ordine_id': ordine.id,
+                        'numero_progressivo': ordine.numero_progressivo,
+                        'timestamp': timezone.now().isoformat(),
+                    })
 
                 return JsonResponse({
                     'success': True,
@@ -1937,24 +1894,14 @@ def segna_ritirata(request, pk):
             
             ordine.save(update_fields=['auto_ritirata', 'data_ritiro'])
             
-            # Notifica WebSocket
-            try:
-                from channels.layers import get_channel_layer
-                from asgiref.sync import async_to_sync
-                
-                channel_layer = get_channel_layer()
-                if channel_layer:
-                    async_to_sync(channel_layer.group_send)(
-                        'ordini_list',
-                        {
-                            'type': 'ordine_modificato',
-                            'ordine_id': ordine.id,
-                            'numero_progressivo': ordine.numero_progressivo,
-                            'timestamp': timezone.now().isoformat()
-                        }
-                    )
-            except Exception as e:
-                print(f'Errore WebSocket: {e}')
+            # Notifica WebSocket (con timeout duro)
+            from apps.api.notify import notify_group
+            notify_group('ordini_list', {
+                'type': 'ordine_modificato',
+                'ordine_id': ordine.id,
+                'numero_progressivo': ordine.numero_progressivo,
+                'timestamp': timezone.now().isoformat(),
+            })
             
             return JsonResponse({
                 'success': True,

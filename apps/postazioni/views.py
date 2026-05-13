@@ -185,65 +185,38 @@ def aggiorna_stato_item(request, postazione_id, item_id):
                 ordine.save()
                 ordine_cambiato = True
         
-        # Invia aggiornamento WebSocket (opzionale)
-        try:
-            from channels.layers import get_channel_layer
-            from asgiref.sync import async_to_sync
-            
-            channel_layer = get_channel_layer()
-            if channel_layer:
-                # Notifica la postazione specifica
-                async_to_sync(channel_layer.group_send)(
-                    f'postazione_{postazione_id}',
-                    {
-                        'type': 'item_status_update',
-                        'item_id': item_id,
-                        'stato': nuovo_stato,
-                        'timestamp': timezone.now().isoformat()
-                    }
-                )
-                
-                # Se lo stato dell'ordine è cambiato, notifica anche le altre interfacce
-                if ordine_cambiato:
-                    # Notifica tutte le postazioni che hanno items di questo ordine
-                    postazioni_coinvolte = set()
-                    for ord_item in ordine.items.all():
-                        if ord_item.postazione_assegnata:
-                            postazioni_coinvolte.add(ord_item.postazione_assegnata.id)
-                    
-                    # Invia notifica a ogni postazione coinvolta
-                    for post_id in postazioni_coinvolte:
-                        async_to_sync(channel_layer.group_send)(
-                            f'postazione_{post_id}',
-                            {
-                                'type': 'order_status_update',
-                                'ordine_id': ordine.id,
-                                'numero_progressivo': ordine.numero_progressivo,
-                                'vecchio_stato': vecchio_stato_ordine,
-                                'nuovo_stato': ordine.stato,
-                                'timestamp': timezone.now().isoformat()
-                            }
-                        )
-                    
-                    # Notifica anche la lista ordini generale
-                    async_to_sync(channel_layer.group_send)(
-                        'ordini_list',
-                        {
-                            'type': 'order_status_update',
-                            'ordine_id': ordine.id,
-                            'numero_progressivo': ordine.numero_progressivo,
-                            'vecchio_stato': vecchio_stato_ordine,
-                            'nuovo_stato': ordine.stato,
-                            'stato_display': ordine.get_stato_display(),
-                            'timestamp': timezone.now().isoformat()
-                        }
-                    )
-        except ImportError:
-            # Django Channels non installato, ignora
-            pass
-        except Exception as e:
-            # Errore WebSocket, ma non bloccare l'aggiornamento
-            print(f'Errore WebSocket: {e}')
+        # Invia aggiornamento WebSocket (con timeout duro per non
+        # bloccare la response se Redis e' lento/down)
+        from apps.api.notify import notify_group
+        notify_group(f'postazione_{postazione_id}', {
+            'type': 'item_status_update',
+            'item_id': item_id,
+            'stato': nuovo_stato,
+            'timestamp': timezone.now().isoformat(),
+        })
+        if ordine_cambiato:
+            postazioni_coinvolte = set()
+            for ord_item in ordine.items.all():
+                if ord_item.postazione_assegnata:
+                    postazioni_coinvolte.add(ord_item.postazione_assegnata.id)
+            for post_id in postazioni_coinvolte:
+                notify_group(f'postazione_{post_id}', {
+                    'type': 'order_status_update',
+                    'ordine_id': ordine.id,
+                    'numero_progressivo': ordine.numero_progressivo,
+                    'vecchio_stato': vecchio_stato_ordine,
+                    'nuovo_stato': ordine.stato,
+                    'timestamp': timezone.now().isoformat(),
+                })
+            notify_group('ordini_list', {
+                'type': 'order_status_update',
+                'ordine_id': ordine.id,
+                'numero_progressivo': ordine.numero_progressivo,
+                'vecchio_stato': vecchio_stato_ordine,
+                'nuovo_stato': ordine.stato,
+                'stato_display': ordine.get_stato_display(),
+                'timestamp': timezone.now().isoformat(),
+            })
         
         # Log dettagliato per debug
         print(f"Item {item.id} cambiato da stato precedente a {nuovo_stato}")
