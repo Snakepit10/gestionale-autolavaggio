@@ -457,6 +457,77 @@
       </div>
     </div>
   </div>
+
+  {# ===== Lag analysis meteo ===== #}
+  <div class="row g-2 mb-3">
+    <div class="col-12">
+      <div class="chart-panel">
+        <div class="panel-title"><i class="bi bi-graph-up-arrow text-primary"></i> Lag analysis meteo</div>
+        <div class="panel-sub">
+          Correlazione fra fatturato di oggi e meteo di N giorni fa. Lag 0 = stesso giorno,
+          Lag 1 = pioggia/temperatura di ieri, ecc. Cerca i picchi: indicano l'effetto ritardato del meteo.
+        </div>
+        <div class="panel-body"><canvas id="chartWeatherLag" height="200"></canvas></div>
+      </div>
+    </div>
+  </div>
+  {% endif %}
+
+  {# ===== Festivita: avg fatturato per categoria giorno ===== #}
+  <div class="row g-2 mb-3 mt-1">
+    <div class="col-12">
+      <h5 class="fw-bold text-muted text-uppercase" style="font-size:.85rem; letter-spacing:.5px;">
+        <i class="bi bi-calendar-heart text-danger"></i> Analisi festivita
+      </h5>
+      <small class="text-muted">Italiane nazionali + Sant'Angelo (patrono Licata). Confronta media fatturato per tipo giorno e ritardi/anticipi degli effetti.</small>
+    </div>
+  </div>
+
+  <div class="row g-2 mb-3">
+    <div class="col-lg-6">
+      <div class="chart-panel">
+        <div class="panel-title"><i class="bi bi-bar-chart text-danger"></i> Fatturato medio per tipo giorno</div>
+        <div class="panel-sub">Feriale &middot; sabato &middot; domenica &middot; pre/post festivo &middot; festivo</div>
+        <div class="panel-body"><canvas id="chartHolidayCat" height="200"></canvas></div>
+      </div>
+    </div>
+    <div class="col-lg-6">
+      <div class="chart-panel">
+        <div class="panel-title"><i class="bi bi-graph-up-arrow text-danger"></i> Lag festivita</div>
+        <div class="panel-sub">
+          Correlazione fatturato vs &laquo;e' festivo X giorni fa/dopo&raquo;. Lag negativo = anticipo, positivo = ritardo.
+        </div>
+        <div class="panel-body"><canvas id="chartHolidayLag" height="200"></canvas></div>
+      </div>
+    </div>
+  </div>
+
+  {% if holiday_analysis.holidays_list %}
+  <div class="row g-2 mb-3">
+    <div class="col-12">
+      <div class="chart-panel">
+        <div class="panel-title"><i class="bi bi-list-ul"></i> Dettaglio festivita nel periodo</div>
+        <div class="panel-body">
+          <div class="table-responsive">
+            <table class="table table-sm mb-0">
+              <thead>
+                <tr><th>Data</th><th>Ricorrenza</th><th class="text-end">Fatturato</th></tr>
+              </thead>
+              <tbody>
+                {% for h in holiday_analysis.holidays_list %}
+                <tr>
+                  <td>{{ h.date|date:"l d/m/Y" }}</td>
+                  <td>{{ h.name }}</td>
+                  <td class="text-end fw-bold">&euro;{{ h.fatturato|floatformat:2 }}</td>
+                </tr>
+                {% endfor %}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
   {% endif %}
 
 </div>
@@ -481,7 +552,10 @@ const gsCambia = {{ gs_cambia_json|safe }};
 const weatherTempMax = {{ weather_temp_max_json|safe }};
 const weatherPrecip = {{ weather_precip_json|safe }};
 const fatturatoPerGiorno = {{ fatturato_per_giorno_json|safe }};
+const weatherLagData = {{ weather_lag_json|safe }};
 {% endif %}
+const holidayCategories = {{ holiday_categories_json|safe }};
+const holidayLagData = {{ holiday_lag_json|safe }};
 const weekdayLabels = {{ giorni_settimana_labels_json|safe }};
 const weekdayTot = {{ giorni_settimana_tot_json|safe }};
 const oreBuckets = {{ ore_buckets_json|safe }};
@@ -705,7 +779,72 @@ if (ctxCT) {
   });
 }
 
+// ===== Lag analysis festivita =====
+const ctxHL = document.getElementById('chartHolidayLag');
+if (ctxHL && holidayLagData) {
+  new Chart(ctxHL, {
+    type: 'bar',
+    data: {
+      labels: holidayLagData.lags.map(l => l === 0 ? 'Stesso giorno' : (l > 0 ? `+${l}g (dopo)` : `${l}g (prima)`)),
+      datasets: [{
+        label: 'Correlazione fatturato vs festivita',
+        data: holidayLagData.corr,
+        backgroundColor: holidayLagData.corr.map(v => v == null ? '#cbd5e1' : (v > 0 ? '#10b981' : '#ef4444')),
+        borderRadius: 3,
+      }]
+    },
+    options: {
+      responsive: true, maintainAspectRatio: false,
+      plugins: { legend: { display: false }, tooltip: { callbacks: { label: c => (c.parsed.y == null ? 'n/d' : c.parsed.y.toFixed(3)) } } },
+      scales: { y: { min: -1, max: 1, grid: { color: '#f1f5f9' } } }
+    }
+  });
+}
+
+// ===== Festivita: medie per categoria =====
+const ctxHC = document.getElementById('chartHolidayCat');
+if (ctxHC) {
+  new Chart(ctxHC, {
+    type: 'bar',
+    data: {
+      labels: holidayCategories.map(c => `${c.label} (n=${c.count})`),
+      datasets: [{
+        data: holidayCategories.map(c => c.media),
+        backgroundColor: ['#94a3b8', '#0ea5e9', '#3b82f6', '#f59e0b', '#ef4444', '#a855f7'],
+        borderRadius: 4,
+      }]
+    },
+    options: {
+      indexAxis: 'y',
+      responsive: true, maintainAspectRatio: false,
+      plugins: { legend: { display: false }, tooltip: { callbacks: { label: c => '€ ' + c.parsed.x.toFixed(2) + ' media' } } },
+      scales: { x: { beginAtZero: true, grid: { color: '#f1f5f9' }, ticks: { callback: v => '€' + v } }, y: { grid: { display: false } } }
+    }
+  });
+}
+
 {% if weather_available %}
+// ===== Lag analysis meteo =====
+const ctxWL = document.getElementById('chartWeatherLag');
+if (ctxWL && weatherLagData) {
+  new Chart(ctxWL, {
+    type: 'line',
+    data: {
+      labels: weatherLagData.lags.map(l => l === 0 ? 'Oggi' : `${l}g fa`),
+      datasets: [
+        { label: 'Temp. max', data: weatherLagData.temp_max, borderColor: '#ef4444', backgroundColor: 'rgba(239,68,68,.1)', tension: .3, borderWidth: 2, fill: false },
+        { label: 'Pioggia', data: weatherLagData.precipitation, borderColor: '#0891b2', backgroundColor: 'rgba(8,145,178,.1)', tension: .3, borderWidth: 2, fill: false },
+        { label: 'Ore di sole', data: weatherLagData.sunshine_hours, borderColor: '#f59e0b', backgroundColor: 'rgba(245,158,11,.1)', tension: .3, borderWidth: 2, fill: false },
+      ]
+    },
+    options: {
+      responsive: true, maintainAspectRatio: false,
+      plugins: { legend: { position: 'bottom' }, tooltip: { callbacks: { label: c => `${c.dataset.label}: ${c.parsed.y == null ? 'n/d' : c.parsed.y.toFixed(3)}` } } },
+      scales: { y: { min: -1, max: 1, grid: { color: '#f1f5f9' }, title: { display: true, text: 'Correlazione' } } }
+    }
+  });
+}
+
 // ===== Meteo Licata vs Fatturato =====
 const ctxMeteo = document.getElementById('chartMeteo');
 if (ctxMeteo) {
