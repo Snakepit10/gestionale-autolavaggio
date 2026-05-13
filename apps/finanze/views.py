@@ -1307,7 +1307,25 @@ def report_periodo(request):
     # ==================== TOTALI E KPI ====================
     fatturato_totale = totale_servito_ordinato + totale_self_service
     fatturato_medio_giornaliero = fatturato_totale / giorni_periodo if giorni_periodo > 0 else Decimal('0.00')
-    scontrino_medio = (totale_servito_pagato + totale_self_service) / num_transazioni if num_transazioni > 0 else Decimal('0.00')
+    # Scontrino medio = fatturato servito ordinato / numero ordini
+    # (era: (servito_pagato + self_service) / num_transazioni di Pagamento
+    # che includeva nel numeratore vendite self-service ma divideva per
+    # i soli Pagamento POS = valore inflato e fuorviante).
+    scontrino_medio = totale_servito_ordinato / num_ordini if num_ordini > 0 else Decimal('0.00')
+
+    # ==================== RILEVATO REALE (quadrature giornaliere) ====================
+    # Somma delle Quadrature giornaliere nel periodo. Usa la stessa
+    # formula del report giornata: contanti + lettore carte - fondo cassa.
+    quadrature_qs = QuadraturaGiornaliera.objects.filter(
+        data__gte=data_inizio, data__lte=data_fine,
+    )
+    totale_rilevato_reale = Decimal('0.00')
+    num_quadrature = 0
+    for q in quadrature_qs:
+        totale_rilevato_reale += q.totale_reale
+        num_quadrature += 1
+    # Differenza vs teorico (= fatturato_totale incassato)
+    diff_rilevato_vs_teorico = totale_rilevato_reale - fatturato_totale
 
     # Corrispettivi fiscali
     totale_corrispettivi = totale_registratore + vendita_self_service
@@ -1570,9 +1588,12 @@ def report_periodo(request):
             giorno_picco = {'data': pk_date, 'totale': pk_tot}
 
     # ==================== DISTRIBUZIONE ORARIA MEDIA ====================
+    # Usa l'ora locale (timezone Europe/Rome), non UTC come e' nel DB
     ore_buckets = [0.0] * 24
     for p in pagamenti_qs:
-        ore_buckets[p.data_pagamento.hour] += float(p.importo)
+        dt = p.data_pagamento
+        local_hour = timezone.localtime(dt).hour if timezone.is_aware(dt) else dt.hour
+        ore_buckets[local_hour] += float(p.importo)
     ora_picco = None
     if any(ore_buckets):
         h = ore_buckets.index(max(ore_buckets))
@@ -1603,6 +1624,11 @@ def report_periodo(request):
         'totale_corrispettivi': totale_corrispettivi,
         'iva_corrispettivi': iva_corrispettivi,
         'imponibile_corrispettivi': imponibile_corrispettivi,
+        # Rilevato reale (quadrature giornaliere)
+        'totale_rilevato_reale': totale_rilevato_reale,
+        'num_quadrature': num_quadrature,
+        'diff_rilevato_vs_teorico': diff_rilevato_vs_teorico,
+        'giorni_senza_quadratura': giorni_periodo - num_quadrature,
         # Volumi
         'totale_wash_cycles': totale_wash_cycles,
         'washcycles_per_giorno': washcycles_per_giorno,

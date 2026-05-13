@@ -170,6 +170,35 @@
     </div>
   </div>
 
+  {# ====== RILEVATO REALE (quadrature) ====== #}
+  <div class="row g-2 mb-3">
+    <div class="col-12 col-lg-6">
+      <div class="kpi-tile {% if num_quadrature == 0 %}{% else %}{% if diff_rilevato_vs_teorico >= 0 %}success{% else %}danger{% endif %}{% endif %}">
+        <div class="label">Rilevato reale (quadrature)</div>
+        <div class="value">&euro;{{ totale_rilevato_reale|floatformat:2 }}</div>
+        <div class="sub">
+          {{ num_quadrature }}/{{ giorni_periodo }} giorni rilevati
+          {% if giorni_senza_quadratura > 0 %}
+            &middot; <span class="text-warning">{{ giorni_senza_quadratura }} senza quadratura</span>
+          {% endif %}
+        </div>
+      </div>
+    </div>
+    <div class="col-12 col-lg-6">
+      <div class="kpi-tile {% if num_quadrature == 0 %}{% elif diff_rilevato_vs_teorico >= 0 %}success{% else %}danger{% endif %}">
+        <div class="label">Differenza vs teorico</div>
+        <div class="value">
+          {% if num_quadrature == 0 %}&mdash;{% else %}
+            {% if diff_rilevato_vs_teorico >= 0 %}+{% endif %}&euro;{{ diff_rilevato_vs_teorico|floatformat:2 }}
+          {% endif %}
+        </div>
+        <div class="sub">
+          Rilevato &minus; fatturato totale ({{ giorni_periodo }} giorni)
+        </div>
+      </div>
+    </div>
+  </div>
+
   {# ====== CREDITI + QUADRATURA ====== #}
   <h6 class="text-muted text-uppercase fw-bold mb-2" style="font-size:.72rem; letter-spacing:.5px;">Crediti e quadratura</h6>
   <div class="row g-2 mb-3">
