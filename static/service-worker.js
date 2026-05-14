@@ -200,23 +200,29 @@ async function networkFirst(request) {
 // Strategia Stale While Revalidate (per pagine HTML)
 async function staleWhileRevalidate(request) {
     const cachedResponse = await caches.match(request);
-    
+
     // Fetch in background per aggiornare la cache
     const fetchPromise = fetch(request).then((networkResponse) => {
         if (networkResponse.ok) {
-            const cache = caches.open(CACHE_NAME);
-            cache.then(c => c.put(request, networkResponse.clone()));
+            // IMPORTANTE: clonare SUBITO, sincronamente, prima che il body
+            // venga consumato dal chiamante che riceve networkResponse.
+            // Una .clone() in una .then() annidata fallirebbe con
+            // 'Response body is already used'.
+            const responseToCache = networkResponse.clone();
+            caches.open(CACHE_NAME)
+                .then(c => c.put(request, responseToCache))
+                .catch(() => { /* ignora errori cache */ });
         }
         return networkResponse;
     }).catch(() => {
         // Ignora errori di rete in background
     });
-    
+
     // Restituisci immediatamente la versione cached se disponibile
     if (cachedResponse) {
         return cachedResponse;
     }
-    
+
     // Altrimenti aspetta la rete
     return await fetchPromise;
 }
