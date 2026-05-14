@@ -1,50 +1,57 @@
 """Helper sicuro per inviare notifiche WebSocket.
 
-Problema risolto: chiamate dirette a `async_to_sync(channel_layer.group_send)`
-in view sync possono bloccare indefinitamente se Redis e' irraggiungibile o
-lento, mandando il worker Daphne in deadlock. Risultato: 499/502 a cascata.
+Strategia fire-and-forget in daemon thread: la send Redis avviene in
+un thread separato; la view ritorna IMMEDIATAMENTE senza aspettarla.
+Se Redis e' lento o non risponde:
+- la richiesta HTTP non viene bloccata
+- il thread eventualmente termina al timeout interno della libreria
+- come daemon, viene killato al shutdown del processo senza warning
 
-Soluzione: timeout duro (default 2s) tramite asyncio.wait_for. Se la send
-non termina nel timeout, si scarta silenziosamente senza bloccare la
-risposta HTTP. Errori (incluso TimeoutError) sono solo loggati.
+Questo elimina sia il blocco runtime (cascade 499/502) sia il warning
+'took too long to shut down and was killed' di Daphne.
 """
-import asyncio
 import logging
+import threading
 
 logger = logging.getLogger(__name__)
 
 
-def notify_group(group_name: str, message: dict, timeout: float = 2.0) -> bool:
-    """Invia un messaggio a un gruppo channels senza bloccare la view.
-
-    Ritorna True se inviato, False altrimenti (errore o timeout). Non
-    solleva eccezioni: in caso di problema logga warning e prosegue.
-    """
+def _send_in_background(group_name: str, message: dict) -> None:
+    """Esegue la send in un thread isolato (con event loop proprio)."""
     try:
         from channels.layers import get_channel_layer
         from asgiref.sync import async_to_sync
 
         channel_layer = get_channel_layer()
         if channel_layer is None:
-            return False
-
-        async def _send_with_timeout():
-            await asyncio.wait_for(
-                channel_layer.group_send(group_name, message),
-                timeout=timeout,
-            )
-
-        async_to_sync(_send_with_timeout)()
-        return True
-    except asyncio.TimeoutError:
-        logger.warning(
-            'WS notify timeout (%.1fs) per group=%s type=%s',
-            timeout, group_name, message.get('type'),
-        )
-        return False
+            return
+        async_to_sync(channel_layer.group_send)(group_name, message)
     except Exception as e:
         logger.warning(
-            'WS notify fallito per group=%s type=%s: %s',
+            'WS notify bg fallito per group=%s type=%s: %s',
             group_name, message.get('type'), e,
         )
+
+
+def notify_group(group_name: str, message: dict, timeout: float = 2.0) -> bool:
+    """Invia un messaggio a un gruppo channels in modo fire-and-forget.
+
+    Ritorna sempre True (la send e' delegata al thread di background).
+    NON aspetta il completamento: la view torna entro pochi ms anche
+    se Redis e' down. Eventuali errori sono solo loggati nel thread.
+
+    Il parametro `timeout` resta per retrocompatibilita ma non viene
+    piu usato (era un parziale workaround che falliva quando le
+    coroutine Redis non rispondevano al cancel).
+    """
+    try:
+        thread = threading.Thread(
+            target=_send_in_background,
+            args=(group_name, message),
+            daemon=True,
+        )
+        thread.start()
+        return True
+    except Exception as e:
+        logger.warning('WS notify thread start fallito: %s', e)
         return False
