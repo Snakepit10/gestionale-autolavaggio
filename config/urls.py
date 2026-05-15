@@ -1,15 +1,72 @@
+import json as _json
 import os
 from django.contrib import admin
 from django.urls import path, include
 from django.conf import settings
 from django.conf.urls.static import static
-from django.http import HttpResponse
+from django.http import HttpResponse, JsonResponse
 from django.views.generic import TemplateView
 from django.views.static import serve as static_serve
 
 # Health check endpoint per Railway
 def health_check(request):
     return HttpResponse("OK", status=200)
+
+
+def assetlinks_json(request):
+    """Serve /.well-known/assetlinks.json per Digital Asset Links (TWA Android).
+
+    Permette alla Trusted Web Activity Android di certificare che e' autorizzata
+    a presentare questo dominio senza URL bar.
+
+    Configurazione via env var:
+      TWA_ANDROID_PACKAGE_NAME  - es. it.autolavaggiomasterwash.app
+      TWA_SHA256_FINGERPRINTS   - comma-separated, es. "AA:BB:...,CC:DD:..."
+                                  (output di `keytool -list -v -keystore ...`)
+    """
+    package_name = os.environ.get('TWA_ANDROID_PACKAGE_NAME', '')
+    fp_raw = os.environ.get('TWA_SHA256_FINGERPRINTS', '')
+    fingerprints = [f.strip() for f in fp_raw.split(',') if f.strip()]
+    if not package_name or not fingerprints:
+        # Restituisci array vuoto valido finche non configurato
+        return JsonResponse([], safe=False)
+    data = [{
+        'relation': ['delegate_permission/common.handle_all_urls'],
+        'target': {
+            'namespace': 'android_app',
+            'package_name': package_name,
+            'sha256_cert_fingerprints': fingerprints,
+        },
+    }]
+    response = JsonResponse(data, safe=False)
+    response['Cache-Control'] = 'public, max-age=3600'
+    return response
+
+
+def apple_app_site_association(request):
+    """Serve /.well-known/apple-app-site-association per iOS Universal Links.
+
+    Configurazione via env var:
+      IOS_APP_ID_PREFIX  - Team ID Apple Developer (10 char)
+      IOS_BUNDLE_ID      - Bundle identifier dell'app
+    """
+    team_id = os.environ.get('IOS_APP_ID_PREFIX', '')
+    bundle_id = os.environ.get('IOS_BUNDLE_ID', '')
+    if not team_id or not bundle_id:
+        return JsonResponse({}, safe=False)
+    data = {
+        'applinks': {
+            'apps': [],
+            'details': [{
+                'appID': f'{team_id}.{bundle_id}',
+                'paths': ['/app/*'],
+            }],
+        },
+    }
+    # AASA deve essere servita con Content-Type application/json e SENZA estensione .json
+    response = HttpResponse(_json.dumps(data), content_type='application/json')
+    response['Cache-Control'] = 'public, max-age=3600'
+    return response
 
 
 def _service_worker(request):
@@ -41,6 +98,10 @@ urlpatterns = [
     # PWA: service worker dalla root (scope /) e pagina offline
     path('service-worker.js', _service_worker, name='service-worker'),
     path('offline.html', TemplateView.as_view(template_name='offline.html'), name='offline'),
+
+    # TWA/Universal Links: Digital Asset Links Android + AASA iOS
+    path('.well-known/assetlinks.json', assetlinks_json, name='assetlinks'),
+    path('.well-known/apple-app-site-association', apple_app_site_association, name='aasa'),
 
     # Sistema di Autenticazione
     path('auth/', include('apps.auth_system.urls')),
