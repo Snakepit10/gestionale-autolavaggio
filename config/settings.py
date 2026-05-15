@@ -13,14 +13,27 @@ SECRET_KEY = os.environ.get('SECRET_KEY', 'django-secret-key-for-development-cha
 # Debug - False in produzione
 DEBUG = os.environ.get('DEBUG', 'True').lower() in ('true', '1', 'yes')
 
-# Host consentiti
-ALLOWED_HOSTS = os.environ.get('ALLOWED_HOSTS', '*').split(',') if os.environ.get('ALLOWED_HOSTS') else ['*']
+# Host consentiti (configurabili via env var, default '*' per dev)
+ALLOWED_HOSTS = (
+    [h.strip() for h in os.environ.get('ALLOWED_HOSTS').split(',') if h.strip()]
+    if os.environ.get('ALLOWED_HOSTS')
+    else ['*']
+)
 
-# CSRF trusted origins for Railway
-CSRF_TRUSTED_ORIGINS = [
+# CSRF trusted origins
+# In produzione passare CSRF_TRUSTED_ORIGINS env var (csv).
+# Aggiunti sempre i default di sviluppo + dominio Railway per fallback.
+_csrf_env = os.environ.get('CSRF_TRUSTED_ORIGINS', '').strip()
+_csrf_defaults = [
     'https://gestionale-autolavaggio-production.up.railway.app',
     'http://gestionale-autolavaggio-production.up.railway.app',
+    'https://autolavaggiomasterwash.it',
+    'https://www.autolavaggiomasterwash.it',
 ]
+if _csrf_env:
+    CSRF_TRUSTED_ORIGINS = [o.strip() for o in _csrf_env.split(',') if o.strip()]
+else:
+    CSRF_TRUSTED_ORIGINS = _csrf_defaults
 
 # Applicazioni Django
 INSTALLED_APPS = [
