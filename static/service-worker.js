@@ -6,8 +6,8 @@ self.addEventListener('message', (event) => {
     }
 });
 
-const CACHE_NAME = 'autolavaggio-cache-v6';
-const OFFLINE_CACHE = 'autolavaggio-offline-v6';
+const CACHE_NAME = 'autolavaggio-cache-v7';
+const OFFLINE_CACHE = 'autolavaggio-offline-v7';
 
 // File essenziali da pre-cachare per funzionamento offline
 // (cache.addAll e' atomico: se UNO fallisce, tutto fallisce)
@@ -106,6 +106,14 @@ function shouldBypassSW(url, request) {
     if (request.method !== 'GET') return true;
     // Bypass: cross-origin (CDN bootstrap, ecc.) — gestito comunque dal browser
     if (url.origin !== self.location.origin) return false; // lascia handleFetch decidere
+    // HARD GUARD: SW e' scope /app/ ma alcuni browser potrebbero ancora
+    // farci passare richieste fuori scope. Bypass tutto cio' che non e'
+    // sotto /app/ o asset statici essenziali per /app/.
+    if (!url.pathname.startsWith('/app/') &&
+        !url.pathname.startsWith('/static/') &&
+        url.pathname !== '/offline.html') {
+        return true;
+    }
     // Bypass: root '/' (redirect dinamica HomeView, mai precachare)
     if (url.pathname === '/') return true;
     // Bypass: prefissi

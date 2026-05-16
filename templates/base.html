@@ -281,65 +281,39 @@
     
     {% block extra_js %}{% endblock %}
 
-    <!-- PWA Service Worker registration + update toast -->
+    <!-- IMPORTANT: le pagine staff/operatore non usano il Service Worker.
+         Lo SW e' attivo SOLO sul lato cliente /app/ (in base_public.html).
+         Qui sotto disinstalliamo eventuali SW residui (operatori che hanno
+         visitato il sito quando il SW era globale) per evitare latenza
+         aggiunta e cache stale. -->
     <script>
     (function () {
         if (!('serviceWorker' in navigator)) return;
-
-        function showUpdateToast(reg) {
-            // Toast Bootstrap se disponibile, altrimenti banner sticky
-            var existing = document.getElementById('pwa-update-toast');
-            if (existing) return;
-            var html = ''
-                + '<div id="pwa-update-toast" style="position:fixed;bottom:20px;left:50%;transform:translateX(-50%);'
-                + 'background:#0d6efd;color:#fff;padding:12px 18px;border-radius:10px;box-shadow:0 6px 20px rgba(0,0,0,.18);'
-                + 'z-index:9999;display:flex;align-items:center;gap:10px;font-size:.95rem;">'
-                + '<i class="bi bi-arrow-clockwise"></i>'
-                + '<span>Nuova versione disponibile</span>'
-                + '<button id="pwa-update-btn" style="background:#fff;color:#0d6efd;border:0;padding:6px 14px;border-radius:6px;font-weight:600;cursor:pointer;">Ricarica</button>'
-                + '<button id="pwa-update-dismiss" style="background:transparent;color:#fff;border:0;padding:6px;cursor:pointer;font-size:1.2rem;">&times;</button>'
-                + '</div>';
-            document.body.insertAdjacentHTML('beforeend', html);
-            document.getElementById('pwa-update-btn').addEventListener('click', function () {
-                if (reg && reg.waiting) {
-                    reg.waiting.postMessage({ type: 'SKIP_WAITING' });
-                }
-                window.location.reload();
-            });
-            document.getElementById('pwa-update-dismiss').addEventListener('click', function () {
-                var t = document.getElementById('pwa-update-toast');
-                if (t) t.remove();
-            });
-        }
-
-        window.addEventListener('load', function () {
-            navigator.serviceWorker.register('/service-worker.js', { scope: '/' })
-                .then(function (reg) {
-                    if (!reg) return;
-                    if (reg.waiting) {
-                        showUpdateToast(reg);
-                    }
-                    reg.addEventListener('updatefound', function () {
-                        var nw = reg.installing;
-                        if (!nw) return;
-                        nw.addEventListener('statechange', function () {
-                            if (nw.state === 'installed' && navigator.serviceWorker.controller) {
-                                showUpdateToast(reg);
-                            }
-                        });
+        navigator.serviceWorker.getRegistrations().then(function (regs) {
+            regs.forEach(function (reg) {
+                // Disinstalla solo SW con scope che include la pagina staff
+                // (esclude eventuale SW scope '/app/' del lato cliente).
+                if (reg.scope && reg.scope.indexOf('/app/') === -1) {
+                    reg.unregister().then(function (ok) {
+                        if (ok) console.log('SW staff disinstallato:', reg.scope);
                     });
-                })
-                .catch(function (err) { console.warn('SW registration failed:', err); });
-
-            // Reload quando il nuovo SW prende il controllo
-            var refreshing = false;
-            navigator.serviceWorker.addEventListener('controllerchange', function () {
-                if (refreshing) return;
-                refreshing = true;
-                window.location.reload();
+                }
             });
-        });
+        }).catch(function () {});
+
+        // Pulisci anche le cache create dal SW (autolavaggio-cache-vN, ecc)
+        if ('caches' in window) {
+            caches.keys().then(function (keys) {
+                keys.forEach(function (k) {
+                    if (k.indexOf('autolavaggio-') === 0) {
+                        caches.delete(k);
+                    }
+                });
+            }).catch(function () {});
+        }
     })();
     </script>
+
+    {% block extra_body_end %}{% endblock %}
 </body>
 </html>

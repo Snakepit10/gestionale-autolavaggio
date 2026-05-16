@@ -2740,9 +2740,19 @@ function toggleOraConsegna() {
     }
 }
 
-// Gestione form pagamento
+// Gestione form pagamento (anti double-submit)
+let _pagamentoInFlight = false;
 document.getElementById('form-pagamento').addEventListener('submit', function(e) {
     e.preventDefault();
+    if (_pagamentoInFlight) return;  // ignora click ripetuti mentre la richiesta e' in corso
+    _pagamentoInFlight = true;
+
+    const submitBtn = this.querySelector('button[type="submit"]');
+    const originalLabel = submitBtn ? submitBtn.innerHTML : '';
+    if (submitBtn) {
+        submitBtn.disabled = true;
+        submitBtn.innerHTML = '<span class="spinner-border spinner-border-sm me-1"></span> Registrazione...';
+    }
 
     const ordineId = document.getElementById('ordine-id').value;
     const importo = document.getElementById('importo-pagamento').value;
@@ -2765,11 +2775,7 @@ document.getElementById('form-pagamento').addEventListener('submit', function(e)
     .then(data => {
         if (data.success) {
             bootstrap.Modal.getInstance(document.getElementById('modalPagamento')).hide();
-
-            // Reset form
             document.getElementById('form-pagamento').reset();
-
-            // Mostra messaggio di successo
             const alertDiv = document.createElement('div');
             alertDiv.className = 'alert alert-success alert-dismissible fade show';
             alertDiv.innerHTML = `
@@ -2778,18 +2784,18 @@ document.getElementById('form-pagamento').addEventListener('submit', function(e)
                 <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
             `;
             document.querySelector('.d-flex.justify-content-between').insertAdjacentElement('afterend', alertDiv);
-
-            // Ricarica la pagina dopo 2 secondi
-            setTimeout(() => {
-                location.reload();
-            }, 2000);
+            setTimeout(() => { location.reload(); }, 1200);
         } else {
             alert('Errore: ' + data.error);
+            _pagamentoInFlight = false;
+            if (submitBtn) { submitBtn.disabled = false; submitBtn.innerHTML = originalLabel; }
         }
     })
     .catch(error => {
         console.error('Errore:', error);
         alert('Errore durante la registrazione del pagamento');
+        _pagamentoInFlight = false;
+        if (submitBtn) { submitBtn.disabled = false; submitBtn.innerHTML = originalLabel; }
     });
 });
 
