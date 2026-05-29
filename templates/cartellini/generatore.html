@@ -149,23 +149,56 @@
   .ck-root .setbar .dirty{font-size:11px;color:#b04a3a;font-weight:700;display:none;}
   .ck-root .setbar.is-dirty .dirty{display:inline;}
 
-  /* STAMPA: fronte-retro vero */
+  /* STAMPA: fronte-retro vero
+     A4 = 210x297mm, margin 9mm => area utile 192x279mm.
+     Griglia 2 colonne x 3 righe con celle FISSE = ogni cartellino occupa
+     sempre la stessa posizione/dimensione sia sul fronte che sul retro.
+     Cosi' quando si gira il foglio sul lato lungo, ogni retro cade
+     esattamente dietro al proprio fronte. */
   .ck-root .printsheet{display:none;}
   @media print{
     @page{size:A4;margin:9mm;}
     html,body{background:#fff !important;-webkit-print-color-adjust:exact;print-color-adjust:exact;}
-    /* Nascondi navbar/footer/altri elementi di base */
     body > nav, body > header, body > footer, .navbar, footer { display:none !important; }
     .ck-root .wrap{max-width:none;padding:0;}
     .ck-root header.top,.ck-root .panel,.ck-root .preview-head,.ck-root .sheet,
     .ck-root #saveStatus,.ck-root .setbar{display:none !important;}
     .ck-root .layout{display:block;}
     .ck-root .printsheet{display:block;}
-    .ck-root .pgrid{display:grid;grid-template-columns:repeat(2,1fr);gap:8mm;align-content:start;}
-    .ck-root .page{page-break-after:always;}
+    .ck-root .page{
+      height:279mm;                /* 297 - 2*9mm di @page margin */
+      width:192mm;
+      display:flex;flex-direction:column;
+      page-break-after:always;page-break-inside:avoid;
+      overflow:hidden;
+    }
     .ck-root .page:last-child{page-break-after:auto;}
-    .ck-root .card{box-shadow:none;}
-    .ck-root .page-tag{font-size:9px;text-transform:uppercase;letter-spacing:.1em;color:#999;margin:0 0 4mm;font-weight:700;}
+    .ck-root .page-tag{
+      flex:0 0 auto;font-size:9px;text-transform:uppercase;letter-spacing:.1em;
+      color:#999;margin:0 0 3mm;font-weight:700;height:4mm;
+    }
+    .ck-root .pgrid{
+      flex:1 1 auto;
+      display:grid;
+      grid-template-columns:repeat(2,1fr);
+      grid-template-rows:repeat(3,1fr);   /* 3 righe IDENTICHE in altezza */
+      gap:6mm;
+      min-height:0;
+    }
+    .ck-root .pgrid > div{
+      min-width:0;min-height:0;
+      display:flex;                       /* la card riempie la cella */
+      overflow:hidden;
+    }
+    .ck-root .pgrid > div > .card{
+      width:100%;height:100%;             /* fronte e retro stessa size */
+      box-shadow:none;
+    }
+    /* La parte "registro ordini" del retro si espande per riempire lo
+       spazio rimanente (in modo che la card occupi tutta la cella). */
+    .ck-root .card.back .reg{flex:1 1 auto;}
+    .ck-root .card.back .reg .rr{flex:1 1 0;min-height:0;}
+    .ck-root .card.back .reg .rr div{height:auto;}
   }
 </style>
 {% endblock %}
