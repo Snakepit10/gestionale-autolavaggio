@@ -102,6 +102,12 @@
   .ck-root .pair-tools button:hover{background:#fff;}
 
   /* CARD */
+  /* Reset collisioni con Bootstrap: .card .row .body sono classi Bootstrap.
+     Forziamo margin/padding/width a zero per le sottoclassi della card. */
+  .ck-root .card,
+  .ck-root .card .body,
+  .ck-root .card .row,
+  .ck-root .card .rows{margin:0;padding:0;--bs-gutter-x:0;--bs-gutter-y:0;}
   .ck-root .card{background:#fff;border:2px solid var(--ckink);border-radius:4px;overflow:hidden;font-size:11px;break-inside:avoid;display:flex;flex-direction:column;}
   .ck-root .card .cap{background:var(--card-accent,#1d6f3f);color:#fff;text-align:center;font-weight:800;text-transform:uppercase;letter-spacing:.04em;font-size:13px;padding:8px 6px;line-height:1.2;}
   .ck-root .card .body{display:flex;}
