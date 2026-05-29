@@ -183,17 +183,32 @@
     .ck-root .card.back .reg .rr{flex:1 1 0;min-height:0;}
     .ck-root .card.back .reg .rr div{height:auto;}
 
-    /* ====== Formato A6 fisso (default) ====== */
-    .ck-root .printsheet.pf-a6 .page{height:296mm;}
+    /* ====== Formato A6 nominale ======
+       Celle 95x138mm (rapporto vicino ad A6 105:148) con margini
+       attorno al foglio (8mm) e piccolo gap (4mm) tra cartellini.
+       I margini servono per non perdere i bordi nelle zone
+       non-stampabili della stampante. */
+    .ck-root .printsheet.pf-a6 .page{height:297mm;padding:8mm;}
     .ck-root .printsheet.pf-a6 .pgrid{
       flex:1 1 auto;display:grid;
-      grid-template-columns:105mm 105mm;
-      grid-template-rows:148mm 148mm;
-      gap:0;min-height:0;
+      grid-template-columns:95mm 95mm;
+      grid-template-rows:138mm 138mm;
+      gap:4mm;min-height:0;
+      justify-content:center;align-content:center;
     }
     .ck-root .printsheet.pf-a6 .pgrid > div > .card{
       height:100%;border-radius:0;
     }
+    /* La GRAFICA della card riempie tutta la cella A6:
+       il corpo (.body con .rows e le sue .row) si stira verticalmente
+       per distribuire lo spazio invece di lasciare bianco in fondo. */
+    .ck-root .printsheet.pf-a6 .card .body{flex:1 1 auto;min-height:0;}
+    .ck-root .printsheet.pf-a6 .card .rows{
+      flex:1 1 auto;display:flex;flex-direction:column;min-height:0;
+    }
+    .ck-root .printsheet.pf-a6 .card .rows .row{flex:1 1 0;min-height:0;}
+    .ck-root .printsheet.pf-a6 .card .rows .row .k,
+    .ck-root .printsheet.pf-a6 .card .rows .row .v{align-items:center;}
 
     /* ====== Formato Adattivo (6 per A4, retro adatta al fronte) ====== */
     .ck-root .printsheet.pf-auto .page{height:297mm;padding:6mm;}
@@ -284,7 +299,7 @@
           <button data-pf="auto">Adattivo (6 per A4)</button>
         </div>
         <div class="hint" style="margin-top:6px;">
-          <b>A6</b>: ogni cartellino esattamente 105&times;148mm, fronte e retro combaciano per costruzione.<br>
+          <b>A6</b>: 4 cartellini A6 nominali (95&times;138mm) per A4, con margini di sicurezza attorno al foglio. La grafica riempie tutta la card; fronte e retro combaciano per costruzione.<br>
           <b>Adattivo</b>: 6 cartellini per pagina, il retro si adatta automaticamente all&apos;altezza del fronte.
         </div>
       </div>
