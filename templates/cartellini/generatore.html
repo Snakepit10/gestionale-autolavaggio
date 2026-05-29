@@ -149,15 +149,15 @@
   .ck-root .setbar .dirty{font-size:11px;color:#b04a3a;font-weight:700;display:none;}
   .ck-root .setbar.is-dirty .dirty{display:inline;}
 
-  /* STAMPA: fronte-retro vero, formato A6 (105x148mm).
-     A4 = 210x297mm. 2 colonne x 2 righe = 4 cartellini per pagina,
-     ciascuno esattamente A6 (105x148mm). Margine @page 0 per fare
-     coincidere i bordi del cartellino con le linee di taglio.
-     I bordi neri delle card adiacenti formano automaticamente la
-     linea di taglio (non serve disegnarla).
-     Con celle di dimensione FISSA (105x148mm) ogni retro cade
-     esattamente dietro al proprio fronte quando si gira il foglio
-     sul lato lungo (long-edge duplex). */
+  /* STAMPA: due formati selezionabili.
+     - pf-a6   (default): A6 fisso 105x148mm, 4 per A4 (2x2), celle fisse
+                          => fronte e retro combaciano per costruzione.
+     - pf-auto: 6 per A4 (2x3), celle ad altezza VARIABILE.
+                Lato JS, per ogni cartellino misuriamo l'altezza naturale
+                del FRONTE e la imponiamo anche al RETRO (inline style),
+                cosi' il retro si adatta al fronte (il blocco "registro
+                ordini" si comprime/espande per riempire la stessa altezza
+                del fronte corrispondente). */
   .ck-root .printsheet{display:none;}
   @media print{
     @page{size:A4;margin:0;}
@@ -168,39 +168,43 @@
     .ck-root #saveStatus,.ck-root .setbar{display:none !important;}
     .ck-root .layout{display:block;}
     .ck-root .printsheet{display:block;}
+    .ck-root .page-tag{display:none !important;}
     .ck-root .page{
-      width:210mm;height:296mm;          /* A4 esatto, 4xA6 = 210x296 */
+      width:210mm;
       display:flex;flex-direction:column;
       page-break-after:always;page-break-inside:avoid;
       overflow:hidden;
     }
     .ck-root .page:last-child{page-break-after:auto;}
-    /* Etichetta della pagina (Fronte/Retro): solo schermo, nascosta in stampa
-       per non sottrarre spazio alle 4 celle A6. */
-    .ck-root .page-tag{display:none !important;}
-    .ck-root .pgrid{
-      flex:1 1 auto;
-      display:grid;
-      grid-template-columns:105mm 105mm; /* A6 esatto */
-      grid-template-rows:148mm 148mm;    /* A6 esatto */
-      gap:0;                              /* bordi adiacenti = linea di taglio */
-      min-height:0;
-    }
-    .ck-root .pgrid > div{
-      min-width:0;min-height:0;
-      display:flex;
-      overflow:hidden;
-    }
-    .ck-root .pgrid > div > .card{
-      width:100%;height:100%;            /* fronte e retro stessa size */
-      box-shadow:none;border-radius:0;   /* squadrato per taglio pulito */
-    }
-    /* Il blocco "Registro ordini" del retro si espande per riempire lo
-       spazio rimanente, cosi' la card retro occupa l'intera cella A6
-       come quella fronte (stessa altezza). */
+    .ck-root .pgrid > div{min-width:0;min-height:0;display:flex;overflow:hidden;}
+    .ck-root .pgrid > div > .card{width:100%;box-shadow:none;}
+    /* Per il retro: .reg deve poter assorbire la differenza di altezza */
     .ck-root .card.back .reg{flex:1 1 auto;}
     .ck-root .card.back .reg .rr{flex:1 1 0;min-height:0;}
     .ck-root .card.back .reg .rr div{height:auto;}
+
+    /* ====== Formato A6 fisso (default) ====== */
+    .ck-root .printsheet.pf-a6 .page{height:296mm;}
+    .ck-root .printsheet.pf-a6 .pgrid{
+      flex:1 1 auto;display:grid;
+      grid-template-columns:105mm 105mm;
+      grid-template-rows:148mm 148mm;
+      gap:0;min-height:0;
+    }
+    .ck-root .printsheet.pf-a6 .pgrid > div > .card{
+      height:100%;border-radius:0;
+    }
+
+    /* ====== Formato Adattivo (6 per A4, retro adatta al fronte) ====== */
+    .ck-root .printsheet.pf-auto .page{height:297mm;padding:6mm;}
+    .ck-root .printsheet.pf-auto .pgrid{
+      flex:0 0 auto;display:grid;
+      grid-template-columns:repeat(2,1fr);
+      grid-auto-rows:auto;
+      gap:4mm;align-content:start;
+    }
+    /* il retro si stira esattamente all'altezza imposta inline dal JS */
+    .ck-root .printsheet.pf-auto .pgrid > div > .card.back{height:100%;}
   }
 </style>
 {% endblock %}
@@ -271,6 +275,18 @@
           <button data-back="off">Solo fronte</button>
         </div>
         <div class="hint" style="margin-top:6px;">Senza retro i campi assegnati al retro vengono mostrati sul fronte.</div>
+      </div>
+
+      <div class="ctl">
+        <label>Formato di stampa</label>
+        <div class="seg" id="printFormat">
+          <button data-pf="a6" class="active">A6 (4 per A4)</button>
+          <button data-pf="auto">Adattivo (6 per A4)</button>
+        </div>
+        <div class="hint" style="margin-top:6px;">
+          <b>A6</b>: ogni cartellino esattamente 105&times;148mm, fronte e retro combaciano per costruzione.<br>
+          <b>Adattivo</b>: 6 cartellini per pagina, il retro si adatta automaticamente all&apos;altezza del fronte.
+        </div>
       </div>
 
       <div class="ctl">
@@ -377,6 +393,7 @@ let qrMode = 'none';
 let hasBack = true;
 let hasPos = true;
 let posLabel = 'Posizione';
+let printFormat = 'a6';   // 'a6' | 'auto'
 let photoData = null;
 let draft = {nome:'', pos:''};
 let editingIdx = null;
@@ -462,6 +479,13 @@ document.querySelectorAll('#backMode button').forEach(b=>{
     document.querySelectorAll('#backMode button').forEach(x=>x.classList.remove('active'));
     b.classList.add('active'); hasBack=(b.dataset.back==='on');
     renderSheet(); markDirty();
+  };
+});
+document.querySelectorAll('#printFormat button').forEach(b=>{
+  b.onclick=()=>{
+    document.querySelectorAll('#printFormat button').forEach(x=>x.classList.remove('active'));
+    b.classList.add('active'); printFormat = b.dataset.pf;
+    markDirty();
   };
 });
 document.querySelectorAll('#posMode button').forEach(b=>{
@@ -767,24 +791,75 @@ document.getElementById('addAllBtn').onclick=()=>{
   renderSheet(); markDirty();
 };
 
-/* ---- STAMPA ---- */
+/* ---- STAMPA ----
+   Due formati:
+   - 'a6'  : 4 per A4 (2x2), 105x148mm fissi. Fronte e retro combaciano
+             per costruzione.
+   - 'auto': 6 per A4 (2x3), altezze libere. Per ogni cartellino misuro
+             l'altezza naturale del fronte e la impongo al retro
+             (inline style) -> il retro si adatta al fronte. */
+
+/* Misura l'altezza naturale del fronte di ogni cartellino, dentro un
+   container off-screen della stessa larghezza che avra' in stampa. */
+function measureFrontHeights(arr, cellWidthMm){
+  const wrap = document.createElement('div');
+  wrap.className = 'ck-root';
+  wrap.style.cssText = 'position:absolute;left:-99999px;top:0;visibility:hidden;pointer-events:none;width:'+cellWidthMm+'mm;';
+  document.body.appendChild(wrap);
+  const heights = arr.map(c=>{
+    wrap.innerHTML = frontHTML(c);
+    const card = wrap.querySelector('.card');
+    return card ? card.offsetHeight : 200;
+  });
+  document.body.removeChild(wrap);
+  return heights;
+}
+
 document.getElementById('printBtn').onclick=()=>{
   if(!cards.length){alert('Aggiungi almeno un cartellino.');return;}
   const ps=document.getElementById('printSheet'); ps.innerHTML='';
-  // Formato A6 (105x148mm) su A4: 2 colonne x 2 righe = 4 per pagina.
-  const PER_ROW=2, PER_PAGE=4;
+  ps.className = 'printsheet pf-'+printFormat;
+
+  // PER_PAGE dipende dal formato
+  const PER_ROW = 2;
+  const PER_PAGE = (printFormat==='a6') ? 4 : 6;
+
   const withBack = cards.filter(c=>c.hasBack!==false);
   const noBack   = cards.filter(c=>c.hasBack===false);
 
-  // card con retro: fronte + retro alternati, retro a specchio per colonna
+  // Solo per formato 'auto': pre-misura altezze del fronte (in px)
+  // cellWidth in 'auto' = (210 - 6*2 padding - 4 gap) / 2 = 97mm
+  let hFrontMap = null;
+  if(printFormat==='auto'){
+    const allWithBack = withBack;
+    const heights = measureFrontHeights(allWithBack, 97);
+    hFrontMap = new Map();
+    allWithBack.forEach((c,i)=>hFrontMap.set(c, heights[i]));
+  }
+
+  // === card con retro: fronte + retro alternati, retro speculato per colonna ===
   for(let start=0; start<withBack.length; start+=PER_PAGE){
     const slice=withBack.slice(start,start+PER_PAGE);
+
+    // pagina fronte
     const pF=document.createElement('div'); pF.className='page';
-    pF.innerHTML='<div class="page-tag">Fronte (con retro) — stampa, poi gira il foglio sul lato lungo</div>';
+    pF.innerHTML='<div class="page-tag">Fronte (con retro)</div>';
     const gF=document.createElement('div'); gF.className='pgrid';
-    slice.forEach(c=>{const d=document.createElement('div');d.innerHTML=frontHTML(c);gF.appendChild(d);});
+    slice.forEach(c=>{
+      const d=document.createElement('div');
+      d.innerHTML=frontHTML(c);
+      // In 'auto' fissiamo l'altezza del fronte alla sua naturale (no-op
+      // pratico ma rende esplicita la dimensione che il retro replichera').
+      if(hFrontMap){
+        const h = hFrontMap.get(c);
+        const card = d.querySelector('.card');
+        if(card && h) card.style.height = h + 'px';
+      }
+      gF.appendChild(d);
+    });
     pF.appendChild(gF); ps.appendChild(pF);
 
+    // pagina retro (speculata per colonna)
     const pB=document.createElement('div'); pB.className='page';
     pB.innerHTML='<div class="page-tag">Retro</div>';
     const gB=document.createElement('div'); gB.className='pgrid';
@@ -794,14 +869,26 @@ document.getElementById('printBtn').onclick=()=>{
       if(rowItems.length===PER_ROW){mirrored.push(rowItems[1],rowItems[0]);}
       else{mirrored.push(rowItems[0]);}
     }
-    mirrored.forEach(c=>{const d=document.createElement('div');d.innerHTML=backHTML(c);gB.appendChild(d);});
+    mirrored.forEach(c=>{
+      const d=document.createElement('div');
+      d.innerHTML=backHTML(c);
+      // In 'auto': il retro PRENDE l'altezza del proprio fronte.
+      // Il blocco .reg si comprime/espande per riempire questa altezza.
+      if(hFrontMap){
+        const h = hFrontMap.get(c);
+        const card = d.querySelector('.card');
+        if(card && h) card.style.height = h + 'px';
+      }
+      gB.appendChild(d);
+    });
     pB.appendChild(gB); ps.appendChild(pB);
   }
-  // card solo fronte: pagine di soli fronti
+
+  // === card solo fronte ===
   for(let start=0; start<noBack.length; start+=PER_PAGE){
     const slice=noBack.slice(start,start+PER_PAGE);
     const p=document.createElement('div'); p.className='page';
-    p.innerHTML='<div class="page-tag">Solo fronte (senza retro)</div>';
+    p.innerHTML='<div class="page-tag">Solo fronte</div>';
     const g=document.createElement('div'); g.className='pgrid';
     slice.forEach(c=>{const d=document.createElement('div');d.innerHTML=frontHTML(c);g.appendChild(d);});
     p.appendChild(g); ps.appendChild(p);
@@ -813,7 +900,8 @@ document.getElementById('printBtn').onclick=()=>{
 function currentState(){
   return {
     _v:1, _app:'kanban-cartellini', _saved:new Date().toISOString(),
-    fields, cardColor, qrMode, hasBack, hasPos, posLabel, library:LIBRARY, cards
+    fields, cardColor, qrMode, hasBack, hasPos, posLabel, printFormat,
+    library:LIBRARY, cards
   };
 }
 function applyState(s){
@@ -824,6 +912,7 @@ function applyState(s){
   hasBack   = (s.hasBack!==false);
   hasPos    = (s.hasPos!==false);
   posLabel  = s.posLabel || 'Posizione';
+  printFormat = (s.printFormat === 'auto') ? 'auto' : 'a6';
   LIBRARY   = Array.isArray(s.library) && s.library.length ? s.library : DEFAULT_LIBRARY.map(p=>({...p}));
   cards     = Array.isArray(s.cards) ? s.cards : [];
   editingIdx=null; setEditUI(false);
@@ -831,6 +920,7 @@ function applyState(s){
   document.querySelectorAll('#qrMode button').forEach(b=>b.classList.toggle('active', b.dataset.qr===qrMode));
   document.querySelectorAll('#backMode button').forEach(b=>b.classList.toggle('active', (b.dataset.back==='on')===hasBack));
   document.querySelectorAll('#posMode button').forEach(b=>b.classList.toggle('active', (b.dataset.pos==='on')===hasPos));
+  document.querySelectorAll('#printFormat button').forEach(b=>b.classList.toggle('active', b.dataset.pf===printFormat));
   document.getElementById('posLabel').value=posLabel; document.getElementById('posLabel').disabled=!hasPos;
   updateQrControls();
   renderSwatches(); renderFieldList(); renderValueInputs(); renderLibrary(); renderSheet();
@@ -977,6 +1067,7 @@ function resetToDefault(){
     _app:'kanban-cartellini',
     fields: DEFAULT_FIELDS.map(f=>({...f})),
     cardColor: PALETTE[0], qrMode:'none', hasBack:true, hasPos:true, posLabel:'Posizione',
+    printFormat:'a6',
     library: DEFAULT_LIBRARY.map(p=>({...p})), cards: [],
   });
 }
