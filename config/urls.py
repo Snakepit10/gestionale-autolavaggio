@@ -130,6 +130,9 @@ urlpatterns = [
     # Turni operatore
     path('turni/', include('apps.turni.urls', namespace='turni')),
 
+    # Cartellini Kanban (etichette magazzino two-bin)
+    path('cartellini/', include('apps.cartellini.urls', namespace='cartellini')),
+
     # path('shop/', include('apps.shop.urls')),
     # path('cassa/', include('apps.ordini.urls', namespace='cassa')),
     # path('report/', include('apps.reportistica.urls')),  # Temporarily disabled

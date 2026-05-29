@@ -1,0 +1,1005 @@
+{% extends "base.html" %}
+{% load static %}
+
+{% block title %}Cartellini Kanban &middot; Gestionale{% endblock %}
+
+{% block extra_css %}
+<style>
+  /* === Generatore Cartellini Kanban — stili identici al file standalone === */
+  :root{
+    --ckink:#14110d; --ckpaper:#f7f4ee; --ckline:#d9d2c4; --ckpanel:#ffffff;
+    --ckaccent:#1d6f3f; --ckaccent-soft:#e7f0ea; --ckfield-bg:#fbf8ee;
+    --ckshadow:0 1px 0 rgba(0,0,0,.04), 0 8px 28px -16px rgba(0,0,0,.35);
+  }
+  .ck-root *{box-sizing:border-box;}
+  .ck-root{color:var(--ckink);font-family:"Helvetica Neue",Helvetica,Arial,sans-serif;line-height:1.45;-webkit-font-smoothing:antialiased;}
+  .ck-root .card,.ck-root .card *{-webkit-print-color-adjust:exact;print-color-adjust:exact;}
+  .ck-root .wrap{max-width:1240px;margin:0 auto;padding:18px 16px 60px;}
+  .ck-root header.top{display:flex;align-items:flex-end;justify-content:space-between;gap:24px;
+    border-bottom:2px solid var(--ckink);padding-bottom:16px;margin-bottom:22px;flex-wrap:wrap;}
+  .ck-root header.top h1{font-size:24px;margin:0;letter-spacing:-.01em;font-weight:800;}
+  .ck-root header.top .sub{font-size:13px;color:#6a6256;margin-top:4px;max-width:560px;}
+  .ck-root .badge-ck{font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.08em;
+    background:var(--ckink);color:var(--ckpaper);padding:5px 10px;border-radius:2px;}
+  .ck-root .layout{display:grid;grid-template-columns:380px 1fr;gap:28px;align-items:start;}
+  @media (max-width:980px){.ck-root .layout{grid-template-columns:1fr;}}
+
+  .ck-root .panel{background:var(--ckpanel);border:1px solid var(--ckline);border-radius:10px;
+    box-shadow:var(--ckshadow);padding:18px;position:sticky;top:18px;}
+  @media (max-width:980px){.ck-root .panel{position:static;}}
+  .ck-root .panel h2{font-size:13px;text-transform:uppercase;letter-spacing:.1em;margin:0 0 14px;color:#6a6256;}
+  .ck-root .ctl{margin-bottom:14px;}
+  .ck-root .ctl label{display:block;font-size:12px;font-weight:700;margin-bottom:5px;}
+  .ck-root .ctl input[type=text],.ck-root .ctl textarea,.ck-root .ctl select{width:100%;font:inherit;font-size:13px;padding:8px 9px;
+    border:1px solid var(--ckline);border-radius:6px;background:var(--ckfield-bg);color:var(--ckink);}
+  .ck-root .ctl input:focus,.ck-root .ctl textarea:focus,.ck-root .ctl select:focus{outline:2px solid var(--ckaccent);outline-offset:0;border-color:transparent;}
+  .ck-root .hint{font-size:11px;color:#8a8275;}
+
+  .ck-root .swatches{display:flex;gap:8px;flex-wrap:wrap;margin-top:4px;}
+  .ck-root .swatch{width:30px;height:30px;border-radius:6px;border:2px solid #fff;box-shadow:0 0 0 1px var(--ckline);cursor:pointer;}
+  .ck-root .swatch.active{box-shadow:0 0 0 2px var(--ckink);}
+  .ck-root .color-row{display:flex;align-items:center;gap:10px;margin-top:8px;}
+  .ck-root .color-row input[type=color]{width:42px;height:34px;border:1px solid var(--ckline);border-radius:6px;background:none;padding:2px;cursor:pointer;}
+
+  .ck-root .seg{display:flex;border:1px solid var(--ckline);border-radius:6px;overflow:hidden;}
+  .ck-root .seg button{flex:1;font:inherit;font-size:11px;font-weight:700;padding:8px 4px;border:0;background:var(--ckfield-bg);cursor:pointer;color:#6a6256;}
+  .ck-root .seg button.active{background:var(--ckink);color:var(--ckpaper);}
+
+  .ck-root .fieldlist{border:1px solid var(--ckline);border-radius:8px;overflow:hidden;}
+  .ck-root .fieldlist .frow{display:flex;align-items:center;gap:6px;padding:7px 9px;border-bottom:1px solid var(--ckline);background:var(--ckfield-bg);}
+  .ck-root .fieldlist .frow:last-child{border-bottom:0;}
+  .ck-root .fieldlist .frow input[type=checkbox]{width:16px;height:16px;accent-color:var(--ckaccent);}
+  .ck-root .fieldlist .frow .fname{flex:1;font-size:12px;font-weight:600;}
+  .ck-root .fieldlist .frow .sideSel{font:inherit;font-size:10px;padding:2px 3px;border:1px solid var(--ckline);border-radius:4px;background:#fff;color:var(--ckink);}
+  .ck-root .fieldlist .frow .mv{border:1px solid var(--ckline);background:#fff;color:var(--ckink);cursor:pointer;font-size:11px;line-height:1;width:22px;height:22px;border-radius:4px;}
+  .ck-root .fieldlist .frow .mv:disabled{opacity:.3;cursor:default;}
+  .ck-root .fieldlist .frow .del{border:0;background:none;color:#b04a3a;cursor:pointer;font-size:14px;line-height:1;padding:2px 4px;border-radius:4px;}
+  .ck-root .fieldlist .frow .del:hover{background:#f3dcd7;}
+
+  .ck-root .addfield{display:flex;gap:6px;margin-top:8px;}
+  .ck-root .addfield input{flex:1;}
+  .ck-root .btn-ck{font:inherit;font-weight:700;font-size:12px;border:1px solid var(--ckink);background:var(--ckink);color:var(--ckpaper);padding:8px 12px;border-radius:6px;cursor:pointer;}
+  .ck-root .btn-ck.ghost{background:none;color:var(--ckink);}
+  .ck-root .btn-ck:hover{opacity:.88;}
+  .ck-root .btn-row{display:flex;gap:8px;flex-wrap:wrap;margin-top:6px;}
+
+  .ck-root details.group{border-top:1px solid var(--ckline);margin-top:6px;padding-top:12px;}
+  .ck-root details.group summary{cursor:pointer;font-size:12px;text-transform:uppercase;letter-spacing:.08em;font-weight:800;color:#6a6256;list-style:none;margin-bottom:10px;}
+  .ck-root details.group summary::-webkit-details-marker{display:none;}
+  .ck-root details.group summary::before{content:"▸ ";color:var(--ckaccent);}
+  .ck-root details.group[open] summary::before{content:"▾ ";}
+
+  .ck-root .libgrid{display:flex;flex-direction:column;gap:5px;max-height:230px;overflow:auto;padding-right:4px;}
+  .ck-root .libgrid .lirow{display:flex;align-items:center;gap:4px;border:1px solid var(--ckline);background:var(--ckfield-bg);border-radius:6px;padding:4px 6px;}
+  .ck-root .libgrid .lirow:hover{border-color:var(--ckaccent);background:var(--ckaccent-soft);}
+  .ck-root .libgrid .lirow .pick{flex:1;text-align:left;font:inherit;font-size:12px;padding:5px 4px;border:0;background:none;cursor:pointer;display:flex;justify-content:space-between;gap:8px;color:var(--ckink);}
+  .ck-root .libgrid .lirow .pick .sup{font-size:10px;color:#8a8275;font-weight:700;}
+  .ck-root .libgrid .lirow .lact{border:0;background:none;cursor:pointer;font-size:13px;line-height:1;padding:4px 5px;border-radius:4px;color:#6a6256;}
+  .ck-root .libgrid .lirow .lact:hover{background:#fff;color:var(--ckink);}
+  .ck-root .libgrid .lirow .lact.del:hover{color:#b04a3a;}
+
+  .ck-root .thumb{margin-top:8px;display:flex;align-items:center;gap:10px;}
+  .ck-root .thumb img{width:48px;height:48px;object-fit:contain;border:1px solid var(--ckline);border-radius:6px;background:#fff;}
+  .ck-root .thumb button{font-size:11px;}
+
+  .ck-root .preview-head{display:flex;align-items:center;justify-content:space-between;gap:16px;margin-bottom:14px;flex-wrap:wrap;}
+  .ck-root .preview-head .ttl{font-size:13px;text-transform:uppercase;letter-spacing:.1em;color:#6a6256;font-weight:700;}
+  .ck-root .preview-head .actions{display:flex;gap:8px;flex-wrap:wrap;}
+
+  .ck-root .sheet{background:var(--ckaccent-soft);border:1px dashed var(--ckline);border-radius:10px;padding:20px;min-height:360px;
+    display:grid;grid-template-columns:repeat(auto-fill,minmax(620px,1fr));gap:22px;align-content:start;}
+  @media (max-width:1100px){.ck-root .sheet{grid-template-columns:1fr;}}
+
+  /* coppia fronte/retro affiancata in anteprima */
+  .ck-root .pair{position:relative;display:grid;grid-template-columns:1fr 1fr;gap:14px;background:#fff;border:1px solid var(--ckline);border-radius:8px;padding:14px;box-shadow:var(--ckshadow);}
+  .ck-root .pair.editing{border:2px solid var(--ckaccent);box-shadow:0 0 0 3px var(--ckaccent-soft);}
+  .ck-root .pair.single{grid-template-columns:1fr;max-width:340px;}
+  .ck-root .pair .face-label{position:absolute;top:-9px;background:var(--ckink);color:#fff;font-size:9px;font-weight:700;letter-spacing:.1em;padding:2px 7px;border-radius:3px;text-transform:uppercase;}
+  .ck-root .pair .face-label.fl-front{left:14px;}
+  .ck-root .pair .face-label.fl-back{left:50%;margin-left:7px;}
+  .ck-root .pair-tools{position:absolute;top:6px;right:6px;display:flex;gap:4px;z-index:3;}
+  .ck-root .pair-tools button{border:0;background:rgba(255,255,255,.9);border:1px solid var(--ckline);border-radius:4px;width:24px;height:24px;cursor:pointer;font-size:13px;line-height:1;color:var(--ckink);}
+  .ck-root .pair-tools button:hover{background:#fff;}
+
+  /* CARD */
+  .ck-root .card{background:#fff;border:2px solid var(--ckink);border-radius:4px;overflow:hidden;font-size:11px;break-inside:avoid;display:flex;flex-direction:column;}
+  .ck-root .card .cap{background:var(--card-accent,#1d6f3f);color:#fff;text-align:center;font-weight:800;text-transform:uppercase;letter-spacing:.04em;font-size:13px;padding:8px 6px;line-height:1.2;}
+  .ck-root .card .body{display:flex;}
+  .ck-root .card .pic{border-bottom:1px solid var(--ckink);background:#fff;display:flex;align-items:center;justify-content:center;padding:6px;height:96px;}
+  .ck-root .card .pic img{max-width:100%;max-height:84px;width:auto;height:auto;object-fit:contain;display:block;}
+  .ck-root .card .rows{flex:1;}
+  .ck-root .card .row{display:flex;border-bottom:1px solid var(--ckink);}
+  .ck-root .card .row:last-child{border-bottom:0;}
+  .ck-root .card .k{flex:0 0 44%;background:var(--ckfield-bg);font-weight:800;text-transform:uppercase;font-size:9px;padding:5px 6px;border-right:1px solid var(--ckink);display:flex;align-items:center;}
+  .ck-root .card .v{flex:1;padding:5px 6px;display:flex;align-items:center;min-height:22px;font-size:11px;}
+  .ck-root .card .pos{border-top:2px solid var(--ckink);text-align:center;font-weight:800;text-transform:uppercase;font-size:11px;padding:6px;letter-spacing:.06em;}
+  .ck-root .card .qr{border-top:1px dashed var(--ckink);display:flex;align-items:center;gap:8px;padding:8px;justify-content:center;}
+  .ck-root .card .qr img,.ck-root .card .qr .qrbox{width:74px;height:74px;flex:0 0 74px;}
+  .ck-root .card .qr .qrbox{border:1px dashed #b9b1a2;border-radius:4px;display:flex;align-items:center;justify-content:center;font-size:8px;color:#9a9182;text-align:center;padding:4px;text-transform:uppercase;font-weight:700;}
+  .ck-root .card .qr .qrlabel{font-size:9px;color:#6a6256;font-weight:700;text-transform:uppercase;letter-spacing:.04em;}
+
+  /* RETRO */
+  .ck-root .card.back .taken{text-align:center;padding:10px 8px;border-bottom:2px solid var(--ckink);}
+  .ck-root .card.back .taken b{color:#c0392b;font-size:16px;font-weight:800;text-transform:uppercase;letter-spacing:.04em;display:block;}
+  .ck-root .card.back .taken small{display:block;font-size:9px;color:#6a6256;margin-top:3px;text-transform:uppercase;letter-spacing:.04em;}
+  .ck-root .card.back .backfields{border-top:1px solid var(--ckink);}
+  .ck-root .card.back .backfields .row .k{flex:0 0 44%;}
+  .ck-root .card.back .reg{flex:1;display:flex;flex-direction:column;border-top:2px solid var(--ckink);}
+  .ck-root .card.back .reg .rtitle{font-size:8.5px;font-weight:800;text-transform:uppercase;letter-spacing:.05em;color:#6a6256;padding:5px 6px 3px;background:#fff;}
+  .ck-root .card.back .reg .rh{display:flex;background:var(--ckfield-bg);border-bottom:1px solid var(--ckink);border-top:1px solid var(--ckink);}
+  .ck-root .card.back .reg .rh div{flex:1;font-size:8.5px;font-weight:800;text-transform:uppercase;letter-spacing:.02em;padding:5px 4px;text-align:center;border-right:1px solid var(--ckink);}
+  .ck-root .card.back .reg .rh div:last-child{border-right:0;}
+  .ck-root .card.back .reg .rr{display:flex;border-bottom:1px solid #c9c2b4;}
+  .ck-root .card.back .reg .rr div{flex:1;height:22px;border-right:1px solid #c9c2b4;}
+  .ck-root .card.back .reg .rr div:last-child{border-right:0;}
+  .ck-root .card.back .reg .rr:last-child{border-bottom:0;}
+
+  .ck-root .empty{grid-column:1/-1;text-align:center;color:#8a8275;font-size:13px;padding:50px 10px;}
+
+  /* Barra "Set salvati" */
+  .ck-root .setbar{display:flex;flex-wrap:wrap;gap:8px;align-items:center;background:var(--ckfield-bg);
+    border:1px solid var(--ckline);border-radius:8px;padding:10px 12px;margin-bottom:14px;}
+  .ck-root .setbar select{flex:1 1 240px;min-width:0;font-size:13px;padding:7px 8px;border:1px solid var(--ckline);border-radius:6px;background:#fff;color:var(--ckink);}
+  .ck-root .setbar .dirty{font-size:11px;color:#b04a3a;font-weight:700;display:none;}
+  .ck-root .setbar.is-dirty .dirty{display:inline;}
+
+  /* STAMPA: fronte-retro vero */
+  .ck-root .printsheet{display:none;}
+  @media print{
+    @page{size:A4;margin:9mm;}
+    html,body{background:#fff !important;-webkit-print-color-adjust:exact;print-color-adjust:exact;}
+    /* Nascondi navbar/footer/altri elementi di base */
+    body > nav, body > header, body > footer, .navbar, footer { display:none !important; }
+    .ck-root .wrap{max-width:none;padding:0;}
+    .ck-root header.top,.ck-root .panel,.ck-root .preview-head,.ck-root .sheet,
+    .ck-root #saveStatus,.ck-root .setbar{display:none !important;}
+    .ck-root .layout{display:block;}
+    .ck-root .printsheet{display:block;}
+    .ck-root .pgrid{display:grid;grid-template-columns:repeat(2,1fr);gap:8mm;align-content:start;}
+    .ck-root .page{page-break-after:always;}
+    .ck-root .page:last-child{page-break-after:auto;}
+    .ck-root .card{box-shadow:none;}
+    .ck-root .page-tag{font-size:9px;text-transform:uppercase;letter-spacing:.1em;color:#999;margin:0 0 4mm;font-weight:700;}
+  }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="ck-root">
+<div class="wrap">
+  <header class="top">
+    <div>
+      <h1>Generatore Cartellini Kanban</h1>
+      <div class="sub">Etichette di riordino &ldquo;two-bin&rdquo; fronte-retro. Personalizza colore, campi, foto e QR. Stampa in fronte-retro: il fronte &egrave; la scheda, il retro il registro ordini.</div>
+    </div>
+    <span class="badge-ck">Autolavaggio &middot; Magazzino</span>
+  </header>
+
+  <div class="layout">
+    <aside class="panel">
+      <h2>Configura cartellino</h2>
+
+      {# === Barra Set salvati (persistenza DB) === #}
+      <div class="setbar" id="setBar">
+        <select id="setSelector" title="Set salvati"></select>
+        <button class="btn-ck" id="btnSetSave" title="Salva sul set corrente">&#128190; Salva</button>
+        <button class="btn-ck ghost" id="btnSetSaveAs" title="Salva come nuovo set">&#128194; Salva come&hellip;</button>
+        <button class="btn-ck ghost" id="btnSetDup" title="Duplica set">&#10697; Duplica</button>
+        <button class="btn-ck ghost" id="btnSetDel" title="Elimina set">&#10005; Elimina</button>
+        <span class="dirty">&bull; modificato</span>
+      </div>
+
+      <div class="ctl">
+        <label>Colore della card</label>
+        <div class="swatches" id="swatches"></div>
+        <div class="color-row">
+          <input type="color" id="customColor" value="#1d6f3f">
+          <span class="hint">o colore personalizzato</span>
+        </div>
+      </div>
+
+      <div class="ctl">
+        <label>QR del cartellino</label>
+        <div class="seg" id="qrMode">
+          <button data-qr="none" class="active">Nessun QR</button>
+          <button data-qr="placeholder">Riquadro vuoto</button>
+          <button data-qr="auto">Genera QR</button>
+        </div>
+        <div id="qrTextWrap" style="margin-top:8px;display:none;">
+          <input type="text" id="qrText" placeholder="Contenuto del QR: URL o testo">
+        </div>
+        <div id="qrLabelWrap" style="margin-top:8px;display:none;">
+          <input type="text" id="qrLabel" placeholder="Etichetta sotto il QR">
+        </div>
+        <div class="hint" id="qrHint" style="margin-top:6px;display:none;">Puoi puntare a un riordino, una scheda prodotto, una SOP&hellip;</div>
+      </div>
+
+      <div class="ctl">
+        <label>Foto prodotto</label>
+        <input type="file" id="photoInput" accept="image/*" style="font-size:12px;">
+        <div class="thumb" id="thumbWrap" style="display:none;">
+          <img id="thumbImg" alt="">
+          <button class="btn-ck ghost" id="removePhoto">Rimuovi foto</button>
+        </div>
+      </div>
+
+      <div class="ctl">
+        <label>Retro del cartellino</label>
+        <div class="seg" id="backMode">
+          <button data-back="on" class="active">Con retro (registro)</button>
+          <button data-back="off">Solo fronte</button>
+        </div>
+        <div class="hint" style="margin-top:6px;">Senza retro i campi assegnati al retro vengono mostrati sul fronte.</div>
+      </div>
+
+      <div class="ctl">
+        <label>Fascia posizione</label>
+        <div class="seg" id="posMode">
+          <button data-pos="on" class="active">Mostra</button>
+          <button data-pos="off">Nascondi</button>
+        </div>
+        <input type="text" id="posLabel" placeholder="Etichetta (default: Posizione)" style="margin-top:8px;">
+      </div>
+
+      <details class="group" open>
+        <summary>Campi del cartellino</summary>
+        <div class="fieldlist" id="fieldList"></div>
+        <div class="addfield">
+          <input type="text" id="newFieldName" placeholder="Nuovo campo (es. Lotto)">
+          <button class="btn-ck" id="addFieldBtn">+</button>
+        </div>
+        <div class="hint" style="margin-top:6px;">Spunta = visibile &middot; frecce = ordine &middot; &#10005; = rimuovi</div>
+      </details>
+
+      <details class="group" open>
+        <summary>Dati del prodotto</summary>
+        <div id="valueInputs"></div>
+        <div class="btn-row">
+          <button class="btn-ck" id="addCardBtn">Aggiungi cartellino</button>
+          <button class="btn-ck ghost" id="cancelEditBtn" style="display:none;">Annulla modifica</button>
+          <button class="btn-ck ghost" id="clearFormBtn">Svuota campi</button>
+        </div>
+      </details>
+
+      <details class="group">
+        <summary>Libreria prodotti</summary>
+        <div class="hint" style="margin-bottom:8px;">Click su un prodotto per precompilare i campi &middot; &#9998; per modificare &middot; &#10005; per eliminare</div>
+        <div class="libgrid" id="libGrid"></div>
+        <div class="btn-row" style="margin-top:10px;">
+          <button class="btn-ck ghost" id="libAddBtn">+ Nuovo prodotto</button>
+          <button class="btn-ck ghost" id="libExportBtn">&darr; Esporta JSON</button>
+          <button class="btn-ck ghost" id="libImportBtn">&uarr; Importa JSON</button>
+          <input type="file" id="libImportInput" accept=".json,application/json" style="display:none;">
+        </div>
+        <div id="libEditor" style="display:none;margin-top:10px;border:1px solid var(--ckline);border-radius:8px;padding:10px;background:var(--ckfield-bg);">
+          <div class="ctl"><label>Nome</label><input type="text" id="leNome"></div>
+          <div class="ctl"><label>Area / Postazione</label><input type="text" id="leArea" placeholder="es. Post.1, Self&hellip;"></div>
+          <div class="ctl"><label>Fornitore</label><input type="text" id="leForn"></div>
+          <div class="ctl"><label>Usato per</label><input type="text" id="leUso"></div>
+          <div class="ctl"><label>Ordina quando</label><input type="text" id="leOrdina"></div>
+          <div class="ctl"><label>Quanto ordinare</label><input type="text" id="leQuanto"></div>
+          <div class="ctl"><label>Tempi di consegna</label><input type="text" id="leTempi"></div>
+          <div class="btn-row">
+            <button class="btn-ck" id="leSaveBtn">Salva</button>
+            <button class="btn-ck ghost" id="leCancelBtn">Annulla</button>
+          </div>
+        </div>
+      </details>
+    </aside>
+
+    <section>
+      <div class="preview-head">
+        <span class="ttl">Anteprima &middot; fronte + retro</span>
+        <div class="actions">
+          <button class="btn-ck ghost" id="addAllBtn">Aggiungi tutti i prodotti</button>
+          <button class="btn-ck ghost" id="exportFileBtn" title="Esporta config su file">&darr; JSON</button>
+          <button class="btn-ck ghost" id="importFileBtn" title="Importa config da file">&uarr; JSON</button>
+          <input type="file" id="loadInput" accept=".json,application/json" style="display:none;">
+          <button class="btn-ck ghost" id="clearAllBtn">Svuota foglio</button>
+          <button class="btn-ck" id="printBtn">Stampa fronte-retro</button>
+        </div>
+      </div>
+      <div class="hint" id="saveStatus" style="margin:-6px 0 10px;min-height:14px;"></div>
+      <div class="sheet" id="sheet">
+        <div class="empty">Nessun cartellino. Compila i dati a sinistra e premi &ldquo;Aggiungi cartellino&rdquo;, oppure scegli un prodotto dalla libreria.</div>
+      </div>
+    </section>
+  </div>
+</div>
+
+<!-- contenitore di stampa (riempito al volo) -->
+<div class="printsheet" id="printSheet"></div>
+</div>{# /.ck-root #}
+{% endblock %}
+
+{% block extra_js %}
+{% verbatim %}
+<script>
+(function(){
+const REG_ROWS = 6;
+const DEFAULT_QR_LABEL = 'Scansiona per riordinare';
+
+const DEFAULT_FIELDS = [
+  {id:'nostro',  name:'Nostro cod',        on:true, side:'front'},
+  {id:'codforn', name:'Cod fornitore',     on:true, side:'front'},
+  {id:'uso',     name:'Usato per',         on:true, side:'front'},
+  {id:'forn',    name:'Fornitore',         on:true, side:'back'},
+  {id:'ordina',  name:'Ordina quando',     on:true, side:'back'},
+  {id:'quanto',  name:'Quanto ordinare',   on:true, side:'back'},
+  {id:'tempi',   name:'Tempi di consegna', on:true, side:'front'},
+];
+let fields = DEFAULT_FIELDS.map(f=>({...f}));
+
+const PALETTE = ['#1d6f3f','#c0392b','#2c6fa6','#d68910','#7d3c98','#16a085','#34495e','#000000'];
+let cardColor = PALETTE[0];
+let qrMode = 'none';
+let hasBack = true;
+let hasPos = true;
+let posLabel = 'Posizione';
+let photoData = null;
+let draft = {nome:'', pos:''};
+let editingIdx = null;
+
+const DEFAULT_LIBRARY = [
+  {nome:'Supermafrasol', forn:'Ma-Fra', uso:'Sgrassante carrozzeria', area:'Post.1'},
+  {nome:'Valido', forn:'Ma-Fra', uso:'Prelavaggio manuale', area:'Post.1'},
+  {nome:'Unika Lava Foam PR2', forn:'Ma-Fra', uso:'Prelavaggio schiumogeno', area:'Post.1'},
+  {nome:'Killer 25 kg', forn:'Giovanni Galanti', uso:'Insetti e organico', area:'Post.1', ordina:'Solo 1 presente', quanto:'1', tempi:'7 giorni'},
+  {nome:'AK 47', forn:'Ma-Fra', uso:'Sgrassante mezzi pesanti', area:'Post.1'},
+  {nome:'HP12', forn:'Ma-Fra', uso:'Sgrassante moto/motori', area:'Post.1'},
+  {nome:'Fall-Out Iron Remover', forn:'Ma-Fra', uso:'Decontaminante ferrico', area:'Post.1'},
+  {nome:'Cromobrill 2G', forn:'Ma-Fra', uso:'Acido cerchi/metalli', area:'Post.1'},
+  {nome:'Mafrasol', forn:'Ma-Fra', uso:'Polish spazzole', area:'Post.2'},
+  {nome:'White Schiuma Attiva 4G', forn:'Ma-Fra', uso:'Schiumogeno spazzole', area:'Post.2'},
+  {nome:'WS ShampooClean', forn:'AUWA/WashTec', uso:'Shampoo acido spazzole', area:'Post.2'},
+  {nome:'FoamPolish Extra', forn:'AUWA/WashTec', uso:'Schiuma cera', area:'Post.2'},
+  {nome:'DryTecs', forn:'AUWA/WashTec', uso:'Additivo asciugatura', area:'Post.2'},
+  {nome:'Power Wheel', forn:'Ma-Fra', uso:'Pulitore cerchi portale', area:'Post.2'},
+  {nome:'WheelClean Extra', forn:'AUWA/WashTec', uso:'Cerchi alcalino forte', area:'Post.2'},
+  {nome:'PreLavan Perfume', forn:'AUWA/WashTec', uso:'Sgrassatore portale/self', area:'Self'},
+  {nome:'FoamClean Jet', forn:'AUWA/WashTec', uso:'Shampoo self service', area:'Self'},
+  {nome:'Pulimax EWO', forn:'—', uso:'Pulitore interni', area:'Post.3/4'},
+];
+let LIBRARY = DEFAULT_LIBRARY.map(p=>({...p}));
+const LIB_KEYS = ['forn','uso','ordina','quanto','tempi'];
+let cards = [];
+
+/* === Persistenza DB === */
+let currentSetId = null;        // id del set caricato (null = nessuno)
+let savedSnapshot = null;        // JSON.stringify dell'ultimo stato salvato (per dirty flag)
+let setsCache = [];              // ultimo elenco set
+const LS_DRAFT = 'ck_draft_v1';  // bozza locale (autosave, separata dal DB)
+
+function csrf(){
+  const m = document.cookie.match(/(?:^|;\s*)csrftoken=([^;]+)/);
+  return m ? decodeURIComponent(m[1]) : '';
+}
+async function api(path, opts){
+  opts = opts || {};
+  const headers = Object.assign({'X-CSRFToken': csrf()}, opts.headers || {});
+  if(opts.body && !(opts.body instanceof FormData)){
+    headers['Content-Type'] = 'application/json';
+  }
+  const r = await fetch(path, {credentials:'same-origin', ...opts, headers});
+  if(!r.ok){
+    let msg = 'Errore '+r.status;
+    try{ const t = await r.text(); if(t) msg += ': '+t; }catch(e){}
+    throw new Error(msg);
+  }
+  if(r.status === 204) return null;
+  return r.json();
+}
+
+/* ---- swatches ---- */
+function renderSwatches(){
+  const el=document.getElementById('swatches'); el.innerHTML='';
+  PALETTE.forEach(c=>{
+    const d=document.createElement('div'); d.className='swatch'+(c===cardColor?' active':'');
+    d.style.background=c; d.title=c;
+    d.onclick=()=>{cardColor=c;document.getElementById('customColor').value=c;renderSwatches();markDirty();};
+    el.appendChild(d);
+  });
+}
+document.getElementById('customColor').addEventListener('input',e=>{cardColor=e.target.value;renderSwatches();markDirty();});
+
+/* ---- QR ---- */
+document.querySelectorAll('#qrMode button').forEach(b=>{
+  b.onclick=()=>{
+    document.querySelectorAll('#qrMode button').forEach(x=>x.classList.remove('active'));
+    b.classList.add('active'); qrMode=b.dataset.qr;
+    updateQrControls(); markDirty();
+  };
+});
+function updateQrControls(){
+  const hasQr = (qrMode==='auto'||qrMode==='placeholder');
+  document.getElementById('qrTextWrap').style.display = qrMode==='auto'?'block':'none';
+  document.getElementById('qrLabelWrap').style.display = hasQr?'block':'none';
+  document.getElementById('qrHint').style.display = hasQr?'block':'none';
+}
+document.querySelectorAll('#backMode button').forEach(b=>{
+  b.onclick=()=>{
+    document.querySelectorAll('#backMode button').forEach(x=>x.classList.remove('active'));
+    b.classList.add('active'); hasBack=(b.dataset.back==='on');
+    renderSheet(); markDirty();
+  };
+});
+document.querySelectorAll('#posMode button').forEach(b=>{
+  b.onclick=()=>{
+    document.querySelectorAll('#posMode button').forEach(x=>x.classList.remove('active'));
+    b.classList.add('active'); hasPos=(b.dataset.pos==='on');
+    document.getElementById('posLabel').disabled=!hasPos;
+    markDirty();
+  };
+});
+document.getElementById('posLabel').addEventListener('input',e=>{posLabel=e.target.value||'Posizione';markDirty();});
+
+/* ---- foto ---- */
+document.getElementById('photoInput').addEventListener('change',e=>{
+  const f=e.target.files[0]; if(!f) return;
+  const r=new FileReader();
+  r.onload=async ev=>{
+    photoData=await compressImage(ev.target.result);
+    document.getElementById('thumbImg').src=photoData;
+    document.getElementById('thumbWrap').style.display='flex';
+    markDirty();
+  };
+  r.readAsDataURL(f);
+});
+document.getElementById('removePhoto').onclick=()=>{
+  photoData=null; document.getElementById('photoInput').value='';
+  document.getElementById('thumbWrap').style.display='none';
+  markDirty();
+};
+
+/* ---- lista campi con riordino ---- */
+function renderFieldList(){
+  const el=document.getElementById('fieldList'); el.innerHTML='';
+  fields.forEach((f,i)=>{
+    const row=document.createElement('div'); row.className='frow';
+    row.innerHTML=`<input type="checkbox" ${f.on?'checked':''}>
+      <span class="fname">${esc(f.name)}</span>
+      <select class="sideSel" title="Dove appare">
+        <option value="front" ${f.side!=='back'?'selected':''}>Fronte</option>
+        <option value="back" ${f.side==='back'?'selected':''}>Retro</option>
+      </select>
+      <button class="mv up" title="Su" ${i===0?'disabled':''}>↑</button>
+      <button class="mv down" title="Giù" ${i===fields.length-1?'disabled':''}>↓</button>
+      <button class="del" title="Rimuovi">✕</button>`;
+    row.querySelector('input').onchange=e=>{fields[i].on=e.target.checked;renderValueInputs();markDirty();};
+    row.querySelector('.sideSel').onchange=e=>{fields[i].side=e.target.value;markDirty();};
+    row.querySelector('.up').onclick=()=>{if(i>0){[fields[i-1],fields[i]]=[fields[i],fields[i-1]];renderFieldList();renderValueInputs();markDirty();}};
+    row.querySelector('.down').onclick=()=>{if(i<fields.length-1){[fields[i+1],fields[i]]=[fields[i],fields[i+1]];renderFieldList();renderValueInputs();markDirty();}};
+    row.querySelector('.del').onclick=()=>{fields.splice(i,1);renderFieldList();renderValueInputs();markDirty();};
+    el.appendChild(row);
+  });
+}
+document.getElementById('addFieldBtn').onclick=()=>{
+  const inp=document.getElementById('newFieldName'); const name=inp.value.trim(); if(!name) return;
+  fields.push({id:'f'+Date.now(),name,on:true,side:'front'}); inp.value='';
+  renderFieldList(); renderValueInputs(); markDirty();
+};
+
+/* ---- input valori ---- */
+function renderValueInputs(){
+  const el=document.getElementById('valueInputs'); el.innerHTML='';
+  el.appendChild(makeInput('nome','Nome prodotto (testata)',draft.nome));
+  fields.filter(f=>f.on).forEach(f=>el.appendChild(makeInput(f.id,f.name,draft[f.id]||'')));
+  if(hasPos) el.appendChild(makeInput('pos', posLabel||'Posizione', draft.pos));
+}
+function makeInput(key,label,val){
+  const w=document.createElement('div'); w.className='ctl';
+  w.innerHTML=`<label>${esc(label)}</label><input type="text" value="${(val||'').replace(/"/g,'&quot;')}">`;
+  w.querySelector('input').oninput=e=>{draft[key]=e.target.value;};
+  return w;
+}
+
+/* ---- libreria ---- */
+let editingLibIdx = null;
+function renderLibrary(){
+  const el=document.getElementById('libGrid'); el.innerHTML='';
+  if(!LIBRARY.length){
+    el.innerHTML='<div class="hint" style="text-align:center;padding:12px;">Libreria vuota — usa "+ Nuovo prodotto" o "Importa JSON".</div>';
+    return;
+  }
+  LIBRARY.forEach((p,idx)=>{
+    const row=document.createElement('div'); row.className='lirow';
+    row.innerHTML=`<button class="pick"><span>${esc(p.nome||'(senza nome)')}</span><span class="sup">${esc(p.area||'')}</span></button>
+      <button class="lact" title="Modifica">✎</button>
+      <button class="lact del" title="Elimina">✕</button>`;
+    row.querySelector('.pick').onclick=()=>{
+      draft.nome = p.nome;
+      LIB_KEYS.forEach(k=>{ if(p[k]!==undefined && p[k]!=='') draft[k]=p[k]; });
+      renderValueInputs();
+      flashStatus('Prodotto caricato dalla libreria.');
+    };
+    row.querySelectorAll('.lact')[0].onclick=()=>openLibEditor(idx);
+    row.querySelectorAll('.lact')[1].onclick=()=>{
+      if(confirm(`Eliminare "${p.nome}" dalla libreria?`)){ LIBRARY.splice(idx,1); renderLibrary(); markDirty(); }
+    };
+    el.appendChild(row);
+  });
+}
+function openLibEditor(idx){
+  editingLibIdx = idx;
+  const p = (idx==null) ? {} : LIBRARY[idx];
+  document.getElementById('leNome').value   = p.nome   || '';
+  document.getElementById('leArea').value   = p.area   || '';
+  document.getElementById('leForn').value   = p.forn   || '';
+  document.getElementById('leUso').value    = p.uso    || '';
+  document.getElementById('leOrdina').value = p.ordina || '';
+  document.getElementById('leQuanto').value = p.quanto || '';
+  document.getElementById('leTempi').value  = p.tempi  || '';
+  document.getElementById('libEditor').style.display='block';
+}
+function closeLibEditor(){
+  editingLibIdx=null;
+  document.getElementById('libEditor').style.display='none';
+}
+document.getElementById('libAddBtn').onclick=()=>openLibEditor(null);
+document.getElementById('leCancelBtn').onclick=closeLibEditor;
+document.getElementById('leSaveBtn').onclick=()=>{
+  const nome = document.getElementById('leNome').value.trim();
+  if(!nome){ alert('Il nome del prodotto è obbligatorio.'); return; }
+  const p = {
+    nome,
+    area:   document.getElementById('leArea').value.trim(),
+    forn:   document.getElementById('leForn').value.trim(),
+    uso:    document.getElementById('leUso').value.trim(),
+    ordina: document.getElementById('leOrdina').value.trim(),
+    quanto: document.getElementById('leQuanto').value.trim(),
+    tempi:  document.getElementById('leTempi').value.trim(),
+  };
+  if(editingLibIdx==null) LIBRARY.push(p);
+  else LIBRARY[editingLibIdx] = p;
+  closeLibEditor(); renderLibrary(); markDirty();
+  flashStatus(editingLibIdx==null?'Prodotto aggiunto alla libreria.':'Prodotto aggiornato.');
+};
+
+/* export libreria JSON */
+document.getElementById('libExportBtn').onclick=()=>{
+  const data = JSON.stringify({_app:'kanban-cartellini-library',_v:1,library:LIBRARY}, null, 2);
+  downloadJSON(data, `libreria-prodotti_${todayStamp()}.json`);
+  flashStatus('Libreria esportata in JSON.');
+};
+document.getElementById('libImportBtn').onclick=()=>document.getElementById('libImportInput').click();
+document.getElementById('libImportInput').addEventListener('change',e=>{
+  const f=e.target.files[0]; if(!f) return;
+  const r=new FileReader();
+  r.onload=ev=>{
+    try{
+      const s=JSON.parse(ev.target.result);
+      const incoming = Array.isArray(s) ? s : (Array.isArray(s.library) ? s.library : null);
+      if(!incoming){ alert('Formato non valido: serve un array di prodotti o un oggetto con campo "library".'); return; }
+      let updated=0, added=0;
+      incoming.forEach(np=>{
+        if(!np || !np.nome) return;
+        const i = LIBRARY.findIndex(x => (x.nome||'').toLowerCase() === (np.nome||'').toLowerCase());
+        if(i>=0){ LIBRARY[i] = {...LIBRARY[i], ...np}; updated++; }
+        else { LIBRARY.push(np); added++; }
+      });
+      renderLibrary(); markDirty();
+      flashStatus(`Import completato: ${added} nuovi, ${updated} aggiornati.`);
+    } catch(err){ alert('File non valido: '+err.message); }
+  };
+  r.readAsText(f);
+  e.target.value='';
+});
+
+/* ---- HTML facce ---- */
+function frontHTML(c){
+  const fl = (c.hasBack===false) ? c.fieldsSnapshot : c.fieldsSnapshot.filter(f=>(f.side||'front')!=='back');
+  const rows=fl.map(f=>`<div class="row"><div class="k">${esc(f.name)}</div><div class="v">${esc(c.vals[f.id]||'')}</div></div>`).join('');
+  let qr='';
+  const qrLab = esc((c.qrLabel||DEFAULT_QR_LABEL));
+  if(c.qrMode==='auto'&&c.qrText){
+    const src='https://api.qrserver.com/v1/create-qr-code/?size=120x120&data='+encodeURIComponent(c.qrText);
+    qr=`<div class="qr"><img src="${src}"><span class="qrlabel">${qrLab}</span></div>`;
+  } else if(c.qrMode==='placeholder'){
+    qr=`<div class="qr"><div class="qrbox">QR</div><span class="qrlabel">${qrLab}</span></div>`;
+  }
+  return `<div class="card front">
+    <div class="cap" style="--card-accent:${c.color}">${esc(c.vals.nome||'Prodotto')}</div>
+    ${c.img?`<div class="pic"><img src="${c.img}"></div>`:''}
+    <div class="body">
+      <div class="rows">${rows||'<div class="row"><div class="v" style="color:#999;">nessun campo</div></div>'}</div>
+    </div>
+    ${(c.hasPos!==false)?`<div class="pos" style="background:${hexA(c.color,.12)}">${esc(c.posLabel||'Posizione')}: ${esc(c.vals.pos||'—')}</div>`:''}
+    ${qr}
+  </div>`;
+}
+function backHTML(c){
+  const bf=c.fieldsSnapshot.filter(f=>(f.side||'front')==='back');
+  const backRows=bf.map(f=>`<div class="row"><div class="k">${esc(f.name)}</div><div class="v">${esc(c.vals[f.id]||'')}</div></div>`).join('');
+  let rows=''; for(let i=0;i<REG_ROWS;i++) rows+=`<div class="rr"><div></div><div></div><div></div></div>`;
+  return `<div class="card back" style="height:100%">
+    <div class="cap" style="--card-accent:${c.color}">${esc(c.vals.nome||'Prodotto')}</div>
+    <div class="taken"><b>Cartellino preso</b><small>Riponi nel raccoglitore ordini · registra l'ordine qui sotto</small></div>
+    ${backRows?`<div class="rows backfields">${backRows}</div>`:''}
+    <div class="reg">
+      <div class="rtitle">Registro ordini</div>
+      <div class="rh"><div>Data ordine</div><div>Quantità</div><div>Data consegna</div></div>
+      ${rows}
+    </div>
+    ${(c.hasPos!==false)?`<div class="pos" style="background:${hexA(c.color,.12)}">${esc(c.posLabel||'Posizione')}: ${esc(c.vals.pos||'—')}</div>`:''}
+  </div>`;
+}
+
+/* ---- anteprima ---- */
+function renderSheet(){
+  const sheet=document.getElementById('sheet');
+  if(!cards.length){
+    sheet.innerHTML='<div class="empty">Nessun cartellino. Compila i dati a sinistra e premi "Aggiungi cartellino", oppure scegli un prodotto dalla libreria.</div>';
+    autosaveDraft(); return;
+  }
+  sheet.innerHTML='';
+  cards.forEach((c,idx)=>{
+    const noBack = (c.hasBack===false);
+    const pair=document.createElement('div'); pair.className='pair'+(editingIdx===idx?' editing':'')+(noBack?' single':'');
+    const labels = noBack
+      ? `<span class="face-label fl-front">Solo fronte</span>`
+      : `<span class="face-label fl-front">Fronte</span><span class="face-label fl-back">Retro</span>`;
+    const faces = noBack
+      ? `<div>${frontHTML(c)}</div>`
+      : `<div>${frontHTML(c)}</div><div>${backHTML(c)}</div>`;
+    pair.innerHTML=`${labels}
+      <div class="pair-tools"><button data-act="edit" title="Modifica">✎</button><button data-act="dup" title="Duplica">⧉</button><button data-act="del" title="Elimina">✕</button></div>
+      ${faces}`;
+    pair.querySelector('[data-act=edit]').onclick=()=>loadCardIntoForm(idx);
+    pair.querySelector('[data-act=del]').onclick=()=>{cards.splice(idx,1);if(editingIdx===idx)cancelEdit();else if(editingIdx>idx)editingIdx--;renderSheet();markDirty();};
+    pair.querySelector('[data-act=dup]').onclick=()=>{cards.splice(idx+1,0,JSON.parse(JSON.stringify(c)));renderSheet();markDirty();};
+    sheet.appendChild(pair);
+  });
+  autosaveDraft();
+}
+
+function loadCardIntoForm(idx){
+  const c=cards[idx];
+  editingIdx=idx;
+  draft={nome:c.vals.nome||'', pos:c.vals.pos||''};
+  (c.fieldsSnapshot||[]).forEach(f=>{ draft[f.id]=c.vals[f.id]||''; });
+  if(c.fieldsSnapshot && c.fieldsSnapshot.length){
+    fields = c.fieldsSnapshot.map(f=>({id:f.id,name:f.name,on:true,side:f.side||'front'}));
+  }
+  cardColor=c.color||PALETTE[0];
+  qrMode=c.qrMode||'none';
+  hasBack=(c.hasBack!==false);
+  hasPos=(c.hasPos!==false);
+  posLabel=c.posLabel||'Posizione';
+  photoData=c.img||null;
+  document.getElementById('customColor').value=cardColor;
+  document.querySelectorAll('#qrMode button').forEach(b=>b.classList.toggle('active', b.dataset.qr===qrMode));
+  document.querySelectorAll('#backMode button').forEach(b=>b.classList.toggle('active', (b.dataset.back==='on')===hasBack));
+  document.querySelectorAll('#posMode button').forEach(b=>b.classList.toggle('active', (b.dataset.pos==='on')===hasPos));
+  document.getElementById('posLabel').value=posLabel; document.getElementById('posLabel').disabled=!hasPos;
+  if(qrMode==='auto') document.getElementById('qrText').value=c.qrText||'';
+  document.getElementById('qrLabel').value=c.qrLabel||'';
+  updateQrControls();
+  if(photoData){ document.getElementById('thumbImg').src=photoData; document.getElementById('thumbWrap').style.display='flex'; }
+  else { document.getElementById('thumbWrap').style.display='none'; }
+  renderSwatches(); renderFieldList(); renderValueInputs();
+  setEditUI(true);
+  renderSheet();
+  document.querySelector('.panel').scrollIntoView({behavior:'smooth',block:'start'});
+}
+function cancelEdit(){
+  editingIdx=null;
+  draft={nome:'',pos:''}; photoData=null;
+  document.getElementById('thumbWrap').style.display='none';
+  setEditUI(false); renderValueInputs(); renderSheet();
+}
+function setEditUI(on){
+  const btn=document.getElementById('addCardBtn');
+  const cancel=document.getElementById('cancelEditBtn');
+  if(on){ btn.textContent='Salva modifiche'; cancel.style.display='inline-block'; }
+  else { btn.textContent='Aggiungi cartellino'; cancel.style.display='none'; }
+}
+
+/* ---- snapshot card ---- */
+function snapshot(){
+  const snap=fields.filter(f=>f.on).map(f=>({id:f.id,name:f.name,side:f.side||'front'}));
+  const vals={nome:draft.nome||'',pos:draft.pos||''};
+  snap.forEach(f=>vals[f.id]=draft[f.id]||'');
+  const qrL = (qrMode==='auto'||qrMode==='placeholder') ? (document.getElementById('qrLabel').value||'') : '';
+  return {color:cardColor,qrMode,qrText:qrMode==='auto'?(document.getElementById('qrText').value||''):'',qrLabel:qrL,img:photoData,hasBack,hasPos,posLabel,vals,fieldsSnapshot:snap};
+}
+document.getElementById('addCardBtn').onclick=()=>{
+  if(!(draft.nome||'').trim()){alert('Inserisci almeno il nome del prodotto.');return;}
+  if(editingIdx!==null){
+    cards[editingIdx]=snapshot();
+    flashStatus('Cartellino aggiornato.');
+    cancelEdit();
+  } else {
+    cards.push(snapshot()); renderSheet();
+  }
+  markDirty();
+};
+document.getElementById('cancelEditBtn').onclick=()=>cancelEdit();
+document.getElementById('clearFormBtn').onclick=()=>{draft={nome:'',pos:''};photoData=null;document.getElementById('thumbWrap').style.display='none';if(editingIdx!==null)cancelEdit();else renderValueInputs();};
+document.getElementById('clearAllBtn').onclick=()=>{if(confirm('Svuotare il foglio?')){cards=[];renderSheet();markDirty();}};
+document.getElementById('addAllBtn').onclick=()=>{
+  const snap=fields.filter(f=>f.on).map(f=>({id:f.id,name:f.name,side:f.side||'front'}));
+  LIBRARY.forEach(p=>{
+    const vals={nome:p.nome,pos:''};
+    snap.forEach(f=>vals[f.id]= p[f.id]!==undefined?p[f.id]:'');
+    cards.push({color:cardColor,qrMode,qrText:'',qrLabel:(qrMode==='auto'||qrMode==='placeholder')?(document.getElementById('qrLabel').value||''):'',img:null,hasBack,hasPos,posLabel,vals,fieldsSnapshot:snap});
+  });
+  renderSheet(); markDirty();
+};
+
+/* ---- STAMPA ---- */
+document.getElementById('printBtn').onclick=()=>{
+  if(!cards.length){alert('Aggiungi almeno un cartellino.');return;}
+  const ps=document.getElementById('printSheet'); ps.innerHTML='';
+  const PER_ROW=2, PER_PAGE=6;
+  const withBack = cards.filter(c=>c.hasBack!==false);
+  const noBack   = cards.filter(c=>c.hasBack===false);
+
+  // card con retro: fronte + retro alternati, retro a specchio per colonna
+  for(let start=0; start<withBack.length; start+=PER_PAGE){
+    const slice=withBack.slice(start,start+PER_PAGE);
+    const pF=document.createElement('div'); pF.className='page';
+    pF.innerHTML='<div class="page-tag">Fronte (con retro) — stampa, poi gira il foglio sul lato lungo</div>';
+    const gF=document.createElement('div'); gF.className='pgrid';
+    slice.forEach(c=>{const d=document.createElement('div');d.innerHTML=frontHTML(c);gF.appendChild(d);});
+    pF.appendChild(gF); ps.appendChild(pF);
+
+    const pB=document.createElement('div'); pB.className='page';
+    pB.innerHTML='<div class="page-tag">Retro</div>';
+    const gB=document.createElement('div'); gB.className='pgrid';
+    const mirrored=[];
+    for(let i=0;i<slice.length;i+=PER_ROW){
+      const rowItems=slice.slice(i,i+PER_ROW);
+      if(rowItems.length===PER_ROW){mirrored.push(rowItems[1],rowItems[0]);}
+      else{mirrored.push(rowItems[0]);}
+    }
+    mirrored.forEach(c=>{const d=document.createElement('div');d.innerHTML=backHTML(c);gB.appendChild(d);});
+    pB.appendChild(gB); ps.appendChild(pB);
+  }
+  // card solo fronte: pagine di soli fronti
+  for(let start=0; start<noBack.length; start+=PER_PAGE){
+    const slice=noBack.slice(start,start+PER_PAGE);
+    const p=document.createElement('div'); p.className='page';
+    p.innerHTML='<div class="page-tag">Solo fronte (senza retro)</div>';
+    const g=document.createElement('div'); g.className='pgrid';
+    slice.forEach(c=>{const d=document.createElement('div');d.innerHTML=frontHTML(c);g.appendChild(d);});
+    p.appendChild(g); ps.appendChild(p);
+  }
+  window.print();
+};
+
+/* ---- Stato corrente / applyState (per DB + file) ---- */
+function currentState(){
+  return {
+    _v:1, _app:'kanban-cartellini', _saved:new Date().toISOString(),
+    fields, cardColor, qrMode, hasBack, hasPos, posLabel, library:LIBRARY, cards
+  };
+}
+function applyState(s){
+  if(!s || s._app!=='kanban-cartellini'){ alert('Configurazione non valida o non compatibile.'); return false; }
+  fields    = Array.isArray(s.fields) && s.fields.length ? s.fields : DEFAULT_FIELDS.map(f=>({...f}));
+  cardColor = s.cardColor || PALETTE[0];
+  qrMode    = s.qrMode || 'none';
+  hasBack   = (s.hasBack!==false);
+  hasPos    = (s.hasPos!==false);
+  posLabel  = s.posLabel || 'Posizione';
+  LIBRARY   = Array.isArray(s.library) && s.library.length ? s.library : DEFAULT_LIBRARY.map(p=>({...p}));
+  cards     = Array.isArray(s.cards) ? s.cards : [];
+  editingIdx=null; setEditUI(false);
+  document.getElementById('customColor').value = cardColor;
+  document.querySelectorAll('#qrMode button').forEach(b=>b.classList.toggle('active', b.dataset.qr===qrMode));
+  document.querySelectorAll('#backMode button').forEach(b=>b.classList.toggle('active', (b.dataset.back==='on')===hasBack));
+  document.querySelectorAll('#posMode button').forEach(b=>b.classList.toggle('active', (b.dataset.pos==='on')===hasPos));
+  document.getElementById('posLabel').value=posLabel; document.getElementById('posLabel').disabled=!hasPos;
+  updateQrControls();
+  renderSwatches(); renderFieldList(); renderValueInputs(); renderLibrary(); renderSheet();
+  return true;
+}
+
+/* ---- Save/Load FILE (export/import JSON) ---- */
+document.getElementById('exportFileBtn').onclick=()=>{
+  downloadJSON(JSON.stringify(currentState(),null,2), `cartellini-kanban_${todayStamp()}.json`);
+  flashStatus('Configurazione esportata su file.');
+};
+document.getElementById('importFileBtn').onclick=()=>document.getElementById('loadInput').click();
+document.getElementById('loadInput').addEventListener('change',e=>{
+  const f=e.target.files[0]; if(!f) return;
+  const r=new FileReader();
+  r.onload=ev=>{
+    try{ const s=JSON.parse(ev.target.result); if(applyState(s)){ flashStatus('Configurazione importata.'); markDirty(); } }
+    catch(err){ alert('Impossibile leggere il file: '+err.message); }
+  };
+  r.readAsText(f);
+  e.target.value='';
+});
+
+/* ============ Persistenza DB: Set salvati ============ */
+function renderSetSelector(){
+  const sel = document.getElementById('setSelector');
+  sel.innerHTML = '';
+  const optNew = document.createElement('option');
+  optNew.value = '';
+  optNew.textContent = '— Nuovo set (non salvato) —';
+  sel.appendChild(optNew);
+  setsCache.forEach(s=>{
+    const o = document.createElement('option');
+    o.value = String(s.id);
+    o.textContent = `${s.nome} (${s.num_cartellini} cartellini)`;
+    sel.appendChild(o);
+  });
+  sel.value = currentSetId ? String(currentSetId) : '';
+}
+async function loadSetsList(){
+  try{
+    const r = await api('/cartellini/api/sets/');
+    setsCache = r.sets || [];
+    renderSetSelector();
+  }catch(e){
+    console.warn('loadSetsList:', e);
+  }
+}
+function setBar(){ return document.getElementById('setBar'); }
+function markDirty(){
+  setBar().classList.add('is-dirty');
+  autosaveDraft();
+}
+function markClean(){
+  setBar().classList.remove('is-dirty');
+  savedSnapshot = JSON.stringify(currentState());
+}
+
+document.getElementById('setSelector').addEventListener('change', async (e)=>{
+  const v = e.target.value;
+  if(setBar().classList.contains('is-dirty')){
+    if(!confirm('Ci sono modifiche non salvate. Continuare e perderle?')){
+      e.target.value = currentSetId ? String(currentSetId) : '';
+      return;
+    }
+  }
+  if(!v){
+    // Nuovo set: reset allo stato default
+    currentSetId = null;
+    resetToDefault();
+    markClean();
+    return;
+  }
+  try{
+    const s = await api(`/cartellini/api/sets/${v}/`);
+    currentSetId = s.id;
+    if(applyState(s.configurazione)){
+      markClean();
+      flashStatus(`Caricato set "${s.nome}".`);
+    }
+  }catch(err){ alert('Errore caricamento set: '+err.message); }
+});
+
+document.getElementById('btnSetSave').onclick = async ()=>{
+  try{
+    if(currentSetId){
+      const s = await api(`/cartellini/api/sets/${currentSetId}/`, {
+        method:'PATCH',
+        body: JSON.stringify({configurazione: currentState()}),
+      });
+      markClean();
+      await loadSetsList();
+      flashStatus(`Set "${s.nome}" salvato.`);
+    } else {
+      // Nessun set selezionato: comportati come Salva come
+      await saveAsNew();
+    }
+  }catch(err){ alert('Errore salvataggio: '+err.message); }
+};
+async function saveAsNew(){
+  const nome = (prompt('Nome del nuovo set:') || '').trim();
+  if(!nome) return;
+  const descrizione = (prompt('Descrizione (opzionale):') || '').trim();
+  try{
+    const s = await api('/cartellini/api/sets/', {
+      method:'POST',
+      body: JSON.stringify({nome, descrizione, configurazione: currentState()}),
+    });
+    currentSetId = s.id;
+    markClean();
+    await loadSetsList();
+    flashStatus(`Set "${s.nome}" creato.`);
+  }catch(err){ alert('Errore creazione: '+err.message); }
+}
+document.getElementById('btnSetSaveAs').onclick = ()=>saveAsNew();
+
+document.getElementById('btnSetDup').onclick = async ()=>{
+  if(!currentSetId){ alert('Carica prima un set da duplicare.'); return; }
+  try{
+    const s = await api(`/cartellini/api/sets/${currentSetId}/duplica/`, {method:'POST'});
+    currentSetId = s.id;
+    if(applyState(s.configurazione)) markClean();
+    await loadSetsList();
+    flashStatus(`Duplicato come "${s.nome}".`);
+  }catch(err){ alert('Errore duplicazione: '+err.message); }
+};
+
+document.getElementById('btnSetDel').onclick = async ()=>{
+  if(!currentSetId){ alert('Nessun set selezionato.'); return; }
+  const cur = setsCache.find(x=>x.id===currentSetId);
+  if(!confirm(`Eliminare definitivamente il set "${cur?cur.nome:''}"?`)) return;
+  try{
+    await api(`/cartellini/api/sets/${currentSetId}/`, {method:'DELETE'});
+    currentSetId = null;
+    resetToDefault();
+    markClean();
+    await loadSetsList();
+    flashStatus('Set eliminato.');
+  }catch(err){ alert('Errore eliminazione: '+err.message); }
+};
+
+function resetToDefault(){
+  applyState({
+    _app:'kanban-cartellini',
+    fields: DEFAULT_FIELDS.map(f=>({...f})),
+    cardColor: PALETTE[0], qrMode:'none', hasBack:true, hasPos:true, posLabel:'Posizione',
+    library: DEFAULT_LIBRARY.map(p=>({...p})), cards: [],
+  });
+}
+
+/* ---- Autosave bozza locale (in caso di crash/reload con modifiche) ---- */
+function autosaveDraft(){
+  try{ localStorage.setItem(LS_DRAFT, JSON.stringify({setId:currentSetId, state:currentState()})); }
+  catch(e){}
+}
+function tryRestoreDraft(){
+  try{
+    const raw=localStorage.getItem(LS_DRAFT);
+    if(!raw) return false;
+    const d=JSON.parse(raw);
+    if(!d || !d.state) return false;
+    // Ripristina solo se c'e' contenuto significativo (almeno una card)
+    if(!(d.state.cards||[]).length) return false;
+    if(applyState(d.state)){
+      currentSetId = d.setId || null;
+      flashStatus('Ripristinata bozza non salvata di questa sessione.');
+      markDirty();
+      return true;
+    }
+  }catch(e){}
+  return false;
+}
+
+/* ---- util ---- */
+let statusTimer=null;
+function flashStatus(msg){
+  const el=document.getElementById('saveStatus'); el.textContent=msg;
+  clearTimeout(statusTimer); statusTimer=setTimeout(()=>{el.textContent='';},4000);
+}
+function compressImage(dataUrl){
+  return new Promise(res=>{
+    const img=new Image();
+    img.onload=()=>{
+      const max=360; let w=img.width, h=img.height;
+      if(w>h && w>max){ h=h*max/w; w=max; } else if(h>max){ w=w*max/h; h=max; }
+      const cv=document.createElement('canvas'); cv.width=w; cv.height=h;
+      cv.getContext('2d').drawImage(img,0,0,w,h);
+      try{ res(cv.toDataURL('image/jpeg',0.8)); }catch(e){ res(dataUrl); }
+    };
+    img.onerror=()=>res(dataUrl);
+    img.src=dataUrl;
+  });
+}
+function esc(s){return (s||'').toString().replace(/[&<>"]/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[m]));}
+function hexA(hex,a){const h=(hex||'#000000').replace('#','');return `rgba(${parseInt(h.substr(0,2),16)||0},${parseInt(h.substr(2,2),16)||0},${parseInt(h.substr(4,2),16)||0},${a})`;}
+function todayStamp(){ return new Date().toISOString().slice(0,10); }
+function downloadJSON(text, filename){
+  const blob = new Blob([text], {type:'application/json'});
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href=url; a.download=filename;
+  document.body.appendChild(a); a.click(); a.remove();
+  URL.revokeObjectURL(url);
+}
+
+/* ---- bootstrap ---- */
+renderSwatches(); renderFieldList(); renderValueInputs(); renderLibrary(); renderSheet();
+markClean();              // snapshot iniziale "pulito"
+tryRestoreDraft();        // se c'era una bozza locale (con cards), ripristinala
+loadSetsList();           // popola il dropdown dei set salvati
+})();
+</script>
+{% endverbatim %}
+{% endblock %}
