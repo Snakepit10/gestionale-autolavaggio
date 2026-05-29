@@ -149,53 +149,55 @@
   .ck-root .setbar .dirty{font-size:11px;color:#b04a3a;font-weight:700;display:none;}
   .ck-root .setbar.is-dirty .dirty{display:inline;}
 
-  /* STAMPA: fronte-retro vero
-     A4 = 210x297mm, margin 9mm => area utile 192x279mm.
-     Griglia 2 colonne x 3 righe con celle FISSE = ogni cartellino occupa
-     sempre la stessa posizione/dimensione sia sul fronte che sul retro.
-     Cosi' quando si gira il foglio sul lato lungo, ogni retro cade
-     esattamente dietro al proprio fronte. */
+  /* STAMPA: fronte-retro vero, formato A6 (105x148mm).
+     A4 = 210x297mm. 2 colonne x 2 righe = 4 cartellini per pagina,
+     ciascuno esattamente A6 (105x148mm). Margine @page 0 per fare
+     coincidere i bordi del cartellino con le linee di taglio.
+     I bordi neri delle card adiacenti formano automaticamente la
+     linea di taglio (non serve disegnarla).
+     Con celle di dimensione FISSA (105x148mm) ogni retro cade
+     esattamente dietro al proprio fronte quando si gira il foglio
+     sul lato lungo (long-edge duplex). */
   .ck-root .printsheet{display:none;}
   @media print{
-    @page{size:A4;margin:9mm;}
+    @page{size:A4;margin:0;}
     html,body{background:#fff !important;-webkit-print-color-adjust:exact;print-color-adjust:exact;}
     body > nav, body > header, body > footer, .navbar, footer { display:none !important; }
-    .ck-root .wrap{max-width:none;padding:0;}
+    .ck-root .wrap{max-width:none;padding:0;margin:0;}
     .ck-root header.top,.ck-root .panel,.ck-root .preview-head,.ck-root .sheet,
     .ck-root #saveStatus,.ck-root .setbar{display:none !important;}
     .ck-root .layout{display:block;}
     .ck-root .printsheet{display:block;}
     .ck-root .page{
-      height:279mm;                /* 297 - 2*9mm di @page margin */
-      width:192mm;
+      width:210mm;height:296mm;          /* A4 esatto, 4xA6 = 210x296 */
       display:flex;flex-direction:column;
       page-break-after:always;page-break-inside:avoid;
       overflow:hidden;
     }
     .ck-root .page:last-child{page-break-after:auto;}
-    .ck-root .page-tag{
-      flex:0 0 auto;font-size:9px;text-transform:uppercase;letter-spacing:.1em;
-      color:#999;margin:0 0 3mm;font-weight:700;height:4mm;
-    }
+    /* Etichetta della pagina (Fronte/Retro): solo schermo, nascosta in stampa
+       per non sottrarre spazio alle 4 celle A6. */
+    .ck-root .page-tag{display:none !important;}
     .ck-root .pgrid{
       flex:1 1 auto;
       display:grid;
-      grid-template-columns:repeat(2,1fr);
-      grid-template-rows:repeat(3,1fr);   /* 3 righe IDENTICHE in altezza */
-      gap:6mm;
+      grid-template-columns:105mm 105mm; /* A6 esatto */
+      grid-template-rows:148mm 148mm;    /* A6 esatto */
+      gap:0;                              /* bordi adiacenti = linea di taglio */
       min-height:0;
     }
     .ck-root .pgrid > div{
       min-width:0;min-height:0;
-      display:flex;                       /* la card riempie la cella */
+      display:flex;
       overflow:hidden;
     }
     .ck-root .pgrid > div > .card{
-      width:100%;height:100%;             /* fronte e retro stessa size */
-      box-shadow:none;
+      width:100%;height:100%;            /* fronte e retro stessa size */
+      box-shadow:none;border-radius:0;   /* squadrato per taglio pulito */
     }
-    /* La parte "registro ordini" del retro si espande per riempire lo
-       spazio rimanente (in modo che la card occupi tutta la cella). */
+    /* Il blocco "Registro ordini" del retro si espande per riempire lo
+       spazio rimanente, cosi' la card retro occupa l'intera cella A6
+       come quella fronte (stessa altezza). */
     .ck-root .card.back .reg{flex:1 1 auto;}
     .ck-root .card.back .reg .rr{flex:1 1 0;min-height:0;}
     .ck-root .card.back .reg .rr div{height:auto;}
@@ -769,7 +771,8 @@ document.getElementById('addAllBtn').onclick=()=>{
 document.getElementById('printBtn').onclick=()=>{
   if(!cards.length){alert('Aggiungi almeno un cartellino.');return;}
   const ps=document.getElementById('printSheet'); ps.innerHTML='';
-  const PER_ROW=2, PER_PAGE=6;
+  // Formato A6 (105x148mm) su A4: 2 colonne x 2 righe = 4 per pagina.
+  const PER_ROW=2, PER_PAGE=4;
   const withBack = cards.filter(c=>c.hasBack!==false);
   const noBack   = cards.filter(c=>c.hasBack===false);
 
