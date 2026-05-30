@@ -170,6 +170,9 @@
      usano il prefisso .ck-root: funzionano sia quando il printsheet
      e' nella sua posizione normale, sia quando e' stato spostato. */
   .ck-root .printsheet{display:none;}
+  /* Baseline: anche se il JS sposta il printsheet sotto <body>
+     (perdendo l'antenato .ck-root), deve restare nascosto a schermo. */
+  body > .printsheet, body > #printSheet{display:none;}
   @media print{
     @page{size:A4;margin:0;}
     html,body{background:#fff !important;-webkit-print-color-adjust:exact;print-color-adjust:exact;margin:0 !important;padding:0 !important;}
@@ -948,22 +951,33 @@ document.getElementById('printBtn').onclick = ()=>{
   }
 
   /* Fix "prima pagina bianca": sposta il printsheet direttamente sotto
-     <body> in modo che non erediti spazio da .ck-root/.wrap/main/etc.
-     Combinato con la regola CSS che nasconde tutti i fratelli del
-     printsheet dentro body, niente altro contribuisce al layout di stampa.
-     Dopo il print, lo rimettiamo al suo posto originale. */
+     <body> cosi' non eredita spazio da .ck-root/.wrap/main/etc.
+     IMPORTANTE: aggiungiamo la classe 'ck-root' al printsheet stesso,
+     perche' gli stili della card sono scopati con `.ck-root .card ...`
+     (selettore descendant): senza un antenato .ck-root, tutte le regole
+     di layout della card (display:flex su .row, padding su .v/.k, ecc.)
+     smettono di applicarsi e i dati non vengono renderizzati. Con la
+     classe sul printsheet stesso, .card e' descendant di .ck-root e
+     gli stili funzionano regolarmente. */
   const origParent = ps.parentNode;
   const origNext = ps.nextSibling;
+  ps.classList.add('ck-root');
   document.body.appendChild(ps);
 
+  let restored = false;
   const restore = ()=>{
-    try { origParent.insertBefore(ps, origNext); } catch(e){}
+    if(restored) return; restored = true;
+    try {
+      ps.classList.remove('ck-root');
+      origParent.insertBefore(ps, origNext);
+    } catch(e){}
     window.removeEventListener('afterprint', restore);
   };
   window.addEventListener('afterprint', restore);
+  // Safety: ripristina comunque dopo qualche secondo (alcuni browser
+  // non sparano afterprint se il dialog viene chiuso senza stampare).
+  setTimeout(restore, 60000);
 
-  // requestAnimationFrame per essere certi che il browser abbia
-  // gia' applicato il riposizionamento prima di aprire l'anteprima.
   requestAnimationFrame(()=> { window.print(); });
 };
 
