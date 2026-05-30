@@ -149,77 +149,78 @@
   .ck-root .setbar .dirty{font-size:11px;color:#b04a3a;font-weight:700;display:none;}
   .ck-root .setbar.is-dirty .dirty{display:inline;}
 
-  /* STAMPA: due formati selezionabili.
-     - pf-a6   (default): A6 fisso 105x148mm, 4 per A4 (2x2), celle fisse
-                          => fronte e retro combaciano per costruzione.
-     - pf-auto: 6 per A4 (2x3), celle ad altezza VARIABILE.
-                Lato JS, per ogni cartellino misuriamo l'altezza naturale
-                del FRONTE e la imponiamo anche al RETRO (inline style),
-                cosi' il retro si adatta al fronte (il blocco "registro
-                ordini" si comprime/espande per riempire la stessa altezza
-                del fronte corrispondente). */
+  /* STAMPA: formato per-cartellino.
+     Ogni cartellino ha la sua proprieta' printFormat ('a6' | 'auto')
+     salvata nello snapshot. La pagina (.page) riceve la classe
+     pf-a6 o pf-auto in base ai cartellini che contiene (i cartellini
+     sono raggruppati per formato prima di essere distribuiti sulle
+     pagine).
+
+     - .page.pf-a6  : 4 per pagina, celle 95x138mm con margini attorno
+                      al foglio. La grafica della card riempie tutta
+                      la cella (rows con flex:1).
+     - .page.pf-auto: 6 per pagina, altezza naturale del fronte.
+                      Il retro viene forzato all'altezza del proprio
+                      fronte via inline style (vedi JS).
+
+     Per evitare una "prima pagina bianca" causata dal layout dei
+     contenitori padre (main, ck-root, wrap), il JS sposta il
+     .printsheet direttamente sotto <body> prima di window.print()
+     e lo rimette al suo posto dopo. Le regole CSS qui sotto NON
+     usano il prefisso .ck-root: funzionano sia quando il printsheet
+     e' nella sua posizione normale, sia quando e' stato spostato. */
   .ck-root .printsheet{display:none;}
   @media print{
     @page{size:A4;margin:0;}
-    html,body{background:#fff !important;-webkit-print-color-adjust:exact;print-color-adjust:exact;}
-    body > nav, body > header, body > footer, .navbar, footer { display:none !important; }
-    .ck-root .wrap{max-width:none;padding:0;margin:0;}
-    .ck-root header.top,.ck-root .panel,.ck-root .preview-head,.ck-root .sheet,
-    .ck-root #saveStatus,.ck-root .setbar{display:none !important;}
-    .ck-root .layout{display:block;}
-    .ck-root .printsheet{display:block;}
-    .ck-root .page-tag{display:none !important;}
-    .ck-root .page{
+    html,body{background:#fff !important;-webkit-print-color-adjust:exact;print-color-adjust:exact;margin:0 !important;padding:0 !important;}
+    /* Nascondi TUTTO sotto <body> tranne il printsheet (che il JS ha
+       spostato qui). Cosi' non ci sono elementi che generano spazio
+       iniziale -> niente prima pagina bianca. */
+    body > *{display:none !important;}
+    body > .printsheet, body > #printSheet{display:block !important;}
+
+    .printsheet{display:block !important;margin:0;padding:0;}
+    .printsheet .page-tag{display:none !important;}
+    .printsheet .page{
       width:210mm;
       display:flex;flex-direction:column;
       page-break-after:always;page-break-inside:avoid;
       overflow:hidden;
+      box-sizing:border-box;
     }
-    .ck-root .page:last-child{page-break-after:auto;}
-    .ck-root .pgrid > div{min-width:0;min-height:0;display:flex;overflow:hidden;}
-    .ck-root .pgrid > div > .card{width:100%;box-shadow:none;}
-    /* Per il retro: .reg deve poter assorbire la differenza di altezza */
-    .ck-root .card.back .reg{flex:1 1 auto;}
-    .ck-root .card.back .reg .rr{flex:1 1 0;min-height:0;}
-    .ck-root .card.back .reg .rr div{height:auto;}
+    .printsheet .page:last-child{page-break-after:auto;}
+    .printsheet .pgrid > div{min-width:0;min-height:0;display:flex;overflow:hidden;}
+    .printsheet .pgrid > div > .card{width:100%;box-shadow:none;}
+    /* il retro: .reg assorbe la differenza di altezza */
+    .printsheet .card.back .reg{flex:1 1 auto;}
+    .printsheet .card.back .reg .rr{flex:1 1 0;min-height:0;}
+    .printsheet .card.back .reg .rr div{height:auto;}
 
-    /* ====== Formato A6 nominale ======
-       Celle 95x138mm (rapporto vicino ad A6 105:148) con margini
-       attorno al foglio (8mm) e piccolo gap (4mm) tra cartellini.
-       I margini servono per non perdere i bordi nelle zone
-       non-stampabili della stampante. */
-    .ck-root .printsheet.pf-a6 .page{height:297mm;padding:8mm;}
-    .ck-root .printsheet.pf-a6 .pgrid{
+    /* ====== Formato A6 nominale (per pagina) ====== */
+    .printsheet .page.pf-a6{height:297mm;padding:8mm;}
+    .printsheet .page.pf-a6 .pgrid{
       flex:1 1 auto;display:grid;
       grid-template-columns:95mm 95mm;
       grid-template-rows:138mm 138mm;
       gap:4mm;min-height:0;
       justify-content:center;align-content:center;
     }
-    .ck-root .printsheet.pf-a6 .pgrid > div > .card{
-      height:100%;border-radius:0;
-    }
-    /* La GRAFICA della card riempie tutta la cella A6:
-       il corpo (.body con .rows e le sue .row) si stira verticalmente
-       per distribuire lo spazio invece di lasciare bianco in fondo. */
-    .ck-root .printsheet.pf-a6 .card .body{flex:1 1 auto;min-height:0;}
-    .ck-root .printsheet.pf-a6 .card .rows{
+    .printsheet .page.pf-a6 .pgrid > div > .card{height:100%;border-radius:0;}
+    .printsheet .page.pf-a6 .card .body{flex:1 1 auto;min-height:0;}
+    .printsheet .page.pf-a6 .card .rows{
       flex:1 1 auto;display:flex;flex-direction:column;min-height:0;
     }
-    .ck-root .printsheet.pf-a6 .card .rows .row{flex:1 1 0;min-height:0;}
-    .ck-root .printsheet.pf-a6 .card .rows .row .k,
-    .ck-root .printsheet.pf-a6 .card .rows .row .v{align-items:center;}
+    .printsheet .page.pf-a6 .card .rows .row{flex:1 1 0;min-height:0;}
 
     /* ====== Formato Adattivo (6 per A4, retro adatta al fronte) ====== */
-    .ck-root .printsheet.pf-auto .page{height:297mm;padding:6mm;}
-    .ck-root .printsheet.pf-auto .pgrid{
+    .printsheet .page.pf-auto{height:297mm;padding:6mm;}
+    .printsheet .page.pf-auto .pgrid{
       flex:0 0 auto;display:grid;
       grid-template-columns:repeat(2,1fr);
       grid-auto-rows:auto;
       gap:4mm;align-content:start;
     }
-    /* il retro si stira esattamente all'altezza imposta inline dal JS */
-    .ck-root .printsheet.pf-auto .pgrid > div > .card.back{height:100%;}
+    .printsheet .page.pf-auto .pgrid > div > .card.back{height:100%;}
   }
 </style>
 {% endblock %}
@@ -299,8 +300,9 @@
           <button data-pf="auto">Adattivo (6 per A4)</button>
         </div>
         <div class="hint" style="margin-top:6px;">
-          <b>A6</b>: 4 cartellini A6 nominali (95&times;138mm) per A4, con margini di sicurezza attorno al foglio. La grafica riempie tutta la card; fronte e retro combaciano per costruzione.<br>
-          <b>Adattivo</b>: 6 cartellini per pagina, il retro si adatta automaticamente all&apos;altezza del fronte.
+          Il formato e&apos; <b>per singolo cartellino</b>: viene salvato nello snapshot al momento dell&apos;aggiunta/modifica. Cartellini di formato diverso finiscono su pagine separate in stampa.<br>
+          <b>A6</b>: 4 per A4 (95&times;138mm) con margini di sicurezza. Grafica che riempie tutta la card; fronte e retro combaciano per costruzione.<br>
+          <b>Adattivo</b>: 6 per A4, il retro adatta l&apos;altezza al fronte.
         </div>
       </div>
 
@@ -715,9 +717,10 @@ function renderSheet(){
   cards.forEach((c,idx)=>{
     const noBack = (c.hasBack===false);
     const pair=document.createElement('div'); pair.className='pair'+(editingIdx===idx?' editing':'')+(noBack?' single':'');
+    const fmtTag = (c.printFormat==='auto') ? 'Adattivo' : 'A6';
     const labels = noBack
-      ? `<span class="face-label fl-front">Solo fronte</span>`
-      : `<span class="face-label fl-front">Fronte</span><span class="face-label fl-back">Retro</span>`;
+      ? `<span class="face-label fl-front">Solo fronte &middot; ${fmtTag}</span>`
+      : `<span class="face-label fl-front">Fronte &middot; ${fmtTag}</span><span class="face-label fl-back">Retro</span>`;
     const faces = noBack
       ? `<div>${frontHTML(c)}</div>`
       : `<div>${frontHTML(c)}</div><div>${backHTML(c)}</div>`;
@@ -745,11 +748,13 @@ function loadCardIntoForm(idx){
   hasBack=(c.hasBack!==false);
   hasPos=(c.hasPos!==false);
   posLabel=c.posLabel||'Posizione';
+  printFormat = (c.printFormat === 'auto') ? 'auto' : 'a6';
   photoData=c.img||null;
   document.getElementById('customColor').value=cardColor;
   document.querySelectorAll('#qrMode button').forEach(b=>b.classList.toggle('active', b.dataset.qr===qrMode));
   document.querySelectorAll('#backMode button').forEach(b=>b.classList.toggle('active', (b.dataset.back==='on')===hasBack));
   document.querySelectorAll('#posMode button').forEach(b=>b.classList.toggle('active', (b.dataset.pos==='on')===hasPos));
+  document.querySelectorAll('#printFormat button').forEach(b=>b.classList.toggle('active', b.dataset.pf===printFormat));
   document.getElementById('posLabel').value=posLabel; document.getElementById('posLabel').disabled=!hasPos;
   if(qrMode==='auto') document.getElementById('qrText').value=c.qrText||'';
   document.getElementById('qrLabel').value=c.qrLabel||'';
@@ -780,7 +785,14 @@ function snapshot(){
   const vals={nome:draft.nome||'',pos:draft.pos||''};
   snap.forEach(f=>vals[f.id]=draft[f.id]||'');
   const qrL = (qrMode==='auto'||qrMode==='placeholder') ? (document.getElementById('qrLabel').value||'') : '';
-  return {color:cardColor,qrMode,qrText:qrMode==='auto'?(document.getElementById('qrText').value||''):'',qrLabel:qrL,img:photoData,hasBack,hasPos,posLabel,vals,fieldsSnapshot:snap};
+  return {
+    color:cardColor, qrMode,
+    qrText: qrMode==='auto' ? (document.getElementById('qrText').value||'') : '',
+    qrLabel:qrL, img:photoData,
+    hasBack, hasPos, posLabel,
+    printFormat,                      // formato di stampa per QUESTO cartellino
+    vals, fieldsSnapshot:snap,
+  };
 }
 document.getElementById('addCardBtn').onclick=()=>{
   if(!(draft.nome||'').trim()){alert('Inserisci almeno il nome del prodotto.');return;}
@@ -801,7 +813,7 @@ document.getElementById('addAllBtn').onclick=()=>{
   LIBRARY.forEach(p=>{
     const vals={nome:p.nome,pos:''};
     snap.forEach(f=>vals[f.id]= p[f.id]!==undefined?p[f.id]:'');
-    cards.push({color:cardColor,qrMode,qrText:'',qrLabel:(qrMode==='auto'||qrMode==='placeholder')?(document.getElementById('qrLabel').value||''):'',img:null,hasBack,hasPos,posLabel,vals,fieldsSnapshot:snap});
+    cards.push({color:cardColor,qrMode,qrText:'',qrLabel:(qrMode==='auto'||qrMode==='placeholder')?(document.getElementById('qrLabel').value||''):'',img:null,hasBack,hasPos,posLabel,printFormat,vals,fieldsSnapshot:snap});
   });
   renderSheet(); markDirty();
 };
@@ -830,85 +842,129 @@ function measureFrontHeights(arr, cellWidthMm){
   return heights;
 }
 
-document.getElementById('printBtn').onclick=()=>{
-  if(!cards.length){alert('Aggiungi almeno un cartellino.');return;}
-  const ps=document.getElementById('printSheet'); ps.innerHTML='';
-  ps.className = 'printsheet pf-'+printFormat;
+function cardFormat(c){ return (c && c.printFormat === 'auto') ? 'auto' : 'a6'; }
 
-  // PER_PAGE dipende dal formato
+function makePage(fmt, label){
+  const p = document.createElement('div');
+  p.className = 'page pf-'+fmt;
+  p.innerHTML = '<div class="page-tag">'+label+'</div>';
+  const g = document.createElement('div'); g.className = 'pgrid';
+  p.appendChild(g);
+  return p;
+}
+
+function applyAutoHeights(wrapperDiv, card, hMap){
+  if(!hMap) return;
+  const h = hMap.get(card);
+  if(!h) return;
+  const cardEl = wrapperDiv.querySelector('.card');
+  if(cardEl) cardEl.style.height = h + 'px';
+}
+
+document.getElementById('printBtn').onclick = ()=>{
+  if(!cards.length){ alert('Aggiungi almeno un cartellino.'); return; }
+  const ps = document.getElementById('printSheet');
+  ps.innerHTML = '';
+  ps.className = 'printsheet';
+
   const PER_ROW = 2;
-  const PER_PAGE = (printFormat==='a6') ? 4 : 6;
+  const PER_PAGE = { a6: 4, auto: 6 };
 
-  const withBack = cards.filter(c=>c.hasBack!==false);
-  const noBack   = cards.filter(c=>c.hasBack===false);
+  /* Raggruppa i cartellini per (formato, hasBack). Cosi' ogni pagina
+     contiene solo cartellini omogenei e ognuno conserva il suo formato. */
+  const groups = [
+    {fmt:'a6',   withBack:true},
+    {fmt:'a6',   withBack:false},
+    {fmt:'auto', withBack:true},
+    {fmt:'auto', withBack:false},
+  ].map(g => ({
+    ...g,
+    cards: cards.filter(c =>
+      cardFormat(c) === g.fmt &&
+      ((c.hasBack !== false) === g.withBack)
+    ),
+  }));
 
-  // Solo per formato 'auto': pre-misura altezze del fronte (in px)
-  // cellWidth in 'auto' = (210 - 6*2 padding - 4 gap) / 2 = 97mm
-  let hFrontMap = null;
-  if(printFormat==='auto'){
-    const allWithBack = withBack;
-    const heights = measureFrontHeights(allWithBack, 97);
-    hFrontMap = new Map();
-    allWithBack.forEach((c,i)=>hFrontMap.set(c, heights[i]));
+  /* Per i soli cartellini in formato Adattivo, pre-misuriamo l'altezza
+     naturale del fronte (in container off-screen di larghezza pari alla
+     cella in stampa, ~97mm). Il retro viene poi forzato a quella altezza. */
+  const autoCards = cards.filter(c => cardFormat(c) === 'auto');
+  let hMap = null;
+  if(autoCards.length){
+    const heights = measureFrontHeights(autoCards, 97);
+    hMap = new Map();
+    autoCards.forEach((c,i)=>hMap.set(c, heights[i]));
   }
 
-  // === card con retro: fronte + retro alternati, retro speculato per colonna ===
-  for(let start=0; start<withBack.length; start+=PER_PAGE){
-    const slice=withBack.slice(start,start+PER_PAGE);
+  for(const g of groups){
+    if(!g.cards.length) continue;
+    const perPage = PER_PAGE[g.fmt];
+    const useAutoHeights = (g.fmt === 'auto');
 
-    // pagina fronte
-    const pF=document.createElement('div'); pF.className='page';
-    pF.innerHTML='<div class="page-tag">Fronte (con retro)</div>';
-    const gF=document.createElement('div'); gF.className='pgrid';
-    slice.forEach(c=>{
-      const d=document.createElement('div');
-      d.innerHTML=frontHTML(c);
-      // In 'auto' fissiamo l'altezza del fronte alla sua naturale (no-op
-      // pratico ma rende esplicita la dimensione che il retro replichera').
-      if(hFrontMap){
-        const h = hFrontMap.get(c);
-        const card = d.querySelector('.card');
-        if(card && h) card.style.height = h + 'px';
+    for(let start=0; start<g.cards.length; start+=perPage){
+      const slice = g.cards.slice(start, start+perPage);
+
+      if(g.withBack){
+        // Pagina fronte
+        const pF = makePage(g.fmt, 'Fronte (con retro)');
+        const gF = pF.querySelector('.pgrid');
+        slice.forEach(c=>{
+          const d=document.createElement('div');
+          d.innerHTML = frontHTML(c);
+          if(useAutoHeights) applyAutoHeights(d, c, hMap);
+          gF.appendChild(d);
+        });
+        ps.appendChild(pF);
+
+        // Pagina retro (speculata per colonna per duplex lato lungo)
+        const pB = makePage(g.fmt, 'Retro');
+        const gB = pB.querySelector('.pgrid');
+        const mirrored = [];
+        for(let i=0;i<slice.length;i+=PER_ROW){
+          const ri = slice.slice(i, i+PER_ROW);
+          if(ri.length===PER_ROW) mirrored.push(ri[1], ri[0]);
+          else mirrored.push(ri[0]);
+        }
+        mirrored.forEach(c=>{
+          const d=document.createElement('div');
+          d.innerHTML = backHTML(c);
+          if(useAutoHeights) applyAutoHeights(d, c, hMap);
+          gB.appendChild(d);
+        });
+        ps.appendChild(pB);
+      } else {
+        // Solo fronte
+        const p = makePage(g.fmt, 'Solo fronte');
+        const grid = p.querySelector('.pgrid');
+        slice.forEach(c=>{
+          const d=document.createElement('div');
+          d.innerHTML = frontHTML(c);
+          if(useAutoHeights) applyAutoHeights(d, c, hMap);
+          grid.appendChild(d);
+        });
+        ps.appendChild(p);
       }
-      gF.appendChild(d);
-    });
-    pF.appendChild(gF); ps.appendChild(pF);
-
-    // pagina retro (speculata per colonna)
-    const pB=document.createElement('div'); pB.className='page';
-    pB.innerHTML='<div class="page-tag">Retro</div>';
-    const gB=document.createElement('div'); gB.className='pgrid';
-    const mirrored=[];
-    for(let i=0;i<slice.length;i+=PER_ROW){
-      const rowItems=slice.slice(i,i+PER_ROW);
-      if(rowItems.length===PER_ROW){mirrored.push(rowItems[1],rowItems[0]);}
-      else{mirrored.push(rowItems[0]);}
     }
-    mirrored.forEach(c=>{
-      const d=document.createElement('div');
-      d.innerHTML=backHTML(c);
-      // In 'auto': il retro PRENDE l'altezza del proprio fronte.
-      // Il blocco .reg si comprime/espande per riempire questa altezza.
-      if(hFrontMap){
-        const h = hFrontMap.get(c);
-        const card = d.querySelector('.card');
-        if(card && h) card.style.height = h + 'px';
-      }
-      gB.appendChild(d);
-    });
-    pB.appendChild(gB); ps.appendChild(pB);
   }
 
-  // === card solo fronte ===
-  for(let start=0; start<noBack.length; start+=PER_PAGE){
-    const slice=noBack.slice(start,start+PER_PAGE);
-    const p=document.createElement('div'); p.className='page';
-    p.innerHTML='<div class="page-tag">Solo fronte</div>';
-    const g=document.createElement('div'); g.className='pgrid';
-    slice.forEach(c=>{const d=document.createElement('div');d.innerHTML=frontHTML(c);g.appendChild(d);});
-    p.appendChild(g); ps.appendChild(p);
-  }
-  window.print();
+  /* Fix "prima pagina bianca": sposta il printsheet direttamente sotto
+     <body> in modo che non erediti spazio da .ck-root/.wrap/main/etc.
+     Combinato con la regola CSS che nasconde tutti i fratelli del
+     printsheet dentro body, niente altro contribuisce al layout di stampa.
+     Dopo il print, lo rimettiamo al suo posto originale. */
+  const origParent = ps.parentNode;
+  const origNext = ps.nextSibling;
+  document.body.appendChild(ps);
+
+  const restore = ()=>{
+    try { origParent.insertBefore(ps, origNext); } catch(e){}
+    window.removeEventListener('afterprint', restore);
+  };
+  window.addEventListener('afterprint', restore);
+
+  // requestAnimationFrame per essere certi che il browser abbia
+  // gia' applicato il riposizionamento prima di aprire l'anteprima.
+  requestAnimationFrame(()=> { window.print(); });
 };
 
 /* ---- Stato corrente / applyState (per DB + file) ---- */
