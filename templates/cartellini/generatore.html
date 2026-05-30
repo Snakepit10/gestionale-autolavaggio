@@ -919,19 +919,36 @@ document.getElementById('printBtn').onclick = ()=>{
         });
         ps.appendChild(pF);
 
-        // Pagina retro (speculata per colonna per duplex lato lungo)
+        // Pagina retro (speculata per colonna per duplex lato lungo).
+        // Per ogni riga del fronte (2 colonne), il retro deve avere i
+        // cartellini in ordine inverso, cosi' dopo il flip lato lungo
+        // ogni retro cade fisicamente dietro al proprio fronte.
+        // Caso speciale - riga parziale (1 solo cartellino, era a col 0
+        // sul fronte): sul retro va inserito un placeholder VUOTO a col 0
+        // e il cartellino a col 1, altrimenti dopo il flip il retro
+        // finisce a destra mentre il fronte e' a sinistra -> retro
+        // bianco dietro al fronte ritagliato.
         const pB = makePage(g.fmt, 'Retro');
         const gB = pB.querySelector('.pgrid');
         const mirrored = [];
         for(let i=0;i<slice.length;i+=PER_ROW){
           const ri = slice.slice(i, i+PER_ROW);
-          if(ri.length===PER_ROW) mirrored.push(ri[1], ri[0]);
-          else mirrored.push(ri[0]);
+          if(ri.length===PER_ROW){
+            mirrored.push(ri[1], ri[0]);
+          } else {
+            // riga parziale: empty + card  (cosi' il card va a col 1)
+            mirrored.push(null, ri[0]);
+          }
         }
         mirrored.forEach(c=>{
           const d=document.createElement('div');
-          d.innerHTML = backHTML(c);
-          if(useAutoHeights) applyAutoHeights(d, c, hMap);
+          if(c === null){
+            // placeholder vuoto: occupa lo slot di griglia ma non rende nulla
+            d.style.visibility = 'hidden';
+          } else {
+            d.innerHTML = backHTML(c);
+            if(useAutoHeights) applyAutoHeights(d, c, hMap);
+          }
           gB.appendChild(d);
         });
         ps.appendChild(pB);
