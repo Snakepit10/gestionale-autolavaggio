@@ -873,77 +873,74 @@ document.getElementById('printBtn').onclick = ()=>{
   const PER_ROW = 2;
   const PER_PAGE = { a6: 4, auto: 6 };
 
-  /* Raggruppa i cartellini per (formato, hasBack). Cosi' ogni pagina
-     contiene solo cartellini omogenei e ognuno conserva il suo formato. */
-  const groups = [
-    {fmt:'a6',   withBack:true},
-    {fmt:'a6',   withBack:false},
-    {fmt:'auto', withBack:true},
-    {fmt:'auto', withBack:false},
-  ].map(g => ({
-    ...g,
-    cards: cards.filter(c =>
-      cardFormat(c) === g.fmt &&
-      ((c.hasBack !== false) === g.withBack)
-    ),
-  }));
+  /* Raggruppa SOLO per formato. Cartellini con o senza retro dello
+     stesso formato vanno sullo stesso foglio fronte, evitando di
+     sprecare slot vuoti su fogli separati.
+     La pagina retro viene generata solo se almeno un cartellino della
+     slice ha retro; i cartellini "solo fronte" diventano placeholder
+     vuoti sul retro (mantenendo la specchiatura corretta per colonna
+     per gli altri). */
+  const byFormat = {
+    a6:   cards.filter(c => cardFormat(c) === 'a6'),
+    auto: cards.filter(c => cardFormat(c) === 'auto'),
+  };
 
-  /* Per i soli cartellini in formato Adattivo, pre-misuriamo l'altezza
-     naturale del fronte (in container off-screen di larghezza pari alla
-     cella in stampa, ~97mm). Il retro viene poi forzato a quella altezza. */
-  const autoCards = cards.filter(c => cardFormat(c) === 'auto');
+  /* Per i cartellini in formato Adattivo, pre-misuriamo l'altezza
+     naturale del fronte (container off-screen, larghezza cella ~97mm). */
   let hMap = null;
-  if(autoCards.length){
-    const heights = measureFrontHeights(autoCards, 97);
+  if(byFormat.auto.length){
+    const heights = measureFrontHeights(byFormat.auto, 97);
     hMap = new Map();
-    autoCards.forEach((c,i)=>hMap.set(c, heights[i]));
+    byFormat.auto.forEach((c,i)=>hMap.set(c, heights[i]));
   }
 
-  for(const g of groups){
-    if(!g.cards.length) continue;
-    const perPage = PER_PAGE[g.fmt];
-    const useAutoHeights = (g.fmt === 'auto');
+  for(const fmt of ['a6', 'auto']){
+    const groupCards = byFormat[fmt];
+    if(!groupCards.length) continue;
+    const perPage = PER_PAGE[fmt];
+    const useAutoHeights = (fmt === 'auto');
 
-    for(let start=0; start<g.cards.length; start+=perPage){
-      const slice = g.cards.slice(start, start+perPage);
+    for(let start=0; start<groupCards.length; start+=perPage){
+      const slice = groupCards.slice(start, start+perPage);
+      const hasAnyBack = slice.some(c => c.hasBack !== false);
 
-      if(g.withBack){
-        // Pagina fronte
-        const pF = makePage(g.fmt, 'Fronte (con retro)');
-        const gF = pF.querySelector('.pgrid');
-        slice.forEach(c=>{
-          const d=document.createElement('div');
-          d.innerHTML = frontHTML(c);
-          if(useAutoHeights) applyAutoHeights(d, c, hMap);
-          gF.appendChild(d);
-        });
-        ps.appendChild(pF);
+      /* Pagina fronte: contiene tutti i cartellini della slice
+         (con o senza retro). */
+      const pF = makePage(fmt, hasAnyBack ? 'Fronte (con retro)' : 'Solo fronte');
+      const gF = pF.querySelector('.pgrid');
+      slice.forEach(c=>{
+        const d = document.createElement('div');
+        d.innerHTML = frontHTML(c);
+        if(useAutoHeights) applyAutoHeights(d, c, hMap);
+        gF.appendChild(d);
+      });
+      ps.appendChild(pF);
 
-        // Pagina retro (speculata per colonna per duplex lato lungo).
-        // Per ogni riga del fronte (2 colonne), il retro deve avere i
-        // cartellini in ordine inverso, cosi' dopo il flip lato lungo
-        // ogni retro cade fisicamente dietro al proprio fronte.
-        // Caso speciale - riga parziale (1 solo cartellino, era a col 0
-        // sul fronte): sul retro va inserito un placeholder VUOTO a col 0
-        // e il cartellino a col 1, altrimenti dopo il flip il retro
-        // finisce a destra mentre il fronte e' a sinistra -> retro
-        // bianco dietro al fronte ritagliato.
-        const pB = makePage(g.fmt, 'Retro');
+      /* Pagina retro: solo se almeno un cartellino della slice ha retro.
+         Specchiatura per colonna: ogni riga viene invertita cosi' dopo
+         il flip lato lungo ogni retro cade fisicamente sul proprio
+         fronte. I cartellini "solo fronte" diventano placeholder vuoti
+         nelle posizioni mirror corrispondenti. La riga parziale (1
+         cartellino solo) inserisce un placeholder davanti per spingere
+         il cartellino sulla colonna giusta. */
+      if(hasAnyBack){
+        const pB = makePage(fmt, 'Retro');
         const gB = pB.querySelector('.pgrid');
         const mirrored = [];
         for(let i=0;i<slice.length;i+=PER_ROW){
           const ri = slice.slice(i, i+PER_ROW);
-          if(ri.length===PER_ROW){
-            mirrored.push(ri[1], ri[0]);
+          // null per cartellini senza retro: posizione preservata ma vuota
+          const items = ri.map(c => (c.hasBack === false ? null : c));
+          if(items.length === PER_ROW){
+            mirrored.push(items[1], items[0]);
           } else {
-            // riga parziale: empty + card  (cosi' il card va a col 1)
-            mirrored.push(null, ri[0]);
+            // riga parziale: placeholder a col 0 + card (o null) a col 1
+            mirrored.push(null, items[0]);
           }
         }
         mirrored.forEach(c=>{
-          const d=document.createElement('div');
+          const d = document.createElement('div');
           if(c === null){
-            // placeholder vuoto: occupa lo slot di griglia ma non rende nulla
             d.style.visibility = 'hidden';
           } else {
             d.innerHTML = backHTML(c);
@@ -952,17 +949,6 @@ document.getElementById('printBtn').onclick = ()=>{
           gB.appendChild(d);
         });
         ps.appendChild(pB);
-      } else {
-        // Solo fronte
-        const p = makePage(g.fmt, 'Solo fronte');
-        const grid = p.querySelector('.pgrid');
-        slice.forEach(c=>{
-          const d=document.createElement('div');
-          d.innerHTML = frontHTML(c);
-          if(useAutoHeights) applyAutoHeights(d, c, hMap);
-          grid.appendChild(d);
-        });
-        ps.appendChild(p);
       }
     }
   }
