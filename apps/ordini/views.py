@@ -294,6 +294,59 @@ def calcola_tempo_attesa(request):
         return JsonResponse({'error': str(e)}, status=500)
 
 
+def _risolvi_cliente_payload(data, required=False):
+    """Risolve il cliente dal payload della cassa: o cliente_id esistente
+    o nuovo_cliente da creare.
+
+    Ritorna (cliente_or_none, error_jsonresponse_or_none). Se entrambi
+    None e required=True, ritorna un errore. Estratta per essere usata
+    sia da completa_ordine sia da crea_prenotazione_da_carrello.
+    """
+    cliente_id = data.get('cliente_id')
+    nuovo_cliente_data = data.get('nuovo_cliente')
+
+    if cliente_id:
+        try:
+            return Cliente.objects.get(pk=cliente_id), None
+        except Cliente.DoesNotExist:
+            return None, JsonResponse({'error': 'Cliente non trovato'}, status=404)
+
+    if nuovo_cliente_data:
+        tipo_cliente = nuovo_cliente_data.get('tipo')
+        if tipo_cliente == 'privato':
+            form = ClienteQuickForm(nuovo_cliente_data)
+            if form.is_valid():
+                return form.save(), None
+            return None, JsonResponse({
+                'error': 'Dati cliente non validi',
+                'form_errors': form.errors,
+            }, status=400)
+        if tipo_cliente == 'azienda':
+            try:
+                email = nuovo_cliente_data.get('email') or None
+                if isinstance(email, str) and not email.strip():
+                    email = None
+                cliente = Cliente.objects.create(
+                    tipo='azienda',
+                    ragione_sociale=nuovo_cliente_data.get('ragione_sociale', ''),
+                    partita_iva=nuovo_cliente_data.get('partita_iva', ''),
+                    codice_sdi=nuovo_cliente_data.get('codice_sdi', ''),
+                    indirizzo=nuovo_cliente_data.get('indirizzo', ''),
+                    telefono=nuovo_cliente_data.get('telefono', ''),
+                    email=email,
+                )
+                return cliente, None
+            except Exception as e:
+                return None, JsonResponse({
+                    'error': f'Errore nella creazione del cliente azienda: {e}'
+                }, status=400)
+        return None, JsonResponse({'error': 'Tipo cliente non valido'}, status=400)
+
+    if required:
+        return None, JsonResponse({'error': 'Seleziona o crea un cliente'}, status=400)
+    return None, None
+
+
 @login_required
 @transaction.atomic
 def completa_ordine(request):
@@ -309,51 +362,11 @@ def completa_ordine(request):
         if not carrello:
             return JsonResponse({'error': 'Carrello vuoto'}, status=400)
         
-        # Cliente (opzionale)
-        cliente_id = data.get('cliente_id')
-        cliente = None
-        if cliente_id:
-            cliente = get_object_or_404(Cliente, id=cliente_id)
-        
-        # Crea nuovo cliente se richiesto
-        if data.get('nuovo_cliente'):
-            nuovo_cliente_data = data.get('nuovo_cliente')
-            tipo_cliente = nuovo_cliente_data.get('tipo')
-            
-            if tipo_cliente == 'privato':
-                # Usa ClienteQuickForm per clienti privati
-                cliente_form = ClienteQuickForm(nuovo_cliente_data)
-                if cliente_form.is_valid():
-                    cliente = cliente_form.save()
-                else:
-                    return JsonResponse({
-                        'error': 'Dati cliente non validi',
-                        'form_errors': cliente_form.errors
-                    }, status=400)
-            elif tipo_cliente == 'azienda':
-                # Crea cliente azienda manualmente
-                try:
-                    email = nuovo_cliente_data.get('email')
-                    if not email or email.strip() == '':
-                        email = None
-                    
-                    cliente = Cliente.objects.create(
-                        tipo='azienda',
-                        ragione_sociale=nuovo_cliente_data.get('ragione_sociale', ''),
-                        partita_iva=nuovo_cliente_data.get('partita_iva', ''),
-                        codice_sdi=nuovo_cliente_data.get('codice_sdi', ''),
-                        indirizzo=nuovo_cliente_data.get('indirizzo', ''),
-                        telefono=nuovo_cliente_data.get('telefono', ''),
-                        email=email,
-                    )
-                except Exception as e:
-                    return JsonResponse({
-                        'error': f'Errore nella creazione del cliente azienda: {str(e)}'
-                    }, status=400)
-            else:
-                return JsonResponse({
-                    'error': 'Tipo cliente non valido'
-                }, status=400)
+        # Cliente (opzionale per gli ordini): esistente o nuovo.
+        # required=False perche' un ordine puo' essere senza cliente.
+        cliente, err = _risolvi_cliente_payload(data, required=False)
+        if err is not None:
+            return err
         
         # Calcola totali
         totale_prezzo = sum(item['prezzo'] * item['quantita'] for item in carrello.values())
@@ -551,11 +564,13 @@ def crea_prenotazione_da_carrello(request):
         if not carrello:
             return JsonResponse({'error': 'Carrello vuoto'}, status=400)
 
-        # Cliente obbligatorio per una prenotazione
-        cliente_id = data.get('cliente_id')
-        if not cliente_id:
-            return JsonResponse({'error': 'Seleziona un cliente prima di prenotare'}, status=400)
-        cliente = get_object_or_404(Cliente, id=cliente_id)
+        # Cliente obbligatorio per una prenotazione: puo' essere un
+        # cliente esistente (cliente_id) o uno nuovo da creare al volo
+        # (nuovo_cliente con tipo/dati). Helper condivisa con
+        # completa_ordine per mantenere coerenza dei due flow della cassa.
+        cliente, err = _risolvi_cliente_payload(data, required=True)
+        if err is not None:
+            return err
 
         # Data e ora obbligatorie
         data_str = data.get('data')

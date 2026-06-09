@@ -1399,10 +1399,14 @@ function confermaPrenotazione() {
         return;
     }
 
+    // Cliente: se esistente passo cliente_id, se nuovo passo l'oggetto
+    // completo cosi' il backend lo crea prima della prenotazione
+    // (stesso pattern di confermaOrdine).
     const payload = {
         data: dataVal,
         ora: oraVal,
-        cliente_id: clienteSelezionato ? clienteSelezionato.id : null,
+        cliente_id: (clienteSelezionato && !clienteSelezionato.nuovo) ? clienteSelezionato.id : null,
+        nuovo_cliente: (clienteSelezionato && clienteSelezionato.nuovo) ? clienteSelezionato : null,
         tipo_auto: document.getElementById('tipo-auto').value.trim(),
         nota: document.getElementById('note-ordine').value.trim(),
     };
