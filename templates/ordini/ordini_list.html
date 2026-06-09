@@ -381,13 +381,16 @@ function prenProponiOrario(pk, vecchiaData, vecchiaOra) {
             data-bs-target="#modalCheckin"
             data-pk="{{ p.pk }}"
             data-codice="{{ p.codice_prenotazione|default:'' }}"
+            data-data="{{ p.slot.data|date:'Y-m-d' }}"
             data-ora="{{ p.slot.ora_inizio|time:'H:i' }}"
             data-cliente="{{ p.cliente }}"
+            data-cliente-id="{{ p.cliente.id }}"
             data-tipo-auto="{{ p.tipo_auto|default:'' }}"
             data-servizi="{% for s in p.servizi.all %}{{ s.titolo }}{% if not forloop.last %}, {% endif %}{% endfor %}"
             data-servizi-ids="{% for s in p.servizi.all %}{{ s.id }}{% if not forloop.last %},{% endif %}{% endfor %}"
             data-durata="{{ p.durata_stimata_minuti|default:'' }}"
             data-stato="{{ p.stato }}"
+            data-nota-cliente="{{ p.nota_cliente|default:'' }}"
             title="{% if p.delta_min < 0 %}In ritardo di {{ p.delta_min|stringformat:'d'|cut:'-' }} min{% elif p.delta_min == 0 %}Ora{% else %}Tra {{ p.delta_min }} min{% endif %}">
         <span class="time-pill">
             <i class="bi bi-clock"></i> {{ p.slot.ora_inizio|time:"H:i" }}
@@ -430,16 +433,44 @@ function prenProponiOrario(pk, vecchiaData, vecchiaOra) {
               <div id="ckCodice" class="fs-6">&mdash;</div>
             </div>
             <div class="col-md-6">
-              <label class="form-label small fw-bold text-muted">Orario</label>
-              <div id="ckOra" class="fs-6">&mdash;</div>
-            </div>
-            <div class="col-md-6">
-              <label class="form-label small fw-bold text-muted">Cliente</label>
-              <div id="ckCliente" class="fs-6">&mdash;</div>
-            </div>
-            <div class="col-md-6">
               <label class="form-label small fw-bold text-muted">Stato</label>
               <div id="ckStato" class="fs-6">&mdash;</div>
+            </div>
+
+            {# === Cliente: visualizzato + cambia con ricerca === #}
+            <div class="col-12">
+              <label class="form-label small fw-bold text-muted">Cliente</label>
+              <div class="input-group input-group-sm">
+                <span class="input-group-text bg-light" id="ckClienteLabel">&mdash;</span>
+                <button type="button" class="btn btn-outline-secondary" id="ckBtnCambiaCliente">
+                  <i class="bi bi-pencil"></i> Cambia
+                </button>
+              </div>
+              <input type="hidden" name="cliente_id" id="ckClienteId" value="">
+              <div id="ckClienteSearchWrap" class="mt-2" style="display:none;">
+                <input type="text" id="ckClienteSearch" class="form-control form-control-sm"
+                       placeholder="Cerca per nome, cognome, ragione sociale, email, telefono&hellip;"
+                       autocomplete="off">
+                <div id="ckClienteResults" class="border rounded mt-1" style="max-height:180px;overflow-y:auto;display:none;background:#fff;"></div>
+              </div>
+            </div>
+
+            {# === Data + Ora editabili (sposta slot) === #}
+            <div class="col-md-6">
+              <label class="form-label small fw-bold text-muted">Data prenotazione</label>
+              <input type="date" name="nuova_data" id="ckNuovaData" class="form-control form-control-sm" value="">
+            </div>
+            <div class="col-md-6">
+              <label class="form-label small fw-bold text-muted">Orario prenotazione</label>
+              <input type="time" name="nuova_ora" id="ckNuovaOra" class="form-control form-control-sm" value="">
+            </div>
+
+            {# === Nota cliente (read-only, solo se presente) === #}
+            <div class="col-12" id="ckNotaClienteWrap" style="display:none;">
+              <label class="form-label small fw-bold text-muted">
+                <i class="bi bi-chat-left-text"></i> Nota del cliente
+              </label>
+              <div id="ckNotaCliente" class="alert alert-light py-2 px-3 mb-0 small">&mdash;</div>
             </div>
             <div class="col-12">
               <label class="form-label small fw-bold text-muted d-flex justify-content-between align-items-center">
@@ -492,7 +523,8 @@ function prenProponiOrario(pk, vecchiaData, vecchiaOra) {
 
           <div class="alert alert-info small mt-3 mb-0">
             <i class="bi bi-info-circle"></i>
-            Confermando, la prenotazione viene convertita in <strong>ordine</strong>. Il cliente e i servizi restano quelli gia prenotati.
+            Confermando, le modifiche (cliente, data/ora, servizi, tipo auto, tipo consegna, note)
+            vengono applicate alla prenotazione e poi la stessa viene convertita in <strong>ordine</strong>.
           </div>
         </div>
         <div class="modal-footer justify-content-between">
@@ -555,6 +587,56 @@ function ckEliminaPrenotazione() {
 (function(){
   const modal = document.getElementById('modalCheckin');
   if (!modal) return;
+
+  // ====== Ricerca cliente live ======
+  const searchInput = document.getElementById('ckClienteSearch');
+  const searchWrap = document.getElementById('ckClienteSearchWrap');
+  const resultsBox = document.getElementById('ckClienteResults');
+  const clienteLabel = document.getElementById('ckClienteLabel');
+  const clienteIdHidden = document.getElementById('ckClienteId');
+  let searchTimer = null;
+
+  document.getElementById('ckBtnCambiaCliente').addEventListener('click', function(){
+    const hidden = (searchWrap.style.display === 'none');
+    searchWrap.style.display = hidden ? '' : 'none';
+    if (hidden) { searchInput.value = ''; resultsBox.style.display = 'none'; searchInput.focus(); }
+  });
+
+  function renderResults(items){
+    if (!items.length){
+      resultsBox.innerHTML = '<div class="p-2 text-muted small">Nessun cliente trovato</div>';
+      resultsBox.style.display = '';
+      return;
+    }
+    resultsBox.innerHTML = items.map(c =>
+      `<button type="button" class="list-group-item list-group-item-action border-0 w-100 text-start ck-cliente-pick" data-id="${c.id}" data-name="${(c.text || '').replace(/"/g, '&quot;')}">
+        <div class="fw-bold small">${c.text || '(senza nome)'}</div>
+        <div class="text-muted" style="font-size:.75rem;">${c.email || ''}${c.email && c.telefono ? ' · ' : ''}${c.telefono || ''}</div>
+      </button>`
+    ).join('');
+    resultsBox.style.display = '';
+    resultsBox.querySelectorAll('.ck-cliente-pick').forEach(b => {
+      b.addEventListener('click', function(){
+        clienteIdHidden.value = b.getAttribute('data-id');
+        clienteLabel.textContent = b.getAttribute('data-name');
+        searchWrap.style.display = 'none';
+      });
+    });
+  }
+
+  searchInput.addEventListener('input', function(){
+    clearTimeout(searchTimer);
+    const term = this.value.trim();
+    if (term.length < 2){ resultsBox.style.display = 'none'; return; }
+    searchTimer = setTimeout(() => {
+      fetch(`/clienti/cerca/?term=${encodeURIComponent(term)}`, { credentials:'same-origin' })
+        .then(r => r.json())
+        .then(d => renderResults(d.results || []))
+        .catch(() => { resultsBox.innerHTML = '<div class="p-2 text-danger small">Errore di ricerca</div>'; resultsBox.style.display=''; });
+    }, 250);
+  });
+
+  // ====== Apertura modal: popola tutti i campi ======
   modal.addEventListener('show.bs.modal', function(event){
     const btn = event.relatedTarget;
     if (!btn) return;
@@ -563,13 +645,36 @@ function ckEliminaPrenotazione() {
     const form = document.getElementById('formCheckin');
     form.action = `/prenotazioni/admin/${pk}/checkin/?next=ordini`;
     document.getElementById('ckCodice').textContent = btn.getAttribute('data-codice') || '—';
-    document.getElementById('ckOra').textContent = btn.getAttribute('data-ora') || '—';
-    document.getElementById('ckCliente').textContent = btn.getAttribute('data-cliente') || '—';
+
+    // Stato badge
     const stato = btn.getAttribute('data-stato') || '—';
     const statoEl = document.getElementById('ckStato');
     statoEl.innerHTML = stato === 'confermata'
       ? '<span class="badge bg-success">Confermata</span>'
       : (stato === 'in_attesa' ? '<span class="badge bg-warning text-dark">In attesa</span>' : stato);
+
+    // Cliente (label + id nascosto) + reset ricerca
+    clienteLabel.textContent = btn.getAttribute('data-cliente') || '—';
+    clienteIdHidden.value = btn.getAttribute('data-cliente-id') || '';
+    searchWrap.style.display = 'none';
+    searchInput.value = '';
+    resultsBox.style.display = 'none';
+
+    // Data e ora editabili (slot prenotazione)
+    document.getElementById('ckNuovaData').value = btn.getAttribute('data-data') || '';
+    document.getElementById('ckNuovaOra').value = btn.getAttribute('data-ora') || '';
+
+    // Nota cliente (read-only, mostra solo se presente)
+    const nota = btn.getAttribute('data-nota-cliente') || '';
+    const notaWrap = document.getElementById('ckNotaClienteWrap');
+    if (nota.trim()){
+      document.getElementById('ckNotaCliente').textContent = nota;
+      notaWrap.style.display = '';
+    } else {
+      notaWrap.style.display = 'none';
+    }
+
+    // Tipo auto
     document.getElementById('ckTipoAuto').value = btn.getAttribute('data-tipo-auto') || '';
     // Default: tipo consegna immediata, ora vuota
     document.getElementById('ckTipoConsegna').value = 'immediata';

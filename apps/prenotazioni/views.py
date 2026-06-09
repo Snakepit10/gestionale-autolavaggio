@@ -1254,7 +1254,42 @@ def checkin_prenotazione(request, pk):
             if tipo_auto_modificato and tipo_auto_modificato != prenotazione.tipo_auto:
                 prenotazione.tipo_auto = tipo_auto_modificato
                 prenotazione.save()
-            
+
+            # Aggiorna data/ora prenotazione se modificata dal modal:
+            # spostiamo la prenotazione a un nuovo slot (get_or_create) e
+            # ri-allineiamo i contatori del vecchio e nuovo slot. Il
+            # successivo converti_in_ordine usera' i NUOVI orari per
+            # calcolare ora_consegna_richiesta dell'ordine.
+            nuova_data_str = request.POST.get('nuova_data', '').strip()
+            nuova_ora_str = request.POST.get('nuova_ora', '').strip()
+            if nuova_data_str and nuova_ora_str:
+                from datetime import datetime as _dt, timedelta as _td
+                try:
+                    nuova_data = _dt.strptime(nuova_data_str, '%Y-%m-%d').date()
+                    nuova_ora = _dt.strptime(nuova_ora_str, '%H:%M').time()
+                    if (nuova_data != prenotazione.slot.data or
+                            nuova_ora != prenotazione.slot.ora_inizio):
+                        durata = prenotazione.durata_stimata_minuti or 30
+                        ora_fine_dt = _dt.combine(nuova_data, nuova_ora) + _td(minutes=durata)
+                        vecchio_slot = prenotazione.slot
+                        nuovo_slot, _ = SlotPrenotazione.objects.get_or_create(
+                            data=nuova_data, ora_inizio=nuova_ora,
+                            defaults={
+                                'ora_fine': ora_fine_dt.time(),
+                                'max_prenotazioni': 99,
+                                'prenotazioni_attuali': 0,
+                                'disponibile': True,
+                            },
+                        )
+                        prenotazione.slot = nuovo_slot
+                        prenotazione.save()
+                        if hasattr(vecchio_slot, 'aggiorna_contatori'):
+                            vecchio_slot.aggiorna_contatori()
+                        if hasattr(nuovo_slot, 'aggiorna_contatori'):
+                            nuovo_slot.aggiorna_contatori()
+                except (ValueError, TypeError):
+                    pass
+
             # Converte prenotazione in ordine
             ordine = prenotazione.converti_in_ordine(request.user)
             
