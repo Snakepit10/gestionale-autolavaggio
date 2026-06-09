@@ -1649,3 +1649,113 @@ def cancella_prenotazione(request, pk):
             'success': False,
             'error': f'Errore durante la cancellazione: {str(e)}'
         })
+
+
+@login_required
+@require_http_methods(["POST"])
+def aggiorna_prenotazione_inline(request, pk):
+    """Aggiorna i campi base di una prenotazione SENZA convertirla in ordine.
+
+    Usata dal modal di check-in in /ordini/ tramite il pulsante
+    "Salva modifiche" (in alternativa a "Conferma check-in" che invece
+    converte). Accetta gli stessi nomi di campo usati dal form check-in
+    cosi' che condividano il payload:
+      - cliente_id        nuovo cliente (esistente)
+      - nuova_data, nuova_ora  sposta a nuovo slot (get_or_create)
+      - servizi_ids       csv id servizi (set + ricalcolo durata)
+      - tipo_auto
+      - tipo_consegna, ora_consegna_richiesta  (preferenze salvate
+        come nota_interna -- diventeranno l'ordine al checkin futuro)
+      - note_interne      salvato come prenotazione.nota_interna
+
+    Ritorna JsonResponse({success: true}) oppure {success: false, error}.
+    """
+    if not request.user.is_staff:
+        return JsonResponse({'success': False, 'error': 'Non autorizzato'}, status=403)
+
+    try:
+        prenotazione = get_object_or_404(Prenotazione, pk=pk)
+        if prenotazione.ordine:
+            return JsonResponse({
+                'success': False,
+                'error': 'Prenotazione gia convertita in ordine, non modificabile.'
+            }, status=400)
+
+        # Cliente
+        cliente_id = (request.POST.get('cliente_id') or '').strip()
+        if cliente_id:
+            try:
+                cliente = Cliente.objects.get(pk=cliente_id)
+                if cliente != prenotazione.cliente:
+                    prenotazione.cliente = cliente
+            except Cliente.DoesNotExist:
+                pass
+
+        # Tipo auto
+        tipo_auto = (request.POST.get('tipo_auto') or '').strip()
+        if tipo_auto != (prenotazione.tipo_auto or ''):
+            prenotazione.tipo_auto = tipo_auto
+
+        # Nota interna (textarea "Note interne" del modal)
+        note_interne = request.POST.get('note_interne')
+        if note_interne is not None:
+            prenotazione.nota_interna = note_interne.strip()
+
+        prenotazione.save()
+
+        # Servizi (set + ricalcolo durata stimata)
+        servizi_ids_raw = (request.POST.get('servizi_ids') or '').strip()
+        if servizi_ids_raw:
+            from apps.core.models import ServizioProdotto
+            servizi_id_list = [int(x) for x in servizi_ids_raw.split(',') if x.strip().isdigit()]
+            if servizi_id_list:
+                nuovi_servizi = ServizioProdotto.objects.filter(id__in=servizi_id_list)
+                prenotazione.servizi.set(nuovi_servizi)
+                prenotazione.durata_stimata_minuti = (
+                    sum(s.durata_minuti for s in nuovi_servizi) or 30
+                )
+                prenotazione.save()
+
+        # Slot data/ora: se differente, sposta a nuovo slot
+        nuova_data_str = (request.POST.get('nuova_data') or '').strip()
+        nuova_ora_str = (request.POST.get('nuova_ora') or '').strip()
+        if nuova_data_str and nuova_ora_str:
+            from datetime import datetime as _dt, timedelta as _td
+            try:
+                nuova_data = _dt.strptime(nuova_data_str, '%Y-%m-%d').date()
+                nuova_ora = _dt.strptime(nuova_ora_str, '%H:%M').time()
+                if (nuova_data != prenotazione.slot.data or
+                        nuova_ora != prenotazione.slot.ora_inizio):
+                    durata = prenotazione.durata_stimata_minuti or 30
+                    ora_fine_dt = _dt.combine(nuova_data, nuova_ora) + _td(minutes=durata)
+                    vecchio_slot = prenotazione.slot
+                    nuovo_slot, _ = SlotPrenotazione.objects.get_or_create(
+                        data=nuova_data, ora_inizio=nuova_ora,
+                        defaults={
+                            'ora_fine': ora_fine_dt.time(),
+                            'max_prenotazioni': 99,
+                            'prenotazioni_attuali': 0,
+                            'disponibile': True,
+                        },
+                    )
+                    prenotazione.slot = nuovo_slot
+                    prenotazione.save()
+                    if hasattr(vecchio_slot, 'aggiorna_contatori'):
+                        vecchio_slot.aggiorna_contatori()
+                    if hasattr(nuovo_slot, 'aggiorna_contatori'):
+                        nuovo_slot.aggiorna_contatori()
+            except (ValueError, TypeError):
+                pass
+
+        return JsonResponse({
+            'success': True,
+            'message': f'Prenotazione {prenotazione.codice_prenotazione} aggiornata.'
+        })
+
+    except Exception as e:
+        import traceback
+        traceback.print_exc()
+        return JsonResponse({
+            'success': False,
+            'error': f'Errore durante l\'aggiornamento: {e}'
+        }, status=500)

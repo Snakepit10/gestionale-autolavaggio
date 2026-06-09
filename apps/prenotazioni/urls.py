@@ -34,4 +34,5 @@ urlpatterns = [
     path('checkin/', views.CheckinPrenotazioniView.as_view(), name='checkin-prenotazioni'),
     path('admin/<int:pk>/checkin/', views.checkin_prenotazione, name='checkin-prenotazione'),
     path('admin/<int:pk>/cancella/', views.cancella_prenotazione, name='cancella-prenotazione'),
+    path('admin/<int:pk>/aggiorna/', views.aggiorna_prenotazione_inline, name='aggiorna-prenotazione-inline'),
 ]
