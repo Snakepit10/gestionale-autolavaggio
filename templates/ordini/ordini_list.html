@@ -356,8 +356,18 @@ function prenProponiOrario(pk, vecchiaData, vecchiaOra) {
 })();
 </script>
 
-<!-- Prenotazioni di oggi (badge cliccabili per check-in) -->
+<!-- Prenotazioni del giorno/range filtrato (badge cliccabili per check-in) -->
 {% if prenotazioni_upcoming %}
+<h6 class="text-muted small mb-2 mt-3">
+    <i class="bi bi-calendar-event"></i>
+    {% if request.GET.data_da or request.GET.data_a %}
+        Prenotazioni
+        {% if request.GET.data_da %}dal {{ request.GET.data_da }}{% endif %}
+        {% if request.GET.data_a %}al {{ request.GET.data_a }}{% endif %}
+    {% else %}
+        Prenotazioni di oggi
+    {% endif %}
+</h6>
 <div class="pren-legend">
     <span><span class="dot" style="background:#cbd5e1"></span>oltre 1h</span>
     <span><span class="dot" style="background:#3b82f6"></span>entro 1h</span>

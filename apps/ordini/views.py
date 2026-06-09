@@ -833,17 +833,27 @@ class OrdiniListView(LoginRequiredMixin, ListView):
         now_local = timezone.localtime(timezone.now())
 
         # Solo confermate: le 'in_attesa' vanno nella sezione separata
-        # 'Prenotazioni da confermare'
+        # 'Prenotazioni da confermare'.
+        # Rispettiamo data_da/data_a del form filtro come gia' fatto per
+        # gli ordini sopra: cosi' navigando i giorni l'operatore vede
+        # i badge delle prenotazioni del giorno/range filtrato (non solo
+        # quelle di oggi). Se nessun filtro temporale e' attivo, default
+        # = oggi (comportamento storico).
+        pren_filter = {'stato': 'confermata', 'ordine__isnull': True}
+        if data_da or data_a:
+            if data_da:
+                pren_filter['slot__data__gte'] = data_da
+            if data_a:
+                pren_filter['slot__data__lte'] = data_a
+        else:
+            pren_filter['slot__data'] = oggi
+
         prenotazioni_qs = (
             Prenotazione.objects
-            .filter(
-                slot__data=oggi,
-                stato='confermata',
-                ordine__isnull=True,
-            )
+            .filter(**pren_filter)
             .select_related('cliente', 'slot')
             .prefetch_related('servizi')
-            .order_by('slot__ora_inizio')
+            .order_by('slot__data', 'slot__ora_inizio')
         )
 
         # Annota ciascuna con delta_minuti e categoria ritardo/urgenza
