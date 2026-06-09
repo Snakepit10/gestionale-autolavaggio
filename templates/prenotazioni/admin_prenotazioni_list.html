@@ -55,7 +55,8 @@
                     <option value="confermata" {% if request.GET.stato == 'confermata' %}selected{% endif %}>Confermata</option>
                     <option value="in_attesa" {% if request.GET.stato == 'in_attesa' %}selected{% endif %}>In Attesa</option>
                     <option value="completata" {% if request.GET.stato == 'completata' %}selected{% endif %}>Completata</option>
-                    <option value="cancellata" {% if request.GET.stato == 'cancellata' %}selected{% endif %}>Cancellata</option>
+                    <option value="annullata" {% if request.GET.stato == 'annullata' %}selected{% endif %}>Annullata</option>
+                    <option value="no_show" {% if request.GET.stato == 'no_show' %}selected{% endif %}>No Show</option>
                 </select>
             </div>
             <div class="col-md-3">

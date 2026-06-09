@@ -2272,11 +2272,16 @@ def prenotazione_rifiuta(request, pk):
         except json.JSONDecodeError:
             motivo = ''
 
-    if hasattr(p, 'annulla'):
-        p.annulla(motivo or 'Rifiutata dall\'operatore')
-    else:
-        p.stato = 'annullata'
-        p.save(update_fields=['stato'])
+    # NB: NON usiamo p.annulla() del modello perche' ha un gate
+    # `can_be_cancelled` che richiede `is_future=True` (pensato per
+    # richieste del cliente). L'operatore staff ha autorita' anche su
+    # slot passati e prenotazioni "scadute": deve poterle sempre
+    # rifiutare. Andiamo a setting diretto + save() esplicito che fa
+    # ripartire anche aggiorna_contatori sullo slot.
+    p.stato = 'annullata'
+    if motivo:
+        p.nota_interna = f"Rifiutata dall'operatore: {motivo}"
+    p.save(update_fields=['stato', 'nota_interna'] if motivo else ['stato'])
 
     email_prenotazione_rifiutata(p, motivo)
     return JsonResponse({'ok': True})

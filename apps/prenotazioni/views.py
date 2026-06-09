@@ -1002,20 +1002,44 @@ class PrenotazioniAdminListView(LoginRequiredMixin, ListView):
     
     def get_queryset(self):
         queryset = Prenotazione.objects.select_related('cliente', 'slot').prefetch_related('servizi')
-        
-        # Filtri
+
+        # Filtri (supporta sia 'data' singola sia range 'data_da'/'data_a'
+        # come spedito dal form del template). Se nessun filtro temporale e'
+        # specificato e nessun filtro stato selezionato, mostra di default
+        # oggi+futuro per non sovraccaricare la pagina con lo storico.
         stato = self.request.GET.get('stato')
         data = self.request.GET.get('data')
-        
+        data_da = self.request.GET.get('data_da')
+        data_a = self.request.GET.get('data_a')
+        cliente = (self.request.GET.get('cliente') or '').strip()
+        servizio = self.request.GET.get('servizio')
+
         if stato:
             queryset = queryset.filter(stato=stato)
+        if cliente:
+            queryset = queryset.filter(
+                Q(cliente__nome__icontains=cliente) |
+                Q(cliente__cognome__icontains=cliente) |
+                Q(cliente__ragione_sociale__icontains=cliente) |
+                Q(cliente__email__icontains=cliente)
+            )
+        if servizio:
+            queryset = queryset.filter(servizi__id=servizio)
+
         if data:
             queryset = queryset.filter(slot__data=data)
         else:
-            # Default: prenotazioni di oggi e future
-            queryset = queryset.filter(slot__data__gte=date.today())
-        
-        return queryset.order_by('slot__data', 'slot__ora_inizio')
+            if data_da:
+                queryset = queryset.filter(slot__data__gte=data_da)
+            if data_a:
+                queryset = queryset.filter(slot__data__lte=data_a)
+            # Se nessuna data e nessuno stato e' stato richiesto -> default
+            # oggi+futuro. Se l'utente ha gia' filtrato per stato (es.
+            # "annullata"), mostra TUTTE le date altrimenti vede vuoto.
+            if not (data_da or data_a or stato):
+                queryset = queryset.filter(slot__data__gte=date.today())
+
+        return queryset.distinct().order_by('slot__data', 'slot__ora_inizio')
 
 
 class CheckinPrenotazioniView(LoginRequiredMixin, ListView):
