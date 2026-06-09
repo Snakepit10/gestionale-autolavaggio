@@ -706,89 +706,62 @@ class OrdiniListView(LoginRequiredMixin, ListView):
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
 
-        # Ottieni i filtri
-        stato = self.request.GET.get('stato')
-        data_da = self.request.GET.get('data_da')
-        data_a = self.request.GET.get('data_a')
-        cliente = self.request.GET.get('cliente')
+        # Filtro unico: data (default = oggi).
+        # Pattern identico a report_giornata: ?data=YYYY-MM-DD + frecce
+        # prev/next + tasto "Oggi". Niente piu' filtri stato/data_da/
+        # data_a/cliente, che complicavano la UX e si potevano gestire
+        # in vista ordini speciali (es. /ordini/non-pagati/).
+        oggi = timezone.now().date()
+        data_str = self.request.GET.get('data')
+        if data_str:
+            try:
+                data = datetime.strptime(data_str, '%Y-%m-%d').date()
+            except (ValueError, TypeError):
+                data = oggi
+        else:
+            data = oggi
 
-        # Query base per tutti gli ordini
+        # Query base per tutti gli ordini del giorno selezionato
         queryset = Ordine.objects.select_related('cliente', 'operatore').prefetch_related(
             'items__servizio_prodotto', 'items__postazione_cq', 'items__aggiunto_da', 'pagamenti'
-        )
+        ).filter(data_ora__date=data)
 
-        # Applica filtri temporali
-        if not any([stato, data_da, data_a, cliente]):
-            oggi = timezone.now().date()
-            queryset = queryset.filter(data_ora__date=oggi)
-        else:
-            if data_da:
-                queryset = queryset.filter(data_ora__date__gte=data_da)
-            if data_a:
-                queryset = queryset.filter(data_ora__date__lte=data_a)
-            if cliente:
-                queryset = queryset.filter(cliente_id=cliente)
+        # Layout sempre in 3 sezioni (attivi / da ritirare / completati):
+        # ordini con priorita manuale vengono prima, poi immediati per
+        # data_ora, poi programmati per ora_consegna_richiesta.
+        ordini_con_priorita = queryset.filter(
+            stato__in=['in_attesa', 'in_lavorazione'],
+            priorita__gt=0,
+        ).order_by('priorita')
 
-        # Separa ordini attivi da completati
-        if stato:
-            # Se c'è un filtro stato specifico, usalo
-            if stato == 'completato':
-                context['ordini_attivi'] = Ordine.objects.none()
-                context['ordini_da_ritirare'] = queryset.filter(stato='completato', auto_ritirata=False).order_by('-data_ora')
-                context['ordini_completati'] = queryset.filter(stato='completato', auto_ritirata=True).order_by('-data_ora')
-            else:
-                # Ordini immediati e programmati separati, poi concatenati
-                ordini_immediati = queryset.filter(
-                    stato=stato,
-                    tipo_consegna='immediata'
-                ).order_by('data_ora')
+        ordini_senza_priorita_imm = queryset.filter(
+            stato__in=['in_attesa', 'in_lavorazione'],
+            priorita=0,
+            tipo_consegna='immediata',
+        ).order_by('data_ora')
 
-                ordini_programmati = queryset.filter(
-                    stato=stato,
-                    tipo_consegna='programmata'
-                ).order_by('ora_consegna_richiesta')
+        ordini_senza_priorita_prog = queryset.filter(
+            stato__in=['in_attesa', 'in_lavorazione'],
+            priorita=0,
+            tipo_consegna='programmata',
+        ).order_by('ora_consegna_richiesta')
 
-                # Concatena: prima immediati, poi programmati
-                from itertools import chain
-                context['ordini_attivi'] = list(chain(ordini_immediati, ordini_programmati))
-                context['ordini_da_ritirare'] = Ordine.objects.none()
-                context['ordini_completati'] = Ordine.objects.none()
-        else:
-            # Senza filtro stato, mostra ordini attivi e completati separatamente
-            # Ordini con priorita manuale vengono prima, poi il resto nell'ordine originale
-            ordini_con_priorita = queryset.filter(
-                stato__in=['in_attesa', 'in_lavorazione'],
-                priorita__gt=0,
-            ).order_by('priorita')
+        from itertools import chain
+        context['ordini_attivi'] = list(chain(
+            ordini_con_priorita, ordini_senza_priorita_imm, ordini_senza_priorita_prog
+        ))
 
-            ordini_senza_priorita_imm = queryset.filter(
-                stato__in=['in_attesa', 'in_lavorazione'],
-                priorita=0,
-                tipo_consegna='immediata',
-            ).order_by('data_ora')
+        # Ordini da ritirare: completati ma NON ancora ritirati
+        context['ordini_da_ritirare'] = queryset.filter(
+            stato='completato',
+            auto_ritirata=False
+        ).order_by('-data_ora')
 
-            ordini_senza_priorita_prog = queryset.filter(
-                stato__in=['in_attesa', 'in_lavorazione'],
-                priorita=0,
-                tipo_consegna='programmata',
-            ).order_by('ora_consegna_richiesta')
-
-            from itertools import chain
-            context['ordini_attivi'] = list(chain(
-                ordini_con_priorita, ordini_senza_priorita_imm, ordini_senza_priorita_prog
-            ))
-
-            # Ordini da ritirare: completati ma NON ancora ritirati
-            context['ordini_da_ritirare'] = queryset.filter(
-                stato='completato',
-                auto_ritirata=False
-            ).order_by('-data_ora')
-
-            # Ordini completati: completati E già ritirati
-            context['ordini_completati'] = queryset.filter(
-                stato='completato',
-                auto_ritirata=True
-            ).order_by('-data_ora')
+        # Ordini completati: completati E gia' ritirati
+        context['ordini_completati'] = queryset.filter(
+            stato='completato',
+            auto_ritirata=True
+        ).order_by('-data_ora')
 
         # Calcola statistiche finanziarie
         # Usa lo stesso queryset filtrato per le statistiche
@@ -826,34 +799,25 @@ class OrdiniListView(LoginRequiredMixin, ListView):
             'totale_incassato': totale_contanti + totale_carte,
         }
 
-        # Prenotazioni di oggi ancora da fare checkin
+        # Prenotazioni del giorno selezionato ancora da fare checkin
         from apps.prenotazioni.models import Prenotazione
         from datetime import datetime as _dt
-        oggi = timezone.now().date()
         now_local = timezone.localtime(timezone.now())
 
         # Solo confermate: le 'in_attesa' vanno nella sezione separata
-        # 'Prenotazioni da confermare'.
-        # Rispettiamo data_da/data_a del form filtro come gia' fatto per
-        # gli ordini sopra: cosi' navigando i giorni l'operatore vede
-        # i badge delle prenotazioni del giorno/range filtrato (non solo
-        # quelle di oggi). Se nessun filtro temporale e' attivo, default
-        # = oggi (comportamento storico).
-        pren_filter = {'stato': 'confermata', 'ordine__isnull': True}
-        if data_da or data_a:
-            if data_da:
-                pren_filter['slot__data__gte'] = data_da
-            if data_a:
-                pren_filter['slot__data__lte'] = data_a
-        else:
-            pren_filter['slot__data'] = oggi
-
+        # 'Prenotazioni da confermare'. Filtriamo sulla stessa data
+        # selezionata per gli ordini cosi' navigando i giorni i badge
+        # delle prenotazioni si aggiornano coerentemente.
         prenotazioni_qs = (
             Prenotazione.objects
-            .filter(**pren_filter)
+            .filter(
+                slot__data=data,
+                stato='confermata',
+                ordine__isnull=True,
+            )
             .select_related('cliente', 'slot')
             .prefetch_related('servizi')
-            .order_by('slot__data', 'slot__ora_inizio')
+            .order_by('slot__ora_inizio')
         )
 
         # Annota ciascuna con delta_minuti e categoria ritardo/urgenza
@@ -883,6 +847,14 @@ class OrdiniListView(LoginRequiredMixin, ListView):
 
         context['prenotazioni_upcoming'] = prenotazioni_list
         context['today'] = oggi
+        # Navigazione giorni (pattern identico a report_giornata):
+        # data = data corrente visualizzata (oggi se senza param)
+        # data_prev/data_next = giorno -1/+1, usati per le frecce
+        # oggi = data odierna, usato per il bottone "Oggi"
+        context['data'] = data
+        context['data_prev'] = data - timedelta(days=1)
+        context['data_next'] = data + timedelta(days=1)
+        context['oggi'] = oggi
 
         # Prenotazioni cliente IN ATTESA di conferma (lato app cliente)
         # Mostra tutte (oggi + future) cosi l'operatore puo gestirle subito
