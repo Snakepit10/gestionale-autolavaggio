@@ -190,8 +190,6 @@
 <header class="pub-header">
     <div class="container">
         <a href="{% url 'clients:landing' %}" class="pub-brand" aria-label="MasterWash home">
-            {# Logo MasterWash. Il fallback testuale via onerror e' una
-               difesa nel caso il PNG venga rimosso/rinominato. #}
             <img src="{% static 'img/masterwash-logo.png' %}"
                  alt="MasterWash"
                  onerror="this.style.display='none';this.nextElementSibling.style.display='inline-block';">
