@@ -1,222 +1,349 @@
 {% extends "clients/base_public.html" %}
-{% block title %}Autolavaggio &mdash; Lavaggio auto a domicilio facile e veloce{% endblock %}
+{% load static %}
+{% block title %}MasterWash &mdash; Autolavaggio a Licata &middot; Self, Portali, Operatori{% endblock %}
 {% block nav_home %}active{% endblock %}
 
 {% block extra_css %}
 <style>
-.hero {
-    background: linear-gradient(135deg, #0d6efd 0%, #14b8a6 100%);
+/* ====== HERO ====== */
+.mw-hero {
+    background: linear-gradient(135deg, #4ab9e0 0%, #2da3cc 60%, #1a3a52 100%);
     color: #fff;
-    padding: 64px 16px 48px;
-    border-radius: 0 0 24px 24px;
+    padding: 72px 16px 56px;
+    border-radius: 0 0 28px 28px;
     text-align: center;
     position: relative;
     overflow: hidden;
 }
-.hero::before {
+.mw-hero::before, .mw-hero::after {
     content: '';
     position: absolute;
-    top: -100px; right: -100px;
-    width: 300px; height: 300px;
-    background: rgba(255,255,255,.1);
     border-radius: 50%;
+    background: rgba(255,255,255,.08);
+    pointer-events: none;
 }
-.hero::after {
-    content: '';
-    position: absolute;
-    bottom: -150px; left: -150px;
-    width: 400px; height: 400px;
-    background: rgba(255,255,255,.05);
-    border-radius: 50%;
+.mw-hero::before { top: -120px; right: -80px; width: 320px; height: 320px; }
+.mw-hero::after { bottom: -160px; left: -120px; width: 380px; height: 380px; background: rgba(255,255,255,.05); }
+.mw-hero .hero-logo {
+    height: 60px;
+    margin-bottom: 18px;
+    filter: drop-shadow(0 2px 8px rgba(0,0,0,.18));
 }
-.hero h1 { font-size: 2.4rem; font-weight: 800; line-height: 1.15; margin-bottom: 16px; position: relative; }
-.hero p.lead { font-size: 1.1rem; opacity: .95; max-width: 580px; margin: 0 auto 28px; position: relative; }
-.hero .cta-row { display: flex; gap: 12px; justify-content: center; flex-wrap: wrap; position: relative; }
-.hero .btn-cta { background: #fff; color: #0d6efd; }
-.hero .btn-cta:hover { background: #f0f9ff; box-shadow: 0 8px 22px rgba(0,0,0,.2); }
-.hero .btn-cta.btn-cta-outline { background: transparent; color: #fff; border: 2px solid rgba(255,255,255,.6); }
-.hero .btn-cta.btn-cta-outline:hover { background: rgba(255,255,255,.1); }
-
+.mw-hero .hero-logo-text {
+    font-family: 'Arial Black', 'Arial', sans-serif;
+    font-style: italic;
+    font-weight: 900;
+    font-size: 2.6rem;
+    color: #fff;
+    letter-spacing: -.02em;
+    text-transform: uppercase;
+    transform: skewX(-8deg);
+    display: inline-block;
+    margin-bottom: 18px;
+    text-shadow: 0 2px 12px rgba(0,0,0,.2);
+}
+.mw-hero h1 { font-size: 2.2rem; font-weight: 800; line-height: 1.2; margin-bottom: 14px; position: relative; letter-spacing: -.015em; }
+.mw-hero p.lead { font-size: 1.08rem; opacity: .96; max-width: 620px; margin: 0 auto 28px; position: relative; }
+.mw-hero .cta-row { display: flex; gap: 12px; justify-content: center; flex-wrap: wrap; position: relative; }
+.mw-hero .location { font-size: .9rem; margin-top: 18px; opacity: .85; position: relative; }
+.mw-hero .location i { margin-right: 6px; }
 @media (max-width: 575.98px) {
-    .hero { padding: 48px 16px 32px; }
-    .hero h1 { font-size: 1.8rem; }
-    .hero p.lead { font-size: .98rem; }
+    .mw-hero { padding: 48px 16px 36px; }
+    .mw-hero h1 { font-size: 1.65rem; }
+    .mw-hero p.lead { font-size: .98rem; }
+    .mw-hero .hero-logo { height: 46px; }
+    .mw-hero .hero-logo-text { font-size: 2rem; }
 }
 
-/* Feature grid */
-.feature-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 16px; }
-.feature-card { background: #fff; border-radius: 14px; padding: 24px; text-align: center; box-shadow: 0 2px 6px rgba(0,0,0,.06); }
-.feature-card i { font-size: 2.4rem; color: #0d6efd; margin-bottom: 10px; }
-.feature-card h5 { font-weight: 700; margin-bottom: 6px; }
-.feature-card p { color: #64748b; font-size: .92rem; margin: 0; }
+/* ====== Le tre soluzioni ====== */
+.soluzioni-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+    gap: 18px;
+}
+.soluzione-card {
+    background: #fff;
+    border-radius: 18px;
+    padding: 28px 22px;
+    text-align: center;
+    border: 1px solid var(--mw-line);
+    box-shadow: 0 4px 16px rgba(26, 58, 82, .06);
+    transition: transform .2s, box-shadow .2s, border-color .2s;
+    position: relative;
+}
+.soluzione-card:hover { transform: translateY(-4px); box-shadow: 0 16px 32px rgba(26, 58, 82, .12); border-color: var(--mw-cyan-light); }
+.soluzione-card .ico {
+    width: 72px; height: 72px;
+    margin: 0 auto 16px;
+    border-radius: 50%;
+    background: linear-gradient(135deg, var(--mw-cyan) 0%, var(--mw-cyan-dark) 100%);
+    color: #fff;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 2rem;
+    box-shadow: 0 4px 14px rgba(74, 185, 224, .35);
+}
+.soluzione-card h4 { font-weight: 800; font-size: 1.15rem; margin-bottom: 10px; color: var(--mw-text); }
+.soluzione-card p { color: var(--mw-text-soft); font-size: .94rem; line-height: 1.5; margin-bottom: 0; }
+.soluzione-card .tag {
+    position: absolute;
+    top: 14px; right: 14px;
+    background: var(--mw-cyan);
+    color: #fff;
+    font-size: .68rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: .06em;
+    padding: 4px 10px;
+    border-radius: 20px;
+}
 
-/* Servizi vetrina */
-.servizi-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 12px; }
-.servizio-card { background: #fff; border-radius: 12px; padding: 16px; border: 1px solid #e2e8f0; transition: all .15s; }
-.servizio-card:hover { border-color: #0d6efd; transform: translateY(-2px); }
-.servizio-card .titolo { font-weight: 700; color: #1e293b; margin-bottom: 4px; }
-.servizio-card .categoria { font-size: .72rem; text-transform: uppercase; color: #94a3b8; letter-spacing: .5px; margin-bottom: 8px; }
-.servizio-card .prezzo { font-size: 1.3rem; font-weight: 800; color: #0d6efd; }
-.servizio-card .durata { font-size: .82rem; color: #64748b; }
+/* ====== Servizi inclusi / area relax ====== */
+.amenities-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+    gap: 14px;
+}
+.amenity {
+    background: #fff;
+    border-radius: 14px;
+    padding: 18px 16px;
+    text-align: center;
+    border: 1px solid var(--mw-line);
+    transition: transform .15s, border-color .15s;
+}
+.amenity:hover { transform: translateY(-2px); border-color: var(--mw-cyan-light); }
+.amenity i { font-size: 1.9rem; color: var(--mw-cyan); margin-bottom: 8px; display: block; }
+.amenity .name { font-weight: 700; font-size: .92rem; color: var(--mw-text); }
+.amenity .desc { font-size: .82rem; color: var(--mw-text-soft); margin-top: 2px; }
 
-/* CTA bottom */
+/* ====== Contatti card ====== */
+.contact-card {
+    background: linear-gradient(135deg, #fff 0%, #f0f9fc 100%);
+    border-radius: 20px;
+    padding: 32px 28px;
+    border: 1px solid var(--mw-cyan-light);
+    box-shadow: 0 8px 24px rgba(74, 185, 224, .15);
+}
+.contact-card h3 { font-weight: 800; color: var(--mw-text); margin-bottom: 18px; font-size: 1.5rem; }
+.contact-item {
+    display: flex;
+    align-items: flex-start;
+    gap: 14px;
+    padding: 14px 0;
+    border-bottom: 1px solid var(--mw-line);
+}
+.contact-item:last-child { border-bottom: 0; }
+.contact-item .ico-wrap {
+    width: 44px; height: 44px;
+    border-radius: 12px;
+    background: var(--mw-cyan);
+    color: #fff;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 1.3rem;
+    flex-shrink: 0;
+}
+.contact-item .label { font-size: .78rem; text-transform: uppercase; letter-spacing: .08em; color: var(--mw-text-soft); font-weight: 600; }
+.contact-item .value { font-size: 1.05rem; font-weight: 700; color: var(--mw-text); margin-top: 2px; }
+.contact-item .value a { color: var(--mw-text); text-decoration: none; }
+.contact-item .value a:hover { color: var(--mw-cyan-dark); }
+.map-embed {
+    border-radius: 16px;
+    overflow: hidden;
+    border: 1px solid var(--mw-line);
+    box-shadow: 0 4px 16px rgba(26, 58, 82, .08);
+}
+.map-embed iframe { display: block; width: 100%; height: 320px; border: 0; }
+
+/* ====== CTA bottom ====== */
 .cta-bottom {
-    background: linear-gradient(135deg, #14b8a6 0%, #0d6efd 100%);
+    background: linear-gradient(135deg, var(--mw-cyan) 0%, var(--mw-cyan-dark) 100%);
     color: #fff;
     padding: 48px 24px;
     border-radius: 24px;
     text-align: center;
-    margin: 48px 16px;
+    margin: 56px 0;
+    box-shadow: 0 12px 32px rgba(74, 185, 224, .25);
 }
-.cta-bottom h3 { font-weight: 800; font-size: 1.6rem; }
-.cta-bottom .btn-cta { background: #fff; color: #0d6efd; }
-
-/* Process steps */
-.steps { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 20px; counter-reset: step; }
-.step-card { position: relative; padding-left: 56px; }
-.step-card::before {
-    counter-increment: step;
-    content: counter(step);
-    position: absolute;
-    left: 0; top: 0;
-    width: 42px; height: 42px;
-    background: #0d6efd;
-    color: #fff;
-    border-radius: 50%;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    font-weight: 800;
-    font-size: 1.2rem;
-}
-.step-card h6 { font-weight: 700; margin-bottom: 4px; }
-.step-card p { color: #64748b; font-size: .9rem; margin: 0; }
+.cta-bottom h3 { font-weight: 800; font-size: 1.7rem; }
+.cta-bottom p { font-size: 1.02rem; opacity: .95; }
 </style>
 {% endblock %}
 
 {% block content %}
 
 {# ========== HERO ========== #}
-<section class="hero">
-    <h1>La tua auto, splendente.<br>In pochi click.</h1>
-    <p class="lead">Prenota online il tuo lavaggio quando vuoi. Servizio rapido, professionale, su misura.</p>
+<section class="mw-hero">
+    <img src="{% static 'img/masterwash-logo.png' %}" alt="MasterWash"
+         class="hero-logo"
+         onerror="this.style.display='none';this.nextElementSibling.style.display='inline-block';">
+    <span class="hero-logo-text" style="display:none;">MasterWash</span>
+
+    <h1>Tre modi per avere la tua auto perfetta</h1>
+    <p class="lead">
+        Self service, portali automatici o servizio con operatori specializzati.<br>
+        Scegli tu come prenderti cura della tua auto.
+    </p>
     <div class="cta-row">
-        <a href="{% url 'clients:booking' %}" class="btn-cta">
+        <a href="{% url 'clients:booking' %}" class="btn-cta btn-cta-light">
             <i class="bi bi-calendar-plus"></i> Prenota ora
         </a>
-        {% if not user.is_authenticated %}
-        <a href="{% url 'clients:register' %}" class="btn-cta btn-cta-outline">
-            <i class="bi bi-person-plus"></i> Registrati gratis
+        <a href="tel:+393792337051" class="btn-cta btn-cta-outline" style="color:#fff;border-color:rgba(255,255,255,.7);">
+            <i class="bi bi-telephone-fill"></i> 379 233 7051
         </a>
-        {% endif %}
+    </div>
+    <div class="location">
+        <i class="bi bi-geo-alt-fill"></i> Via Palma 302, Licata (AG)
     </div>
 </section>
 
-{# ========== Perche sceglierci ========== #}
+{# ========== Chi siamo / Pitch ========== #}
+<section class="pub-section">
+    <div class="container" style="max-width:820px;text-align:center;">
+        <h2>Il nuovo autolavaggio di Licata</h2>
+        <p class="lead">
+            MasterWash trasforma il momento del lavaggio in un'<strong>esperienza piacevole</strong>:
+            spazi ampi, attrezzature complete per gli interni, e un'area relax dove aspettare
+            comodamente. La nostra missione &egrave; accontentare ogni tipo di cliente con
+            qualit&agrave; e comfort.
+        </p>
+    </div>
+</section>
+
+{# ========== Le tre soluzioni ========== #}
+<section class="pub-section" style="background:#fff;">
+    <div class="container">
+        <div class="text-center mb-5">
+            <h2>Le nostre soluzioni</h2>
+            <p class="lead">Tre modi diversi di lavare l'auto, un'unica qualit&agrave;.</p>
+        </div>
+        <div class="soluzioni-grid">
+            <div class="soluzione-card">
+                <span class="tag">Risparmia</span>
+                <div class="ico"><i class="bi bi-droplet-half"></i></div>
+                <h4>Self Service</h4>
+                <p>
+                    Per chi ama dedicarsi personalmente alla propria auto. Box self con tutti i programmi
+                    e prodotti professionali a disposizione, 24h su 24.
+                </p>
+            </div>
+            <div class="soluzione-card">
+                <span class="tag">Rapido</span>
+                <div class="ico"><i class="bi bi-arrow-repeat"></i></div>
+                <h4>Portali Automatici</h4>
+                <p>
+                    Lavaggio rapido ed efficiente con i nostri portali di ultima generazione.
+                    Entra, scegli il programma, esci con l'auto perfetta in pochi minuti.
+                </p>
+            </div>
+            <div class="soluzione-card">
+                <span class="tag">Premium</span>
+                <div class="ico"><i class="bi bi-person-arms-up"></i></div>
+                <h4>Servizio Completo</h4>
+                <p>
+                    Per chi non vuole sporcarsi le mani. I nostri operatori specializzati
+                    si occupano di tutto: esterno, interno, dettagli.
+                </p>
+            </div>
+        </div>
+    </div>
+</section>
+
+{# ========== Perch&eacute; sceglierci / amenities ========== #}
 <section class="pub-section">
     <div class="container">
-        <div class="text-center mb-4">
-            <h2>Perche sceglierci</h2>
-            <p class="lead">Il modo piu semplice per tenere la tua auto perfetta.</p>
+        <div class="text-center mb-5">
+            <h2>Perch&eacute; sceglierci</h2>
+            <p class="lead">Non solo lavaggio: un'esperienza completa per te e la tua famiglia.</p>
         </div>
-        <div class="feature-grid">
-            <div class="feature-card">
-                <i class="bi bi-clock-history"></i>
-                <h5>Veloce</h5>
-                <p>Lavaggio professionale in 30-60 minuti. Programma quando ti serve.</p>
+        <div class="amenities-grid">
+            <div class="amenity">
+                <i class="bi bi-stopwatch"></i>
+                <div class="name">Rapido</div>
+                <div class="desc">Servizio veloce, niente attese</div>
             </div>
-            <div class="feature-card">
-                <i class="bi bi-droplet-half"></i>
-                <h5>Professionale</h5>
-                <p>Prodotti di qualita, attenzione ai dettagli, risultato garantito.</p>
+            <div class="amenity">
+                <i class="bi bi-arrows-fullscreen"></i>
+                <div class="name">Spazi ampi</div>
+                <div class="desc">Movimento comodo per ogni auto</div>
             </div>
-            <div class="feature-card">
-                <i class="bi bi-phone"></i>
-                <h5>Tutto via app</h5>
-                <p>Prenota, paga e gestisci le tue prenotazioni direttamente da smartphone.</p>
+            <div class="amenity">
+                <i class="bi bi-tools"></i>
+                <div class="name">Attrezzature complete</div>
+                <div class="desc">Pulizia interni professionale</div>
             </div>
-            <div class="feature-card">
-                <i class="bi bi-award"></i>
-                <h5>Punti fedelta</h5>
-                <p>Accumula punti ad ogni lavaggio e ottieni sconti e servizi gratuiti.</p>
+            <div class="amenity">
+                <i class="bi bi-cup-hot"></i>
+                <div class="name">Area relax</div>
+                <div class="desc">Distributori bevande durante l'attesa</div>
+            </div>
+            <div class="amenity">
+                <i class="bi bi-puzzle"></i>
+                <div class="name">Zona bimbi</div>
+                <div class="desc">Giochi per i pi&ugrave; piccoli</div>
+            </div>
+            <div class="amenity">
+                <i class="bi bi-wifi"></i>
+                <div class="name">WiFi gratuito</div>
+                <div class="desc">Connessione libera per tutti</div>
             </div>
         </div>
     </div>
 </section>
 
-{# ========== Come funziona ========== #}
-<section class="pub-section" style="background:#fff">
+{# ========== Contatti + mappa ========== #}
+<section class="pub-section" style="background:#fff;">
     <div class="container">
-        <div class="text-center mb-4">
-            <h2>Come funziona</h2>
+        <div class="text-center mb-5">
+            <h2>Vieni a trovarci</h2>
+            <p class="lead">Siamo a Licata, in via Palma. Chiamaci per qualsiasi informazione.</p>
         </div>
-        <div class="steps">
-            <div class="step-card">
-                <h6>Scegli il servizio</h6>
-                <p>Sfoglia il catalogo, seleziona quello che ti serve.</p>
+        <div class="row g-4 align-items-stretch">
+            <div class="col-lg-5">
+                <div class="contact-card h-100">
+                    <h3><i class="bi bi-info-circle"></i> Informazioni</h3>
+                    <div class="contact-item">
+                        <div class="ico-wrap"><i class="bi bi-telephone-fill"></i></div>
+                        <div>
+                            <div class="label">Telefono</div>
+                            <div class="value"><a href="tel:+393792337051">379 233 7051</a></div>
+                        </div>
+                    </div>
+                    <div class="contact-item">
+                        <div class="ico-wrap"><i class="bi bi-geo-alt-fill"></i></div>
+                        <div>
+                            <div class="label">Indirizzo</div>
+                            <div class="value">
+                                <a href="https://www.google.com/maps/search/?api=1&query=Via+Palma+302+Licata+AG" target="_blank" rel="noopener">
+                                    Via Palma 302, Licata (AG)
+                                </a>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="contact-item">
+                        <div class="ico-wrap"><i class="bi bi-car-front-fill"></i></div>
+                        <div>
+                            <div class="label">Servizio</div>
+                            <div class="value" style="font-size:.95rem;font-weight:600;color:var(--mw-text-soft);">
+                                Self &middot; Portali &middot; Operatori
+                            </div>
+                        </div>
+                    </div>
+                    <div class="mt-3">
+                        <a href="https://www.google.com/maps/dir/?api=1&destination=Via+Palma+302+Licata+AG" target="_blank" rel="noopener" class="btn-cta">
+                            <i class="bi bi-signpost-split-fill"></i> Indicazioni stradali
+                        </a>
+                    </div>
+                </div>
             </div>
-            <div class="step-card">
-                <h6>Seleziona data e ora</h6>
-                <p>Scegli lo slot che preferisci dal calendario disponibilita.</p>
+            <div class="col-lg-7">
+                <div class="map-embed h-100">
+                    <iframe
+                        src="https://www.google.com/maps?q=Via+Palma+302+Licata+AG&output=embed"
+                        loading="lazy"
+                        referrerpolicy="no-referrer-when-downgrade"
+                        title="Posizione MasterWash su Google Maps"></iframe>
+                </div>
             </div>
-            <div class="step-card">
-                <h6>Conferma</h6>
-                <p>Ricevi codice prenotazione, presentati all'orario.</p>
-            </div>
-            <div class="step-card">
-                <h6>Auto pulita!</h6>
-                <p>Ritira la tua auto rinnovata e accumula punti fedelta.</p>
-            </div>
-        </div>
-    </div>
-</section>
-
-{# ========== I nostri servizi (discorsivo) ========== #}
-<section class="pub-section">
-    <div class="container" style="max-width:880px">
-        <div class="text-center mb-4">
-            <h2 class="mb-1">I nostri servizi</h2>
-            <p class="lead">Pulizia auto su misura, dal lavaggio rapido al trattamento completo.</p>
-        </div>
-        <div class="row g-3">
-            <div class="col-md-4 text-center">
-                <i class="bi bi-droplet" style="font-size:2.4rem;color:#0d6efd"></i>
-                <h6 class="mt-2 fw-bold">Lavaggio esterno</h6>
-                <p class="text-muted small mb-0">
-                    Carrozzeria, cerchi e vetri puliti a fondo con prodotti professionali
-                    rispettosi della vernice.
-                </p>
-            </div>
-            <div class="col-md-4 text-center">
-                <i class="bi bi-house" style="font-size:2.4rem;color:#0d6efd"></i>
-                <h6 class="mt-2 fw-bold">Pulizia interni</h6>
-                <p class="text-muted small mb-0">
-                    Aspirazione tappetini e moquette, pulizia plance, vetri interni e
-                    sanificazione abitacolo.
-                </p>
-            </div>
-            <div class="col-md-4 text-center">
-                <i class="bi bi-stars" style="font-size:2.4rem;color:#0d6efd"></i>
-                <h6 class="mt-2 fw-bold">Trattamenti completi</h6>
-                <p class="text-muted small mb-0">
-                    Pacchetti combinati di lavaggio esterno, pulizia interni e
-                    finitura per un risultato impeccabile.
-                </p>
-            </div>
-        </div>
-        <div class="text-center mt-4">
-            {% if user.is_authenticated %}
-                <a href="{% url 'clients:booking' %}" class="btn-cta">
-                    <i class="bi bi-calendar-plus"></i> Vedi disponibilita e prenota
-                </a>
-            {% else %}
-                <a href="{% url 'auth:client-login' %}" class="btn-cta">
-                    <i class="bi bi-box-arrow-in-right"></i> Accedi per prenotare
-                </a>
-                <p class="text-muted small mt-2 mb-0">
-                    Catalogo dettagliato e prenotazioni disponibili per i clienti registrati.
-                </p>
-            {% endif %}
         </div>
     </div>
 </section>
@@ -224,17 +351,18 @@
 {# ========== CTA finale ========== #}
 <div class="container">
     <div class="cta-bottom">
-        <h3 class="mb-3">Pronto a iniziare?</h3>
-        <p class="mb-4" style="opacity:.95">Registrati in 30 secondi e prenota subito il tuo primo lavaggio.</p>
-        {% if not user.is_authenticated %}
-            <a href="{% url 'clients:register' %}" class="btn-cta">
-                <i class="bi bi-person-plus"></i> Registrati gratis
-            </a>
-        {% else %}
-            <a href="{% url 'clients:booking' %}" class="btn-cta">
+        <h3 class="mb-2">Pronto a vivere l'esperienza MasterWash?</h3>
+        <p class="mb-4">Prenota online il tuo lavaggio o vieni direttamente per il self service.</p>
+        <div class="d-flex gap-3 justify-content-center flex-wrap">
+            <a href="{% url 'clients:booking' %}" class="btn-cta btn-cta-light">
                 <i class="bi bi-calendar-plus"></i> Prenota ora
             </a>
-        {% endif %}
+            {% if not user.is_authenticated %}
+            <a href="{% url 'clients:register' %}" class="btn-cta btn-cta-outline" style="color:#fff;border-color:rgba(255,255,255,.7);">
+                <i class="bi bi-person-plus"></i> Registrati
+            </a>
+            {% endif %}
+        </div>
     </div>
 </div>
 
