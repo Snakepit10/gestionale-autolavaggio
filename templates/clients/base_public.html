@@ -187,6 +187,75 @@
     .pub-section h2 { font-weight: 800; font-size: 1.9rem; margin-bottom: 12px; color: var(--mw-text); letter-spacing: -.01em; }
     .pub-section .lead { font-size: 1.05rem; color: var(--mw-text-soft); }
 
+    /* === Override utility Bootstrap per dark theme (validi su tutte
+       le pagine cliente: booking, dashboard, register, ecc.) === */
+    .text-muted { color: var(--mw-text-soft) !important; }
+    .text-secondary { color: var(--mw-text-soft) !important; }
+    .text-dark { color: var(--mw-text) !important; }
+    .bg-light { background-color: var(--mw-navy-soft) !important; color: var(--mw-text); }
+    .bg-white { background-color: var(--mw-navy-soft) !important; color: var(--mw-text); }
+
+    /* Form controls dark */
+    .form-control, .form-select, textarea.form-control {
+        background-color: var(--mw-navy-soft);
+        border: 1px solid var(--mw-line);
+        color: var(--mw-text);
+    }
+    .form-control:focus, .form-select:focus {
+        background-color: var(--mw-navy-soft);
+        color: var(--mw-text);
+        border-color: var(--mw-cyan);
+        box-shadow: 0 0 0 .2rem rgba(74, 185, 224, .25);
+    }
+    .form-control::placeholder { color: var(--mw-text-soft); opacity: .7; }
+    .form-label { color: var(--mw-text); }
+    .form-text, .form-check-label { color: var(--mw-text-soft); }
+
+    /* Alert: solo info/light scuriti, le altre (success/warning/danger)
+       conservano i loro colori semantici originali */
+    .alert-light, .alert-info {
+        background-color: var(--mw-navy-soft);
+        color: var(--mw-text);
+        border: 1px solid var(--mw-line);
+    }
+
+    /* List groups (storico prenotazioni dashboard) */
+    .list-group-item {
+        background-color: var(--mw-navy-soft);
+        color: var(--mw-text);
+        border-color: var(--mw-line);
+    }
+    .list-group-flush > .list-group-item {
+        background-color: transparent;
+        border-color: var(--mw-line);
+    }
+
+    /* Badge bg-light text-dark usate per chip servizi */
+    .badge.bg-light.text-dark, .badge.bg-light {
+        background-color: rgba(74, 185, 224, .18) !important;
+        color: var(--mw-cyan-light) !important;
+        border: 1px solid var(--mw-line);
+    }
+
+    /* Bordi neutri Bootstrap */
+    .border { border-color: var(--mw-line) !important; }
+
+    /* Bootstrap btn-outline-* su sfondo dark: assicura contrasto */
+    .btn-outline-secondary {
+        color: var(--mw-text);
+        border-color: var(--mw-line);
+    }
+    .btn-outline-secondary:hover {
+        background-color: var(--mw-navy-soft);
+        color: var(--mw-text);
+        border-color: var(--mw-cyan);
+    }
+
+    /* Link e text-primary brand cyan */
+    a:not(.btn):not(.btn-cta):not(.pub-brand):not(.nav-link) { color: var(--mw-cyan-light); }
+    a:not(.btn):not(.btn-cta):not(.pub-brand):not(.nav-link):hover { color: var(--mw-cyan); }
+    .text-primary { color: var(--mw-cyan-light) !important; }
+
     @media (max-width: 575.98px) {
         .pub-section { padding: 36px 16px; }
         .pub-section h2 { font-size: 1.5rem; }

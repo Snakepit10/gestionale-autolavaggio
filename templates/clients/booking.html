@@ -1,5 +1,5 @@
 {% extends "clients/base_public.html" %}
-{% block title %}Prenota un servizio &mdash; Autolavaggio{% endblock %}
+{% block title %}Prenota un servizio &mdash; MasterWash{% endblock %}
 {% block nav_booking %}active{% endblock %}
 
 {% block extra_css %}
@@ -7,12 +7,12 @@
 .bk-step { display: none; }
 .bk-step.active { display: block; }
 .bk-progress { display: flex; gap: 4px; margin-bottom: 24px; }
-.bk-progress .pi { flex: 1; height: 6px; background: #e2e8f0; border-radius: 3px; }
-.bk-progress .pi.done { background: #0d6efd; }
+.bk-progress .pi { flex: 1; height: 6px; background: var(--mw-line); border-radius: 3px; }
+.bk-progress .pi.done { background: var(--mw-cyan); }
 
 .servizio-pick {
-    background: #fff;
-    border: 2px solid #e2e8f0;
+    background: var(--mw-navy-soft);
+    border: 2px solid var(--mw-line);
     border-radius: 12px;
     padding: 14px;
     cursor: pointer;
@@ -21,39 +21,56 @@
     justify-content: space-between;
     align-items: center;
     gap: 12px;
+    color: var(--mw-text);
 }
 .servizio-pick:active { transform: scale(.98); }
-.servizio-pick.selected { border-color: #0d6efd; background: #eff6ff; box-shadow: 0 4px 12px rgba(13,110,253,.15); }
-.servizio-pick .titolo { font-weight: 700; color: #1e293b; }
-.servizio-pick .meta { font-size: .82rem; color: #64748b; }
-.servizio-pick .check { font-size: 1.3rem; color: #cbd5e1; flex-shrink: 0; }
-.servizio-pick.selected .check { color: #0d6efd; }
+.servizio-pick.selected {
+    border-color: var(--mw-cyan);
+    background: rgba(74, 185, 224, .12);
+    box-shadow: 0 4px 12px rgba(74, 185, 224, .25);
+}
+.servizio-pick .titolo { font-weight: 700; color: var(--mw-text); }
+.servizio-pick .meta { font-size: .82rem; color: var(--mw-text-soft); }
+.servizio-pick .check { font-size: 1.3rem; color: var(--mw-text-soft); flex-shrink: 0; }
+.servizio-pick.selected .check { color: var(--mw-cyan-light); }
 
 .slot-pick {
-    background: #fff;
-    border: 2px solid #e2e8f0;
+    background: var(--mw-navy-soft);
+    border: 2px solid var(--mw-line);
     border-radius: 8px;
     padding: 10px 8px;
     text-align: center;
     cursor: pointer;
     font-weight: 600;
-    color: #1e293b;
+    color: var(--mw-text);
     transition: all .12s;
     user-select: none;
 }
 .slot-pick:active { transform: scale(.97); }
-.slot-pick.selected { border-color: #0d6efd; background: #0d6efd; color: #fff; box-shadow: 0 4px 12px rgba(13,110,253,.25); }
+.slot-pick.selected {
+    border-color: var(--mw-cyan);
+    background: var(--mw-cyan);
+    color: #fff;
+    box-shadow: 0 4px 12px rgba(74, 185, 224, .35);
+}
 .slot-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(80px, 1fr)); gap: 8px; }
 
 .bk-summary {
-    background: linear-gradient(135deg, #0d6efd 0%, #14b8a6 100%);
+    background: linear-gradient(135deg, var(--mw-cyan) 0%, var(--mw-cyan-dark) 100%);
     color: #fff;
     padding: 20px;
     border-radius: 14px;
     margin-bottom: 16px;
+    box-shadow: 0 6px 20px rgba(74, 185, 224, .35);
 }
 
-.bk-actions { position: sticky; bottom: 0; padding: 12px 0; background: linear-gradient(180deg, transparent, #f8fafc 30%); margin-top: 24px; }
+.bk-actions {
+    position: sticky;
+    bottom: 0;
+    padding: 12px 0;
+    background: linear-gradient(180deg, transparent, var(--mw-bg) 40%);
+    margin-top: 24px;
+}
 @media (max-width: 575.98px) {
     .bk-actions { bottom: 60px; }
 }

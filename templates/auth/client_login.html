@@ -1,304 +1,172 @@
-{% extends 'base.html' %}
+{% extends "clients/base_public.html" %}
 {% load static %}
 
-{% block title %}Accesso Clienti - Gestionale Autolavaggio{% endblock %}
+{% block title %}Accedi &mdash; MasterWash{% endblock %}
 
 {% block extra_css %}
 <style>
-.client-login-container {
-    min-height: 100vh;
-    background: linear-gradient(135deg, #4facfe 0%, #00f2fe 100%);
+.cl-wrap {
+    min-height: calc(100vh - 80px);
     display: flex;
     align-items: center;
     justify-content: center;
-    padding: 1rem;
+    padding: 24px 16px;
 }
-
-.client-login-card {
-    background: white;
-    border-radius: 20px;
-    box-shadow: 0 20px 40px rgba(0, 0, 0, 0.1);
-    padding: 2.5rem;
+.cl-card {
     width: 100%;
-    max-width: 450px;
+    max-width: 460px;
+    background: var(--mw-navy-soft);
+    border: 1px solid var(--mw-line);
+    border-radius: 20px;
+    padding: 36px 28px;
+    box-shadow: 0 12px 40px rgba(0,0,0,.35);
+    color: var(--mw-text);
     position: relative;
     overflow: hidden;
 }
-
-.client-login-card::before {
+.cl-card::before {
     content: '';
     position: absolute;
-    top: 0;
-    left: 0;
-    right: 0;
+    top: 0; left: 0; right: 0;
     height: 5px;
-    background: linear-gradient(90deg, #4facfe 0%, #00f2fe 100%);
+    background: linear-gradient(90deg, var(--mw-cyan) 0%, var(--mw-cyan-light) 100%);
 }
-
-.client-header {
-    text-align: center;
-    margin-bottom: 2rem;
-}
-
-.client-header .logo {
-    width: 80px;
-    height: 80px;
-    background: linear-gradient(135deg, #4facfe 0%, #00f2fe 100%);
+.cl-header { text-align: center; margin-bottom: 28px; }
+.cl-icon {
+    width: 72px; height: 72px;
+    margin: 0 auto 14px;
+    background: linear-gradient(135deg, var(--mw-cyan) 0%, var(--mw-cyan-dark) 100%);
     border-radius: 50%;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    margin: 0 auto 1rem;
-    color: white;
-    font-size: 2rem;
+    display: flex; align-items: center; justify-content: center;
+    color: #fff;
+    font-size: 1.9rem;
+    box-shadow: 0 6px 18px rgba(74,185,224,.35);
 }
+.cl-header h2 { font-weight: 800; font-size: 1.6rem; color: var(--mw-text); margin-bottom: 6px; }
+.cl-header p { color: var(--mw-text-soft); font-size: .95rem; margin: 0; }
 
-.client-header h2 {
-    color: #333;
-    margin-bottom: 0.5rem;
-    font-weight: 600;
-}
-
-.client-header p {
-    color: #666;
-    font-size: 0.95rem;
-}
-
-.form-floating {
-    margin-bottom: 1rem;
-}
-
-.form-floating > .form-control {
-    border: 2px solid #e9ecef;
+.cl-card .form-floating { margin-bottom: 14px; }
+.cl-card .form-floating > .form-control {
+    height: calc(3.4rem + 2px);
+    padding: 1rem .85rem;
     border-radius: 12px;
-    height: calc(3.5rem + 2px);
-    padding: 1rem 0.75rem;
-    font-size: 1rem;
-    transition: all 0.3s ease;
+    border: 2px solid var(--mw-line);
+    background: var(--mw-navy-deep);
+    color: var(--mw-text);
 }
-
-.form-floating > .form-control:focus {
-    border-color: #4facfe;
-    box-shadow: 0 0 0 0.2rem rgba(79, 172, 254, 0.25);
+.cl-card .form-floating > .form-control:focus {
+    border-color: var(--mw-cyan);
+    box-shadow: 0 0 0 .2rem rgba(74,185,224,.25);
+    background: var(--mw-navy-deep);
 }
+.cl-card .form-floating > label { color: var(--mw-text-soft); padding: 1rem .85rem; }
+.cl-card .form-check-label { color: var(--mw-text-soft); font-size: .9rem; }
 
-.form-floating > label {
-    padding: 1rem 0.75rem;
-    color: #666;
-    font-weight: 500;
-}
-
-.btn-client-login {
-    background: linear-gradient(135deg, #4facfe 0%, #00f2fe 100%);
-    border: none;
-    border-radius: 12px;
-    padding: 1rem;
-    font-weight: 600;
-    color: white;
-    width: 100%;
-    font-size: 1.1rem;
-    transition: all 0.3s ease;
-    margin-top: 1rem;
-}
-
-.btn-client-login:hover {
-    transform: translateY(-2px);
-    box-shadow: 0 10px 30px rgba(79, 172, 254, 0.4);
-    color: white;
-}
-
-.divider {
-    text-align: center;
-    margin: 2rem 0;
-    position: relative;
-}
-
-.divider::before {
+.cl-divider { text-align: center; margin: 26px 0 18px; position: relative; }
+.cl-divider::before {
     content: '';
     position: absolute;
-    top: 50%;
-    left: 0;
-    right: 0;
-    height: 1px;
-    background: #e9ecef;
+    top: 50%; left: 0; right: 0;
+    height: 1px; background: var(--mw-line);
+}
+.cl-divider span {
+    background: var(--mw-navy-soft);
+    position: relative;
+    padding: 0 14px;
+    color: var(--mw-text-soft);
+    font-size: .85rem;
 }
 
-.divider span {
-    background: white;
-    padding: 0 1rem;
-    color: #666;
-    font-size: 0.9rem;
-}
-
-.register-section {
+.cl-register-section {
     text-align: center;
-    padding: 1.5rem;
-    background: #f8f9fa;
-    border-radius: 15px;
-    margin-top: 1.5rem;
+    padding: 22px 18px;
+    background: var(--mw-navy-deep);
+    border-radius: 14px;
+    margin-top: 12px;
+    border: 1px solid var(--mw-line);
 }
+.cl-register-section h5 { color: var(--mw-text); font-weight: 700; margin-bottom: 6px; }
+.cl-register-section p { color: var(--mw-text-soft); font-size: .88rem; margin-bottom: 14px; }
+.cl-benefits { text-align: left; max-width: 280px; margin: 0 auto 14px; }
+.cl-benefit-item { display: flex; align-items: center; margin-bottom: 6px; font-size: .9rem; color: var(--mw-text); }
+.cl-benefit-item i { color: var(--mw-cyan-light); margin-right: 8px; width: 16px; flex-shrink: 0; }
 
-.register-section h5 {
-    color: #333;
-    margin-bottom: 0.5rem;
-}
-
-.register-section p {
-    color: #666;
-    margin-bottom: 1rem;
-    font-size: 0.9rem;
-}
-
-.btn-register {
-    background: transparent;
-    border: 2px solid #4facfe;
-    border-radius: 10px;
-    color: #4facfe;
-    padding: 0.5rem 1.5rem;
-    font-weight: 600;
-    transition: all 0.3s ease;
-}
-
-.btn-register:hover {
-    background: #4facfe;
-    color: white;
-    transform: translateY(-1px);
-}
-
-.alert-custom {
-    border-radius: 12px;
-    border: none;
-    padding: 1rem;
-    margin-bottom: 1.5rem;
-}
-
-.benefits {
-    margin-top: 1rem;
-}
-
-.benefit-item {
-    display: flex;
-    align-items: center;
-    margin-bottom: 0.5rem;
-    font-size: 0.9rem;
-    color: #666;
-}
-
-.benefit-item i {
-    color: #4facfe;
-    margin-right: 0.5rem;
-    width: 16px;
-}
+.btn-link-soft { color: var(--mw-cyan-light) !important; text-decoration: none; font-size: .9rem; }
+.btn-link-soft:hover { color: var(--mw-cyan) !important; }
 </style>
 {% endblock %}
 
 {% block content %}
-<div class="client-login-container">
-    <div class="client-login-card">
-        <div class="client-header">
-            <div class="logo">
-                <i class="bi bi-car-front"></i>
-            </div>
-            <h2>Area Clienti</h2>
-            <p>Accedi al tuo account per gestire i tuoi servizi</p>
+<div class="cl-wrap">
+    <div class="cl-card">
+        <div class="cl-header">
+            <div class="cl-icon"><i class="bi bi-car-front"></i></div>
+            <h2>Bentornato</h2>
+            <p>Accedi al tuo account MasterWash</p>
         </div>
-
-        {% if messages %}
-            {% for message in messages %}
-                <div class="alert alert-{{ message.tags }} alert-custom alert-dismissible fade show" role="alert">
-                    <i class="bi bi-{% if message.tags == 'error' %}exclamation-triangle{% else %}check-circle{% endif %} me-2"></i>
-                    {{ message }}
-                    <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
-                </div>
-            {% endfor %}
-        {% endif %}
 
         <form method="post">
             {% csrf_token %}
-            
+
             <div class="form-floating">
-                <input type="email" class="form-control" id="email" name="email" 
-                       placeholder="nome@esempio.com" required>
-                <label for="email">
-                    <i class="bi bi-envelope me-2"></i>Email
-                </label>
+                <input type="email" class="form-control" id="email" name="email"
+                       placeholder="nome@esempio.com" required autocomplete="email">
+                <label for="email"><i class="bi bi-envelope me-2"></i>Email</label>
             </div>
 
             <div class="form-floating">
-                <input type="password" class="form-control" id="password" name="password" 
-                       placeholder="Password" required>
-                <label for="password">
-                    <i class="bi bi-lock me-2"></i>Password
-                </label>
+                <input type="password" class="form-control" id="password" name="password"
+                       placeholder="Password" required autocomplete="current-password">
+                <label for="password"><i class="bi bi-lock me-2"></i>Password</label>
             </div>
 
             <div class="form-check mb-3">
                 <input type="checkbox" class="form-check-input" id="remember_me" name="remember_me">
-                <label class="form-check-label" for="remember_me">
-                    Ricordami per 30 giorni
-                </label>
+                <label class="form-check-label" for="remember_me">Ricordami per 30 giorni</label>
             </div>
 
-            <button type="submit" class="btn btn-client-login">
-                <i class="bi bi-box-arrow-in-right me-2"></i>
-                Accedi al mio account
+            <button type="submit" class="btn-cta w-100 justify-content-center">
+                <i class="bi bi-box-arrow-in-right"></i> Accedi
             </button>
         </form>
 
         <div class="text-center mt-3">
-            <a href="#" class="text-decoration-none" onclick="alert('Controlla la tua email per le istruzioni di recupero')">
-                <i class="bi bi-question-circle me-1"></i>
-                Password dimenticata?
+            <a href="#" class="btn-link-soft" onclick="alert('Contattaci al 379 233 7051 per recuperare la password.'); return false;">
+                <i class="bi bi-question-circle"></i> Password dimenticata?
             </a>
         </div>
 
-        <div class="divider">
-            <span>oppure</span>
-        </div>
+        <div class="cl-divider"><span>oppure</span></div>
 
-        <div class="register-section">
-            <h5>Nuovo Cliente?</h5>
-            <p>Registrati per accedere ai nostri servizi online</p>
-            
-            <div class="benefits">
-                <div class="benefit-item">
-                    <i class="bi bi-check-circle-fill"></i>
-                    <span>Prenota i tuoi lavaggi online</span>
-                </div>
-                <div class="benefit-item">
-                    <i class="bi bi-check-circle-fill"></i>
-                    <span>Gestisci i tuoi abbonamenti</span>
-                </div>
-                <div class="benefit-item">
-                    <i class="bi bi-check-circle-fill"></i>
-                    <span>Accumula punti fedeltà</span>
-                </div>
-                <div class="benefit-item">
-                    <i class="bi bi-check-circle-fill"></i>
-                    <span>Storico servizi e fatture</span>
-                </div>
+        <div class="cl-register-section">
+            <h5>Nuovo cliente?</h5>
+            <p>Registrati gratis e accedi a:</p>
+            <div class="cl-benefits">
+                <div class="cl-benefit-item"><i class="bi bi-check-circle-fill"></i> Prenotazioni online</div>
+                <div class="cl-benefit-item"><i class="bi bi-check-circle-fill"></i> Gestione abbonamenti</div>
+                <div class="cl-benefit-item"><i class="bi bi-check-circle-fill"></i> Punti fedelt&agrave;</div>
+                <div class="cl-benefit-item"><i class="bi bi-check-circle-fill"></i> Storico e ricevute</div>
             </div>
-
-            <button type="button" class="btn btn-register mt-3" onclick="window.location.href='{% url 'clients:register' %}'">
-                <i class="bi bi-person-plus me-2"></i>
-                Registrati Gratuitamente
-            </button>
+            <a href="{% url 'clients:register' %}" class="btn-cta btn-cta-outline">
+                <i class="bi bi-person-plus"></i> Registrati gratis
+            </a>
         </div>
     </div>
 </div>
 
 <script>
 document.addEventListener('DOMContentLoaded', function() {
-    // Auto-focus sul primo campo
-    document.getElementById('email').focus();
-    
-    // Enter key navigation
-    document.getElementById('email').addEventListener('keypress', function(e) {
-        if (e.key === 'Enter') {
-            e.preventDefault();
-            document.getElementById('password').focus();
-        }
-    });
+    const email = document.getElementById('email');
+    if (email) email.focus();
+    if (email) {
+        email.addEventListener('keypress', function(e) {
+            if (e.key === 'Enter') {
+                e.preventDefault();
+                const pwd = document.getElementById('password');
+                if (pwd) pwd.focus();
+            }
+        });
+    }
 });
 </script>
 {% endblock %}
