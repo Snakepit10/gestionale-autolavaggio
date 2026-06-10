@@ -62,16 +62,17 @@
     gap: 18px;
 }
 .soluzione-card {
-    background: #fff;
+    background: var(--mw-navy-soft);
     border-radius: 18px;
     padding: 28px 22px;
     text-align: center;
     border: 1px solid var(--mw-line);
-    box-shadow: 0 4px 16px rgba(26, 58, 82, .06);
+    box-shadow: 0 4px 16px rgba(0, 0, 0, .25);
     transition: transform .2s, box-shadow .2s, border-color .2s;
     position: relative;
+    color: var(--mw-text);
 }
-.soluzione-card:hover { transform: translateY(-4px); box-shadow: 0 16px 32px rgba(26, 58, 82, .12); border-color: var(--mw-cyan-light); }
+.soluzione-card:hover { transform: translateY(-4px); box-shadow: 0 16px 32px rgba(0, 0, 0, .35); border-color: var(--mw-cyan); }
 .soluzione-card .ico {
     width: 72px; height: 72px;
     margin: 0 auto 16px;
@@ -80,7 +81,7 @@
     color: #fff;
     display: flex; align-items: center; justify-content: center;
     font-size: 2rem;
-    box-shadow: 0 4px 14px rgba(74, 185, 224, .35);
+    box-shadow: 0 4px 14px rgba(74, 185, 224, .4);
 }
 .soluzione-card h4 { font-weight: 800; font-size: 1.15rem; margin-bottom: 10px; color: var(--mw-text); }
 .soluzione-card p { color: var(--mw-text-soft); font-size: .94rem; line-height: 1.5; margin-bottom: 0; }
@@ -104,25 +105,26 @@
     gap: 14px;
 }
 .amenity {
-    background: #fff;
+    background: var(--mw-navy-soft);
     border-radius: 14px;
     padding: 18px 16px;
     text-align: center;
     border: 1px solid var(--mw-line);
-    transition: transform .15s, border-color .15s;
+    transition: transform .15s, border-color .15s, background .15s;
 }
-.amenity:hover { transform: translateY(-2px); border-color: var(--mw-cyan-light); }
-.amenity i { font-size: 1.9rem; color: var(--mw-cyan); margin-bottom: 8px; display: block; }
+.amenity:hover { transform: translateY(-2px); border-color: var(--mw-cyan); background: rgba(74, 185, 224, .08); }
+.amenity i { font-size: 1.9rem; color: var(--mw-cyan-light); margin-bottom: 8px; display: block; }
 .amenity .name { font-weight: 700; font-size: .92rem; color: var(--mw-text); }
 .amenity .desc { font-size: .82rem; color: var(--mw-text-soft); margin-top: 2px; }
 
 /* ====== Contatti card ====== */
 .contact-card {
-    background: linear-gradient(135deg, #fff 0%, #f0f9fc 100%);
+    background: linear-gradient(135deg, var(--mw-navy-soft) 0%, var(--mw-navy-deep) 100%);
     border-radius: 20px;
     padding: 32px 28px;
-    border: 1px solid var(--mw-cyan-light);
-    box-shadow: 0 8px 24px rgba(74, 185, 224, .15);
+    border: 1px solid var(--mw-line);
+    box-shadow: 0 8px 24px rgba(0, 0, 0, .3);
+    color: var(--mw-text);
 }
 .contact-card h3 { font-weight: 800; color: var(--mw-text); margin-bottom: 18px; font-size: 1.5rem; }
 .contact-item {
@@ -141,17 +143,19 @@
     display: flex; align-items: center; justify-content: center;
     font-size: 1.3rem;
     flex-shrink: 0;
+    box-shadow: 0 4px 12px rgba(74, 185, 224, .3);
 }
 .contact-item .label { font-size: .78rem; text-transform: uppercase; letter-spacing: .08em; color: var(--mw-text-soft); font-weight: 600; }
 .contact-item .value { font-size: 1.05rem; font-weight: 700; color: var(--mw-text); margin-top: 2px; }
 .contact-item .value a { color: var(--mw-text); text-decoration: none; }
-.contact-item .value a:hover { color: var(--mw-cyan-dark); }
+.contact-item .value a:hover { color: var(--mw-cyan-light); }
 .map-embed {
     border-radius: 16px;
     overflow: hidden;
     border: 1px solid var(--mw-line);
-    box-shadow: 0 4px 16px rgba(26, 58, 82, .08);
+    box-shadow: 0 8px 24px rgba(0, 0, 0, .35);
 }
+.map-embed iframe { filter: brightness(.95) contrast(1.05); }
 .map-embed iframe { display: block; width: 100%; height: 320px; border: 0; }
 
 /* ====== CTA bottom ====== */
@@ -210,7 +214,7 @@
 </section>
 
 {# ========== Le tre soluzioni ========== #}
-<section class="pub-section" style="background:#fff;">
+<section class="pub-section" style="background:var(--mw-navy-deep);">
     <div class="container">
         <div class="text-center mb-5">
             <h2>Le nostre soluzioni</h2>
@@ -291,7 +295,7 @@
 </section>
 
 {# ========== Contatti + mappa ========== #}
-<section class="pub-section" style="background:#fff;">
+<section class="pub-section" style="background:var(--mw-navy-deep);">
     <div class="container">
         <div class="text-center mb-5">
             <h2>Vieni a trovarci</h2>

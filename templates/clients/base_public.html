@@ -14,7 +14,7 @@
 
     <!-- PWA (manifest dedicato cliente, scope /app/ — usato anche dalla TWA Android) -->
     <link rel="manifest" href="{% static 'client-manifest.json' %}">
-    <meta name="theme-color" content="#4ab9e0">
+    <meta name="theme-color" content="#122a3d">
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="default">
     <meta name="apple-mobile-web-app-title" content="MasterWash">
@@ -24,15 +24,19 @@
 
     <style>
     :root {
-        /* Palette MasterWash: cyan brand + grigi puliti */
+        /* Palette MasterWash dark: navy come sfondo, cyan brand,
+           testo chiaro. Stessa estetica del footer estesa a tutto il
+           lato cliente. */
         --mw-cyan: #4ab9e0;
         --mw-cyan-light: #7fd0ec;
         --mw-cyan-dark: #2da3cc;
         --mw-navy: #1a3a52;
-        --mw-bg: #f5fafd;
-        --mw-text: #1a3a52;
-        --mw-text-soft: #5a7689;
-        --mw-line: #e2eef5;
+        --mw-navy-soft: #234a66;        /* surface card piu' chiaro */
+        --mw-navy-deep: #122a3d;        /* sezioni in evidenza piu' scure */
+        --mw-bg: #1a3a52;
+        --mw-text: #eaf3f9;
+        --mw-text-soft: #a8c3d6;
+        --mw-line: rgba(255, 255, 255, .12);
     }
     * { box-sizing: border-box; }
     body {
@@ -44,7 +48,7 @@
 
     /* === Header pubblico === */
     .pub-header {
-        background: #fff;
+        background: var(--mw-navy-deep);
         border-bottom: 1px solid var(--mw-line);
         position: sticky;
         top: 0;
@@ -82,7 +86,7 @@
 
     .pub-nav { display: flex; gap: 8px; align-items: center; }
     .pub-nav a { padding: 8px 14px; border-radius: 8px; font-weight: 500; text-decoration: none; color: var(--mw-text); font-size: .92rem; }
-    .pub-nav a:hover { background: #e7f4fa; color: var(--mw-cyan-dark); }
+    .pub-nav a:hover { background: rgba(74, 185, 224, .15); color: var(--mw-cyan-light); }
     .pub-nav a.btn-primary, .pub-nav a.nav-cta { background: var(--mw-cyan); color: #fff; }
     .pub-nav a.btn-primary:hover, .pub-nav a.nav-cta:hover { background: var(--mw-cyan-dark); color: #fff; }
 
@@ -94,11 +98,11 @@
             display: flex;
             position: fixed;
             bottom: 0; left: 0; right: 0;
-            background: #fff;
+            background: var(--mw-navy-deep);
             border-top: 1px solid var(--mw-line);
             z-index: 100;
             padding: 6px env(safe-area-inset-right) calc(6px + env(safe-area-inset-bottom)) env(safe-area-inset-left);
-            box-shadow: 0 -2px 12px rgba(0,0,0,.04);
+            box-shadow: 0 -2px 12px rgba(0,0,0,.3);
         }
         .pub-bottom-nav a {
             flex: 1;
@@ -110,16 +114,17 @@
             font-weight: 600;
         }
         .pub-bottom-nav a i { display: block; font-size: 1.3rem; margin-bottom: 2px; }
-        .pub-bottom-nav a.active { color: var(--mw-cyan); }
+        .pub-bottom-nav a.active { color: var(--mw-cyan-light); }
         body { padding-bottom: 70px; }
     }
 
     /* === Footer === */
     .pub-footer {
-        background: var(--mw-navy);
+        background: var(--mw-navy-deep);
         color: #cbe2ee;
         padding: 40px 16px 24px;
         margin-top: 56px;
+        border-top: 1px solid var(--mw-line);
     }
     .pub-footer .footer-grid {
         max-width: 980px;
@@ -165,9 +170,17 @@
     .btn-cta.btn-cta-light { background: #fff; color: var(--mw-cyan); box-shadow: 0 4px 14px rgba(0,0,0,.12); }
     .btn-cta.btn-cta-light:hover { background: #f0f9fc; color: var(--mw-cyan-dark); }
 
-    /* === Cards generiche === */
-    .pub-card { background: #fff; border-radius: 16px; padding: 22px; box-shadow: 0 2px 8px rgba(26, 58, 82, .06); transition: transform .15s, box-shadow .15s; border: 1px solid var(--mw-line); }
-    .pub-card:hover { transform: translateY(-2px); box-shadow: 0 12px 28px rgba(26, 58, 82, .1); }
+    /* === Cards generiche (surface su dark bg) === */
+    .pub-card {
+        background: var(--mw-navy-soft);
+        border-radius: 16px;
+        padding: 22px;
+        box-shadow: 0 4px 12px rgba(0,0,0,.25);
+        transition: transform .15s, box-shadow .15s;
+        border: 1px solid var(--mw-line);
+        color: var(--mw-text);
+    }
+    .pub-card:hover { transform: translateY(-2px); box-shadow: 0 12px 28px rgba(0,0,0,.35); }
 
     /* === Section spacing === */
     .pub-section { padding: 56px 16px; }
