@@ -85,8 +85,10 @@
     }
 
     .pub-nav { display: flex; gap: 8px; align-items: center; }
-    .pub-nav a { padding: 8px 14px; border-radius: 8px; font-weight: 500; text-decoration: none; color: var(--mw-text); font-size: .92rem; }
-    .pub-nav a:hover { background: rgba(74, 185, 224, .15); color: var(--mw-cyan-light); }
+    /* Header su sfondo navy-deep: link in BIANCO puro per massimo
+       contrasto + font-weight 600 per maggiore leggibilita'. */
+    .pub-nav a { padding: 8px 14px; border-radius: 8px; font-weight: 600; text-decoration: none; color: #ffffff; font-size: .92rem; }
+    .pub-nav a:hover { background: rgba(74, 185, 224, .2); color: var(--mw-cyan-light); }
     .pub-nav a.btn-primary, .pub-nav a.nav-cta { background: var(--mw-cyan); color: #fff; }
     .pub-nav a.btn-primary:hover, .pub-nav a.nav-cta:hover { background: var(--mw-cyan-dark); color: #fff; }
 
