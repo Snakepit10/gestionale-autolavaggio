@@ -13,6 +13,24 @@ from django.core.mail import send_mail
 logger = logging.getLogger(__name__)
 
 
+# Condizioni di prenotazione mostrate al cliente nel modal di conferma
+# e accodate alle email di ricevuta/conferma. Mantenere coerente con il
+# testo del modale in templates/clients/booking.html.
+CONDIZIONI_PRENOTAZIONE = (
+    "\n\n— CONDIZIONI DI PRENOTAZIONE —\n"
+    "La prenotazione inizia all'orario selezionato e ha una durata\n"
+    "stimata in base ai servizi scelti.\n\n"
+    "Ti chiediamo di segnalarci telefonicamente eventuali ritardi o\n"
+    "necessita' di modifica. In caso di mancato avviso, dopo 15 minuti\n"
+    "di ritardo la slot potrebbe essere ceduta ad altri clienti in\n"
+    "attesa.\n\n"
+    "Per annullare o modificare la prenotazione contattaci\n"
+    "telefonicamente al 379 233 7051.\n\n"
+    "Il prezzo finale dei servizi viene comunicato al ritiro dell'auto,\n"
+    "in base ai servizi effettivamente erogati.\n"
+)
+
+
 def _safe_send(subject: str, body: str, to_email: str | None) -> bool:
     if not to_email:
         logger.warning('Email skipped: destinatario vuoto (subject=%s)', subject)
@@ -69,6 +87,7 @@ def email_prenotazione_ricevuta(prenotazione, to_email: str | None = None) -> bo
         f"L'autolavaggio confermera a breve la disponibilita. "
         f"Riceverai una nuova email all'esito.\n\n"
         f"Grazie!"
+        f"{CONDIZIONI_PRENOTAZIONE}"
     )
     return _safe_send(
         'Prenotazione ricevuta - in attesa di conferma',
@@ -88,7 +107,8 @@ def email_prenotazione_confermata(prenotazione) -> bool:
         f"- Data: {data}\n"
         f"- Ora: {ora}\n"
         f"- Codice: {prenotazione.codice_prenotazione}\n\n"
-        f"Ti aspettiamo. Per modifiche o annullamenti contattaci."
+        f"Ti aspettiamo."
+        f"{CONDIZIONI_PRENOTAZIONE}"
     )
     return _safe_send('Prenotazione confermata', body, _email_target(prenotazione))
 
