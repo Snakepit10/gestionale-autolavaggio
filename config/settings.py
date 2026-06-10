@@ -148,6 +148,14 @@ STATICFILES_DIRS = [BASE_DIR / 'static']
 # Whitenoise configuration for static files
 STATICFILES_STORAGE = 'whitenoise.storage.CompressedManifestStaticFilesStorage'
 
+# Permetti {% static %} di referenziare file non ancora presenti nel
+# manifest (es. masterwash-logo.png prima che venga caricato lo PNG).
+# Senza questo flag, ManifestStaticFilesStorage lancia ValueError al
+# render del template -> 500 sulla landing. Con strict=False ritorna
+# l'URL non-hashed, il browser ottiene 404 e il fallback onerror della
+# pagina mostra il testo stilizzato del brand.
+WHITENOISE_MANIFEST_STRICT = False
+
 # Chiave primaria di default
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 
