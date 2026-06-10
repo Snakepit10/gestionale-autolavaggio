@@ -86,11 +86,36 @@
 
     .pub-nav { display: flex; gap: 8px; align-items: center; }
     /* Header su sfondo navy-deep: link in BIANCO puro per massimo
-       contrasto + font-weight 600 per maggiore leggibilita'. */
-    .pub-nav a { padding: 8px 14px; border-radius: 8px; font-weight: 600; text-decoration: none; color: #ffffff; font-size: .92rem; }
-    .pub-nav a:hover { background: rgba(74, 185, 224, .2); color: var(--mw-cyan-light); }
-    .pub-nav a.btn-primary, .pub-nav a.nav-cta { background: var(--mw-cyan); color: #fff; }
-    .pub-nav a.btn-primary:hover, .pub-nav a.nav-cta:hover { background: var(--mw-cyan-dark); color: #fff; }
+       contrasto + font-weight 600 per maggiore leggibilita'.
+       !important serve a battere l'override globale dei link
+       (a:not(.btn)... in fondo al CSS) che ha specificita' maggiore. */
+    .pub-nav a {
+        padding: 8px 14px;
+        border-radius: 8px;
+        font-weight: 600;
+        text-decoration: none;
+        color: #ffffff !important;
+        font-size: .92rem;
+        transition: background .15s, color .15s;
+    }
+    .pub-nav a:hover {
+        background: rgba(74, 185, 224, .2);
+        color: var(--mw-cyan-light) !important;
+    }
+    /* CTA "Registrati": bianco con testo cyan per staccarsi sia dal
+       navy dell'header sia dal cyan del gradient hero subito sotto. */
+    .pub-nav a.btn-primary, .pub-nav a.nav-cta {
+        background: #ffffff;
+        color: var(--mw-cyan-dark) !important;
+        font-weight: 700;
+        box-shadow: 0 2px 8px rgba(0,0,0,.2);
+    }
+    .pub-nav a.btn-primary:hover, .pub-nav a.nav-cta:hover {
+        background: var(--mw-cyan-light);
+        color: #ffffff !important;
+        transform: translateY(-1px);
+        box-shadow: 0 4px 12px rgba(0,0,0,.25);
+    }
 
     /* === Bottom nav mobile === */
     .pub-bottom-nav { display: none; }
