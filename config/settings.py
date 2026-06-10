@@ -178,9 +178,20 @@ REDIS_URL = os.environ.get('REDIS_URL', 'redis://localhost:6379')
 
 CHANNEL_LAYERS = {
     'default': {
-        'BACKEND': 'channels_redis.core.RedisChannelLayer',
+        # RedisPubSubChannelLayer (basato su pub/sub) e' molto piu'
+        # resiliente del classic RedisChannelLayer (basato su BLPOP)
+        # contro disconnessioni intermittenti di Redis Railway:
+        # - si riconnette automaticamente alla perdita di connessione
+        # - non si blocca per ore su BLPOP morente -> niente cascate
+        #   "Timeout reading from redis.railway.internal:6379"
+        # - messaggi sono fire-and-forget (chi e' connesso al gruppo
+        #   in quel momento li riceve; chi non c'e' li perde — accettabile
+        #   per notifiche live di nuovi ordini/prenotazioni: al reconnect
+        #   il client ricarica lo stato da REST)
+        'BACKEND': 'channels_redis.pubsub.RedisPubSubChannelLayer',
         'CONFIG': {
             "hosts": [REDIS_URL],
+            "prefix": "mw",  # namespace cosi' app diverse non collidono
         },
     },
 }
