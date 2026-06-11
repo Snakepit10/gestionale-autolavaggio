@@ -76,10 +76,16 @@ def _send_template_blocking(to_e164: str, template_name: str, params: list[str])
         'Authorization': f'Bearer {settings.META_WHATSAPP_ACCESS_TOKEN}',
         'Content-Type': 'application/json',
     }
-    body_params = [
-        {'type': 'text', 'text': (str(p) if p is not None else '')[:60]}
-        for p in params
-    ]
+    # Test mode: skippa i parametri body per compatibilita' con template
+    # Meta pre-approvati senza variabili (es. hello_world). Vedi
+    # settings.META_WA_OMIT_BODY_PARAMS.
+    if settings.META_WA_OMIT_BODY_PARAMS:
+        body_params = []
+    else:
+        body_params = [
+            {'type': 'text', 'text': (str(p) if p is not None else '')[:60]}
+            for p in params
+        ]
     payload = {
         'messaging_product': 'whatsapp',
         'to': to_e164.lstrip('+'),  # Meta vuole solo cifre, no +
