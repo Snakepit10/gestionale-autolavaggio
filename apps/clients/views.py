@@ -206,7 +206,7 @@ def crea_prenotazione_pub(request):
     from django.contrib.auth.models import User
     from django.contrib.auth import login as auth_login
     from django.db import transaction
-    from .notifications import email_prenotazione_ricevuta
+    from .notifications import notifica_prenotazione_ricevuta
 
     try:
         body = json.loads(request.body)
@@ -381,7 +381,7 @@ def crea_prenotazione_pub(request):
         'Prenotazione %s creata. Invio email a: %s (cliente.email=%s)',
         prenotazione.codice_prenotazione, email_target, cliente.email,
     )
-    email_prenotazione_ricevuta(prenotazione, to_email=email_target)
+    notifica_prenotazione_ricevuta(prenotazione, to_email=email_target)
 
     # Notifica WebSocket realtime agli operatori (gruppo 'ordini_list')
     # con timeout duro per non bloccare la risposta se Redis e' lento.

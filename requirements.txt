@@ -19,3 +19,7 @@ channels>=4.0
 channels-redis>=4.1
 daphne>=4.0
 redis>=5.0
+
+# WhatsApp notifications (Meta Cloud API)
+phonenumbers>=8.13
+requests>=2.31

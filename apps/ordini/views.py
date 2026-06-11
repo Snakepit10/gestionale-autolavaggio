@@ -2213,7 +2213,7 @@ def prenotazione_accetta(request, pk):
     if request.method != 'POST':
         return JsonResponse({'error': 'Metodo non permesso'}, status=405)
     from apps.prenotazioni.models import Prenotazione
-    from apps.clients.notifications import email_prenotazione_confermata
+    from apps.clients.notifications import notifica_prenotazione_confermata
 
     p = get_object_or_404(Prenotazione, pk=pk)
     if p.stato != 'in_attesa':
@@ -2224,7 +2224,7 @@ def prenotazione_accetta(request, pk):
     if hasattr(p.slot, 'aggiorna_contatori'):
         p.slot.aggiorna_contatori()
 
-    email_prenotazione_confermata(p)
+    notifica_prenotazione_confermata(p)
     return JsonResponse({
         'ok': True,
         'codice': p.codice_prenotazione,
@@ -2241,7 +2241,7 @@ def prenotazione_rifiuta(request, pk):
     if request.method != 'POST':
         return JsonResponse({'error': 'Metodo non permesso'}, status=405)
     from apps.prenotazioni.models import Prenotazione
-    from apps.clients.notifications import email_prenotazione_rifiutata
+    from apps.clients.notifications import notifica_prenotazione_rifiutata
 
     p = get_object_or_404(Prenotazione, pk=pk)
     if p.stato != 'in_attesa':
@@ -2265,7 +2265,7 @@ def prenotazione_rifiuta(request, pk):
         p.nota_interna = f"Rifiutata dall'operatore: {motivo}"
     p.save(update_fields=['stato', 'nota_interna'] if motivo else ['stato'])
 
-    email_prenotazione_rifiutata(p, motivo)
+    notifica_prenotazione_rifiutata(p, motivo)
     return JsonResponse({'ok': True})
 
 
@@ -2279,7 +2279,7 @@ def prenotazione_proponi_orario(request, pk):
     if request.method != 'POST':
         return JsonResponse({'error': 'Metodo non permesso'}, status=405)
     from apps.prenotazioni.models import Prenotazione, SlotPrenotazione
-    from apps.clients.notifications import email_prenotazione_modificata
+    from apps.clients.notifications import notifica_prenotazione_modificata
     from datetime import datetime as _dt, timedelta as _td
 
     p = get_object_or_404(Prenotazione, pk=pk)
@@ -2324,7 +2324,7 @@ def prenotazione_proponi_orario(request, pk):
     if hasattr(nuovo_slot, 'aggiorna_contatori'):
         nuovo_slot.aggiorna_contatori()
 
-    email_prenotazione_modificata(p, vecchia_data, vecchia_ora)
+    notifica_prenotazione_modificata(p, vecchia_data, vecchia_ora)
     return JsonResponse({
         'ok': True,
         'data': nuova_data.strftime('%d/%m/%Y'),

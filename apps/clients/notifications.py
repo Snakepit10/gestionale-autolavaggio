@@ -1,14 +1,22 @@
-"""Notifiche email cliente per le prenotazioni.
+"""Notifiche cliente per le prenotazioni.
 
-Wrapper sopra django.core.mail.send_mail con template testuali. In dev
-usa console backend (le email appaiono in stdout); in produzione SMTP
-configurato via env vars.
+Modulo che combina i due canali:
+- WhatsApp Cloud API (Meta) come canale primario (vedi
+  `apps/clients/whatsapp.py`)
+- Email come fallback automatico quando WhatsApp non e' configurato
+  o l'invio fallisce
 
-Phase 2 (futuro): SMS via Twilio, WhatsApp via Twilio/Meta Cloud API.
+Il chiamante (view) usa solo le funzioni `notifica_prenotazione_*`
+e non sa quale canale parte: la scelta e' centralizzata qui.
+
+In dev l'email usa console backend (stdout); in produzione SMTP via
+env vars.
 """
 import logging
 from django.conf import settings
 from django.core.mail import send_mail
+
+from . import whatsapp as wa
 
 logger = logging.getLogger(__name__)
 
@@ -150,3 +158,55 @@ def email_prenotazione_modificata(prenotazione, vecchia_data: str, vecchia_ora: 
         f"prenotazione dalla tua area cliente."
     )
     return _safe_send('Prenotazione riprogrammata', body, _email_target(prenotazione))
+
+
+def email_prenotazione_promemoria(prenotazione) -> bool:
+    """Promemoria pre-appuntamento (~1h prima dello slot)."""
+    cliente = prenotazione.cliente
+    nome = (cliente.nome or cliente.cognome or '').strip() or 'Cliente'
+    data = prenotazione.slot.data.strftime('%d/%m/%Y')
+    ora = prenotazione.slot.ora_inizio.strftime('%H:%M')
+    body = (
+        f"Ciao {nome},\n\n"
+        f"ti ricordiamo la prenotazione di OGGI alle {ora}.\n"
+        f"Codice: {prenotazione.codice_prenotazione}\n\n"
+        f"Indirizzo: Via Palma 302, Licata (AG)\n"
+        f"In caso di ritardo chiamaci al 379 233 7051.\n\n"
+        f"A tra poco!"
+    )
+    return _safe_send('Promemoria prenotazione', body, _email_target(prenotazione))
+
+
+# ===========================================================================
+# Wrapper unificati: WhatsApp primary, email fallback.
+# Usate dalle view al posto dei `email_*` diretti.
+# ===========================================================================
+
+def notifica_prenotazione_ricevuta(prenotazione, to_email: str | None = None) -> bool:
+    if wa.whatsapp_prenotazione_ricevuta(prenotazione):
+        return True
+    return email_prenotazione_ricevuta(prenotazione, to_email=to_email)
+
+
+def notifica_prenotazione_confermata(prenotazione) -> bool:
+    if wa.whatsapp_prenotazione_confermata(prenotazione):
+        return True
+    return email_prenotazione_confermata(prenotazione)
+
+
+def notifica_prenotazione_rifiutata(prenotazione, motivo: str = '') -> bool:
+    if wa.whatsapp_prenotazione_rifiutata(prenotazione, motivo):
+        return True
+    return email_prenotazione_rifiutata(prenotazione, motivo)
+
+
+def notifica_prenotazione_modificata(prenotazione, vecchia_data: str, vecchia_ora: str) -> bool:
+    if wa.whatsapp_prenotazione_modificata(prenotazione, vecchia_data, vecchia_ora):
+        return True
+    return email_prenotazione_modificata(prenotazione, vecchia_data, vecchia_ora)
+
+
+def notifica_prenotazione_promemoria(prenotazione) -> bool:
+    if wa.whatsapp_prenotazione_promemoria(prenotazione):
+        return True
+    return email_prenotazione_promemoria(prenotazione)

@@ -219,4 +219,21 @@ EMAIL_HOST_USER = os.environ.get('EMAIL_HOST_USER', '')
 EMAIL_HOST_PASSWORD = os.environ.get('EMAIL_HOST_PASSWORD', '')
 DEFAULT_FROM_EMAIL = os.environ.get('DEFAULT_FROM_EMAIL', 'no-reply@autolavaggio.it')
 
+# === WhatsApp Cloud API (Meta) ===
+# Notifiche prenotazione cliente via WhatsApp Business. Senza le env vars
+# il sistema cade automaticamente sul fallback email (notifications.py).
+# Setup: docs/WHATSAPP_SETUP.md
+META_WHATSAPP_PHONE_ID = os.environ.get('META_WHATSAPP_PHONE_ID', '')
+META_WHATSAPP_ACCESS_TOKEN = os.environ.get('META_WHATSAPP_ACCESS_TOKEN', '')
+META_WHATSAPP_BUSINESS_ACCOUNT_ID = os.environ.get('META_WHATSAPP_BUSINESS_ACCOUNT_ID', '')
+META_WHATSAPP_API_VERSION = os.environ.get('META_WHATSAPP_API_VERSION', 'v21.0')
+META_WHATSAPP_TEMPLATE_LANG = os.environ.get('META_WHATSAPP_TEMPLATE_LANG', 'it')
+# Nomi template HSM Meta-approvati (override via env se necessario)
+META_WA_TEMPLATE_RICEVUTA = os.environ.get('META_WA_TEMPLATE_RICEVUTA', 'prenotazione_ricevuta')
+META_WA_TEMPLATE_CONFERMATA = os.environ.get('META_WA_TEMPLATE_CONFERMATA', 'prenotazione_confermata')
+META_WA_TEMPLATE_RIFIUTATA = os.environ.get('META_WA_TEMPLATE_RIFIUTATA', 'prenotazione_rifiutata')
+META_WA_TEMPLATE_MODIFICATA = os.environ.get('META_WA_TEMPLATE_MODIFICATA', 'prenotazione_modificata')
+META_WA_TEMPLATE_PROMEMORIA = os.environ.get('META_WA_TEMPLATE_PROMEMORIA', 'prenotazione_promemoria')
+WHATSAPP_ENABLED = bool(META_WHATSAPP_PHONE_ID and META_WHATSAPP_ACCESS_TOKEN)
+
 # --- FINE CONFIGURAZIONE ---
