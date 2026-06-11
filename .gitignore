@@ -84,3 +84,6 @@ exports/
 # Coverage reports
 coverage/
 .coverage.*
+
+# Diagnostica WhatsApp (contiene token in chiaro)
+scripts/diag_whatsapp.py
