@@ -26,7 +26,6 @@ from datetime import datetime, timedelta
 import requests
 from django.conf import settings
 from django.contrib.auth.decorators import login_required
-from django.db.models import F
 from django.http import (HttpResponse, JsonResponse,
                          HttpResponseForbidden, StreamingHttpResponse)
 from django.shortcuts import get_object_or_404
@@ -314,67 +313,49 @@ def _handle_quick_reply(conv_pk: int, testo: str):
                 vecchio_slot.aggiorna_contatori()
             logger.info('Auto-annullata prenotazione %s via Quick Reply "No, non riesco"',
                        p.codice_prenotazione)
-            # Proponi al cliente slot alternativi via testo libero
-            _proponi_slot_alternativi_text(conv.numero_e164)
+            # Manda al cliente l'invito a riprovare dal sito o a
+            # scrivere gli orari preferiti.
+            _proponi_riprovare_text(conv.numero_e164)
     except Exception as e:
         logger.warning('handle_quick_reply error conv=%s testo=%s: %s',
                       conv_pk, testo, e, exc_info=True)
 
 
-def _proponi_slot_alternativi_text(to_e164: str) -> None:
-    """Manda al cliente un testo libero con i prossimi slot disponibili.
+def _proponi_riprovare_text(to_e164: str) -> None:
+    """Manda al cliente un testo libero invitandolo a riprovare la
+    prenotazione dal sito oppure a scrivere gli orari che preferisce.
 
-    Funziona solo entro 24h dall'ultimo messaggio del cliente -- e' il
-    caso giusto dopo un Quick Reply (il messaggio "No, non riesco" e'
-    appena entrato, finestra 24h fresca).
+    Semplificato dalla vecchia logica che tentava di elencare slot
+    disponibili: era fragile (includeva slot gia' passati o pieni) e
+    metteva sull'operatore l'onere di mantenere allineato il messaggio
+    con la reale disponibilita'. Ora il cliente o riprenota dal sito
+    (che ha la vera griglia disponibilita') o ci scrive un orario
+    preferito e l'operatore risponde manualmente.
 
-    Cerca slot liberi nei prossimi 4 giorni (oggi incluso), fino a 8
-    slot totali, e li formatta in modo leggibile su WhatsApp.
+    Funziona perche' il messaggio incoming "No, non riesco" e' appena
+    arrivato -> finestra 24h fresca -> testo libero permesso senza
+    template approvati.
+
+    Salva anche il messaggio in MessaggioWhatsApp cosi' la bubble
+    outgoing appare nella inbox del gestionale (storico chat).
     """
     try:
-        from apps.prenotazioni.models import SlotPrenotazione
         from apps.clients import whatsapp as wa_module
 
-        oggi = timezone.localtime(timezone.now()).date()
-        giorni_con_slot = []
-        totale_slot = 0
-        for delta in range(0, 4):
-            data = oggi + timedelta(days=delta)
-            qs = (
-                SlotPrenotazione.objects
-                .filter(data=data, disponibile=True)
-                .annotate(liberi=F('max_prenotazioni') - F('prenotazioni_attuali'))
-                .filter(liberi__gt=0)
-                .order_by('ora_inizio')[:6]
-            )
-            qs_list = list(qs)
-            if qs_list:
-                giorni_con_slot.append((data, qs_list))
-                totale_slot += len(qs_list)
-            if totale_slot >= 8:
-                break
-
-        if not giorni_con_slot:
-            text = (
-                "Capito! Purtroppo per i prossimi giorni siamo al completo.\n\n"
-                "Chiamaci al 379 233 7051 e troveremo insieme un orario per te."
-            )
-        else:
-            giorni_it = ['Lun', 'Mar', 'Mer', 'Gio', 'Ven', 'Sab', 'Dom']
-            lines = ["Capito! Ecco i prossimi slot disponibili:\n"]
-            for data, ss in giorni_con_slot:
-                gn = giorni_it[data.weekday()]
-                ore = ', '.join(s.ora_inizio.strftime('%H:%M') for s in ss)
-                lines.append(f"📅 {gn} {data.strftime('%d/%m')}: {ore}")
-            lines.append(
-                "\nScrivici qui l'orario che preferisci, oppure chiamaci "
-                "al 379 233 7051."
-            )
-            text = '\n'.join(lines)
-
-        wa_module._send_text_blocking(to_e164, text)
+        text = (
+            "Capito! Per fissare un nuovo orario:\n\n"
+            "🌐 Riprova dal sito: autolavaggiomasterwash.it\n"
+            "💬 Oppure scrivici qui gli orari che preferisci e ti "
+            "risponderemo al più presto.\n\n"
+            "📞 Per parlare subito: 379 233 7051"
+        )
+        ok, wa_id = wa_module._send_text_blocking(to_e164, text)
+        if ok:
+            # Salva nel storico inbox cosi' l'operatore vede la bubble
+            # outgoing inviata in automatico al cliente.
+            wa_module._log_outgoing_msg(to_e164, text, wa_id)
     except Exception as e:
-        logger.warning('proponi_slot_alternativi error to=%s: %s', to_e164, e)
+        logger.warning('proponi_riprovare error to=%s: %s', to_e164, e)
 
 
 def _handle_status(status_obj: dict):
