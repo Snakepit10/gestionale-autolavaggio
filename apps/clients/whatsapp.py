@@ -116,6 +116,57 @@ def _send_template_blocking(to_e164: str, template_name: str, params: list[str])
         return False
 
 
+def _send_text_blocking(to_e164: str, text: str) -> tuple[bool, str]:
+    """Invia un messaggio di testo libero (non template) — sincrono.
+
+    Funziona solo entro la "finestra di servizio" di 24h dall'ultimo
+    messaggio del cliente; oltre, Meta restituisce errore
+    "re-engagement required" (132047) e bisogna usare un template.
+
+    Usato dalla view di risposta nell'inbox: vogliamo riportare in UI
+    l'esito immediatamente, quindi semantica sincrona (no thread).
+
+    Ritorna `(success, wa_message_id_o_errore)`:
+    - successo: True, id messaggio Meta (es. "wamid.HBg...")
+    - fallimento: False, descrizione errore (es. "400 132047 ...")
+    """
+    if not settings.WHATSAPP_ENABLED:
+        return False, 'WHATSAPP_ENABLED=False'
+    url = (
+        f"{_GRAPH_URL}/{settings.META_WHATSAPP_API_VERSION}"
+        f"/{settings.META_WHATSAPP_PHONE_ID}/messages"
+    )
+    headers = {
+        'Authorization': f'Bearer {settings.META_WHATSAPP_ACCESS_TOKEN}',
+        'Content-Type': 'application/json',
+    }
+    payload = {
+        'messaging_product': 'whatsapp',
+        'to': to_e164.lstrip('+'),
+        'type': 'text',
+        'text': {'body': (text or '')[:4096]},
+    }
+    try:
+        r = requests.post(url, json=payload, headers=headers, timeout=_REQUEST_TIMEOUT)
+        if r.status_code >= 400:
+            logger.warning(
+                'WhatsApp text fallito (%s) to=%s: %s',
+                r.status_code, to_e164, r.text[:300],
+            )
+            return False, f'HTTP {r.status_code}: {r.text[:200]}'
+        data = r.json()
+        wa_id = ''
+        try:
+            wa_id = data['messages'][0]['id']
+        except (KeyError, IndexError, TypeError):
+            pass
+        logger.info('WhatsApp text inviato to=%s id=%s', to_e164, wa_id)
+        return True, wa_id
+    except requests.RequestException as e:
+        logger.warning('WhatsApp text request error to=%s: %s', to_e164, e)
+        return False, str(e)
+
+
 def _send_template(to_e164: str, template_name: str, params: list[str]) -> bool:
     """Fire-and-forget: avvia thread daemon e ritorna subito True.
 

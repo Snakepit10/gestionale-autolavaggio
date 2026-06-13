@@ -133,10 +133,13 @@ urlpatterns = [
     # Cartellini Kanban (etichette magazzino two-bin)
     path('cartellini/', include('apps.cartellini.urls', namespace='cartellini')),
 
+    # Messaggi WhatsApp (inbox staff)
+    path('messaggi/', include('apps.messaggi.urls', namespace='messaggi')),
+
     # path('shop/', include('apps.shop.urls')),
     # path('cassa/', include('apps.ordini.urls', namespace='cassa')),
     # path('report/', include('apps.reportistica.urls')),  # Temporarily disabled
-    # path('api/', include('apps.api.urls')),
+    path('api/', include('apps.api.urls')),
     # path('', include('pwa.urls')),
 ]
 

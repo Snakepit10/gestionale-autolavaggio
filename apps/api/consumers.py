@@ -206,3 +206,48 @@ class DashboardConsumer(AsyncWebsocketConsumer):
             'type': 'stats_update',
             'stats': event['stats']
         }))
+
+
+class MessaggiConsumer(AsyncWebsocketConsumer):
+    """Consumer per la pagina /messaggi/ (inbox WhatsApp).
+
+    Subscribe al group 'messaggi_wa' e inoltra al frontend gli eventi:
+    - nuovo_messaggio_wa: messaggio in entrata o in uscita
+    - aggiorna_stato_wa: status update (delivered/read/failed)
+    - segna_letti_wa: counter non_letti azzerato (sync tra browser aperti)
+    """
+    async def connect(self):
+        from django.contrib.auth.models import AnonymousUser
+        if isinstance(self.scope['user'], AnonymousUser):
+            await self.close()
+            return
+        self.room_group_name = 'messaggi_wa'
+        await self.channel_layer.group_add(self.room_group_name, self.channel_name)
+        await self.accept()
+
+    async def disconnect(self, close_code):
+        await self.channel_layer.group_discard(self.room_group_name, self.channel_name)
+
+    async def nuovo_messaggio_wa(self, event):
+        await self.send(text_data=json.dumps({
+            'type': 'nuovo_messaggio_wa',
+            'conv_id': event.get('conv_id'),
+            'numero_e164': event.get('numero_e164', ''),
+            'preview': event.get('preview', ''),
+            'direzione': event.get('direzione', 'in'),
+            'timestamp': event.get('timestamp', ''),
+        }))
+
+    async def aggiorna_stato_wa(self, event):
+        await self.send(text_data=json.dumps({
+            'type': 'aggiorna_stato_wa',
+            'conv_id': event.get('conv_id'),
+            'msg_id': event.get('msg_id'),
+            'stato': event.get('stato', ''),
+        }))
+
+    async def segna_letti_wa(self, event):
+        await self.send(text_data=json.dumps({
+            'type': 'segna_letti_wa',
+            'conv_id': event.get('conv_id'),
+        }))

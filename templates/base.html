@@ -54,6 +54,14 @@
                         </li>
 
                         <li class="nav-item">
+                            <a class="nav-link position-relative" href="{% url 'messaggi:inbox' %}" id="navWaLink">
+                                <i class="bi bi-whatsapp"></i> Messaggi
+                                <span id="navbar-wa-badge" class="badge bg-danger position-absolute"
+                                      style="top:6px;right:-2px;display:none;font-size:.62rem;padding:2px 6px;border-radius:10px;"></span>
+                            </a>
+                        </li>
+
+                        <li class="nav-item">
                             <a class="nav-link" href="{% url 'ordini:cassa' %}">
                                 <i class="bi bi-cash-register"></i> Cassa
                             </a>
@@ -281,6 +289,50 @@
     {% endif %}
     
     {% block extra_js %}{% endblock %}
+
+    {% if user.is_authenticated and user.is_staff %}
+    {# Badge "Messaggi WhatsApp" non letti nella navbar, aggiornato live via WS #}
+    <script>
+    (function() {
+        const badge = document.getElementById('navbar-wa-badge');
+        if (!badge) return;
+
+        function aggiornaBadge(totale) {
+            if (totale > 0) {
+                badge.textContent = totale > 99 ? '99+' : totale;
+                badge.style.display = '';
+            } else {
+                badge.style.display = 'none';
+            }
+        }
+
+        async function caricaTotale() {
+            try {
+                const r = await fetch('/api/whatsapp/conversazioni/', { credentials: 'same-origin' });
+                if (!r.ok) return;
+                const d = await r.json();
+                const tot = (d.conversazioni || []).reduce((a, c) => a + (c.non_letti || 0), 0);
+                aggiornaBadge(tot);
+            } catch (e) { /* ignora */ }
+        }
+
+        // WS subscribe per refresh badge live
+        let ws = null;
+        function connettiWS() {
+            try {
+                const proto = location.protocol === 'https:' ? 'wss' : 'ws';
+                ws = new WebSocket(`${proto}://${location.host}/ws/messaggi/`);
+                ws.onmessage = () => caricaTotale();
+                ws.onclose = () => setTimeout(connettiWS, 5000);
+                ws.onerror = () => { try { ws.close(); } catch(e){} };
+            } catch(e) { /* ignora */ }
+        }
+
+        caricaTotale();
+        connettiWS();
+    })();
+    </script>
+    {% endif %}
 
     <!-- IMPORTANT: le pagine staff/operatore non usano il Service Worker.
          Lo SW e' attivo SOLO sul lato cliente /app/ (in base_public.html).

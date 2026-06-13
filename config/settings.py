@@ -66,6 +66,7 @@ INSTALLED_APPS = [
     'apps.turni',
     'apps.clients',
     'apps.cartellini',
+    'apps.messaggi',
     # 'apps.reportistica',  # Temporarily disabled due to pandas dependency
     # 'apps.shop',
 ]
@@ -243,6 +244,13 @@ META_WA_TEMPLATE_AUTO_PRONTA = os.environ.get('META_WA_TEMPLATE_AUTO_PRONTA', 'a
 META_WA_OMIT_BODY_PARAMS = os.environ.get(
     'META_WA_OMIT_BODY_PARAMS', ''
 ).strip().lower() in ('1', 'true', 'yes', 'on')
+# Webhook (ricezione messaggi clienti):
+# - VERIFY_TOKEN: stringa segreta a scelta, va impostata uguale qui e in
+#   Meta Developers App -> WhatsApp -> Configuration -> Verify token
+# - APP_SECRET: in Meta Developers App -> Settings -> Basic -> App Secret
+#   Serve per validare X-Hub-Signature-256 contro spoofing del webhook
+META_WHATSAPP_VERIFY_TOKEN = os.environ.get('META_WHATSAPP_VERIFY_TOKEN', '')
+META_WHATSAPP_APP_SECRET = os.environ.get('META_WHATSAPP_APP_SECRET', '')
 WHATSAPP_ENABLED = bool(META_WHATSAPP_PHONE_ID and META_WHATSAPP_ACCESS_TOKEN)
 
 # --- FINE CONFIGURAZIONE ---

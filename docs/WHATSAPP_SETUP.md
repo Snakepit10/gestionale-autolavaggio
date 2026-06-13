@@ -224,3 +224,71 @@ Una "conversazione" = finestra di 24h con un cliente. 5 notifiche
 allo stesso cliente nello stesso giorno = 1 conversazione = 1
 addebito. Volume tipico: 100 prenotazioni/mese → 100–200 conv,
 ampiamente dentro il free tier.
+
+---
+
+## STEP 8 — Ricezione messaggi (inbox bidirezionale)
+
+Per leggere le risposte dei clienti e poter rispondere dal gestionale
+serve configurare un **webhook**: Meta chiama il nostro backend ogni
+volta che arriva un messaggio o un cambio di stato consegna/letto.
+
+### 8.1 Env vars su Railway
+
+```
+META_WHATSAPP_VERIFY_TOKEN = <una stringa segreta a scelta, es. mw-wa-verify-2026>
+META_WHATSAPP_APP_SECRET   = <App Secret della tua Meta App>
+```
+
+L'App Secret si trova in [Meta Developers App](https://developers.facebook.com)
+→ la tua app → **Settings → Basic → App Secret → Show**.
+
+### 8.2 Configura il webhook in Meta
+
+In Meta Developers App → **WhatsApp → Configuration**:
+
+1. **Callback URL**:
+   `https://autolavaggiomasterwash.it/api/whatsapp/webhook/`
+2. **Verify token**: stesso valore di `META_WHATSAPP_VERIFY_TOKEN`
+3. Click **Verify and save** → Meta fa GET con `hub.challenge`,
+   il backend risponde con il challenge → ✅ verde.
+4. In **Webhook fields** della WABA → **Subscribe** al campo
+   `messages`.
+
+### 8.3 Test
+
+1. Dal tuo telefono manda un WhatsApp al numero business
+   `+39 379 233 7051`.
+2. Log Railway atteso:
+   ```
+   INFO ... WhatsApp webhook ricevuto ...
+   ```
+3. Apri `/messaggi/` come staff → vedi la nuova conversazione
+   con badge "1 non letto".
+4. Click → leggi → digita risposta → "Invia" → ✓ (sent),
+   poi ✓✓ (delivered), poi ✓✓ blu (read).
+
+### 8.4 Finestra 24h
+
+Per inviare **testo libero** WhatsApp richiede che il cliente abbia
+scritto entro 24h. Oltre quel limite il textarea si disabilita e
+l'UI mostra un warning: per riavviare la conversazione si deve
+inviare un template (le 5 notifiche prenotazione del gestionale
+fanno questo automaticamente).
+
+### 8.5 Numeri sconosciuti
+
+I messaggi da numeri non in anagrafica appaiono come "Numero
+sconosciuto" con un bottone **Aggancia cliente** nell'header chat:
+click → cerca per nome/telefono → seleziona → la conversazione viene
+collegata e il nome cliente appare nell'inbox.
+
+### Troubleshooting webhook
+
+| Sintomo | Causa | Fix |
+|---|---|---|
+| Setup "Verify and save" → 403 | Verify token Railway ≠ Meta | Riallinea `META_WHATSAPP_VERIFY_TOKEN` su Railway |
+| Webhook POST risponde 403 in produzione | App Secret errato (firma X-Hub non matcha) | Verifica `META_WHATSAPP_APP_SECRET` su Railway = App Secret della tua app Meta |
+| Messaggi arrivano ma non in `/messaggi/` | Subscribe a `messages` mancato | In WABA → Webhooks → click "Subscribe" sul campo `messages` |
+| Inbox vuota anche dopo POST | Numero E.164 non parsabile | Log Railway: cerca `_to_e164` ritornato None. Probabile prefisso strano |
+| Risposta operatore restituisce 400 "finestra_24h_scaduta" | Cliente non scrive da >24h | Atteso: invia un template per riavviare la chat |
