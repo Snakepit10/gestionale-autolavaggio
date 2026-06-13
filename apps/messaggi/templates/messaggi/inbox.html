@@ -465,9 +465,39 @@ function renderChat() {
 
 function renderBubble(m) {
     const checks = m.direzione === 'out' ? statoChecks(m.stato) : '';
+    // Media: scarica via proxy /api/whatsapp/media/<id>/
+    const url = m.has_media ? `/api/whatsapp/media/${m.id}/` : '';
+    let mediaHtml = '';
+    if (m.media_type === 'audio') {
+        mediaHtml = `<audio controls preload="none" src="${url}" style="max-width:280px;width:100%;display:block;margin-bottom:4px;"></audio>`;
+    } else if (m.media_type === 'image') {
+        mediaHtml = `<a href="${url}" target="_blank" rel="noopener">
+            <img src="${url}" loading="lazy"
+                 style="max-width:240px;max-height:240px;border-radius:6px;cursor:pointer;display:block;margin-bottom:4px;">
+        </a>`;
+    } else if (m.media_type === 'video') {
+        mediaHtml = `<video controls preload="none" src="${url}"
+                     style="max-width:280px;width:100%;border-radius:6px;display:block;margin-bottom:4px;"></video>`;
+    } else if (m.media_type === 'document') {
+        mediaHtml = `<a href="${url}" target="_blank" rel="noopener"
+                     class="d-inline-flex align-items-center gap-2 text-decoration-none"
+                     style="padding:8px 10px;background:rgba(0,0,0,.04);border-radius:6px;color:#333;margin-bottom:4px;">
+            <i class="bi bi-file-earmark-fill" style="font-size:1.3rem;"></i>
+            <span>Scarica documento</span>
+        </a>`;
+    } else if (m.media_type === 'sticker' && m.has_media) {
+        mediaHtml = `<img src="${url}" loading="lazy"
+                     style="max-width:120px;display:block;margin-bottom:4px;">`;
+    }
+    // Mostra il testo solo se non e' un placeholder tipo "[Audio]" senza caption
+    const corpo = m.corpo || '';
+    const isPlaceholder = m.media_type !== 'text' && /^\[[A-Za-z]+\]$/.test(corpo);
+    const corpoHtml = (corpo && !isPlaceholder)
+        ? `<div class="corpo">${escapeHtml(corpo)}</div>` : '';
     return `
         <div class="wa-bubble ${m.direzione}">
-            <div class="corpo">${escapeHtml(m.corpo)}</div>
+            ${mediaHtml}
+            ${corpoHtml}
             <div class="meta">
                 <span>${formatTime(m.creato_il)}</span>
                 ${checks}

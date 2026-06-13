@@ -21,4 +21,7 @@ urlpatterns = [
          views.segna_letti, name='wa-read'),
     path('whatsapp/conversazioni/<int:pk>/aggancia-cliente/',
          views.aggancia_cliente, name='wa-link'),
+    # Proxy media (audio/foto/video/document) - usa bearer token Meta
+    path('whatsapp/media/<int:msg_id>/',
+         views.media_proxy, name='wa-media'),
 ]

@@ -75,13 +75,32 @@ class MessaggioWhatsApp(models.Model):
         ('failed', 'Fallito'),       # outgoing: Meta ha rigettato
     ]
 
+    TIPO = [
+        ('text', 'Testo'),
+        ('audio', 'Audio'),
+        ('image', 'Foto'),
+        ('video', 'Video'),
+        ('document', 'Documento'),
+        ('sticker', 'Sticker'),
+        ('location', 'Posizione'),
+    ]
+
     conversazione = models.ForeignKey(
         ConversazioneWhatsApp,
         on_delete=models.CASCADE,
         related_name='messaggi',
     )
     direzione = models.CharField(max_length=3, choices=DIREZIONE)
-    corpo = models.TextField(blank=True, default='')
+    corpo = models.TextField(blank=True, default='',
+                            help_text="Testo o caption del media. '[Audio]' come placeholder per voce.")
+    # Media (audio/foto/video/document). Meta non manda il file binario nel
+    # webhook ma solo un ID temporaneo: lo scarichiamo on-demand via proxy
+    # quando l'operatore preme play/apri (vedi api.views.media_proxy).
+    media_type = models.CharField(max_length=12, choices=TIPO, default='text', blank=True)
+    media_id = models.CharField(max_length=128, blank=True, default='',
+                               help_text="ID media Meta. Usato dal proxy per scaricare il file.")
+    media_mime = models.CharField(max_length=80, blank=True, default='',
+                                 help_text="Content-Type, es. audio/ogg, image/jpeg")
     # ID del messaggio lato Meta. Per incoming arriva nel payload del
     # webhook; per outgoing torna nella response API messages.
     # Lo usiamo per dedup (Meta puo' rinotificare) e per matchare

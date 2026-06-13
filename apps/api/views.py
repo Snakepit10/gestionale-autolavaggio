@@ -22,9 +22,11 @@ import json
 import logging
 from datetime import datetime
 
+import requests
 from django.conf import settings
 from django.contrib.auth.decorators import login_required
-from django.http import HttpResponse, JsonResponse, HttpResponseForbidden
+from django.http import (HttpResponse, JsonResponse,
+                         HttpResponseForbidden, StreamingHttpResponse)
 from django.shortcuts import get_object_or_404
 from django.utils import timezone
 from django.views.decorators.csrf import csrf_exempt
@@ -110,14 +112,37 @@ def _handle_incoming(payload_msg: dict, contacts: list[dict]):
         if match:
             conv.cliente = match
 
-    # Estrai corpo testo. Meta puo' mandare anche image/video/document/
-    # location/audio/sticker: per Phase 1 estraiamo solo text.body, gli
-    # altri tipi finiscono come placeholder.
-    msg_type = payload_msg.get('type', 'text')
-    if msg_type == 'text':
+    # Estrai testo o media. Meta manda solo media_id per audio/foto/video/
+    # document: il file binario lo scarichiamo on-demand via media_proxy
+    # quando l'operatore preme play/apri nella inbox.
+    msg_type_raw = payload_msg.get('type', 'text')
+    # Meta usa 'audio' anche per le voce; trattiamo uguale.
+    if msg_type_raw == 'voice':
+        msg_type_raw = 'audio'
+    media_id = ''
+    media_mime = ''
+    if msg_type_raw == 'text':
         corpo = payload_msg.get('text', {}).get('body', '')
+        media_type = 'text'
+    elif msg_type_raw in ('audio', 'image', 'video', 'document', 'sticker'):
+        media_obj = payload_msg.get(msg_type_raw, {}) or {}
+        media_id = media_obj.get('id', '')
+        media_mime = media_obj.get('mime_type', '')
+        caption = media_obj.get('caption', '') or ''
+        label = {
+            'audio': 'Audio', 'image': 'Foto', 'video': 'Video',
+            'document': 'Documento', 'sticker': 'Sticker',
+        }[msg_type_raw]
+        corpo = f'[{label}]' + (f' {caption}' if caption else '')
+        media_type = msg_type_raw
+    elif msg_type_raw == 'location':
+        loc = payload_msg.get('location', {}) or {}
+        corpo = f"[Posizione] {loc.get('latitude','?')},{loc.get('longitude','?')}"
+        media_type = 'location'
     else:
-        corpo = f'[{msg_type}]'  # placeholder per media
+        # Tipi sconosciuti: salva placeholder
+        corpo = f'[{msg_type_raw}]'
+        media_type = 'text'
 
     # Timestamp Meta in Unix epoch (string)
     ts_raw = payload_msg.get('timestamp', '')
@@ -139,6 +164,9 @@ def _handle_incoming(payload_msg: dict, contacts: list[dict]):
         wa_message_id=wa_msg_id,
         stato='received',
         timestamp_meta=ts,
+        media_type=media_type,
+        media_id=media_id,
+        media_mime=media_mime,
     )
     conv.ultimo_incoming_il = timezone.now()
     conv.non_letti = (conv.non_letti or 0) + 1
@@ -232,9 +260,12 @@ def _is_staff(user):
 
 
 def _serialize_conv(c: ConversazioneWhatsApp, ultimo: MessaggioWhatsApp | None = None) -> dict:
-    nome = (c.cliente.nome if c.cliente and c.cliente.nome
-            else (c.cliente.ragione_sociale if c.cliente and c.cliente.ragione_sociale
-                  else 'Numero sconosciuto'))
+    # Nome+cognome (o ragione sociale) usando la property `nome_completo`
+    # gia' esistente sul modello Cliente. Per numeri sconosciuti -> default.
+    if c.cliente:
+        nome = c.cliente.nome_completo or 'Cliente senza nome'
+    else:
+        nome = 'Numero sconosciuto'
     return {
         'id': c.pk,
         'numero_e164': c.numero_e164,
@@ -256,6 +287,9 @@ def _serialize_msg(m: MessaggioWhatsApp) -> dict:
         'stato': m.stato,
         'creato_il': m.creato_il.isoformat(),
         'operatore': m.operatore.username if m.operatore else None,
+        'media_type': m.media_type or 'text',
+        'media_mime': m.media_mime or '',
+        'has_media': bool(m.media_id),
     }
 
 
@@ -378,4 +412,68 @@ def aggancia_cliente(request, pk):
     else:
         conv.cliente = None
     conv.save(update_fields=['cliente'])
-    return JsonResponse({'ok': True, 'cliente_nome': (conv.cliente.nome if conv.cliente else None)})
+    return JsonResponse({'ok': True, 'cliente_nome': (conv.cliente.nome_completo if conv.cliente else None)})
+
+
+# ===========================================================================
+# MEDIA PROXY: scarica audio/foto/video da Meta on-demand
+# ===========================================================================
+# Meta non manda il binario nel webhook ma solo un media_id. Per ottenerlo
+# servono 2 step autenticati col bearer token:
+#   1. GET /<media_id>           -> ritorna JSON con un URL temporaneo (~5min)
+#   2. GET <quel URL>             -> ritorna il binario
+# Il browser dell'operatore non puo' fare il passo 1 da solo (richiede il
+# token segreto del System User), quindi facciamo proxy noi: il browser
+# punta a /api/whatsapp/media/<msg_id>/ e noi rispondiamo col binario.
+
+@login_required
+@require_http_methods(['GET'])
+def media_proxy(request, msg_id):
+    if not _is_staff(request.user):
+        return HttpResponse(status=403)
+    msg = get_object_or_404(MessaggioWhatsApp, pk=msg_id)
+    if not msg.media_id:
+        return HttpResponse(status=404)
+    if not settings.WHATSAPP_ENABLED:
+        return HttpResponse(status=503)
+
+    headers = {'Authorization': f'Bearer {settings.META_WHATSAPP_ACCESS_TOKEN}'}
+    info_url = (
+        f'https://graph.facebook.com/{settings.META_WHATSAPP_API_VERSION}'
+        f'/{msg.media_id}'
+    )
+    try:
+        r1 = requests.get(info_url, headers=headers, timeout=10)
+        if r1.status_code >= 400:
+            logger.warning('media_proxy info fallito (%s) media_id=%s: %s',
+                          r1.status_code, msg.media_id, r1.text[:200])
+            return HttpResponse(status=502)
+        data = r1.json()
+        media_url = data.get('url', '')
+    except (requests.RequestException, ValueError) as e:
+        logger.warning('media_proxy info error media_id=%s: %s', msg.media_id, e)
+        return HttpResponse(status=502)
+
+    if not media_url:
+        return HttpResponse(status=404)
+
+    try:
+        # stream=True: scarichiamo a chunks per non caricare in RAM file grandi
+        r2 = requests.get(media_url, headers=headers, timeout=30, stream=True)
+        if r2.status_code >= 400:
+            return HttpResponse(status=502)
+    except requests.RequestException as e:
+        logger.warning('media_proxy fetch error: %s', e)
+        return HttpResponse(status=502)
+
+    content_type = msg.media_mime or r2.headers.get('Content-Type', 'application/octet-stream')
+
+    def stream():
+        for chunk in r2.iter_content(chunk_size=8192):
+            if chunk:
+                yield chunk
+
+    resp = StreamingHttpResponse(stream(), content_type=content_type)
+    # Cache lato browser: stessa risposta media valida ~1h
+    resp['Cache-Control'] = 'private, max-age=3600'
+    return resp
