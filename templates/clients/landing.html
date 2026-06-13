@@ -170,6 +170,153 @@
 }
 .cta-bottom h3 { font-weight: 800; font-size: 1.7rem; }
 .cta-bottom p { font-size: 1.02rem; opacity: .95; }
+
+/* ====== Scarica l'app ====== */
+.app-promo {
+    display: grid;
+    grid-template-columns: 240px 1fr;
+    gap: 32px;
+    align-items: center;
+    background: linear-gradient(135deg, var(--mw-navy-soft) 0%, var(--mw-navy-deep) 100%);
+    border: 1px solid var(--mw-line);
+    border-radius: 24px;
+    padding: 36px;
+    box-shadow: 0 12px 32px rgba(0, 0, 0, .3);
+}
+@media (max-width: 767.98px) {
+    .app-promo { grid-template-columns: 1fr; padding: 24px; text-align: center; }
+    .app-promo .phone-mockup { margin: 0 auto; }
+    .app-features { text-align: left; max-width: 380px; margin: 0 auto 16px; }
+    .app-promo .d-flex { justify-content: center; }
+}
+.phone-mockup {
+    width: 220px;
+    height: 380px;
+    background: #1a1a1a;
+    border: 8px solid #2a2a2a;
+    border-radius: 36px;
+    box-shadow: 0 20px 50px rgba(0, 0, 0, .5), inset 0 0 0 2px #444;
+    position: relative;
+    overflow: hidden;
+}
+.phone-mockup::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 50%;
+    transform: translateX(-50%);
+    width: 70px;
+    height: 18px;
+    background: #1a1a1a;
+    border-radius: 0 0 14px 14px;
+    z-index: 2;
+}
+.phone-screen {
+    width: 100%;
+    height: 100%;
+    background: linear-gradient(135deg, #122a3d 0%, #1a3a52 60%, var(--mw-cyan-dark) 130%);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    padding-top: 38px;
+    color: #fff;
+}
+.phone-bar {
+    width: 60%;
+    height: 5px;
+    background: rgba(255, 255, 255, .25);
+    border-radius: 3px;
+    margin-top: 8px;
+}
+.phone-logo {
+    margin-top: 60px;
+    width: 70px;
+    height: 70px;
+    background: #fff;
+    border-radius: 18px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    box-shadow: 0 6px 18px rgba(0, 0, 0, .3);
+}
+.phone-dots {
+    display: flex;
+    gap: 10px;
+    margin-top: 28px;
+}
+.phone-dots span {
+    width: 8px;
+    height: 8px;
+    background: rgba(255, 255, 255, .4);
+    border-radius: 50%;
+}
+.phone-dots span:first-child {
+    background: var(--mw-cyan);
+    box-shadow: 0 0 8px var(--mw-cyan);
+}
+
+.app-promo-info h2 {
+    font-size: 1.8rem;
+    color: var(--mw-text);
+}
+.app-promo-info .lead {
+    color: var(--mw-text-soft);
+}
+.app-features {
+    list-style: none;
+    padding: 0;
+    margin: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+}
+.app-features li {
+    color: var(--mw-text);
+    font-size: .95rem;
+}
+.app-features li i {
+    color: var(--mw-cyan);
+    margin-right: 10px;
+    font-size: 1.05rem;
+}
+.text-soft { color: var(--mw-text-soft); }
+
+/* Tutorial iOS step-by-step */
+.ios-tutorial {
+    background: var(--mw-navy-soft);
+    border: 1px solid var(--mw-line);
+    border-radius: 18px;
+    padding: 24px;
+    margin-top: 24px;
+    color: var(--mw-text);
+}
+.ios-tutorial h5 { color: var(--mw-cyan-light); font-weight: 700; }
+.ios-steps {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+    gap: 16px;
+}
+.ios-step {
+    background: var(--mw-navy-deep);
+    border-radius: 12px;
+    padding: 16px;
+    display: flex;
+    align-items: flex-start;
+    gap: 12px;
+}
+.ios-step-num {
+    width: 32px;
+    height: 32px;
+    background: var(--mw-cyan);
+    color: #fff;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-weight: 800;
+    flex-shrink: 0;
+}
+.ios-step strong { color: var(--mw-text); }
 </style>
 {% endblock %}
 
@@ -185,6 +332,11 @@
     <div class="cta-row">
         <a href="{% url 'clients:booking' %}" class="btn-cta btn-cta-light">
             <i class="bi bi-calendar-plus"></i> Prenota ora
+        </a>
+        {# Visibile solo se l'app PWA NON e' gia' installata. La logica show/hide e' nel JS in fondo alla pagina. #}
+        <a href="#scarica-app" class="btn-cta btn-cta-outline" id="hero-btn-install"
+           style="color:#fff;border-color:rgba(255,255,255,.7);display:none;">
+            <i class="bi bi-download"></i> Scarica l'app
         </a>
         <a href="tel:+393792337051" class="btn-cta btn-cta-outline" style="color:#fff;border-color:rgba(255,255,255,.7);">
             <i class="bi bi-telephone-fill"></i> 379 233 7051
@@ -245,6 +397,84 @@
             </div>
         </div>
     </div>
+</section>
+
+{# ========== Scarica l'app (PWA + iOS tutorial) ========== #}
+<section class="pub-section" id="scarica-app" style="background:var(--mw-bg);">
+  <div class="container" style="max-width:980px;">
+    <div class="app-promo" id="appPromoBox">
+      <div class="app-promo-cta">
+        <div class="phone-mockup" aria-hidden="true">
+          <div class="phone-screen">
+            <div class="phone-bar"></div>
+            <div class="phone-logo">
+              <span style="font-family:'Arial Black',Arial,sans-serif;font-style:italic;font-weight:900;color:var(--mw-cyan);font-size:1.3rem;letter-spacing:-.02em;transform:skewX(-8deg);display:inline-block;">MW</span>
+            </div>
+            <div class="phone-dots"><span></span><span></span><span></span></div>
+          </div>
+        </div>
+      </div>
+      <div class="app-promo-info">
+        <h2 class="mb-2">Porta MasterWash in tasca</h2>
+        <p class="lead mb-3">Installa l'app sul tuo smartphone e prenota in 2 tap.</p>
+        <ul class="app-features">
+          <li><i class="bi bi-check-circle-fill"></i> Prenota e gestisci da casa o in viaggio</li>
+          <li><i class="bi bi-check-circle-fill"></i> Notifiche WhatsApp di conferma e promemoria</li>
+          <li><i class="bi bi-check-circle-fill"></i> Storico prenotazioni e codice rapido</li>
+          <li><i class="bi bi-check-circle-fill"></i> Funziona offline una volta installata</li>
+        </ul>
+
+        {# Bottoni install: solo uno alla volta in base al device. JS in fondo. #}
+        <div class="d-flex gap-2 flex-wrap mt-4" id="installButtons">
+          <button class="btn-cta" id="btnInstallPwa" style="display:none;">
+            <i class="bi bi-download"></i> Installa l'app
+          </button>
+          <button class="btn-cta btn-cta-outline" id="btnInstallIos" style="display:none;"
+                  onclick="document.getElementById('iosTutorial').scrollIntoView({behavior:'smooth'});">
+            <i class="bi bi-apple"></i> Come installare su iPhone
+          </button>
+          <a class="btn-cta btn-cta-outline" id="btnPlayStore"
+             href="https://play.google.com/store/apps/details?id=it.autolavaggiomasterwash.app"
+             target="_blank" rel="noopener" style="display:none;">
+            <i class="bi bi-google-play"></i> Google Play
+          </a>
+        </div>
+        {# Stato "gia' installata" #}
+        <div id="installedAlert" class="alert alert-success mt-3" style="display:none;">
+          <i class="bi bi-check-circle-fill"></i>
+          Stai gi&agrave; usando l'app installata. Grazie!
+        </div>
+      </div>
+    </div>
+
+    {# Tutorial iOS visibile solo su iPhone/iPad #}
+    <div class="ios-tutorial" id="iosTutorial" style="display:none;">
+      <h5 class="mb-3"><i class="bi bi-apple"></i> Installazione su iPhone/iPad (Safari)</h5>
+      <div class="ios-steps">
+        <div class="ios-step">
+          <span class="ios-step-num">1</span>
+          <div>
+            <strong>Tocca <i class="bi bi-box-arrow-up" style="font-size:1.1rem;"></i> Condividi</strong>
+            <p class="small mb-0 text-soft">il quadrato con freccia in basso allo schermo.</p>
+          </div>
+        </div>
+        <div class="ios-step">
+          <span class="ios-step-num">2</span>
+          <div>
+            <strong>Scegli "Aggiungi a schermata Home"</strong>
+            <p class="small mb-0 text-soft">scorri il menu fino a trovarla.</p>
+          </div>
+        </div>
+        <div class="ios-step">
+          <span class="ios-step-num">3</span>
+          <div>
+            <strong>Conferma "Aggiungi"</strong>
+            <p class="small mb-0 text-soft">l'icona di MasterWash apparir&agrave; nella tua home.</p>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
 </section>
 
 {# ========== Perch&eacute; sceglierci / amenities ========== #}
@@ -365,4 +595,83 @@
     </div>
 </div>
 
+<script>
+// === Install PWA helper ===
+// 1. Se l'app gira gia' standalone -> nasconde tutta la sezione (utente
+//    sta gia' usando l'app installata).
+// 2. Se Android/Chrome cattura beforeinstallprompt -> mostra "Installa
+//    l'app" + bottone hero -> al click triggera prompt nativo Meta.
+// 3. Se iOS Safari -> mostra "Come installare su iPhone" + scrolla al
+//    tutorial step-by-step (iOS non ha API install).
+// 4. Se nessuna delle 2 -> mostra solo il link Play Store (Android
+//    senza Chrome o desktop senza beforeinstallprompt).
+(function() {
+    const heroBtn = document.getElementById('hero-btn-install');
+    const btnPwa = document.getElementById('btnInstallPwa');
+    const btnIos = document.getElementById('btnInstallIos');
+    const btnPlay = document.getElementById('btnPlayStore');
+    const installedAlert = document.getElementById('installedAlert');
+    const tutorialIos = document.getElementById('iosTutorial');
+
+    const isStandalone = window.matchMedia('(display-mode: standalone)').matches
+        || window.navigator.standalone === true;
+    const isIos = /iPad|iPhone|iPod/.test(navigator.userAgent) && !window.MSStream;
+    const isAndroid = /Android/.test(navigator.userAgent);
+
+    if (isStandalone) {
+        // Gia' installata: nessun bottone, mostra alert
+        installedAlert.style.display = '';
+        if (heroBtn) heroBtn.style.display = 'none';
+        return;
+    }
+
+    if (isIos) {
+        // iOS: solo tutorial (no beforeinstallprompt su Safari)
+        btnIos.style.display = '';
+        tutorialIos.style.display = '';
+        if (heroBtn) heroBtn.style.display = '';
+        return;
+    }
+
+    if (isAndroid) {
+        // Android: mostra anche il link Play Store come opzione
+        btnPlay.style.display = '';
+        if (heroBtn) heroBtn.style.display = '';
+    }
+
+    // Chrome/Edge/Samsung/Brave (Android e desktop): intercetta
+    // beforeinstallprompt per offrire l'installazione nativa.
+    let deferredPrompt = null;
+    window.addEventListener('beforeinstallprompt', function(e) {
+        e.preventDefault();
+        deferredPrompt = e;
+        btnPwa.style.display = '';
+        if (heroBtn) heroBtn.style.display = '';
+    });
+
+    btnPwa.addEventListener('click', async function() {
+        if (!deferredPrompt) return;
+        deferredPrompt.prompt();
+        try {
+            const choice = await deferredPrompt.userChoice;
+            if (choice.outcome === 'accepted') {
+                btnPwa.style.display = 'none';
+                if (heroBtn) heroBtn.style.display = 'none';
+                installedAlert.style.display = '';
+            }
+        } catch (e) { /* ignore */ }
+        deferredPrompt = null;
+    });
+
+    // Se a installazione completata l'app apre standalone, l'evento
+    // appinstalled lo segnala (e' ridondante con beforeinstallprompt
+    // pulito ma utile per pulire UI subito).
+    window.addEventListener('appinstalled', function() {
+        btnPwa.style.display = 'none';
+        if (heroBtn) heroBtn.style.display = 'none';
+        installedAlert.style.display = '';
+        deferredPrompt = null;
+    });
+})();
+</script>
 {% endblock %}
