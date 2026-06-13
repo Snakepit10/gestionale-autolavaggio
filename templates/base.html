@@ -54,10 +54,15 @@
                         </li>
 
                         <li class="nav-item">
-                            <a class="nav-link position-relative" href="{% url 'messaggi:inbox' %}" id="navWaLink">
+                            <a class="nav-link position-relative" href="{% url 'messaggi:inbox' %}" id="navWaLink"
+                               title="Messaggi WhatsApp">
                                 <i class="bi bi-whatsapp"></i> Messaggi
-                                <span id="navbar-wa-badge" class="badge bg-danger position-absolute"
-                                      style="top:6px;right:-2px;display:none;font-size:.62rem;padding:2px 6px;border-radius:10px;"></span>
+                                <span id="navbar-wa-badge" class="position-absolute"
+                                      style="display:none;top:0px;right:-6px;background:#25d366;color:#fff;
+                                             font-size:.72rem;font-weight:700;line-height:1;
+                                             padding:3px 7px;border-radius:11px;min-width:20px;
+                                             text-align:center;border:2px solid #0d6efd;
+                                             box-shadow:0 1px 4px rgba(0,0,0,.25);"></span>
                             </a>
                         </li>
 
@@ -292,27 +297,48 @@
 
     {% if user.is_authenticated and user.is_staff %}
     {# Badge "Messaggi WhatsApp" non letti nella navbar, aggiornato live via WS #}
+    <style>
+        @keyframes wa-badge-pulse {
+            0%   { transform: scale(1);   box-shadow: 0 1px 4px rgba(0,0,0,.25), 0 0 0 0 rgba(37,211,102,.6); }
+            50%  { transform: scale(1.2); box-shadow: 0 2px 8px rgba(0,0,0,.35), 0 0 0 8px rgba(37,211,102,0); }
+            100% { transform: scale(1);   box-shadow: 0 1px 4px rgba(0,0,0,.25), 0 0 0 0 rgba(37,211,102,0); }
+        }
+        #navbar-wa-badge.pulse { animation: wa-badge-pulse .9s ease-out 2; }
+        #navWaLink:hover #navbar-wa-badge { transform: scale(1.05); }
+    </style>
     <script>
     (function() {
         const badge = document.getElementById('navbar-wa-badge');
         if (!badge) return;
 
-        function aggiornaBadge(totale) {
+        let ultimoTotale = -1;
+
+        function aggiornaBadge(totale, pulseSeNuovi=true) {
+            const nuovi = ultimoTotale >= 0 && totale > ultimoTotale;
+            ultimoTotale = totale;
             if (totale > 0) {
                 badge.textContent = totale > 99 ? '99+' : totale;
                 badge.style.display = '';
+                badge.title = totale + ' messagg' + (totale === 1 ? 'io' : 'i') + ' non lett' + (totale === 1 ? 'o' : 'i');
+                if (nuovi && pulseSeNuovi) {
+                    badge.classList.remove('pulse');
+                    // forza reflow per riavviare animation
+                    void badge.offsetWidth;
+                    badge.classList.add('pulse');
+                }
             } else {
                 badge.style.display = 'none';
+                badge.title = '';
             }
         }
 
-        async function caricaTotale() {
+        async function caricaTotale(pulseSeNuovi=true) {
             try {
                 const r = await fetch('/api/whatsapp/conversazioni/', { credentials: 'same-origin' });
                 if (!r.ok) return;
                 const d = await r.json();
                 const tot = (d.conversazioni || []).reduce((a, c) => a + (c.non_letti || 0), 0);
-                aggiornaBadge(tot);
+                aggiornaBadge(tot, pulseSeNuovi);
             } catch (e) { /* ignora */ }
         }
 
@@ -322,13 +348,22 @@
             try {
                 const proto = location.protocol === 'https:' ? 'wss' : 'ws';
                 ws = new WebSocket(`${proto}://${location.host}/ws/messaggi/`);
-                ws.onmessage = () => caricaTotale();
+                ws.onmessage = (e) => {
+                    let ev = null;
+                    try { ev = JSON.parse(e.data); } catch(_) {}
+                    // Pulse solo per messaggi entranti (in), non outgoing
+                    const pulseAtteso = ev && ev.type === 'nuovo_messaggio_wa' && ev.direzione !== 'out';
+                    caricaTotale(pulseAtteso);
+                };
                 ws.onclose = () => setTimeout(connettiWS, 5000);
                 ws.onerror = () => { try { ws.close(); } catch(e){} };
             } catch(e) { /* ignora */ }
         }
 
-        caricaTotale();
+        // Polling di backup ogni 60s nel caso il WS sia gnegne
+        setInterval(() => caricaTotale(false), 60000);
+
+        caricaTotale(false);
         connettiWS();
     })();
     </script>
