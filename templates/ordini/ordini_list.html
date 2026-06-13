@@ -3219,7 +3219,17 @@ document.addEventListener('DOMContentLoaded', function() {
 </script>
 
 {# ====== Bottone "Avvisa cliente" (auto pronta via WhatsApp) ====== #}
+{# Form CSRF dedicato, SEMPRE presente (fuori dai blocchi {% if %}).
+   Il template ha gia' un #prenCsrfForm ma vive dentro
+   {% if prenotazioni_da_confermare %}: se non ci sono richieste in
+   attesa, _prenCsrf() e' undefined e il bottone falliva silenzioso. #}
+<form id="avvisaCsrfForm" style="display:none">{% csrf_token %}</form>
 <script>
+function _avvisaCsrf() {
+    const el = document.querySelector('#avvisaCsrfForm [name=csrfmiddlewaretoken]');
+    return el ? el.value : '';
+}
+
 // Delegated handler: i bottoni .btn-avvisa-cliente sono nelle 3 tabelle
 // (attivi/da ritirare/completati) e possono essere ri-renderizzati.
 document.addEventListener('click', function(e) {
@@ -3238,7 +3248,7 @@ document.addEventListener('click', function(e) {
         method: 'POST',
         headers: {
             'Content-Type': 'application/json',
-            'X-CSRFToken': _prenCsrf(),
+            'X-CSRFToken': _avvisaCsrf(),
         },
         credentials: 'same-origin',
     })
