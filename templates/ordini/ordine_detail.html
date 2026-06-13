@@ -48,10 +48,19 @@
         <!-- Avvisa cliente (auto pronta) -->
         {% if ordine.stato == 'completato' and ordine.cliente %}
         <div class="btn-group me-2">
-            <button id="btnAvvisaCliente" type="button" class="btn btn-primary"
-                    onclick="avvisaClienteAutoPronta()">
-                <i class="bi bi-whatsapp"></i> Avvisa cliente
-            </button>
+            {% if ordine.cliente_avvisato_il %}
+                <button id="btnAvvisaCliente" type="button" class="btn btn-outline-success"
+                        onclick="avvisaClienteAutoPronta()"
+                        title="Avvisato il {{ ordine.cliente_avvisato_il|date:'d/m/Y H:i' }} via {{ ordine.cliente_avvisato_canale|default:'?' }} - click per re-inviare">
+                    <i class="bi bi-{% if ordine.cliente_avvisato_canale == 'whatsapp' %}whatsapp{% else %}envelope-check{% endif %}"></i>
+                    Avvisato {{ ordine.cliente_avvisato_il|date:'d/m H:i' }}
+                </button>
+            {% else %}
+                <button id="btnAvvisaCliente" type="button" class="btn btn-primary"
+                        onclick="avvisaClienteAutoPronta()">
+                    <i class="bi bi-whatsapp"></i> Avvisa cliente
+                </button>
+            {% endif %}
         </div>
         {% endif %}
 
@@ -746,24 +755,20 @@ function avvisaClienteAutoPronta() {
     .then(r => r.json())
     .then(data => {
         if (data.ok) {
-            btn.classList.remove('btn-primary');
-            btn.classList.add('btn-success');
             const canale = (data.canale || '').toLowerCase();
             const icon = canale === 'whatsapp' ? 'bi-whatsapp' : 'bi-envelope-check';
-            btn.innerHTML = `<i class="bi ${icon}"></i> Cliente avvisato (${canale})`;
-            // Mostra alert successo
+            // Stato finale persistente (matcha il look del template post-refresh).
+            btn.classList.remove('btn-primary');
+            btn.classList.add('btn-outline-success');
+            btn.title = `Avvisato ora via ${canale} - click per re-inviare`;
+            btn.innerHTML = `<i class="bi ${icon}"></i> Avvisato ${data.avvisato_il || ''}`;
+            btn.disabled = false;
+            // Alert effimero di conferma
             const alertDiv = document.createElement('div');
             alertDiv.className = 'alert alert-success alert-dismissible fade show mt-2';
             alertDiv.innerHTML = `${data.message}<button type="button" class="btn-close" data-bs-dismiss="alert"></button>`;
             const titleDiv = document.querySelector('.d-flex.justify-content-between');
             if (titleDiv) titleDiv.insertAdjacentElement('afterend', alertDiv);
-            // Riattiva dopo 3s per permettere un re-invio in caso il primo non sia arrivato
-            setTimeout(() => {
-                btn.disabled = false;
-                btn.classList.remove('btn-success');
-                btn.classList.add('btn-outline-primary');
-                btn.innerHTML = '<i class="bi bi-arrow-clockwise"></i> Re-invia avviso';
-            }, 3000);
         } else {
             btn.disabled = false;
             btn.innerHTML = originalHtml;

@@ -95,6 +95,18 @@ class Ordine(models.Model):
     auto_ritirata = models.BooleanField(default=False, help_text="Indica se l'auto è stata ritirata dal cliente")
     data_ritiro = models.DateTimeField(null=True, blank=True, help_text="Data e ora del ritiro")
 
+    # Notifica "auto pronta" inviata al cliente (WhatsApp/email).
+    # null = non ancora avvisato. Si aggiorna ad ogni invio (re-invio
+    # sovrascrive il timestamp).
+    cliente_avvisato_il = models.DateTimeField(
+        null=True, blank=True,
+        help_text="Quando l'operatore ha avvisato il cliente che l'auto e' pronta"
+    )
+    cliente_avvisato_canale = models.CharField(
+        max_length=20, blank=True, default='',
+        help_text="Canale dell'ultimo avviso: 'whatsapp' o 'email'"
+    )
+
     creato_il = models.DateTimeField(auto_now_add=True)
     aggiornato_il = models.DateTimeField(auto_now=True)
     

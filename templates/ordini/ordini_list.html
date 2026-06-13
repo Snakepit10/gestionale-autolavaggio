@@ -979,11 +979,20 @@ function ckEliminaPrenotazione() {
                             </td>
                             <td class="text-center">
                                 {% if ordine.stato == 'completato' and ordine.cliente %}
-                                    <button type="button" class="btn btn-sm btn-primary btn-avvisa-cliente"
-                                            data-ordine-id="{{ ordine.pk }}"
-                                            title="Avvisa il cliente che l'auto e' pronta">
-                                        <i class="bi bi-whatsapp"></i> Avvisa
-                                    </button>
+                                    {% if ordine.cliente_avvisato_il %}
+                                        <button type="button" class="btn btn-sm btn-outline-success btn-avvisa-cliente"
+                                                data-ordine-id="{{ ordine.pk }}"
+                                                title="Avvisato il {{ ordine.cliente_avvisato_il|date:'d/m/Y H:i' }} via {{ ordine.cliente_avvisato_canale|default:'?' }} - click per re-inviare">
+                                            <i class="bi bi-{% if ordine.cliente_avvisato_canale == 'whatsapp' %}whatsapp{% else %}envelope-check{% endif %}"></i>
+                                            Avvisato {{ ordine.cliente_avvisato_il|date:'H:i' }}
+                                        </button>
+                                    {% else %}
+                                        <button type="button" class="btn btn-sm btn-primary btn-avvisa-cliente"
+                                                data-ordine-id="{{ ordine.pk }}"
+                                                title="Avvisa il cliente che l'auto e' pronta">
+                                            <i class="bi bi-whatsapp"></i> Avvisa
+                                        </button>
+                                    {% endif %}
                                 {% else %}
                                     <span class="badge bg-light text-muted border">—</span>
                                 {% endif %}
@@ -1203,11 +1212,20 @@ function ckEliminaPrenotazione() {
                             </td>
                             <td class="text-center">
                                 {% if ordine.stato == 'completato' and ordine.cliente %}
-                                    <button type="button" class="btn btn-sm btn-primary btn-avvisa-cliente"
-                                            data-ordine-id="{{ ordine.pk }}"
-                                            title="Avvisa il cliente che l'auto e' pronta">
-                                        <i class="bi bi-whatsapp"></i> Avvisa
-                                    </button>
+                                    {% if ordine.cliente_avvisato_il %}
+                                        <button type="button" class="btn btn-sm btn-outline-success btn-avvisa-cliente"
+                                                data-ordine-id="{{ ordine.pk }}"
+                                                title="Avvisato il {{ ordine.cliente_avvisato_il|date:'d/m/Y H:i' }} via {{ ordine.cliente_avvisato_canale|default:'?' }} - click per re-inviare">
+                                            <i class="bi bi-{% if ordine.cliente_avvisato_canale == 'whatsapp' %}whatsapp{% else %}envelope-check{% endif %}"></i>
+                                            Avvisato {{ ordine.cliente_avvisato_il|date:'H:i' }}
+                                        </button>
+                                    {% else %}
+                                        <button type="button" class="btn btn-sm btn-primary btn-avvisa-cliente"
+                                                data-ordine-id="{{ ordine.pk }}"
+                                                title="Avvisa il cliente che l'auto e' pronta">
+                                            <i class="bi bi-whatsapp"></i> Avvisa
+                                        </button>
+                                    {% endif %}
                                 {% else %}
                                     <span class="badge bg-light text-muted border">—</span>
                                 {% endif %}
@@ -1429,11 +1447,20 @@ function ckEliminaPrenotazione() {
                             </td>
                             <td class="text-center">
                                 {% if ordine.stato == 'completato' and ordine.cliente %}
-                                    <button type="button" class="btn btn-sm btn-primary btn-avvisa-cliente"
-                                            data-ordine-id="{{ ordine.pk }}"
-                                            title="Avvisa il cliente che l'auto e' pronta">
-                                        <i class="bi bi-whatsapp"></i> Avvisa
-                                    </button>
+                                    {% if ordine.cliente_avvisato_il %}
+                                        <button type="button" class="btn btn-sm btn-outline-success btn-avvisa-cliente"
+                                                data-ordine-id="{{ ordine.pk }}"
+                                                title="Avvisato il {{ ordine.cliente_avvisato_il|date:'d/m/Y H:i' }} via {{ ordine.cliente_avvisato_canale|default:'?' }} - click per re-inviare">
+                                            <i class="bi bi-{% if ordine.cliente_avvisato_canale == 'whatsapp' %}whatsapp{% else %}envelope-check{% endif %}"></i>
+                                            Avvisato {{ ordine.cliente_avvisato_il|date:'H:i' }}
+                                        </button>
+                                    {% else %}
+                                        <button type="button" class="btn btn-sm btn-primary btn-avvisa-cliente"
+                                                data-ordine-id="{{ ordine.pk }}"
+                                                title="Avvisa il cliente che l'auto e' pronta">
+                                            <i class="bi bi-whatsapp"></i> Avvisa
+                                        </button>
+                                    {% endif %}
                                 {% else %}
                                     <span class="badge bg-light text-muted border">—</span>
                                 {% endif %}
@@ -3257,16 +3284,12 @@ document.addEventListener('click', function(e) {
         if (data.ok) {
             const canale = (data.canale || '').toLowerCase();
             const icon = canale === 'whatsapp' ? 'bi-whatsapp' : 'bi-envelope-check';
+            // Stato finale persistente (stesso look del template dopo refresh).
             btn.classList.remove('btn-primary');
-            btn.classList.add('btn-success');
-            btn.innerHTML = `<i class="bi ${icon}"></i> Avvisato`;
-            // Lascia visibile l'esito per 4s, poi torna disponibile
-            setTimeout(() => {
-                btn.disabled = false;
-                btn.classList.remove('btn-success');
-                btn.classList.add('btn-outline-primary');
-                btn.innerHTML = '<i class="bi bi-arrow-clockwise"></i> Re-invia';
-            }, 4000);
+            btn.classList.add('btn-outline-success');
+            btn.title = `Avvisato ora via ${canale} - click per re-inviare`;
+            btn.innerHTML = `<i class="bi ${icon}"></i> Avvisato ${data.avvisato_il || ''}`;
+            btn.disabled = false;
         } else {
             btn.disabled = false;
             btn.innerHTML = originalHtml;

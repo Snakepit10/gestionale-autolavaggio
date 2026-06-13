@@ -1955,9 +1955,16 @@ def avvisa_cliente_auto_pronta(request, pk):
                 'error': 'Impossibile contattare il cliente: WhatsApp e email entrambi non disponibili.'
             }, status=500)
 
+    # Persistiamo lo stato per non perdere traccia al refresh pagina.
+    # Re-invio: il timestamp viene aggiornato all'ultimo invio.
+    ordine.cliente_avvisato_il = timezone.now()
+    ordine.cliente_avvisato_canale = canale
+    ordine.save(update_fields=['cliente_avvisato_il', 'cliente_avvisato_canale'])
+
     return JsonResponse({
         'ok': True,
         'canale': canale,
+        'avvisato_il': ordine.cliente_avvisato_il.strftime('%d/%m %H:%M'),
         'message': f'Cliente avvisato via {canale}.',
     })
 
