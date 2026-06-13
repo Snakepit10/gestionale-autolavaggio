@@ -218,7 +218,8 @@ def _handle_incoming(payload_msg: dict, contacts: list[dict]):
 # Quick Reply buttons del template prenotazione_proposta_orario.
 # Quando il cliente clicca uno di questi, scattano azioni automatiche
 # sulla prenotazione in_attesa piu' recente del cliente.
-_QUICK_REPLY_AZIONI = {'Va bene', 'No, non riesco'}
+# Nomi esatti come approvati su Meta WhatsApp Manager.
+_QUICK_REPLY_AZIONI = {'Confermo', 'No, non riesco'}
 
 
 def _handle_quick_reply(conv_pk: int, testo: str):
@@ -254,13 +255,13 @@ def _handle_quick_reply(conv_pk: int, testo: str):
                        conv.cliente_id)
             return
 
-        if testo == 'Va bene':
+        if testo == 'Confermo':
             p.stato = 'confermata'
             p.save(update_fields=['stato'])
             if hasattr(p.slot, 'aggiorna_contatori'):
                 p.slot.aggiorna_contatori()
             notifica_prenotazione_confermata(p)
-            logger.info('Auto-confermata prenotazione %s via Quick Reply "Va bene"',
+            logger.info('Auto-confermata prenotazione %s via Quick Reply "Confermo"',
                        p.codice_prenotazione)
 
         elif testo == 'No, non riesco':
