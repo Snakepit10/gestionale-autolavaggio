@@ -44,7 +44,17 @@
                 </ul>
             </div>
         {% endif %}
-        
+
+        <!-- Avvisa cliente (auto pronta) -->
+        {% if ordine.stato == 'completato' and ordine.cliente %}
+        <div class="btn-group me-2">
+            <button id="btnAvvisaCliente" type="button" class="btn btn-primary"
+                    onclick="avvisaClienteAutoPronta()">
+                <i class="bi bi-whatsapp"></i> Avvisa cliente
+            </button>
+        </div>
+        {% endif %}
+
         <!-- Cambio stato pagamento -->
         {% if ordine.stato_pagamento != 'pagato' %}
             <div class="btn-group me-2">
@@ -715,6 +725,57 @@ function getNomeStato(stato) {
         'annullato': 'Annullato'
     };
     return stati[stato] || stato;
+}
+
+function avvisaClienteAutoPronta() {
+    const btn = document.getElementById('btnAvvisaCliente');
+    if (!btn) return;
+    if (!confirm('Inviare al cliente l\'avviso che l\'auto è pronta per il ritiro?')) return;
+
+    const originalHtml = btn.innerHTML;
+    btn.disabled = true;
+    btn.innerHTML = '<i class="bi bi-hourglass-split"></i> Invio...';
+
+    fetch(`{% url 'ordini:avvisa-cliente' ordine.pk %}`, {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+            'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]').value
+        },
+    })
+    .then(r => r.json())
+    .then(data => {
+        if (data.ok) {
+            btn.classList.remove('btn-primary');
+            btn.classList.add('btn-success');
+            const canale = (data.canale || '').toLowerCase();
+            const icon = canale === 'whatsapp' ? 'bi-whatsapp' : 'bi-envelope-check';
+            btn.innerHTML = `<i class="bi ${icon}"></i> Cliente avvisato (${canale})`;
+            // Mostra alert successo
+            const alertDiv = document.createElement('div');
+            alertDiv.className = 'alert alert-success alert-dismissible fade show mt-2';
+            alertDiv.innerHTML = `${data.message}<button type="button" class="btn-close" data-bs-dismiss="alert"></button>`;
+            const titleDiv = document.querySelector('.d-flex.justify-content-between');
+            if (titleDiv) titleDiv.insertAdjacentElement('afterend', alertDiv);
+            // Riattiva dopo 3s per permettere un re-invio in caso il primo non sia arrivato
+            setTimeout(() => {
+                btn.disabled = false;
+                btn.classList.remove('btn-success');
+                btn.classList.add('btn-outline-primary');
+                btn.innerHTML = '<i class="bi bi-arrow-clockwise"></i> Re-invia avviso';
+            }, 3000);
+        } else {
+            btn.disabled = false;
+            btn.innerHTML = originalHtml;
+            alert('Errore: ' + (data.error || 'invio fallito'));
+        }
+    })
+    .catch(err => {
+        console.error(err);
+        btn.disabled = false;
+        btn.innerHTML = originalHtml;
+        alert('Errore di rete durante l\'invio dell\'avviso');
+    });
 }
 
 function cambiaStatoPagamento(nuovoStato) {

@@ -1923,6 +1923,45 @@ def segna_ritirata(request, pk):
     }, status=405)
 
 
+@login_required
+def avvisa_cliente_auto_pronta(request, pk):
+    """Invia al cliente una notifica WhatsApp (con fallback email) per
+    avvisarlo che l'auto e' pronta al ritiro. Triggerata manualmente
+    dall'operatore dalla pagina dettaglio ordine.
+
+    POST /ordini/<pk>/avvisa-cliente/  ->  JsonResponse {ok, canale}
+    """
+    if request.method != 'POST':
+        return JsonResponse({'ok': False, 'error': 'Metodo non permesso'}, status=405)
+
+    from apps.clients.notifications import notifica_auto_pronta
+    from apps.clients import whatsapp as wa
+
+    ordine = get_object_or_404(Ordine, pk=pk)
+    if not ordine.cliente:
+        return JsonResponse({
+            'ok': False,
+            'error': 'Ordine senza cliente associato, impossibile notificare.'
+        }, status=400)
+
+    # Proviamo prima WhatsApp esplicitamente, cosi' possiamo riportare
+    # il canale usato all'operatore (utile in UI).
+    canale = 'whatsapp' if wa.whatsapp_auto_pronta(ordine) else 'email'
+    if canale == 'email':
+        # WhatsApp fallito o non configurato -> email fallback
+        if not notifica_auto_pronta(ordine):
+            return JsonResponse({
+                'ok': False,
+                'error': 'Impossibile contattare il cliente: WhatsApp e email entrambi non disponibili.'
+            }, status=500)
+
+    return JsonResponse({
+        'ok': True,
+        'canale': canale,
+        'message': f'Cliente avvisato via {canale}.',
+    })
+
+
 # ==================== PIANIFICAZIONE TIMELINE ====================
 
 class PianificazioneView(LoginRequiredMixin, TemplateView):
