@@ -3246,10 +3246,14 @@ document.addEventListener('DOMContentLoaded', function() {
 </script>
 
 {# ====== Bottone "Avvisa cliente" (auto pronta via WhatsApp) ====== #}
-{# Form CSRF dedicato, SEMPRE presente (fuori dai blocchi {% if %}).
-   Il template ha gia' un #prenCsrfForm ma vive dentro
-   {% if prenotazioni_da_confermare %}: se non ci sono richieste in
-   attesa, _prenCsrf() e' undefined e il bottone falliva silenzioso. #}
+<!--
+  Form CSRF dedicato, SEMPRE presente (fuori da qualsiasi blocco
+  condizionale). Il template ha gia' un #prenCsrfForm ma vive
+  all'interno del blocco prenotazioni-da-confermare: se non ci
+  sono richieste in attesa, _prenCsrf e' undefined e il bottone
+  falliva silenzioso. Questo form/helper evita il problema in
+  qualunque stato della pagina.
+-->
 <form id="avvisaCsrfForm" style="display:none">{% csrf_token %}</form>
 <script>
 function _avvisaCsrf() {
