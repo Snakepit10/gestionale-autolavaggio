@@ -773,7 +773,7 @@ function ckEliminaPrenotazione() {
                                     <th>Pagamento</th>
                                     <th>Stato</th>
                                     <th>Ora di Consegna</th>
-                                    <th class="text-center">CQ</th>
+                                    <th class="text-center">Avvisa</th>
                                 </tr>
                             </thead>
                     <tbody id="ordiniAttiviBody">
@@ -978,22 +978,14 @@ function ckEliminaPrenotazione() {
                                 {% endif %}
                             </td>
                             <td class="text-center">
-                                {% if ordine.scheda_cq %}
-                                    <a href="{% url 'cq:scheda_detail' ordine_pk=ordine.pk %}" class="text-decoration-none">
-                                        {% if ordine.scheda_cq.esito == 'ok' %}
-                                            <span class="badge bg-success"><i class="bi bi-check-circle"></i> OK</span>
-                                        {% else %}
-                                            <span class="badge bg-danger"><i class="bi bi-x-circle"></i> Non OK</span>
-                                        {% endif %}
-                                    </a>
+                                {% if ordine.stato == 'completato' and ordine.cliente %}
+                                    <button type="button" class="btn btn-sm btn-primary btn-avvisa-cliente"
+                                            data-ordine-id="{{ ordine.pk }}"
+                                            title="Avvisa il cliente che l'auto e' pronta">
+                                        <i class="bi bi-whatsapp"></i> Avvisa
+                                    </button>
                                 {% else %}
-                                    {% if request.user|can_compile_cq %}
-                                        <a href="{% url 'cq:scheda_crea' ordine_pk=ordine.pk %}" class="text-decoration-none">
-                                            <span class="badge bg-secondary"><i class="bi bi-clipboard2-plus"></i> Compila</span>
-                                        </a>
-                                    {% else %}
-                                        <span class="badge bg-light text-muted border">—</span>
-                                    {% endif %}
+                                    <span class="badge bg-light text-muted border">—</span>
                                 {% endif %}
                             </td>
                         </tr>
@@ -1033,7 +1025,7 @@ function ckEliminaPrenotazione() {
                                     <th>Stato</th>
                                     <th>Ora di Consegna</th>
                                     <th>Auto Ritirata</th>
-                                    <th class="text-center">CQ</th>
+                                    <th class="text-center">Avvisa</th>
                                 </tr>
                             </thead>
                     <tbody>
@@ -1210,22 +1202,14 @@ function ckEliminaPrenotazione() {
                                 </div>
                             </td>
                             <td class="text-center">
-                                {% if ordine.scheda_cq %}
-                                    <a href="{% url 'cq:scheda_detail' ordine_pk=ordine.pk %}" class="text-decoration-none">
-                                        {% if ordine.scheda_cq.esito == 'ok' %}
-                                            <span class="badge bg-success"><i class="bi bi-check-circle"></i> OK</span>
-                                        {% else %}
-                                            <span class="badge bg-danger"><i class="bi bi-x-circle"></i> Non OK</span>
-                                        {% endif %}
-                                    </a>
+                                {% if ordine.stato == 'completato' and ordine.cliente %}
+                                    <button type="button" class="btn btn-sm btn-primary btn-avvisa-cliente"
+                                            data-ordine-id="{{ ordine.pk }}"
+                                            title="Avvisa il cliente che l'auto e' pronta">
+                                        <i class="bi bi-whatsapp"></i> Avvisa
+                                    </button>
                                 {% else %}
-                                    {% if request.user|can_compile_cq %}
-                                        <a href="{% url 'cq:scheda_crea' ordine_pk=ordine.pk %}" class="text-decoration-none">
-                                            <span class="badge bg-secondary"><i class="bi bi-clipboard2-plus"></i> Compila</span>
-                                        </a>
-                                    {% else %}
-                                        <span class="badge bg-light text-muted border">—</span>
-                                    {% endif %}
+                                    <span class="badge bg-light text-muted border">—</span>
                                 {% endif %}
                             </td>
                         </tr>
@@ -1265,7 +1249,7 @@ function ckEliminaPrenotazione() {
                                     <th>Stato</th>
                                     <th>Ora di Consegna</th>
                                     <th>Auto Ritirata</th>
-                                    <th class="text-center">CQ</th>
+                                    <th class="text-center">Avvisa</th>
                                 </tr>
                             </thead>
                     <tbody>
@@ -1444,22 +1428,14 @@ function ckEliminaPrenotazione() {
                                 {% endif %}
                             </td>
                             <td class="text-center">
-                                {% if ordine.scheda_cq %}
-                                    <a href="{% url 'cq:scheda_detail' ordine_pk=ordine.pk %}" class="text-decoration-none">
-                                        {% if ordine.scheda_cq.esito == 'ok' %}
-                                            <span class="badge bg-success"><i class="bi bi-check-circle"></i> OK</span>
-                                        {% else %}
-                                            <span class="badge bg-danger"><i class="bi bi-x-circle"></i> Non OK</span>
-                                        {% endif %}
-                                    </a>
+                                {% if ordine.stato == 'completato' and ordine.cliente %}
+                                    <button type="button" class="btn btn-sm btn-primary btn-avvisa-cliente"
+                                            data-ordine-id="{{ ordine.pk }}"
+                                            title="Avvisa il cliente che l'auto e' pronta">
+                                        <i class="bi bi-whatsapp"></i> Avvisa
+                                    </button>
                                 {% else %}
-                                    {% if request.user|can_compile_cq %}
-                                        <a href="{% url 'cq:scheda_crea' ordine_pk=ordine.pk %}" class="text-decoration-none">
-                                            <span class="badge bg-secondary"><i class="bi bi-clipboard2-plus"></i> Compila</span>
-                                        </a>
-                                    {% else %}
-                                        <span class="badge bg-light text-muted border">—</span>
-                                    {% endif %}
+                                    <span class="badge bg-light text-muted border">—</span>
                                 {% endif %}
                             </td>
                         </tr>
@@ -3239,6 +3215,60 @@ document.addEventListener('DOMContentLoaded', function() {
       }
     }
   });
+});
+</script>
+
+{# ====== Bottone "Avvisa cliente" (auto pronta via WhatsApp) ====== #}
+<script>
+// Delegated handler: i bottoni .btn-avvisa-cliente sono nelle 3 tabelle
+// (attivi/da ritirare/completati) e possono essere ri-renderizzati.
+document.addEventListener('click', function(e) {
+    const btn = e.target.closest('.btn-avvisa-cliente');
+    if (!btn) return;
+    e.preventDefault();
+    const pk = btn.getAttribute('data-ordine-id');
+    if (!pk) return;
+    if (!confirm('Inviare al cliente l\'avviso che l\'auto e\' pronta per il ritiro?')) return;
+
+    const originalHtml = btn.innerHTML;
+    btn.disabled = true;
+    btn.innerHTML = '<i class="bi bi-hourglass-split"></i>';
+
+    fetch(`/ordini/${pk}/avvisa-cliente/`, {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+            'X-CSRFToken': _prenCsrf(),
+        },
+        credentials: 'same-origin',
+    })
+    .then(r => r.json())
+    .then(data => {
+        if (data.ok) {
+            const canale = (data.canale || '').toLowerCase();
+            const icon = canale === 'whatsapp' ? 'bi-whatsapp' : 'bi-envelope-check';
+            btn.classList.remove('btn-primary');
+            btn.classList.add('btn-success');
+            btn.innerHTML = `<i class="bi ${icon}"></i> Avvisato`;
+            // Lascia visibile l'esito per 4s, poi torna disponibile
+            setTimeout(() => {
+                btn.disabled = false;
+                btn.classList.remove('btn-success');
+                btn.classList.add('btn-outline-primary');
+                btn.innerHTML = '<i class="bi bi-arrow-clockwise"></i> Re-invia';
+            }, 4000);
+        } else {
+            btn.disabled = false;
+            btn.innerHTML = originalHtml;
+            alert('Errore: ' + (data.error || 'invio fallito'));
+        }
+    })
+    .catch(err => {
+        console.error(err);
+        btn.disabled = false;
+        btn.innerHTML = originalHtml;
+        alert('Errore di rete durante l\'invio dell\'avviso');
+    });
 });
 </script>
 
