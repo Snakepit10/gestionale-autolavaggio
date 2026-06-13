@@ -20,11 +20,13 @@ import hashlib
 import hmac
 import json
 import logging
-from datetime import datetime
+import threading
+from datetime import datetime, timedelta
 
 import requests
 from django.conf import settings
 from django.contrib.auth.decorators import login_required
+from django.db.models import F
 from django.http import (HttpResponse, JsonResponse,
                          HttpResponseForbidden, StreamingHttpResponse)
 from django.shortcuts import get_object_or_404
@@ -139,6 +141,25 @@ def _handle_incoming(payload_msg: dict, contacts: list[dict]):
         loc = payload_msg.get('location', {}) or {}
         corpo = f"[Posizione] {loc.get('latitude','?')},{loc.get('longitude','?')}"
         media_type = 'location'
+    elif msg_type_raw == 'button':
+        # Quick Reply Button cliccato su un template Meta (formato legacy)
+        # Meta manda: { type: 'button', button: { text: 'Va bene', payload: '...' } }
+        btn = payload_msg.get('button', {}) or {}
+        corpo = btn.get('text', '') or btn.get('payload', '') or '[button]'
+        media_type = 'text'
+    elif msg_type_raw == 'interactive':
+        # Risposta a interactive message (button reply o list reply)
+        # Meta manda: { type: 'interactive', interactive: { type: 'button_reply',
+        # button_reply: { id, title } } }
+        inter = payload_msg.get('interactive', {}) or {}
+        inter_type = inter.get('type', '')
+        if inter_type == 'button_reply':
+            corpo = (inter.get('button_reply', {}) or {}).get('title', '') or '[button]'
+        elif inter_type == 'list_reply':
+            corpo = (inter.get('list_reply', {}) or {}).get('title', '') or '[list]'
+        else:
+            corpo = f'[{inter_type or "interactive"}]'
+        media_type = 'text'
     else:
         # Tipi sconosciuti: salva placeholder
         corpo = f'[{msg_type_raw}]'
@@ -180,6 +201,140 @@ def _handle_incoming(payload_msg: dict, contacts: list[dict]):
         'preview': corpo[:80],
         'timestamp': timezone.now().isoformat(),
     })
+
+    # Auto-handler Quick Reply: se il messaggio e' la risposta a un
+    # template prenotazione_proposta_orario, conferma o annulla
+    # automaticamente la prenotazione del cliente. Lanciato in thread
+    # daemon per non bloccare la risposta al webhook (Meta retrya
+    # se non rispondiamo entro pochi secondi).
+    if media_type == 'text' and corpo in _QUICK_REPLY_AZIONI:
+        threading.Thread(
+            target=_handle_quick_reply,
+            args=(conv.pk, corpo),
+            daemon=True,
+        ).start()
+
+
+# Quick Reply buttons del template prenotazione_proposta_orario.
+# Quando il cliente clicca uno di questi, scattano azioni automatiche
+# sulla prenotazione in_attesa piu' recente del cliente.
+_QUICK_REPLY_AZIONI = {'Va bene', 'No, non riesco'}
+
+
+def _handle_quick_reply(conv_pk: int, testo: str):
+    """Esegue auto-azione sulla prenotazione in_attesa del cliente in
+    base al Quick Reply Button cliccato.
+
+    Eseguito in daemon thread separato:
+    - 'Va bene' -> stato='confermata', notifica conferma
+    - 'No, non riesco' -> stato='annullata', manda elenco slot
+      alternativi via testo libero (finestra 24h aperta -> niente
+      template necessario)
+    """
+    try:
+        from apps.prenotazioni.models import Prenotazione
+        from apps.clients.notifications import notifica_prenotazione_confermata
+        from apps.clients import whatsapp as wa_module
+
+        conv = ConversazioneWhatsApp.objects.select_related('cliente').filter(pk=conv_pk).first()
+        if not conv or not conv.cliente:
+            logger.info('Quick reply ignorato: conversazione senza cliente (conv=%s)', conv_pk)
+            return
+
+        # Trova la prenotazione in_attesa piu' recente per questo cliente
+        p = (
+            Prenotazione.objects
+            .filter(cliente=conv.cliente, stato='in_attesa', ordine__isnull=True)
+            .select_related('slot')
+            .order_by('-creata_il')
+            .first()
+        )
+        if not p:
+            logger.info('Quick reply ignorato: nessuna prenotazione in_attesa per cliente=%s',
+                       conv.cliente_id)
+            return
+
+        if testo == 'Va bene':
+            p.stato = 'confermata'
+            p.save(update_fields=['stato'])
+            if hasattr(p.slot, 'aggiorna_contatori'):
+                p.slot.aggiorna_contatori()
+            notifica_prenotazione_confermata(p)
+            logger.info('Auto-confermata prenotazione %s via Quick Reply "Va bene"',
+                       p.codice_prenotazione)
+
+        elif testo == 'No, non riesco':
+            # Annulla e libera lo slot
+            vecchio_slot = p.slot
+            p.stato = 'annullata'
+            nota = (p.nota_interna or '').strip()
+            p.nota_interna = (nota + '\n' if nota else '') + 'Rifiutata dal cliente via WhatsApp (Quick Reply "No, non riesco").'
+            p.save(update_fields=['stato', 'nota_interna'])
+            if hasattr(vecchio_slot, 'aggiorna_contatori'):
+                vecchio_slot.aggiorna_contatori()
+            logger.info('Auto-annullata prenotazione %s via Quick Reply "No, non riesco"',
+                       p.codice_prenotazione)
+            # Proponi al cliente slot alternativi via testo libero
+            _proponi_slot_alternativi_text(conv.numero_e164)
+    except Exception as e:
+        logger.warning('handle_quick_reply error conv=%s testo=%s: %s',
+                      conv_pk, testo, e, exc_info=True)
+
+
+def _proponi_slot_alternativi_text(to_e164: str) -> None:
+    """Manda al cliente un testo libero con i prossimi slot disponibili.
+
+    Funziona solo entro 24h dall'ultimo messaggio del cliente -- e' il
+    caso giusto dopo un Quick Reply (il messaggio "No, non riesco" e'
+    appena entrato, finestra 24h fresca).
+
+    Cerca slot liberi nei prossimi 4 giorni (oggi incluso), fino a 8
+    slot totali, e li formatta in modo leggibile su WhatsApp.
+    """
+    try:
+        from apps.prenotazioni.models import SlotPrenotazione
+        from apps.clients import whatsapp as wa_module
+
+        oggi = timezone.localtime(timezone.now()).date()
+        giorni_con_slot = []
+        totale_slot = 0
+        for delta in range(0, 4):
+            data = oggi + timedelta(days=delta)
+            qs = (
+                SlotPrenotazione.objects
+                .filter(data=data, disponibile=True)
+                .annotate(liberi=F('max_prenotazioni') - F('prenotazioni_attuali'))
+                .filter(liberi__gt=0)
+                .order_by('ora_inizio')[:6]
+            )
+            qs_list = list(qs)
+            if qs_list:
+                giorni_con_slot.append((data, qs_list))
+                totale_slot += len(qs_list)
+            if totale_slot >= 8:
+                break
+
+        if not giorni_con_slot:
+            text = (
+                "Capito! Purtroppo per i prossimi giorni siamo al completo.\n\n"
+                "Chiamaci al 379 233 7051 e troveremo insieme un orario per te."
+            )
+        else:
+            giorni_it = ['Lun', 'Mar', 'Mer', 'Gio', 'Ven', 'Sab', 'Dom']
+            lines = ["Capito! Ecco i prossimi slot disponibili:\n"]
+            for data, ss in giorni_con_slot:
+                gn = giorni_it[data.weekday()]
+                ore = ', '.join(s.ora_inizio.strftime('%H:%M') for s in ss)
+                lines.append(f"📅 {gn} {data.strftime('%d/%m')}: {ore}")
+            lines.append(
+                "\nScrivici qui l'orario che preferisci, oppure chiamaci "
+                "al 379 233 7051."
+            )
+            text = '\n'.join(lines)
+
+        wa_module._send_text_blocking(to_e164, text)
+    except Exception as e:
+        logger.warning('proponi_slot_alternativi error to=%s: %s', to_e164, e)
 
 
 def _handle_status(status_obj: dict):
