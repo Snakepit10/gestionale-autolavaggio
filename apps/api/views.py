@@ -202,15 +202,27 @@ def _handle_incoming(payload_msg: dict, contacts: list[dict]):
         'timestamp': timezone.now().isoformat(),
     })
 
+    # Log diagnostico per debug Quick Reply: raw payload type + corpo finale
+    logger.info(
+        'WA incoming: type=%s -> corpo=%r media_type=%s conv=%d cliente=%s',
+        msg_type_raw, corpo, media_type, conv.pk,
+        conv.cliente_id if conv.cliente_id else 'NESSUNO',
+    )
+
     # Auto-handler Quick Reply: se il messaggio e' la risposta a un
     # template prenotazione_proposta_orario, conferma o annulla
     # automaticamente la prenotazione del cliente. Lanciato in thread
     # daemon per non bloccare la risposta al webhook (Meta retrya
     # se non rispondiamo entro pochi secondi).
-    if media_type == 'text' and corpo in _QUICK_REPLY_AZIONI:
+    # Strip + check case-insensitive per essere robusti contro spazi
+    # extra o variazioni che Meta a volte introduce.
+    corpo_norm = (corpo or '').strip()
+    if media_type == 'text' and corpo_norm in _QUICK_REPLY_AZIONI:
+        logger.info('Quick reply detected: %r -> spawn handler conv=%d',
+                   corpo_norm, conv.pk)
         threading.Thread(
             target=_handle_quick_reply,
-            args=(conv.pk, corpo),
+            args=(conv.pk, corpo_norm),
             daemon=True,
         ).start()
 
@@ -227,32 +239,57 @@ def _handle_quick_reply(conv_pk: int, testo: str):
     base al Quick Reply Button cliccato.
 
     Eseguito in daemon thread separato:
-    - 'Va bene' -> stato='confermata', notifica conferma
+    - 'Confermo' -> stato='confermata', notifica conferma
     - 'No, non riesco' -> stato='annullata', manda elenco slot
       alternativi via testo libero (finestra 24h aperta -> niente
       template necessario)
     """
+    logger.info('handle_quick_reply START conv=%s testo=%r', conv_pk, testo)
     try:
         from apps.prenotazioni.models import Prenotazione
         from apps.clients.notifications import notifica_prenotazione_confermata
         from apps.clients import whatsapp as wa_module
 
         conv = ConversazioneWhatsApp.objects.select_related('cliente').filter(pk=conv_pk).first()
-        if not conv or not conv.cliente:
-            logger.info('Quick reply ignorato: conversazione senza cliente (conv=%s)', conv_pk)
+        if not conv:
+            logger.warning('Quick reply: conv=%s non trovata', conv_pk)
             return
 
-        # Trova la prenotazione in_attesa piu' recente per questo cliente
-        p = (
-            Prenotazione.objects
-            .filter(cliente=conv.cliente, stato='in_attesa', ordine__isnull=True)
-            .select_related('slot')
-            .order_by('-creata_il')
-            .first()
-        )
+        # Cerca prenotazione in_attesa: prima per cliente agganciato, poi
+        # come fallback per telefono_contatto matchato col numero E.164
+        # della conversazione (cliente potrebbe non essere agganciato).
+        p = None
+        if conv.cliente:
+            p = (
+                Prenotazione.objects
+                .filter(cliente=conv.cliente, stato='in_attesa', ordine__isnull=True)
+                .select_related('slot')
+                .order_by('-creata_il')
+                .first()
+            )
+            if p:
+                logger.info('Quick reply: trovata pren=%s via cliente=%s',
+                           p.codice_prenotazione, conv.cliente_id)
         if not p:
-            logger.info('Quick reply ignorato: nessuna prenotazione in_attesa per cliente=%s',
-                       conv.cliente_id)
+            # Fallback: telefono_contatto matchato. Iteriamo i candidati
+            # e normalizziamo in E.164.
+            for cand in (Prenotazione.objects
+                         .filter(stato='in_attesa', ordine__isnull=True)
+                         .exclude(telefono_contatto='')
+                         .select_related('slot')
+                         .order_by('-creata_il')[:20]):
+                if wa._to_e164(cand.telefono_contatto) == conv.numero_e164:
+                    p = cand
+                    logger.info('Quick reply: trovata pren=%s via telefono_contatto',
+                               p.codice_prenotazione)
+                    break
+
+        if not p:
+            logger.warning(
+                'Quick reply: NESSUNA prenotazione in_attesa per conv=%s '
+                'cliente=%s numero=%s',
+                conv_pk, conv.cliente_id, conv.numero_e164,
+            )
             return
 
         if testo == 'Confermo':
