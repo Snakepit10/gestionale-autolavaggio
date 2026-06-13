@@ -1961,10 +1961,15 @@ def avvisa_cliente_auto_pronta(request, pk):
     ordine.cliente_avvisato_canale = canale
     ordine.save(update_fields=['cliente_avvisato_il', 'cliente_avvisato_canale'])
 
+    # Convertiamo a timezone locale (Europe/Rome) prima del strftime:
+    # ordine.cliente_avvisato_il e' aware UTC, strftime diretto darebbe
+    # l'ora UTC (-2h in estate). Il template Django converte gia' da
+    # solo grazie a USE_TZ=True, qui dobbiamo farlo a mano.
+    avvisato_local = timezone.localtime(ordine.cliente_avvisato_il)
     return JsonResponse({
         'ok': True,
         'canale': canale,
-        'avvisato_il': ordine.cliente_avvisato_il.strftime('%d/%m %H:%M'),
+        'avvisato_il': avvisato_local.strftime('%H:%M'),
         'message': f'Cliente avvisato via {canale}.',
     })
 
