@@ -28,6 +28,106 @@ _GRAPH_URL = 'https://graph.facebook.com'
 _REQUEST_TIMEOUT = 8  # secondi
 
 
+# Testo "umano" dei template approvati, per renderizzare la bubble nella
+# inbox WhatsApp dopo l'invio. Meta restituisce solo l'id messaggio nella
+# response, NON il corpo formattato, quindi ricostruiamo qui localmente.
+# Tenere sincronizzato con i template approvati in Meta WhatsApp Manager.
+TEMPLATE_PREVIEWS = {
+    'prenotazione_ricevuta':
+        "Ciao {0}! Abbiamo ricevuto la tua richiesta di prenotazione per il "
+        "{1} alle {2}. Servizi: {3}. Confermeremo a breve.",
+    'prenotazione_confermata':
+        "Ciao {0}! La tua prenotazione del {1} alle {2} è CONFERMATA. "
+        "Ti aspettiamo in Via Palma 302, Licata. "
+        "Per modifiche: 379 233 7051.",
+    'prenotazione_rifiutata':
+        "Ciao {0}, non possiamo confermare la prenotazione del {1} alle {2}. "
+        "Motivo: {3}. Riprova scegliendo un'altra fascia oraria. "
+        "Ci scusiamo per il disagio.",
+    'prenotazione_modificata':
+        "Ciao {0}! La prenotazione è stata spostata da {1} a {2} alle {3}. "
+        "Per modifiche telefonaci al 379 233 7051.",
+    'prenotazione_promemoria':
+        "Ciao {0}! Ti ricordiamo la prenotazione di OGGI alle {1}. "
+        "A presto!",
+    'auto_pronta':
+        "Ciao {0}! La tua auto è pronta per il ritiro. "
+        "Puoi ritirarla negli orari di apertura: dalle 8:00 alle 13:00 e "
+        "dalle 15:00 alle 19:00.",
+    'hello_world': "Hello World!",
+}
+
+
+def _format_preview(template_name: str, params: list[str]) -> str:
+    """Genera il testo da mostrare nella inbox per un template Meta."""
+    base = TEMPLATE_PREVIEWS.get(template_name, f'[Template: {template_name}]')
+    try:
+        if params:
+            return base.format(*params)
+        return base
+    except (IndexError, KeyError):
+        # Numero di params non combacia: ritorna base + concat dei params
+        return base + ' | ' + ' | '.join(params)
+
+
+def _log_outgoing_msg(to_e164: str, corpo: str, wa_message_id: str) -> None:
+    """Salva un messaggio outgoing nella inbox WhatsApp (storico DB).
+
+    Chiamato dopo ogni invio API Meta riuscito (template o text) per
+    rendere la bubble visibile nella inbox /messaggi/. Pinga il
+    frontend via channels per refresh realtime.
+
+    Robusto a errori: se il salvataggio fallisce (es. migration non
+    applicata) logga warning ma non rilancia per non rompere il
+    flusso d'invio.
+    """
+    try:
+        from apps.messaggi.models import ConversazioneWhatsApp, MessaggioWhatsApp
+        from apps.clienti.models import Cliente
+        from apps.api.notify import notify_group
+
+        conv, created = ConversazioneWhatsApp.objects.get_or_create(
+            numero_e164=to_e164,
+        )
+        # Match cliente per numero (solo se conv appena creata e senza cliente)
+        if created and not conv.cliente:
+            for c in Cliente.objects.exclude(telefono='').only('id', 'telefono'):
+                if _to_e164(c.telefono) == to_e164:
+                    conv.cliente = c
+                    conv.save(update_fields=['cliente'])
+                    break
+
+        # Dedup su wa_message_id (caso raro: stesso send invocato 2 volte)
+        if wa_message_id and MessaggioWhatsApp.objects.filter(
+            conversazione=conv, wa_message_id=wa_message_id,
+        ).exists():
+            return
+
+        msg = MessaggioWhatsApp.objects.create(
+            conversazione=conv,
+            direzione='out',
+            corpo=corpo,
+            wa_message_id=wa_message_id or '',
+            stato='sent',
+        )
+        # ultimo_messaggio_il aggiornato automaticamente da auto_now
+        conv.save(update_fields=['ultimo_messaggio_il'])
+
+        notify_group('messaggi_wa', {
+            'type': 'nuovo_messaggio_wa',
+            'conv_id': conv.pk,
+            'numero_e164': to_e164,
+            'preview': corpo[:80],
+            'direzione': 'out',
+            'timestamp': msg.creato_il.isoformat(),
+        })
+    except Exception as e:
+        logger.warning(
+            'log_outgoing_msg fallito to=%s wa_id=%s: %s',
+            to_e164, wa_message_id, e,
+        )
+
+
 def _to_e164(phone: str | None, default_country: str = 'IT') -> str | None:
     """Normalizza un numero in formato E.164 (+393792337051).
 
@@ -107,6 +207,14 @@ def _send_template_blocking(to_e164: str, template_name: str, params: list[str])
             )
             return False
         logger.info('WhatsApp inviato to=%s template=%s', to_e164, template_name)
+        # Salva nel storico inbox: ricostruisce il corpo "umano" del
+        # template con le variabili sostituite e crea il MessaggioWhatsApp.
+        wa_id = ''
+        try:
+            wa_id = r.json()['messages'][0]['id']
+        except (KeyError, IndexError, TypeError, ValueError):
+            pass
+        _log_outgoing_msg(to_e164, _format_preview(template_name, params), wa_id)
         return True
     except requests.RequestException as e:
         logger.warning(
