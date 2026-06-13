@@ -45,8 +45,8 @@ TEMPLATE_PREVIEWS = {
         "Motivo: {3}. Riprova scegliendo un'altra fascia oraria. "
         "Ci scusiamo per il disagio.",
     'prenotazione_modificata':
-        "Ciao {0}! La prenotazione è stata spostata da {1} a {2} alle {3}. "
-        "Per modifiche telefonaci al 379 233 7051.",
+        "Ciao {0}! La tua prenotazione è stata spostata dal {1} al {2} "
+        "alle {3}. Per modifiche o conferma contattaci al 379 233 7051.",
     'prenotazione_promemoria':
         "Ciao {0}! Ti ricordiamo la prenotazione di OGGI alle {1}. "
         "A presto!",
@@ -363,10 +363,13 @@ def whatsapp_prenotazione_modificata(prenotazione, vecchia_data: str, vecchia_or
         return False
     nome = _nome_cliente(prenotazione)
     nuova_data, nuova_ora = _data_ora(prenotazione)
+    # Template approvato: 4 variabili
+    # {{1}}=nome, {{2}}=vecchia (data+ora unite), {{3}}=nuova data,
+    # {{4}}=nuova ora (codice rimosso come negli altri template)
     return _send_template(
         to,
         settings.META_WA_TEMPLATE_MODIFICATA,
-        [nome, f'{vecchia_data} {vecchia_ora}', nuova_data, nuova_ora, prenotazione.codice_prenotazione],
+        [nome, f'{vecchia_data} {vecchia_ora}', nuova_data, nuova_ora],
     )
 
 
