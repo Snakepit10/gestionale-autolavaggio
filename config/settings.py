@@ -233,7 +233,9 @@ META_WHATSAPP_TEMPLATE_LANG = os.environ.get('META_WHATSAPP_TEMPLATE_LANG', 'it'
 META_WA_TEMPLATE_RICEVUTA = os.environ.get('META_WA_TEMPLATE_RICEVUTA', 'prenotazione_ricevuta')
 META_WA_TEMPLATE_CONFERMATA = os.environ.get('META_WA_TEMPLATE_CONFERMATA', 'prenotazione_confermata')
 META_WA_TEMPLATE_RIFIUTATA = os.environ.get('META_WA_TEMPLATE_RIFIUTATA', 'prenotazione_rifiutata')
-META_WA_TEMPLATE_MODIFICATA = os.environ.get('META_WA_TEMPLATE_MODIFICATA', 'prenotazione_modificata')
+META_WA_TEMPLATE_PROPOSTA_ORARIO = os.environ.get(
+    'META_WA_TEMPLATE_PROPOSTA_ORARIO', 'prenotazione_proposta_orario'
+)
 META_WA_TEMPLATE_PROMEMORIA = os.environ.get('META_WA_TEMPLATE_PROMEMORIA', 'prenotazione_promemoria')
 META_WA_TEMPLATE_AUTO_PRONTA = os.environ.get('META_WA_TEMPLATE_AUTO_PRONTA', 'auto_pronta')
 # Test mode: quando True, l'invio WhatsApp NON include i parametri body

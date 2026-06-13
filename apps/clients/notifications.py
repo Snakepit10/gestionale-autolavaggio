@@ -141,23 +141,30 @@ def email_prenotazione_rifiutata(prenotazione, motivo: str = '') -> bool:
     return _safe_send('Prenotazione non confermata', body, _email_target(prenotazione))
 
 
-def email_prenotazione_modificata(prenotazione, vecchia_data: str, vecchia_ora: str) -> bool:
-    """Operatore propone una nuova fascia oraria modificando lo slot."""
+def email_prenotazione_proposta_orario(prenotazione, vecchia_data: str, vecchia_ora: str) -> bool:
+    """Fallback email per la proposta di nuovo orario al cliente.
+
+    Usato quando WhatsApp non e' configurato o fallisce. Il testo
+    invita il cliente a confermare o proporre un orario alternativo
+    rispondendo all'email o telefonando.
+    """
     cliente = prenotazione.cliente
     nome = (cliente.nome or cliente.cognome or '').strip() or 'Cliente'
     nuova_data = prenotazione.slot.data.strftime('%d/%m/%Y')
     nuova_ora = prenotazione.slot.ora_inizio.strftime('%H:%M')
     body = (
         f"Ciao {nome},\n\n"
-        f"la tua prenotazione del {vecchia_data} alle {vecchia_ora} e' stata "
-        f"riprogrammata.\n\n"
-        f"Nuova data: {nuova_data}\n"
-        f"Nuova ora: {nuova_ora}\n"
-        f"Codice: {prenotazione.codice_prenotazione}\n\n"
-        f"Se la nuova fascia non ti va bene, contattaci o annulla la "
-        f"prenotazione dalla tua area cliente."
+        f"abbiamo ricevuto la tua richiesta di prenotazione del "
+        f"{vecchia_data} alle {vecchia_ora} che purtroppo non e'\n"
+        f"disponibile.\n\n"
+        f"Possiamo proporti il {nuova_data} alle {nuova_ora}?\n\n"
+        f"Per confermare il nuovo orario o proporne un altro:\n"
+        f"- rispondi a questa email\n"
+        f"- oppure chiamaci al 379 233 7051\n\n"
+        f"Codice prenotazione: {prenotazione.codice_prenotazione}"
     )
-    return _safe_send('Prenotazione riprogrammata', body, _email_target(prenotazione))
+    return _safe_send('Proposta nuovo orario per la tua prenotazione',
+                     body, _email_target(prenotazione))
 
 
 def email_prenotazione_promemoria(prenotazione) -> bool:
@@ -200,10 +207,10 @@ def notifica_prenotazione_rifiutata(prenotazione, motivo: str = '') -> bool:
     return email_prenotazione_rifiutata(prenotazione, motivo)
 
 
-def notifica_prenotazione_modificata(prenotazione, vecchia_data: str, vecchia_ora: str) -> bool:
-    if wa.whatsapp_prenotazione_modificata(prenotazione, vecchia_data, vecchia_ora):
+def notifica_prenotazione_proposta_orario(prenotazione, vecchia_data: str, vecchia_ora: str) -> bool:
+    if wa.whatsapp_prenotazione_proposta_orario(prenotazione, vecchia_data, vecchia_ora):
         return True
-    return email_prenotazione_modificata(prenotazione, vecchia_data, vecchia_ora)
+    return email_prenotazione_proposta_orario(prenotazione, vecchia_data, vecchia_ora)
 
 
 def notifica_prenotazione_promemoria(prenotazione) -> bool:

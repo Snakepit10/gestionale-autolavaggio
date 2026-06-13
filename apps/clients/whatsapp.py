@@ -44,9 +44,10 @@ TEMPLATE_PREVIEWS = {
         "Ciao {0}, non possiamo confermare la prenotazione del {1} alle {2}. "
         "Motivo: {3}. Riprova scegliendo un'altra fascia oraria. "
         "Ci scusiamo per il disagio.",
-    'prenotazione_modificata':
-        "Ciao {0}! La tua prenotazione è stata spostata dal {1} al {2} "
-        "alle {3}. Per modifiche o conferma contattaci al 379 233 7051.",
+    'prenotazione_proposta_orario':
+        "Ciao {0}, abbiamo ricevuto la tua richiesta di prenotazione per il "
+        "{1} che purtroppo non è disponibile. Possiamo proporti il giorno {2} "
+        "alle ore {3}? Confermaci con un clic sul pulsante qui sotto, grazie.",
     'prenotazione_promemoria':
         "Ciao {0}! Ti ricordiamo la prenotazione di OGGI alle {1}. "
         "A presto!",
@@ -357,19 +358,29 @@ def whatsapp_prenotazione_rifiutata(prenotazione, motivo: str = '') -> bool:
     )
 
 
-def whatsapp_prenotazione_modificata(prenotazione, vecchia_data: str, vecchia_ora: str) -> bool:
+def whatsapp_prenotazione_proposta_orario(prenotazione, vecchia_data: str, vecchia_ora: str) -> bool:
+    """Manda al cliente una proposta di nuovo orario per la sua prenotazione.
+
+    Template Meta con Quick Reply Buttons: il cliente vede "Va bene" e
+    "No, non riesco". Il tap su un pulsante apre la conversazione
+    bidirezionale e il messaggio compare nella inbox /messaggi/.
+
+    Usato quando l'operatore sposta lo slot ma vuole che il cliente
+    confermi prima di marcare la prenotazione come definitiva.
+
+    Template ha 4 variabili:
+    {{1}}=nome, {{2}}=richiesta originale (data+ora), {{3}}=nuova data,
+    {{4}}=nuova ora.
+    """
     to = _whatsapp_target(prenotazione)
     if not to:
         return False
     nome = _nome_cliente(prenotazione)
     nuova_data, nuova_ora = _data_ora(prenotazione)
-    # Template approvato: 4 variabili
-    # {{1}}=nome, {{2}}=vecchia (data+ora unite), {{3}}=nuova data,
-    # {{4}}=nuova ora (codice rimosso come negli altri template)
     return _send_template(
         to,
-        settings.META_WA_TEMPLATE_MODIFICATA,
-        [nome, f'{vecchia_data} {vecchia_ora}', nuova_data, nuova_ora],
+        settings.META_WA_TEMPLATE_PROPOSTA_ORARIO,
+        [nome, f'{vecchia_data} alle {vecchia_ora}', nuova_data, nuova_ora],
     )
 
 

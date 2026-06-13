@@ -2322,15 +2322,21 @@ def prenotazione_rifiuta(request, pk):
 
 @login_required
 def prenotazione_proponi_orario(request, pk):
-    """Operatore modifica data/ora di una prenotazione in attesa.
+    """Operatore propone una nuova data/ora alla prenotazione in attesa.
+
+    Sposta lo slot della prenotazione al nuovo orario ma lascia lo
+    stato 'in_attesa' (NON confermata): manda al cliente un template
+    WhatsApp 'prenotazione_proposta_orario' con Quick Reply Buttons
+    'Va bene' / 'No, non riesco'. Quando il cliente risponde dalla
+    chat, l'operatore vede la risposta nella inbox e clicca poi
+    'Accetta' (o cambia di nuovo) per chiudere il flow.
 
     Body JSON: {data: 'YYYY-MM-DD', ora: 'HH:MM'}
-    Notifica il cliente via email del cambio.
     """
     if request.method != 'POST':
         return JsonResponse({'error': 'Metodo non permesso'}, status=405)
     from apps.prenotazioni.models import Prenotazione, SlotPrenotazione
-    from apps.clients.notifications import notifica_prenotazione_modificata
+    from apps.clients.notifications import notifica_prenotazione_proposta_orario
     from datetime import datetime as _dt, timedelta as _td
 
     p = get_object_or_404(Prenotazione, pk=pk)
@@ -2364,10 +2370,10 @@ def prenotazione_proponi_orario(request, pk):
 
     vecchio_slot = p.slot
     p.slot = nuovo_slot
-    # Confermiamo automaticamente quando l'operatore propone un orario:
-    # significa che ha trovato la disponibilita.
-    p.stato = 'confermata'
-    p.save(update_fields=['slot', 'stato'])
+    # Lo stato RESTA 'in_attesa': la conferma definitiva arrivera' quando
+    # il cliente rispondera' "Va bene" alla proposta WhatsApp e
+    # l'operatore cliccherà "Accetta".
+    p.save(update_fields=['slot'])
 
     # Aggiorna contatori vecchio + nuovo slot
     if hasattr(vecchio_slot, 'aggiorna_contatori'):
@@ -2375,7 +2381,7 @@ def prenotazione_proponi_orario(request, pk):
     if hasattr(nuovo_slot, 'aggiorna_contatori'):
         nuovo_slot.aggiorna_contatori()
 
-    notifica_prenotazione_modificata(p, vecchia_data, vecchia_ora)
+    notifica_prenotazione_proposta_orario(p, vecchia_data, vecchia_ora)
     return JsonResponse({
         'ok': True,
         'data': nuova_data.strftime('%d/%m/%Y'),
