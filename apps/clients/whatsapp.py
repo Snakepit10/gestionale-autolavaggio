@@ -157,10 +157,13 @@ def whatsapp_prenotazione_ricevuta(prenotazione) -> bool:
     nome = _nome_cliente(prenotazione)
     data, ora = _data_ora(prenotazione)
     servizi = ', '.join(s.titolo for s in prenotazione.servizi.all())[:60]
+    # Template Meta approvato ha 4 variabili:
+    # {{1}}=nome, {{2}}=data, {{3}}=ora, {{4}}=servizi
+    # (il codice prenotazione e' stato rimosso dal testo approvato)
     return _send_template(
         to,
         settings.META_WA_TEMPLATE_RICEVUTA,
-        [nome, data, ora, servizi, prenotazione.codice_prenotazione],
+        [nome, data, ora, servizi],
     )
 
 
