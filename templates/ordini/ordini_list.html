@@ -146,64 +146,93 @@
 
 <!-- Prenotazioni cliente DA CONFERMARE (in attesa) -->
 {% if prenotazioni_da_confermare %}
-<div class="card mb-4 border-warning shadow-sm">
-    <div class="card-header bg-warning bg-opacity-10 d-flex align-items-center justify-content-between">
-        <h6 class="mb-0 text-warning fw-bold">
+<style>
+.pren-conferma-card {
+    padding: 8px 12px;
+    border-radius: 8px;
+    border: 1px solid #fcd34d;
+    background: #fffbeb;
+    font-size: .88rem;
+    transition: background .2s, border-color .2s;
+}
+/* Proposta gia' inviata al cliente: in attesa di risposta WhatsApp */
+.pren-conferma-card.in-attesa-cliente {
+    border-color: #60a5fa;
+    background: #eff6ff;
+}
+.pren-conferma-card .pren-data { color: #b45309; font-weight: 700; font-size: .92rem; }
+.pren-conferma-card.in-attesa-cliente .pren-data { color: #1d4ed8; }
+.pren-conferma-card .pren-meta { font-size: .78rem; color: #64748b; }
+.pren-conferma-card .pren-cliente { font-weight: 600; font-size: .92rem; }
+.pren-conferma-card .pren-btn-row .btn { padding: 3px 8px; font-size: .76rem; }
+.pren-conferma-card .badge-codice { font-size: .68rem; padding: 2px 6px; }
+.pren-conferma-card .badge-attesa {
+    display: inline-block; margin-left: 6px; font-size: .68rem;
+    background: #1d4ed8; color: #fff; padding: 2px 8px; border-radius: 10px;
+    font-weight: 700; text-transform: uppercase; letter-spacing: .03em;
+}
+</style>
+<div class="card mb-3 border-warning shadow-sm">
+    <div class="card-header bg-warning bg-opacity-10 d-flex align-items-center justify-content-between py-2">
+        <h6 class="mb-0 text-warning fw-bold small">
             <i class="bi bi-bell-fill"></i> Prenotazioni cliente da confermare
             <span class="badge bg-warning text-dark ms-2">{{ prenotazioni_da_confermare|length }}</span>
         </h6>
-        <small class="text-muted">Richieste in attesa dalla PWA cliente</small>
+        <small class="text-muted d-none d-md-inline">
+            <span class="badge" style="background:#60a5fa;color:#fff;">blu</span> = proposta inviata, in attesa cliente
+        </small>
     </div>
-    <div class="card-body">
+    <div class="card-body p-2">
         <div class="row g-2">
             {% for p in prenotazioni_da_confermare %}
-            <div class="col-md-6">
-                <div class="border rounded p-3 h-100" style="background:#fffbeb;">
-                    <div class="d-flex justify-content-between align-items-start mb-2">
-                        <div>
-                            <strong class="text-warning">
-                                <i class="bi bi-clock"></i> {{ p.slot.data|date:"d/m/Y" }} alle {{ p.slot.ora_inizio|time:"H:i" }}
-                            </strong>
-                            <br>
-                            <span class="fw-bold">{{ p.cliente }}</span>
-                            {% if p.cliente.telefono %}
-                                &middot; <a href="tel:{{ p.cliente.telefono }}" class="text-decoration-none small">
-                                    <i class="bi bi-telephone"></i> {{ p.cliente.telefono }}
-                                </a>
-                            {% endif %}
-                            {% if p.cliente.email %}
-                                <br><small class="text-muted"><i class="bi bi-envelope"></i> {{ p.cliente.email }}</small>
+            <div class="col-md-6 col-lg-4">
+                <div class="pren-conferma-card h-100 {% if p.proposta_inviata_il %}in-attesa-cliente{% endif %}">
+                    <div class="d-flex justify-content-between align-items-start mb-1">
+                        <div class="pren-data">
+                            <i class="bi bi-clock"></i> {{ p.slot.data|date:"d/m" }} {{ p.slot.ora_inizio|time:"H:i" }}
+                            {% if p.proposta_inviata_il %}
+                                <span class="badge-attesa" title="Proposta inviata il {{ p.proposta_inviata_il|date:'d/m H:i' }} - in attesa risposta cliente">
+                                    <i class="bi bi-hourglass-split"></i> attesa
+                                </span>
                             {% endif %}
                         </div>
-                        <span class="badge bg-light text-dark border">#{{ p.codice_prenotazione }}</span>
+                        <span class="badge bg-light text-dark border badge-codice">#{{ p.codice_prenotazione }}</span>
                     </div>
 
-                    {% if p.tipo_auto %}
-                        <div class="small mb-1"><i class="bi bi-car-front"></i> {{ p.tipo_auto }}</div>
+                    <div class="pren-cliente">{{ p.cliente }}</div>
+                    {% if p.cliente.telefono %}
+                        <div class="pren-meta">
+                            <a href="tel:{{ p.cliente.telefono }}" class="text-decoration-none">
+                                <i class="bi bi-telephone"></i> {{ p.cliente.telefono }}
+                            </a>
+                        </div>
                     {% endif %}
 
-                    <div class="d-flex flex-wrap gap-1 mb-2">
+                    <div class="d-flex flex-wrap gap-1 my-1">
                         {% for s in p.servizi.all %}
-                            <span class="badge bg-light text-dark border small">{{ s.titolo }}</span>
+                            <span class="badge bg-light text-dark border" style="font-size:.68rem;padding:2px 6px;">{{ s.titolo }}</span>
                         {% endfor %}
+                        {% if p.tipo_auto %}
+                            <span class="pren-meta ms-1"><i class="bi bi-car-front"></i> {{ p.tipo_auto }}</span>
+                        {% endif %}
                     </div>
 
                     {% if p.nota_cliente %}
-                        <div class="alert alert-light py-1 px-2 mb-2 small">
-                            <i class="bi bi-sticky"></i> {{ p.nota_cliente }}
+                        <div class="pren-meta mb-1" style="font-style:italic;">
+                            <i class="bi bi-sticky"></i> {{ p.nota_cliente|truncatechars:80 }}
                         </div>
                     {% endif %}
 
-                    <div class="d-flex flex-wrap gap-2 mt-2">
-                        <button class="btn btn-success btn-sm" onclick="prenAccetta({{ p.pk }})">
+                    <div class="d-flex flex-wrap gap-1 pren-btn-row mt-1">
+                        <button class="btn btn-success" onclick="prenAccetta({{ p.pk }})" title="Conferma definitivamente">
                             <i class="bi bi-check-circle"></i> Accetta
                         </button>
-                        <button class="btn btn-outline-warning btn-sm"
+                        <button class="btn btn-outline-primary"
                                 onclick="prenProponiOrario({{ p.pk }}, '{{ p.slot.data|date:'Y-m-d' }}', '{{ p.slot.ora_inizio|time:'H:i' }}')"
-                                title="Sposta lo slot e manda al cliente una proposta WhatsApp con conferma">
-                            <i class="bi bi-clock-history"></i> Proponi orario
+                                title="Sposta lo slot e manda al cliente una proposta WhatsApp">
+                            <i class="bi bi-clock-history"></i> Proponi
                         </button>
-                        <button class="btn btn-outline-danger btn-sm" onclick="prenRifiuta({{ p.pk }})">
+                        <button class="btn btn-outline-danger" onclick="prenRifiuta({{ p.pk }})" title="Rifiuta richiesta">
                             <i class="bi bi-x-circle"></i> Rifiuta
                         </button>
                     </div>
@@ -427,9 +456,11 @@ function proponiConferma() {
   </div>
 </div>
 
-{# Stili slot-pill (gli stessi della cassa, duplicati qui perche'
-   templates/ordini/cassa.html e ordini_list.html sono pagine
-   separate e Bootstrap non condivide il CSS automaticamente). #}
+<!--
+  Stili slot-pill (gli stessi della cassa, duplicati qui perche'
+  cassa.html e ordini_list.html sono pagine separate e Bootstrap
+  non condivide il CSS automaticamente).
+-->
 <style>
 .slot-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(80px, 1fr)); gap: 6px; max-height: 320px; overflow-y: auto; padding: 8px; background: #f8fafc; border-radius: 8px; border:1px solid #e5e7eb; }
 .slot-pill { padding: 10px 4px; border-radius: 8px; text-align: center; font-size: .8rem; cursor: pointer; border: 2px solid transparent; transition: all .12s; user-select: none; }

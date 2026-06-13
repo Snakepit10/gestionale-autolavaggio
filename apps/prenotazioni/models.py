@@ -135,7 +135,12 @@ class Prenotazione(models.Model):
 
     # Notifiche
     promemoria_inviato = models.BooleanField(default=False)
-    
+    # Set quando l'operatore manda WA proposta_orario al cliente
+    # tramite "Proponi orario". Resettato (null) quando il cliente
+    # conferma/rifiuta col Quick Reply. Usato in /ordini/ per dare
+    # un colore diverso alle card in attesa di conferma cliente.
+    proposta_inviata_il = models.DateTimeField(null=True, blank=True)
+
     creata_il = models.DateTimeField(auto_now_add=True)
     aggiornata_il = models.DateTimeField(auto_now=True)
     

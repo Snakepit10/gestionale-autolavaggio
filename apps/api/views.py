@@ -257,7 +257,8 @@ def _handle_quick_reply(conv_pk: int, testo: str):
 
         if testo == 'Confermo':
             p.stato = 'confermata'
-            p.save(update_fields=['stato'])
+            p.proposta_inviata_il = None
+            p.save(update_fields=['stato', 'proposta_inviata_il'])
             if hasattr(p.slot, 'aggiorna_contatori'):
                 p.slot.aggiorna_contatori()
             notifica_prenotazione_confermata(p)
@@ -268,9 +269,10 @@ def _handle_quick_reply(conv_pk: int, testo: str):
             # Annulla e libera lo slot
             vecchio_slot = p.slot
             p.stato = 'annullata'
+            p.proposta_inviata_il = None
             nota = (p.nota_interna or '').strip()
             p.nota_interna = (nota + '\n' if nota else '') + 'Rifiutata dal cliente via WhatsApp (Quick Reply "No, non riesco").'
-            p.save(update_fields=['stato', 'nota_interna'])
+            p.save(update_fields=['stato', 'nota_interna', 'proposta_inviata_il'])
             if hasattr(vecchio_slot, 'aggiorna_contatori'):
                 vecchio_slot.aggiorna_contatori()
             logger.info('Auto-annullata prenotazione %s via Quick Reply "No, non riesco"',

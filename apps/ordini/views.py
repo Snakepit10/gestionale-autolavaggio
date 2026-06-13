@@ -2371,9 +2371,10 @@ def prenotazione_proponi_orario(request, pk):
     vecchio_slot = p.slot
     p.slot = nuovo_slot
     # Lo stato RESTA 'in_attesa': la conferma definitiva arrivera' quando
-    # il cliente rispondera' "Va bene" alla proposta WhatsApp e
-    # l'operatore cliccherà "Accetta".
-    p.save(update_fields=['slot'])
+    # il cliente rispondera' "Confermo" alla proposta WhatsApp e
+    # l'auto-handler scattera'.
+    p.proposta_inviata_il = timezone.now()
+    p.save(update_fields=['slot', 'proposta_inviata_il'])
 
     # Aggiorna contatori vecchio + nuovo slot
     if hasattr(vecchio_slot, 'aggiorna_contatori'):
