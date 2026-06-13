@@ -234,6 +234,7 @@ META_WA_TEMPLATE_CONFERMATA = os.environ.get('META_WA_TEMPLATE_CONFERMATA', 'pre
 META_WA_TEMPLATE_RIFIUTATA = os.environ.get('META_WA_TEMPLATE_RIFIUTATA', 'prenotazione_rifiutata')
 META_WA_TEMPLATE_MODIFICATA = os.environ.get('META_WA_TEMPLATE_MODIFICATA', 'prenotazione_modificata')
 META_WA_TEMPLATE_PROMEMORIA = os.environ.get('META_WA_TEMPLATE_PROMEMORIA', 'prenotazione_promemoria')
+META_WA_TEMPLATE_AUTO_PRONTA = os.environ.get('META_WA_TEMPLATE_AUTO_PRONTA', 'auto_pronta')
 # Test mode: quando True, l'invio WhatsApp NON include i parametri body
 # nel payload. Serve per testare con template Meta pre-approvati senza
 # variabili (es. "hello_world"), finche' i 5 template ufficiali del

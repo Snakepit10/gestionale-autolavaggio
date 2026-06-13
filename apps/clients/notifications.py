@@ -210,3 +210,32 @@ def notifica_prenotazione_promemoria(prenotazione) -> bool:
     if wa.whatsapp_prenotazione_promemoria(prenotazione):
         return True
     return email_prenotazione_promemoria(prenotazione)
+
+
+def email_auto_pronta(ordine) -> bool:
+    """Email fallback: auto pronta al ritiro."""
+    cliente = getattr(ordine, 'cliente', None)
+    if not cliente:
+        return False
+    nome = (cliente.nome or cliente.cognome or '').strip() or 'Cliente'
+    body = (
+        f"Ciao {nome},\n\n"
+        f"la tua auto e' pronta per il ritiro.\n\n"
+        f"Puoi ritirarla negli orari di apertura: dalle 8:00 alle 13:00\n"
+        f"e dalle 15:00 alle 19:00.\n\n"
+        f"Ti chiediamo di rispettare questi orari: oltre l'orario indicato\n"
+        f"non siamo tenuti ad attendere il ritiro.\n\n"
+        f"Indirizzo: Via Palma 302, Licata (AG)\n"
+        f"Tel. 379 233 7051"
+    )
+    to_email = cliente.email or ''
+    return _safe_send('La tua auto e\' pronta', body, to_email)
+
+
+def notifica_auto_pronta(ordine) -> bool:
+    """Notifica al cliente che la sua auto e' pronta. WhatsApp primary,
+    email fallback. Chiamala quando un ordine passa allo stato
+    'completato' (vedi apps/ordini/views.py)."""
+    if wa.whatsapp_auto_pronta(ordine):
+        return True
+    return email_auto_pronta(ordine)

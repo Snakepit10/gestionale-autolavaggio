@@ -173,10 +173,12 @@ def whatsapp_prenotazione_confermata(prenotazione) -> bool:
         return False
     nome = _nome_cliente(prenotazione)
     data, ora = _data_ora(prenotazione)
+    # Template approvato: 3 variabili {{1}}=nome, {{2}}=data, {{3}}=ora
+    # (codice prenotazione non presente nel testo approvato)
     return _send_template(
         to,
         settings.META_WA_TEMPLATE_CONFERMATA,
-        [nome, data, ora, prenotazione.codice_prenotazione],
+        [nome, data, ora],
     )
 
 
@@ -187,6 +189,8 @@ def whatsapp_prenotazione_rifiutata(prenotazione, motivo: str = '') -> bool:
     nome = _nome_cliente(prenotazione)
     data, ora = _data_ora(prenotazione)
     motivo = (motivo or 'Slot non disponibile').strip()
+    # Template approvato: 4 variabili
+    # {{1}}=nome, {{2}}=data, {{3}}=ora, {{4}}=motivo
     return _send_template(
         to,
         settings.META_WA_TEMPLATE_RIFIUTATA,
@@ -213,8 +217,35 @@ def whatsapp_prenotazione_promemoria(prenotazione) -> bool:
         return False
     nome = _nome_cliente(prenotazione)
     _data, ora = _data_ora(prenotazione)
+    # Template approvato: 2 variabili {{1}}=nome, {{2}}=ora
+    # (data hardcoded come "OGGI", codice prenotazione rimosso)
     return _send_template(
         to,
         settings.META_WA_TEMPLATE_PROMEMORIA,
-        [nome, ora, prenotazione.codice_prenotazione],
+        [nome, ora],
+    )
+
+
+# ===========================================================================
+# Nuova notifica: auto pronta (ordine completato, pronto al ritiro)
+# ===========================================================================
+
+def whatsapp_auto_pronta(ordine) -> bool:
+    """Notifica al cliente che la sua auto e' pronta per il ritiro.
+
+    Triggerata quando un ordine passa allo stato 'completato' lato
+    operatore. Template approvato: 1 variabile {{1}}=nome.
+    """
+    cliente = getattr(ordine, 'cliente', None)
+    if not cliente:
+        return False
+    raw_phone = getattr(cliente, 'telefono', '') or ''
+    to = _to_e164(raw_phone)
+    if not to:
+        return False
+    nome = (cliente.nome or cliente.cognome or '').strip() or 'Cliente'
+    return _send_template(
+        to,
+        settings.META_WA_TEMPLATE_AUTO_PRONTA,
+        [nome],
     )
