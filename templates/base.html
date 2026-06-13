@@ -54,14 +54,14 @@
                         </li>
 
                         <li class="nav-item">
-                            <a class="nav-link position-relative" href="{% url 'messaggi:inbox' %}" id="navWaLink"
+                            <a class="nav-link" href="{% url 'messaggi:inbox' %}" id="navWaLink"
                                title="Messaggi WhatsApp">
                                 <i class="bi bi-whatsapp"></i> Messaggi
-                                <span id="navbar-wa-badge" class="position-absolute"
-                                      style="display:none;top:0px;right:-6px;background:#25d366;color:#fff;
-                                             font-size:.72rem;font-weight:700;line-height:1;
-                                             padding:3px 7px;border-radius:11px;min-width:20px;
-                                             text-align:center;border:2px solid #0d6efd;
+                                <span id="navbar-wa-badge" class="ms-1"
+                                      style="display:none;background:#25d366;color:#fff;
+                                             font-size:.75rem;font-weight:700;line-height:1;
+                                             padding:3px 8px;border-radius:11px;min-width:22px;
+                                             text-align:center;vertical-align:middle;
                                              box-shadow:0 1px 4px rgba(0,0,0,.25);"></span>
                             </a>
                         </li>
@@ -335,11 +335,18 @@
         async function caricaTotale(pulseSeNuovi=true) {
             try {
                 const r = await fetch('/api/whatsapp/conversazioni/', { credentials: 'same-origin' });
-                if (!r.ok) return;
+                if (!r.ok) {
+                    console.warn('[wa-badge] fetch fallito:', r.status);
+                    return;
+                }
                 const d = await r.json();
-                const tot = (d.conversazioni || []).reduce((a, c) => a + (c.non_letti || 0), 0);
+                const conv = d.conversazioni || [];
+                const tot = conv.reduce((a, c) => a + (c.non_letti || 0), 0);
+                console.debug('[wa-badge] non letti totali:', tot, '(conv:', conv.length, ')');
                 aggiornaBadge(tot, pulseSeNuovi);
-            } catch (e) { /* ignora */ }
+            } catch (e) {
+                console.warn('[wa-badge] errore:', e);
+            }
         }
 
         // WS subscribe per refresh badge live
