@@ -33,28 +33,50 @@ _REQUEST_TIMEOUT = 8  # secondi
 # response, NON il corpo formattato, quindi ricostruiamo qui localmente.
 # Tenere sincronizzato con i template approvati in Meta WhatsApp Manager.
 TEMPLATE_PREVIEWS = {
+    # I testi qui sotto devono combaciare ESATTAMENTE con i template
+    # approvati su Meta WhatsApp Manager (incluse interruzioni di riga
+    # e paragrafi), perche' sono salvati come corpo nella inbox del
+    # gestionale: l'operatore vede lo stesso messaggio inviato al
+    # cliente. Se Meta modifica un testo, aggiornare anche qui.
     'prenotazione_ricevuta':
-        "Ciao {0}! Abbiamo ricevuto la tua richiesta di prenotazione per il "
-        "{1} alle {2}. Servizi: {3}. Confermeremo a breve.",
+        "Ciao {0}! Abbiamo ricevuto la tua richiesta di prenotazione "
+        "per il {1} alle {2}.\n\n"
+        "Servizi: *{3}*.\n\n"
+        "Confermeremo a breve.",
     'prenotazione_confermata':
         "Ciao {0}! La tua prenotazione del {1} alle {2} è CONFERMATA. "
-        "Ti aspettiamo in Via Palma 302, Licata. "
-        "Per modifiche: 379 233 7051.",
+        "Ti aspettiamo in Via Palma 302, Licata.\n\n"
+        "Ti chiediamo di presentarti 15 minuti prima dell'orario "
+        "prenotato.\n\n"
+        "Segnalaci telefonicamente eventuali ritardi o modifiche: "
+        "faremo il possibile per accoglierti.\n\n"
+        "In caso di mancato avviso o ritardo la slot prenotata "
+        "potrebbe essere ceduta ad altri clienti in attesa.\n\n"
+        "Il prezzo finale viene comunicato al ritiro dell'auto, in "
+        "base ai servizi effettivamente erogati.",
     'prenotazione_rifiutata':
-        "Ciao {0}, non possiamo confermare la prenotazione del {1} alle {2}. "
-        "Motivo: {3}. Riprova scegliendo un'altra fascia oraria. "
-        "Ci scusiamo per il disagio.",
+        "Ciao {0}, non possiamo confermare la prenotazione del {1} "
+        "alle {2}.\n\n"
+        "Motivo: {3}.\n\n"
+        "Riprova scegliendo un'altra fascia oraria. Ci scusiamo per "
+        "il disagio.",
     'prenotazione_proposta_orario':
-        "Ciao {0}, abbiamo ricevuto la tua richiesta di prenotazione per il "
-        "{1} che purtroppo non è disponibile. Possiamo proporti il giorno {2} "
-        "alle ore {3}? Confermaci con un clic sul pulsante qui sotto, grazie.",
+        "Ciao {0}, abbiamo ricevuto la tua richiesta di prenotazione "
+        "per il {1} che purtroppo non è disponibile.\n\n"
+        "Possiamo proporti il giorno {2} alle ore {3}? Confermaci "
+        "con un clic sul pulsante qui sotto, grazie.",
     'prenotazione_promemoria':
-        "Ciao {0}! Ti ricordiamo la prenotazione di OGGI alle {1}. "
+        "Ciao {0}! Ti ricordiamo la prenotazione di OGGI alle {1}.\n\n"
+        "Ti chiediamo di presentarti 15 minuti prima dell'orario "
+        "prenotato.\n\n"
+        "Segnalaci telefonicamente eventuali ritardi o modifiche.\n\n"
         "A presto!",
     'auto_pronta':
-        "Ciao {0}! La tua auto è pronta per il ritiro. "
-        "Puoi ritirarla negli orari di apertura: dalle 8:00 alle 13:00 e "
-        "dalle 15:00 alle 19:00.",
+        "Ciao {0}! La tua auto è pronta per il ritiro.\n\n"
+        "Puoi ritirarla negli orari di apertura: dalle 8:00 alle 13:00 "
+        "e dalle 15:00 alle 19:00.\n\n"
+        "Ti chiediamo di rispettare questi orari: oltre l'orario "
+        "indicato non siamo tenuti ad attendere il ritiro.",
     'hello_world': "Hello World!",
 }
 
