@@ -644,6 +644,8 @@ function proponiConferma() {
             data-durata="{{ p.durata_stimata_minuti|default:'' }}"
             data-stato="{{ p.stato }}"
             data-nota-cliente="{{ p.nota_cliente|default:'' }}"
+            data-tipo-consegna="{{ p.tipo_consegna|default:'immediata' }}"
+            data-ora-consegna="{{ p.ora_consegna_richiesta|time:'H:i'|default:'' }}"
             title="{% if p.delta_min < 0 %}In ritardo di {{ p.delta_min|stringformat:'d'|cut:'-' }} min{% elif p.delta_min == 0 %}Ora{% else %}Tra {{ p.delta_min }} min{% endif %}">
         <span class="time-pill">
             <i class="bi bi-clock"></i> {{ p.slot.ora_inizio|time:"H:i" }}
@@ -974,9 +976,13 @@ function ckEliminaPrenotazione() {
 
     // Tipo auto
     document.getElementById('ckTipoAuto').value = btn.getAttribute('data-tipo-auto') || '';
-    // Default: tipo consegna immediata, ora vuota
-    document.getElementById('ckTipoConsegna').value = 'immediata';
-    document.getElementById('ckOraConsegna').value = '';
+    // Tipo consegna + ora consegna: ereditati dalla prenotazione (impostati
+    // al momento della creazione dal modal "Crea prenotazione" della cassa).
+    // L'operatore puo' comunque modificarli qui se le esigenze del cliente
+    // sono cambiate al check-in.
+    const tipoConsegnaPren = btn.getAttribute('data-tipo-consegna') || 'immediata';
+    document.getElementById('ckTipoConsegna').value = tipoConsegnaPren;
+    document.getElementById('ckOraConsegna').value = btn.getAttribute('data-ora-consegna') || '';
     ckToggleOra();
 
     // Precheck servizi correnti

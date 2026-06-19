@@ -258,14 +258,28 @@ class Prenotazione(models.Model):
             # Se il cliente è puntuale, usa l'ora di inizio originale
             ora_base = ora_inizio_aware
             
-        ora_consegna_richiesta = ora_base + timedelta(minutes=self.durata_stimata_minuti)
-        
+        ora_consegna_default = ora_base + timedelta(minutes=self.durata_stimata_minuti)
+
+        # Eredita il tipo di consegna scelto al momento della prenotazione:
+        # - 'programmata' -> usa ora_consegna_richiesta dalla prenotazione,
+        #   fallback al calcolo standard (ora inizio + durata) se non era
+        #   stata impostata;
+        # - 'immediata'   -> nessuna ora_consegna fissa, l'auto al ritiro
+        #   appena pronta.
+        # La view di check-in puo' comunque sovrascrivere entrambi i valori
+        # se l'operatore li modifica nel modal.
+        tipo_consegna_ordine = self.tipo_consegna or 'immediata'
+        if tipo_consegna_ordine == 'programmata':
+            ora_consegna_finale = self.ora_consegna_richiesta or ora_consegna_default.time()
+        else:
+            ora_consegna_finale = None
+
         # Crea l'ordine
         ordine = Ordine.objects.create(
             cliente=self.cliente,
             origine='prenotazione',
-            tipo_consegna='programmata',
-            ora_consegna_richiesta=ora_consegna_richiesta.time(),
+            tipo_consegna=tipo_consegna_ordine,
+            ora_consegna_richiesta=ora_consegna_finale,
             ora_consegna_prevista=self.data_ora_prenotazione,
             totale=totale,
             totale_finale=totale,
