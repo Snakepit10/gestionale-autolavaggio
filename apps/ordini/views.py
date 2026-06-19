@@ -1935,7 +1935,6 @@ def avvisa_cliente_auto_pronta(request, pk):
         return JsonResponse({'ok': False, 'error': 'Metodo non permesso'}, status=405)
 
     from apps.clients.notifications import notifica_auto_pronta
-    from apps.clients import whatsapp as wa
 
     ordine = get_object_or_404(Ordine, pk=pk)
     if not ordine.cliente:
@@ -1944,34 +1943,90 @@ def avvisa_cliente_auto_pronta(request, pk):
             'error': 'Ordine senza cliente associato, impossibile notificare.'
         }, status=400)
 
-    # Proviamo prima WhatsApp esplicitamente, cosi' possiamo riportare
-    # il canale usato all'operatore (utile in UI).
-    canale = 'whatsapp' if wa.whatsapp_auto_pronta(ordine) else 'email'
-    if canale == 'email':
-        # WhatsApp fallito o non configurato -> email fallback
-        if not notifica_auto_pronta(ordine):
-            return JsonResponse({
-                'ok': False,
-                'error': 'Impossibile contattare il cliente: WhatsApp e email entrambi non disponibili.'
-            }, status=500)
+    # WhatsApp primary + email fallback in un'unica chiamata. Restituisce
+    # anche il wa_message_id per il canale WhatsApp: lo memorizziamo
+    # sull'ordine cosi' il badge in /ordini/ puo' mostrare lo stato di
+    # consegna (sent / delivered / read) interrogando MessaggioWhatsApp.
+    ok, canale, wa_message_id = notifica_auto_pronta(ordine)
+    if not ok:
+        return JsonResponse({
+            'ok': False,
+            'error': 'Impossibile contattare il cliente: WhatsApp e email entrambi non disponibili.'
+        }, status=500)
 
     # Persistiamo lo stato per non perdere traccia al refresh pagina.
-    # Re-invio: il timestamp viene aggiornato all'ultimo invio.
+    # Re-invio: il timestamp viene aggiornato all'ultimo invio; il
+    # wa_message_id viene sovrascritto (= seguiamo lo stato dell'ultimo
+    # messaggio inviato, gli stati precedenti restano in MessaggioWhatsApp
+    # ma non li mostriamo piu' sul badge).
     ordine.cliente_avvisato_il = timezone.now()
     ordine.cliente_avvisato_canale = canale
-    ordine.save(update_fields=['cliente_avvisato_il', 'cliente_avvisato_canale'])
+    ordine.cliente_avvisato_wa_message_id = wa_message_id
+    ordine.save(update_fields=[
+        'cliente_avvisato_il', 'cliente_avvisato_canale',
+        'cliente_avvisato_wa_message_id',
+    ])
 
     # Convertiamo a timezone locale (Europe/Rome) prima del strftime:
     # ordine.cliente_avvisato_il e' aware UTC, strftime diretto darebbe
     # l'ora UTC (-2h in estate). Il template Django converte gia' da
     # solo grazie a USE_TZ=True, qui dobbiamo farlo a mano.
     avvisato_local = timezone.localtime(ordine.cliente_avvisato_il)
+    # Lo stato iniziale e' 'sent' (subito dopo l'invio): il template lo
+    # rendera' con la singola V. I delivery report Meta aggiornano il
+    # MessaggioWhatsApp via webhook _handle_status -> il badge si
+    # aggiorna al prossimo refresh pagina o via polling.
+    stato_wa = ordine.cliente_avvisato_stato_wa
     return JsonResponse({
         'ok': True,
         'canale': canale,
         'avvisato_il': avvisato_local.strftime('%H:%M'),
+        'stato_wa': stato_wa,
         'message': f'Cliente avvisato via {canale}.',
     })
+
+
+@login_required
+def avvisi_stato_batch(request):
+    """Stato consegna WhatsApp per un batch di ordini.
+
+    GET /ordini/api/avvisi-stato/?ids=12,17,22  ->
+        {'stati': {'12': 'read', '17': 'delivered', '22': 'sent'}}
+
+    Polling dal template ordini_list ogni ~30s sui badge "Avvisato HH:MM"
+    visibili con stato non finale (!= 'read' e != 'failed') per promuovere
+    i check ✓ -> ✓✓ -> ✓✓ blu mano a mano che Meta consegna/notifica
+    lettura. Stati vuoti vengono omessi dalla risposta.
+    """
+    if request.method != 'GET':
+        return JsonResponse({'error': 'Metodo non permesso'}, status=405)
+    raw = (request.GET.get('ids') or '').strip()
+    if not raw:
+        return JsonResponse({'stati': {}})
+    try:
+        ids = [int(x) for x in raw.split(',') if x.strip()]
+    except ValueError:
+        return JsonResponse({'error': 'ids invalido'}, status=400)
+    if not ids:
+        return JsonResponse({'stati': {}})
+    # Cap difensivo per evitare query enormi: max 200 ordini per request.
+    ids = ids[:200]
+
+    from apps.messaggi.models import MessaggioWhatsApp
+    ordini = Ordine.objects.filter(
+        pk__in=ids,
+        cliente_avvisato_canale='whatsapp',
+    ).exclude(cliente_avvisato_wa_message_id='').only(
+        'pk', 'cliente_avvisato_wa_message_id',
+    )
+    wa_ids = {o.cliente_avvisato_wa_message_id: o.pk for o in ordini}
+    if not wa_ids:
+        return JsonResponse({'stati': {}})
+    msgs = MessaggioWhatsApp.objects.filter(
+        wa_message_id__in=list(wa_ids.keys()),
+    ).only('wa_message_id', 'stato')
+    stati = {str(wa_ids[m.wa_message_id]): m.stato for m in msgs}
+    return JsonResponse({'stati': stati})
 
 
 # ==================== PIANIFICAZIONE TIMELINE ====================

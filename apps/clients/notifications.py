@@ -239,10 +239,18 @@ def email_auto_pronta(ordine) -> bool:
     return _safe_send('La tua auto e\' pronta', body, to_email)
 
 
-def notifica_auto_pronta(ordine) -> bool:
+def notifica_auto_pronta(ordine) -> tuple[bool, str, str]:
     """Notifica al cliente che la sua auto e' pronta. WhatsApp primary,
     email fallback. Chiamala quando un ordine passa allo stato
-    'completato' (vedi apps/ordini/views.py)."""
-    if wa.whatsapp_auto_pronta(ordine):
-        return True
-    return email_auto_pronta(ordine)
+    'completato' (vedi apps/ordini/views.py).
+
+    Ritorna `(success, canale, wa_message_id)`. canale: 'whatsapp' |
+    'email' | ''. wa_message_id valorizzato solo per WhatsApp riuscito
+    (serve a tracciare lo stato di consegna -> badge ✓ / ✓✓ / ✓✓ blu).
+    """
+    ok, wa_id = wa.whatsapp_auto_pronta(ordine)
+    if ok:
+        return True, 'whatsapp', wa_id
+    if email_auto_pronta(ordine):
+        return True, 'email', ''
+    return False, '', ''

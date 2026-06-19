@@ -37,6 +37,7 @@ urlpatterns = [
     path('<int:pk>/elimina-item/', views.elimina_item_ordine, name='elimina-item-ordine'),
     path('<int:pk>/segna-ritirata/', views.segna_ritirata, name='segna-ritirata'),
     path('<int:pk>/avvisa-cliente/', views.avvisa_cliente_auto_pronta, name='avvisa-cliente'),
+    path('api/avvisi-stato/', views.avvisi_stato_batch, name='avvisi-stato-batch'),
     path('api/aggiorna-priorita/', views.aggiorna_priorita_ordini, name='aggiorna-priorita'),
 
     # Ordini speciali

@@ -182,15 +182,20 @@ def _whatsapp_target(prenotazione) -> str | None:
     return _to_e164(raw)
 
 
-def _send_template_blocking(to_e164: str, template_name: str, params: list[str]) -> bool:
+def _send_template_blocking(to_e164: str, template_name: str, params: list[str]) -> tuple[bool, str]:
     """Invio sincrono di un template Meta (chiamato dal thread daemon).
 
     `params` sono i valori per {{1}}, {{2}}, ... del body template.
     Tutti i parametri sono stringhe; tronca a 60 char ognuno per
     rispettare i limiti Meta sul body parameter (1024 totali).
+
+    Ritorna `(success, wa_message_id)`. wa_message_id e' l'id Meta del
+    messaggio (es. 'wamid.HBg...') utile per agganciarlo lato chiamante
+    e seguirne lo stato di consegna. Stringa vuota se fallisce o se
+    Meta non ha restituito l'id.
     """
     if not settings.WHATSAPP_ENABLED:
-        return False
+        return False, ''
     url = (
         f"{_GRAPH_URL}/{settings.META_WHATSAPP_API_VERSION}"
         f"/{settings.META_WHATSAPP_PHONE_ID}/messages"
@@ -228,7 +233,7 @@ def _send_template_blocking(to_e164: str, template_name: str, params: list[str])
                 'WhatsApp send fallito (%s) to=%s template=%s: %s',
                 r.status_code, to_e164, template_name, r.text[:300],
             )
-            return False
+            return False, ''
         logger.info('WhatsApp inviato to=%s template=%s', to_e164, template_name)
         # Salva nel storico inbox: ricostruisce il corpo "umano" del
         # template con le variabili sostituite e crea il MessaggioWhatsApp.
@@ -238,13 +243,13 @@ def _send_template_blocking(to_e164: str, template_name: str, params: list[str])
         except (KeyError, IndexError, TypeError, ValueError):
             pass
         _log_outgoing_msg(to_e164, _format_preview(template_name, params), wa_id)
-        return True
+        return True, wa_id
     except requests.RequestException as e:
         logger.warning(
             'WhatsApp request error to=%s template=%s: %s',
             to_e164, template_name, e,
         )
-        return False
+        return False, ''
 
 
 def _send_text_blocking(to_e164: str, text: str) -> tuple[bool, str]:
@@ -420,32 +425,42 @@ def whatsapp_prenotazione_promemoria(prenotazione) -> bool:
     # non compare in /messaggi/). Usiamo la versione blocking che
     # attende la response di Meta e poi chiama _log_outgoing_msg in
     # modo sincrono.
-    return _send_template_blocking(
+    ok, _wa_id = _send_template_blocking(
         to,
         settings.META_WA_TEMPLATE_PROMEMORIA,
         [nome, ora],
     )
+    return ok
 
 
 # ===========================================================================
 # Nuova notifica: auto pronta (ordine completato, pronto al ritiro)
 # ===========================================================================
 
-def whatsapp_auto_pronta(ordine) -> bool:
+def whatsapp_auto_pronta(ordine) -> tuple[bool, str]:
     """Notifica al cliente che la sua auto e' pronta per il ritiro.
 
     Triggerata quando un ordine passa allo stato 'completato' lato
     operatore. Template approvato: 1 variabile {{1}}=nome.
+
+    Usa la versione blocking (sincrona) per ottenere subito il
+    wa_message_id da agganciare all'Ordine: il badge in /ordini/
+    mostra i check di consegna (sent/delivered/read) basandosi su
+    quell'id. La latenza aggiuntiva (~0.5-1s sulla view) e' accettabile
+    perche' la view e' triggerata da un click esplicito dell'operatore.
+
+    Ritorna `(success, wa_message_id)`. Stringa vuota se canale
+    fallisce: il caller fa fallback su email.
     """
     cliente = getattr(ordine, 'cliente', None)
     if not cliente:
-        return False
+        return False, ''
     raw_phone = getattr(cliente, 'telefono', '') or ''
     to = _to_e164(raw_phone)
     if not to:
-        return False
+        return False, ''
     nome = (cliente.nome or cliente.cognome or '').strip() or 'Cliente'
-    return _send_template(
+    return _send_template_blocking(
         to,
         settings.META_WA_TEMPLATE_AUTO_PRONTA,
         [nome],

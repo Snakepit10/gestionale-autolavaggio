@@ -106,6 +106,11 @@ class Ordine(models.Model):
         max_length=20, blank=True, default='',
         help_text="Canale dell'ultimo avviso: 'whatsapp' o 'email'"
     )
+    cliente_avvisato_wa_message_id = models.CharField(
+        max_length=128, blank=True, default='', db_index=True,
+        help_text="ID del MessaggioWhatsApp inviato come avviso. "
+                  "Usato per leggere stato consegna (sent/delivered/read) sul badge."
+    )
 
     creato_il = models.DateTimeField(auto_now_add=True)
     aggiornato_il = models.DateTimeField(auto_now=True)
@@ -182,7 +187,26 @@ class Ordine(models.Model):
     @property
     def is_pagato(self):
         return self.saldo_dovuto <= 0
-    
+
+    @property
+    def cliente_avvisato_stato_wa(self) -> str:
+        """Stato consegna WhatsApp dell'ultimo avviso 'auto pronta'.
+
+        Ritorna 'sent' / 'delivered' / 'read' / 'failed' / ''. Vuoto se
+        canale != whatsapp o il MessaggioWhatsApp non e' stato trovato
+        (es. avviso pre-existente al rilascio della feature).
+        Usato dal template ordini_list per renderizzare ✓ ✓✓ ✓✓ blu.
+        """
+        if self.cliente_avvisato_canale != 'whatsapp':
+            return ''
+        if not self.cliente_avvisato_wa_message_id:
+            return ''
+        from apps.messaggi.models import MessaggioWhatsApp
+        msg = MessaggioWhatsApp.objects.filter(
+            wa_message_id=self.cliente_avvisato_wa_message_id,
+        ).only('stato').first()
+        return msg.stato if msg else ''
+
     def aggiorna_stato_pagamento(self):
         if self.saldo_dovuto <= 0:
             self.stato_pagamento = 'pagato'

@@ -1224,6 +1224,7 @@ function ckEliminaPrenotazione() {
                                                 title="Avvisato il {{ ordine.cliente_avvisato_il|date:'d/m/Y H:i' }} via {{ ordine.cliente_avvisato_canale|default:'?' }} - click per re-inviare">
                                             <i class="bi bi-{% if ordine.cliente_avvisato_canale == 'whatsapp' %}whatsapp{% else %}envelope-check{% endif %}"></i>
                                             Avvisato {{ ordine.cliente_avvisato_il|date:'H:i' }}
+                                            <span class="ms-1 wa-checks" data-stato="{{ ordine.cliente_avvisato_stato_wa }}">{% if ordine.cliente_avvisato_stato_wa == 'sent' %}<span class="text-muted">✓</span>{% elif ordine.cliente_avvisato_stato_wa == 'delivered' %}<span class="text-muted">✓✓</span>{% elif ordine.cliente_avvisato_stato_wa == 'read' %}<span style="color:#53bdeb;">✓✓</span>{% elif ordine.cliente_avvisato_stato_wa == 'failed' %}<span class="text-danger">⚠</span>{% endif %}</span>
                                         </button>
                                     {% else %}
                                         <button type="button" class="btn btn-sm btn-primary btn-avvisa-cliente"
@@ -1457,6 +1458,7 @@ function ckEliminaPrenotazione() {
                                                 title="Avvisato il {{ ordine.cliente_avvisato_il|date:'d/m/Y H:i' }} via {{ ordine.cliente_avvisato_canale|default:'?' }} - click per re-inviare">
                                             <i class="bi bi-{% if ordine.cliente_avvisato_canale == 'whatsapp' %}whatsapp{% else %}envelope-check{% endif %}"></i>
                                             Avvisato {{ ordine.cliente_avvisato_il|date:'H:i' }}
+                                            <span class="ms-1 wa-checks" data-stato="{{ ordine.cliente_avvisato_stato_wa }}">{% if ordine.cliente_avvisato_stato_wa == 'sent' %}<span class="text-muted">✓</span>{% elif ordine.cliente_avvisato_stato_wa == 'delivered' %}<span class="text-muted">✓✓</span>{% elif ordine.cliente_avvisato_stato_wa == 'read' %}<span style="color:#53bdeb;">✓✓</span>{% elif ordine.cliente_avvisato_stato_wa == 'failed' %}<span class="text-danger">⚠</span>{% endif %}</span>
                                         </button>
                                     {% else %}
                                         <button type="button" class="btn btn-sm btn-primary btn-avvisa-cliente"
@@ -1692,6 +1694,7 @@ function ckEliminaPrenotazione() {
                                                 title="Avvisato il {{ ordine.cliente_avvisato_il|date:'d/m/Y H:i' }} via {{ ordine.cliente_avvisato_canale|default:'?' }} - click per re-inviare">
                                             <i class="bi bi-{% if ordine.cliente_avvisato_canale == 'whatsapp' %}whatsapp{% else %}envelope-check{% endif %}"></i>
                                             Avvisato {{ ordine.cliente_avvisato_il|date:'H:i' }}
+                                            <span class="ms-1 wa-checks" data-stato="{{ ordine.cliente_avvisato_stato_wa }}">{% if ordine.cliente_avvisato_stato_wa == 'sent' %}<span class="text-muted">✓</span>{% elif ordine.cliente_avvisato_stato_wa == 'delivered' %}<span class="text-muted">✓✓</span>{% elif ordine.cliente_avvisato_stato_wa == 'read' %}<span style="color:#53bdeb;">✓✓</span>{% elif ordine.cliente_avvisato_stato_wa == 'failed' %}<span class="text-danger">⚠</span>{% endif %}</span>
                                         </button>
                                     {% else %}
                                         <button type="button" class="btn btn-sm btn-primary btn-avvisa-cliente"
@@ -3500,6 +3503,20 @@ function _avvisaCsrf() {
     return el ? el.value : '';
 }
 
+// Stati consegna WhatsApp -> simboli sullo stile WA Web:
+//   sent      = singola V grigia
+//   delivered = doppia V grigia
+//   read      = doppia V blu (#53bdeb)
+//   failed    = triangolo di avviso rosso
+// Per stati vuoti (email, vecchi avvisi pre-feature) torna stringa vuota.
+function _renderWaChecks(stato) {
+    if (stato === 'sent')      return '<span class="text-muted">✓</span>';
+    if (stato === 'delivered') return '<span class="text-muted">✓✓</span>';
+    if (stato === 'read')      return '<span style="color:#53bdeb;">✓✓</span>';
+    if (stato === 'failed')    return '<span class="text-danger">⚠</span>';
+    return '';
+}
+
 // Delegated handler: i bottoni .btn-avvisa-cliente sono nelle 3 tabelle
 // (attivi/da ritirare/completati) e possono essere ri-renderizzati.
 document.addEventListener('click', function(e) {
@@ -3531,7 +3548,12 @@ document.addEventListener('click', function(e) {
             btn.classList.remove('btn-primary');
             btn.classList.add('btn-outline-success');
             btn.title = `Avvisato ora via ${canale} - click per re-inviare`;
-            btn.innerHTML = `<i class="bi ${icon}"></i> Avvisato ${data.avvisato_il || ''}`;
+            // Check di consegna WA: render iniziale = stato 'sent' (singola V).
+            // I delivery report Meta aggiornano in DB; refresh / polling
+            // promuove a ✓✓ (delivered) e ✓✓ blu (read).
+            const stato = data.stato_wa || '';
+            const checks = _renderWaChecks(stato);
+            btn.innerHTML = `<i class="bi ${icon}"></i> Avvisato ${data.avvisato_il || ''} <span class="ms-1 wa-checks" data-stato="${stato}">${checks}</span>`;
             btn.disabled = false;
         } else {
             btn.disabled = false;
@@ -3546,6 +3568,41 @@ document.addEventListener('click', function(e) {
         alert('Errore di rete durante l\'invio dell\'avviso');
     });
 });
+
+// Polling stato consegna WhatsApp per i badge "Avvisato HH:MM" visibili.
+// Promuove i check ✓ -> ✓✓ -> ✓✓ blu mano a mano che Meta consegna /
+// notifica lettura. Skip dei badge gia' in stato finale (read/failed)
+// per non sovraccaricare il backend con query inutili.
+const _WA_STATI_FINALI = new Set(['read', 'failed', '']);
+async function _pollAvvisiStato() {
+    const ids = new Set();
+    document.querySelectorAll('.btn-avvisa-cliente .wa-checks').forEach(el => {
+        if (_WA_STATI_FINALI.has(el.dataset.stato || '')) return;
+        const btn = el.closest('.btn-avvisa-cliente');
+        const id = btn && btn.dataset.ordineId;
+        if (id) ids.add(id);
+    });
+    if (!ids.size) return;
+    try {
+        const r = await fetch(`/ordini/api/avvisi-stato/?ids=${[...ids].join(',')}`, {
+            credentials: 'same-origin',
+        });
+        if (!r.ok) return;
+        const data = await r.json();
+        const stati = data.stati || {};
+        Object.entries(stati).forEach(([id, stato]) => {
+            document.querySelectorAll(`.btn-avvisa-cliente[data-ordine-id="${id}"] .wa-checks`).forEach(el => {
+                if (el.dataset.stato === stato) return;
+                el.dataset.stato = stato;
+                el.innerHTML = _renderWaChecks(stato);
+            });
+        });
+    } catch (_err) {
+        // Polling non critico: errore di rete -> riprova al prossimo tick.
+    }
+}
+setInterval(_pollAvvisiStato, 30000);
+setTimeout(_pollAvvisiStato, 3000);
 </script>
 
 {% endblock %}
