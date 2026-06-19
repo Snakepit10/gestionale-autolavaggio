@@ -611,6 +611,26 @@ def crea_prenotazione_da_carrello(request):
         # Crea prenotazione
         nota = (data.get('nota') or '').strip()
         tipo_auto = (data.get('tipo_auto') or '').strip()
+
+        # Tipo consegna + ora consegna (per distinguere ritiri programmati
+        # da consegne immediate). Default 'immediata' = lavoriamo subito e
+        # consegnamo appena pronta; 'programmata' = cliente lascia l'auto
+        # e torna a un orario fisso. ora_consegna_richiesta ha senso solo
+        # per 'programmata': per 'immediata' la ignoriamo lato server.
+        tipo_consegna = (data.get('tipo_consegna') or 'immediata').strip()
+        if tipo_consegna not in {'immediata', 'programmata'}:
+            tipo_consegna = 'immediata'
+        ora_consegna = None
+        if tipo_consegna == 'programmata':
+            ora_consegna_str = (data.get('ora_consegna') or '').strip()
+            if ora_consegna_str:
+                try:
+                    ora_consegna = datetime.strptime(ora_consegna_str, '%H:%M').time()
+                except ValueError:
+                    return JsonResponse({
+                        'error': 'Formato ora consegna non valido (atteso HH:MM)'
+                    }, status=400)
+
         prenotazione = Prenotazione.objects.create(
             cliente=cliente,
             slot=slot,
@@ -618,6 +638,8 @@ def crea_prenotazione_da_carrello(request):
             stato='confermata',
             tipo_auto=tipo_auto,
             nota_interna=nota,
+            tipo_consegna=tipo_consegna,
+            ora_consegna_richiesta=ora_consegna,
         )
         prenotazione.servizi.set(servizi_qs)
 

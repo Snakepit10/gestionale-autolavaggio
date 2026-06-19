@@ -79,6 +79,18 @@
 }
 .pren-badge .servizi-list i { color: #0ea5e9; margin-right: 2px; }
 .pren-badge .delta-label { font-size: .7rem; font-weight: 700; padding: 2px 8px; border-radius: 999px; }
+/* Pillola tipo consegna: distingue ritiro programmato (orologio + ora)
+   da consegna immediata (saetta). Si affianca alla time-pill principale. */
+.consegna-pill {
+    display: inline-flex; align-items: center; gap: 3px;
+    padding: 2px 8px; border-radius: 999px;
+    font-size: .7rem; font-weight: 700;
+    margin-left: 4px;
+}
+.consegna-pill.programmata { background: #ede9fe; color: #5b21b6; }
+.consegna-pill.programmata i { color: #7c3aed; }
+.consegna-pill.immediata { background: #fef3c7; color: #92400e; }
+.consegna-pill.immediata i { color: #d97706; }
 
 /* Future: > 60 min */
 .pren-badge.cat-future { border-color: #cbd5e1; background: #f8fafc; }
@@ -200,6 +212,15 @@
                     <div class="d-flex justify-content-between align-items-start mb-1">
                         <div class="pren-data">
                             <i class="bi bi-clock"></i> {{ p.slot.data|date:"d/m" }} {{ p.slot.ora_inizio|time:"H:i" }}
+                            {% if p.tipo_consegna == 'programmata' and p.ora_consegna_richiesta %}
+                                <span class="consegna-pill programmata" title="Ritiro programmato alle {{ p.ora_consegna_richiesta|time:'H:i' }}">
+                                    <i class="bi bi-clock-history"></i> ritiro {{ p.ora_consegna_richiesta|time:'H:i' }}
+                                </span>
+                            {% elif p.tipo_consegna == 'immediata' %}
+                                <span class="consegna-pill immediata" title="Consegna immediata: l'auto al ritiro appena pronta">
+                                    <i class="bi bi-lightning-charge-fill"></i> immediata
+                                </span>
+                            {% endif %}
                             {% if p.proposta_inviata_il %}
                                 <span class="badge-attesa" title="Proposta inviata il {{ p.proposta_inviata_il|date:'d/m H:i' }} - in attesa risposta cliente">
                                     <i class="bi bi-hourglass-split"></i> attesa
@@ -627,6 +648,15 @@ function proponiConferma() {
         <span class="time-pill">
             <i class="bi bi-clock"></i> {{ p.slot.ora_inizio|time:"H:i" }}
         </span>
+        {% if p.tipo_consegna == 'programmata' and p.ora_consegna_richiesta %}
+            <span class="consegna-pill programmata" title="Ritiro programmato alle {{ p.ora_consegna_richiesta|time:'H:i' }}">
+                <i class="bi bi-clock-history"></i> ritiro {{ p.ora_consegna_richiesta|time:'H:i' }}
+            </span>
+        {% elif p.tipo_consegna == 'immediata' %}
+            <span class="consegna-pill immediata" title="Consegna immediata: l'auto al ritiro appena pronta">
+                <i class="bi bi-lightning-charge-fill"></i> immediata
+            </span>
+        {% endif %}
         <span class="cliente-name">{{ p.cliente }}</span>
         {% if p.tipo_auto %}<span class="tipo-auto">&middot; {{ p.tipo_auto }}</span>{% endif %}
         {% if p.servizi.all %}

@@ -97,7 +97,11 @@ class Prenotazione(models.Model):
         ('annullata', 'Annullata'),
         ('no_show', 'No Show'),
     ]
-    
+    TIPO_CONSEGNA_CHOICES = [
+        ('immediata', 'Consegna immediata'),
+        ('programmata', 'Ritiro programmato'),
+    ]
+
     cliente = models.ForeignKey(
         'clienti.Cliente', 
         on_delete=models.CASCADE, 
@@ -125,6 +129,20 @@ class Prenotazione(models.Model):
     nota_cliente = models.TextField(blank=True)
     nota_interna = models.TextField(blank=True)
     tipo_auto = models.CharField(max_length=200, blank=True, help_text="Modello e colore dell'auto")
+
+    # Modalita' di consegna: serve a distinguere chi aspetta in autolavaggio
+    # ('immediata' - lavoriamo e gli diamo l'auto appena pronta) da chi lascia
+    # l'auto e torna a un orario fisso ('programmata'). Influenza il colore
+    # del badge in /ordini/ e la priorita' in pianificazione.
+    tipo_consegna = models.CharField(
+        max_length=20, choices=TIPO_CONSEGNA_CHOICES,
+        default='immediata',
+        help_text="immediata = consegna appena pronta; programmata = ritiro a un orario fisso"
+    )
+    ora_consegna_richiesta = models.TimeField(
+        null=True, blank=True,
+        help_text="Solo se tipo_consegna='programmata': orario al quale il cliente vuole ritirare"
+    )
 
     # Contatti specifici per QUESTA prenotazione (separati da cliente.email
     # per gestire guest che riusano un Cliente esistente con email diversa)

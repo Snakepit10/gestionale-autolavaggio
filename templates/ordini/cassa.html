@@ -775,6 +775,22 @@
                     </div>
                 </div>
 
+                <div class="row g-2 mt-1">
+                    <div class="col-md-6">
+                        <label class="form-label">Tipo consegna *</label>
+                        <select class="form-select" id="prenota-tipo-consegna" onchange="aggiornaOraConsegna()">
+                            <option value="immediata" selected>Consegna immediata</option>
+                            <option value="programmata">Ritiro programmato</option>
+                        </select>
+                        <div class="form-text small">Programmata = ritiro a un'ora fissa; immediata = appena pronta.</div>
+                    </div>
+                    <div class="col-md-6" id="prenota-ora-consegna-wrap" style="display:none;">
+                        <label class="form-label">Ora consegna *</label>
+                        <input type="time" class="form-control" id="prenota-ora-consegna">
+                        <div class="form-text small">Quando il cliente tornera a ritirare.</div>
+                    </div>
+                </div>
+
                 <div class="mt-3">
                     <label class="form-label small fw-bold text-muted d-flex justify-content-between align-items-center">
                         <span><i class="bi bi-calendar-week"></i> Disponibilita slot giornata</span>
@@ -1391,11 +1407,32 @@ function selezionaSlotCassa(ora, el) {
     if (el) el.classList.add('selected');
 }
 
+// Mostra/nasconde il campo "Ora consegna" in base al tipo di consegna.
+// Triggerato anche al cambio nel <select> tipo consegna.
+function aggiornaOraConsegna() {
+    const tipo = document.getElementById('prenota-tipo-consegna').value;
+    const wrap = document.getElementById('prenota-ora-consegna-wrap');
+    const input = document.getElementById('prenota-ora-consegna');
+    if (tipo === 'programmata') {
+        wrap.style.display = '';
+    } else {
+        wrap.style.display = 'none';
+        input.value = '';  // azzera per evitare di inviarlo per 'immediata'
+    }
+}
+
 function confermaPrenotazione() {
     const dataVal = document.getElementById('prenota-data').value;
     const oraVal = document.getElementById('prenota-ora').value;
     if (!dataVal || !oraVal) {
         AutolavaggioJS.showToast('Inserisci data e ora della prenotazione', 'warning');
+        return;
+    }
+
+    const tipoConsegna = document.getElementById('prenota-tipo-consegna').value;
+    const oraConsegna = document.getElementById('prenota-ora-consegna').value;
+    if (tipoConsegna === 'programmata' && !oraConsegna) {
+        AutolavaggioJS.showToast('Inserisci l\'ora di consegna per il ritiro programmato', 'warning');
         return;
     }
 
@@ -1405,6 +1442,8 @@ function confermaPrenotazione() {
     const payload = {
         data: dataVal,
         ora: oraVal,
+        tipo_consegna: tipoConsegna,
+        ora_consegna: tipoConsegna === 'programmata' ? oraConsegna : '',
         cliente_id: (clienteSelezionato && !clienteSelezionato.nuovo) ? clienteSelezionato.id : null,
         nuovo_cliente: (clienteSelezionato && clienteSelezionato.nuovo) ? clienteSelezionato : null,
         tipo_auto: document.getElementById('tipo-auto').value.trim(),
