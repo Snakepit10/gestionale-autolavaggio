@@ -412,9 +412,15 @@ def whatsapp_prenotazione_promemoria(prenotazione) -> bool:
         return False
     nome = _nome_cliente(prenotazione)
     _data, ora = _data_ora(prenotazione)
-    # Template approvato: 2 variabili {{1}}=nome, {{2}}=ora
-    # (data hardcoded come "OGGI", codice prenotazione rimosso)
-    return _send_template(
+    # Chiamato dal management command `invia_promemoria_prenotazioni`
+    # (cron service): NON usare fire-and-forget, perche' il processo
+    # Python termina appena il command finisce e i thread daemon
+    # vengono killati prima di salvare il messaggio in inbox (Meta
+    # riceve, il cliente ottiene il template, ma la bubble outgoing
+    # non compare in /messaggi/). Usiamo la versione blocking che
+    # attende la response di Meta e poi chiama _log_outgoing_msg in
+    # modo sincrono.
+    return _send_template_blocking(
         to,
         settings.META_WA_TEMPLATE_PROMEMORIA,
         [nome, ora],
