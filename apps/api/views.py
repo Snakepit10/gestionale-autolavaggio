@@ -140,6 +140,19 @@ def _handle_incoming(payload_msg: dict, contacts: list[dict]):
         loc = payload_msg.get('location', {}) or {}
         corpo = f"[Posizione] {loc.get('latitude','?')},{loc.get('longitude','?')}"
         media_type = 'location'
+    elif msg_type_raw == 'reaction':
+        # Reazione emoji a un messaggio precedente. Meta manda:
+        # { type: 'reaction', reaction: { message_id: '...', emoji: '❤️' } }
+        # La interpretiamo come testo normale: l'operatore vede l'emoji
+        # nella inbox come messaggio incoming con prefisso "(reazione)".
+        # Se emoji vuoto = reazione rimossa.
+        react = payload_msg.get('reaction', {}) or {}
+        emoji = react.get('emoji', '')
+        if emoji:
+            corpo = f'{emoji} (reazione)'
+        else:
+            corpo = '(reazione rimossa)'
+        media_type = 'text'
     elif msg_type_raw == 'button':
         # Quick Reply Button cliccato su un template Meta (formato legacy)
         # Meta manda: { type: 'button', button: { text: 'Va bene', payload: '...' } }
