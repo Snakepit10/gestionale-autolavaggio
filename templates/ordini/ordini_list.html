@@ -1219,11 +1219,11 @@ function ckEliminaPrenotazione() {
                             <td class="text-center">
                                 {% if ordine.stato == 'completato' and ordine.cliente %}
                                     {% if ordine.cliente_avvisato_il %}
-                                        <button type="button" class="btn btn-sm btn-outline-success btn-avvisa-cliente"
+                                        <button type="button" class="btn btn-sm {% if ordine.cliente_avvisato_stato_wa == 'failed' %}btn-outline-danger{% else %}btn-outline-success{% endif %} btn-avvisa-cliente"
                                                 data-ordine-id="{{ ordine.pk }}"
-                                                title="Avvisato il {{ ordine.cliente_avvisato_il|date:'d/m/Y H:i' }} via {{ ordine.cliente_avvisato_canale|default:'?' }} - click per re-inviare">
-                                            <i class="bi bi-{% if ordine.cliente_avvisato_canale == 'whatsapp' %}whatsapp{% else %}envelope-check{% endif %}"></i>
-                                            Avvisato {{ ordine.cliente_avvisato_il|date:'H:i' }}
+                                                title="{% if ordine.cliente_avvisato_stato_wa == 'failed' %}Invio WhatsApp fallito il {{ ordine.cliente_avvisato_il|date:'d/m/Y H:i' }} - click per riprovare{% else %}Avvisato il {{ ordine.cliente_avvisato_il|date:'d/m/Y H:i' }} via WhatsApp - click per re-inviare{% endif %}">
+                                            <i class="bi bi-whatsapp"></i>
+                                            {% if ordine.cliente_avvisato_stato_wa == 'failed' %}Errore invio{% else %}Avvisato{% endif %} {{ ordine.cliente_avvisato_il|date:'H:i' }}
                                             <span class="ms-1 wa-checks" data-stato="{{ ordine.cliente_avvisato_stato_wa }}">{% if ordine.cliente_avvisato_stato_wa == 'sent' %}<span class="text-muted">✓</span>{% elif ordine.cliente_avvisato_stato_wa == 'delivered' %}<span class="text-muted">✓✓</span>{% elif ordine.cliente_avvisato_stato_wa == 'read' %}<span style="color:#53bdeb;">✓✓</span>{% elif ordine.cliente_avvisato_stato_wa == 'failed' %}<span class="text-danger">⚠</span>{% endif %}</span>
                                         </button>
                                     {% else %}
@@ -1453,11 +1453,11 @@ function ckEliminaPrenotazione() {
                             <td class="text-center">
                                 {% if ordine.stato == 'completato' and ordine.cliente %}
                                     {% if ordine.cliente_avvisato_il %}
-                                        <button type="button" class="btn btn-sm btn-outline-success btn-avvisa-cliente"
+                                        <button type="button" class="btn btn-sm {% if ordine.cliente_avvisato_stato_wa == 'failed' %}btn-outline-danger{% else %}btn-outline-success{% endif %} btn-avvisa-cliente"
                                                 data-ordine-id="{{ ordine.pk }}"
-                                                title="Avvisato il {{ ordine.cliente_avvisato_il|date:'d/m/Y H:i' }} via {{ ordine.cliente_avvisato_canale|default:'?' }} - click per re-inviare">
-                                            <i class="bi bi-{% if ordine.cliente_avvisato_canale == 'whatsapp' %}whatsapp{% else %}envelope-check{% endif %}"></i>
-                                            Avvisato {{ ordine.cliente_avvisato_il|date:'H:i' }}
+                                                title="{% if ordine.cliente_avvisato_stato_wa == 'failed' %}Invio WhatsApp fallito il {{ ordine.cliente_avvisato_il|date:'d/m/Y H:i' }} - click per riprovare{% else %}Avvisato il {{ ordine.cliente_avvisato_il|date:'d/m/Y H:i' }} via WhatsApp - click per re-inviare{% endif %}">
+                                            <i class="bi bi-whatsapp"></i>
+                                            {% if ordine.cliente_avvisato_stato_wa == 'failed' %}Errore invio{% else %}Avvisato{% endif %} {{ ordine.cliente_avvisato_il|date:'H:i' }}
                                             <span class="ms-1 wa-checks" data-stato="{{ ordine.cliente_avvisato_stato_wa }}">{% if ordine.cliente_avvisato_stato_wa == 'sent' %}<span class="text-muted">✓</span>{% elif ordine.cliente_avvisato_stato_wa == 'delivered' %}<span class="text-muted">✓✓</span>{% elif ordine.cliente_avvisato_stato_wa == 'read' %}<span style="color:#53bdeb;">✓✓</span>{% elif ordine.cliente_avvisato_stato_wa == 'failed' %}<span class="text-danger">⚠</span>{% endif %}</span>
                                         </button>
                                     {% else %}
@@ -1689,11 +1689,11 @@ function ckEliminaPrenotazione() {
                             <td class="text-center">
                                 {% if ordine.stato == 'completato' and ordine.cliente %}
                                     {% if ordine.cliente_avvisato_il %}
-                                        <button type="button" class="btn btn-sm btn-outline-success btn-avvisa-cliente"
+                                        <button type="button" class="btn btn-sm {% if ordine.cliente_avvisato_stato_wa == 'failed' %}btn-outline-danger{% else %}btn-outline-success{% endif %} btn-avvisa-cliente"
                                                 data-ordine-id="{{ ordine.pk }}"
-                                                title="Avvisato il {{ ordine.cliente_avvisato_il|date:'d/m/Y H:i' }} via {{ ordine.cliente_avvisato_canale|default:'?' }} - click per re-inviare">
-                                            <i class="bi bi-{% if ordine.cliente_avvisato_canale == 'whatsapp' %}whatsapp{% else %}envelope-check{% endif %}"></i>
-                                            Avvisato {{ ordine.cliente_avvisato_il|date:'H:i' }}
+                                                title="{% if ordine.cliente_avvisato_stato_wa == 'failed' %}Invio WhatsApp fallito il {{ ordine.cliente_avvisato_il|date:'d/m/Y H:i' }} - click per riprovare{% else %}Avvisato il {{ ordine.cliente_avvisato_il|date:'d/m/Y H:i' }} via WhatsApp - click per re-inviare{% endif %}">
+                                            <i class="bi bi-whatsapp"></i>
+                                            {% if ordine.cliente_avvisato_stato_wa == 'failed' %}Errore invio{% else %}Avvisato{% endif %} {{ ordine.cliente_avvisato_il|date:'H:i' }}
                                             <span class="ms-1 wa-checks" data-stato="{{ ordine.cliente_avvisato_stato_wa }}">{% if ordine.cliente_avvisato_stato_wa == 'sent' %}<span class="text-muted">✓</span>{% elif ordine.cliente_avvisato_stato_wa == 'delivered' %}<span class="text-muted">✓✓</span>{% elif ordine.cliente_avvisato_stato_wa == 'read' %}<span style="color:#53bdeb;">✓✓</span>{% elif ordine.cliente_avvisato_stato_wa == 'failed' %}<span class="text-danger">⚠</span>{% endif %}</span>
                                         </button>
                                     {% else %}
@@ -3542,18 +3542,24 @@ document.addEventListener('click', function(e) {
     .then(r => r.json())
     .then(data => {
         if (data.ok) {
-            const canale = (data.canale || '').toLowerCase();
-            const icon = canale === 'whatsapp' ? 'bi-whatsapp' : 'bi-envelope-check';
-            // Stato finale persistente (stesso look del template dopo refresh).
-            btn.classList.remove('btn-primary');
-            btn.classList.add('btn-outline-success');
-            btn.title = `Avvisato ora via ${canale} - click per re-inviare`;
-            // Check di consegna WA: render iniziale = stato 'sent' (singola V).
-            // I delivery report Meta aggiornano in DB; refresh / polling
-            // promuove a ✓✓ (delivered) e ✓✓ blu (read).
+            // data.ok = il backend ha persistito uno stato (success o fail
+            // dell'invio WA). data.invio_ok distingue i due casi:
+            //   true  -> badge verde "Avvisato HH:MM ✓" (poi ✓✓ ✓✓ blu)
+            //   false -> badge rosso "Errore invio HH:MM ⚠"
+            // Niente fallback email (disattivato lato server).
+            btn.classList.remove('btn-primary', 'btn-outline-success', 'btn-outline-danger');
             const stato = data.stato_wa || '';
             const checks = _renderWaChecks(stato);
-            btn.innerHTML = `<i class="bi ${icon}"></i> Avvisato ${data.avvisato_il || ''} <span class="ms-1 wa-checks" data-stato="${stato}">${checks}</span>`;
+            const avvisato = data.avvisato_il || '';
+            if (data.invio_ok) {
+                btn.classList.add('btn-outline-success');
+                btn.title = `Avvisato ora via WhatsApp - click per re-inviare`;
+                btn.innerHTML = `<i class="bi bi-whatsapp"></i> Avvisato ${avvisato} <span class="ms-1 wa-checks" data-stato="${stato}">${checks}</span>`;
+            } else {
+                btn.classList.add('btn-outline-danger');
+                btn.title = `Invio WhatsApp fallito - click per riprovare`;
+                btn.innerHTML = `<i class="bi bi-whatsapp"></i> Errore invio ${avvisato} <span class="ms-1 wa-checks" data-stato="failed">${checks}</span>`;
+            }
             btn.disabled = false;
         } else {
             btn.disabled = false;
@@ -3591,10 +3597,21 @@ async function _pollAvvisiStato() {
         const data = await r.json();
         const stati = data.stati || {};
         Object.entries(stati).forEach(([id, stato]) => {
-            document.querySelectorAll(`.btn-avvisa-cliente[data-ordine-id="${id}"] .wa-checks`).forEach(el => {
-                if (el.dataset.stato === stato) return;
+            document.querySelectorAll(`.btn-avvisa-cliente[data-ordine-id="${id}"]`).forEach(btn => {
+                const el = btn.querySelector('.wa-checks');
+                if (!el || el.dataset.stato === stato) return;
                 el.dataset.stato = stato;
                 el.innerHTML = _renderWaChecks(stato);
+                // Transizione verso 'failed' (es. Meta rigetta in delay):
+                // ridipingi il bottone in rosso + testo "Errore invio".
+                // Casi sent/delivered/read: il bottone resta verde, solo
+                // i check si aggiornano.
+                if (stato === 'failed' && !btn.classList.contains('btn-outline-danger')) {
+                    btn.classList.remove('btn-outline-success');
+                    btn.classList.add('btn-outline-danger');
+                    btn.title = 'Invio WhatsApp fallito - click per riprovare';
+                    btn.innerHTML = btn.innerHTML.replace(/>\s*Avvisato\s/, '> Errore invio ');
+                }
             });
         });
     } catch (_err) {

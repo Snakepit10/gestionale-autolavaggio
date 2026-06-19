@@ -1943,28 +1943,19 @@ def avvisa_cliente_auto_pronta(request, pk):
             'error': 'Ordine senza cliente associato, impossibile notificare.'
         }, status=400)
 
-    # WhatsApp primary + email fallback in un'unica chiamata. Restituisce
-    # anche il wa_message_id per il canale WhatsApp: lo memorizziamo
-    # sull'ordine cosi' il badge in /ordini/ puo' mostrare lo stato di
-    # consegna (sent / delivered / read) interrogando MessaggioWhatsApp.
-    ok, canale, wa_message_id = notifica_auto_pronta(ordine)
-    if not ok:
-        return JsonResponse({
-            'ok': False,
-            'error': 'Impossibile contattare il cliente: WhatsApp e email entrambi non disponibili.'
-        }, status=500)
+    # Solo WhatsApp (fallback email disattivato). Persistiamo lo stato
+    # sia in caso di successo che di fallimento: il badge in /ordini/
+    # mostra ✓ / ✓✓ / ✓✓ blu se ok, oppure ⚠ rosso se fallito (l'operatore
+    # vede subito gli avvisi da riprovare o per cui chiamare il cliente).
+    invio_ok, wa_message_id = notifica_auto_pronta(ordine)
 
-    # Persistiamo lo stato per non perdere traccia al refresh pagina.
-    # Re-invio: il timestamp viene aggiornato all'ultimo invio; il
-    # wa_message_id viene sovrascritto (= seguiamo lo stato dell'ultimo
-    # messaggio inviato, gli stati precedenti restano in MessaggioWhatsApp
-    # ma non li mostriamo piu' sul badge).
     ordine.cliente_avvisato_il = timezone.now()
-    ordine.cliente_avvisato_canale = canale
-    ordine.cliente_avvisato_wa_message_id = wa_message_id
+    ordine.cliente_avvisato_canale = 'whatsapp'
+    ordine.cliente_avvisato_wa_message_id = wa_message_id if invio_ok else ''
+    ordine.cliente_avvisato_fallito = not invio_ok
     ordine.save(update_fields=[
         'cliente_avvisato_il', 'cliente_avvisato_canale',
-        'cliente_avvisato_wa_message_id',
+        'cliente_avvisato_wa_message_id', 'cliente_avvisato_fallito',
     ])
 
     # Convertiamo a timezone locale (Europe/Rome) prima del strftime:
@@ -1972,17 +1963,16 @@ def avvisa_cliente_auto_pronta(request, pk):
     # l'ora UTC (-2h in estate). Il template Django converte gia' da
     # solo grazie a USE_TZ=True, qui dobbiamo farlo a mano.
     avvisato_local = timezone.localtime(ordine.cliente_avvisato_il)
-    # Lo stato iniziale e' 'sent' (subito dopo l'invio): il template lo
-    # rendera' con la singola V. I delivery report Meta aggiornano il
-    # MessaggioWhatsApp via webhook _handle_status -> il badge si
-    # aggiorna al prossimo refresh pagina o via polling.
+    # Stato iniziale: 'sent' se invio riuscito, 'failed' se no. I
+    # delivery report Meta aggiornano sent -> delivered -> read via
+    # webhook _handle_status; il polling JS riflette i cambi.
     stato_wa = ordine.cliente_avvisato_stato_wa
     return JsonResponse({
         'ok': True,
-        'canale': canale,
+        'invio_ok': invio_ok,
         'avvisato_il': avvisato_local.strftime('%H:%M'),
         'stato_wa': stato_wa,
-        'message': f'Cliente avvisato via {canale}.',
+        'message': 'Cliente avvisato via WhatsApp.' if invio_ok else 'Invio WhatsApp fallito.',
     })
 
 

@@ -239,18 +239,22 @@ def email_auto_pronta(ordine) -> bool:
     return _safe_send('La tua auto e\' pronta', body, to_email)
 
 
-def notifica_auto_pronta(ordine) -> tuple[bool, str, str]:
-    """Notifica al cliente che la sua auto e' pronta. WhatsApp primary,
-    email fallback. Chiamala quando un ordine passa allo stato
-    'completato' (vedi apps/ordini/views.py).
+def notifica_auto_pronta(ordine) -> tuple[bool, str]:
+    """Notifica al cliente che la sua auto e' pronta. Solo WhatsApp:
+    il fallback email e' disattivato perche' WhatsApp e' diventato il
+    canale primario per il cliente (90%+ apertura, stato consegna
+    trasparente) e l'operatore preferisce sapere subito se l'invio
+    fallisce per riprovare manualmente o telefonare, anziche' avere
+    un fallback silenzioso via email che il cliente potrebbe non
+    vedere mai.
 
-    Ritorna `(success, canale, wa_message_id)`. canale: 'whatsapp' |
-    'email' | ''. wa_message_id valorizzato solo per WhatsApp riuscito
-    (serve a tracciare lo stato di consegna -> badge ✓ / ✓✓ / ✓✓ blu).
+    Ritorna `(success, wa_message_id)`. Se fallito, wa_message_id e'
+    stringa vuota: la view persiste comunque l'esito (ordine marcato
+    con cliente_avvisato_fallito=True) cosi' il badge in /ordini/ si
+    colora di rosso e l'operatore vede a colpo d'occhio gli avvisi
+    falliti da riprovare.
+
+    `email_auto_pronta` resta esposta nel modulo per usi diretti
+    eventuali, ma non viene piu' invocata automaticamente qui.
     """
-    ok, wa_id = wa.whatsapp_auto_pronta(ordine)
-    if ok:
-        return True, 'whatsapp', wa_id
-    if email_auto_pronta(ordine):
-        return True, 'email', ''
-    return False, '', ''
+    return wa.whatsapp_auto_pronta(ordine)

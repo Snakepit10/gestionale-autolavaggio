@@ -111,6 +111,13 @@ class Ordine(models.Model):
         help_text="ID del MessaggioWhatsApp inviato come avviso. "
                   "Usato per leggere stato consegna (sent/delivered/read) sul badge."
     )
+    cliente_avvisato_fallito = models.BooleanField(
+        default=False,
+        help_text="True se l'ultimo tentativo di avviso WhatsApp non e' "
+                  "andato a buon fine (Meta ha rigettato, finestra 24h "
+                  "chiusa, numero invalido, rete down). Il badge in /ordini/ "
+                  "diventa rosso e l'operatore puo' cliccare per ri-tentare."
+    )
 
     creato_il = models.DateTimeField(auto_now_add=True)
     aggiornato_il = models.DateTimeField(auto_now=True)
@@ -193,12 +200,17 @@ class Ordine(models.Model):
         """Stato consegna WhatsApp dell'ultimo avviso 'auto pronta'.
 
         Ritorna 'sent' / 'delivered' / 'read' / 'failed' / ''. Vuoto se
-        canale != whatsapp o il MessaggioWhatsApp non e' stato trovato
-        (es. avviso pre-existente al rilascio della feature).
-        Usato dal template ordini_list per renderizzare ✓ ✓✓ ✓✓ blu.
+        canale != whatsapp o avviso pre-feature (senza wa_message_id e
+        non marcato fallito). Usato dal template ordini_list per
+        renderizzare ✓ ✓✓ ✓✓ blu / ⚠ rosso.
         """
         if self.cliente_avvisato_canale != 'whatsapp':
             return ''
+        # Esito esplicito di fallimento applicativo (Meta rigettato,
+        # finestra 24h, numero invalido): non c'e' MessaggioWhatsApp
+        # da interrogare, lo stato e' direttamente 'failed'.
+        if self.cliente_avvisato_fallito:
+            return 'failed'
         if not self.cliente_avvisato_wa_message_id:
             return ''
         from apps.messaggi.models import MessaggioWhatsApp
