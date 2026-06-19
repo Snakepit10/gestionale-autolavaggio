@@ -68,6 +68,16 @@
 }
 .pren-badge .cliente-name { font-weight: 600; }
 .pren-badge .tipo-auto { color: #64748b; font-size: .78rem; }
+.pren-badge .servizi-list {
+    color: #475569;
+    font-size: .78rem;
+    font-weight: 500;
+    max-width: 260px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+.pren-badge .servizi-list i { color: #0ea5e9; margin-right: 2px; }
 .pren-badge .delta-label { font-size: .7rem; font-weight: 700; padding: 2px 8px; border-radius: 999px; }
 
 /* Future: > 60 min */
@@ -619,6 +629,13 @@ function proponiConferma() {
         </span>
         <span class="cliente-name">{{ p.cliente }}</span>
         {% if p.tipo_auto %}<span class="tipo-auto">&middot; {{ p.tipo_auto }}</span>{% endif %}
+        {% if p.servizi.all %}
+        <span class="servizi-list" title="{% for s in p.servizi.all %}{{ s.titolo }}{% if not forloop.last %}, {% endif %}{% endfor %}">
+            &middot;
+            <i class="bi bi-droplet"></i>
+            {% for s in p.servizi.all %}{{ s.titolo }}{% if not forloop.last %}, {% endif %}{% endfor %}
+        </span>
+        {% endif %}
         <span class="delta-label">
             {% if p.delta_min < 0 %}
                 <i class="bi bi-exclamation-triangle-fill"></i>
