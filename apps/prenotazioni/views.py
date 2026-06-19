@@ -1696,6 +1696,30 @@ def aggiorna_prenotazione_inline(request, pk):
         if tipo_auto != (prenotazione.tipo_auto or ''):
             prenotazione.tipo_auto = tipo_auto
 
+        # Tipo consegna + ora consegna richiesta. Salvati direttamente
+        # sulla Prenotazione: vengono ereditati dall'ordine al check-in
+        # tramite Prenotazione.converti_in_ordine.
+        tipo_consegna_raw = (request.POST.get('tipo_consegna') or '').strip()
+        if tipo_consegna_raw in ('immediata', 'programmata'):
+            prenotazione.tipo_consegna = tipo_consegna_raw
+            if tipo_consegna_raw == 'immediata':
+                # Su 'immediata' azzeriamo l'ora: ignoriamo quello che
+                # potrebbe essere ancora in form (il JS la nasconde ma
+                # qualche browser puo' inviare il valore precedente).
+                prenotazione.ora_consegna_richiesta = None
+            else:
+                ora_consegna_str = (request.POST.get('ora_consegna_richiesta') or '').strip()
+                if ora_consegna_str:
+                    from datetime import datetime as _dt
+                    try:
+                        prenotazione.ora_consegna_richiesta = _dt.strptime(
+                            ora_consegna_str, '%H:%M'
+                        ).time()
+                    except ValueError:
+                        # Formato invalido: lasciamo il valore precedente
+                        # (il JS impedisce di salvare senza ora valida).
+                        pass
+
         # Nota interna (textarea "Note interne" del modal)
         note_interne = request.POST.get('note_interne')
         if note_interne is not None:
