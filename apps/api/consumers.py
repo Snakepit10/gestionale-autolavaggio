@@ -3,6 +3,18 @@ from channels.generic.websocket import AsyncWebsocketConsumer
 from channels.db import database_sync_to_async
 
 
+async def _safe_group_discard(consumer):
+    """Wrapper difensivo per disconnect: se connect() ha rifiutato
+    l'handshake (utente anonimo, sessione scaduta) ritornando prima di
+    settare self.room_group_name, channels chiama comunque disconnect()
+    e accedere all'attributo direttamente solleverebbe AttributeError.
+    Skip silenzioso in quel caso.
+    """
+    group = getattr(consumer, 'room_group_name', None)
+    if group:
+        await consumer.channel_layer.group_discard(group, consumer.channel_name)
+
+
 class PostazioneConsumer(AsyncWebsocketConsumer):
     async def connect(self):
         from django.contrib.auth.models import AnonymousUser
@@ -19,13 +31,10 @@ class PostazioneConsumer(AsyncWebsocketConsumer):
             self.channel_name
         )
         await self.accept()
-    
+
     async def disconnect(self, close_code):
-        await self.channel_layer.group_discard(
-            self.room_group_name,
-            self.channel_name
-        )
-    
+        await _safe_group_discard(self)
+
     async def receive(self, text_data):
         data = json.loads(text_data)
         message_type = data.get('type')
@@ -110,13 +119,10 @@ class OrdiniConsumer(AsyncWebsocketConsumer):
             self.channel_name
         )
         await self.accept()
-    
+
     async def disconnect(self, close_code):
-        await self.channel_layer.group_discard(
-            self.room_group_name,
-            self.channel_name
-        )
-    
+        await _safe_group_discard(self)
+
     async def nuovo_ordine_created(self, event):
         await self.send(text_data=json.dumps({
             'type': 'nuovo_ordine_created',
@@ -194,13 +200,10 @@ class DashboardConsumer(AsyncWebsocketConsumer):
             self.channel_name
         )
         await self.accept()
-    
+
     async def disconnect(self, close_code):
-        await self.channel_layer.group_discard(
-            self.room_group_name,
-            self.channel_name
-        )
-    
+        await _safe_group_discard(self)
+
     async def stats_update(self, event):
         await self.send(text_data=json.dumps({
             'type': 'stats_update',
@@ -226,7 +229,7 @@ class MessaggiConsumer(AsyncWebsocketConsumer):
         await self.accept()
 
     async def disconnect(self, close_code):
-        await self.channel_layer.group_discard(self.room_group_name, self.channel_name)
+        await _safe_group_discard(self)
 
     async def nuovo_messaggio_wa(self, event):
         await self.send(text_data=json.dumps({
