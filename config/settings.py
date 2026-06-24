@@ -112,11 +112,24 @@ WSGI_APPLICATION = 'config.wsgi.application'
 import os
 import dj_database_url
 
-# Use PostgreSQL on Railway, SQLite locally
+# Use PostgreSQL on Railway, SQLite locally.
+# CONN_MAX_AGE = 60 -> connessioni persistenti per 60s: senza, Django
+# apre/chiude una connection DB a ogni request. Su Railway questo
+# generava decine di TCP_ABORT_ON_DATA / NO_SOCKET nei flow log
+# (Postgres riceve un RST quando il task Daphne viene chiuso prima del
+# graceful close della connection). Con la connection riusata, la
+# pressione su DB e network si riduce drasticamente.
+# CONN_HEALTH_CHECKS = True -> Django 4.1+: ping prima del riuso, cosi'
+# una connection morta (es. Postgres restart) viene scartata invece di
+# generare un errore al primo query.
 DATABASES = {
-    'default': dj_database_url.config(
-        default=f'sqlite:///{BASE_DIR / "db.sqlite3"}'
-    )
+    'default': {
+        **dj_database_url.config(
+            default=f'sqlite:///{BASE_DIR / "db.sqlite3"}'
+        ),
+        'CONN_MAX_AGE': 60,
+        'CONN_HEALTH_CHECKS': True,
+    }
 }
 
 # Validazione password
