@@ -1904,29 +1904,31 @@ def elimina_item_ordine(request, pk):
 def segna_ritirata(request, pk):
     """Segna un ordine come ritirato dal cliente"""
     ordine = get_object_or_404(Ordine, pk=pk)
-    
+
     if request.method == 'POST':
         try:
             data = json.loads(request.body)
             ritirata = data.get('ritirata', False)
-            
+
             # Verifica che l'ordine sia completato
             if ordine.stato != 'completato':
                 return JsonResponse({
                     'success': False,
                     'error': 'Solo gli ordini completati possono essere segnati come ritirati'
                 }, status=400)
-            
-            # Aggiorna lo stato
-            ordine.auto_ritirata = ritirata
-            if ritirata:
-                ordine.data_ritiro = timezone.now()
-            else:
-                ordine.data_ritiro = None
-            
-            ordine.save(update_fields=['auto_ritirata', 'data_ritiro'])
-            
-            # Notifica WebSocket (con timeout duro)
+
+            # Update diretto sul queryset: bypassa pre_save/post_save signal
+            # (aggrega SUM(pagamenti), ricalcola punti fedelta', ecc.) che
+            # qui non servono perche' il toggle "auto ritirata" non tocca
+            # ne' pagamento ne' cliente. Daphne killa l'instance se la
+            # view supera 1s -> con i signal su ordini "carichi" capitava.
+            data_ritiro_val = timezone.now() if ritirata else None
+            Ordine.objects.filter(pk=ordine.pk).update(
+                auto_ritirata=ritirata,
+                data_ritiro=data_ritiro_val,
+            )
+
+            # Notifica WebSocket (fire-and-forget)
             from apps.api.notify import notify_group
             notify_group('ordini_list', {
                 'type': 'ordine_modificato',
@@ -1934,11 +1936,11 @@ def segna_ritirata(request, pk):
                 'numero_progressivo': ordine.numero_progressivo,
                 'timestamp': timezone.now().isoformat(),
             })
-            
+
             return JsonResponse({
                 'success': True,
                 'message': 'Auto segnata come ritirata' if ritirata else 'Ritiro annullato',
-                'data_ritiro': ordine.data_ritiro.strftime('%d/%m/%Y %H:%M') if ordine.data_ritiro else None
+                'data_ritiro': data_ritiro_val.strftime('%d/%m/%Y %H:%M') if data_ritiro_val else None
             })
             
         except json.JSONDecodeError:
