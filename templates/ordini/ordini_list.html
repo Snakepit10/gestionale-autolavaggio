@@ -548,6 +548,12 @@ function proponiConferma() {
                 if (data.type === 'nuova_prenotazione') {
                     showNewReservationToast(data);
                 }
+                // Inoltra anche al gestore generico ordini (era una
+                // seconda WS duplicata: ora c'e' un solo socket condiviso
+                // per ridurre il churn di connessioni verso Daphne/Redis).
+                if (typeof handleWebSocketMessage === 'function') {
+                    handleWebSocketMessage(data);
+                }
             } catch (e) { /* ignore */ }
         });
         ws.addEventListener('close', function() {
@@ -3266,45 +3272,20 @@ document.getElementById('form-modifica-ordine').addEventListener('submit', funct
     });
 });
 
-// WebSocket per aggiornamenti real-time
+// WebSocket per aggiornamenti real-time.
+// Storicamente questa pagina apriva 2 connessioni /ws/ordini/ in
+// parallelo (una qui via inizializzaWebSocket, una nella IIFE che gestisce
+// le notifiche "nuova_prenotazione" in alto al template). Ora consolidato
+// a un solo socket: il listener message della IIFE inoltra a
+// handleWebSocketMessage. Questa funzione resta come no-op per non
+// rompere il DOMContentLoaded che la richiama; aggiunge solo il fallback
+// auto-refresh se il browser non supporta WebSocket.
 let webSocket = null;
 
 function inizializzaWebSocket() {
-    const wsProtocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
-    const wsUrl = `${wsProtocol}//${window.location.host}/ws/ordini/`;
-
-    console.log('Tentativo connessione WebSocket:', wsUrl);
-
-    try {
-        webSocket = new WebSocket(wsUrl);
-
-        webSocket.onopen = function() {
-            console.log('✓ WebSocket connesso per lista ordini');
-        };
-
-        webSocket.onmessage = function(event) {
-            console.log('Messaggio WebSocket ricevuto:', event.data);
-            const data = JSON.parse(event.data);
-            handleWebSocketMessage(data);
-        };
-
-        webSocket.onclose = function(event) {
-            console.log('WebSocket disconnesso - Code:', event.code, 'Reason:', event.reason);
-            console.log('Tentativo riconnessione tra 3 secondi...');
-            setTimeout(inizializzaWebSocket, 3000);
-        };
-
-        webSocket.onerror = function(error) {
-            console.error('Errore WebSocket:', error);
-        };
-    } catch (error) {
-        console.warn('WebSocket non supportato, uso auto-refresh:', error);
-        webSocket = null;
-        // Fallback: Auto-refresh ogni 30 secondi per ordini in lavorazione
+    if (!('WebSocket' in window)) {
         if (document.querySelector('.badge.bg-warning')) {
-            setInterval(() => {
-                location.reload();
-            }, 30000);
+            setInterval(() => { location.reload(); }, 30000);
         }
     }
 }
