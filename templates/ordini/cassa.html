@@ -1769,7 +1769,10 @@ function confermaOrdine() {
         nuovo_cliente: clienteSelezionato && clienteSelezionato.nuovo ? clienteSelezionato : null,
         nota: document.getElementById('note-ordine').value,
         tipo_auto: document.getElementById('tipo-auto').value,
-        stampa_scontrino: true,
+        // Stampa disattivata: l'autolavaggio non stampa scontrini ne'
+        // comande, e la chiamata sincrona a una stampante LAN da Railway
+        // bloccava la response per ~100s su connect() non-routable.
+        stampa_scontrino: false,
         // Dati consegna
         tipo_consegna: document.getElementById('tipo-consegna').value,
         ora_consegna_richiesta: document.getElementById('ora-consegna-richiesta').value || null

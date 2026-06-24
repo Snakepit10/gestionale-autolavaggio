@@ -466,13 +466,26 @@ def completa_ordine(request):
             del request.session['sconto_applicato']
         request.session.modified = True
         
-        # Stampa scontrino se richiesto
-        if data.get('stampa_scontrino', False):  # Cambiato default a False
-            try:
-                StampaService.stampa_scontrino(ordine)
-            except Exception as e:
-                # Non bloccare l'ordine per errori di stampa
-                print(f'Errore stampa scontrino: {str(e)}')  # Log invece di messages
+        # Stampa scontrino in fire-and-forget: la stampante e' un device
+        # di LAN (IP non-routable da Railway), un socket.connect()
+        # sincrono qui bloccava la response per minuti (cassa congelata).
+        # Su thread daemon: se la stampante non risponde, il thread muore
+        # silenzioso al timeout interno senza toccare la response. NB: lo
+        # frontend (cassa.html) ora invia stampa_scontrino=false di
+        # default — il blocco e' tenuto per retrocompatibilita' di altri
+        # eventuali caller futuri.
+        if data.get('stampa_scontrino', False):
+            import threading
+
+            def _stampa_bg(ord_id):
+                try:
+                    StampaService.stampa_scontrino(Ordine.objects.get(pk=ord_id))
+                except Exception as e:
+                    print(f'Errore stampa scontrino (bg): {e}')
+
+            threading.Thread(
+                target=_stampa_bg, args=(ordine.pk,), daemon=True,
+            ).start()
         
         # Invia notifica WebSocket alle postazioni e alla lista ordini
         # (timeout duro: se Redis e' lento NON blocca la response)
