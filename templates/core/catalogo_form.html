@@ -106,8 +106,41 @@
                                 </label>
                             </div>
                         </div>
+                        <div class="col-md-6">
+                            <div class="form-check form-switch">
+                                {{ form.mostra_pubblico }}
+                                <label class="form-check-label" for="{{ form.mostra_pubblico.id_for_label }}">
+                                    Mostra al pubblico (catalogo cliente)
+                                </label>
+                            </div>
+                        </div>
                     </div>
-                    
+
+                    <!-- Upselling prenotazione online -->
+                    <div class="row mb-4">
+                        <div class="col-12">
+                            <h5 class="border-bottom pb-2 mb-3">Upselling prenotazione online</h5>
+                            <p class="text-muted small mb-3">
+                                Configura se e quando questo item compare nella sezione
+                                <strong>"Aggiungi extra"</strong> del riepilogo prenotazione cliente.
+                            </p>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="form-check form-switch">
+                                {{ form.proponi_in_upsell }}
+                                <label class="form-check-label" for="{{ form.proponi_in_upsell.id_for_label }}">
+                                    Proponi in upsell
+                                </label>
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            {{ form.ordine_upsell|as_crispy_field }}
+                        </div>
+                        <div class="col-12">
+                            {{ form.upsell_per|as_crispy_field }}
+                        </div>
+                    </div>
+
                     <div class="d-flex justify-content-between">
                         <a href="{% url 'core:catalogo-list' %}" class="btn btn-secondary">
                             <i class="bi bi-x-circle"></i> Annulla
