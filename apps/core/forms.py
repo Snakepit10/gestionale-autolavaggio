@@ -27,14 +27,32 @@ class ServizioProdottoForm(forms.ModelForm):
             'durata_minuti', 'postazioni', 'quantita_disponibile',
             'quantita_minima_alert', 'codice_prodotto', 'attivo',
             'is_supplemento', 'mostra_pubblico',
+            # Upsell prenotazione online (vedi docs/UPSELL_PRENOTAZIONE.md)
+            'proponi_in_upsell', 'ordine_upsell', 'upsell_per',
         ]
         widgets = {
             'descrizione': forms.Textarea(attrs={'rows': 3}),
             'postazioni': forms.CheckboxSelectMultiple(),
+            'upsell_per': forms.SelectMultiple(attrs={'size': 6}),
         }
-    
+
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
+
+        # Limita le scelte di `upsell_per` ai soli servizi (esclude se
+        # stessi se l'oggetto esiste gia' per evitare cicli auto-referenziali).
+        from .models import ServizioProdotto as SP
+        qs = SP.objects.filter(tipo='servizio', attivo=True).order_by('titolo')
+        if self.instance and self.instance.pk:
+            qs = qs.exclude(pk=self.instance.pk)
+        self.fields['upsell_per'].queryset = qs
+        self.fields['upsell_per'].help_text = (
+            "Se vuoto, l'upsell e' universale (mostrato sempre). "
+            "Se selezioni uno o piu' servizi, l'item compare nel blocco "
+            '"Aggiungi extra" SOLO se il cliente ha scelto almeno uno di '
+            "quei servizi nello step 1 della prenotazione."
+        )
+
         self.helper = FormHelper()
         self.helper.form_method = 'post'
         self.helper.layout = Layout(
@@ -64,6 +82,17 @@ class ServizioProdottoForm(forms.ModelForm):
                 Field('quantita_minima_alert'),
                 Field('codice_prodotto'),
                 css_id='prodotto-fields'
+            ),
+            Div(
+                HTML('<h5>Upselling prenotazione online</h5>'),
+                HTML('<p class="text-muted small mb-2">Configura se e quando '
+                     "questo item compare nella sezione \"Aggiungi extra\" "
+                     'del riepilogo prenotazione cliente.</p>'),
+                Field('proponi_in_upsell'),
+                Field('ordine_upsell'),
+                Field('upsell_per'),
+                css_id='upsell-fields',
+                css_class='col-12 mt-3 pt-3 border-top'
             )
         )
     
