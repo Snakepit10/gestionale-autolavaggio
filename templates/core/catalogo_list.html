@@ -141,11 +141,16 @@
                             </td>
                             <td class="text-center">
                                 <div class="btn-group" role="group">
-                                    <a href="{% url 'core:catalogo-update' item.pk %}" 
+                                    <a href="{% url 'core:catalogo-update' item.pk %}"
                                        class="btn btn-sm btn-outline-primary" title="Modifica">
                                         <i class="bi bi-pencil"></i>
                                     </a>
-                                    <a href="{% url 'core:catalogo-delete' item.pk %}" 
+                                    <a href="{% url 'core:catalogo-duplica' item.pk %}"
+                                       class="btn btn-sm btn-outline-secondary" title="Duplica"
+                                       onclick="return confirm('Duplicare &quot;{{ item.titolo|escapejs }}&quot;? Verrai portato alla pagina di modifica del duplicato.');">
+                                        <i class="bi bi-files"></i>
+                                    </a>
+                                    <a href="{% url 'core:catalogo-delete' item.pk %}"
                                        class="btn btn-sm btn-outline-danger" title="Elimina">
                                         <i class="bi bi-trash"></i>
                                     </a>

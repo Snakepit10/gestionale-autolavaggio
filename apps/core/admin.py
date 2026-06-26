@@ -33,7 +33,7 @@ class ServizioProdottoAdmin(admin.ModelAdmin):
     ]
     list_editable = ['proponi_in_upsell', 'ordine_upsell']
     search_fields = ['titolo', 'descrizione', 'codice_prodotto']
-    filter_horizontal = ['postazioni', 'upsell_per']
+    filter_horizontal = ['postazioni', 'upsell_per', 'categorie_aggiuntive']
 
     def scorta_bassa(self, obj):
         return obj.scorta_bassa

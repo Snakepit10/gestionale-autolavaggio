@@ -364,22 +364,23 @@
                 </div>
             </div>
 
-            {% regroup servizi_prodotti by categoria as categorie_raggruppate %}
-            {% for categoria_group in categorie_raggruppate %}
-                <div class="categoria-sezione mb-4" data-categoria="{{ categoria_group.grouper.id }}">
+            {# servizi_per_categoria: lista (categoria, [items]); ogni item compare
+               in ogni categoria a cui appartiene (primaria + aggiuntive). #}
+            {% for categoria, items in servizi_per_categoria %}
+                <div class="categoria-sezione mb-4" data-categoria="{{ categoria.id }}">
                     <!-- Intestazione categoria -->
                     <div class="d-flex align-items-center mb-3">
-                        <div class="categoria-header p-2 rounded me-3 categoria-color-{{ categoria_group.grouper.id }}" style="color: white;">
-                            <h6 class="mb-0 fw-bold">{{ categoria_group.grouper.nome }}</h6>
+                        <div class="categoria-header p-2 rounded me-3 categoria-color-{{ categoria.id }}" style="color: white;">
+                            <h6 class="mb-0 fw-bold">{{ categoria.nome }}</h6>
                         </div>
-                        <small class="text-muted">{{ categoria_group.list|length }} elementi</small>
+                        <small class="text-muted">{{ items|length }} elementi</small>
                     </div>
 
                     <!-- Card della categoria -->
                     <div class="row g-1 mb-3">
-                        {% for item in categoria_group.list %}
-                        <div class="col-sm-6 col-md-4 col-lg-3 catalogo-item" data-categoria="{{ item.categoria.id }}" data-id="{{ item.id }}">
-                            <div class="card item-card {{ item.tipo }}{% if item.id in preferiti_ids %} is-preferito{% endif %}" data-id="{{ item.id }}" data-categoria="{{ item.categoria.id }}" onclick="aggiungiAlCarrello({{ item.id }})">
+                        {% for item in items %}
+                        <div class="col-sm-6 col-md-4 col-lg-3 catalogo-item" data-categoria="{{ categoria.id }}" data-id="{{ item.id }}">
+                            <div class="card item-card {{ item.tipo }}{% if item.id in preferiti_ids %} is-preferito{% endif %}" data-id="{{ item.id }}" data-categoria="{{ categoria.id }}" onclick="aggiungiAlCarrello({{ item.id }})">
                                 <button type="button" class="btn-fav{% if item.id in preferiti_ids %} active{% endif %}"
                                         onclick="event.stopPropagation(); togglePreferito({{ item.id }})"
                                         title="{% if item.id in preferiti_ids %}Rimuovi dai preferiti{% else %}Aggiungi ai preferiti{% endif %}">

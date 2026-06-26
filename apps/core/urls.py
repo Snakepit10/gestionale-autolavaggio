@@ -16,6 +16,7 @@ urlpatterns = [
     path('catalogo/', views.CatalogoListView.as_view(), name='catalogo-list'),
     path('catalogo/nuovo/', views.CatalogoCreateView.as_view(), name='catalogo-create'),
     path('catalogo/<int:pk>/modifica/', views.CatalogoUpdateView.as_view(), name='catalogo-update'),
+    path('catalogo/<int:pk>/duplica/', views.duplica_servizio, name='catalogo-duplica'),
     path('catalogo/<int:pk>/elimina/', views.CatalogoDeleteView.as_view(), name='catalogo-delete'),
     path('catalogo/<int:pk>/toggle-pubblico/', views.toggle_mostra_pubblico, name='catalogo-toggle-pubblico'),
     

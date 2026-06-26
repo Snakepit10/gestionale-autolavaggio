@@ -43,9 +43,21 @@
                         </div>
                         <div class="col-md-6">
                             {{ form.categoria|as_crispy_field }}
+                            <small class="form-text text-muted d-block mt-1">
+                                Categoria principale (usata per ordinamento).
+                            </small>
                         </div>
                         <div class="col-md-6">
                             {{ form.codice_prodotto|as_crispy_field }}
+                        </div>
+                        <div class="col-12">
+                            <label class="form-label fw-bold">Categorie aggiuntive</label>
+                            {{ form.categorie_aggiuntive }}
+                            <small class="form-text text-muted d-block mt-1">
+                                Spunta una o piu' categorie extra in cui mostrare
+                                anche questo item, oltre alla principale. Lascia
+                                vuoto se appartiene a una sola categoria.
+                            </small>
                         </div>
                     </div>
 

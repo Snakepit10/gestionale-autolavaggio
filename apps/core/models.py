@@ -87,7 +87,23 @@ class ServizioProdotto(models.Model):
     titolo = models.CharField(max_length=200)
     tipo = models.CharField(max_length=20, choices=TIPO_CHOICES, default='servizio')
     prezzo = models.DecimalField(max_digits=10, decimal_places=2)
-    categoria = models.ForeignKey(Categoria, on_delete=models.CASCADE)
+    # Categoria primaria: usata per ordinamento e raggruppamento di default.
+    # Mantenuta come FK per non rompere il codice esistente che fa
+    # s.categoria.nome ovunque. La presenza di un singolo "principale"
+    # serve anche per scegliere un ordine canonico nelle pagine che
+    # iterano per categoria (es. /catalogo/).
+    categoria = models.ForeignKey(Categoria, on_delete=models.CASCADE, related_name='servizi_primari')
+    # Categorie aggiuntive: l'item compare anche in queste sezioni del
+    # catalogo (cassa + prenotazione online). Es. "Lavaggio esterno" che
+    # va sia in "Lavaggi base" (primaria) sia in "Promozioni" (aggiuntiva).
+    # Niente cambio per il flusso scorte / postazioni (gestiscono il
+    # singolo ServizioProdotto, non le sue categorie).
+    categorie_aggiuntive = models.ManyToManyField(
+        Categoria, blank=True, related_name='servizi_aggiuntivi',
+        help_text="Categorie extra in cui mostrare l'item, oltre alla "
+                  "categoria principale. Lascia vuoto se l'item appartiene "
+                  "a una sola categoria.",
+    )
     descrizione = models.TextField()
     
     # Campi per servizi
@@ -156,6 +172,18 @@ class ServizioProdotto(models.Model):
         if self.tipo == 'servizio':
             return self.attivo
         return self.attivo and (self.quantita_disponibile == -1 or self.quantita_disponibile > 0)
+
+    @property
+    def tutte_le_categorie(self):
+        """Lista (no QuerySet) di tutte le categorie a cui l'item appartiene:
+        la primaria + le aggiuntive, deduplicate, in ordine. Utile per i
+        template che devono renderizzare badge "categorie".
+        """
+        out = [self.categoria]
+        for c in self.categorie_aggiuntive.all():
+            if c.pk != self.categoria_id:
+                out.append(c)
+        return out
 
 
 class Sconto(models.Model):

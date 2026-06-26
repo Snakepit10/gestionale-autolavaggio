@@ -215,8 +215,11 @@
         <div class="pi" data-key="conferma" title="Conferma"></div>
     </div>
 
-    {# ========== STEP CATEGORIE: uno per ciascuna (Esterno, Interno, ...) ========== #}
-    {% for cat in categorie_step %}
+    {# ========== STEP CATEGORIE: uno per ciascuna (Esterno, Interno, ...).
+       servizi_per_categoria e' una lista di tuple (categoria, [servizi])
+       gia' pronta dal backend, con item multicategoria duplicati nelle
+       loro sezioni. ========== #}
+    {% for cat, servizi_cat in servizi_per_categoria %}
     <section class="bk-step {% if forloop.first %}active{% endif %}" data-step-key="cat-{{ cat.id }}">
         <h3 class="fw-bold mb-1">{{ forloop.counter }}. {{ cat.nome }}</h3>
         <p class="text-muted">
@@ -241,30 +244,28 @@
         {% endif %}
 
         <div class="d-flex flex-column gap-2 mt-3">
-            {% for s in servizi %}
-                {% if s.categoria_id == cat.id %}
-                <div class="servizio-pick"
-                     data-id="{{ s.id }}"
-                     data-titolo="{{ s.titolo|escape }}"
-                     data-durata="{{ s.durata_minuti|default:30 }}"
-                     data-prezzo="{{ s.prezzo }}"
-                     data-categoria-id="{{ s.categoria_id }}"
-                     onclick="toggleServizio(this)">
-                    <div class="flex-grow-1">
-                        <div class="titolo">{{ s.titolo }}</div>
-                        {% if s.descrizione %}
-                        <div class="meta">{{ s.descrizione|truncatewords:20 }}</div>
-                        {% endif %}
-                        <div class="meta">
-                            <i class="bi bi-clock"></i> circa {{ s.durata_minuti|default:"30" }} min
-                            <span class="prezzo-orientativo ms-2">da € {{ s.prezzo }}</span>
-                        </div>
-                    </div>
-                    <div class="d-flex align-items-center gap-2">
-                        <i class="bi bi-circle check"></i>
+            {% for s in servizi_cat %}
+            <div class="servizio-pick"
+                 data-id="{{ s.id }}"
+                 data-titolo="{{ s.titolo|escape }}"
+                 data-durata="{{ s.durata_minuti|default:30 }}"
+                 data-prezzo="{{ s.prezzo }}"
+                 data-categoria-id="{{ cat.id }}"
+                 onclick="toggleServizio(this)">
+                <div class="flex-grow-1">
+                    <div class="titolo">{{ s.titolo }}</div>
+                    {% if s.descrizione %}
+                    <div class="meta">{{ s.descrizione|truncatewords:20 }}</div>
+                    {% endif %}
+                    <div class="meta">
+                        <i class="bi bi-clock"></i> circa {{ s.durata_minuti|default:"30" }} min
+                        <span class="prezzo-orientativo ms-2">da € {{ s.prezzo }}</span>
                     </div>
                 </div>
-                {% endif %}
+                <div class="d-flex align-items-center gap-2">
+                    <i class="bi bi-circle check"></i>
+                </div>
+            </div>
             {% endfor %}
         </div>
 
@@ -628,13 +629,14 @@ function vaiIndietro() {
 }
 
 // === Selezione servizi base (step categoria) =====================
+// Un servizio puo' apparire in piu' step (multicategoria): tutte le
+// card con lo stesso data-id devono restare sincronizzate visivamente.
 function toggleServizio(el) {
     const id = parseInt(el.dataset.id);
     const idx = serviziSelezionati.findIndex(s => s.id === id);
-    if (idx >= 0) {
+    const giaSelezionato = idx >= 0;
+    if (giaSelezionato) {
         serviziSelezionati.splice(idx, 1);
-        el.classList.remove('selected');
-        el.querySelector('.check').className = 'bi bi-circle check';
     } else {
         serviziSelezionati.push({
             id: id,
@@ -643,12 +645,18 @@ function toggleServizio(el) {
             prezzo: parseFloat(el.dataset.prezzo) || 0,
             categoriaId: parseInt(el.dataset.categoriaId) || 0,
         });
-        el.classList.add('selected');
-        el.querySelector('.check').className = 'bi bi-check-circle-fill check';
     }
-    // Se cambio i servizi base, ricontrollo i toggle extra: alcuni
-    // potrebbero non essere piu' rilevanti (legati a un servizio
-    // appena deselezionato).
+    // Sync visivo su TUTTE le card di questo servizio (potrebbe essere
+    // multicategoria -> piu' .servizio-pick con lo stesso data-id).
+    document.querySelectorAll(`.servizio-pick[data-id="${id}"]`).forEach(card => {
+        card.classList.toggle('selected', !giaSelezionato);
+        const check = card.querySelector('.check');
+        if (check) {
+            check.className = giaSelezionato
+                ? 'bi bi-circle check'
+                : 'bi bi-check-circle-fill check';
+        }
+    });
     syncExtraDopoChange();
 }
 

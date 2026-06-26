@@ -23,7 +23,8 @@ class ServizioProdottoForm(forms.ModelForm):
     class Meta:
         model = ServizioProdotto
         fields = [
-            'titolo', 'tipo', 'categoria', 'prezzo', 'descrizione',
+            'titolo', 'tipo', 'categoria', 'categorie_aggiuntive',
+            'prezzo', 'descrizione',
             'durata_minuti', 'postazioni', 'quantita_disponibile',
             'quantita_minima_alert', 'codice_prodotto', 'attivo',
             'is_supplemento', 'mostra_pubblico',
@@ -33,6 +34,7 @@ class ServizioProdottoForm(forms.ModelForm):
         widgets = {
             'descrizione': forms.Textarea(attrs={'rows': 3}),
             'postazioni': forms.CheckboxSelectMultiple(),
+            'categorie_aggiuntive': forms.CheckboxSelectMultiple(),
             'upsell_per': forms.SelectMultiple(attrs={'size': 6}),
         }
 

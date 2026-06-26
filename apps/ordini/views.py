@@ -32,13 +32,33 @@ class CassaView(LoginRequiredMixin, TemplateView):
         # (visibili solo nel wizard di prenotazione online /app/servizi/).
         # Utile quando l'operatore al banco e il cliente self-service hanno
         # cataloghi diversi (es. pacchetti promozionali online).
-        context['categorie'] = Categoria.objects.filter(attiva=True, solo_pubblico=False)
-        servizi_qs = (
+        categorie_qs = list(Categoria.objects.filter(attiva=True, solo_pubblico=False))
+        context['categorie'] = categorie_qs
+
+        # Servizi/prodotti distinct: un item compare una sola volta nel QS
+        # anche se appartiene a piu' categorie tramite categorie_aggiuntive
+        # (il join M2M lo duplicherebbe). distinct() lo collassa.
+        servizi_qs = list(
             ServizioProdotto.objects
             .filter(attivo=True, categoria__solo_pubblico=False)
             .select_related('categoria')
+            .prefetch_related('categorie_aggiuntive')
         )
         context['servizi_prodotti'] = servizi_qs
+
+        # Mappa "categoria -> items": un item appare in ogni categoria a
+        # cui appartiene (primaria + aggiuntive). Permette al template di
+        # iterare per categoria mostrando ciascun item nelle sue sezioni
+        # rilevanti, senza dover usare regroup (che si basa sulla sola
+        # categoria primaria).
+        cat_ids_visibili = {c.id for c in categorie_qs}
+        per_cat = {c.id: [] for c in categorie_qs}
+        for s in servizi_qs:
+            ids_app = {s.categoria_id}
+            ids_app.update(c.id for c in s.categorie_aggiuntive.all())
+            for cid in ids_app & cat_ids_visibili:
+                per_cat[cid].append(s)
+        context['servizi_per_categoria'] = [(c, per_cat[c.id]) for c in categorie_qs]
 
         # Item preferiti per l'utente corrente
         from .models import ItemPreferito

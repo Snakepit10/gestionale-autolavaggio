@@ -136,22 +136,39 @@ def booking(request):
     # Servizi base raggruppati per categoria (Esterno, Interno, Sottoscocca,
     # ecc.): un wizard step per ogni categoria che ha almeno un servizio
     # pubblico. L'ordine degli step segue Categoria.ordine_visualizzazione.
-    servizi = list(
+    # prefetch_related('categorie_aggiuntive') per supportare gli item
+    # multicategoria che compaiono in piu' step.
+    servizi_qs = list(
         ServizioProdotto.objects
         .filter(attivo=True, tipo='servizio', is_supplemento=False, mostra_pubblico=True)
         .select_related('categoria')
+        .prefetch_related('categorie_aggiuntive')
         .order_by('categoria__ordine_visualizzazione', 'titolo')
     )
-    # Categorie effettivamente presenti nei servizi pubblici, in ordine.
-    # Usate dal template per renderizzare uno step per ognuna senza
-    # passare per regroup (che restituisce un grouper non iterabile due
-    # volte). Permette anche di calcolare il numero totale di step.
+
+    # Mappa "categoria -> [servizi]": un servizio appare in ogni categoria
+    # a cui appartiene (primaria + aggiuntive). Ordine: ordine_visualizzazione.
     cat_ids_in_uso = []
-    for s in servizi:
-        if s.categoria_id not in cat_ids_in_uso:
-            cat_ids_in_uso.append(s.categoria_id)
-    cat_map = {c.id: c for c in Categoria.objects.filter(id__in=cat_ids_in_uso)}
-    categorie_step = [cat_map[i] for i in cat_ids_in_uso if i in cat_map]
+    per_cat = {}
+    for s in servizi_qs:
+        cat_ids = [s.categoria_id] + [c.id for c in s.categorie_aggiuntive.all()]
+        for cid in cat_ids:
+            if cid not in per_cat:
+                per_cat[cid] = []
+                cat_ids_in_uso.append(cid)
+            # Evita duplicati se primary == aggiuntiva (defensive)
+            if s not in per_cat[cid]:
+                per_cat[cid].append(s)
+    cat_map = {
+        c.id: c for c in Categoria.objects.filter(id__in=cat_ids_in_uso)
+        .order_by('ordine_visualizzazione', 'nome')
+    }
+    # Ordina cat_ids_in_uso per ordine_visualizzazione della categoria
+    categorie_step = [cat_map[i] for i in sorted(cat_ids_in_uso, key=lambda i: (cat_map[i].ordine_visualizzazione if i in cat_map else 999, cat_map[i].nome if i in cat_map else '')) if i in cat_map]
+    # Lista (categoria, [servizi]) pre-renderizzata per il template
+    servizi_per_categoria = [(c, per_cat[c.id]) for c in categorie_step]
+    # Manteniamo anche `servizi` flat per compat con codice JS esistente
+    servizi = servizi_qs
     # Extra (servizi upsell) e Profumazione (prodotti upsell): step dedicati
     # nel wizard, dopo le categorie di servizi base. Non legati a una
     # categoria specifica via upsell_per qui (il filtro per servizi scelti
@@ -172,6 +189,7 @@ def booking(request):
     return render(request, 'clients/booking.html', {
         'categorie_step': categorie_step,
         'servizi': servizi,
+        'servizi_per_categoria': servizi_per_categoria,
         'servizi_extra': servizi_extra,
         'prodotti_extra': prodotti_extra,
     })

@@ -438,3 +438,47 @@ def toggle_mostra_pubblico(request, pk):
     sp.save(update_fields=['mostra_pubblico'])
     return JsonResponse({'ok': True, 'mostra_pubblico': sp.mostra_pubblico})
 
+
+@login_required
+def duplica_servizio(request, pk):
+    """Duplica un ServizioProdotto.
+
+    Crea una copia con titolo "Copia di <originale>" e redirige al form
+    di modifica del duplicato cosi' l'operatore puo' rifinire i campi
+    (titolo, prezzo, ecc.) prima di salvare definitivamente. Copia
+    anche le relazioni M2M (postazioni, categorie_aggiuntive, upsell_per)
+    e tutti i flag/attributi del modello.
+    """
+    from django.contrib import messages
+    from django.shortcuts import get_object_or_404, redirect
+    if not (request.user.is_staff or request.user.is_superuser):
+        messages.error(request, 'Non autorizzato.')
+        return redirect('core:catalogo-list')
+
+    originale = get_object_or_404(ServizioProdotto, pk=pk)
+    # Snapshot delle M2M prima del clone: dopo aver azzerato il pk
+    # l'istanza perde l'accesso alle vecchie relazioni; le riapplichiamo
+    # al duplicato dopo il primo save().
+    postazioni_ids = list(originale.postazioni.values_list('id', flat=True))
+    cat_aggiuntive_ids = list(originale.categorie_aggiuntive.values_list('id', flat=True))
+    upsell_per_ids = list(originale.upsell_per.values_list('id', flat=True))
+
+    # Clone: pk=None forza un INSERT al prossimo save() invece dell'UPDATE.
+    originale.pk = None
+    originale.id = None
+    originale.titolo = f'Copia di {originale.titolo}'[:200]
+    originale.save()
+
+    if postazioni_ids:
+        originale.postazioni.set(postazioni_ids)
+    if cat_aggiuntive_ids:
+        originale.categorie_aggiuntive.set(cat_aggiuntive_ids)
+    if upsell_per_ids:
+        originale.upsell_per.set(upsell_per_ids)
+
+    messages.success(
+        request,
+        f'Duplicato creato: "{originale.titolo}". Modifica i campi e salva.'
+    )
+    return redirect('core:catalogo-update', pk=originale.pk)
+
