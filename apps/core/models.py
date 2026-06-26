@@ -9,11 +9,20 @@ class Categoria(models.Model):
     descrizione = models.TextField(blank=True)
     ordine_visualizzazione = models.IntegerField(default=0)
     attiva = models.BooleanField(default=True)
-    
+    solo_pubblico = models.BooleanField(
+        default=False,
+        verbose_name='Solo prenotazione online',
+        help_text="Se attivo, la categoria (e tutti i suoi item) viene "
+                  "mostrata SOLO nel catalogo della prenotazione online "
+                  "(/app/servizi/) e nascosta all'operatore in cassa "
+                  "(/ordini/cassa/). Utile per gestire cataloghi diversi "
+                  "tra cliente self-service e operatore al banco.",
+    )
+
     class Meta:
         ordering = ['ordine_visualizzazione', 'nome']
         verbose_name_plural = "Categorie"
-    
+
     def __str__(self):
         return self.nome
 

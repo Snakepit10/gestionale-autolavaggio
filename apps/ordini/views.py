@@ -28,9 +28,16 @@ class CassaView(LoginRequiredMixin, TemplateView):
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
 
-        # Categorie e servizi/prodotti
-        context['categorie'] = Categoria.objects.filter(attiva=True)
-        servizi_qs = ServizioProdotto.objects.filter(attivo=True).select_related('categoria')
+        # Categorie e servizi/prodotti: esclude le categorie "solo pubblico"
+        # (visibili solo nel wizard di prenotazione online /app/servizi/).
+        # Utile quando l'operatore al banco e il cliente self-service hanno
+        # cataloghi diversi (es. pacchetti promozionali online).
+        context['categorie'] = Categoria.objects.filter(attiva=True, solo_pubblico=False)
+        servizi_qs = (
+            ServizioProdotto.objects
+            .filter(attivo=True, categoria__solo_pubblico=False)
+            .select_related('categoria')
+        )
         context['servizi_prodotti'] = servizi_qs
 
         # Item preferiti per l'utente corrente
@@ -91,10 +98,11 @@ class CassaMobileView(LoginRequiredMixin, TemplateView):
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
         
-        # Dati ottimizzati per mobile
-        context['categorie'] = Categoria.objects.filter(attiva=True)
+        # Dati ottimizzati per mobile. Esclude categorie "solo pubblico"
+        # (stesso filtro della CassaView desktop).
+        context['categorie'] = Categoria.objects.filter(attiva=True, solo_pubblico=False)
         context['servizi_frequenti'] = ServizioProdotto.objects.filter(
-            attivo=True, tipo='servizio'
+            attivo=True, tipo='servizio', categoria__solo_pubblico=False,
         ).order_by('-id')[:12]  # Ultimi 12 servizi più utilizzati
         
         return context
@@ -906,11 +914,13 @@ class OrdiniListView(LoginRequiredMixin, ListView):
         )
         context['prenotazioni_da_confermare'] = prenotazioni_da_confermare
 
-        # Servizi disponibili per modifica dentro modal check-in
+        # Servizi disponibili per modifica dentro modal check-in.
+        # Esclude categorie "solo pubblico" (catalogo online riservato),
+        # coerente con cosa l'operatore vede in cassa.
         from apps.core.models import ServizioProdotto
         context['servizi_disponibili'] = (
             ServizioProdotto.objects
-            .filter(attivo=True, tipo='servizio')
+            .filter(attivo=True, tipo='servizio', categoria__solo_pubblico=False)
             .select_related('categoria')
             .order_by('categoria__nome', 'titolo')
         )

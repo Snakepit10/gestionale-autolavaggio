@@ -44,7 +44,19 @@
                             Categoria Attiva
                         </label>
                     </div>
-                    
+
+                    <div class="form-check form-switch mb-3">
+                        {{ form.solo_pubblico }}
+                        <label class="form-check-label" for="{{ form.solo_pubblico.id_for_label }}">
+                            Solo prenotazione online
+                        </label>
+                        <div class="form-text small text-muted">
+                            Se attivo, la categoria (e tutti i suoi item) viene mostrata
+                            <strong>solo</strong> nel catalogo della prenotazione online
+                            <code>/app/servizi/</code> e nascosta all'operatore in cassa.
+                        </div>
+                    </div>
+
                     <div class="d-flex justify-content-between">
                         <a href="{% url 'core:categoria-list' %}" class="btn btn-secondary">
                             <i class="bi bi-x-circle"></i> Annulla
