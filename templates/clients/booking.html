@@ -75,6 +75,38 @@
     .bk-actions { bottom: 60px; }
 }
 
+/* Disclaimer prezzi orientativi (step 1 e step 4) */
+.bk-prezzi-info {
+    display: flex;
+    align-items: flex-start;
+    gap: 10px;
+    padding: 10px 14px;
+    margin: 8px 0 4px;
+    border-radius: 10px;
+    background: rgba(74, 185, 224, .08);
+    border: 1px solid rgba(74, 185, 224, .25);
+    color: var(--mw-text);
+    font-size: .82rem;
+    line-height: 1.4;
+}
+.bk-prezzi-info i {
+    color: var(--mw-cyan-light);
+    font-size: 1.1rem;
+    margin-top: 1px;
+    flex-shrink: 0;
+}
+
+/* Pillola prezzo orientativo accanto a durata sulla card servizio */
+.servizio-pick .prezzo-orientativo {
+    display: inline-block;
+    padding: 1px 8px;
+    border-radius: 999px;
+    background: rgba(74, 185, 224, .15);
+    color: var(--mw-cyan-light);
+    font-weight: 700;
+    font-size: .78rem;
+}
+
 /* Upsell: griglia di card extra nella schermata di riepilogo */
 .upsell-grid {
     display: grid;
@@ -185,6 +217,16 @@
         <h3 class="fw-bold mb-1">1. Scegli i servizi</h3>
         <p class="text-muted">Seleziona uno o piu servizi.</p>
 
+        <div class="bk-prezzi-info">
+            <i class="bi bi-info-circle-fill"></i>
+            <span>
+                I prezzi mostrati sono <strong>orientativi</strong>: il prezzo
+                finale puo' variare in base alla grandezza dell'auto, allo stato
+                di sporco e al tempo effettivo di pulizia. Il prezzo definitivo
+                viene confermato al ritiro.
+            </span>
+        </div>
+
         {% regroup servizi by categoria as categorie_raggruppate %}
         {% for cat in categorie_raggruppate %}
             <h6 class="mt-4 mb-2 text-uppercase text-muted small fw-bold">
@@ -196,13 +238,17 @@
                      data-id="{{ s.id }}"
                      data-titolo="{{ s.titolo|escape }}"
                      data-durata="{{ s.durata_minuti|default:30 }}"
+                     data-prezzo="{{ s.prezzo }}"
                      onclick="toggleServizio(this)">
                     <div class="flex-grow-1">
                         <div class="titolo">{{ s.titolo }}</div>
                         {% if s.descrizione %}
                         <div class="meta">{{ s.descrizione|truncatewords:20 }}</div>
                         {% endif %}
-                        <div class="meta"><i class="bi bi-clock"></i> circa {{ s.durata_minuti|default:"30" }} min</div>
+                        <div class="meta">
+                            <i class="bi bi-clock"></i> circa {{ s.durata_minuti|default:"30" }} min
+                            <span class="prezzo-orientativo ms-2">da € {{ s.prezzo }}</span>
+                        </div>
                     </div>
                     <div class="d-flex align-items-center gap-2">
                         <i class="bi bi-circle check"></i>
@@ -325,14 +371,18 @@
             </div>
             <div id="rec-totale-wrap" class="mt-2 pt-2 border-top border-light border-opacity-25" style="display:none;">
                 <div class="d-flex justify-content-between align-items-center">
-                    <span class="fw-bold">Totale stimato</span>
+                    <span class="fw-bold">Totale orientativo</span>
                     <span class="fs-5 fw-bold" id="rec-totale">€ 0,00</span>
                 </div>
-                <div class="small opacity-75 mt-1">
-                    Il prezzo finale verra confermato al ritiro.
+                <div class="small opacity-90 mt-2">
+                    <i class="bi bi-info-circle"></i>
+                    Prezzo <strong>orientativo</strong>: puo' variare in base
+                    alla grandezza dell'auto, allo stato di sporco e al tempo
+                    effettivo di pulizia. Il prezzo definitivo viene confermato
+                    al ritiro.
                 </div>
             </div>
-            <div id="rec-no-totale" class="small opacity-75 mt-2">
+            <div id="rec-no-totale" class="small opacity-75 mt-2" style="display:none;">
                 Il prezzo finale verra comunicato al ritiro.
             </div>
         </div>
@@ -476,6 +526,7 @@ function toggleServizio(el) {
             id: id,
             titolo: el.dataset.titolo,
             durata: parseInt(el.dataset.durata),
+            prezzo: parseFloat(el.dataset.prezzo) || 0,
         });
         el.classList.add('selected');
         el.querySelector('.check').className = 'bi bi-check-circle-fill check';
@@ -686,21 +737,26 @@ function renderRiepilogo() {
     document.getElementById('rec-data').textContent =
         `${dataSelezionata.split('-').reverse().join('/')} alle ${oraSelezionata}`;
 
-    // Servizi: base (sempre, dallo step 1) + extra (da upsell)
+    // Servizi: base (sempre, dallo step 1) + extra (da upsell).
+    // Mostra prezzo orientativo accanto a ogni voce.
     const list = document.getElementById('rec-servizi-list');
     const serviziHtml = serviziSelezionati.map(s =>
-        `<div class="d-flex align-items-center gap-2 mb-1">
-            <i class="bi bi-check-circle-fill"></i> ${escapeHtml(s.titolo)}
+        `<div class="d-flex justify-content-between align-items-center mb-1">
+            <span><i class="bi bi-check-circle-fill"></i> ${escapeHtml(s.titolo)}</span>
+            <span class="opacity-75">da € ${(s.prezzo || 0).toFixed(2)}</span>
         </div>`
     );
     let durata = serviziSelezionati.reduce((a, s) => a + s.durata, 0);
+    let totale = serviziSelezionati.reduce((a, s) => a + (s.prezzo || 0), 0);
     serviziExtraSel.forEach(id => {
         const s = upsellServiziCatalogo.get(id);
         if (!s) return;
         durata += s.durata;
+        totale += s.prezzo;
         serviziHtml.push(
-            `<div class="d-flex align-items-center gap-2 mb-1">
-                <i class="bi bi-plus-circle-fill" style="color:var(--mw-cyan-light)"></i> ${escapeHtml(s.titolo)}
+            `<div class="d-flex justify-content-between align-items-center mb-1">
+                <span><i class="bi bi-plus-circle-fill" style="color:var(--mw-cyan-light)"></i> ${escapeHtml(s.titolo)}</span>
+                <span class="opacity-75">da € ${s.prezzo.toFixed(2)}</span>
             </div>`
         );
     });
@@ -719,6 +775,7 @@ function renderRiepilogo() {
         prodottiSel.forEach((qty, id) => {
             const p = upsellProdottiCatalogo.get(id);
             if (!p) return;
+            totale += p.prezzo * qty;
             prodHtml.push(
                 `<div class="d-flex justify-content-between align-items-center mb-1">
                     <span><i class="bi bi-bag-check-fill" style="color:var(--mw-cyan-light)"></i> ${escapeHtml(p.titolo)} × ${qty}</span>
@@ -729,30 +786,14 @@ function renderRiepilogo() {
         prodList.innerHTML = prodHtml.join('');
     }
 
-    // Totale extra: somma prezzi servizi_extra + prezzi*qty prodotti.
-    // I servizi base restano senza prezzo (politica esistente: prezzo
-    // dei lavaggi comunicato al ritiro). Se totale extra > 0 mostro il
-    // bottone "Totale extra"; altrimenti nascondo e tengo il messaggio
-    // "Il prezzo finale verra comunicato al ritiro".
-    let totaleExtra = 0;
-    serviziExtraSel.forEach(id => {
-        const s = upsellServiziCatalogo.get(id);
-        if (s) totaleExtra += s.prezzo;
-    });
-    prodottiSel.forEach((qty, id) => {
-        const p = upsellProdottiCatalogo.get(id);
-        if (p) totaleExtra += p.prezzo * qty;
-    });
+    // Totale stimato: include TUTTO (servizi base + servizi extra +
+    // prodotti). Sempre visibile (anche se l'utente non aggiunge extra)
+    // perche' ora i servizi base hanno un prezzo orientativo dichiarato.
     const totWrap = document.getElementById('rec-totale-wrap');
     const noTot = document.getElementById('rec-no-totale');
-    if (totaleExtra > 0) {
-        document.getElementById('rec-totale').textContent = `€ ${totaleExtra.toFixed(2)}`;
-        totWrap.style.display = '';
-        noTot.style.display = 'none';
-    } else {
-        totWrap.style.display = 'none';
-        noTot.style.display = '';
-    }
+    document.getElementById('rec-totale').textContent = `€ ${totale.toFixed(2)}`;
+    totWrap.style.display = '';
+    noTot.style.display = 'none';
 }
 
 // Step intermedio: prima di inviare la prenotazione, l'utente deve
