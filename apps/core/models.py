@@ -101,6 +101,31 @@ class ServizioProdotto(models.Model):
         verbose_name='Mostra al pubblico (lato cliente)',
         help_text='Se attivo, il servizio appare nel catalogo prenotabile dei clienti (/app/servizi/)',
     )
+    # Upselling lato prenotazione online: questi 3 campi governano la
+    # sezione "Aggiungi extra" nello step di riepilogo del wizard cliente.
+    # Indipendenti da mostra_pubblico: un item puo' apparire SOLO nell'upsell
+    # (es. profumatore non e' un "lavaggio prenotabile" nello step 1) o in
+    # ENTRAMBE le aree (es. aspirazione interni: scelta principale + upsell).
+    proponi_in_upsell = models.BooleanField(
+        default=False,
+        verbose_name='Proponi in upsell',
+        help_text="Se attivo, l'item compare nella sezione 'Aggiungi extra' "
+                  "del riepilogo prenotazione online.",
+    )
+    ordine_upsell = models.PositiveSmallIntegerField(
+        default=0,
+        help_text="Ordinamento nella sezione upsell (0 = primo). "
+                  "A parita' di ordine fallback su titolo.",
+    )
+    upsell_per = models.ManyToManyField(
+        'self', symmetrical=False, blank=True,
+        related_name='upsell_suggeriti',
+        limit_choices_to={'tipo': 'servizio'},
+        help_text="Servizi base per cui questo item va proposto come upsell. "
+                  "Se vuoto, l'upsell e' universale (mostrato sempre). "
+                  "Se valorizzato, mostrato solo quando il cliente ha "
+                  "selezionato almeno uno dei servizi indicati.",
+    )
     creato_il = models.DateTimeField(auto_now_add=True)
     aggiornato_il = models.DateTimeField(auto_now=True)
 

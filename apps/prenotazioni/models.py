@@ -230,8 +230,12 @@ class Prenotazione(models.Model):
     
     @property
     def totale_stimato(self):
-        """Calcola il totale stimato della prenotazione"""
-        return sum(servizio.prezzo for servizio in self.servizi.all())
+        """Totale stimato = somma dei servizi + somma dei prodotti extra
+        (subtotale = quantita * prezzo_unitario gia' fotografato al
+        momento della prenotazione)."""
+        tot_servizi = sum(s.prezzo for s in self.servizi.all())
+        tot_prodotti = sum(p.subtotale for p in self.prodotti_extra.all())
+        return tot_servizi + tot_prodotti
     
     def converti_in_ordine(self, operatore=None):
         """Converte la prenotazione in un ordine"""
@@ -239,9 +243,14 @@ class Prenotazione(models.Model):
             return self.ordine
         
         from apps.ordini.models import Ordine, ItemOrdine
-        
-        # Calcola il totale
-        totale = sum(servizio.prezzo for servizio in self.servizi.all())
+
+        # Calcola il totale: servizi + prodotti extra (snapshot prezzo
+        # dalla prenotazione, vedi PrenotazioneProdotto.prezzo_unitario).
+        prodotti_extra = list(self.prodotti_extra.select_related('servizio_prodotto'))
+        totale = (
+            sum(s.prezzo for s in self.servizi.all())
+            + sum(p.subtotale for p in prodotti_extra)
+        )
         
         # Calcola ora consegna richiesta basata su puntualità del check-in
         from datetime import datetime, timedelta
@@ -299,7 +308,7 @@ class Prenotazione(models.Model):
             )
             # Forza il salvataggio per attivare l'auto-assegnazione postazione
             item.save()
-            
+
             # Se l'auto-assegnazione non ha funzionato, assegna alla prima postazione disponibile
             if not item.postazione_assegnata and servizio.tipo == 'servizio':
                 from apps.core.models import Postazione
@@ -307,7 +316,21 @@ class Prenotazione(models.Model):
                 if postazione_default:
                     item.postazione_assegnata = postazione_default
                     item.save()
-        
+
+        # Prodotti extra acquistati durante la prenotazione online (upsell):
+        # ItemOrdine con quantita > 1 quando il cliente ha scelto piu'
+        # unita'. Niente postazione (sono prodotti da scaffale, non
+        # passano in lavaggio). Il signal aggiorna_scorte_prodotto
+        # decrementa le scorte solo se quantita_disponibile > 0; con il
+        # default -1 le scorte non vengono toccate.
+        for p in prodotti_extra:
+            ItemOrdine.objects.create(
+                ordine=ordine,
+                servizio_prodotto=p.servizio_prodotto,
+                quantita=p.quantita,
+                prezzo_unitario=p.prezzo_unitario,
+            )
+
         # Collega l'ordine alla prenotazione
         self.ordine = ordine
         self.stato = 'completata'
@@ -329,6 +352,44 @@ class Prenotazione(models.Model):
         """Segna la prenotazione come no-show"""
         self.stato = 'no_show'
         self.save()  # Il metodo save() si occuperà di aggiornare i contatori
+
+
+class PrenotazioneProdotto(models.Model):
+    """Prodotti extra (non lavaggi) aggiunti tramite upsell durante la
+    prenotazione online. Esiste come modello separato (non un M2M sul
+    M2M esistente `Prenotazione.servizi`) perche' serve la `quantita`:
+    il cliente puo' prendere 2 profumatori, 1 panno ecc.
+
+    Il `prezzo_unitario` viene "fotografato" al momento della prenotazione
+    per proteggere il cliente da cambi listino tra la prenotazione e il
+    check-in.
+    """
+    prenotazione = models.ForeignKey(
+        'Prenotazione',
+        on_delete=models.CASCADE,
+        related_name='prodotti_extra',
+    )
+    servizio_prodotto = models.ForeignKey(
+        'core.ServizioProdotto',
+        on_delete=models.PROTECT,
+        limit_choices_to={'tipo': 'prodotto'},
+        related_name='+',
+    )
+    quantita = models.PositiveSmallIntegerField(default=1)
+    prezzo_unitario = models.DecimalField(max_digits=8, decimal_places=2)
+    creato_il = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        unique_together = [('prenotazione', 'servizio_prodotto')]
+        verbose_name = 'Prodotto prenotazione'
+        verbose_name_plural = 'Prodotti prenotazione'
+
+    def __str__(self):
+        return f'{self.quantita}x {self.servizio_prodotto.titolo}'
+
+    @property
+    def subtotale(self):
+        return self.quantita * self.prezzo_unitario
 
 
 class CalendarioPersonalizzato(models.Model):

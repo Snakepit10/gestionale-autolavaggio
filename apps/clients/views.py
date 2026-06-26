@@ -187,6 +187,79 @@ def slot_disponibili_pub(request):
     return JsonResponse({'slot': out})
 
 
+def catalogo_upsell(request):
+    """API JSON: catalogo upsell per la sezione "Aggiungi extra" del
+    riepilogo prenotazione.
+
+    GET /app/api/upsell/?servizi_scelti=1,4
+    Querystring:
+      - servizi_scelti: csv di id servizi gia' selezionati nello step 1.
+        Usato sia per escluderli dal catalogo (sono gia' nel carrello),
+        sia per filtrare gli upsell legati a servizi base specifici via
+        ServizioProdotto.upsell_per.
+
+    Risposta:
+      {
+        "servizi_extra": [{id, titolo, prezzo, durata_minuti, descrizione, immagine}, ...],
+        "prodotti":      [{id, titolo, prezzo, descrizione, immagine}, ...]
+      }
+
+    Logica filtro:
+      proponi_in_upsell=True AND attivo=True
+      AND NOT IN (servizi_scelti)
+      AND (upsell_per vuoto                  -- universale
+           OR upsell_per intersect servizi_scelti)  -- mirato
+    """
+    from django.db.models import Q
+
+    raw = (request.GET.get('servizi_scelti') or '').strip()
+    if raw:
+        try:
+            servizi_scelti_ids = [int(x) for x in raw.split(',') if x.strip()]
+        except ValueError:
+            return JsonResponse({'error': 'servizi_scelti non valido'}, status=400)
+    else:
+        servizi_scelti_ids = []
+
+    items = (
+        ServizioProdotto.objects
+        .filter(proponi_in_upsell=True, attivo=True)
+        .exclude(id__in=servizi_scelti_ids)
+        .filter(
+            Q(upsell_per__isnull=True)
+            | Q(upsell_per__in=servizi_scelti_ids)
+        )
+        .distinct()
+        .order_by('ordine_upsell', 'titolo')
+    )
+
+    def _serialize(it):
+        # immagine: tentiamo i nomi piu' comuni; se nessuno esiste,
+        # campo vuoto. Il frontend mostra un fallback grafico.
+        img = ''
+        for field in ('immagine', 'foto', 'thumbnail'):
+            val = getattr(it, field, None)
+            if val:
+                try:
+                    img = val.url
+                except (ValueError, AttributeError):
+                    img = ''
+                break
+        return {
+            'id': it.id,
+            'titolo': it.titolo,
+            'prezzo': str(it.prezzo),
+            'descrizione': it.descrizione or '',
+            'durata_minuti': it.durata_minuti if it.tipo == 'servizio' else None,
+            'immagine': img,
+        }
+
+    return JsonResponse({
+        'servizi_extra': [_serialize(i) for i in items if i.tipo == 'servizio'],
+        'prodotti': [_serialize(i) for i in items if i.tipo == 'prodotto'],
+    })
+
+
 @require_POST
 def crea_prenotazione_pub(request):
     """Crea prenotazione cliente con flusso lazy-register.
@@ -216,6 +289,14 @@ def crea_prenotazione_pub(request):
     data_str = body.get('data')
     ora_str = body.get('ora')
     servizi_ids = body.get('servizi') or []
+    # Upsell: servizi complementari scelti nello step di riepilogo
+    # (es. "Aspirazione interni" aggiunta a un Lavaggio esterno).
+    # Validati con stesso filtro dei servizi base + proponi_in_upsell.
+    servizi_extra_ids = body.get('servizi_extra') or []
+    # Upsell: prodotti da scaffale con quantita' (profumatore x2, ecc.).
+    # Lista di {id, quantita}. Salvati in PrenotazioneProdotto con
+    # snapshot del prezzo corrente.
+    prodotti_raw = body.get('prodotti') or []
     tipo_auto = (body.get('tipo_auto') or '').strip()
     nota = (body.get('nota') or '').strip()
 
@@ -244,7 +325,52 @@ def crea_prenotazione_pub(request):
     )
     if not servizi:
         return JsonResponse({'error': 'Servizi non trovati'}, status=400)
-    durata = sum(s.durata_minuti or 30 for s in servizi)
+
+    # Servizi extra (upsell): validati separatamente con proponi_in_upsell.
+    # Vengono uniti ai servizi base in un singolo set prima del save del
+    # M2M, cosi' niente duplicati anche se qualcuno appare in entrambi
+    # gli array del payload.
+    servizi_extra = []
+    if servizi_extra_ids:
+        servizi_extra = list(
+            ServizioProdotto.objects.filter(
+                id__in=servizi_extra_ids,
+                attivo=True, tipo='servizio',
+                proponi_in_upsell=True,
+            )
+        )
+
+    # Prodotti upsell: validati uno per uno con quantita' >= 1.
+    # Costruiamo una mappa {servizio_prodotto: quantita} per il save
+    # successivo. Se quantita <= 0 si ignora silenziosamente l'item.
+    prodotti_validi = []
+    if prodotti_raw:
+        ids_richiesti = []
+        qty_richieste = {}
+        for item in prodotti_raw:
+            if not isinstance(item, dict):
+                continue
+            try:
+                pid = int(item.get('id'))
+                qty = int(item.get('quantita') or 0)
+            except (TypeError, ValueError):
+                return JsonResponse({'error': 'Prodotto non valido'}, status=400)
+            if qty <= 0:
+                continue
+            ids_richiesti.append(pid)
+            qty_richieste[pid] = qty
+        if ids_richiesti:
+            prodotti_db = ServizioProdotto.objects.filter(
+                id__in=ids_richiesti,
+                attivo=True, tipo='prodotto',
+                proponi_in_upsell=True,
+            )
+            prodotti_validi = [(p, qty_richieste[p.pk]) for p in prodotti_db]
+
+    # Durata calcolata sui servizi (base + extra). I prodotti non
+    # consumano tempo di lavorazione.
+    tutti_servizi = {s.pk: s for s in servizi + servizi_extra}.values()
+    durata = sum(s.durata_minuti or 30 for s in tutti_servizi)
 
     # ---------- Determina cliente ----------
     cliente = None
@@ -363,7 +489,24 @@ def crea_prenotazione_pub(request):
         email_contatto=contact_email,
         telefono_contatto=contact_telefono,
     )
-    prenotazione.servizi.set(servizi)
+    # M2M servizi: base + extra. set() gestisce sia INSERT che UPDATE
+    # dei legami.
+    prenotazione.servizi.set(list(tutti_servizi))
+
+    # Prodotti upsell: una riga PrenotazioneProdotto per ognuno con il
+    # prezzo "fotografato" al momento (protegge il cliente da cambi
+    # listino tra prenotazione e check-in).
+    if prodotti_validi:
+        from apps.prenotazioni.models import PrenotazioneProdotto
+        PrenotazioneProdotto.objects.bulk_create([
+            PrenotazioneProdotto(
+                prenotazione=prenotazione,
+                servizio_prodotto=prodotto,
+                quantita=qty,
+                prezzo_unitario=prodotto.prezzo,
+            )
+            for prodotto, qty in prodotti_validi
+        ])
 
     # Auto-login se ha appena creato un User
     if user_creato:
@@ -393,7 +536,7 @@ def crea_prenotazione_pub(request):
         'cliente': str(cliente),
         'data': data_p.strftime('%d/%m/%Y'),
         'ora': ora_inizio.strftime('%H:%M'),
-        'servizi': [s.titolo for s in servizi],
+        'servizi': [s.titolo for s in tutti_servizi],
         'tipo_auto': tipo_auto,
         'timestamp': timezone.now().isoformat(),
     })

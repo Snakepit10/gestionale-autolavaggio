@@ -74,6 +74,88 @@
 @media (max-width: 575.98px) {
     .bk-actions { bottom: 60px; }
 }
+
+/* Upsell: griglia di card extra nella schermata di riepilogo */
+.upsell-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+    gap: 10px;
+}
+.upsell-card {
+    background: var(--mw-navy-soft);
+    border: 1px solid var(--mw-line);
+    border-radius: 12px;
+    padding: 10px;
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    transition: border-color .15s, transform .12s;
+}
+.upsell-card.selected {
+    border-color: var(--mw-cyan-light);
+    box-shadow: 0 0 0 2px rgba(74, 185, 224, .25);
+}
+.upsell-card .titolo {
+    font-weight: 600;
+    font-size: .92rem;
+    line-height: 1.2;
+}
+.upsell-card .desc {
+    font-size: .78rem;
+    color: var(--mw-text-soft);
+    line-height: 1.3;
+    max-height: 2.6em;
+    overflow: hidden;
+}
+.upsell-card .meta {
+    font-size: .75rem;
+    color: var(--mw-text-soft);
+}
+.upsell-card .prezzo {
+    font-weight: 700;
+    color: var(--mw-cyan-light);
+    font-size: 1rem;
+}
+.upsell-card .actions {
+    margin-top: auto;
+}
+.upsell-card .btn-add,
+.upsell-card .btn-rem {
+    width: 100%;
+    padding: 6px 10px;
+    border-radius: 8px;
+    font-size: .82rem;
+    font-weight: 600;
+    border: 1px solid var(--mw-cyan-light);
+    background: transparent;
+    color: var(--mw-cyan-light);
+    cursor: pointer;
+    transition: background .12s, color .12s;
+}
+.upsell-card .btn-add:hover { background: var(--mw-cyan-light); color: var(--mw-navy); }
+.upsell-card.selected .btn-rem { background: var(--mw-cyan-light); color: var(--mw-navy); }
+.upsell-card .qty {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 6px;
+}
+.upsell-card .qty button {
+    width: 32px; height: 32px;
+    border-radius: 8px;
+    background: transparent;
+    border: 1px solid var(--mw-line);
+    color: var(--mw-text);
+    font-weight: 700;
+    cursor: pointer;
+}
+.upsell-card .qty button:hover { background: var(--mw-navy); }
+.upsell-card .qty span {
+    flex: 1;
+    text-align: center;
+    font-weight: 700;
+    font-size: 1rem;
+}
 </style>
 {% endblock %}
 
@@ -234,12 +316,43 @@
             <div id="rec-data" class="fs-5 fw-bold mt-1"></div>
             <div class="small opacity-75 mt-3 fw-bold">Servizi richiesti</div>
             <div id="rec-servizi-list" class="mt-1"></div>
+            <div id="rec-prodotti-wrap" class="mt-2" style="display:none;">
+                <div class="small opacity-75 fw-bold">Extra</div>
+                <div id="rec-prodotti-list" class="mt-1"></div>
+            </div>
             <div class="small opacity-90 mt-3 pt-2 border-top border-light border-opacity-25">
                 <i class="bi bi-clock"></i> Durata stimata: <span id="rec-durata">--</span>
             </div>
-            <div class="small opacity-75 mt-2">
+            <div id="rec-totale-wrap" class="mt-2 pt-2 border-top border-light border-opacity-25" style="display:none;">
+                <div class="d-flex justify-content-between align-items-center">
+                    <span class="fw-bold">Totale stimato</span>
+                    <span class="fs-5 fw-bold" id="rec-totale">€ 0,00</span>
+                </div>
+                <div class="small opacity-75 mt-1">
+                    Il prezzo finale verra confermato al ritiro.
+                </div>
+            </div>
+            <div id="rec-no-totale" class="small opacity-75 mt-2">
                 Il prezzo finale verra comunicato al ritiro.
             </div>
+        </div>
+
+        {# ========== Sezione upsell: Aggiungi extra al tuo lavaggio ========== #}
+        <div class="pub-card mb-3" id="upsell-section" style="display:none;">
+            <h6 class="fw-bold mb-2">
+                <i class="bi bi-plus-circle" style="color:var(--mw-cyan-light)"></i>
+                Aggiungi extra al tuo lavaggio
+            </h6>
+            <p class="text-muted small mb-3">
+                Servizi e prodotti complementari per rendere il tuo lavaggio ancora migliore.
+            </p>
+            <div id="upsell-loading" class="text-center text-muted small py-2">
+                <i class="bi bi-arrow-clockwise"></i> Caricamento...
+            </div>
+            <div id="upsell-empty" class="text-muted small text-center py-2" style="display:none;">
+                Nessun extra disponibile per i servizi selezionati.
+            </div>
+            <div id="upsell-grid" class="upsell-grid" style="display:none;"></div>
         </div>
 
         {% if not user.is_authenticated %}
@@ -331,6 +444,17 @@ let serviziSelezionati = [];
 let dataSelezionata = '';
 let oraSelezionata = '';
 
+// Upsell state (popolato all'ingresso nello step 4):
+// - upsellServiziCatalogo: Map id -> {titolo, prezzo, durata}
+// - upsellProdottiCatalogo: Map id -> {titolo, prezzo}
+// - serviziExtraSel: Set di id servizi extra selezionati
+// - prodottiSel: Map id -> qty (1..N) dei prodotti selezionati
+let upsellServiziCatalogo = new Map();
+let upsellProdottiCatalogo = new Map();
+let serviziExtraSel = new Set();
+let prodottiSel = new Map();
+let lastUpsellSignature = '';  // per evitare refetch inutili
+
 function getCsrf() {
     // Preferisci il cookie csrftoken (autoritativo per Django).
     // Fallback al form input solo se il cookie non e' presente.
@@ -375,8 +499,140 @@ function goStep(n) {
             caricaSlot();
         }
     }
-    if (n === 4) renderRiepilogo();
+    if (n === 4) {
+        caricaUpsell();   // fetch (no-op se gia' caricato per gli stessi servizi)
+        renderRiepilogo();
+    }
     window.scrollTo({ top: 0, behavior: 'smooth' });
+}
+
+function caricaUpsell() {
+    // Firma basata sui servizi base scelti: se non e' cambiata rispetto
+    // all'ultimo fetch, non rifacciamo la chiamata (l'utente puo'
+    // tornare avanti/indietro tra step senza che il catalogo si
+    // ricarichi inutilmente).
+    const baseIds = serviziSelezionati.map(s => s.id).sort();
+    const sig = baseIds.join(',');
+    const section = document.getElementById('upsell-section');
+    section.style.display = '';
+
+    if (sig === lastUpsellSignature) {
+        renderUpsell();   // re-render con stato corrente
+        return;
+    }
+    // I servizi base sono cambiati: reset stato upsell precedente
+    // (potrebbe contenere item non piu' rilevanti).
+    serviziExtraSel = new Set();
+    prodottiSel = new Map();
+
+    document.getElementById('upsell-loading').style.display = '';
+    document.getElementById('upsell-empty').style.display = 'none';
+    document.getElementById('upsell-grid').style.display = 'none';
+
+    const qs = baseIds.length ? '?servizi_scelti=' + baseIds.join(',') : '';
+    fetch('/app/api/upsell/' + qs, { credentials: 'same-origin' })
+        .then(r => r.json())
+        .then(d => {
+            upsellServiziCatalogo = new Map();
+            upsellProdottiCatalogo = new Map();
+            (d.servizi_extra || []).forEach(s => upsellServiziCatalogo.set(s.id, {
+                id: s.id, titolo: s.titolo,
+                prezzo: parseFloat(s.prezzo) || 0,
+                durata: s.durata_minuti || 30,
+                descrizione: s.descrizione,
+            }));
+            (d.prodotti || []).forEach(p => upsellProdottiCatalogo.set(p.id, {
+                id: p.id, titolo: p.titolo,
+                prezzo: parseFloat(p.prezzo) || 0,
+                descrizione: p.descrizione,
+            }));
+            lastUpsellSignature = sig;
+            renderUpsell();
+            renderRiepilogo();
+        })
+        .catch(() => {
+            document.getElementById('upsell-loading').style.display = 'none';
+            document.getElementById('upsell-empty').textContent =
+                'Errore caricamento extra. Puoi comunque proseguire.';
+            document.getElementById('upsell-empty').style.display = '';
+        });
+}
+
+function renderUpsell() {
+    const grid = document.getElementById('upsell-grid');
+    const empty = document.getElementById('upsell-empty');
+    const loading = document.getElementById('upsell-loading');
+    loading.style.display = 'none';
+
+    const totale = upsellServiziCatalogo.size + upsellProdottiCatalogo.size;
+    if (totale === 0) {
+        empty.style.display = '';
+        grid.style.display = 'none';
+        return;
+    }
+    empty.style.display = 'none';
+    grid.style.display = '';
+
+    const html = [];
+    // Servizi extra: toggle binario (Aggiungi/Rimuovi)
+    upsellServiziCatalogo.forEach(s => {
+        const sel = serviziExtraSel.has(s.id);
+        html.push(`
+            <div class="upsell-card ${sel ? 'selected' : ''}" data-kind="serv" data-id="${s.id}">
+                <div class="titolo">${escapeHtml(s.titolo)}</div>
+                ${s.descrizione ? `<div class="desc">${escapeHtml(s.descrizione)}</div>` : ''}
+                <div class="meta"><i class="bi bi-clock"></i> +${s.durata} min</div>
+                <div class="prezzo">€ ${s.prezzo.toFixed(2)}</div>
+                <div class="actions">
+                    ${sel
+                        ? `<button type="button" class="btn-rem" onclick="toggleServizioExtra(${s.id})"><i class="bi bi-check2"></i> Aggiunto — rimuovi</button>`
+                        : `<button type="button" class="btn-add" onclick="toggleServizioExtra(${s.id})"><i class="bi bi-plus-lg"></i> Aggiungi</button>`}
+                </div>
+            </div>`);
+    });
+    // Prodotti: quantita' regolabile con - / +
+    upsellProdottiCatalogo.forEach(p => {
+        const qty = prodottiSel.get(p.id) || 0;
+        const sel = qty > 0;
+        html.push(`
+            <div class="upsell-card ${sel ? 'selected' : ''}" data-kind="prod" data-id="${p.id}">
+                <div class="titolo">${escapeHtml(p.titolo)}</div>
+                ${p.descrizione ? `<div class="desc">${escapeHtml(p.descrizione)}</div>` : ''}
+                <div class="prezzo">€ ${p.prezzo.toFixed(2)}</div>
+                <div class="actions">
+                    ${qty === 0
+                        ? `<button type="button" class="btn-add" onclick="prodQty(${p.id}, 1)"><i class="bi bi-plus-lg"></i> Aggiungi</button>`
+                        : `<div class="qty">
+                                <button type="button" onclick="prodQty(${p.id}, -1)">−</button>
+                                <span>${qty}</span>
+                                <button type="button" onclick="prodQty(${p.id}, 1)">+</button>
+                            </div>`}
+                </div>
+            </div>`);
+    });
+    grid.innerHTML = html.join('');
+}
+
+function escapeHtml(s) {
+    return String(s == null ? '' : s)
+        .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+}
+
+function toggleServizioExtra(id) {
+    if (serviziExtraSel.has(id)) serviziExtraSel.delete(id);
+    else serviziExtraSel.add(id);
+    renderUpsell();
+    renderRiepilogo();
+}
+
+function prodQty(id, delta) {
+    const cur = prodottiSel.get(id) || 0;
+    const next = Math.max(0, Math.min(9, cur + delta));
+    if (next === 0) prodottiSel.delete(id);
+    else prodottiSel.set(id, next);
+    renderUpsell();
+    renderRiepilogo();
 }
 
 function goStep4() {
@@ -427,16 +683,76 @@ function selSlot(el) {
 }
 
 function renderRiepilogo() {
-    const durata = serviziSelezionati.reduce((a, s) => a + s.durata, 0);
     document.getElementById('rec-data').textContent =
         `${dataSelezionata.split('-').reverse().join('/')} alle ${oraSelezionata}`;
+
+    // Servizi: base (sempre, dallo step 1) + extra (da upsell)
     const list = document.getElementById('rec-servizi-list');
-    list.innerHTML = serviziSelezionati.map(s =>
+    const serviziHtml = serviziSelezionati.map(s =>
         `<div class="d-flex align-items-center gap-2 mb-1">
-            <i class="bi bi-check-circle-fill"></i> ${s.titolo}
+            <i class="bi bi-check-circle-fill"></i> ${escapeHtml(s.titolo)}
         </div>`
-    ).join('');
+    );
+    let durata = serviziSelezionati.reduce((a, s) => a + s.durata, 0);
+    serviziExtraSel.forEach(id => {
+        const s = upsellServiziCatalogo.get(id);
+        if (!s) return;
+        durata += s.durata;
+        serviziHtml.push(
+            `<div class="d-flex align-items-center gap-2 mb-1">
+                <i class="bi bi-plus-circle-fill" style="color:var(--mw-cyan-light)"></i> ${escapeHtml(s.titolo)}
+            </div>`
+        );
+    });
+    list.innerHTML = serviziHtml.join('');
     document.getElementById('rec-durata').textContent = `circa ${durata} min`;
+
+    // Prodotti: visibili solo se almeno uno selezionato
+    const prodWrap = document.getElementById('rec-prodotti-wrap');
+    const prodList = document.getElementById('rec-prodotti-list');
+    if (prodottiSel.size === 0) {
+        prodWrap.style.display = 'none';
+        prodList.innerHTML = '';
+    } else {
+        prodWrap.style.display = '';
+        const prodHtml = [];
+        prodottiSel.forEach((qty, id) => {
+            const p = upsellProdottiCatalogo.get(id);
+            if (!p) return;
+            prodHtml.push(
+                `<div class="d-flex justify-content-between align-items-center mb-1">
+                    <span><i class="bi bi-bag-check-fill" style="color:var(--mw-cyan-light)"></i> ${escapeHtml(p.titolo)} × ${qty}</span>
+                    <span class="opacity-75">€ ${(p.prezzo * qty).toFixed(2)}</span>
+                </div>`
+            );
+        });
+        prodList.innerHTML = prodHtml.join('');
+    }
+
+    // Totale extra: somma prezzi servizi_extra + prezzi*qty prodotti.
+    // I servizi base restano senza prezzo (politica esistente: prezzo
+    // dei lavaggi comunicato al ritiro). Se totale extra > 0 mostro il
+    // bottone "Totale extra"; altrimenti nascondo e tengo il messaggio
+    // "Il prezzo finale verra comunicato al ritiro".
+    let totaleExtra = 0;
+    serviziExtraSel.forEach(id => {
+        const s = upsellServiziCatalogo.get(id);
+        if (s) totaleExtra += s.prezzo;
+    });
+    prodottiSel.forEach((qty, id) => {
+        const p = upsellProdottiCatalogo.get(id);
+        if (p) totaleExtra += p.prezzo * qty;
+    });
+    const totWrap = document.getElementById('rec-totale-wrap');
+    const noTot = document.getElementById('rec-no-totale');
+    if (totaleExtra > 0) {
+        document.getElementById('rec-totale').textContent = `€ ${totaleExtra.toFixed(2)}`;
+        totWrap.style.display = '';
+        noTot.style.display = 'none';
+    } else {
+        totWrap.style.display = 'none';
+        noTot.style.display = '';
+    }
 }
 
 // Step intermedio: prima di inviare la prenotazione, l'utente deve
@@ -464,6 +780,8 @@ function confermaPrenotazione() {
         data: dataSelezionata,
         ora: oraSelezionata,
         servizi: serviziSelezionati.map(s => s.id),
+        servizi_extra: Array.from(serviziExtraSel),
+        prodotti: Array.from(prodottiSel.entries()).map(([id, quantita]) => ({ id, quantita })),
         tipo_auto: document.getElementById('bk-tipo-auto').value,
         nota: document.getElementById('bk-nota').value,
     };

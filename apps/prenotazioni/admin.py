@@ -1,5 +1,20 @@
 from django.contrib import admin
-from .models import ConfigurazioneSlot, SlotPrenotazione, Prenotazione, CalendarioPersonalizzato
+from .models import (
+    ConfigurazioneSlot, SlotPrenotazione, Prenotazione,
+    PrenotazioneProdotto, CalendarioPersonalizzato,
+)
+
+
+class PrenotazioneProdottoInline(admin.TabularInline):
+    model = PrenotazioneProdotto
+    extra = 0
+    readonly_fields = ['creato_il', 'subtotale']
+    autocomplete_fields = ['servizio_prodotto']
+
+    def subtotale(self, obj):
+        if obj.pk:
+            return obj.subtotale
+        return '-'
 
 
 @admin.register(ConfigurazioneSlot)
@@ -27,7 +42,8 @@ class PrenotazioneAdmin(admin.ModelAdmin):
     list_filter = ['stato', 'creata_il', 'slot__data']
     search_fields = ['codice_prenotazione', 'cliente__nome', 'cliente__cognome']
     readonly_fields = ['codice_prenotazione', 'creata_il']
-    
+    inlines = [PrenotazioneProdottoInline]
+
     def get_queryset(self, request):
         return super().get_queryset(request).select_related('cliente', 'slot')
 

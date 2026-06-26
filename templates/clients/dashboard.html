@@ -62,6 +62,11 @@
                     {% for s in p.servizi.all %}
                     <span class="badge bg-light text-dark border">{{ s.titolo }}</span>
                     {% endfor %}
+                    {% for pe in p.prodotti_extra.all %}
+                    <span class="badge border" style="background:#ede9fe;color:#5b21b6;border-color:#c4b5fd!important;" title="Extra acquistato">
+                        <i class="bi bi-bag-check-fill"></i> {{ pe.servizio_prodotto.titolo }}{% if pe.quantita > 1 %} ×{{ pe.quantita }}{% endif %}
+                    </span>
+                    {% endfor %}
                 </div>
                 {% if p.tipo_auto %}
                 <div class="small text-muted"><i class="bi bi-car-front"></i> {{ p.tipo_auto }}</div>

@@ -21,11 +21,19 @@ class PostazioneAdmin(admin.ModelAdmin):
 
 @admin.register(ServizioProdotto)
 class ServizioProdottoAdmin(admin.ModelAdmin):
-    list_display = ['titolo', 'tipo', 'categoria', 'prezzo', 'attivo', 'scorta_bassa']
-    list_filter = ['tipo', 'categoria', 'attivo']
+    list_display = [
+        'titolo', 'tipo', 'categoria', 'prezzo', 'attivo',
+        'mostra_pubblico', 'proponi_in_upsell', 'ordine_upsell',
+        'scorta_bassa',
+    ]
+    list_filter = [
+        'tipo', 'categoria', 'attivo',
+        'mostra_pubblico', 'proponi_in_upsell',
+    ]
+    list_editable = ['proponi_in_upsell', 'ordine_upsell']
     search_fields = ['titolo', 'descrizione', 'codice_prodotto']
-    filter_horizontal = ['postazioni']
-    
+    filter_horizontal = ['postazioni', 'upsell_per']
+
     def scorta_bassa(self, obj):
         return obj.scorta_bassa
     scorta_bassa.boolean = True

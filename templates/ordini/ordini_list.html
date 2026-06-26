@@ -243,6 +243,11 @@
                         {% for s in p.servizi.all %}
                             <span class="badge bg-light text-dark border" style="font-size:.68rem;padding:2px 6px;">{{ s.titolo }}</span>
                         {% endfor %}
+                        {% for pe in p.prodotti_extra.all %}
+                            <span class="badge border" style="font-size:.68rem;padding:2px 6px;background:#ede9fe;color:#5b21b6;border-color:#c4b5fd!important;" title="Prodotto extra acquistato in upsell">
+                                <i class="bi bi-bag-check-fill"></i> {{ pe.servizio_prodotto.titolo }}{% if pe.quantita > 1 %} ×{{ pe.quantita }}{% endif %}
+                            </span>
+                        {% endfor %}
                         {% if p.tipo_auto %}
                             <span class="pren-meta ms-1"><i class="bi bi-car-front"></i> {{ p.tipo_auto }}</span>
                         {% endif %}
@@ -652,6 +657,7 @@ function proponiConferma() {
             data-nota-cliente="{{ p.nota_cliente|default:'' }}"
             data-tipo-consegna="{{ p.tipo_consegna|default:'immediata' }}"
             data-ora-consegna="{{ p.ora_consegna_richiesta|time:'H:i'|default:'' }}"
+            data-prodotti-extra="{% for pe in p.prodotti_extra.all %}{{ pe.servizio_prodotto.titolo|escape }}|{{ pe.quantita }}|{{ pe.prezzo_unitario }}{% if not forloop.last %}~~{% endif %}{% endfor %}"
             title="{% if p.delta_min < 0 %}In ritardo di {{ p.delta_min|stringformat:'d'|cut:'-' }} min{% elif p.delta_min == 0 %}Ora{% else %}Tra {{ p.delta_min }} min{% endif %}">
         <span class="time-pill">
             <i class="bi bi-clock"></i> {{ p.slot.ora_inizio|time:"H:i" }}
@@ -771,6 +777,16 @@ function proponiConferma() {
                 {% endfor %}
               </div>
               <input type="hidden" name="servizi_ids" id="ckServiziIds">
+            </div>
+
+            {# Sezione "Prodotti extra acquistati" via upsell online (read-only) #}
+            <div class="col-12" id="ckProdottiExtraWrap" style="display:none;">
+              <label class="form-label small fw-bold text-muted">
+                <i class="bi bi-bag-check-fill" style="color:#7c3aed"></i>
+                Prodotti extra acquistati
+              </label>
+              <div id="ckProdottiExtraBox" class="d-flex flex-wrap gap-1 p-2 border rounded" style="background:#f5f3ff;"></div>
+              <div class="form-text small text-muted">Acquistati dal cliente nel flusso upsell della prenotazione. Verranno aggiunti come item dell'ordine al check-in.</div>
             </div>
           </div>
 
@@ -990,6 +1006,30 @@ function ckEliminaPrenotazione() {
     document.getElementById('ckTipoConsegna').value = tipoConsegnaPren;
     document.getElementById('ckOraConsegna').value = btn.getAttribute('data-ora-consegna') || '';
     ckToggleOra();
+
+    // Prodotti extra (upsell): se la prenotazione ne ha, popoliamo il box
+    // read-only. Formato data-prodotti-extra = "titolo|qty|prezzo~~titolo2|qty2|prezzo2".
+    // Sono read-only nel modal: vengono aggiunti automaticamente all'ordine
+    // alla conferma del check-in tramite converti_in_ordine.
+    const peRaw = btn.getAttribute('data-prodotti-extra') || '';
+    const peWrap = document.getElementById('ckProdottiExtraWrap');
+    const peBox = document.getElementById('ckProdottiExtraBox');
+    if (peRaw.trim()) {
+        const items = peRaw.split('~~').filter(Boolean).map(s => {
+            const [titolo, qty, prezzo] = s.split('|');
+            return { titolo, qty: parseInt(qty) || 1, prezzo: parseFloat(prezzo) || 0 };
+        });
+        peBox.innerHTML = items.map(it =>
+            `<span class="badge" style="background:#ede9fe;color:#5b21b6;border:1px solid #c4b5fd;font-size:.78rem;padding:4px 8px;">
+                <i class="bi bi-bag-check-fill"></i> ${it.titolo}${it.qty > 1 ? ' ×' + it.qty : ''}
+                <span class="ms-1" style="opacity:.85;">€ ${(it.prezzo * it.qty).toFixed(2)}</span>
+            </span>`
+        ).join('');
+        peWrap.style.display = '';
+    } else {
+        peWrap.style.display = 'none';
+        peBox.innerHTML = '';
+    }
 
     // Precheck servizi correnti
     const serviziIds = (btn.getAttribute('data-servizi-ids') || '').split(',').filter(Boolean);

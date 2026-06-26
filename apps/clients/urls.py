@@ -15,6 +15,7 @@ urlpatterns = [
 
     # API JSON
     path('api/slot/', views.slot_disponibili_pub, name='api_slot'),
+    path('api/upsell/', views.catalogo_upsell, name='api_upsell'),
     path('api/prenota/', views.crea_prenotazione_pub, name='api_prenota'),
 
     # Diagnostica (solo staff)
