@@ -364,8 +364,10 @@
                 </div>
             </div>
 
-            {# servizi_per_categoria: lista (categoria, [items]); ogni item compare
-               in ogni categoria a cui appartiene (primaria + aggiuntive). #}
+            {% comment %}
+            servizi_per_categoria: lista (categoria, [items]); ogni item compare
+            in ogni categoria a cui appartiene (primaria + aggiuntive).
+            {% endcomment %}
             {% for categoria, items in servizi_per_categoria %}
                 <div class="categoria-sezione mb-4" data-categoria="{{ categoria.id }}">
                     <!-- Intestazione categoria -->
