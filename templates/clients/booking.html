@@ -215,10 +215,12 @@
         <div class="pi" data-key="conferma" title="Conferma"></div>
     </div>
 
-    {# ========== STEP CATEGORIE: uno per ciascuna (Esterno, Interno, ...).
-       servizi_per_categoria e' una lista di tuple (categoria, [servizi])
-       gia' pronta dal backend, con item multicategoria duplicati nelle
-       loro sezioni. ========== #}
+    {% comment %}
+    STEP CATEGORIE: uno per ciascuna (Esterno, Interno, ...).
+    servizi_per_categoria e' una lista di tuple (categoria, [servizi])
+    gia' pronta dal backend, con item multicategoria duplicati nelle
+    loro sezioni.
+    {% endcomment %}
     {% for cat, servizi_cat in servizi_per_categoria %}
     <section class="bk-step {% if forloop.first %}active{% endif %}" data-step-key="cat-{{ cat.id }}">
         <h3 class="fw-bold mb-1">{{ forloop.counter }}. {{ cat.nome }}</h3>
