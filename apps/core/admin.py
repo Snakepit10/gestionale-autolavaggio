@@ -7,9 +7,9 @@ from .models import (
 
 @admin.register(Categoria)
 class CategoriaAdmin(admin.ModelAdmin):
-    list_display = ['nome', 'ordine_visualizzazione', 'attiva', 'solo_pubblico']
-    list_editable = ['ordine_visualizzazione', 'attiva', 'solo_pubblico']
-    list_filter = ['attiva', 'solo_pubblico']
+    list_display = ['nome', 'ordine_visualizzazione', 'attiva', 'solo_pubblico', 'selezione_singola']
+    list_editable = ['ordine_visualizzazione', 'attiva', 'solo_pubblico', 'selezione_singola']
+    list_filter = ['attiva', 'solo_pubblico', 'selezione_singola']
     ordering = ['ordine_visualizzazione', 'nome']
 
 

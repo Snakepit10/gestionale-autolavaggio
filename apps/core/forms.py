@@ -7,7 +7,7 @@ from .models import Categoria, ServizioProdotto, Sconto, StampanteRete
 class CategoriaForm(forms.ModelForm):
     class Meta:
         model = Categoria
-        fields = ['nome', 'descrizione', 'ordine_visualizzazione', 'attiva', 'solo_pubblico']
+        fields = ['nome', 'descrizione', 'ordine_visualizzazione', 'attiva', 'solo_pubblico', 'selezione_singola']
         widgets = {
             'descrizione': forms.Textarea(attrs={'rows': 3}),
         }

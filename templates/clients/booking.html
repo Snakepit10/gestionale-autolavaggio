@@ -219,15 +219,22 @@
     STEP CATEGORIE: uno per ciascuna (Esterno, Interno, ...).
     servizi_per_categoria e' una lista di tuple (categoria, [servizi])
     gia' pronta dal backend, con item multicategoria duplicati nelle
-    loro sezioni.
+    loro sezioni. La categoria porta selezione_singola che governa
+    radio (singola) vs checkbox (multipla) lato JS.
     {% endcomment %}
     {% for cat, servizi_cat in servizi_per_categoria %}
-    <section class="bk-step {% if forloop.first %}active{% endif %}" data-step-key="cat-{{ cat.id }}">
+    <section class="bk-step {% if forloop.first %}active{% endif %}"
+             data-step-key="cat-{{ cat.id }}"
+             data-categoria-id="{{ cat.id }}"
+             data-selezione-singola="{{ cat.selezione_singola|yesno:'1,0' }}">
         <h3 class="fw-bold mb-1">{{ forloop.counter }}. {{ cat.nome }}</h3>
         <p class="text-muted">
-            {% if forloop.first %}
-                Inizia scegliendo i lavaggi. Puoi proseguire anche senza
-                selezionare nulla in questa categoria.
+            {% if cat.selezione_singola %}
+                Scegli <strong>uno</strong> dei servizi disponibili
+                {% if not forloop.first %}(opzionale){% endif %}.
+            {% elif forloop.first %}
+                Seleziona uno o piu' lavaggi. Puoi anche proseguire senza
+                scegliere nulla in questa categoria.
             {% else %}
                 Aggiungi servizi di questa categoria (opzionale).
             {% endif %}
@@ -633,11 +640,50 @@ function vaiIndietro() {
 // === Selezione servizi base (step categoria) =====================
 // Un servizio puo' apparire in piu' step (multicategoria): tutte le
 // card con lo stesso data-id devono restare sincronizzate visivamente.
+// La categoria ha un flag selezione_singola: se True, scegliere un
+// servizio in quel passo deseleziona gli altri della stessa categoria
+// (comportamento radio button). Se False, si possono spuntare piu'
+// servizi nella stessa categoria (checkbox, default).
+function _setCardVisual(card, selezionato) {
+    card.classList.toggle('selected', selezionato);
+    const check = card.querySelector('.check');
+    if (check) {
+        check.className = selezionato
+            ? 'bi bi-check-circle-fill check'
+            : 'bi bi-circle check';
+    }
+}
+
+function _deselezionaServizio(id) {
+    const idx = serviziSelezionati.findIndex(s => s.id === id);
+    if (idx >= 0) serviziSelezionati.splice(idx, 1);
+    document.querySelectorAll(`.servizio-pick[data-id="${id}"]`)
+        .forEach(card => _setCardVisual(card, false));
+}
+
 function toggleServizio(el) {
     const id = parseInt(el.dataset.id);
-    const idx = serviziSelezionati.findIndex(s => s.id === id);
-    const giaSelezionato = idx >= 0;
+    const catId = parseInt(el.dataset.categoriaId) || 0;
+    const step = el.closest('.bk-step');
+    const isSingola = step && step.dataset.selezioneSingola === '1';
+    const giaSelezionato = serviziSelezionati.findIndex(s => s.id === id) >= 0;
+
+    // Esclusione mutua nelle categorie a selezione singola: se sto
+    // selezionando (non deselezionando), deseleziono tutti gli altri
+    // servizi gia' selezionati nella STESSA categoria (filtro per
+    // .servizio-pick[data-categoria-id=catId] visivamente .selected).
+    if (isSingola && !giaSelezionato) {
+        document.querySelectorAll(
+            `.servizio-pick[data-categoria-id="${catId}"].selected`
+        ).forEach(otherCard => {
+            const otherId = parseInt(otherCard.dataset.id);
+            if (otherId !== id) _deselezionaServizio(otherId);
+        });
+    }
+
+    // Toggle dell'item cliccato
     if (giaSelezionato) {
+        const idx = serviziSelezionati.findIndex(s => s.id === id);
         serviziSelezionati.splice(idx, 1);
     } else {
         serviziSelezionati.push({
@@ -645,20 +691,13 @@ function toggleServizio(el) {
             titolo: el.dataset.titolo,
             durata: parseInt(el.dataset.durata),
             prezzo: parseFloat(el.dataset.prezzo) || 0,
-            categoriaId: parseInt(el.dataset.categoriaId) || 0,
+            categoriaId: catId,
         });
     }
-    // Sync visivo su TUTTE le card di questo servizio (potrebbe essere
-    // multicategoria -> piu' .servizio-pick con lo stesso data-id).
-    document.querySelectorAll(`.servizio-pick[data-id="${id}"]`).forEach(card => {
-        card.classList.toggle('selected', !giaSelezionato);
-        const check = card.querySelector('.check');
-        if (check) {
-            check.className = giaSelezionato
-                ? 'bi bi-circle check'
-                : 'bi bi-check-circle-fill check';
-        }
-    });
+    // Sync visivo su TUTTE le card di questo servizio (multicategoria).
+    document.querySelectorAll(`.servizio-pick[data-id="${id}"]`)
+        .forEach(card => _setCardVisual(card, !giaSelezionato));
+
     syncExtraDopoChange();
 }
 

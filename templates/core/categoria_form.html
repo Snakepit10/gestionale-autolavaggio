@@ -57,6 +57,20 @@
                         </div>
                     </div>
 
+                    <div class="form-check form-switch mb-3">
+                        {{ form.selezione_singola }}
+                        <label class="form-check-label" for="{{ form.selezione_singola.id_for_label }}">
+                            Selezione singola nel wizard
+                        </label>
+                        <div class="form-text small text-muted">
+                            Se attivo, nel wizard di prenotazione online il cliente puo'
+                            scegliere <strong>un solo</strong> servizio in questa categoria
+                            (radio button). Default disattivo = scelta multipla (checkbox).
+                            Usalo per scelte alternative tipo
+                            <em>Esterno base / Esterno completo / Esterno premium</em>.
+                        </div>
+                    </div>
+
                     <div class="d-flex justify-content-between">
                         <a href="{% url 'core:categoria-list' %}" class="btn btn-secondary">
                             <i class="bi bi-x-circle"></i> Annulla

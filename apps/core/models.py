@@ -18,6 +18,16 @@ class Categoria(models.Model):
                   "(/ordini/cassa/). Utile per gestire cataloghi diversi "
                   "tra cliente self-service e operatore al banco.",
     )
+    selezione_singola = models.BooleanField(
+        default=False,
+        verbose_name='Selezione singola nel wizard',
+        help_text="Se attivo, nel wizard di prenotazione online il cliente "
+                  "puo' scegliere UN solo servizio in questa categoria "
+                  "(comportamento radio button). Se disattivo, puo' "
+                  "selezionarne piu' di uno (comportamento checkbox, "
+                  "default). Usa singola per scelte alternative tipo "
+                  "'Esterno base / Esterno completo / Esterno premium'.",
+    )
 
     class Meta:
         ordering = ['ordine_visualizzazione', 'nome']
