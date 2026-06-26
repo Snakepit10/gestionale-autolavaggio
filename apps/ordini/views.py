@@ -35,22 +35,28 @@ class CassaView(LoginRequiredMixin, TemplateView):
         categorie_qs = list(Categoria.objects.filter(attiva=True, solo_pubblico=False))
         context['categorie'] = categorie_qs
 
-        # Servizi/prodotti distinct: un item compare una sola volta nel QS
-        # anche se appartiene a piu' categorie tramite categorie_aggiuntive
-        # (il join M2M lo duplicherebbe). distinct() lo collassa.
+        # Servizi/prodotti: includi tutti gli item attivi che hanno
+        # ALMENO una categoria visibile in cassa (primaria O aggiuntiva
+        # non solo_pubblico). distinct() perche' il join M2M sulle
+        # aggiuntive duplicherebbe l'item se ne ha piu' visibili.
         servizi_qs = list(
             ServizioProdotto.objects
-            .filter(attivo=True, categoria__solo_pubblico=False)
+            .filter(attivo=True)
+            .filter(
+                Q(categoria__solo_pubblico=False)
+                | Q(categorie_aggiuntive__solo_pubblico=False)
+            )
             .select_related('categoria')
             .prefetch_related('categorie_aggiuntive')
+            .distinct()
         )
         context['servizi_prodotti'] = servizi_qs
 
-        # Mappa "categoria -> items": un item appare in ogni categoria a
-        # cui appartiene (primaria + aggiuntive). Permette al template di
-        # iterare per categoria mostrando ciascun item nelle sue sezioni
-        # rilevanti, senza dover usare regroup (che si basa sulla sola
-        # categoria primaria).
+        # Mappa "categoria -> items": un item appare in ogni categoria
+        # VISIBILE a cui appartiene (primaria + aggiuntive). Le categorie
+        # solo_pubblico sono filtrate fuori a livello di cat_ids_visibili
+        # quindi un item con primaria solo_pubblico ma aggiuntiva normale
+        # appare comunque nella sezione "aggiuntiva".
         cat_ids_visibili = {c.id for c in categorie_qs}
         per_cat = {c.id: [] for c in categorie_qs}
         for s in servizi_qs:
