@@ -39,10 +39,15 @@ class ServizioProdottoForm(forms.ModelForm):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
 
-        # Limita le scelte di `upsell_per` ai soli servizi (esclude se
-        # stessi se l'oggetto esiste gia' per evitare cicli auto-referenziali).
+        # Limita le scelte di `upsell_per` ai soli servizi PUBBLICI
+        # (quelli che il cliente vede nello step 1 della prenotazione).
+        # Non ha senso legare un upsell a un servizio che il cliente non
+        # puo' nemmeno selezionare. Esclude se stessi se l'oggetto
+        # esiste gia' per evitare cicli auto-referenziali.
         from .models import ServizioProdotto as SP
-        qs = SP.objects.filter(tipo='servizio', attivo=True).order_by('titolo')
+        qs = SP.objects.filter(
+            tipo='servizio', attivo=True, mostra_pubblico=True,
+        ).order_by('titolo')
         if self.instance and self.instance.pk:
             qs = qs.exclude(pk=self.instance.pk)
         self.fields['upsell_per'].queryset = qs
