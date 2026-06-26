@@ -133,16 +133,47 @@ def booking(request):
     creare un account con password nello step 4. Loggati saltano
     direttamente alla conferma.
     """
-    categorie_pub = Categoria.objects.filter(attiva=True).order_by('ordine_visualizzazione', 'nome')
-    servizi = (
+    # Servizi base raggruppati per categoria (Esterno, Interno, Sottoscocca,
+    # ecc.): un wizard step per ogni categoria che ha almeno un servizio
+    # pubblico. L'ordine degli step segue Categoria.ordine_visualizzazione.
+    servizi = list(
         ServizioProdotto.objects
         .filter(attivo=True, tipo='servizio', is_supplemento=False, mostra_pubblico=True)
         .select_related('categoria')
         .order_by('categoria__ordine_visualizzazione', 'titolo')
     )
+    # Categorie effettivamente presenti nei servizi pubblici, in ordine.
+    # Usate dal template per renderizzare uno step per ognuna senza
+    # passare per regroup (che restituisce un grouper non iterabile due
+    # volte). Permette anche di calcolare il numero totale di step.
+    cat_ids_in_uso = []
+    for s in servizi:
+        if s.categoria_id not in cat_ids_in_uso:
+            cat_ids_in_uso.append(s.categoria_id)
+    cat_map = {c.id: c for c in Categoria.objects.filter(id__in=cat_ids_in_uso)}
+    categorie_step = [cat_map[i] for i in cat_ids_in_uso if i in cat_map]
+    # Extra (servizi upsell) e Profumazione (prodotti upsell): step dedicati
+    # nel wizard, dopo le categorie di servizi base. Non legati a una
+    # categoria specifica via upsell_per qui (il filtro per servizi scelti
+    # avviene client-side: l'utente nel template vede TUTTI gli upsell e
+    # il JS nasconde quelli non rilevanti per i servizi selezionati).
+    servizi_extra = (
+        ServizioProdotto.objects
+        .filter(attivo=True, tipo='servizio', proponi_in_upsell=True)
+        .prefetch_related('upsell_per')
+        .order_by('ordine_upsell', 'titolo')
+    )
+    prodotti_extra = (
+        ServizioProdotto.objects
+        .filter(attivo=True, tipo='prodotto', proponi_in_upsell=True)
+        .prefetch_related('upsell_per')
+        .order_by('ordine_upsell', 'titolo')
+    )
     return render(request, 'clients/booking.html', {
-        'categorie': categorie_pub,
+        'categorie_step': categorie_step,
         'servizi': servizi,
+        'servizi_extra': servizi_extra,
+        'prodotti_extra': prodotti_extra,
     })
 
 
