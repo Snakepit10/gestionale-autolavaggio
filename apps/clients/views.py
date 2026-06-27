@@ -169,29 +169,15 @@ def booking(request):
     servizi_per_categoria = [(c, per_cat[c.id]) for c in categorie_step]
     # Manteniamo anche `servizi` flat per compat con codice JS esistente
     servizi = servizi_qs
-    # Extra (servizi upsell) e Profumazione (prodotti upsell): step dedicati
-    # nel wizard, dopo le categorie di servizi base. Non legati a una
-    # categoria specifica via upsell_per qui (il filtro per servizi scelti
-    # avviene client-side: l'utente nel template vede TUTTI gli upsell e
-    # il JS nasconde quelli non rilevanti per i servizi selezionati).
-    servizi_extra = (
-        ServizioProdotto.objects
-        .filter(attivo=True, tipo='servizio', proponi_in_upsell=True)
-        .prefetch_related('upsell_per')
-        .order_by('ordine_upsell', 'titolo')
-    )
-    prodotti_extra = (
-        ServizioProdotto.objects
-        .filter(attivo=True, tipo='prodotto', proponi_in_upsell=True)
-        .prefetch_related('upsell_per')
-        .order_by('ordine_upsell', 'titolo')
-    )
+    # Gli step Extra/Profumazione sono stati rimossi dal wizard:
+    # i relativi item (servizi extra, prodotti scaffale) vengono ora
+    # gestiti come categorie normali con mostra_pubblico=True. Il flag
+    # ServizioProdotto.proponi_in_upsell resta in modello per
+    # compatibilita' ma non e' piu' usato qui.
     return render(request, 'clients/booking.html', {
         'categorie_step': categorie_step,
         'servizi': servizi,
         'servizi_per_categoria': servizi_per_categoria,
-        'servizi_extra': servizi_extra,
-        'prodotti_extra': prodotti_extra,
     })
 
 

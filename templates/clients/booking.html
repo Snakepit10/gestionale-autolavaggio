@@ -209,8 +209,6 @@
         {% for cat in categorie_step %}
             <div class="pi {% if forloop.first %}done{% endif %}" data-key="cat-{{ cat.id }}" title="{{ cat.nome }}"></div>
         {% endfor %}
-        {% if servizi_extra %}<div class="pi" data-key="extra" title="Extra"></div>{% endif %}
-        {% if prodotti_extra %}<div class="pi" data-key="profumazione" title="Profumazione"></div>{% endif %}
         <div class="pi" data-key="data" title="Data e ora"></div>
         <div class="pi" data-key="conferma" title="Conferma"></div>
     </div>
@@ -291,91 +289,9 @@
     </section>
     {% endfor %}
 
-    {# ========== STEP EXTRA: servizi upsell (visibili solo se compatibili con i servizi scelti) ========== #}
-    {% if servizi_extra %}
-    <section class="bk-step" data-step-key="extra">
-        <h3 class="fw-bold mb-1">Extra</h3>
-        <p class="text-muted">
-            Servizi aggiuntivi per rendere il lavaggio ancora migliore.
-            Puoi anche saltare questo passaggio.
-        </p>
-
-        <div id="extra-empty" class="text-muted small text-center py-3" style="display:none;">
-            Nessun extra disponibile per i servizi che hai scelto.
-        </div>
-        <div id="extra-grid" class="upsell-grid">
-            {% for s in servizi_extra %}
-            <div class="upsell-card extra-item"
-                 data-id="{{ s.id }}"
-                 data-titolo="{{ s.titolo|escape }}"
-                 data-durata="{{ s.durata_minuti|default:30 }}"
-                 data-prezzo="{{ s.prezzo }}"
-                 data-upsell-per="{% for cat in s.upsell_per.all %}{{ cat.id }}{% if not forloop.last %},{% endif %}{% endfor %}">
-                <div class="titolo">{{ s.titolo }}</div>
-                {% if s.descrizione %}<div class="desc">{{ s.descrizione|truncatewords:15 }}</div>{% endif %}
-                <div class="meta"><i class="bi bi-clock"></i> +{{ s.durata_minuti|default:"30" }} min</div>
-                <div class="prezzo">€ {{ s.prezzo }}</div>
-                <div class="actions">
-                    <button type="button" class="btn-add" onclick="toggleServizioExtra({{ s.id }})">
-                        <i class="bi bi-plus-lg"></i> Aggiungi
-                    </button>
-                </div>
-            </div>
-            {% endfor %}
-        </div>
-
-        <div class="d-flex gap-2 bk-actions">
-            <button class="btn btn-outline-secondary flex-grow-0" onclick="vaiIndietro()">
-                <i class="bi bi-arrow-left"></i>
-            </button>
-            <button class="btn-cta flex-grow-1 justify-content-center" onclick="vaiAvanti()">
-                Avanti <i class="bi bi-arrow-right"></i>
-            </button>
-        </div>
-    </section>
-    {% endif %}
-
-    {# ========== STEP PROFUMAZIONE: prodotti upsell ========== #}
-    {% if prodotti_extra %}
-    <section class="bk-step" data-step-key="profumazione">
-        <h3 class="fw-bold mb-1">Profumazione</h3>
-        <p class="text-muted">
-            Aggiungi profumatori e accessori per la tua auto.
-            Puoi anche saltare questo passaggio.
-        </p>
-
-        <div id="prof-empty" class="text-muted small text-center py-3" style="display:none;">
-            Nessun prodotto disponibile per i servizi che hai scelto.
-        </div>
-        <div id="prof-grid" class="upsell-grid">
-            {% for p in prodotti_extra %}
-            <div class="upsell-card prod-item"
-                 data-id="{{ p.id }}"
-                 data-titolo="{{ p.titolo|escape }}"
-                 data-prezzo="{{ p.prezzo }}"
-                 data-upsell-per="{% for cat in p.upsell_per.all %}{{ cat.id }}{% if not forloop.last %},{% endif %}{% endfor %}">
-                <div class="titolo">{{ p.titolo }}</div>
-                {% if p.descrizione %}<div class="desc">{{ p.descrizione|truncatewords:15 }}</div>{% endif %}
-                <div class="prezzo">€ {{ p.prezzo }}</div>
-                <div class="actions">
-                    <button type="button" class="btn-add" onclick="prodQty({{ p.id }}, 1)">
-                        <i class="bi bi-plus-lg"></i> Aggiungi
-                    </button>
-                </div>
-            </div>
-            {% endfor %}
-        </div>
-
-        <div class="d-flex gap-2 bk-actions">
-            <button class="btn btn-outline-secondary flex-grow-0" onclick="vaiIndietro()">
-                <i class="bi bi-arrow-left"></i>
-            </button>
-            <button class="btn-cta flex-grow-1 justify-content-center" onclick="vaiAvanti()">
-                Avanti <i class="bi bi-arrow-right"></i>
-            </button>
-        </div>
-    </section>
-    {% endif %}
+    {# Step Extra e Profumazione rimossi dal wizard: ora gestiti come
+       categorie normali nel catalogo (con flag mostra_pubblico=True su
+       Categoria/ServizioProdotto). #}
 
     {# ========== STEP DATA E ORA ========== #}
     <section class="bk-step" data-step-key="data">
@@ -416,10 +332,6 @@
             <div id="rec-data" class="fs-5 fw-bold mt-1"></div>
             <div class="small opacity-75 mt-3 fw-bold">Servizi richiesti</div>
             <div id="rec-servizi-list" class="mt-1"></div>
-            <div id="rec-prodotti-wrap" class="mt-2" style="display:none;">
-                <div class="small opacity-75 fw-bold">Profumazione e accessori</div>
-                <div id="rec-prodotti-list" class="mt-1"></div>
-            </div>
             <div class="small opacity-90 mt-3 pt-2 border-top border-light border-opacity-25">
                 <i class="bi bi-clock"></i> Durata stimata: <span id="rec-durata">--</span>
             </div>
@@ -571,13 +483,12 @@
 const IS_LOGGED = {% if user.is_authenticated %}true{% else %}false{% endif %};
 
 // Stato del wizard ---------------------------------------------------
-// serviziSelezionati: servizi base scelti negli step categoria.
-// serviziExtraSel:    servizi extra (upsell) scelti nello step Extra.
-// prodottiSel:        Map id -> qty dei prodotti scelti nello step Profumazione.
+// serviziSelezionati: servizi scelti nei vari step categoria.
 // dataSelezionata + oraSelezionata: scelti nello step Data e ora.
+// (Gli ex stati serviziExtraSel/prodottiSel sono stati rimossi quando
+// gli step Extra/Profumazione sono stati eliminati a favore di
+// categorie normali multiselezione.)
 let serviziSelezionati = [];
-let serviziExtraSel = new Set();
-let prodottiSel = new Map();
 let dataSelezionata = '';
 let oraSelezionata = '';
 
@@ -612,8 +523,6 @@ function goStepKey(key) {
         pi.classList.toggle('done', i <= idx);
     });
     // Side effect specifici per step
-    if (key === 'extra') aggiornaVisibilitaExtra();
-    if (key === 'profumazione') aggiornaVisibilitaProfumazione();
     if (key === 'data') {
         const inp = document.getElementById('bk-data');
         if (!inp.value) {
@@ -697,112 +606,6 @@ function toggleServizio(el) {
     // Sync visivo su TUTTE le card di questo servizio (multicategoria).
     document.querySelectorAll(`.servizio-pick[data-id="${id}"]`)
         .forEach(card => _setCardVisual(card, !giaSelezionato));
-
-    syncExtraDopoChange();
-}
-
-// Quando l'utente cambia i servizi base, gli extra che dipendono via
-// upsell_per da quei servizi devono essere riconsiderati. Approccio
-// semplice: deseleziono gli extra ora non piu' visibili.
-function syncExtraDopoChange() {
-    const baseIds = serviziSelezionati.map(s => s.id);
-    document.querySelectorAll('.extra-item').forEach(card => {
-        if (!extraRilevante(card, baseIds) && serviziExtraSel.has(parseInt(card.dataset.id))) {
-            serviziExtraSel.delete(parseInt(card.dataset.id));
-        }
-    });
-    document.querySelectorAll('.prod-item').forEach(card => {
-        if (!extraRilevante(card, baseIds) && prodottiSel.has(parseInt(card.dataset.id))) {
-            prodottiSel.delete(parseInt(card.dataset.id));
-        }
-    });
-}
-
-// Un upsell e' rilevante se non ha vincoli (upsell_per vuoto =
-// universale) OPPURE se almeno uno dei suoi upsell_per e' tra i
-// servizi base scelti.
-function extraRilevante(card, baseIds) {
-    const raw = (card.dataset.upsellPer || '').trim();
-    if (!raw) return true;  // universale
-    const requiredIds = raw.split(',').map(x => parseInt(x)).filter(Boolean);
-    return requiredIds.some(id => baseIds.includes(id));
-}
-
-// === Step Extra / Profumazione ===================================
-function aggiornaVisibilitaExtra() {
-    const baseIds = serviziSelezionati.map(s => s.id);
-    let visibili = 0;
-    document.querySelectorAll('.extra-item').forEach(card => {
-        const rilev = extraRilevante(card, baseIds);
-        card.style.display = rilev ? '' : 'none';
-        if (rilev) visibili++;
-        // Sync della classe selected con lo stato JS
-        const id = parseInt(card.dataset.id);
-        card.classList.toggle('selected', serviziExtraSel.has(id));
-        // Bottone aggiunto/rimuovi
-        const btn = card.querySelector('button');
-        if (btn) {
-            if (serviziExtraSel.has(id)) {
-                btn.innerHTML = '<i class="bi bi-check2"></i> Aggiunto — rimuovi';
-                btn.className = 'btn-rem';
-            } else {
-                btn.innerHTML = '<i class="bi bi-plus-lg"></i> Aggiungi';
-                btn.className = 'btn-add';
-            }
-        }
-    });
-    const empty = document.getElementById('extra-empty');
-    const grid = document.getElementById('extra-grid');
-    if (empty && grid) {
-        empty.style.display = visibili === 0 ? '' : 'none';
-        grid.style.display = visibili === 0 ? 'none' : 'grid';
-    }
-}
-
-function aggiornaVisibilitaProfumazione() {
-    const baseIds = serviziSelezionati.map(s => s.id);
-    let visibili = 0;
-    document.querySelectorAll('.prod-item').forEach(card => {
-        const rilev = extraRilevante(card, baseIds);
-        card.style.display = rilev ? '' : 'none';
-        if (rilev) visibili++;
-        const id = parseInt(card.dataset.id);
-        const qty = prodottiSel.get(id) || 0;
-        card.classList.toggle('selected', qty > 0);
-        const actions = card.querySelector('.actions');
-        if (actions) {
-            if (qty === 0) {
-                actions.innerHTML = `<button type="button" class="btn-add" onclick="prodQty(${id}, 1)"><i class="bi bi-plus-lg"></i> Aggiungi</button>`;
-            } else {
-                actions.innerHTML = `
-                    <div class="qty">
-                        <button type="button" onclick="prodQty(${id}, -1)">−</button>
-                        <span>${qty}</span>
-                        <button type="button" onclick="prodQty(${id}, 1)">+</button>
-                    </div>`;
-            }
-        }
-    });
-    const empty = document.getElementById('prof-empty');
-    const grid = document.getElementById('prof-grid');
-    if (empty && grid) {
-        empty.style.display = visibili === 0 ? '' : 'none';
-        grid.style.display = visibili === 0 ? 'none' : 'grid';
-    }
-}
-
-function toggleServizioExtra(id) {
-    if (serviziExtraSel.has(id)) serviziExtraSel.delete(id);
-    else serviziExtraSel.add(id);
-    aggiornaVisibilitaExtra();
-}
-
-function prodQty(id, delta) {
-    const cur = prodottiSel.get(id) || 0;
-    const next = Math.max(0, Math.min(9, cur + delta));
-    if (next === 0) prodottiSel.delete(id);
-    else prodottiSel.set(id, next);
-    aggiornaVisibilitaProfumazione();
 }
 
 // === Step Data e ora =============================================
@@ -839,73 +642,23 @@ function selSlot(el) {
     document.getElementById('btn-data-avanti').disabled = false;
 }
 
-// Helper: legge metadata da una card extra/prodotto rendering nel DOM
-// (sostituisce il vecchio catalogo JS in-memory). Ritorna null se la
-// card non e' presente.
-function leggiExtraDom(selector, id) {
-    const card = document.querySelector(`${selector}[data-id="${id}"]`);
-    if (!card) return null;
-    return {
-        id: id,
-        titolo: card.dataset.titolo,
-        prezzo: parseFloat(card.dataset.prezzo) || 0,
-        durata: parseInt(card.dataset.durata) || 0,
-    };
-}
-
 function renderRiepilogo() {
     document.getElementById('rec-data').textContent =
         `${dataSelezionata.split('-').reverse().join('/')} alle ${oraSelezionata}`;
 
-    // Servizi: base (sempre, dagli step categoria) + extra (dallo step Extra).
+    // Servizi selezionati nei vari step categoria.
     const list = document.getElementById('rec-servizi-list');
-    const serviziHtml = serviziSelezionati.map(s =>
+    list.innerHTML = serviziSelezionati.map(s =>
         `<div class="d-flex justify-content-between align-items-center mb-1">
             <span><i class="bi bi-check-circle-fill"></i> ${escapeHtml(s.titolo)}</span>
             <span class="opacity-75">da € ${(s.prezzo || 0).toFixed(2)}</span>
         </div>`
-    );
-    let durata = serviziSelezionati.reduce((a, s) => a + s.durata, 0);
-    let totale = serviziSelezionati.reduce((a, s) => a + (s.prezzo || 0), 0);
-    serviziExtraSel.forEach(id => {
-        const s = leggiExtraDom('.extra-item', id);
-        if (!s) return;
-        durata += s.durata;
-        totale += s.prezzo;
-        serviziHtml.push(
-            `<div class="d-flex justify-content-between align-items-center mb-1">
-                <span><i class="bi bi-plus-circle-fill" style="color:var(--mw-cyan-light)"></i> ${escapeHtml(s.titolo)}</span>
-                <span class="opacity-75">da € ${s.prezzo.toFixed(2)}</span>
-            </div>`
-        );
-    });
-    list.innerHTML = serviziHtml.join('');
+    ).join('');
+    const durata = serviziSelezionati.reduce((a, s) => a + s.durata, 0);
+    const totale = serviziSelezionati.reduce((a, s) => a + (s.prezzo || 0), 0);
     document.getElementById('rec-durata').textContent = `circa ${durata} min`;
 
-    // Prodotti dello step Profumazione: visibili solo se almeno uno selezionato.
-    const prodWrap = document.getElementById('rec-prodotti-wrap');
-    const prodList = document.getElementById('rec-prodotti-list');
-    if (prodottiSel.size === 0) {
-        prodWrap.style.display = 'none';
-        prodList.innerHTML = '';
-    } else {
-        prodWrap.style.display = '';
-        const prodHtml = [];
-        prodottiSel.forEach((qty, id) => {
-            const p = leggiExtraDom('.prod-item', id);
-            if (!p) return;
-            totale += p.prezzo * qty;
-            prodHtml.push(
-                `<div class="d-flex justify-content-between align-items-center mb-1">
-                    <span><i class="bi bi-bag-check-fill" style="color:var(--mw-cyan-light)"></i> ${escapeHtml(p.titolo)} × ${qty}</span>
-                    <span class="opacity-75">€ ${(p.prezzo * qty).toFixed(2)}</span>
-                </div>`
-            );
-        });
-        prodList.innerHTML = prodHtml.join('');
-    }
-
-    // Totale orientativo: include TUTTO (servizi base + extra + prodotti).
+    // Totale orientativo: somma di tutti i servizi scelti.
     document.getElementById('rec-totale').textContent = `€ ${totale.toFixed(2)}`;
     document.getElementById('rec-totale-wrap').style.display = '';
     document.getElementById('rec-no-totale').style.display = 'none';
@@ -930,11 +683,10 @@ document.addEventListener('DOMContentLoaded', function() {
 let _condizioniModal = null;
 function apriCondizioni() {
     // Validazioni finali prima di mostrare il modale condizioni:
-    // 1) almeno un servizio (base o extra) deve essere stato scelto
+    // 1) almeno un servizio deve essere stato scelto
     // 2) data e ora devono essere impostate
     // 3) se anonimo, nome/cognome/email/telefono obbligatori
-    const totServizi = serviziSelezionati.length + serviziExtraSel.size;
-    if (totServizi === 0) {
+    if (serviziSelezionati.length === 0) {
         alert('Seleziona almeno un servizio prima di prenotare.');
         return;
     }
@@ -970,8 +722,6 @@ function confermaPrenotazione() {
         data: dataSelezionata,
         ora: oraSelezionata,
         servizi: serviziSelezionati.map(s => s.id),
-        servizi_extra: Array.from(serviziExtraSel),
-        prodotti: Array.from(prodottiSel.entries()).map(([id, quantita]) => ({ id, quantita })),
         tipo_auto: document.getElementById('bk-tipo-auto').value,
         nota: document.getElementById('bk-nota').value,
     };
