@@ -280,7 +280,9 @@
                 <i class="bi bi-arrow-left"></i>
             </button>
             {% endif %}
-            <button class="btn-cta flex-grow-1 justify-content-center" onclick="vaiAvanti()">
+            <button class="btn-cta flex-grow-1 justify-content-center"
+                    {% if forloop.first %}id="btn-pacchetto-avanti" disabled{% endif %}
+                    onclick="vaiAvanti()">
                 Avanti <i class="bi bi-arrow-right"></i>
             </button>
         </div>
@@ -542,6 +544,17 @@ function goStepKey(key) {
 
 function vaiAvanti() {
     if (currentStepIdx >= STEPS.length - 1) return;
+    // Gate primo step: il "pacchetto" e' obbligatorio. Difensivo in
+    // caso il bottone disabled venga aggirato (es. devtools).
+    const currentKey = STEPS[currentStepIdx];
+    const btnPacchetto = document.getElementById('btn-pacchetto-avanti');
+    if (btnPacchetto && btnPacchetto.disabled) {
+        const firstCatStep = document.querySelector('.bk-step[data-categoria-id]');
+        if (firstCatStep && currentKey === firstCatStep.dataset.stepKey) {
+            alert('Seleziona almeno un servizio per continuare.');
+            return;
+        }
+    }
     goStepKey(STEPS[currentStepIdx + 1]);
 }
 
@@ -610,6 +623,22 @@ function toggleServizio(el) {
     // Sync visivo su TUTTE le card di questo servizio (multicategoria).
     document.querySelectorAll(`.servizio-pick[data-id="${id}"]`)
         .forEach(card => _setCardVisual(card, !giaSelezionato));
+
+    aggiornaStatoPacchettoAvanti();
+}
+
+// Il primo step categoria (= "pacchetto" principale) e' OBBLIGATORIO:
+// il bottone "Avanti" resta disabled finche' l'utente non sceglie
+// almeno un servizio di quella categoria. Gli step successivi sono
+// invece facoltativi (l'utente puo' proseguire senza selezionare nulla).
+function aggiornaStatoPacchettoAvanti() {
+    const btn = document.getElementById('btn-pacchetto-avanti');
+    if (!btn) return;
+    const firstCatStep = document.querySelector('.bk-step[data-categoria-id]');
+    if (!firstCatStep) { btn.disabled = false; return; }
+    const pacchettoCatId = parseInt(firstCatStep.dataset.categoriaId);
+    const ok = serviziSelezionati.some(s => s.categoriaId === pacchettoCatId);
+    btn.disabled = !ok;
 }
 
 // === Step Data e ora =============================================
@@ -686,6 +715,7 @@ document.addEventListener('DOMContentLoaded', function() {
         .map(s => s.dataset.stepKey)
         .filter(Boolean);
     currentStepIdx = 0;
+    aggiornaStatoPacchettoAvanti();
 });
 
 // Step intermedio: prima di inviare la prenotazione, l'utente deve
