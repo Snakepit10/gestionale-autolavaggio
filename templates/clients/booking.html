@@ -264,7 +264,7 @@
                     {% endif %}
                     <div class="meta">
                         <i class="bi bi-clock"></i> circa {{ s.durata_minuti|default:"30" }} min
-                        <span class="prezzo-orientativo ms-2">da € {{ s.prezzo }}</span>
+                        <span class="prezzo-orientativo ms-2">{% if forloop.parentloop.first %}da{% else %}+{% endif %} € {{ s.prezzo }}</span>
                     </div>
                 </div>
                 <div class="d-flex align-items-center gap-2">
@@ -322,44 +322,22 @@
         </div>
     </section>
 
-    {# ========== STEP CONFERMA E PRENOTA ========== #}
+    {% comment %}
+    STEP CONFERMA E PRENOTA. Ordine voluto: PRIMA i dati personali +
+    tipo auto/note/password, POI il riepilogo prenotazione, infine
+    bottoni. Il riepilogo in fondo da' all'utente la vista finale
+    completa appena prima di inviare.
+    {% endcomment %}
     <section class="bk-step" data-step-key="conferma">
         <h3 class="fw-bold mb-1">Conferma e prenota</h3>
-        <p class="text-muted">Controlla il riepilogo, inserisci i tuoi dati e invia.</p>
+        <p class="text-muted">Inserisci i tuoi dati, controlla il riepilogo e invia.</p>
 
-        <div class="bk-summary">
-            <div class="small opacity-75 fw-bold">Riepilogo prenotazione</div>
-            <div id="rec-data" class="fs-5 fw-bold mt-1"></div>
-            <div class="small opacity-75 mt-3 fw-bold">Servizi richiesti</div>
-            <div id="rec-servizi-list" class="mt-1"></div>
-            <div class="small opacity-90 mt-3 pt-2 border-top border-light border-opacity-25">
-                <i class="bi bi-clock"></i> Durata stimata: <span id="rec-durata">--</span>
-            </div>
-            <div id="rec-totale-wrap" class="mt-2 pt-2 border-top border-light border-opacity-25" style="display:none;">
-                <div class="d-flex justify-content-between align-items-center">
-                    <span class="fw-bold">Totale orientativo</span>
-                    <span class="fs-5 fw-bold" id="rec-totale">€ 0,00</span>
-                </div>
-                <div class="small opacity-90 mt-2">
-                    <i class="bi bi-info-circle"></i>
-                    Prezzo <strong>orientativo</strong>: puo' variare in base
-                    alla grandezza dell'auto, allo stato di sporco e al tempo
-                    effettivo di pulizia. Il prezzo definitivo viene confermato
-                    al ritiro.
-                </div>
-            </div>
-            <div id="rec-no-totale" class="small opacity-75 mt-2" style="display:none;">
-                Il prezzo finale verra comunicato al ritiro.
-            </div>
-        </div>
-
-        {# Dati personali: incorporati qui (prima erano in uno step separato) #}
         {% if user.is_authenticated %}
             <div class="alert alert-success">
                 <i class="bi bi-check-circle"></i> Sei gia accesso come <strong>{{ user.get_full_name|default:user.email }}</strong>
             </div>
         {% else %}
-        <h6 class="fw-bold mt-3 mb-2">I tuoi dati</h6>
+        <h6 class="fw-bold mb-2">I tuoi dati</h6>
         <div class="row g-2">
             <div class="col-6">
                 <label class="form-label small fw-bold text-muted">Nome *</label>
@@ -407,6 +385,32 @@
                    placeholder="Lascia vuoto per saltare" minlength="6">
         </div>
         {% endif %}
+
+        <div class="bk-summary mt-3">
+            <div class="small opacity-75 fw-bold">Riepilogo prenotazione</div>
+            <div id="rec-data" class="fs-5 fw-bold mt-1"></div>
+            <div class="small opacity-75 mt-3 fw-bold">Servizi richiesti</div>
+            <div id="rec-servizi-list" class="mt-1"></div>
+            <div class="small opacity-90 mt-3 pt-2 border-top border-light border-opacity-25">
+                <i class="bi bi-clock"></i> Durata stimata: <span id="rec-durata">--</span>
+            </div>
+            <div id="rec-totale-wrap" class="mt-2 pt-2 border-top border-light border-opacity-25" style="display:none;">
+                <div class="d-flex justify-content-between align-items-center">
+                    <span class="fw-bold">Totale orientativo</span>
+                    <span class="fs-5 fw-bold" id="rec-totale">€ 0,00</span>
+                </div>
+                <div class="small opacity-90 mt-2">
+                    <i class="bi bi-info-circle"></i>
+                    Prezzo <strong>orientativo</strong>: puo' variare in base
+                    alla grandezza dell'auto, allo stato di sporco e al tempo
+                    effettivo di pulizia. Il prezzo definitivo viene confermato
+                    al ritiro.
+                </div>
+            </div>
+            <div id="rec-no-totale" class="small opacity-75 mt-2" style="display:none;">
+                Il prezzo finale verra comunicato al ritiro.
+            </div>
+        </div>
 
         <div class="alert alert-warning small mt-3">
             <i class="bi bi-info-circle"></i>
@@ -647,13 +651,21 @@ function renderRiepilogo() {
         `${dataSelezionata.split('-').reverse().join('/')} alle ${oraSelezionata}`;
 
     // Servizi selezionati nei vari step categoria.
+    // Prefisso prezzo: i servizi della categoria del PRIMO step (il
+    // "pacchetto" principale) usano "da € X"; quelli delle categorie
+    // successive sono add-on e usano "+ € X". Stessa logica del
+    // template (forloop.parentloop.first).
+    const firstCatStep = document.querySelector('.bk-step[data-categoria-id]');
+    const pacchettoCatId = firstCatStep ? parseInt(firstCatStep.dataset.categoriaId) : null;
+
     const list = document.getElementById('rec-servizi-list');
-    list.innerHTML = serviziSelezionati.map(s =>
-        `<div class="d-flex justify-content-between align-items-center mb-1">
+    list.innerHTML = serviziSelezionati.map(s => {
+        const prefisso = (pacchettoCatId !== null && s.categoriaId === pacchettoCatId) ? 'da' : '+';
+        return `<div class="d-flex justify-content-between align-items-center mb-1">
             <span><i class="bi bi-check-circle-fill"></i> ${escapeHtml(s.titolo)}</span>
-            <span class="opacity-75">da € ${(s.prezzo || 0).toFixed(2)}</span>
-        </div>`
-    ).join('');
+            <span class="opacity-75">${prefisso} € ${(s.prezzo || 0).toFixed(2)}</span>
+        </div>`;
+    }).join('');
     const durata = serviziSelezionati.reduce((a, s) => a + s.durata, 0);
     const totale = serviziSelezionati.reduce((a, s) => a + (s.prezzo || 0), 0);
     document.getElementById('rec-durata').textContent = `circa ${durata} min`;
