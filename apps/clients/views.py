@@ -143,7 +143,7 @@ def booking(request):
         .filter(attivo=True, tipo='servizio', is_supplemento=False, mostra_pubblico=True)
         .select_related('categoria')
         .prefetch_related('categorie_aggiuntive')
-        .order_by('categoria__ordine_visualizzazione', 'titolo')
+        .order_by('categoria__ordine_visualizzazione', 'ordine_visualizzazione', 'titolo')
     )
 
     # Mappa "categoria -> [servizi]": un servizio appare in ogni categoria

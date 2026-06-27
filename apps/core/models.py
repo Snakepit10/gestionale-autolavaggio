@@ -161,6 +161,12 @@ class ServizioProdotto(models.Model):
                   "Se valorizzato, mostrato solo quando il cliente ha "
                   "selezionato almeno uno dei servizi indicati.",
     )
+    ordine_visualizzazione = models.PositiveSmallIntegerField(
+        default=0,
+        help_text="Ordinamento dell'item dentro la sua categoria (0 = primo, "
+                  "poi 1, 2, ...). A parita' di ordine, fallback su titolo "
+                  "alfabetico. L'ordine vale anche per le categorie aggiuntive.",
+    )
     creato_il = models.DateTimeField(auto_now_add=True)
     aggiornato_il = models.DateTimeField(auto_now=True)
 

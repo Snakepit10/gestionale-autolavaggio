@@ -23,7 +23,7 @@ class PostazioneAdmin(admin.ModelAdmin):
 @admin.register(ServizioProdotto)
 class ServizioProdottoAdmin(admin.ModelAdmin):
     list_display = [
-        'titolo', 'tipo', 'categoria', 'prezzo', 'attivo',
+        'titolo', 'tipo', 'categoria', 'ordine_visualizzazione', 'prezzo', 'attivo',
         'mostra_pubblico', 'proponi_in_upsell', 'ordine_upsell',
         'scorta_bassa',
     ]
@@ -31,7 +31,7 @@ class ServizioProdottoAdmin(admin.ModelAdmin):
         'tipo', 'categoria', 'attivo',
         'mostra_pubblico', 'proponi_in_upsell',
     ]
-    list_editable = ['proponi_in_upsell', 'ordine_upsell']
+    list_editable = ['ordine_visualizzazione', 'proponi_in_upsell', 'ordine_upsell']
     search_fields = ['titolo', 'descrizione', 'codice_prodotto']
     filter_horizontal = ['postazioni', 'upsell_per', 'categorie_aggiuntive']
 

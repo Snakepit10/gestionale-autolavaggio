@@ -126,6 +126,14 @@
                                 </label>
                             </div>
                         </div>
+                        <div class="col-md-4 mt-3">
+                            {{ form.ordine_visualizzazione|as_crispy_field }}
+                            <small class="form-text text-muted d-block mt-1">
+                                Posizione dell'item dentro la sua categoria
+                                (0 = primo, poi 1, 2, ...). A parita' di
+                                valore, ordine alfabetico per titolo.
+                            </small>
+                        </div>
                     </div>
 
                     <!-- Upselling prenotazione online -->
