@@ -143,7 +143,11 @@ def booking(request):
         .filter(attivo=True, tipo='servizio', is_supplemento=False, mostra_pubblico=True)
         .select_related('categoria')
         .prefetch_related('categorie_aggiuntive')
-        .order_by('categoria__ordine_visualizzazione', 'ordine_visualizzazione', 'titolo')
+        # `gruppo` PRIMA di `ordine_visualizzazione` perche' il template
+        # usa {% regroup ... by gruppo %} che raggruppa solo elementi
+        # consecutivi nell'iterable. Dentro ogni gruppo poi vale ordine_v
+        # + titolo.
+        .order_by('categoria__ordine_visualizzazione', 'gruppo', 'ordine_visualizzazione', 'titolo')
     )
 
     # Mappa "categoria -> [servizi]": un servizio appare in ogni categoria

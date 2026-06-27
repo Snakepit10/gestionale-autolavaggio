@@ -249,28 +249,36 @@
         {% endif %}
 
         <div class="d-flex flex-column gap-2 mt-3">
-            {% for s in servizi_cat %}
-            <div class="servizio-pick"
-                 data-id="{{ s.id }}"
-                 data-titolo="{{ s.titolo|escape }}"
-                 data-durata="{{ s.durata_minuti|default:30 }}"
-                 data-prezzo="{{ s.prezzo }}"
-                 data-categoria-id="{{ cat.id }}"
-                 onclick="toggleServizio(this)">
-                <div class="flex-grow-1">
-                    <div class="titolo">{{ s.titolo }}</div>
-                    {% if s.descrizione %}
-                    <div class="meta">{{ s.descrizione }}</div>
-                    {% endif %}
-                    <div class="meta">
-                        <i class="bi bi-clock"></i> circa {{ s.durata_minuti|default:"30" }} min
-                        <span class="prezzo-orientativo ms-2">{% if forloop.parentloop.first %}da{% else %}+{% endif %} € {{ s.prezzo }}</span>
+            {% regroup servizi_cat by gruppo as gruppi %}
+            {% for grp in gruppi %}
+                {% if grp.grouper %}
+                <h6 class="bk-gruppo-header text-uppercase text-muted small fw-bold mt-3 mb-1">
+                    {{ grp.grouper }}
+                </h6>
+                {% endif %}
+                {% for s in grp.list %}
+                <div class="servizio-pick"
+                     data-id="{{ s.id }}"
+                     data-titolo="{{ s.titolo|escape }}"
+                     data-durata="{{ s.durata_minuti|default:30 }}"
+                     data-prezzo="{{ s.prezzo }}"
+                     data-categoria-id="{{ cat.id }}"
+                     onclick="toggleServizio(this)">
+                    <div class="flex-grow-1">
+                        <div class="titolo">{{ s.titolo }}</div>
+                        {% if s.descrizione %}
+                        <div class="meta">{{ s.descrizione }}</div>
+                        {% endif %}
+                        <div class="meta">
+                            <i class="bi bi-clock"></i> circa {{ s.durata_minuti|default:"30" }} min
+                            <span class="prezzo-orientativo ms-2">{% if forloop.parentloop.parentloop.first %}da{% else %}+{% endif %} € {{ s.prezzo }}</span>
+                        </div>
+                    </div>
+                    <div class="d-flex align-items-center gap-2">
+                        <i class="bi bi-circle check"></i>
                     </div>
                 </div>
-                <div class="d-flex align-items-center gap-2">
-                    <i class="bi bi-circle check"></i>
-                </div>
-            </div>
+                {% endfor %}
             {% endfor %}
         </div>
 

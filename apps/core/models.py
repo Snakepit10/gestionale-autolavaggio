@@ -167,6 +167,15 @@ class ServizioProdotto(models.Model):
                   "poi 1, 2, ...). A parita' di ordine, fallback su titolo "
                   "alfabetico. L'ordine vale anche per le categorie aggiuntive.",
     )
+    gruppo = models.CharField(
+        max_length=100, blank=True, default='',
+        help_text="Sotto-sezione opzionale dentro lo step del wizard. Item "
+                  "con lo stesso gruppo vengono raccolti sotto un'intestazione "
+                  "comune (es. 'Pelle' / 'Tessuto' dentro 'Trattamento sedili'). "
+                  "Lascia vuoto per item senza sotto-sezione. I gruppi sono "
+                  "ordinati alfabeticamente; per controllare l'ordine usa un "
+                  "prefisso numerico (es. '1. Pelle', '2. Tessuto').",
+    )
     creato_il = models.DateTimeField(auto_now_add=True)
     aggiornato_il = models.DateTimeField(auto_now=True)
 
