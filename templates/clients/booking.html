@@ -289,9 +289,11 @@
     </section>
     {% endfor %}
 
-    {# Step Extra e Profumazione rimossi dal wizard: ora gestiti come
-       categorie normali nel catalogo (con flag mostra_pubblico=True su
-       Categoria/ServizioProdotto). #}
+    {% comment %}
+    Step Extra e Profumazione rimossi dal wizard: ora gestiti come
+    categorie normali nel catalogo (con flag mostra_pubblico=True su
+    Categoria/ServizioProdotto).
+    {% endcomment %}
 
     {# ========== STEP DATA E ORA ========== #}
     <section class="bk-step" data-step-key="data">
