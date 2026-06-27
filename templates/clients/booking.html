@@ -136,8 +136,6 @@
     font-size: .78rem;
     color: var(--mw-text-soft);
     line-height: 1.3;
-    max-height: 2.6em;
-    overflow: hidden;
 }
 .upsell-card .meta {
     font-size: .75rem;
@@ -262,7 +260,7 @@
                 <div class="flex-grow-1">
                     <div class="titolo">{{ s.titolo }}</div>
                     {% if s.descrizione %}
-                    <div class="meta">{{ s.descrizione|truncatewords:20 }}</div>
+                    <div class="meta">{{ s.descrizione }}</div>
                     {% endif %}
                     <div class="meta">
                         <i class="bi bi-clock"></i> circa {{ s.durata_minuti|default:"30" }} min
