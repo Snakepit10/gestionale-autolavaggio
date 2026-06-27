@@ -134,7 +134,7 @@
                                 valore, ordine alfabetico per titolo.
                             </small>
                         </div>
-                        <div class="col-md-8 mt-3">
+                        <div class="col-md-6 mt-3">
                             {{ form.gruppo|as_crispy_field }}
                             <small class="form-text text-muted d-block mt-1">
                                 Sotto-sezione opzionale dentro lo step del wizard
@@ -142,9 +142,15 @@
                                 "Trattamento sedili"). Item con lo stesso gruppo
                                 vengono raccolti sotto un'intestazione comune.
                                 Lascia vuoto per item senza sotto-sezione.
-                                Ordine dei gruppi: alfabetico — usa un prefisso
-                                numerico per forzarlo (es. <code>1. Pelle</code>,
-                                <code>2. Tessuto</code>).
+                            </small>
+                        </div>
+                        <div class="col-md-2 mt-3">
+                            {{ form.ordine_gruppo|as_crispy_field }}
+                            <small class="form-text text-muted d-block mt-1">
+                                Posizione del <strong>gruppo</strong> nello step
+                                (0 = primo). Il valore viene propagato in
+                                automatico a tutti gli item dello stesso gruppo
+                                quando salvi.
                             </small>
                         </div>
                     </div>

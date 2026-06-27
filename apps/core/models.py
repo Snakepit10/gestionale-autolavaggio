@@ -172,9 +172,15 @@ class ServizioProdotto(models.Model):
         help_text="Sotto-sezione opzionale dentro lo step del wizard. Item "
                   "con lo stesso gruppo vengono raccolti sotto un'intestazione "
                   "comune (es. 'Pelle' / 'Tessuto' dentro 'Trattamento sedili'). "
-                  "Lascia vuoto per item senza sotto-sezione. I gruppi sono "
-                  "ordinati alfabeticamente; per controllare l'ordine usa un "
-                  "prefisso numerico (es. '1. Pelle', '2. Tessuto').",
+                  "Lascia vuoto per item senza sotto-sezione.",
+    )
+    ordine_gruppo = models.PositiveSmallIntegerField(
+        default=0,
+        help_text="Posizione del GRUPPO dentro lo step (0 = primo, poi 1, "
+                  "2, ...). A parita' di ordine, fallback alfabetico sul "
+                  "nome del gruppo. Il save() lo propaga automaticamente "
+                  "a tutti gli item dello stesso gruppo+categoria, cosi' "
+                  "basta cambiarlo una volta per spostare l'intera sezione.",
     )
     creato_il = models.DateTimeField(auto_now_add=True)
     aggiornato_il = models.DateTimeField(auto_now=True)
@@ -185,7 +191,21 @@ class ServizioProdotto(models.Model):
     
     def __str__(self):
         return f"{self.titolo} ({self.get_tipo_display()})"
-    
+
+    def save(self, *args, **kwargs):
+        super().save(*args, **kwargs)
+        # Propaga ordine_gruppo a tutti gli item dello stesso
+        # (categoria, gruppo): cosi' basta cambiarlo su una riga per
+        # spostare l'intera sezione nel wizard. Skip se gruppo vuoto
+        # (item senza sotto-sezione).
+        if self.gruppo:
+            ServizioProdotto.objects.filter(
+                categoria_id=self.categoria_id,
+                gruppo=self.gruppo,
+            ).exclude(pk=self.pk).exclude(
+                ordine_gruppo=self.ordine_gruppo,
+            ).update(ordine_gruppo=self.ordine_gruppo)
+
     @property
     def scorta_bassa(self):
         if self.tipo == 'prodotto' and self.quantita_disponibile > 0:

@@ -48,7 +48,11 @@ class CassaView(LoginRequiredMixin, TemplateView):
             )
             .select_related('categoria')
             .prefetch_related('categorie_aggiuntive')
-            .order_by('categoria__ordine_visualizzazione', 'ordine_visualizzazione', 'titolo')
+            .order_by(
+                'categoria__ordine_visualizzazione',
+                'ordine_gruppo', 'gruppo',
+                'ordine_visualizzazione', 'titolo',
+            )
             .distinct()
         )
         context['servizi_prodotti'] = servizi_qs
