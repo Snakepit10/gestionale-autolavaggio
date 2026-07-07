@@ -96,6 +96,37 @@
     flex-shrink: 0;
 }
 
+/* Toggle "Descrizione" espandibile dentro le card servizio */
+.servizio-pick .desc-toggle { display: block; }
+.servizio-pick .desc-btn {
+    background: transparent;
+    border: 0;
+    padding: 2px 0;
+    color: var(--mw-cyan-light);
+    font-size: .78rem;
+    font-weight: 600;
+    cursor: pointer;
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+}
+.servizio-pick .desc-btn:hover { text-decoration: underline; }
+.servizio-pick .desc-chevron {
+    transition: transform .2s;
+    font-size: .82rem;
+}
+.servizio-pick .desc-toggle.open .desc-chevron { transform: rotate(180deg); }
+.servizio-pick .desc-body {
+    margin-top: 4px;
+    padding: 8px 10px;
+    background: rgba(74, 185, 224, .06);
+    border-left: 2px solid var(--mw-cyan-light);
+    border-radius: 6px;
+    font-size: .82rem;
+    color: var(--mw-text);
+    line-height: 1.4;
+}
+
 /* Pillola prezzo orientativo accanto a durata sulla card servizio */
 .servizio-pick .prezzo-orientativo {
     display: inline-block;
@@ -266,13 +297,18 @@
                      onclick="toggleServizio(this)">
                     <div class="flex-grow-1">
                         <div class="titolo">{{ s.titolo }}</div>
-                        {% if s.descrizione %}
-                        <div class="meta">{{ s.descrizione }}</div>
-                        {% endif %}
                         <div class="meta">
                             <i class="bi bi-clock"></i> circa {{ s.durata_minuti|default:"30" }} min
                             <span class="prezzo-orientativo ms-2">{% if forloop.parentloop.parentloop.first %}da{% else %}+{% endif %} € {{ s.prezzo }}</span>
                         </div>
+                        {% if s.descrizione %}
+                        <div class="desc-toggle mt-1">
+                            <button type="button" class="desc-btn" onclick="toggleDesc(event, this)">
+                                Descrizione <i class="bi bi-chevron-down desc-chevron"></i>
+                            </button>
+                            <div class="desc-body" hidden>{{ s.descrizione|linebreaksbr }}</div>
+                        </div>
+                        {% endif %}
                     </div>
                     <div class="d-flex align-items-center gap-2">
                         <i class="bi bi-circle check"></i>
@@ -524,6 +560,20 @@ function escapeHtml(s) {
     return String(s == null ? '' : s)
         .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
         .replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+}
+
+// Toggle collapsible "Descrizione" nelle card servizio. stopPropagation
+// perche' la card intera ha onclick=toggleServizio: senza, cliccare
+// "Descrizione" selezionerebbe/deselezionerebbe il servizio.
+function toggleDesc(ev, btn) {
+    ev.stopPropagation();
+    const wrap = btn.closest('.desc-toggle');
+    if (!wrap) return;
+    const body = wrap.querySelector('.desc-body');
+    if (!body) return;
+    const isOpen = wrap.classList.toggle('open');
+    if (isOpen) body.removeAttribute('hidden');
+    else body.setAttribute('hidden', '');
 }
 
 // === Navigazione step ============================================
