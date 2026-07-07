@@ -197,12 +197,23 @@ def cerca_cliente(request):
         )
     
     clienti = Cliente.objects.filter(query)
-    
+
     if tipo:
         clienti = clienti.filter(tipo=tipo)
-    
-    clienti = clienti[:10]
-    
+
+    # Ordina per cognome/nome/ragione_sociale cosi' i risultati sono
+    # prevedibili (senza order_by il DB restituisce in ordine indefinito
+    # e lo slice tagliava clienti "a caso").
+    clienti = clienti.order_by('cognome', 'nome', 'ragione_sociale')
+
+    # Limite alzato da 10 a 50: con soli 10 risultati alcuni clienti
+    # gia' registrati non venivano mai mostrati (es. su termini generici
+    # come "mar" che matchano "Marco", "Maria", "Marino", ...). 50 e'
+    # abbastanza da coprire ricerche larghe senza saturare il payload.
+    # Il frontend fa gia' scroll sulla lista.
+    total = clienti.count()
+    clienti = clienti[:50]
+
     results = []
     for cliente in clienti:
         results.append({
@@ -212,8 +223,12 @@ def cerca_cliente(request):
             'telefono': cliente.telefono,
             'tipo': cliente.tipo
         })
-    
-    return JsonResponse({'results': results})
+
+    return JsonResponse({
+        'results': results,
+        'total': total,
+        'has_more': total > len(results),
+    })
 
 
 @login_required
