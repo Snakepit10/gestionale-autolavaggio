@@ -29,6 +29,7 @@
                     <th class="text-center">Totale lavaggi</th>
                     <th class="text-center">Frequenza media</th>
                     <th class="text-center">Giorni da ultimo</th>
+                    <th class="text-center">Contattabile</th>
                 </tr>
             </thead>
             <tbody>
@@ -66,10 +67,27 @@
                             {{ cs.giorni_da_ultimo }}
                         </span>
                     </td>
+                    <td class="text-center">
+                        <form method="post" action="{% url 'marketing:toggle-optout' cs.cliente.pk %}" class="d-inline">
+                            {% csrf_token %}
+                            <input type="hidden" name="next" value="{{ request.path }}">
+                            {% if cs.cliente.blocca_marketing %}
+                                <button type="submit" class="btn btn-sm btn-outline-danger"
+                                        title="Opt-out attivo{% if cs.cliente.blocca_marketing_motivo %} ({{ cs.cliente.blocca_marketing_motivo }}){% endif %} — clicca per riattivare">
+                                    <i class="bi bi-bell-slash"></i> No
+                                </button>
+                            {% else %}
+                                <button type="submit" class="btn btn-sm btn-outline-success"
+                                        title="Contattabile — clicca per attivare opt-out">
+                                    <i class="bi bi-bell"></i> Sì
+                                </button>
+                            {% endif %}
+                        </form>
+                    </td>
                 </tr>
                 {% empty %}
                 <tr>
-                    <td colspan="6" class="text-center text-muted py-4">
+                    <td colspan="7" class="text-center text-muted py-4">
                         Nessun cliente in questo segmento.
                     </td>
                 </tr>

@@ -238,12 +238,76 @@ def _handle_incoming(payload_msg: dict, contacts: list[dict]):
             daemon=True,
         ).start()
 
+    # STOP-word marketing: se il cliente chiede di non essere contattato,
+    # attiva l'opt-out sul Cliente collegato alla conversazione e conferma
+    # con un testo (finestra 24h appena aperta dal suo incoming, quindi
+    # il testo libero passa). In thread per non bloccare il webhook.
+    if media_type == 'text' and _e_stop_word(corpo_norm):
+        logger.info('STOP-word marketing rilevata conv=%d: %r', conv.pk, corpo_norm)
+        threading.Thread(
+            target=_handle_stop_word,
+            args=(conv.pk,),
+            daemon=True,
+        ).start()
+
 
 # Quick Reply buttons del template prenotazione_proposta_orario.
 # Quando il cliente clicca uno di questi, scattano azioni automatiche
 # sulla prenotazione in_attesa piu' recente del cliente.
 # Nomi esatti come approvati su Meta WhatsApp Manager.
 _QUICK_REPLY_AZIONI = {'Confermo', 'No, non riesco'}
+
+# Parole/frasi che attivano l'opt-out marketing automatico. Match
+# case-insensitive: 'STOP' da solo (parola intera, per non scattare su
+# 'non stop' o simili) oppure frasi contenute nel messaggio.
+_STOP_WORDS_ESATTE = {'stop', 'basta', 'cancellami', 'disiscrivimi', 'unsubscribe'}
+_STOP_FRASI = ('non contattarmi', 'non contattatemi', 'non voglio essere contattato',
+               'non voglio piu ricevere', "non voglio più ricevere",
+               'smettete di scrivermi', 'togliermi dalla lista')
+
+
+def _e_stop_word(testo: str) -> bool:
+    t = (testo or '').strip().lower()
+    if not t:
+        return False
+    if t in _STOP_WORDS_ESATTE:
+        return True
+    return any(frase in t for frase in _STOP_FRASI)
+
+
+def _handle_stop_word(conv_pk: int):
+    """Attiva blocca_marketing sul cliente della conversazione e invia
+    conferma. Se la conversazione non ha un Cliente agganciato, logga
+    soltanto (l'operatore vedra' il messaggio in inbox e agira' a mano).
+    """
+    try:
+        from apps.clients import whatsapp as wa_module
+
+        conv = ConversazioneWhatsApp.objects.select_related('cliente').filter(pk=conv_pk).first()
+        if not conv:
+            return
+        if conv.cliente:
+            if not conv.cliente.blocca_marketing:
+                conv.cliente.imposta_opt_out(motivo='STOP via WhatsApp')
+                logger.info('Opt-out marketing attivato per cliente=%s via STOP-word',
+                            conv.cliente_id)
+        else:
+            logger.warning('STOP-word su conv=%s senza cliente agganciato: '
+                           'opt-out NON attivato automaticamente', conv_pk)
+            return
+
+        # Conferma al cliente. Testo libero: la finestra 24h e' aperta
+        # perche' il suo messaggio e' appena arrivato.
+        text = (
+            "Ricevuto: non ti invieremo piu' messaggi promozionali. "
+            "Continuerai a ricevere solo le comunicazioni di servizio "
+            "sulle tue prenotazioni. Grazie!"
+        )
+        ok, wa_id = wa_module._send_text_blocking(conv.numero_e164, text)
+        if ok:
+            wa_module._log_outgoing_msg(conv.numero_e164, text, wa_id)
+    except Exception as e:
+        logger.warning('handle_stop_word error conv=%s: %s', conv_pk, e, exc_info=True)
 
 
 def _handle_quick_reply(conv_pk: int, testo: str):

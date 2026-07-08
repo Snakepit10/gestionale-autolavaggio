@@ -90,6 +90,28 @@ def segmento_export_csv(request, chiave):
 
 
 @_staff_required
+def toggle_opt_out(request, cliente_id):
+    """Attiva/disattiva 'non contattare' su un cliente (POST).
+
+    Usato dal bottone nelle liste segmento e richiamabile da altre
+    pagine (es. inbox). Redirect alla pagina di provenienza.
+    """
+    from apps.clienti.models import Cliente
+    from django.shortcuts import get_object_or_404
+
+    if request.method != 'POST':
+        return redirect('marketing:dashboard')
+    cliente = get_object_or_404(Cliente, pk=cliente_id)
+    if cliente.blocca_marketing:
+        cliente.rimuovi_opt_out()
+        messages.success(request, f'{cliente}: opt-out rimosso, di nuovo contattabile.')
+    else:
+        cliente.imposta_opt_out(motivo=f'manuale da {request.user.username}')
+        messages.success(request, f'{cliente}: segnato come "non contattare".')
+    return redirect(request.POST.get('next') or 'marketing:dashboard')
+
+
+@_staff_required
 def impostazioni(request):
     """Form impostazioni marketing (singleton)."""
     cfg = ImpostazioniMarketing.get_solo()

@@ -32,6 +32,41 @@ class Cliente(models.Model):
     user = models.OneToOneField(User, null=True, blank=True, on_delete=models.SET_NULL)
     consenso_marketing = models.BooleanField(default=False)
     data_registrazione = models.DateTimeField(auto_now_add=True)
+
+    # Opt-out marketing: contrario di consenso_marketing (che e' l'opt-in
+    # GDPR spuntato in registrazione). blocca_marketing=True esclude il
+    # cliente da OGNI invio promozionale, sia campagne manuali che
+    # richiamo automatico. Si attiva a mano (bottone in /marketing/ e
+    # inbox) o in automatico quando il cliente scrive una STOP-word su
+    # WhatsApp (vedi apps/api/views.py::_handle_incoming).
+    blocca_marketing = models.BooleanField(
+        default=False,
+        verbose_name='Non contattare (opt-out marketing)',
+        help_text="Escluso da ogni messaggio promozionale.",
+    )
+    blocca_marketing_il = models.DateTimeField(null=True, blank=True)
+    blocca_marketing_motivo = models.CharField(
+        max_length=200, blank=True, default='',
+        help_text="Es. 'STOP via WhatsApp', 'richiesta telefonica', ...",
+    )
+
+    def imposta_opt_out(self, motivo: str = ''):
+        """Attiva l'opt-out marketing con timestamp e motivo."""
+        self.blocca_marketing = True
+        self.blocca_marketing_il = timezone.now()
+        self.blocca_marketing_motivo = motivo[:200]
+        self.save(update_fields=[
+            'blocca_marketing', 'blocca_marketing_il', 'blocca_marketing_motivo',
+        ])
+
+    def rimuovi_opt_out(self):
+        """Rimuove l'opt-out (es. cliente ci ripensa)."""
+        self.blocca_marketing = False
+        self.blocca_marketing_il = None
+        self.blocca_marketing_motivo = ''
+        self.save(update_fields=[
+            'blocca_marketing', 'blocca_marketing_il', 'blocca_marketing_motivo',
+        ])
     
     def save(self, *args, **kwargs):
         # Applica title case ai campi di testo

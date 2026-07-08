@@ -4,8 +4,8 @@ from .models import Cliente, PuntiFedelta, MovimentoPunti
 
 @admin.register(Cliente)
 class ClienteAdmin(admin.ModelAdmin):
-    list_display = ['__str__', 'tipo', 'email', 'telefono', 'data_registrazione', 'ordini_count', 'has_account']
-    list_filter = ['tipo', 'consenso_marketing', 'data_registrazione']
+    list_display = ['__str__', 'tipo', 'email', 'telefono', 'data_registrazione', 'ordini_count', 'has_account', 'blocca_marketing']
+    list_filter = ['tipo', 'consenso_marketing', 'blocca_marketing', 'data_registrazione']
     search_fields = ['nome', 'cognome', 'ragione_sociale', 'email', 'telefono', 'partita_iva', 'codice_fiscale']
     readonly_fields = ['data_registrazione']
     
@@ -23,7 +23,10 @@ class ClienteAdmin(admin.ModelAdmin):
         }),
         ('Account Online', {
             'fields': ('user', 'consenso_marketing', 'data_registrazione')
-        })
+        }),
+        ('Marketing', {
+            'fields': ('blocca_marketing', 'blocca_marketing_il', 'blocca_marketing_motivo'),
+        }),
     )
     
     def ordini_count(self, obj):
