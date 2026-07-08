@@ -136,6 +136,9 @@ urlpatterns = [
     # Messaggi WhatsApp (inbox staff)
     path('messaggi/', include('apps.messaggi.urls', namespace='messaggi')),
 
+    # Marketing / CRM (segmentazione + campagne WhatsApp)
+    path('marketing/', include('apps.marketing.urls', namespace='marketing')),
+
     # path('shop/', include('apps.shop.urls')),
     # path('cassa/', include('apps.ordini.urls', namespace='cassa')),
     # path('report/', include('apps.reportistica.urls')),  # Temporarily disabled

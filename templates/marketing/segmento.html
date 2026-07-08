@@ -1,0 +1,81 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}{{ label }} - Marketing{% endblock %}
+
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <h1><i class="bi bi-people"></i> {{ label }}
+        <span class="badge bg-secondary fs-6 align-middle">{{ clienti|length }}</span>
+    </h1>
+    <div>
+        <a href="{% url 'marketing:segmento-export' chiave %}" class="btn btn-outline-secondary me-2">
+            <i class="bi bi-download"></i> Esporta CSV
+        </a>
+        <a href="{% url 'marketing:dashboard' %}" class="btn btn-outline-primary">
+            <i class="bi bi-arrow-left"></i> Marketing
+        </a>
+    </div>
+</div>
+
+<div class="card border-0 shadow-sm">
+    <div class="table-responsive">
+        <table class="table table-hover align-middle mb-0">
+            <thead class="table-light">
+                <tr>
+                    <th>Cliente</th>
+                    <th>Telefono</th>
+                    <th>Ultimo lavaggio</th>
+                    <th class="text-center">Totale lavaggi</th>
+                    <th class="text-center">Frequenza media</th>
+                    <th class="text-center">Giorni da ultimo</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for cs in clienti %}
+                <tr>
+                    <td>
+                        <a href="{% url 'clienti:storico-cliente' cs.cliente.pk %}" class="text-decoration-none">
+                            {{ cs.nome_completo|default:"(senza nome)" }}
+                        </a>
+                        {% if cs.cliente.blocca_marketing %}
+                            <span class="badge bg-danger ms-1" title="Cliente con opt-out marketing">non contattare</span>
+                        {% endif %}
+                    </td>
+                    <td>
+                        {% if cs.telefono %}
+                            <a href="tel:{{ cs.telefono }}" class="text-decoration-none">{{ cs.telefono }}</a>
+                        {% else %}
+                            <span class="text-muted">—</span>
+                        {% endif %}
+                    </td>
+                    <td>{{ cs.ultimo_lavaggio|date:"d/m/Y" }}</td>
+                    <td class="text-center">{{ cs.totale_lavaggi }}</td>
+                    <td class="text-center">
+                        {% if cs.frequenza_media_giorni %}
+                            ogni {{ cs.frequenza_media_giorni|floatformat:0 }} gg
+                        {% else %}
+                            <span class="text-muted">—</span>
+                        {% endif %}
+                    </td>
+                    <td class="text-center">
+                        <span class="badge
+                            {% if cs.giorni_da_ultimo > 120 %}bg-danger
+                            {% elif cs.giorni_da_ultimo > 60 %}bg-warning text-dark
+                            {% else %}bg-success{% endif %}">
+                            {{ cs.giorni_da_ultimo }}
+                        </span>
+                    </td>
+                </tr>
+                {% empty %}
+                <tr>
+                    <td colspan="6" class="text-center text-muted py-4">
+                        Nessun cliente in questo segmento.
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+{% endblock %}

@@ -1,0 +1,128 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}Impostazioni Marketing - Gestionale Autolavaggio{% endblock %}
+
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <h1><i class="bi bi-gear"></i> Impostazioni Marketing</h1>
+    <a href="{% url 'marketing:dashboard' %}" class="btn btn-outline-primary">
+        <i class="bi bi-arrow-left"></i> Marketing
+    </a>
+</div>
+
+<form method="post">
+    {% csrf_token %}
+
+    <div class="card border-0 shadow-sm mb-4">
+        <div class="card-body">
+            <h5 class="card-title"><i class="bi bi-people text-primary"></i> Segmentazione</h5>
+            <div class="row g-3">
+                <div class="col-md-6">
+                    <label class="form-label">Giorni per "dormiente"</label>
+                    <input type="number" min="1" class="form-control" name="giorni_dormiente"
+                           value="{{ cfg.giorni_dormiente }}">
+                    <div class="form-text">Nessun lavaggio da piu' di N giorni → cliente dormiente.</div>
+                </div>
+                <div class="col-md-6">
+                    <label class="form-label">Delta "in rallentamento" (giorni)</label>
+                    <input type="number" min="1" class="form-control" name="giorni_rallentamento_delta"
+                           value="{{ cfg.giorni_rallentamento_delta }}">
+                    <div class="form-text">
+                        Se i giorni dall'ultimo lavaggio superano la frequenza media
+                        del cliente + questo delta → in rallentamento.
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="card border-0 shadow-sm mb-4">
+        <div class="card-body">
+            <h5 class="card-title"><i class="bi bi-send text-primary"></i> Invii scaglionati</h5>
+            <div class="row g-3">
+                <div class="col-md-4">
+                    <label class="form-label">Max messaggi al giorno</label>
+                    <input type="number" min="1" class="form-control" name="max_invii_giorno"
+                           value="{{ cfg.max_invii_giorno }}">
+                    <div class="form-text">Tetto giornaliero anti-blocco WhatsApp.</div>
+                </div>
+                <div class="col-md-4">
+                    <label class="form-label">Pausa minima tra invii (sec)</label>
+                    <input type="number" min="1" class="form-control" name="intervallo_min_secondi"
+                           value="{{ cfg.intervallo_min_secondi }}">
+                </div>
+                <div class="col-md-4">
+                    <label class="form-label">Pausa massima tra invii (sec)</label>
+                    <input type="number" min="1" class="form-control" name="intervallo_max_secondi"
+                           value="{{ cfg.intervallo_max_secondi }}">
+                    <div class="form-text">La pausa effettiva è casuale nel range.</div>
+                </div>
+                <div class="col-md-6">
+                    <label class="form-label">Finestra anti-duplicati (giorni)</label>
+                    <input type="number" min="0" class="form-control" name="finestra_no_ricontatto_giorni"
+                           value="{{ cfg.finestra_no_ricontatto_giorni }}">
+                    <div class="form-text">
+                        Un cliente contattato negli ultimi N giorni non riceve altri
+                        messaggi promozionali.
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="card border-0 shadow-sm mb-4">
+        <div class="card-body">
+            <h5 class="card-title"><i class="bi bi-alarm text-primary"></i> Richiamo automatico</h5>
+            <div class="row g-3">
+                <div class="col-md-4">
+                    <div class="form-check form-switch mt-4">
+                        <input class="form-check-input" type="checkbox" name="richiamo_automatico_attivo"
+                               id="richiamo-attivo" {% if cfg.richiamo_automatico_attivo %}checked{% endif %}>
+                        <label class="form-check-label fw-bold" for="richiamo-attivo">
+                            Richiamo automatico attivo
+                        </label>
+                    </div>
+                </div>
+                <div class="col-md-4">
+                    <label class="form-label">Giorni dopo l'ultimo lavaggio</label>
+                    <input type="number" min="1" class="form-control" name="richiamo_giorni_dopo"
+                           value="{{ cfg.richiamo_giorni_dopo }}">
+                </div>
+                <div class="col-md-4">
+                    <label class="form-label">Template Meta per il richiamo</label>
+                    <input type="text" class="form-control" name="richiamo_template_meta"
+                           value="{{ cfg.richiamo_template_meta }}"
+                           placeholder="es. richiamo_45_giorni">
+                    <div class="form-text">
+                        Nome del template approvato su Meta WhatsApp Manager.
+                        Vuoto = il richiamo non parte anche se l'interruttore è ON.
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="card border-0 shadow-sm mb-4">
+        <div class="card-body">
+            <h5 class="card-title"><i class="bi bi-graph-up text-primary"></i> Misurazione</h5>
+            <div class="row g-3">
+                <div class="col-md-6">
+                    <label class="form-label">Finestra di conversione (giorni)</label>
+                    <input type="number" min="1" class="form-control" name="giorni_finestra_conversione"
+                           value="{{ cfg.giorni_finestra_conversione }}">
+                    <div class="form-text">
+                        Un cliente "converte" se torna a lavare entro N giorni dal messaggio.
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="d-flex justify-content-end">
+        <button type="submit" class="btn btn-primary">
+            <i class="bi bi-check-circle"></i> Salva impostazioni
+        </button>
+    </div>
+</form>
+{% endblock %}

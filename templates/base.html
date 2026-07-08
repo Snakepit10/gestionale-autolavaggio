@@ -72,6 +72,14 @@
                             </a>
                         </li>
 
+                        {% if user.is_staff %}
+                        <li class="nav-item">
+                            <a class="nav-link" href="{% url 'marketing:dashboard' %}">
+                                <i class="bi bi-megaphone"></i> Marketing
+                            </a>
+                        </li>
+                        {% endif %}
+
                         <li class="nav-item">
                             <a class="nav-link" href="{% url 'ordini:ordini-list' %}">
                                 <i class="bi bi-receipt"></i> Ordini
