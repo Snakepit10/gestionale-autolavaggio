@@ -1,0 +1,136 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}{{ campagna.nome }} - Marketing{% endblock %}
+
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <h1><i class="bi bi-send"></i> {{ campagna.nome }}
+        <span class="badge fs-6 align-middle
+            {% if campagna.stato == 'completata' %}bg-success
+            {% elif campagna.stato == 'in_corso' %}bg-primary
+            {% elif campagna.stato == 'in_coda' %}bg-warning text-dark
+            {% elif campagna.stato == 'annullata' %}bg-secondary
+            {% else %}bg-light text-dark border{% endif %}">
+            {{ campagna.get_stato_display }}
+        </span>
+    </h1>
+    <div>
+        {% if campagna.stato == 'in_coda' or campagna.stato == 'in_corso' %}
+        <form method="post" action="{% url 'marketing:campagna-annulla' campagna.pk %}" class="d-inline">
+            {% csrf_token %}
+            <button type="submit" class="btn btn-outline-danger me-2"
+                    onclick="return confirm('Annullare la campagna? Gli invii in coda non partiranno.');">
+                <i class="bi bi-x-circle"></i> Annulla campagna
+            </button>
+        </form>
+        {% endif %}
+        <a href="{% url 'marketing:campagne' %}" class="btn btn-outline-primary">
+            <i class="bi bi-arrow-left"></i> Campagne
+        </a>
+    </div>
+</div>
+
+<div class="row g-3 mb-4">
+    <div class="col-6 col-lg-2">
+        <div class="card border-0 shadow-sm h-100"><div class="card-body text-center">
+            <div class="fs-3 fw-bold">{{ campagna.n_destinatari }}</div>
+            <div class="text-muted small">destinatari</div>
+        </div></div>
+    </div>
+    <div class="col-6 col-lg-2">
+        <div class="card border-0 shadow-sm h-100"><div class="card-body text-center">
+            <div class="fs-3 fw-bold text-success">{{ campagna.n_inviati }}</div>
+            <div class="text-muted small">inviati</div>
+        </div></div>
+    </div>
+    <div class="col-6 col-lg-2">
+        <div class="card border-0 shadow-sm h-100"><div class="card-body text-center">
+            <div class="fs-3 fw-bold {% if campagna.n_falliti %}text-danger{% endif %}">{{ campagna.n_falliti }}</div>
+            <div class="text-muted small">falliti</div>
+        </div></div>
+    </div>
+    <div class="col-6 col-lg-2">
+        <div class="card border-0 shadow-sm h-100"><div class="card-body text-center">
+            <div class="fs-3 fw-bold">{{ campagna.n_in_coda }}</div>
+            <div class="text-muted small">in coda</div>
+        </div></div>
+    </div>
+    <div class="col-6 col-lg-2">
+        <div class="card border-0 shadow-sm h-100"><div class="card-body text-center">
+            <div class="fs-3 fw-bold text-primary">{{ n_conversioni }}</div>
+            <div class="text-muted small">conversioni ({{ tasso_conversione|floatformat:1 }}%)</div>
+        </div></div>
+    </div>
+    <div class="col-6 col-lg-2">
+        <div class="card border-0 shadow-sm h-100"><div class="card-body text-center">
+            <div class="fs-3 fw-bold text-primary">€ {{ fatturato|floatformat:0 }}</div>
+            <div class="text-muted small">fatturato attribuito</div>
+        </div></div>
+    </div>
+</div>
+
+<div class="card border-0 shadow-sm mb-4">
+    <div class="card-body py-2">
+        <span class="text-muted small">
+            Template: <code>{{ campagna.template_meta }}</code>
+            {% if campagna.template_params %} · Parametri:
+                {% for p in campagna.template_params %}<code>{{ p }}</code>{% if not forloop.last %}, {% endif %}{% endfor %}
+            {% endif %}
+            · Segmento: {{ campagna.segmento_origine|default:"—" }}
+            · Conversione entro {{ campagna.finestra_conversione_giorni }} giorni dall'invio
+        </span>
+    </div>
+</div>
+
+<div class="card border-0 shadow-sm">
+    <div class="table-responsive">
+        <table class="table table-hover align-middle mb-0">
+            <thead class="table-light">
+                <tr>
+                    <th>Cliente</th>
+                    <th>Telefono</th>
+                    <th>Stato</th>
+                    <th>Inviato il</th>
+                    <th>Consegna WA</th>
+                    <th>Note</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for i in invii %}
+                <tr>
+                    <td>{{ i.cliente.nome_completo }}</td>
+                    <td>{{ i.cliente.telefono }}</td>
+                    <td>
+                        <span class="badge
+                            {% if i.stato == 'inviato' %}bg-success
+                            {% elif i.stato == 'fallito' %}bg-danger
+                            {% elif i.stato == 'saltato' %}bg-secondary
+                            {% else %}bg-warning text-dark{% endif %}">
+                            {{ i.get_stato_display }}
+                        </span>
+                    </td>
+                    <td>{{ i.inviato_il|date:"d/m/Y H:i"|default:"—" }}</td>
+                    <td>
+                        {% if i.messaggio_wa %}
+                            {% if i.messaggio_wa.stato == 'read' %}
+                                <span style="color:#53bdeb;">✓✓</span> letto
+                            {% elif i.messaggio_wa.stato == 'delivered' %}
+                                <span class="text-muted">✓✓</span> recapitato
+                            {% elif i.messaggio_wa.stato == 'sent' %}
+                                <span class="text-muted">✓</span> inviato
+                            {% elif i.messaggio_wa.stato == 'failed' %}
+                                <span class="text-danger">⚠</span> fallito
+                            {% else %}—{% endif %}
+                        {% else %}—{% endif %}
+                    </td>
+                    <td class="text-muted small">{{ i.motivo_salto|default:"" }}</td>
+                </tr>
+                {% empty %}
+                <tr><td colspan="6" class="text-center text-muted py-4">Nessun invio.</td></tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+{% endblock %}

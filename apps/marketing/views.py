@@ -90,6 +90,171 @@ def segmento_export_csv(request, chiave):
 
 
 @_staff_required
+def campagne_list(request):
+    """Elenco campagne con statistiche sintetiche."""
+    from .models import Campagna
+    campagne = Campagna.objects.all()
+    return render(request, 'marketing/campagne_list.html', {'campagne': campagne})
+
+
+@_staff_required
+def campagna_nuova(request):
+    """Step 1 del composer: nome, segmento, template Meta, parametri."""
+    from .services.campagne import PLACEHOLDER_SUPPORTATI
+    ris = segmenta_clienti()
+    segmenti = [
+        (chiave, SEGMENTI_LABEL[chiave], len(ris.get(chiave)))
+        for chiave in ('attivi', 'rallentamento', 'dormienti', 'one_shot')
+    ]
+    return render(request, 'marketing/campagna_nuova.html', {
+        'segmenti': segmenti,
+        'placeholder': PLACEHOLDER_SUPPORTATI,
+    })
+
+
+@_staff_required
+def campagna_preview(request):
+    """Step 2: anteprima destinatari + messaggi compilati, prima della conferma."""
+    from .services.campagne import prepara_destinatari, risolvi_params
+
+    if request.method != 'POST':
+        return redirect('marketing:campagna-nuova')
+
+    nome = (request.POST.get('nome') or '').strip()
+    segmento = (request.POST.get('segmento') or '').strip()
+    template_meta = (request.POST.get('template_meta') or '').strip()
+    # Un parametro per riga nella textarea
+    params_raw = request.POST.get('template_params') or ''
+    template_params = [r.strip() for r in params_raw.splitlines() if r.strip()]
+
+    if not nome or not template_meta:
+        messages.error(request, 'Nome campagna e template Meta sono obbligatori.')
+        return redirect('marketing:campagna-nuova')
+    if segmento not in SEGMENTI_LABEL:
+        messages.error(request, 'Segmento non valido.')
+        return redirect('marketing:campagna-nuova')
+
+    ris = segmenta_clienti()
+    cliente_ids = [cs.cliente.pk for cs in ris.get(segmento)]
+    eleggibili, esclusi = prepara_destinatari(cliente_ids)
+
+    # Esempi di messaggi compilati sui primi 3 eleggibili
+    esempi = [
+        (c, risolvi_params(template_params, c))
+        for c in eleggibili[:3]
+    ]
+
+    return render(request, 'marketing/campagna_preview.html', {
+        'nome': nome,
+        'segmento': segmento,
+        'segmento_label': SEGMENTI_LABEL[segmento],
+        'template_meta': template_meta,
+        'template_params': template_params,
+        'params_raw': params_raw,
+        'eleggibili': eleggibili,
+        'esclusi': esclusi,
+        'esempi': esempi,
+    })
+
+
+@_staff_required
+def campagna_crea(request):
+    """Step 3: conferma finale -> crea campagna + invii in coda."""
+    from .services.campagne import crea_campagna
+
+    if request.method != 'POST':
+        return redirect('marketing:campagna-nuova')
+
+    nome = (request.POST.get('nome') or '').strip()
+    segmento = (request.POST.get('segmento') or '').strip()
+    template_meta = (request.POST.get('template_meta') or '').strip()
+    params_raw = request.POST.get('template_params') or ''
+    template_params = [r.strip() for r in params_raw.splitlines() if r.strip()]
+    # Id selezionati dalle checkbox della preview
+    try:
+        cliente_ids = [int(x) for x in request.POST.getlist('destinatari')]
+    except ValueError:
+        messages.error(request, 'Destinatari non validi.')
+        return redirect('marketing:campagna-nuova')
+
+    if not cliente_ids:
+        messages.error(request, 'Seleziona almeno un destinatario.')
+        return redirect('marketing:campagna-nuova')
+
+    campagna = crea_campagna(
+        nome=nome, template_meta=template_meta,
+        template_params=template_params,
+        cliente_ids_selezionati=cliente_ids,
+        segmento=segmento, user=request.user,
+    )
+    messages.success(
+        request,
+        f'Campagna "{campagna.nome}" creata: {campagna.n_in_coda} invii in coda. '
+        f"L'invio parte scaglionato (max {ImpostazioniMarketing.get_solo().max_invii_giorno}/giorno)."
+    )
+    return redirect('marketing:campagna-dettaglio', pk=campagna.pk)
+
+
+@_staff_required
+def campagna_dettaglio(request, pk):
+    """Dettaglio campagna: stati invii + conversioni (F6)."""
+    from django.shortcuts import get_object_or_404
+    from .models import Campagna
+
+    campagna = get_object_or_404(Campagna, pk=pk)
+    invii = campagna.invii.select_related('cliente', 'messaggio_wa').order_by('stato', '-inviato_il')
+
+    # Conversioni: solo sugli inviati. Loop accettabile per campagne di
+    # centinaia di destinatari; da ottimizzare con una query aggregata
+    # se si superano le migliaia.
+    inviati = [i for i in invii if i.stato == 'inviato']
+    conversioni = [i for i in inviati if i.ha_convertito()]
+
+    # Fatturato attribuito: somma totale_finale degli ordini completati
+    # nella finestra di conversione per i clienti convertiti.
+    from apps.ordini.models import Ordine
+    fatturato = 0
+    for i in conversioni:
+        fine = i.inviato_il + timezone.timedelta(days=campagna.finestra_conversione_giorni)
+        for o in Ordine.objects.filter(
+            cliente=i.cliente, stato='completato',
+            data_ora__gt=i.inviato_il, data_ora__lte=fine,
+        ):
+            fatturato += float(o.totale_finale or 0)
+
+    n_inviati = len(inviati)
+    tasso = (len(conversioni) / n_inviati * 100) if n_inviati else 0
+
+    return render(request, 'marketing/campagna_dettaglio.html', {
+        'campagna': campagna,
+        'invii': invii,
+        'n_conversioni': len(conversioni),
+        'tasso_conversione': tasso,
+        'fatturato': fatturato,
+    })
+
+
+@_staff_required
+def campagna_annulla(request, pk):
+    """Annulla una campagna: gli invii ancora in coda non partiranno."""
+    from django.shortcuts import get_object_or_404
+    from .models import Campagna
+
+    if request.method != 'POST':
+        return redirect('marketing:campagne')
+    campagna = get_object_or_404(Campagna, pk=pk)
+    if campagna.stato in ('in_coda', 'in_corso'):
+        campagna.invii.filter(stato='in_coda').update(
+            stato='saltato', motivo_salto='campagna annullata')
+        campagna.stato = 'annullata'
+        campagna.save(update_fields=['stato'])
+        messages.success(request, f'Campagna "{campagna.nome}" annullata.')
+    else:
+        messages.error(request, 'La campagna non e\' annullabile in questo stato.')
+    return redirect('marketing:campagna-dettaglio', pk=pk)
+
+
+@_staff_required
 def toggle_opt_out(request, cliente_id):
     """Attiva/disattiva 'non contattare' su un cliente (POST).
 

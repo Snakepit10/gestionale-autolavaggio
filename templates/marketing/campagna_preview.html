@@ -1,0 +1,153 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}Anteprima campagna - Marketing{% endblock %}
+
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <h1><i class="bi bi-eye"></i> Anteprima: {{ nome }}</h1>
+    <a href="{% url 'marketing:campagna-nuova' %}" class="btn btn-outline-primary">
+        <i class="bi bi-arrow-left"></i> Modifica
+    </a>
+</div>
+
+<div class="row g-3 mb-4">
+    <div class="col-sm-4">
+        <div class="card border-0 shadow-sm h-100">
+            <div class="card-body text-center">
+                <div class="fs-2 fw-bold text-success">{{ eleggibili|length }}</div>
+                <div class="text-muted">destinatari contattabili</div>
+            </div>
+        </div>
+    </div>
+    <div class="col-sm-4">
+        <div class="card border-0 shadow-sm h-100">
+            <div class="card-body text-center">
+                <div class="fs-2 fw-bold text-secondary">{{ esclusi|length }}</div>
+                <div class="text-muted">esclusi automaticamente</div>
+            </div>
+        </div>
+    </div>
+    <div class="col-sm-4">
+        <div class="card border-0 shadow-sm h-100">
+            <div class="card-body text-center">
+                <div class="fs-5 fw-bold">{{ segmento_label }}</div>
+                <div class="text-muted">template: <code>{{ template_meta }}</code></div>
+            </div>
+        </div>
+    </div>
+</div>
+
+{% if esempi %}
+<div class="card border-0 shadow-sm mb-4">
+    <div class="card-body">
+        <h5 class="card-title"><i class="bi bi-chat-square-text text-primary"></i> Esempio parametri compilati</h5>
+        <p class="text-muted small">
+            Come verranno riempiti i segnaposto del template per i primi destinatari.
+        </p>
+        <div class="table-responsive">
+            <table class="table table-sm mb-0">
+                <thead class="table-light">
+                    <tr><th>Cliente</th><th>Parametri {1}, {2}, ...</th></tr>
+                </thead>
+                <tbody>
+                    {% for cliente, params in esempi %}
+                    <tr>
+                        <td>{{ cliente.nome_completo }}</td>
+                        <td>{% for p in params %}<code>{{ p }}</code>{% if not forloop.last %} · {% endif %}{% endfor %}</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+{% endif %}
+
+<form method="post" action="{% url 'marketing:campagna-crea' %}">
+    {% csrf_token %}
+    <input type="hidden" name="nome" value="{{ nome }}">
+    <input type="hidden" name="segmento" value="{{ segmento }}">
+    <input type="hidden" name="template_meta" value="{{ template_meta }}">
+    <input type="hidden" name="template_params" value="{{ params_raw }}">
+
+    <div class="card border-0 shadow-sm mb-4">
+        <div class="card-body">
+            <div class="d-flex justify-content-between align-items-center mb-2">
+                <h5 class="card-title mb-0"><i class="bi bi-people text-success"></i> Destinatari</h5>
+                <div>
+                    <button type="button" class="btn btn-sm btn-outline-secondary" onclick="selezionaTutti(true)">Tutti</button>
+                    <button type="button" class="btn btn-sm btn-outline-secondary" onclick="selezionaTutti(false)">Nessuno</button>
+                </div>
+            </div>
+            <div class="table-responsive" style="max-height: 400px; overflow-y: auto;">
+                <table class="table table-sm table-hover align-middle mb-0">
+                    <thead class="table-light" style="position: sticky; top: 0;">
+                        <tr>
+                            <th style="width:40px;"></th>
+                            <th>Cliente</th>
+                            <th>Telefono</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for c in eleggibili %}
+                        <tr>
+                            <td>
+                                <input type="checkbox" class="form-check-input chk-dest"
+                                       name="destinatari" value="{{ c.pk }}" checked>
+                            </td>
+                            <td>{{ c.nome_completo }}</td>
+                            <td>{{ c.telefono }}</td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
+    {% if esclusi %}
+    <div class="card border-0 shadow-sm mb-4">
+        <div class="card-body">
+            <h5 class="card-title"><i class="bi bi-person-x text-secondary"></i> Esclusi automaticamente</h5>
+            <div class="table-responsive" style="max-height: 250px; overflow-y: auto;">
+                <table class="table table-sm mb-0">
+                    <thead class="table-light">
+                        <tr><th>Cliente</th><th>Motivo</th></tr>
+                    </thead>
+                    <tbody>
+                        {% for c, motivo in esclusi %}
+                        <tr>
+                            <td>{{ c.nome_completo }}</td>
+                            <td><span class="badge bg-light text-dark border">{{ motivo }}</span></td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+    {% endif %}
+
+    <div class="alert alert-warning small">
+        <i class="bi bi-info-circle"></i>
+        Confermando, gli invii vengono messi <strong>in coda</strong> e partono
+        scaglionati nel tempo (limite giornaliero configurato nelle impostazioni).
+        Potrai annullare la campagna finche' ci sono invii in coda.
+    </div>
+
+    <div class="d-flex justify-content-end gap-2">
+        <a href="{% url 'marketing:campagna-nuova' %}" class="btn btn-secondary">Annulla</a>
+        <button type="submit" class="btn btn-primary"
+                onclick="return confirm('Confermi il lancio della campagna?');">
+            <i class="bi bi-send"></i> Conferma e metti in coda
+        </button>
+    </div>
+</form>
+
+<script>
+function selezionaTutti(stato) {
+    document.querySelectorAll('.chk-dest').forEach(c => c.checked = stato);
+}
+</script>
+{% endblock %}

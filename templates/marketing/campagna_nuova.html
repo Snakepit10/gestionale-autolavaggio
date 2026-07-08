@@ -1,0 +1,66 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}Nuova campagna - Marketing{% endblock %}
+
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <h1><i class="bi bi-send-plus"></i> Nuova campagna</h1>
+    <a href="{% url 'marketing:campagne' %}" class="btn btn-outline-primary">
+        <i class="bi bi-arrow-left"></i> Campagne
+    </a>
+</div>
+
+<form method="post" action="{% url 'marketing:campagna-preview' %}">
+    {% csrf_token %}
+
+    <div class="card border-0 shadow-sm mb-4">
+        <div class="card-body">
+            <div class="row g-3">
+                <div class="col-md-6">
+                    <label class="form-label fw-bold">Nome campagna *</label>
+                    <input type="text" class="form-control" name="nome" required
+                           placeholder="es. Riattivazione dormienti luglio">
+                </div>
+                <div class="col-md-6">
+                    <label class="form-label fw-bold">Segmento destinatari *</label>
+                    <select class="form-select" name="segmento" required>
+                        {% for chiave, label, conteggio in segmenti %}
+                        <option value="{{ chiave }}">{{ label }} ({{ conteggio }} clienti)</option>
+                        {% endfor %}
+                    </select>
+                    <div class="form-text">
+                        Nella preview potrai deselezionare singoli clienti.
+                    </div>
+                </div>
+                <div class="col-md-6">
+                    <label class="form-label fw-bold">Template Meta *</label>
+                    <input type="text" class="form-control" name="template_meta" required
+                           placeholder="es. riattivazione_cliente">
+                    <div class="form-text">
+                        Nome esatto del template <strong>approvato</strong> su Meta
+                        WhatsApp Manager. I messaggi promozionali fuori dalla
+                        finestra 24h possono partire SOLO come template.
+                    </div>
+                </div>
+                <div class="col-md-6">
+                    <label class="form-label fw-bold">Parametri template (uno per riga)</label>
+                    <textarea class="form-control" name="template_params" rows="3"
+                              placeholder="{nome}&#10;20%"></textarea>
+                    <div class="form-text">
+                        Nell'ordine dei segnaposto {1}, {2}, ... del template.
+                        Placeholder disponibili:
+                        {% for ph in placeholder %}<code>{{ ph }}</code>{% if not forloop.last %}, {% endif %}{% endfor %}
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="d-flex justify-content-end">
+        <button type="submit" class="btn btn-primary">
+            <i class="bi bi-eye"></i> Anteprima destinatari
+        </button>
+    </div>
+</form>
+{% endblock %}
