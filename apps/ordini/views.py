@@ -362,6 +362,15 @@ def _risolvi_cliente_payload(data, required=False):
             }, status=400)
         if tipo_cliente == 'azienda':
             try:
+                # Telefono univoco anche per le aziende (stesso check
+                # normalizzato del ClienteQuickForm usato per i privati).
+                from apps.clienti.utils import trova_cliente_per_telefono
+                esistente = trova_cliente_per_telefono(nuovo_cliente_data.get('telefono'))
+                if esistente:
+                    return None, JsonResponse({
+                        'error': f'Numero già registrato per "{esistente}". '
+                                 f'Cerca e seleziona quel cliente.',
+                    }, status=400)
                 email = nuovo_cliente_data.get('email') or None
                 if isinstance(email, str) and not email.strip():
                     email = None

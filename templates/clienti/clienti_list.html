@@ -7,6 +7,12 @@
 <div class="d-flex justify-content-between align-items-center mb-4">
     <h1><i class="bi bi-people"></i> Gestione Clienti</h1>
     <div>
+        {% if user.is_staff %}
+        <a href="{% url 'clienti:pulizia' %}" class="btn btn-outline-warning me-2"
+           title="Trova e unisci duplicati, elimina anagrafiche senza telefono">
+            <i class="bi bi-eraser"></i> Pulizia clienti
+        </a>
+        {% endif %}
         <a href="{% url 'clienti:export-clienti-csv' %}" class="btn btn-outline-success me-2">
             <i class="bi bi-file-earmark-excel"></i> Esporta CSV
         </a>

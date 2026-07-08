@@ -1,0 +1,173 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}Pulizia clienti - Gestionale Autolavaggio{% endblock %}
+
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <h1><i class="bi bi-eraser"></i> Pulizia clienti</h1>
+    <a href="{% url 'clienti:clienti-list' %}" class="btn btn-outline-primary">
+        <i class="bi bi-arrow-left"></i> Lista clienti
+    </a>
+</div>
+
+{# ================= DUPLICATI ================= #}
+<div class="card border-0 shadow-sm mb-4">
+    <div class="card-header bg-warning bg-opacity-10">
+        <h5 class="mb-0">
+            <i class="bi bi-people-fill text-warning"></i>
+            Duplicati per numero di telefono
+            <span class="badge bg-warning text-dark">{{ gruppi_duplicati|length }} gruppi</span>
+        </h5>
+    </div>
+    <div class="card-body">
+        {% if gruppi_duplicati %}
+        <p class="text-muted small">
+            Clienti diversi che condividono lo stesso numero (il confronto
+            ignora spazi, trattini e prefisso +39). Scegli il profilo
+            <strong>principale</strong> di ogni gruppo: gli altri verranno
+            <strong>fusi</strong> dentro di lui — ordini, prenotazioni, punti
+            fedeltà, abbonamenti e chat WhatsApp vengono riassegnati, i campi
+            mancanti completati — e poi eliminati. Il profilo con più ordini
+            è preselezionato.
+        </p>
+
+        {% for gruppo in gruppi_duplicati %}
+        <form method="post" action="{% url 'clienti:pulizia-unisci' %}"
+              class="border rounded p-3 mb-3 {% cycle 'bg-light' '' %}">
+            {% csrf_token %}
+            <div class="table-responsive">
+                <table class="table table-sm align-middle mb-2">
+                    <thead>
+                        <tr class="text-muted small">
+                            <th style="width:90px;">Principale</th>
+                            <th>Cliente</th>
+                            <th>Telefono</th>
+                            <th>Email</th>
+                            <th class="text-center">Ordini</th>
+                            <th class="text-center">Prenotazioni</th>
+                            <th class="text-center">Account</th>
+                            <th>Registrato</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for info in gruppo %}
+                        <tr>
+                            <td class="text-center">
+                                <input type="radio" class="form-check-input" name="master_id"
+                                       value="{{ info.cliente.pk }}" {% if forloop.first %}checked{% endif %}>
+                                <input type="hidden" name="gruppo_ids" value="{{ info.cliente.pk }}">
+                            </td>
+                            <td>
+                                <a href="{% url 'clienti:storico-cliente' info.cliente.pk %}" class="text-decoration-none">
+                                    {{ info.cliente.nome_completo|default:"(senza nome)" }}
+                                </a>
+                                <span class="text-muted small">#{{ info.cliente.pk }}</span>
+                            </td>
+                            <td>{{ info.cliente.telefono }}</td>
+                            <td class="text-muted small">{{ info.cliente.email|default:"—" }}</td>
+                            <td class="text-center">{{ info.n_ordini }}</td>
+                            <td class="text-center">{{ info.n_prenotazioni }}</td>
+                            <td class="text-center">
+                                {% if info.ha_account %}<i class="bi bi-check-circle-fill text-success"></i>{% else %}—{% endif %}
+                            </td>
+                            <td class="text-muted small">{{ info.cliente.data_registrazione|date:"d/m/Y" }}</td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+            <button type="submit" class="btn btn-sm btn-warning"
+                    onclick="return confirm('Unire questi profili nel cliente selezionato come principale? Gli altri verranno eliminati dopo il travaso dei dati. Operazione NON reversibile.');">
+                <i class="bi bi-union"></i> Unisci nel principale
+            </button>
+        </form>
+        {% endfor %}
+        {% else %}
+        <div class="text-center text-muted py-4">
+            <i class="bi bi-check-circle text-success fs-3 d-block mb-2"></i>
+            Nessun duplicato: ogni numero di telefono appartiene a un solo cliente.
+        </div>
+        {% endif %}
+    </div>
+</div>
+
+{# ================= SENZA TELEFONO ================= #}
+<div class="card border-0 shadow-sm mb-4">
+    <div class="card-header bg-secondary bg-opacity-10">
+        <h5 class="mb-0">
+            <i class="bi bi-telephone-x text-secondary"></i>
+            Clienti senza numero valido
+            <span class="badge bg-secondary">{{ senza_telefono|length }}</span>
+        </h5>
+    </div>
+    <div class="card-body">
+        {% if senza_telefono %}
+        <p class="text-muted small">
+            Numero mancante o non riconoscibile. Le anagrafiche
+            <strong>vuote</strong> (zero ordini, prenotazioni, abbonamenti e
+            senza account) si possono eliminare in blocco; le altre vanno
+            corrette aprendo la scheda.
+        </p>
+        <form method="post" action="{% url 'clienti:pulizia-elimina-vuoti' %}">
+            {% csrf_token %}
+            <div class="table-responsive" style="max-height: 420px; overflow-y: auto;">
+                <table class="table table-sm table-hover align-middle mb-2">
+                    <thead class="table-light" style="position: sticky; top: 0;">
+                        <tr>
+                            <th style="width:40px;">
+                                <input type="checkbox" class="form-check-input" id="chk-tutti-vuoti"
+                                       onclick="document.querySelectorAll('.chk-vuoto').forEach(c => c.checked = this.checked)">
+                            </th>
+                            <th>Cliente</th>
+                            <th>Telefono attuale</th>
+                            <th>Email</th>
+                            <th class="text-center">Ordini</th>
+                            <th class="text-center">Prenotazioni</th>
+                            <th></th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for info in senza_telefono %}
+                        <tr>
+                            <td class="text-center">
+                                {% if info.eliminabile %}
+                                <input type="checkbox" class="form-check-input chk-vuoto"
+                                       name="cliente_ids" value="{{ info.cliente.pk }}">
+                                {% endif %}
+                            </td>
+                            <td>{{ info.cliente.nome_completo|default:"(senza nome)" }}
+                                <span class="text-muted small">#{{ info.cliente.pk }}</span>
+                                {% if info.eliminabile %}
+                                    <span class="badge bg-light text-muted border">vuota</span>
+                                {% endif %}
+                            </td>
+                            <td class="text-muted">{{ info.cliente.telefono|default:"—" }}</td>
+                            <td class="text-muted small">{{ info.cliente.email|default:"—" }}</td>
+                            <td class="text-center">{{ info.n_ordini }}</td>
+                            <td class="text-center">{{ info.n_prenotazioni }}</td>
+                            <td class="text-end">
+                                <a href="{% url 'clienti:cliente-update' info.cliente.pk %}"
+                                   class="btn btn-sm btn-outline-primary" title="Correggi il numero">
+                                    <i class="bi bi-pencil"></i>
+                                </a>
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+            <button type="submit" class="btn btn-sm btn-outline-danger"
+                    onclick="return confirm('Eliminare le anagrafiche vuote selezionate? Solo i clienti senza alcuna attività verranno rimossi.');">
+                <i class="bi bi-trash"></i> Elimina anagrafiche vuote selezionate
+            </button>
+        </form>
+        {% else %}
+        <div class="text-center text-muted py-4">
+            <i class="bi bi-check-circle text-success fs-3 d-block mb-2"></i>
+            Tutti i clienti hanno un numero di telefono valido.
+        </div>
+        {% endif %}
+    </div>
+</div>
+{% endblock %}

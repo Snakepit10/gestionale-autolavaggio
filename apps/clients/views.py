@@ -446,12 +446,17 @@ def crea_prenotazione_pub(request):
                 }, status=400)
 
         with transaction.atomic():
-            # Tenta riuso Cliente esistente per email/telefono
+            # Tenta riuso Cliente esistente per email/telefono. Il match
+            # telefono e' sul numero NORMALIZZATO (E.164): '333 1234567'
+            # e '+39 3331234567' sono lo stesso cliente. Evita di creare
+            # duplicati quando il guest ridigita il numero in un formato
+            # diverso da quello in anagrafica.
+            from apps.clienti.utils import trova_cliente_per_telefono
             existing_cliente = None
             if email:
                 existing_cliente = Cliente.objects.filter(email__iexact=email).first()
             if not existing_cliente and telefono:
-                existing_cliente = Cliente.objects.filter(telefono=telefono).first()
+                existing_cliente = trova_cliente_per_telefono(telefono)
 
             if existing_cliente:
                 cliente = existing_cliente

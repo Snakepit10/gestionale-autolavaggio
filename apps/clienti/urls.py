@@ -15,6 +15,11 @@ urlpatterns = [
     path('admin/<int:pk>/modifica/', views.ClienteUpdateView.as_view(), name='cliente-update'),
     path('admin/<int:pk>/elimina/', views.ClienteDeleteView.as_view(), name='cliente-delete'),
     path('admin/<int:pk>/storico/', views.StoricoClienteView.as_view(), name='storico-cliente'),
+
+    # Pulizia anagrafica (duplicati + senza telefono)
+    path('admin/pulizia/', views.pulizia_clienti, name='pulizia'),
+    path('admin/pulizia/unisci/', views.pulizia_unisci, name='pulizia-unisci'),
+    path('admin/pulizia/elimina-vuoti/', views.pulizia_elimina_vuoti, name='pulizia-elimina-vuoti'),
     
     # AJAX e utility
     path('cerca/', views.cerca_cliente, name='cerca-cliente'),

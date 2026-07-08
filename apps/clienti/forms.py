@@ -73,13 +73,32 @@ class ClienteForm(forms.ModelForm):
         # Converti stringa vuota in None per consistenza
         if not email or email.strip() == '':
             return None
-            
+
         return email.strip()
-    
+
+    def clean_telefono(self):
+        """Il numero deve essere univoco nell'anagrafica (confronto sul
+        formato normalizzato E.164: '333 1234567' e '+39 333-1234567'
+        sono lo stesso numero)."""
+        telefono = (self.cleaned_data.get('telefono') or '').strip()
+        if not telefono:
+            return telefono
+        from .utils import trova_cliente_per_telefono
+        esistente = trova_cliente_per_telefono(
+            telefono,
+            escludi_pk=self.instance.pk if self.instance and self.instance.pk else None,
+        )
+        if esistente:
+            raise forms.ValidationError(
+                f'Numero gia\' registrato per "{esistente}". '
+                f'Usa quel cliente oppure correggi il numero.'
+            )
+        return telefono
+
     def clean_nome(self):
         nome = self.cleaned_data.get('nome')
         return nome.title() if nome else ''
-    
+
     def clean_cognome(self):
         cognome = self.cleaned_data.get('cognome')
         return cognome.title() if cognome else ''
@@ -197,19 +216,33 @@ class ClienteQuickForm(forms.Form):
     def clean_nome(self):
         nome = self.cleaned_data.get('nome')
         return nome.title() if nome else ''
-    
+
     def clean_cognome(self):
         cognome = self.cleaned_data.get('cognome')
         return cognome.title() if cognome else ''
-    
+
+    def clean_telefono(self):
+        """Univocita' sul numero normalizzato (vedi ClienteForm)."""
+        telefono = (self.cleaned_data.get('telefono') or '').strip()
+        if not telefono:
+            return telefono
+        from .utils import trova_cliente_per_telefono
+        esistente = trova_cliente_per_telefono(telefono)
+        if esistente:
+            raise forms.ValidationError(
+                f'Numero gia\' registrato per "{esistente}". '
+                f'Cerca e seleziona quel cliente invece di crearne uno nuovo.'
+            )
+        return telefono
+
     def clean_email(self):
         email = self.cleaned_data.get('email')
         # Converti stringa vuota in None per consistenza
         if not email or email.strip() == '':
             return None
-        
+
         return email.strip()
-    
+
     def save(self):
         """Crea un nuovo cliente con i dati essenziali"""
         email = self.cleaned_data.get('email')

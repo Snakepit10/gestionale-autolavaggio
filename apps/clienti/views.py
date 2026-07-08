@@ -232,6 +232,80 @@ def cerca_cliente(request):
 
 
 @login_required
+def pulizia_clienti(request):
+    """Pagina di pulizia anagrafica: duplicati per telefono + senza numero."""
+    if not (request.user.is_staff or request.user.is_superuser):
+        messages.error(request, 'Sezione riservata allo staff.')
+        return redirect('clienti:clienti-list')
+
+    from .services_pulizia import clienti_senza_telefono, trova_duplicati
+    return render(request, 'clienti/pulizia.html', {
+        'gruppi_duplicati': trova_duplicati(),
+        'senza_telefono': clienti_senza_telefono(),
+    })
+
+
+@login_required
+def pulizia_unisci(request):
+    """POST: fonde i duplicati di un gruppo nel master scelto."""
+    if not (request.user.is_staff or request.user.is_superuser):
+        return redirect('clienti:clienti-list')
+    if request.method != 'POST':
+        return redirect('clienti:pulizia')
+
+    from .services_pulizia import unisci_clienti
+    try:
+        master_id = int(request.POST.get('master_id'))
+        gruppo_ids = [int(x) for x in request.POST.getlist('gruppo_ids')]
+    except (TypeError, ValueError):
+        messages.error(request, 'Dati non validi.')
+        return redirect('clienti:pulizia')
+
+    if master_id not in gruppo_ids:
+        messages.error(request, 'Il cliente principale deve far parte del gruppo.')
+        return redirect('clienti:pulizia')
+
+    master = get_object_or_404(Cliente, pk=master_id)
+    duplicati = list(Cliente.objects.filter(
+        pk__in=[i for i in gruppo_ids if i != master_id]))
+    fusi = unisci_clienti(master, duplicati)
+    messages.success(
+        request,
+        f'{fusi} profili uniti in "{master}". Ordini, prenotazioni, punti '
+        f'fedelta\' e storico WhatsApp sono stati riassegnati.'
+    )
+    return redirect('clienti:pulizia')
+
+
+@login_required
+def pulizia_elimina_vuoti(request):
+    """POST: elimina i clienti senza telefono selezionati, solo se privi
+    di qualsiasi attivita' (ri-verifica server-side)."""
+    if not (request.user.is_staff or request.user.is_superuser):
+        return redirect('clienti:clienti-list')
+    if request.method != 'POST':
+        return redirect('clienti:pulizia')
+
+    from .services_pulizia import elimina_clienti_vuoti
+    try:
+        ids = [int(x) for x in request.POST.getlist('cliente_ids')]
+    except (TypeError, ValueError):
+        messages.error(request, 'Dati non validi.')
+        return redirect('clienti:pulizia')
+
+    eliminati, rifiutati = elimina_clienti_vuoti(ids)
+    if eliminati:
+        messages.success(request, f'{eliminati} anagrafiche vuote eliminate.')
+    if rifiutati:
+        messages.warning(
+            request,
+            f'{rifiutati} clienti NON eliminati: hanno ordini, prenotazioni, '
+            f'abbonamenti o un account collegato.'
+        )
+    return redirect('clienti:pulizia')
+
+
+@login_required
 def crea_cliente_ajax(request):
     """AJAX endpoint per creare un nuovo cliente"""
     if request.method != 'POST':
@@ -261,7 +335,19 @@ def crea_cliente_ajax(request):
         email = data.get('email', '').strip()
         if email and Cliente.objects.filter(email=email).exists():
             return JsonResponse({'success': False, 'error': 'Email già esistente'})
-        
+
+        # Telefono univoco (confronto normalizzato E.164: formati diversi
+        # dello stesso numero contano come duplicato)
+        from .utils import trova_cliente_per_telefono
+        esistente = trova_cliente_per_telefono(data.get('telefono'))
+        if esistente:
+            return JsonResponse({
+                'success': False,
+                'error': f'Numero già registrato per "{esistente}". '
+                         f'Cerca e seleziona quel cliente.',
+                'cliente_esistente_id': esistente.pk,
+            })
+
         # Crea il cliente
         cliente = Cliente.objects.create(
             tipo=tipo,
