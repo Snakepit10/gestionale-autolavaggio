@@ -89,6 +89,16 @@ class Command(BaseCommand):
             self.stdout.write(f'Richiamo: nessun cliente con ultimo lavaggio il {target}.')
             return
 
+        # Dry-run: nessuna scrittura, nemmeno il contenitore campagna.
+        if dry:
+            for c in candidati:
+                esito = verifica_eleggibilita(c, cfg)
+                self.stdout.write(
+                    f'[dry-run] richiamo {c} -> '
+                    f'{"in_coda" if esito.eleggibile else "saltato: " + esito.motivo}'
+                )
+            return
+
         # Campagna mensile: raggruppa i richiami del mese. Con
         # richiamo_giorni_dopo >= 30, un cliente non puo' rientrare due
         # volte nello stesso mese, quindi unique_together non confligge.
@@ -116,12 +126,6 @@ class Command(BaseCommand):
             if InvioCampagna.objects.filter(campagna=campagna, cliente=c).exists():
                 continue  # gia' accodato in un run precedente di oggi
             esito = verifica_eleggibilita(c, cfg, escludi_campagna=campagna)
-            if dry:
-                self.stdout.write(
-                    f'[dry-run] richiamo {c} -> '
-                    f'{"in_coda" if esito.eleggibile else "saltato: " + esito.motivo}'
-                )
-                continue
             InvioCampagna.objects.create(
                 campagna=campagna,
                 cliente=c,

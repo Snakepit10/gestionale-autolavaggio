@@ -91,10 +91,18 @@ def segmento_export_csv(request, chiave):
 
 @_staff_required
 def campagne_list(request):
-    """Elenco campagne con statistiche sintetiche."""
+    """Elenco campagne con statistiche complete + riepilogo per segmento."""
     from .models import Campagna
-    campagne = Campagna.objects.all()
-    return render(request, 'marketing/campagne_list.html', {'campagne': campagne})
+    from .services.statistiche import statistiche_campagna, statistiche_per_segmento
+
+    campagne = [
+        (c, statistiche_campagna(c)) for c in Campagna.objects.all()
+    ]
+    return render(request, 'marketing/campagne_list.html', {
+        'campagne': campagne,
+        'per_segmento': statistiche_per_segmento(),
+        'segmenti_label': SEGMENTI_LABEL,
+    })
 
 
 @_staff_required
@@ -200,37 +208,18 @@ def campagna_dettaglio(request, pk):
     """Dettaglio campagna: stati invii + conversioni (F6)."""
     from django.shortcuts import get_object_or_404
     from .models import Campagna
+    from .services.statistiche import statistiche_campagna
 
     campagna = get_object_or_404(Campagna, pk=pk)
     invii = campagna.invii.select_related('cliente', 'messaggio_wa').order_by('stato', '-inviato_il')
-
-    # Conversioni: solo sugli inviati. Loop accettabile per campagne di
-    # centinaia di destinatari; da ottimizzare con una query aggregata
-    # se si superano le migliaia.
-    inviati = [i for i in invii if i.stato == 'inviato']
-    conversioni = [i for i in inviati if i.ha_convertito()]
-
-    # Fatturato attribuito: somma totale_finale degli ordini completati
-    # nella finestra di conversione per i clienti convertiti.
-    from apps.ordini.models import Ordine
-    fatturato = 0
-    for i in conversioni:
-        fine = i.inviato_il + timezone.timedelta(days=campagna.finestra_conversione_giorni)
-        for o in Ordine.objects.filter(
-            cliente=i.cliente, stato='completato',
-            data_ora__gt=i.inviato_il, data_ora__lte=fine,
-        ):
-            fatturato += float(o.totale_finale or 0)
-
-    n_inviati = len(inviati)
-    tasso = (len(conversioni) / n_inviati * 100) if n_inviati else 0
+    stats = statistiche_campagna(campagna)
 
     return render(request, 'marketing/campagna_dettaglio.html', {
         'campagna': campagna,
         'invii': invii,
-        'n_conversioni': len(conversioni),
-        'tasso_conversione': tasso,
-        'fatturato': fatturato,
+        'n_conversioni': stats['n_conversioni'],
+        'tasso_conversione': stats['tasso_conversione'],
+        'fatturato': stats['fatturato'],
     })
 
 
