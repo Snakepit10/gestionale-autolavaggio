@@ -104,19 +104,36 @@
     <div class="card-body">
         {% if senza_telefono %}
         <p class="text-muted small">
-            Numero mancante o non riconoscibile. Le anagrafiche
-            <strong>vuote</strong> (zero ordini, prenotazioni, abbonamenti e
-            senza account) si possono eliminare in blocco; le altre vanno
-            corrette aprendo la scheda.
+            Numero mancante o non riconoscibile. Seleziona i clienti da
+            eliminare: per sicurezza il sistema rimuove <strong>solo le
+            anagrafiche vuote</strong> (badge grigio: zero ordini,
+            prenotazioni, abbonamenti e senza account). Chi ha uno storico
+            viene rifiutato automaticamente anche se selezionato — per quelli
+            correggi il numero dalla scheda (matita).
         </p>
         <form method="post" action="{% url 'clienti:pulizia-elimina-vuoti' %}">
             {% csrf_token %}
+            <div class="mb-2 d-flex gap-2">
+                <button type="button" class="btn btn-sm btn-outline-secondary"
+                        onclick="document.querySelectorAll('.chk-vuoto').forEach(c => c.checked = true)">
+                    Seleziona tutti
+                </button>
+                <button type="button" class="btn btn-sm btn-outline-secondary"
+                        onclick="document.querySelectorAll('.chk-vuoto').forEach(c => c.checked = c.dataset.vuota === '1')">
+                    Solo anagrafiche vuote
+                </button>
+                <button type="button" class="btn btn-sm btn-outline-secondary"
+                        onclick="document.querySelectorAll('.chk-vuoto').forEach(c => c.checked = false)">
+                    Nessuno
+                </button>
+            </div>
             <div class="table-responsive" style="max-height: 420px; overflow-y: auto;">
                 <table class="table table-sm table-hover align-middle mb-2">
                     <thead class="table-light" style="position: sticky; top: 0;">
                         <tr>
                             <th style="width:40px;">
                                 <input type="checkbox" class="form-check-input" id="chk-tutti-vuoti"
+                                       title="Seleziona/deseleziona tutti"
                                        onclick="document.querySelectorAll('.chk-vuoto').forEach(c => c.checked = this.checked)">
                             </th>
                             <th>Cliente</th>
@@ -131,15 +148,18 @@
                         {% for info in senza_telefono %}
                         <tr>
                             <td class="text-center">
-                                {% if info.eliminabile %}
                                 <input type="checkbox" class="form-check-input chk-vuoto"
-                                       name="cliente_ids" value="{{ info.cliente.pk }}">
-                                {% endif %}
+                                       name="cliente_ids" value="{{ info.cliente.pk }}"
+                                       data-vuota="{% if info.eliminabile %}1{% else %}0{% endif %}">
                             </td>
                             <td>{{ info.cliente.nome_completo|default:"(senza nome)" }}
                                 <span class="text-muted small">#{{ info.cliente.pk }}</span>
                                 {% if info.eliminabile %}
                                     <span class="badge bg-light text-muted border">vuota</span>
+                                {% else %}
+                                    <span class="badge bg-warning text-dark" title="Ha storico: non eliminabile, correggi il numero">
+                                        con storico
+                                    </span>
                                 {% endif %}
                             </td>
                             <td class="text-muted">{{ info.cliente.telefono|default:"—" }}</td>
@@ -158,8 +178,8 @@
                 </table>
             </div>
             <button type="submit" class="btn btn-sm btn-outline-danger"
-                    onclick="return confirm('Eliminare le anagrafiche vuote selezionate? Solo i clienti senza alcuna attività verranno rimossi.');">
-                <i class="bi bi-trash"></i> Elimina anagrafiche vuote selezionate
+                    onclick="return confirm('Eliminare i clienti selezionati? Verranno rimosse SOLO le anagrafiche vuote (zero ordini/prenotazioni/account); le altre verranno rifiutate e conteggiate.');">
+                <i class="bi bi-trash"></i> Elimina selezionati (solo vuote)
             </button>
         </form>
         {% else %}
