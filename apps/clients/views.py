@@ -535,6 +535,7 @@ def crea_prenotazione_pub(request):
         slot=slot,
         durata_stimata_minuti=durata,
         stato='in_attesa',
+        origine='web',
         tipo_auto=tipo_auto,
         nota_cliente=nota,
         email_contatto=contact_email,

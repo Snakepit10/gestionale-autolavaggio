@@ -67,6 +67,13 @@
     background: rgba(0,0,0,.06); color: #1e293b;
 }
 .pren-badge .cliente-name { font-weight: 600; }
+/* Canale di origine della prenotazione: globo = booking online, negozio = cassa */
+.origine-pill {
+    display: inline-flex; align-items: center; justify-content: center;
+    width: 20px; height: 20px; border-radius: 50%; font-size: .72rem; flex: 0 0 auto;
+}
+.origine-pill.web { background: #e0f2fe; color: #0284c7; }
+.origine-pill.cassa { background: #ede9fe; color: #7c3aed; }
 .pren-badge .tipo-auto { color: #64748b; font-size: .78rem; }
 .pren-badge .servizi-list {
     color: #475569;
@@ -212,6 +219,11 @@
                     <div class="d-flex justify-content-between align-items-start mb-1">
                         <div class="pren-data">
                             <i class="bi bi-clock"></i> {{ p.slot.data|date:"d/m" }} {{ p.slot.ora_inizio|time:"H:i" }}
+                            {% if p.origine == 'web' %}
+                                <span class="origine-pill web" title="Prenotazione online (dal sito)"><i class="bi bi-globe"></i></span>
+                            {% else %}
+                                <span class="origine-pill cassa" title="Prenotazione registrata in cassa"><i class="bi bi-shop"></i></span>
+                            {% endif %}
                             {% if p.tipo_consegna == 'programmata' and p.ora_consegna_richiesta %}
                                 <span class="consegna-pill programmata" title="Ritiro programmato alle {{ p.ora_consegna_richiesta|time:'H:i' }}">
                                     <i class="bi bi-clock-history"></i> ritiro {{ p.ora_consegna_richiesta|time:'H:i' }}
@@ -662,6 +674,11 @@ function proponiConferma() {
         <span class="time-pill">
             <i class="bi bi-clock"></i> {{ p.slot.ora_inizio|time:"H:i" }}
         </span>
+        {% if p.origine == 'web' %}
+            <span class="origine-pill web" title="Prenotazione online (dal sito)"><i class="bi bi-globe"></i></span>
+        {% else %}
+            <span class="origine-pill cassa" title="Prenotazione registrata in cassa"><i class="bi bi-shop"></i></span>
+        {% endif %}
         {% if p.tipo_consegna == 'programmata' and p.ora_consegna_richiesta %}
             <span class="consegna-pill programmata" title="Ritiro programmato alle {{ p.ora_consegna_richiesta|time:'H:i' }}">
                 <i class="bi bi-clock-history"></i> ritiro {{ p.ora_consegna_richiesta|time:'H:i' }}
@@ -1111,7 +1128,17 @@ function ckEliminaPrenotazione() {
                                     </span>
                                     <br><small class="text-muted">#{{ ordine.numero_progressivo }}</small>
                                 </a>
-                                {% if ordine.origine != 'operatore' %}
+                                {% if ordine.origine == 'prenotazione' and ordine.prenotazione %}
+                                    {% if ordine.prenotazione.origine == 'web' %}
+                                        <br><small style="color:#0284c7;" title="Prenotazione fatta dal cliente sul sito">
+                                            <i class="bi bi-globe"></i> Pren. online
+                                        </small>
+                                    {% else %}
+                                        <br><small style="color:#7c3aed;" title="Prenotazione registrata dall'operatore in cassa">
+                                            <i class="bi bi-shop"></i> Pren. cassa
+                                        </small>
+                                    {% endif %}
+                                {% elif ordine.origine != 'operatore' %}
                                     <br><small class="text-muted">
                                         <i class="bi bi-globe"></i> {{ ordine.get_origine_display }}
                                     </small>
@@ -1370,7 +1397,17 @@ function ckEliminaPrenotazione() {
                                     </span>
                                     <br><small class="text-muted">#{{ ordine.numero_progressivo }}</small>
                                 </a>
-                                {% if ordine.origine != 'operatore' %}
+                                {% if ordine.origine == 'prenotazione' and ordine.prenotazione %}
+                                    {% if ordine.prenotazione.origine == 'web' %}
+                                        <br><small style="color:#0284c7;" title="Prenotazione fatta dal cliente sul sito">
+                                            <i class="bi bi-globe"></i> Pren. online
+                                        </small>
+                                    {% else %}
+                                        <br><small style="color:#7c3aed;" title="Prenotazione registrata dall'operatore in cassa">
+                                            <i class="bi bi-shop"></i> Pren. cassa
+                                        </small>
+                                    {% endif %}
+                                {% elif ordine.origine != 'operatore' %}
                                     <br><small class="text-muted">
                                         <i class="bi bi-globe"></i> {{ ordine.get_origine_display }}
                                     </small>
@@ -1604,7 +1641,17 @@ function ckEliminaPrenotazione() {
                                     </span>
                                     <br><small class="text-muted">#{{ ordine.numero_progressivo }}</small>
                                 </a>
-                                {% if ordine.origine != 'operatore' %}
+                                {% if ordine.origine == 'prenotazione' and ordine.prenotazione %}
+                                    {% if ordine.prenotazione.origine == 'web' %}
+                                        <br><small style="color:#0284c7;" title="Prenotazione fatta dal cliente sul sito">
+                                            <i class="bi bi-globe"></i> Pren. online
+                                        </small>
+                                    {% else %}
+                                        <br><small style="color:#7c3aed;" title="Prenotazione registrata dall'operatore in cassa">
+                                            <i class="bi bi-shop"></i> Pren. cassa
+                                        </small>
+                                    {% endif %}
+                                {% elif ordine.origine != 'operatore' %}
                                     <br><small class="text-muted">
                                         <i class="bi bi-globe"></i> {{ ordine.get_origine_display }}
                                     </small>

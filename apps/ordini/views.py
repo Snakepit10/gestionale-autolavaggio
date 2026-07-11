@@ -697,6 +697,7 @@ def crea_prenotazione_da_carrello(request):
             slot=slot,
             durata_stimata_minuti=durata_totale,
             stato='confermata',
+            origine='cassa',
             tipo_auto=tipo_auto,
             nota_interna=nota,
             tipo_consegna=tipo_consegna,
@@ -805,7 +806,9 @@ class OrdiniListView(LoginRequiredMixin, ListView):
             data = oggi
 
         # Query base per tutti gli ordini del giorno selezionato
-        queryset = Ordine.objects.select_related('cliente', 'operatore').prefetch_related(
+        queryset = Ordine.objects.select_related(
+            'cliente', 'operatore', 'prenotazione'
+        ).prefetch_related(
             'items__servizio_prodotto', 'items__postazione_cq', 'items__aggiunto_da', 'pagamenti'
         ).filter(data_ora__date=data)
 

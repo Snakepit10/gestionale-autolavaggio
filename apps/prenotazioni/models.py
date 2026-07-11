@@ -117,6 +117,18 @@ class Prenotazione(models.Model):
     
     stato = models.CharField(max_length=20, choices=STATO_CHOICES, default='confermata')
     codice_prenotazione = models.CharField(max_length=10, unique=True, blank=True)
+
+    # Canale da cui e' nata la prenotazione: 'web' = booking online fatto
+    # dal cliente, 'cassa' = registrata dall'operatore dal gestionale.
+    # Mostrato nei badge di /ordini/ e accanto al numero ordine dopo il
+    # check-in.
+    ORIGINE_CHOICES = [
+        ('web', 'Prenotazione online'),
+        ('cassa', 'Registrata in cassa'),
+    ]
+    origine = models.CharField(
+        max_length=10, choices=ORIGINE_CHOICES, default='cassa',
+    )
     
     # Riferimento all'ordine quando viene convertita
     ordine = models.OneToOneField(
