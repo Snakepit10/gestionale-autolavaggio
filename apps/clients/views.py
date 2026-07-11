@@ -55,18 +55,9 @@ def landing(request):
 
     Non espone item ne' prezzi: presenta i servizi come testo discorsivo
     discreto. Per il catalogo dettagliato l'utente deve essere loggato.
-    """
-    return render(request, 'clients/landing.html', {})
 
-
-def landing_v2(request):
-    """ANTEPRIMA nuovo design della landing (/app/anteprima/).
-
-    Pagina di prova per confrontare il redesign con la versione in
-    produzione: la landing ufficiale resta invariata su /app/. Quando
-    il nuovo design viene approvato, basta puntare `landing` al
-    template landing_v2.html (o rinominare i file) e rimuovere questa
-    view + la barra anteprima in fondo al template.
+    Design v2 (approvato 2026-07): il vecchio template resta in
+    templates/clients/landing.html come riferimento/rollback.
     """
     return render(request, 'clients/landing_v2.html', {})
 

@@ -335,37 +335,13 @@
 }
 .v2-cta-final h3 { font-weight: 900; font-size: clamp(1.5rem, 4vw, 2.1rem); letter-spacing: -.02em; }
 .v2-cta-final p { opacity: .95; max-width: 480px; margin: 10px auto 28px; }
+/* Bottone invertito: bianco con testo NAVY scuro (il cyan su bianco
+   non aveva abbastanza contrasto ed era poco leggibile). */
 .v2-cta-final .v2-btn-primary {
-    background: #fff; color: var(--mw-cyan-dark);
+    background: #fff; color: #0d1f2e;
     box-shadow: 0 10px 30px rgba(0,0,0,.25);
 }
-.v2-cta-final .v2-btn-primary:hover { color: var(--mw-cyan-dark); }
-
-/* ====== Barra anteprima design (solo su questa pagina di prova) ====== */
-.v2-preview-bar {
-    position: fixed;
-    bottom: 16px; left: 50%; transform: translateX(-50%);
-    z-index: 1080;
-    display: flex; align-items: center; gap: 14px;
-    background: rgba(13, 31, 46, .92);
-    backdrop-filter: blur(12px);
-    border: 1px solid rgba(74,185,224,.5);
-    border-radius: 999px;
-    padding: 10px 20px;
-    box-shadow: 0 12px 36px rgba(0,0,0,.5);
-    color: #fff; font-size: .88rem; font-weight: 600;
-    max-width: calc(100vw - 24px);
-}
-.v2-preview-bar .badge-new {
-    background: var(--mw-cyan); color: #fff;
-    font-size: .68rem; font-weight: 800; text-transform: uppercase; letter-spacing: .06em;
-    padding: 4px 10px; border-radius: 999px;
-}
-.v2-preview-bar a { color: var(--mw-cyan-light); text-decoration: none; font-weight: 700; white-space: nowrap; }
-.v2-preview-bar a:hover { text-decoration: underline; }
-@media (max-width: 575.98px) {
-    .v2-preview-bar { flex-wrap: wrap; justify-content: center; border-radius: 18px; text-align: center; }
-}
+.v2-cta-final .v2-btn-primary:hover { color: #0d1f2e; }
 
 .v2-section-title { text-align: center; margin-bottom: 44px; }
 .v2-section-title h2 {
@@ -667,13 +643,6 @@
             {% endif %}
         </div>
     </div>
-</div>
-
-{# ========== Barra anteprima (solo pagina di prova) ========== #}
-<div class="v2-preview-bar">
-    <span class="badge-new">Anteprima</span>
-    <span>Stai vedendo il nuovo design.</span>
-    <a href="{% url 'clients:landing' %}"><i class="bi bi-arrow-left-right"></i> Confronta con l'attuale</a>
 </div>
 
 <script>

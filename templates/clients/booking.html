@@ -4,64 +4,94 @@
 
 {% block extra_css %}
 <style>
+/* ============================================================
+   BOOKING WIZARD — design v2 (allineato alla nuova landing):
+   card glassmorphism, pill CTA con glow cyan, progress bar
+   luminosa. Stessi nomi classe del wizard originale: nessun
+   cambio a HTML/JS.
+   ============================================================ */
 .bk-step { display: none; }
-.bk-step.active { display: block; }
-.bk-progress { display: flex; gap: 4px; margin-bottom: 24px; }
-.bk-progress .pi { flex: 1; height: 6px; background: var(--mw-line); border-radius: 3px; }
-.bk-progress .pi.done { background: var(--mw-cyan); }
+.bk-step.active { display: block; animation: bkfade .25s ease-out; }
+@keyframes bkfade {
+    from { opacity: 0; transform: translateY(8px); }
+    to { opacity: 1; transform: none; }
+}
+@media (prefers-reduced-motion: reduce) { .bk-step.active { animation: none; } }
+
+.bk-progress { display: flex; gap: 6px; margin-bottom: 28px; }
+.bk-progress .pi {
+    flex: 1; height: 8px;
+    background: var(--mw-line);
+    border-radius: 999px;
+    transition: background .25s, box-shadow .25s;
+}
+.bk-progress .pi.done {
+    background: linear-gradient(90deg, var(--mw-cyan) 0%, var(--mw-cyan-light) 100%);
+    box-shadow: 0 0 10px rgba(74, 185, 224, .5);
+}
+
+/* Titoli step piu' incisivi (stesso peso del hero v2) */
+.bk-step h3 { font-weight: 900; letter-spacing: -.02em; color: var(--mw-text); }
 
 .servizio-pick {
-    background: var(--mw-navy-soft);
-    border: 2px solid var(--mw-line);
-    border-radius: 12px;
-    padding: 14px;
+    background: linear-gradient(160deg, rgba(255,255,255,.05) 0%, rgba(255,255,255,.015) 100%);
+    border: 1px solid var(--mw-line);
+    border-radius: 16px;
+    padding: 16px;
     cursor: pointer;
-    transition: all .15s;
+    transition: transform .15s, border-color .15s, box-shadow .15s;
     display: flex;
     justify-content: space-between;
     align-items: center;
     gap: 12px;
     color: var(--mw-text);
+    backdrop-filter: blur(8px);
 }
-.servizio-pick:active { transform: scale(.98); }
+.servizio-pick:hover { transform: translateY(-2px); border-color: rgba(74,185,224,.5); }
+.servizio-pick:active { transform: scale(.985); }
 .servizio-pick.selected {
     border-color: var(--mw-cyan);
-    background: rgba(74, 185, 224, .12);
-    box-shadow: 0 4px 12px rgba(74, 185, 224, .25);
+    background: linear-gradient(160deg, rgba(74,185,224,.16) 0%, rgba(74,185,224,.06) 100%);
+    box-shadow: 0 0 0 2px rgba(74,185,224,.25), 0 10px 24px rgba(74,185,224,.18);
 }
-.servizio-pick .titolo { font-weight: 700; color: var(--mw-text); }
+.servizio-pick .titolo { font-weight: 800; color: var(--mw-text); }
 .servizio-pick .meta { font-size: .82rem; color: var(--mw-text-soft); }
-.servizio-pick .check { font-size: 1.3rem; color: var(--mw-text-soft); flex-shrink: 0; }
-.servizio-pick.selected .check { color: var(--mw-cyan-light); }
+.servizio-pick .check { font-size: 1.4rem; color: var(--mw-text-soft); flex-shrink: 0; transition: color .15s, transform .15s; }
+.servizio-pick.selected .check { color: var(--mw-cyan-light); transform: scale(1.15); }
 
 .slot-pick {
-    background: var(--mw-navy-soft);
-    border: 2px solid var(--mw-line);
-    border-radius: 8px;
+    background: rgba(255,255,255,.04);
+    border: 1px solid var(--mw-line);
+    border-radius: 999px;
     padding: 10px 8px;
     text-align: center;
     cursor: pointer;
-    font-weight: 600;
+    font-weight: 700;
     color: var(--mw-text);
-    transition: all .12s;
+    transition: transform .12s, border-color .12s, background .12s, box-shadow .12s;
     user-select: none;
 }
-.slot-pick:active { transform: scale(.97); }
+.slot-pick:hover { border-color: rgba(74,185,224,.5); }
+.slot-pick:active { transform: scale(.95); }
 .slot-pick.selected {
-    border-color: var(--mw-cyan);
-    background: var(--mw-cyan);
-    color: #fff;
-    box-shadow: 0 4px 12px rgba(74, 185, 224, .35);
-}
-.slot-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(80px, 1fr)); gap: 8px; }
-
-.bk-summary {
+    border-color: transparent;
     background: linear-gradient(135deg, var(--mw-cyan) 0%, var(--mw-cyan-dark) 100%);
     color: #fff;
-    padding: 20px;
-    border-radius: 14px;
+    box-shadow: 0 8px 20px rgba(74, 185, 224, .45);
+}
+.slot-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(84px, 1fr)); gap: 10px; }
+
+.bk-summary {
+    position: relative;
+    overflow: hidden;
+    background:
+        radial-gradient(ellipse 70% 90% at 50% -20%, rgba(255,255,255,.18), transparent 60%),
+        linear-gradient(135deg, var(--mw-cyan) 0%, var(--mw-cyan-dark) 100%);
+    color: #fff;
+    padding: 24px;
+    border-radius: 20px;
     margin-bottom: 16px;
-    box-shadow: 0 6px 20px rgba(74, 185, 224, .35);
+    box-shadow: 0 14px 34px rgba(74, 185, 224, .3);
 }
 
 .bk-actions {
@@ -73,6 +103,24 @@
 }
 @media (max-width: 575.98px) {
     .bk-actions { bottom: 60px; }
+}
+
+/* CTA pill v2 (override locale del .btn-cta di base_public) */
+.bk-actions .btn-cta {
+    border-radius: 999px;
+    font-weight: 800;
+    padding: 15px 30px;
+    background: linear-gradient(135deg, var(--mw-cyan) 0%, var(--mw-cyan-dark) 100%);
+    box-shadow: 0 10px 26px rgba(74,185,224,.4), inset 0 1px 0 rgba(255,255,255,.25);
+    border: 0;
+    transition: transform .15s, box-shadow .15s, opacity .15s;
+}
+.bk-actions .btn-cta:hover:not(:disabled) { transform: translateY(-2px); box-shadow: 0 14px 34px rgba(74,185,224,.5); }
+.bk-actions .btn-cta:disabled { opacity: .45; box-shadow: none; }
+.bk-actions .btn-outline-secondary {
+    border-radius: 999px;
+    padding-left: 18px;
+    padding-right: 18px;
 }
 
 /* Disclaimer prezzi orientativi (step 1 e step 4) */
