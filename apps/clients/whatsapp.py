@@ -81,16 +81,93 @@ TEMPLATE_PREVIEWS = {
 }
 
 
+def _fetch_template_body(template_name: str) -> str | None:
+    """Scarica il body di un template approvato dalla Graph API Meta.
+
+    Cache 24h (Django cache): i template cambiano di rado e la fetch
+    costa una chiamata HTTP. Il body Meta usa segnaposto {{1}}, {{2}}:
+    li convertiamo in {0}, {1} per il .format() Python di
+    _format_preview. Ritorna None se WABA id non configurato, template
+    non trovato o errore API.
+
+    Serve per i template NON presenti in TEMPLATE_PREVIEWS (es. quelli
+    creati per le campagne marketing): senza, la inbox mostrerebbe il
+    placeholder '[Template: nome]' invece del vero messaggio.
+    """
+    import re
+    from django.core.cache import cache
+
+    waba_id = getattr(settings, 'META_WHATSAPP_BUSINESS_ACCOUNT_ID', '')
+    if not waba_id or not settings.META_WHATSAPP_ACCESS_TOKEN:
+        return None
+
+    cache_key = f'wa_tpl_body:{template_name}'
+    cached = cache.get(cache_key)
+    if cached is not None:
+        return cached or None  # '' cached = "non trovato", evita retry a raffica
+
+    body = None
+    try:
+        url = (
+            f"{_GRAPH_URL}/{settings.META_WHATSAPP_API_VERSION}"
+            f"/{waba_id}/message_templates"
+        )
+        r = requests.get(
+            url,
+            params={'name': template_name, 'fields': 'name,components,language'},
+            headers={'Authorization': f'Bearer {settings.META_WHATSAPP_ACCESS_TOKEN}'},
+            timeout=_REQUEST_TIMEOUT,
+        )
+        if r.status_code < 400:
+            for tpl in r.json().get('data', []):
+                # Il filtro name= di Meta fa substring match: verifica esatto
+                if tpl.get('name') != template_name:
+                    continue
+                for comp in tpl.get('components', []):
+                    if comp.get('type') == 'BODY' and comp.get('text'):
+                        # {{1}} -> {0}, {{2}} -> {1}, ...
+                        body = re.sub(
+                            r'\{\{(\d+)\}\}',
+                            lambda m: '{' + str(int(m.group(1)) - 1) + '}',
+                            comp['text'],
+                        )
+                        break
+                if body:
+                    break
+        else:
+            logger.warning('fetch template body fallita (%s) name=%s: %s',
+                           r.status_code, template_name, r.text[:200])
+    except requests.RequestException as e:
+        logger.warning('fetch template body errore name=%s: %s', template_name, e)
+        # Non cachare gli errori di rete: riprova al prossimo invio
+        return None
+
+    cache.set(cache_key, body or '', 60 * 60 * 24)
+    return body
+
+
 def _format_preview(template_name: str, params: list[str]) -> str:
-    """Genera il testo da mostrare nella inbox per un template Meta."""
-    base = TEMPLATE_PREVIEWS.get(template_name, f'[Template: {template_name}]')
+    """Genera il testo da mostrare nella inbox per un template Meta.
+
+    Ordine di risoluzione:
+    1. TEMPLATE_PREVIEWS (testi curati a mano, sempre esatti)
+    2. body scaricato dalla Graph API Meta (cache 24h) — copre i
+       template nuovi, es. quelli delle campagne marketing
+    3. fallback '[Template: nome]'
+    """
+    base = TEMPLATE_PREVIEWS.get(template_name)
+    if base is None:
+        base = _fetch_template_body(template_name)
+    if base is None:
+        base = f'[Template: {template_name}]'
     try:
         if params:
             return base.format(*params)
         return base
-    except (IndexError, KeyError):
-        # Numero di params non combacia: ritorna base + concat dei params
-        return base + ' | ' + ' | '.join(params)
+    except (IndexError, KeyError, ValueError):
+        # Numero di params non combacia o brace letterali nel body:
+        # ritorna base + concat dei params
+        return base + (' | ' + ' | '.join(params) if params else '')
 
 
 def _log_outgoing_msg(to_e164: str, corpo: str, wa_message_id: str) -> None:
