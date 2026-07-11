@@ -58,6 +58,21 @@ def statistiche_campagna(campagna: Campagna) -> dict:
     }
 
 
+_SEGMENTO_LABELS = {
+    'attivi': 'Attivi regolari',
+    'rallentamento': 'In rallentamento',
+    'dormienti': 'Dormienti',
+    'one_shot': 'One-shot',
+    'richiamo_automatico': 'Richiamo automatico',
+    'tutti': 'Tutti i clienti',
+}
+
+
+def _label_segmento(seg: str) -> str:
+    """Label leggibile anche per segmenti combinati ('dormienti,one_shot')."""
+    return ' + '.join(_SEGMENTO_LABELS.get(p, p) for p in seg.split(',') if p)
+
+
 def statistiche_per_segmento() -> list[dict]:
     """Aggregato per segmento di origine su tutte le campagne.
 
@@ -71,8 +86,8 @@ def statistiche_per_segmento() -> list[dict]:
         seg = campagna.segmento_origine
         if seg not in out:
             out[seg] = {
-                'segmento': seg, 'n_inviati': 0,
-                'n_conversioni': 0, 'fatturato': 0.0,
+                'segmento': seg, 'label': _label_segmento(seg),
+                'n_inviati': 0, 'n_conversioni': 0, 'fatturato': 0.0,
             }
         out[seg]['n_inviati'] += stats['n_inviati']
         out[seg]['n_conversioni'] += stats['n_conversioni']

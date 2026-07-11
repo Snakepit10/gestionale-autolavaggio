@@ -139,8 +139,10 @@ class Campagna(models.Model):
     # Fotografato perche' la segmentazione e' dinamica: senza snapshot i
     # destinatari cambierebbero tra il lancio e l'ultimo invio scaglionato.
     segmento_origine = models.CharField(
-        max_length=30, blank=True, default='',
-        help_text="Segmento da cui e' partita la selezione (informativo).",
+        max_length=120, blank=True, default='',
+        help_text="Segmenti da cui e' partita la selezione (informativo). "
+                  "Piu' segmenti sono separati da virgola; 'tutti' = intera "
+                  "anagrafica.",
     )
     finestra_conversione_giorni = models.PositiveSmallIntegerField(
         default=21,

@@ -107,7 +107,8 @@ def campagne_list(request):
 
 @_staff_required
 def campagna_nuova(request):
-    """Step 1 del composer: nome, segmento, template Meta, parametri."""
+    """Step 1 del composer: nome, segmenti (multi), template Meta, parametri."""
+    from apps.clienti.models import Cliente
     from .services.campagne import PLACEHOLDER_SUPPORTATI
     ris = segmenta_clienti()
     segmenti = [
@@ -116,8 +117,34 @@ def campagna_nuova(request):
     ]
     return render(request, 'marketing/campagna_nuova.html', {
         'segmenti': segmenti,
+        'n_tutti': Cliente.objects.exclude(telefono='').count(),
         'placeholder': PLACEHOLDER_SUPPORTATI,
     })
+
+
+def _risolvi_destinatari_da_segmenti(segmenti_scelti: list[str]) -> list[int]:
+    """Unione (dedup) dei cliente_id dei segmenti scelti.
+
+    'tutti' = intera anagrafica con telefono (per comunicazioni di
+    servizio tipo "nuovo sistema di prenotazione"): ingloba qualsiasi
+    altro segmento selezionato. I filtri di eleggibilita' (opt-out,
+    no-ricontatto, telefono valido) vengono comunque applicati dopo.
+    """
+    from apps.clienti.models import Cliente
+
+    if 'tutti' in segmenti_scelti:
+        return list(
+            Cliente.objects.exclude(telefono='').values_list('pk', flat=True)
+        )
+    ris = segmenta_clienti()
+    ids = []
+    visti = set()
+    for seg in segmenti_scelti:
+        for cs in ris.get(seg):
+            if cs.cliente.pk not in visti:
+                visti.add(cs.cliente.pk)
+                ids.append(cs.cliente.pk)
+    return ids
 
 
 @_staff_required
@@ -129,7 +156,10 @@ def campagna_preview(request):
         return redirect('marketing:campagna-nuova')
 
     nome = (request.POST.get('nome') or '').strip()
-    segmento = (request.POST.get('segmento') or '').strip()
+    segmenti_scelti = [
+        s for s in request.POST.getlist('segmenti')
+        if s in SEGMENTI_LABEL or s == 'tutti'
+    ]
     template_meta = (request.POST.get('template_meta') or '').strip()
     # Un parametro per riga nella textarea
     params_raw = request.POST.get('template_params') or ''
@@ -138,12 +168,11 @@ def campagna_preview(request):
     if not nome or not template_meta:
         messages.error(request, 'Nome campagna e template Meta sono obbligatori.')
         return redirect('marketing:campagna-nuova')
-    if segmento not in SEGMENTI_LABEL:
-        messages.error(request, 'Segmento non valido.')
+    if not segmenti_scelti:
+        messages.error(request, 'Seleziona almeno un segmento di destinatari.')
         return redirect('marketing:campagna-nuova')
 
-    ris = segmenta_clienti()
-    cliente_ids = [cs.cliente.pk for cs in ris.get(segmento)]
+    cliente_ids = _risolvi_destinatari_da_segmenti(segmenti_scelti)
     eleggibili, esclusi = prepara_destinatari(cliente_ids)
 
     # Esempi di messaggi compilati sui primi 3 eleggibili
@@ -152,10 +181,15 @@ def campagna_preview(request):
         for c in eleggibili[:3]
     ]
 
+    if 'tutti' in segmenti_scelti:
+        segmento_label = 'Tutti i clienti'
+    else:
+        segmento_label = ' + '.join(SEGMENTI_LABEL[s] for s in segmenti_scelti)
+
     return render(request, 'marketing/campagna_preview.html', {
         'nome': nome,
-        'segmento': segmento,
-        'segmento_label': SEGMENTI_LABEL[segmento],
+        'segmenti_scelti': segmenti_scelti,
+        'segmento_label': segmento_label,
         'template_meta': template_meta,
         'template_params': template_params,
         'params_raw': params_raw,
@@ -174,7 +208,10 @@ def campagna_crea(request):
         return redirect('marketing:campagna-nuova')
 
     nome = (request.POST.get('nome') or '').strip()
-    segmento = (request.POST.get('segmento') or '').strip()
+    segmenti_scelti = [
+        s for s in request.POST.getlist('segmenti')
+        if s in SEGMENTI_LABEL or s == 'tutti'
+    ]
     template_meta = (request.POST.get('template_meta') or '').strip()
     params_raw = request.POST.get('template_params') or ''
     template_params = [r.strip() for r in params_raw.splitlines() if r.strip()]
@@ -193,7 +230,7 @@ def campagna_crea(request):
         nome=nome, template_meta=template_meta,
         template_params=template_params,
         cliente_ids_selezionati=cliente_ids,
-        segmento=segmento, user=request.user,
+        segmento=','.join(segmenti_scelti), user=request.user,
     )
     messages.success(
         request,

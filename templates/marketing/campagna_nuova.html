@@ -23,13 +23,31 @@
                            placeholder="es. Riattivazione dormienti luglio">
                 </div>
                 <div class="col-md-6">
-                    <label class="form-label fw-bold">Segmento destinatari *</label>
-                    <select class="form-select" name="segmento" required>
+                    <label class="form-label fw-bold">Segmenti destinatari *</label>
+                    <div class="border rounded p-2" style="background:#f8fafc;">
+                        <div class="form-check">
+                            <input class="form-check-input seg-chk" type="checkbox"
+                                   name="segmenti" value="tutti" id="seg-tutti"
+                                   onchange="toggleTutti(this)">
+                            <label class="form-check-label fw-bold" for="seg-tutti">
+                                Tutti i clienti ({{ n_tutti }} con telefono)
+                            </label>
+                        </div>
+                        <hr class="my-2">
                         {% for chiave, label, conteggio in segmenti %}
-                        <option value="{{ chiave }}">{{ label }} ({{ conteggio }} clienti)</option>
+                        <div class="form-check">
+                            <input class="form-check-input seg-chk seg-specifico" type="checkbox"
+                                   name="segmenti" value="{{ chiave }}" id="seg-{{ chiave }}">
+                            <label class="form-check-label" for="seg-{{ chiave }}">
+                                {{ label }} ({{ conteggio }} clienti)
+                            </label>
+                        </div>
                         {% endfor %}
-                    </select>
+                    </div>
                     <div class="form-text">
+                        Puoi combinare piu' segmenti (es. Dormienti + One-shot);
+                        i clienti in comune contano una volta sola. "Tutti" e' per
+                        comunicazioni generali (promo, nuovo sistema di prenotazione).
                         Nella preview potrai deselezionare singoli clienti.
                     </div>
                 </div>
@@ -63,4 +81,16 @@
         </button>
     </div>
 </form>
+
+<script>
+// "Tutti i clienti" ingloba qualsiasi segmento: quando e' spuntato,
+// i segmenti specifici vengono disabilitati (e viceversa restano
+// attivi se "tutti" e' deselezionato).
+function toggleTutti(chk) {
+    document.querySelectorAll('.seg-specifico').forEach(c => {
+        c.disabled = chk.checked;
+        if (chk.checked) c.checked = false;
+    });
+}
+</script>
 {% endblock %}

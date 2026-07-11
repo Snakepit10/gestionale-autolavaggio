@@ -34,16 +34,7 @@
                 <tbody>
                     {% for r in per_segmento %}
                     <tr>
-                        <td>
-                            <span class="fw-bold">
-                            {% if r.segmento == 'attivi' %}Attivi regolari
-                            {% elif r.segmento == 'rallentamento' %}In rallentamento
-                            {% elif r.segmento == 'dormienti' %}Dormienti
-                            {% elif r.segmento == 'one_shot' %}One-shot
-                            {% elif r.segmento == 'richiamo_automatico' %}Richiamo automatico
-                            {% else %}{{ r.segmento }}{% endif %}
-                            </span>
-                        </td>
+                        <td><span class="fw-bold">{{ r.label }}</span></td>
                         <td class="text-center">{{ r.n_inviati }}</td>
                         <td class="text-center">{{ r.n_conversioni }}</td>
                         <td class="text-center fw-bold">{{ r.tasso_conversione|floatformat:1 }}%</td>

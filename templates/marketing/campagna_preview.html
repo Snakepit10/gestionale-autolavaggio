@@ -67,7 +67,9 @@
 <form method="post" action="{% url 'marketing:campagna-crea' %}">
     {% csrf_token %}
     <input type="hidden" name="nome" value="{{ nome }}">
-    <input type="hidden" name="segmento" value="{{ segmento }}">
+    {% for seg in segmenti_scelti %}
+    <input type="hidden" name="segmenti" value="{{ seg }}">
+    {% endfor %}
     <input type="hidden" name="template_meta" value="{{ template_meta }}">
     <input type="hidden" name="template_params" value="{{ params_raw }}">
 
