@@ -153,7 +153,9 @@ class StoricoClienteView(LoginRequiredMixin, DetailView):
         cliente = self.object
         
         # Ordini del cliente
-        context['ordini'] = Ordine.objects.filter(cliente=cliente).order_by('-data_ora')[:20]
+        context['ordini'] = Ordine.objects.filter(cliente=cliente).prefetch_related(
+            'items__servizio_prodotto'
+        ).order_by('-data_ora')[:20]
         
         # Statistiche
         context['statistiche'] = {

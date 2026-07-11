@@ -261,6 +261,7 @@
                             <th>Data/Ora</th>
                             <th>Numero</th>
                             <th>Servizi</th>
+                            <th>Auto</th>
                             <th>Totale</th>
                             <th>Stato</th>
                             <th>Azioni</th>
@@ -272,15 +273,22 @@
                             <td>{{ ordine.data_ora|date:"d/m/Y H:i" }}</td>
                             <td>
                                 <a href="{% url 'ordini:ordine-detail' ordine.pk %}" class="text-decoration-none">
-                                    #{{ ordine.numero_ordine }}
+                                    #{{ ordine.numero_progressivo }}
                                 </a>
                             </td>
                             <td>
-                                {% for dettaglio in ordine.dettagli.all|slice:":3" %}
-                                    <span class="badge bg-secondary me-1">{{ dettaglio.servizio.titolo }}</span>
+                                {% for item in ordine.items.all|slice:":3" %}
+                                    <span class="badge bg-secondary me-1">{{ item.servizio_prodotto.titolo }}{% if item.quantita > 1 %} ×{{ item.quantita }}{% endif %}</span>
                                 {% endfor %}
-                                {% if ordine.dettagli.count > 3 %}
-                                    <span class="text-muted">+{{ ordine.dettagli.count|add:"-3" }} altri</span>
+                                {% if ordine.items.count > 3 %}
+                                    <span class="text-muted">+{{ ordine.items.count|add:"-3" }} altri</span>
+                                {% endif %}
+                            </td>
+                            <td>
+                                {% if ordine.tipo_auto %}
+                                    <small><i class="bi bi-car-front"></i> {{ ordine.tipo_auto }}</small>
+                                {% else %}
+                                    <span class="text-muted">—</span>
                                 {% endif %}
                             </td>
                             <td><strong>€{{ ordine.totale_finale|floatformat:2 }}</strong></td>
