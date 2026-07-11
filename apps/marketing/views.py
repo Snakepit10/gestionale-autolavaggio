@@ -294,6 +294,31 @@ def processa_coda_ora(request):
 
 
 @_staff_required
+def invio_singolo(request, pk, invio_id):
+    """POST: invia SUBITO il messaggio della campagna a un singolo
+    destinatario, senza aspettare coda/cron. Funziona anche come
+    'riprova' per invii falliti o saltati.
+    """
+    from django.shortcuts import get_object_or_404
+    from .models import InvioCampagna
+    from .services.invio import invia_singolo as _invia_singolo
+
+    if request.method != 'POST':
+        return redirect('marketing:campagna-dettaglio', pk=pk)
+
+    invio = get_object_or_404(
+        InvioCampagna.objects.select_related('campagna', 'cliente'),
+        pk=invio_id, campagna_id=pk,
+    )
+    ok, msg = _invia_singolo(invio)
+    if ok:
+        messages.success(request, msg)
+    else:
+        messages.error(request, msg)
+    return redirect('marketing:campagna-dettaglio', pk=pk)
+
+
+@_staff_required
 def campagna_pausa(request, pk):
     """Mette in pausa / riprende una campagna.
 

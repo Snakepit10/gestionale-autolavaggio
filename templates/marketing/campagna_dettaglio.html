@@ -121,6 +121,7 @@
                     <th>Inviato il</th>
                     <th>Consegna WA</th>
                     <th>Note</th>
+                    <th class="text-end">Azioni</th>
                 </tr>
             </thead>
             <tbody>
@@ -152,9 +153,23 @@
                         {% else %}—{% endif %}
                     </td>
                     <td class="text-muted small">{{ i.motivo_salto|default:"" }}</td>
+                    <td class="text-end">
+                        {% if campagna.stato != 'annullata' and i.stato != 'inviato' %}
+                        <form method="post" action="{% url 'marketing:invio-singolo' campagna.pk i.pk %}" class="d-inline">
+                            {% csrf_token %}
+                            <button type="submit"
+                                    class="btn btn-sm {% if i.stato == 'in_coda' %}btn-outline-success{% else %}btn-outline-warning{% endif %}"
+                                    title="{% if i.stato == 'in_coda' %}Invia subito il messaggio a questo cliente, senza aspettare la coda{% else %}Riprova l'invio a questo cliente{% endif %}"
+                                    onclick="return confirm('Inviare ora il messaggio della campagna a {{ i.cliente.nome_completo|escapejs }}?');">
+                                <i class="bi bi-send"></i>
+                                {% if i.stato == 'in_coda' %}Invia ora{% else %}Riprova{% endif %}
+                            </button>
+                        </form>
+                        {% endif %}
+                    </td>
                 </tr>
                 {% empty %}
-                <tr><td colspan="6" class="text-center text-muted py-4">Nessun invio.</td></tr>
+                <tr><td colspan="7" class="text-center text-muted py-4">Nessun invio.</td></tr>
                 {% endfor %}
             </tbody>
         </table>

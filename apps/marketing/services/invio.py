@@ -140,6 +140,75 @@ def _processa(max_batch, log, dry):
     return esiti
 
 
+def invia_singolo(invio) -> tuple:
+    """Invio manuale immediato a UN destinatario (bottone per-riga UI).
+
+    E' una scelta deliberata dell'operatore, quindi: niente pausa
+    casuale, niente controllo finestra no-ricontatto/altre campagne
+    attive e niente tetto giornaliero bloccante (il messaggio inviato
+    conta comunque nel conteggio di oggi). Restano i controlli non
+    negoziabili: opt-out e telefono valido. Utilizzabile anche per
+    ritentare invii 'fallito' o 'saltato'.
+
+    Ritorna (ok, messaggio_per_operatore).
+    """
+    from django.db.models import Q
+
+    campagna = invio.campagna
+    cliente = invio.cliente
+
+    if campagna.stato == 'annullata':
+        return False, 'La campagna e\' annullata: invii disabilitati.'
+    if invio.stato == 'inviato':
+        return False, f'Messaggio gia\' inviato a {cliente}.'
+    if getattr(cliente, 'blocca_marketing', False):
+        return False, f'{cliente} ha fatto opt-out dai messaggi promozionali.'
+
+    from apps.clients import whatsapp as wa
+    from apps.messaggi.models import MessaggioWhatsApp
+
+    to_e164 = wa._to_e164(cliente.telefono)
+    if not to_e164:
+        return False, f'{cliente}: numero di telefono mancante o non valido.'
+
+    # Claim atomico anche qui: se il cron sta processando questa riga
+    # (o il bottone viene premuto due volte) solo un processo vince.
+    # Le righe 'in_coda' si vincono solo se non ancora claimate
+    # (inviato_il null, stesso marcatore usato da _processa); le righe
+    # fallito/saltato sono ferme, basta lo stato.
+    claimed = InvioCampagna.objects.filter(
+        Q(stato='in_coda', inviato_il__isnull=True) | Q(stato__in=['fallito', 'saltato']),
+        pk=invio.pk,
+    ).update(stato='in_coda', inviato_il=timezone.now(), motivo_salto='')
+    if not claimed:
+        return False, f'{cliente}: invio gia\' in corso da un altro processo, riprova tra poco.'
+
+    if campagna.stato == 'in_coda':
+        campagna.stato = 'in_corso'
+        campagna.save(update_fields=['stato'])
+
+    params = risolvi_params(campagna.template_params, cliente)
+    ok, wa_id = wa._send_template_blocking(to_e164, campagna.template_meta, params)
+
+    if not ok:
+        InvioCampagna.objects.filter(pk=invio.pk).update(stato='fallito')
+        return False, f'Invio a {cliente} fallito: controlla template e numero nei log.'
+
+    msg = MessaggioWhatsApp.objects.filter(wa_message_id=wa_id).first() if wa_id else None
+    InvioCampagna.objects.filter(pk=invio.pk).update(
+        stato='inviato', inviato_il=timezone.now(), messaggio_wa=msg)
+
+    # Se era l'ultimo invio pendente di una campagna manuale, chiudila
+    # (stessa regola di fine batch in _processa).
+    if campagna.tipo == 'manuale' and campagna.stato == 'in_corso' \
+            and not campagna.invii.filter(stato='in_coda').exists():
+        campagna.stato = 'completata'
+        campagna.completata_il = timezone.now()
+        campagna.save(update_fields=['stato', 'completata_il'])
+
+    return True, f'Messaggio inviato a {cliente}.'
+
+
 def avvia_processamento_background(max_batch: int = 8) -> None:
     """Lancia processa_coda in thread daemon (per il bottone UI).
 
