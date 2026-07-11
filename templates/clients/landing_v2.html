@@ -1,0 +1,737 @@
+{% extends "clients/base_public.html" %}
+{% load static %}
+{% block title %}MasterWash &mdash; Autolavaggio a Licata &middot; Self, Portali, Operatori{% endblock %}
+{% block nav_home %}active{% endblock %}
+
+{% block extra_css %}
+<style>
+/* ============================================================
+   LANDING V2 — anteprima nuovo design
+   Direzione: piu' aria, tipografia piu' grande e contrastata,
+   glassmorphism sulle card, micro-animazioni CSS, gerarchia CTA
+   piu' netta. Stessa palette brand (navy + cyan).
+   ============================================================ */
+
+/* ====== HERO ====== */
+.v2-hero {
+    position: relative;
+    min-height: 86vh;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    align-items: center;
+    text-align: center;
+    padding: 90px 20px 110px;
+    overflow: hidden;
+    background:
+        radial-gradient(ellipse 80% 60% at 70% -10%, rgba(74,185,224,.35), transparent 60%),
+        radial-gradient(ellipse 60% 50% at 10% 110%, rgba(45,163,204,.25), transparent 60%),
+        linear-gradient(160deg, #0d1f2e 0%, #12293c 55%, #16344c 100%);
+}
+/* bolle animate (decorazione acqua) */
+.v2-bubble {
+    position: absolute;
+    border-radius: 50%;
+    background: radial-gradient(circle at 30% 30%, rgba(255,255,255,.18), rgba(255,255,255,.03) 70%);
+    border: 1px solid rgba(255,255,255,.08);
+    animation: v2float 14s ease-in-out infinite;
+    pointer-events: none;
+}
+.v2-bubble.b1 { width: 180px; height: 180px; top: 12%; left: 6%; animation-delay: 0s; }
+.v2-bubble.b2 { width: 90px;  height: 90px;  top: 65%; left: 12%; animation-delay: -4s; }
+.v2-bubble.b3 { width: 260px; height: 260px; top: 8%;  right: -60px; animation-delay: -8s; }
+.v2-bubble.b4 { width: 120px; height: 120px; bottom: 14%; right: 10%; animation-delay: -2s; }
+@keyframes v2float {
+    0%, 100% { transform: translateY(0) scale(1); }
+    50% { transform: translateY(-26px) scale(1.04); }
+}
+@media (prefers-reduced-motion: reduce) { .v2-bubble { animation: none; } }
+
+.v2-hero .brand {
+    font-family: 'Arial Black', Arial, sans-serif;
+    font-style: italic;
+    font-weight: 900;
+    text-transform: uppercase;
+    letter-spacing: -.02em;
+    transform: skewX(-8deg);
+    font-size: 1.4rem;
+    color: rgba(255,255,255,.85);
+    margin-bottom: 26px;
+    position: relative;
+}
+.v2-hero .brand .dot { color: var(--mw-cyan-light); }
+.v2-hero h1 {
+    font-size: clamp(2.2rem, 6vw, 3.6rem);
+    font-weight: 900;
+    line-height: 1.08;
+    letter-spacing: -.03em;
+    color: #fff;
+    max-width: 820px;
+    margin: 0 auto 20px;
+    position: relative;
+}
+.v2-hero h1 .accent {
+    background: linear-gradient(90deg, var(--mw-cyan-light) 0%, #8fd8f2 100%);
+    -webkit-background-clip: text;
+    background-clip: text;
+    color: transparent;
+}
+.v2-hero p.lead {
+    font-size: clamp(1rem, 2.4vw, 1.2rem);
+    color: rgba(255,255,255,.82);
+    max-width: 560px;
+    margin: 0 auto 36px;
+    position: relative;
+}
+.v2-hero .cta-row {
+    display: flex; gap: 14px; justify-content: center; flex-wrap: wrap;
+    position: relative;
+}
+.v2-btn-primary {
+    display: inline-flex; align-items: center; gap: 10px;
+    background: linear-gradient(135deg, var(--mw-cyan) 0%, var(--mw-cyan-dark) 100%);
+    color: #fff; font-weight: 800; font-size: 1.05rem;
+    padding: 16px 34px; border-radius: 999px; text-decoration: none;
+    box-shadow: 0 10px 30px rgba(74,185,224,.45), inset 0 1px 0 rgba(255,255,255,.25);
+    transition: transform .18s, box-shadow .18s;
+}
+.v2-btn-primary:hover { transform: translateY(-2px) scale(1.02); color:#fff; box-shadow: 0 16px 40px rgba(74,185,224,.55); }
+.v2-btn-ghost {
+    display: inline-flex; align-items: center; gap: 10px;
+    background: rgba(255,255,255,.07);
+    border: 1px solid rgba(255,255,255,.25);
+    backdrop-filter: blur(8px);
+    color: #fff; font-weight: 700; font-size: 1rem;
+    padding: 16px 28px; border-radius: 999px; text-decoration: none;
+    transition: background .18s, border-color .18s;
+}
+.v2-btn-ghost:hover { background: rgba(255,255,255,.14); border-color: rgba(255,255,255,.5); color:#fff; }
+
+.v2-hero .trust-chips {
+    display: flex; gap: 10px; justify-content: center; flex-wrap: wrap;
+    margin-top: 40px; position: relative;
+}
+.trust-chip {
+    display: inline-flex; align-items: center; gap: 8px;
+    background: rgba(255,255,255,.06);
+    border: 1px solid rgba(255,255,255,.12);
+    color: rgba(255,255,255,.85);
+    font-size: .85rem; font-weight: 600;
+    padding: 8px 16px; border-radius: 999px;
+    backdrop-filter: blur(6px);
+}
+.trust-chip i { color: var(--mw-cyan-light); }
+
+/* onda di raccordo in fondo al hero */
+.v2-hero .wave {
+    position: absolute; bottom: -1px; left: 0; right: 0;
+    height: 70px; pointer-events: none;
+}
+.v2-hero .wave svg { display: block; width: 100%; height: 100%; }
+
+/* ====== COME FUNZIONA ====== */
+.v2-steps {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+    gap: 18px;
+    counter-reset: step;
+}
+.v2-step {
+    position: relative;
+    background: var(--mw-navy-soft);
+    border: 1px solid var(--mw-line);
+    border-radius: 20px;
+    padding: 30px 24px 26px;
+    transition: transform .18s, border-color .18s;
+}
+.v2-step:hover { transform: translateY(-4px); border-color: var(--mw-cyan); }
+.v2-step .num {
+    position: absolute; top: -18px; left: 22px;
+    width: 40px; height: 40px; border-radius: 12px;
+    background: linear-gradient(135deg, var(--mw-cyan) 0%, var(--mw-cyan-dark) 100%);
+    color: #fff; font-weight: 900; font-size: 1.15rem;
+    display: flex; align-items: center; justify-content: center;
+    box-shadow: 0 6px 16px rgba(74,185,224,.4);
+}
+.v2-step h5 { color: var(--mw-text); font-weight: 800; margin: 8px 0 8px; }
+.v2-step p { color: var(--mw-text-soft); font-size: .92rem; margin: 0; line-height: 1.5; }
+
+/* ====== SOLUZIONI (glass cards) ====== */
+.v2-sol-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+    gap: 22px;
+}
+.v2-sol {
+    position: relative;
+    border-radius: 24px;
+    padding: 34px 26px;
+    background: linear-gradient(160deg, rgba(255,255,255,.05) 0%, rgba(255,255,255,.015) 100%);
+    border: 1px solid var(--mw-line);
+    backdrop-filter: blur(10px);
+    overflow: hidden;
+    transition: transform .2s, border-color .2s, box-shadow .2s;
+}
+.v2-sol::before {
+    content: '';
+    position: absolute; inset: 0;
+    background: radial-gradient(ellipse 60% 40% at 50% -10%, rgba(74,185,224,.18), transparent 65%);
+    pointer-events: none;
+}
+.v2-sol:hover {
+    transform: translateY(-6px);
+    border-color: var(--mw-cyan);
+    box-shadow: 0 24px 48px rgba(0,0,0,.4);
+}
+.v2-sol .ico {
+    width: 64px; height: 64px; border-radius: 18px;
+    background: linear-gradient(135deg, var(--mw-cyan) 0%, var(--mw-cyan-dark) 100%);
+    color: #fff; font-size: 1.7rem;
+    display: flex; align-items: center; justify-content: center;
+    margin-bottom: 18px;
+    box-shadow: 0 8px 22px rgba(74,185,224,.4);
+    position: relative;
+}
+.v2-sol h4 { color: var(--mw-text); font-weight: 800; font-size: 1.25rem; position: relative; }
+.v2-sol p { color: var(--mw-text-soft); font-size: .95rem; line-height: 1.55; margin: 0; position: relative; }
+.v2-sol .tag {
+    position: absolute; top: 18px; right: 18px;
+    font-size: .68rem; font-weight: 800; text-transform: uppercase; letter-spacing: .08em;
+    color: var(--mw-cyan-light);
+    border: 1px solid rgba(74,185,224,.4);
+    background: rgba(74,185,224,.1);
+    padding: 5px 12px; border-radius: 999px;
+}
+
+/* ====== AMENITIES (chips compatte) ====== */
+.v2-amenities {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+    gap: 12px;
+}
+.v2-amenity {
+    display: flex; align-items: center; gap: 12px;
+    background: var(--mw-navy-soft);
+    border: 1px solid var(--mw-line);
+    border-radius: 14px;
+    padding: 14px 16px;
+    transition: border-color .15s, background .15s;
+}
+.v2-amenity:hover { border-color: var(--mw-cyan); background: rgba(74,185,224,.07); }
+.v2-amenity i { font-size: 1.5rem; color: var(--mw-cyan-light); flex-shrink: 0; }
+.v2-amenity .name { font-weight: 700; font-size: .9rem; color: var(--mw-text); line-height: 1.2; }
+.v2-amenity .desc { font-size: .76rem; color: var(--mw-text-soft); }
+
+/* ====== APP PROMO (riusa mockup, restyle contenitore) ====== */
+.v2-app {
+    display: grid;
+    grid-template-columns: 240px 1fr;
+    gap: 40px;
+    align-items: center;
+    border-radius: 28px;
+    padding: 44px;
+    background:
+        radial-gradient(ellipse 70% 80% at 85% 15%, rgba(74,185,224,.16), transparent 60%),
+        linear-gradient(160deg, var(--mw-navy-soft) 0%, var(--mw-navy-deep) 100%);
+    border: 1px solid var(--mw-line);
+    box-shadow: 0 20px 48px rgba(0,0,0,.35);
+}
+@media (max-width: 767.98px) {
+    .v2-app { grid-template-columns: 1fr; padding: 28px; text-align: center; }
+    .v2-app .phone-mockup { margin: 0 auto; }
+    .v2-app .app-features { text-align: left; max-width: 380px; margin: 0 auto 16px; }
+    .v2-app .d-flex { justify-content: center; }
+}
+.phone-mockup {
+    width: 220px; height: 380px;
+    background: #10151b;
+    border: 8px solid #232a33;
+    border-radius: 38px;
+    box-shadow: 0 24px 56px rgba(0,0,0,.55), inset 0 0 0 2px #3a4550;
+    position: relative; overflow: hidden;
+}
+.phone-mockup::before {
+    content: '';
+    position: absolute; top: 0; left: 50%; transform: translateX(-50%);
+    width: 70px; height: 18px; background: #10151b;
+    border-radius: 0 0 14px 14px; z-index: 2;
+}
+.phone-screen {
+    width: 100%; height: 100%;
+    background: linear-gradient(150deg, #122a3d 0%, #1a3a52 60%, var(--mw-cyan-dark) 140%);
+    display: flex; flex-direction: column; align-items: center;
+    padding-top: 38px; color: #fff;
+}
+.phone-bar { width: 60%; height: 5px; background: rgba(255,255,255,.25); border-radius: 3px; margin-top: 8px; }
+.phone-logo {
+    margin-top: 60px; width: 70px; height: 70px;
+    background: #fff; border-radius: 18px;
+    display: flex; align-items: center; justify-content: center;
+    box-shadow: 0 6px 18px rgba(0,0,0,.3);
+}
+.phone-dots { display: flex; gap: 10px; margin-top: 28px; }
+.phone-dots span { width: 8px; height: 8px; background: rgba(255,255,255,.4); border-radius: 50%; }
+.phone-dots span:first-child { background: var(--mw-cyan); box-shadow: 0 0 8px var(--mw-cyan); }
+
+.app-features { list-style: none; padding: 0; margin: 0; display: flex; flex-direction: column; gap: 10px; }
+.app-features li { color: var(--mw-text); font-size: .95rem; }
+.app-features li i { color: var(--mw-cyan); margin-right: 10px; font-size: 1.05rem; }
+.text-soft { color: var(--mw-text-soft); }
+
+/* Tutorial iOS (identico funzionalmente) */
+.ios-tutorial {
+    background: var(--mw-navy-soft);
+    border: 1px solid var(--mw-line);
+    border-radius: 18px; padding: 24px; margin-top: 24px; color: var(--mw-text);
+}
+.ios-tutorial h5 { color: var(--mw-cyan-light); font-weight: 700; }
+.ios-steps { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 16px; }
+.ios-step { background: var(--mw-navy-deep); border-radius: 12px; padding: 16px; display: flex; align-items: flex-start; gap: 12px; }
+.ios-step-num {
+    width: 32px; height: 32px; background: var(--mw-cyan); color: #fff;
+    border-radius: 50%; display: flex; align-items: center; justify-content: center;
+    font-weight: 800; flex-shrink: 0;
+}
+.ios-step strong { color: var(--mw-text); }
+
+/* ====== CONTATTI ====== */
+.v2-contact {
+    border-radius: 24px;
+    padding: 34px 28px;
+    background: linear-gradient(160deg, var(--mw-navy-soft) 0%, var(--mw-navy-deep) 100%);
+    border: 1px solid var(--mw-line);
+    color: var(--mw-text);
+}
+.v2-contact h3 { font-weight: 800; margin-bottom: 20px; }
+.v2-contact .item { display: flex; gap: 14px; padding: 13px 0; border-bottom: 1px solid var(--mw-line); }
+.v2-contact .item:last-of-type { border-bottom: 0; }
+.v2-contact .ico-wrap {
+    width: 44px; height: 44px; border-radius: 13px;
+    background: linear-gradient(135deg, var(--mw-cyan) 0%, var(--mw-cyan-dark) 100%);
+    color: #fff; font-size: 1.25rem;
+    display: flex; align-items: center; justify-content: center; flex-shrink: 0;
+    box-shadow: 0 4px 14px rgba(74,185,224,.35);
+}
+.v2-contact .label { font-size: .74rem; text-transform: uppercase; letter-spacing: .1em; color: var(--mw-text-soft); font-weight: 700; }
+.v2-contact .value { font-size: 1.02rem; font-weight: 700; }
+.v2-contact .value a { color: var(--mw-text); text-decoration: none; }
+.v2-contact .value a:hover { color: var(--mw-cyan-light); }
+.v2-map { border-radius: 20px; overflow: hidden; border: 1px solid var(--mw-line); box-shadow: 0 12px 32px rgba(0,0,0,.4); }
+.v2-map iframe { display: block; width: 100%; height: 100%; min-height: 340px; border: 0; filter: brightness(.92) contrast(1.05) saturate(.9); }
+
+/* ====== CTA FINALE ====== */
+.v2-cta-final {
+    position: relative;
+    border-radius: 28px;
+    padding: 56px 28px;
+    text-align: center;
+    overflow: hidden;
+    background:
+        radial-gradient(ellipse 70% 90% at 50% -20%, rgba(255,255,255,.18), transparent 60%),
+        linear-gradient(135deg, var(--mw-cyan) 0%, var(--mw-cyan-dark) 100%);
+    color: #fff;
+    box-shadow: 0 20px 48px rgba(74,185,224,.3);
+    margin: 64px 0;
+}
+.v2-cta-final h3 { font-weight: 900; font-size: clamp(1.5rem, 4vw, 2.1rem); letter-spacing: -.02em; }
+.v2-cta-final p { opacity: .95; max-width: 480px; margin: 10px auto 28px; }
+.v2-cta-final .v2-btn-primary {
+    background: #fff; color: var(--mw-cyan-dark);
+    box-shadow: 0 10px 30px rgba(0,0,0,.25);
+}
+.v2-cta-final .v2-btn-primary:hover { color: var(--mw-cyan-dark); }
+
+/* ====== Barra anteprima design (solo su questa pagina di prova) ====== */
+.v2-preview-bar {
+    position: fixed;
+    bottom: 16px; left: 50%; transform: translateX(-50%);
+    z-index: 1080;
+    display: flex; align-items: center; gap: 14px;
+    background: rgba(13, 31, 46, .92);
+    backdrop-filter: blur(12px);
+    border: 1px solid rgba(74,185,224,.5);
+    border-radius: 999px;
+    padding: 10px 20px;
+    box-shadow: 0 12px 36px rgba(0,0,0,.5);
+    color: #fff; font-size: .88rem; font-weight: 600;
+    max-width: calc(100vw - 24px);
+}
+.v2-preview-bar .badge-new {
+    background: var(--mw-cyan); color: #fff;
+    font-size: .68rem; font-weight: 800; text-transform: uppercase; letter-spacing: .06em;
+    padding: 4px 10px; border-radius: 999px;
+}
+.v2-preview-bar a { color: var(--mw-cyan-light); text-decoration: none; font-weight: 700; white-space: nowrap; }
+.v2-preview-bar a:hover { text-decoration: underline; }
+@media (max-width: 575.98px) {
+    .v2-preview-bar { flex-wrap: wrap; justify-content: center; border-radius: 18px; text-align: center; }
+}
+
+.v2-section-title { text-align: center; margin-bottom: 44px; }
+.v2-section-title h2 {
+    color: var(--mw-text); font-weight: 900; letter-spacing: -.02em;
+    font-size: clamp(1.6rem, 4vw, 2.2rem);
+}
+.v2-section-title p { color: var(--mw-text-soft); max-width: 560px; margin: 8px auto 0; }
+</style>
+{% endblock %}
+
+{% block content %}
+
+{# ========== HERO ========== #}
+<section class="v2-hero">
+    <div class="v2-bubble b1"></div>
+    <div class="v2-bubble b2"></div>
+    <div class="v2-bubble b3"></div>
+    <div class="v2-bubble b4"></div>
+
+    <div class="brand">MasterWash<span class="dot">.</span></div>
+    <h1>La tua auto <span class="accent">perfetta</span>,<br>come preferisci tu</h1>
+    <p class="lead">
+        Self service, portali automatici o operatori specializzati.
+        Prenota online e salta la fila.
+    </p>
+    <div class="cta-row">
+        <a href="{% url 'clients:booking' %}" class="v2-btn-primary">
+            <i class="bi bi-calendar-plus"></i> Prenota ora
+        </a>
+        <a href="#scarica-app" class="v2-btn-ghost" id="hero-btn-install" style="display:none;">
+            <i class="bi bi-download"></i> Scarica l'app
+        </a>
+        <a href="tel:+393792337051" class="v2-btn-ghost">
+            <i class="bi bi-telephone-fill"></i> 379 233 7051
+        </a>
+    </div>
+    <div class="trust-chips">
+        <span class="trust-chip"><i class="bi bi-geo-alt-fill"></i> Via Palma 302, Licata</span>
+        <span class="trust-chip"><i class="bi bi-droplet-half"></i> Self 24h su 24</span>
+        <span class="trust-chip"><i class="bi bi-people-fill"></i> Operatori specializzati</span>
+        <span class="trust-chip"><i class="bi bi-cup-hot"></i> Area relax e zona bimbi</span>
+    </div>
+
+    <div class="wave" aria-hidden="true">
+        <svg viewBox="0 0 1440 70" preserveAspectRatio="none">
+            <path d="M0,40 C240,70 480,0 720,25 C960,50 1200,15 1440,40 L1440,70 L0,70 Z"
+                  fill="var(--mw-bg)"></path>
+        </svg>
+    </div>
+</section>
+
+{# ========== COME FUNZIONA ========== #}
+<section class="pub-section">
+    <div class="container">
+        <div class="v2-section-title">
+            <h2>Prenotare &egrave; semplicissimo</h2>
+            <p>Tre passaggi e la tua auto torna come nuova.</p>
+        </div>
+        <div class="v2-steps">
+            <div class="v2-step">
+                <span class="num">1</span>
+                <h5><i class="bi bi-phone" style="color:var(--mw-cyan-light);margin-right:8px;"></i>Prenota online</h5>
+                <p>Scegli i servizi, il giorno e l'orario che preferisci. Bastano 2 minuti, anche senza registrarti.</p>
+            </div>
+            <div class="v2-step">
+                <span class="num">2</span>
+                <h5><i class="bi bi-car-front" style="color:var(--mw-cyan-light);margin-right:8px;"></i>Porta l'auto</h5>
+                <p>Arriva all'orario prenotato: nessuna fila, ci pensiamo noi. Rilassati nell'area relax con WiFi.</p>
+            </div>
+            <div class="v2-step">
+                <span class="num">3</span>
+                <h5><i class="bi bi-stars" style="color:var(--mw-cyan-light);margin-right:8px;"></i>Ritira splendente</h5>
+                <p>Ti avvisiamo su WhatsApp appena &egrave; pronta. Ritiri un'auto perfetta, dentro e fuori.</p>
+            </div>
+        </div>
+    </div>
+</section>
+
+{# ========== SOLUZIONI ========== #}
+<section class="pub-section" style="background:var(--mw-navy-deep);">
+    <div class="container">
+        <div class="v2-section-title">
+            <h2>Le nostre soluzioni</h2>
+            <p>Tre modi diversi di lavare l'auto, un'unica qualit&agrave;.</p>
+        </div>
+        <div class="v2-sol-grid">
+            <div class="v2-sol">
+                <span class="tag">Risparmia</span>
+                <div class="ico"><i class="bi bi-droplet-half"></i></div>
+                <h4>Self Service</h4>
+                <p>
+                    Per chi ama dedicarsi personalmente alla propria auto. Box self con tutti
+                    i programmi e prodotti professionali a disposizione, 24 ore su 24.
+                </p>
+            </div>
+            <div class="v2-sol">
+                <span class="tag">Rapido</span>
+                <div class="ico"><i class="bi bi-arrow-repeat"></i></div>
+                <h4>Portali Automatici</h4>
+                <p>
+                    Lavaggio rapido ed efficiente con portali di ultima generazione.
+                    Entra, scegli il programma, esci con l'auto perfetta in pochi minuti.
+                </p>
+            </div>
+            <div class="v2-sol">
+                <span class="tag">Premium</span>
+                <div class="ico"><i class="bi bi-person-arms-up"></i></div>
+                <h4>Servizio Completo</h4>
+                <p>
+                    Per chi non vuole sporcarsi le mani. I nostri operatori specializzati
+                    si occupano di tutto: esterno, interno, dettagli.
+                </p>
+            </div>
+        </div>
+    </div>
+</section>
+
+{# ========== SCARICA L'APP (stessa logica JS della v1) ========== #}
+<section class="pub-section" id="scarica-app" style="background:var(--mw-bg);">
+  <div class="container" style="max-width:980px;">
+    <div class="v2-app" id="appPromoBox">
+      <div class="app-promo-cta">
+        <div class="phone-mockup" aria-hidden="true">
+          <div class="phone-screen">
+            <div class="phone-bar"></div>
+            <div class="phone-logo">
+              <span style="font-family:'Arial Black',Arial,sans-serif;font-style:italic;font-weight:900;color:var(--mw-cyan);font-size:1.3rem;letter-spacing:-.02em;transform:skewX(-8deg);display:inline-block;">MW</span>
+            </div>
+            <div class="phone-dots"><span></span><span></span><span></span></div>
+          </div>
+        </div>
+      </div>
+      <div class="app-promo-info">
+        <h2 class="mb-2" style="color:var(--mw-text);font-weight:900;letter-spacing:-.02em;">Porta MasterWash in tasca</h2>
+        <p class="lead mb-3" style="color:var(--mw-text-soft);">Installa l'app sul tuo smartphone e prenota in 2 tap.</p>
+        <ul class="app-features">
+          <li><i class="bi bi-check-circle-fill"></i> Prenota e gestisci da casa o in viaggio</li>
+          <li><i class="bi bi-check-circle-fill"></i> Notifiche WhatsApp di conferma e promemoria</li>
+          <li><i class="bi bi-check-circle-fill"></i> Storico prenotazioni e codice rapido</li>
+          <li><i class="bi bi-check-circle-fill"></i> Funziona offline una volta installata</li>
+        </ul>
+        <div class="d-flex gap-2 flex-wrap mt-4" id="installButtons">
+          <button class="v2-btn-primary" id="btnInstallPwa" style="display:none;border:0;">
+            <i class="bi bi-download"></i> Installa l'app
+          </button>
+          <button class="v2-btn-ghost" id="btnInstallIos" style="display:none;border-color:var(--mw-line);color:var(--mw-text);"
+                  onclick="document.getElementById('iosTutorial').scrollIntoView({behavior:'smooth'});">
+            <i class="bi bi-apple"></i> Come installare su iPhone
+          </button>
+          <a class="v2-btn-ghost" id="btnPlayStore"
+             href="https://play.google.com/store/apps/details?id=it.autolavaggiomasterwash.app"
+             target="_blank" rel="noopener" style="display:none;border-color:var(--mw-line);color:var(--mw-text);">
+            <i class="bi bi-google-play"></i> Google Play
+          </a>
+        </div>
+        <div id="installedAlert" class="alert alert-success mt-3" style="display:none;">
+          <i class="bi bi-check-circle-fill"></i>
+          Stai gi&agrave; usando l'app installata. Grazie!
+        </div>
+      </div>
+    </div>
+
+    <div class="ios-tutorial" id="iosTutorial" style="display:none;">
+      <h5 class="mb-3"><i class="bi bi-apple"></i> Installazione su iPhone/iPad (Safari)</h5>
+      <div class="ios-steps">
+        <div class="ios-step">
+          <span class="ios-step-num">1</span>
+          <div>
+            <strong>Tocca <i class="bi bi-box-arrow-up" style="font-size:1.1rem;"></i> Condividi</strong>
+            <p class="small mb-0 text-soft">il quadrato con freccia in basso allo schermo.</p>
+          </div>
+        </div>
+        <div class="ios-step">
+          <span class="ios-step-num">2</span>
+          <div>
+            <strong>Scegli "Aggiungi a schermata Home"</strong>
+            <p class="small mb-0 text-soft">scorri il menu fino a trovarla.</p>
+          </div>
+        </div>
+        <div class="ios-step">
+          <span class="ios-step-num">3</span>
+          <div>
+            <strong>Conferma "Aggiungi"</strong>
+            <p class="small mb-0 text-soft">l'icona di MasterWash apparir&agrave; nella tua home.</p>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+{# ========== AMENITIES ========== #}
+<section class="pub-section">
+    <div class="container">
+        <div class="v2-section-title">
+            <h2>Perch&eacute; sceglierci</h2>
+            <p>Non solo lavaggio: un'esperienza completa per te e la tua famiglia.</p>
+        </div>
+        <div class="v2-amenities">
+            <div class="v2-amenity">
+                <i class="bi bi-stopwatch"></i>
+                <div><div class="name">Rapido</div><div class="desc">Niente attese</div></div>
+            </div>
+            <div class="v2-amenity">
+                <i class="bi bi-arrows-fullscreen"></i>
+                <div><div class="name">Spazi ampi</div><div class="desc">Per ogni auto</div></div>
+            </div>
+            <div class="v2-amenity">
+                <i class="bi bi-tools"></i>
+                <div><div class="name">Attrezzature pro</div><div class="desc">Interni perfetti</div></div>
+            </div>
+            <div class="v2-amenity">
+                <i class="bi bi-cup-hot"></i>
+                <div><div class="name">Area relax</div><div class="desc">Caff&egrave; e bevande</div></div>
+            </div>
+            <div class="v2-amenity">
+                <i class="bi bi-puzzle"></i>
+                <div><div class="name">Zona bimbi</div><div class="desc">Giochi inclusi</div></div>
+            </div>
+            <div class="v2-amenity">
+                <i class="bi bi-wifi"></i>
+                <div><div class="name">WiFi gratuito</div><div class="desc">Per tutti</div></div>
+            </div>
+        </div>
+    </div>
+</section>
+
+{# ========== CONTATTI + MAPPA ========== #}
+<section class="pub-section" style="background:var(--mw-navy-deep);">
+    <div class="container">
+        <div class="v2-section-title">
+            <h2>Vieni a trovarci</h2>
+            <p>Siamo a Licata, in via Palma. Chiamaci per qualsiasi informazione.</p>
+        </div>
+        <div class="row g-4 align-items-stretch">
+            <div class="col-lg-5">
+                <div class="v2-contact h-100">
+                    <h3><i class="bi bi-info-circle" style="color:var(--mw-cyan-light);"></i> Informazioni</h3>
+                    <div class="item">
+                        <div class="ico-wrap"><i class="bi bi-telephone-fill"></i></div>
+                        <div>
+                            <div class="label">Telefono</div>
+                            <div class="value"><a href="tel:+393792337051">379 233 7051</a></div>
+                        </div>
+                    </div>
+                    <div class="item">
+                        <div class="ico-wrap"><i class="bi bi-geo-alt-fill"></i></div>
+                        <div>
+                            <div class="label">Indirizzo</div>
+                            <div class="value">
+                                <a href="https://www.google.com/maps/search/?api=1&query=Via+Palma+302+Licata+AG" target="_blank" rel="noopener">
+                                    Via Palma 302, Licata (AG)
+                                </a>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="item">
+                        <div class="ico-wrap"><i class="bi bi-car-front-fill"></i></div>
+                        <div>
+                            <div class="label">Servizio</div>
+                            <div class="value" style="font-size:.95rem;color:var(--mw-text-soft);">
+                                Self &middot; Portali &middot; Operatori
+                            </div>
+                        </div>
+                    </div>
+                    <div class="mt-4">
+                        <a href="https://www.google.com/maps/dir/?api=1&destination=Via+Palma+302+Licata+AG" target="_blank" rel="noopener" class="v2-btn-primary" style="font-size:.95rem;padding:13px 26px;">
+                            <i class="bi bi-signpost-split-fill"></i> Indicazioni stradali
+                        </a>
+                    </div>
+                </div>
+            </div>
+            <div class="col-lg-7">
+                <div class="v2-map h-100">
+                    <iframe
+                        src="https://www.google.com/maps?q=Via+Palma+302+Licata+AG&output=embed"
+                        loading="lazy"
+                        referrerpolicy="no-referrer-when-downgrade"
+                        title="Posizione MasterWash su Google Maps"></iframe>
+                </div>
+            </div>
+        </div>
+    </div>
+</section>
+
+{# ========== CTA FINALE ========== #}
+<div class="container">
+    <div class="v2-cta-final">
+        <h3>Pronto a vivere l'esperienza MasterWash?</h3>
+        <p>Prenota online il tuo lavaggio o vieni direttamente per il self service.</p>
+        <div class="d-flex gap-3 justify-content-center flex-wrap">
+            <a href="{% url 'clients:booking' %}" class="v2-btn-primary">
+                <i class="bi bi-calendar-plus"></i> Prenota ora
+            </a>
+            {% if not user.is_authenticated %}
+            <a href="{% url 'clients:register' %}" class="v2-btn-ghost">
+                <i class="bi bi-person-plus"></i> Registrati
+            </a>
+            {% endif %}
+        </div>
+    </div>
+</div>
+
+{# ========== Barra anteprima (solo pagina di prova) ========== #}
+<div class="v2-preview-bar">
+    <span class="badge-new">Anteprima</span>
+    <span>Stai vedendo il nuovo design.</span>
+    <a href="{% url 'clients:landing' %}"><i class="bi bi-arrow-left-right"></i> Confronta con l'attuale</a>
+</div>
+
+<script>
+// === Install PWA helper (identico alla landing attuale) ===
+(function() {
+    const heroBtn = document.getElementById('hero-btn-install');
+    const btnPwa = document.getElementById('btnInstallPwa');
+    const btnIos = document.getElementById('btnInstallIos');
+    const btnPlay = document.getElementById('btnPlayStore');
+    const installedAlert = document.getElementById('installedAlert');
+    const tutorialIos = document.getElementById('iosTutorial');
+
+    const isStandalone = window.matchMedia('(display-mode: standalone)').matches
+        || window.navigator.standalone === true;
+    const isIos = /iPad|iPhone|iPod/.test(navigator.userAgent) && !window.MSStream;
+    const isAndroid = /Android/.test(navigator.userAgent);
+
+    if (isStandalone) {
+        installedAlert.style.display = '';
+        if (heroBtn) heroBtn.style.display = 'none';
+        return;
+    }
+    if (isIos) {
+        btnIos.style.display = '';
+        tutorialIos.style.display = '';
+        if (heroBtn) heroBtn.style.display = '';
+        return;
+    }
+    if (isAndroid) {
+        btnPlay.style.display = '';
+        if (heroBtn) heroBtn.style.display = '';
+    }
+    let deferredPrompt = null;
+    window.addEventListener('beforeinstallprompt', function(e) {
+        e.preventDefault();
+        deferredPrompt = e;
+        btnPwa.style.display = '';
+        if (heroBtn) heroBtn.style.display = '';
+    });
+    btnPwa.addEventListener('click', async function() {
+        if (!deferredPrompt) return;
+        deferredPrompt.prompt();
+        try {
+            const choice = await deferredPrompt.userChoice;
+            if (choice.outcome === 'accepted') {
+                btnPwa.style.display = 'none';
+                if (heroBtn) heroBtn.style.display = 'none';
+                installedAlert.style.display = '';
+            }
+        } catch (e) { /* ignore */ }
+        deferredPrompt = null;
+    });
+    window.addEventListener('appinstalled', function() {
+        btnPwa.style.display = 'none';
+        if (heroBtn) heroBtn.style.display = 'none';
+        installedAlert.style.display = '';
+        deferredPrompt = null;
+    });
+})();
+</script>
+{% endblock %}

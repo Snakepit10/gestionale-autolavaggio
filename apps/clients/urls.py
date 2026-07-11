@@ -6,6 +6,7 @@ app_name = 'clients'
 urlpatterns = [
     # Pubblico
     path('', views.landing, name='landing'),
+    path('anteprima/', views.landing_v2, name='landing-v2'),
     path('registrati/', views.register, name='register'),
     path('servizi/', views.booking, name='booking'),
 

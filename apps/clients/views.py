@@ -59,6 +59,18 @@ def landing(request):
     return render(request, 'clients/landing.html', {})
 
 
+def landing_v2(request):
+    """ANTEPRIMA nuovo design della landing (/app/anteprima/).
+
+    Pagina di prova per confrontare il redesign con la versione in
+    produzione: la landing ufficiale resta invariata su /app/. Quando
+    il nuovo design viene approvato, basta puntare `landing` al
+    template landing_v2.html (o rinominare i file) e rimuovere questa
+    view + la barra anteprima in fondo al template.
+    """
+    return render(request, 'clients/landing_v2.html', {})
+
+
 def register(request):
     """Registrazione cliente privato."""
     if request.user.is_authenticated:
