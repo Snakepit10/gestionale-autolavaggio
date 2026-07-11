@@ -287,6 +287,7 @@
             <div class="pi {% if forloop.first %}done{% endif %}" data-key="cat-{{ cat.id }}" title="{{ cat.nome }}"></div>
         {% endfor %}
         <div class="pi" data-key="data" title="Data e ora"></div>
+        <div class="pi" data-key="dati" title="I tuoi dati"></div>
         <div class="pi" data-key="conferma" title="Conferma"></div>
     </div>
 
@@ -416,22 +417,16 @@
         </div>
     </section>
 
-    {% comment %}
-    STEP CONFERMA E PRENOTA. Ordine voluto: PRIMA i dati personali +
-    tipo auto/note/password, POI il riepilogo prenotazione, infine
-    bottoni. Il riepilogo in fondo da' all'utente la vista finale
-    completa appena prima di inviare.
-    {% endcomment %}
-    <section class="bk-step" data-step-key="conferma">
-        <h3 class="fw-bold mb-1">Conferma e prenota</h3>
-        <p class="text-muted">Inserisci i tuoi dati, controlla il riepilogo e invia.</p>
+    {# ========== STEP I TUOI DATI ========== #}
+    <section class="bk-step" data-step-key="dati">
+        <h3 class="fw-bold mb-1">I tuoi dati</h3>
+        <p class="text-muted">Servono per contattarti per la conferma.</p>
 
         {% if user.is_authenticated %}
             <div class="alert alert-success">
                 <i class="bi bi-check-circle"></i> Sei gia accesso come <strong>{{ user.get_full_name|default:user.email }}</strong>
             </div>
         {% else %}
-        <h6 class="fw-bold mb-2">I tuoi dati</h6>
         <div class="row g-2">
             <div class="col-6">
                 <label class="form-label small fw-bold text-muted">Nome *</label>
@@ -479,6 +474,21 @@
                    placeholder="Lascia vuoto per saltare" minlength="6">
         </div>
         {% endif %}
+
+        <div class="d-flex gap-2 bk-actions">
+            <button class="btn btn-outline-secondary flex-grow-0" onclick="vaiIndietro()">
+                <i class="bi bi-arrow-left"></i>
+            </button>
+            <button class="btn-cta flex-grow-1 justify-content-center" onclick="vaiAvantiDati()">
+                Avanti <i class="bi bi-arrow-right"></i>
+            </button>
+        </div>
+    </section>
+
+    {# ========== STEP CONFERMA E PRENOTA (solo riepilogo + invio) ========== #}
+    <section class="bk-step" data-step-key="conferma">
+        <h3 class="fw-bold mb-1">Conferma e prenota</h3>
+        <p class="text-muted">Controlla il riepilogo e invia la richiesta.</p>
 
         <div class="bk-summary mt-3">
             <div class="small opacity-75 fw-bold">Riepilogo prenotazione</div>
@@ -667,6 +677,22 @@ function vaiAvanti() {
 function vaiIndietro() {
     if (currentStepIdx <= 0) return;
     goStepKey(STEPS[currentStepIdx - 1]);
+}
+
+// Avanti dallo step "I tuoi dati": valida i campi obbligatori del
+// guest prima di passare al riepilogo. Per gli utenti loggati i campi
+// non esistono e si passa direttamente.
+function vaiAvantiDati() {
+    if (!IS_LOGGED) {
+        const nome = document.getElementById('bk-nome').value.trim();
+        const cognome = document.getElementById('bk-cognome').value.trim();
+        const email = document.getElementById('bk-email').value.trim();
+        const tel = document.getElementById('bk-telefono').value.trim();
+        if (!nome || !cognome) { alert('Inserisci nome e cognome'); return; }
+        if (!email) { alert('Inserisci email'); return; }
+        if (!tel) { alert('Inserisci telefono'); return; }
+    }
+    vaiAvanti();
 }
 
 // === Selezione servizi base (step categoria) =====================
