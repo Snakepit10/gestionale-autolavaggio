@@ -17,5 +17,6 @@ urlpatterns = [
     path('campagne/crea/', views.campagna_crea, name='campagna-crea'),
     path('campagne/<int:pk>/', views.campagna_dettaglio, name='campagna-dettaglio'),
     path('campagne/<int:pk>/annulla/', views.campagna_annulla, name='campagna-annulla'),
+    path('campagne/<int:pk>/pausa/', views.campagna_pausa, name='campagna-pausa'),
     path('campagne/processa-coda/', views.processa_coda_ora, name='processa-coda'),
 ]

@@ -112,6 +112,7 @@ class Campagna(models.Model):
         ('bozza', 'Bozza'),
         ('in_coda', 'In coda'),
         ('in_corso', 'In corso'),
+        ('in_pausa', 'In pausa'),
         ('completata', 'Completata'),
         ('annullata', 'Annullata'),
     ]

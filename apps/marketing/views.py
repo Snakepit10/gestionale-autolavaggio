@@ -294,6 +294,45 @@ def processa_coda_ora(request):
 
 
 @_staff_required
+def campagna_pausa(request, pk):
+    """Mette in pausa / riprende una campagna.
+
+    In pausa: il cron e il bottone 'Processa coda ora' non toccano i
+    suoi invii (la coda seleziona solo campagne in_coda/in_corso).
+    Gli invii restano 'in_coda' e ripartono al 'Riprendi'. Diverso da
+    'Annulla' che e' definitivo.
+    """
+    from django.shortcuts import get_object_or_404
+    from .models import Campagna
+
+    if request.method != 'POST':
+        return redirect('marketing:campagne')
+    campagna = get_object_or_404(Campagna, pk=pk)
+
+    if campagna.stato in ('in_coda', 'in_corso'):
+        campagna.stato = 'in_pausa'
+        campagna.save(update_fields=['stato'])
+        messages.success(
+            request,
+            f'Campagna "{campagna.nome}" in pausa: gli invii rimanenti sono '
+            f'sospesi finche\' non la riprendi.'
+        )
+    elif campagna.stato == 'in_pausa':
+        # Riprendi: in_corso se ha gia' inviato qualcosa, altrimenti in_coda
+        nuovo = 'in_corso' if campagna.invii.filter(stato='inviato').exists() else 'in_coda'
+        campagna.stato = nuovo
+        campagna.save(update_fields=['stato'])
+        messages.success(
+            request,
+            f'Campagna "{campagna.nome}" ripresa: gli invii in coda '
+            f'ripartiranno dal prossimo batch.'
+        )
+    else:
+        messages.error(request, 'La campagna non e\' in uno stato pausabile.')
+    return redirect('marketing:campagna-dettaglio', pk=pk)
+
+
+@_staff_required
 def campagna_annulla(request, pk):
     """Annulla una campagna: gli invii ancora in coda non partiranno."""
     from django.shortcuts import get_object_or_404
@@ -302,7 +341,7 @@ def campagna_annulla(request, pk):
     if request.method != 'POST':
         return redirect('marketing:campagne')
     campagna = get_object_or_404(Campagna, pk=pk)
-    if campagna.stato in ('in_coda', 'in_corso'):
+    if campagna.stato in ('in_coda', 'in_corso', 'in_pausa'):
         campagna.invii.filter(stato='in_coda').update(
             stato='saltato', motivo_salto='campagna annullata')
         campagna.stato = 'annullata'

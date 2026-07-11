@@ -93,9 +93,10 @@
                             {% if c.stato == 'completata' %}bg-success
                             {% elif c.stato == 'in_corso' %}bg-primary
                             {% elif c.stato == 'in_coda' %}bg-warning text-dark
+                            {% elif c.stato == 'in_pausa' %}bg-info text-dark
                             {% elif c.stato == 'annullata' %}bg-secondary
                             {% else %}bg-light text-dark border{% endif %}">
-                            {{ c.get_stato_display }}
+                            {% if c.stato == 'in_pausa' %}<i class="bi bi-pause-fill"></i> {% endif %}{{ c.get_stato_display }}
                         </span>
                     </td>
                     <td>{{ c.creata_il|date:"d/m/Y H:i" }}</td>

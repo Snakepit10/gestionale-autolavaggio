@@ -10,6 +10,7 @@
             {% if campagna.stato == 'completata' %}bg-success
             {% elif campagna.stato == 'in_corso' %}bg-primary
             {% elif campagna.stato == 'in_coda' %}bg-warning text-dark
+            {% elif campagna.stato == 'in_pausa' %}bg-info text-dark
             {% elif campagna.stato == 'annullata' %}bg-secondary
             {% else %}bg-light text-dark border{% endif %}">
             {{ campagna.get_stato_display }}
@@ -25,10 +26,28 @@
                 <i class="bi bi-send-check"></i> Processa coda ora
             </button>
         </form>
+        <form method="post" action="{% url 'marketing:campagna-pausa' campagna.pk %}" class="d-inline">
+            {% csrf_token %}
+            <button type="submit" class="btn btn-outline-warning me-2"
+                    title="Sospende gli invii rimanenti: riprendibili in qualsiasi momento">
+                <i class="bi bi-pause-circle"></i> Metti in pausa
+            </button>
+        </form>
+        {% endif %}
+        {% if campagna.stato == 'in_pausa' %}
+        <form method="post" action="{% url 'marketing:campagna-pausa' campagna.pk %}" class="d-inline">
+            {% csrf_token %}
+            <button type="submit" class="btn btn-warning me-2"
+                    title="Riprende gli invii rimasti in coda">
+                <i class="bi bi-play-circle"></i> Riprendi campagna
+            </button>
+        </form>
+        {% endif %}
+        {% if campagna.stato == 'in_coda' or campagna.stato == 'in_corso' or campagna.stato == 'in_pausa' %}
         <form method="post" action="{% url 'marketing:campagna-annulla' campagna.pk %}" class="d-inline">
             {% csrf_token %}
             <button type="submit" class="btn btn-outline-danger me-2"
-                    onclick="return confirm('Annullare la campagna? Gli invii in coda non partiranno.');">
+                    onclick="return confirm('Annullare DEFINITIVAMENTE la campagna? Gli invii in coda non partiranno. Per una sospensione temporanea usa Metti in pausa.');">
                 <i class="bi bi-x-circle"></i> Annulla campagna
             </button>
         </form>
