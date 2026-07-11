@@ -261,6 +261,39 @@ def campagna_dettaglio(request, pk):
 
 
 @_staff_required
+def processa_coda_ora(request):
+    """POST: avvia subito il processamento della coda invii in un
+    thread in background (senza aspettare il cron).
+
+    Utile per il primo invio o per smaltire la coda a mano. Il batch
+    rispetta comunque tetto giornaliero e pause casuali tra i
+    messaggi, quindi la coda si svuota progressivamente: ricaricare la
+    pagina per vedere gli stati aggiornarsi.
+    """
+    if request.method != 'POST':
+        return redirect('marketing:campagne')
+
+    from .models import InvioCampagna
+    from .services.invio import avvia_processamento_background
+
+    n_in_coda = InvioCampagna.objects.filter(
+        stato='in_coda', campagna__stato__in=['in_coda', 'in_corso']).count()
+    if n_in_coda == 0:
+        messages.info(request, 'Nessun invio in coda.')
+    else:
+        avvia_processamento_background(max_batch=8)
+        cfg = ImpostazioniMarketing.get_solo()
+        messages.success(
+            request,
+            f'Invio avviato in background ({min(n_in_coda, 8)} messaggi in '
+            f'questo batch, pause di {cfg.intervallo_min_secondi}-'
+            f'{cfg.intervallo_max_secondi}s tra un messaggio e l\'altro). '
+            f'Ricarica la pagina tra qualche minuto per vedere gli stati.'
+        )
+    return redirect(request.POST.get('next') or 'marketing:campagne')
+
+
+@_staff_required
 def campagna_annulla(request, pk):
     """Annulla una campagna: gli invii ancora in coda non partiranno."""
     from django.shortcuts import get_object_or_404

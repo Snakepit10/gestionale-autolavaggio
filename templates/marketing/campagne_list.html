@@ -7,6 +7,14 @@
 <div class="d-flex justify-content-between align-items-center mb-4">
     <h1><i class="bi bi-send"></i> Campagne</h1>
     <div>
+        <form method="post" action="{% url 'marketing:processa-coda' %}" class="d-inline">
+            {% csrf_token %}
+            <input type="hidden" name="next" value="{{ request.path }}">
+            <button type="submit" class="btn btn-success me-2"
+                    title="Invia subito un batch dalla coda senza aspettare il cron">
+                <i class="bi bi-send-check"></i> Processa coda ora
+            </button>
+        </form>
         <a href="{% url 'marketing:campagna-nuova' %}" class="btn btn-primary me-2">
             <i class="bi bi-plus-circle"></i> Nuova campagna
         </a>

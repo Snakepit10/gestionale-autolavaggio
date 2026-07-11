@@ -17,6 +17,14 @@
     </h1>
     <div>
         {% if campagna.stato == 'in_coda' or campagna.stato == 'in_corso' %}
+        <form method="post" action="{% url 'marketing:processa-coda' %}" class="d-inline">
+            {% csrf_token %}
+            <input type="hidden" name="next" value="{{ request.path }}">
+            <button type="submit" class="btn btn-success me-2"
+                    title="Invia subito un batch dalla coda senza aspettare il cron">
+                <i class="bi bi-send-check"></i> Processa coda ora
+            </button>
+        </form>
         <form method="post" action="{% url 'marketing:campagna-annulla' campagna.pk %}" class="d-inline">
             {% csrf_token %}
             <button type="submit" class="btn btn-outline-danger me-2"
