@@ -98,10 +98,36 @@ def campagne_list(request):
     campagne = [
         (c, statistiche_campagna(c)) for c in Campagna.objects.all()
     ]
+
+    # Il richiamo automatico e' una campagna ricorrente: il cron crea un
+    # contenitore mensile 'Richiamo automatico YYYY-MM' (gia' in lista),
+    # ma qui mostriamo sempre un riepilogo con le metriche cumulate,
+    # anche prima che esista il primo contenitore.
+    cfg = ImpostazioniMarketing.get_solo()
+    stats_ric = [s for c, s in campagne if c.tipo == 'automatica_richiamo']
+    tot = {
+        chiave: sum(s[chiave] for s in stats_ric)
+        for chiave in ('n_destinatari', 'n_inviati', 'n_letti', 'n_in_coda',
+                       'n_falliti', 'n_conversioni')
+    }
+    tot['fatturato'] = sum(s['fatturato'] for s in stats_ric)
+    tot['tasso_lettura'] = (
+        tot['n_letti'] / tot['n_inviati'] * 100 if tot['n_inviati'] else 0.0)
+    tot['tasso_conversione'] = (
+        tot['n_conversioni'] / tot['n_inviati'] * 100 if tot['n_inviati'] else 0.0)
+    richiamo = {
+        'attivo': cfg.richiamo_automatico_attivo,
+        'template': cfg.richiamo_template_meta,
+        'giorni': cfg.richiamo_giorni_dopo,
+        'n_campagne': len(stats_ric),
+        'stats': tot,
+    }
+
     return render(request, 'marketing/campagne_list.html', {
         'campagne': campagne,
         'per_segmento': statistiche_per_segmento(),
         'segmenti_label': SEGMENTI_LABEL,
+        'richiamo': richiamo,
     })
 
 

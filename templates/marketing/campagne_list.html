@@ -61,6 +61,57 @@
 </div>
 {% endif %}
 
+<div class="card border-0 shadow-sm mb-4">
+    <div class="card-body">
+        <div class="d-flex justify-content-between align-items-center flex-wrap gap-2">
+            <h5 class="card-title mb-0">
+                <i class="bi bi-alarm text-primary"></i> Richiamo automatico
+                {% if richiamo.attivo and richiamo.template %}
+                    <span class="badge bg-success align-middle">Attivo</span>
+                {% elif richiamo.attivo %}
+                    <span class="badge bg-warning text-dark align-middle"
+                          title="L'interruttore e' ON ma manca il template Meta nelle impostazioni: i richiami non partono">
+                        ON, template mancante
+                    </span>
+                {% else %}
+                    <span class="badge bg-secondary align-middle">Spento</span>
+                {% endif %}
+            </h5>
+            <a href="{% url 'marketing:impostazioni' %}" class="btn btn-sm btn-outline-primary">
+                <i class="bi bi-gear"></i> Configura
+            </a>
+        </div>
+        <p class="text-muted small mb-2 mt-1">
+            Campagna ricorrente: ogni giorno accoda i clienti il cui ultimo lavaggio
+            risale a {{ richiamo.giorni }} giorni fa. Gli invii confluiscono in una
+            campagna mensile "Richiamo automatico AAAA-MM" (righe
+            <span class="badge bg-info text-dark"><i class="bi bi-alarm"></i> automatica</span>
+            nella tabella sotto).
+        </p>
+        {% if richiamo.n_campagne %}
+        <div class="d-flex flex-wrap gap-4 small">
+            <span><strong>{{ richiamo.stats.n_inviati }}</strong> inviati</span>
+            <span title="Spunte blu Meta"><strong style="color:#53bdeb;">{{ richiamo.stats.n_letti }}</strong> letti ({{ richiamo.stats.tasso_lettura|floatformat:0 }}%)</span>
+            <span><strong>{{ richiamo.stats.n_in_coda }}</strong> in coda</span>
+            <span class="{% if richiamo.stats.n_falliti %}text-danger{% endif %}"><strong>{{ richiamo.stats.n_falliti }}</strong> falliti</span>
+            <span class="text-primary"><strong>{{ richiamo.stats.n_conversioni }}</strong> conversioni ({{ richiamo.stats.tasso_conversione|floatformat:1 }}%)</span>
+            <span class="text-primary"><strong>€ {{ richiamo.stats.fatturato|floatformat:0 }}</strong> fatturato attribuito</span>
+            <span class="text-muted">{{ richiamo.n_campagne }} campagn{{ richiamo.n_campagne|pluralize:"a,e" }} mensil{{ richiamo.n_campagne|pluralize:"e,i" }}</span>
+        </div>
+        {% else %}
+        <div class="text-muted small">
+            {% if richiamo.attivo and richiamo.template %}
+                Nessun richiamo ancora partito: la prima campagna mensile apparira'
+                qui appena un cliente raggiunge i {{ richiamo.giorni }} giorni dall'ultimo lavaggio.
+            {% else %}
+                Nessun richiamo inviato finora. Attivalo dalle impostazioni per
+                ricontattare in automatico i clienti dopo {{ richiamo.giorni }} giorni.
+            {% endif %}
+        </div>
+        {% endif %}
+    </div>
+</div>
+
 <div class="card border-0 shadow-sm">
     <div class="table-responsive">
         <table class="table table-hover align-middle mb-0">
