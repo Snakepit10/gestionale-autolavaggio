@@ -131,7 +131,7 @@
         </form>
 
         <div class="text-center mt-3">
-            <a href="#" class="btn-link-soft" onclick="alert('Contattaci al 379 233 7051 per recuperare la password.'); return false;">
+            <a href="{% url 'auth:client-password-reset' %}" class="btn-link-soft">
                 <i class="bi bi-question-circle"></i> Password dimenticata?
             </a>
         </div>

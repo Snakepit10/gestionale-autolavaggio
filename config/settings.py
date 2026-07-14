@@ -187,6 +187,11 @@ LOGIN_URL = '/auth/operatori/login/'
 LOGIN_REDIRECT_URL = '/'
 LOGOUT_REDIRECT_URL = '/auth/operatori/login/'
 
+# Dietro il proxy Railway la connessione app-side e' http ma il client
+# arriva in https: senza questo header request.is_secure() = False e i
+# link assoluti generati (es. email recupero password) sarebbero http://.
+SECURE_PROXY_SSL_HEADER = ('HTTP_X_FORWARDED_PROTO', 'https')
+
 # Session settings
 SESSION_COOKIE_AGE = 1209600  # 2 settimane
 SESSION_EXPIRE_AT_BROWSER_CLOSE = False

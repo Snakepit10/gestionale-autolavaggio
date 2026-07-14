@@ -1,5 +1,6 @@
 from django.shortcuts import render, redirect
 from django.contrib.auth import authenticate, login, logout
+from django.contrib.auth import views as auth_views
 from django.contrib.auth.decorators import login_required
 from django.contrib import messages
 from django.views.generic import TemplateView
@@ -76,6 +77,41 @@ def client_login(request):
             messages.error(request, 'Email non registrata nel sistema.')
     
     return render(request, 'auth/client_login.html')
+
+
+# ---------------------------------------------------------------------
+# Recupero password clienti
+#
+# Flusso standard Django (token monouso con scadenza PASSWORD_RESET_TIMEOUT,
+# default 3 giorni) con template brandizzati MasterWash. L'email del form
+# viene confrontata con User.email (alla registrazione username = email =
+# User.email, quindi il match e' affidabile). Se l'email non corrisponde a
+# nessun account la pagina "inviata" e' identica: non riveliamo quali email
+# sono registrate.
+# ---------------------------------------------------------------------
+
+class ClientPasswordResetView(auth_views.PasswordResetView):
+    """Step 1: il cliente inserisce l'email e riceve il link di reset."""
+    template_name = 'auth/client_password_reset.html'
+    email_template_name = 'auth/emails/password_reset_email.txt'
+    subject_template_name = 'auth/emails/password_reset_subject.txt'
+    success_url = reverse_lazy('auth:client-password-reset-done')
+
+
+class ClientPasswordResetDoneView(auth_views.PasswordResetDoneView):
+    """Step 2: conferma 'se l'email esiste, ti abbiamo scritto'."""
+    template_name = 'auth/client_password_reset_done.html'
+
+
+class ClientPasswordResetConfirmView(auth_views.PasswordResetConfirmView):
+    """Step 3: dal link nell'email, form nuova password."""
+    template_name = 'auth/client_password_reset_confirm.html'
+    success_url = reverse_lazy('auth:client-password-reset-complete')
+
+
+class ClientPasswordResetCompleteView(auth_views.PasswordResetCompleteView):
+    """Step 4: password cambiata, invito al login."""
+    template_name = 'auth/client_password_reset_complete.html'
 
 
 def operator_logout(request):

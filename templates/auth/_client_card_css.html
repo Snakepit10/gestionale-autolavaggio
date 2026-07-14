@@ -1,0 +1,72 @@
+<style>
+/* Stili condivisi delle card auth clienti (login-like).
+   Copia compatta di .cl-* da client_login.html per le pagine
+   di recupero password. */
+.cl-wrap {
+    min-height: calc(100vh - 80px);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 24px 16px;
+}
+.cl-card {
+    width: 100%;
+    max-width: 460px;
+    background: var(--mw-navy-soft);
+    border: 1px solid var(--mw-line);
+    border-radius: 20px;
+    padding: 36px 28px;
+    box-shadow: 0 12px 40px rgba(0,0,0,.35);
+    color: var(--mw-text);
+    position: relative;
+    overflow: hidden;
+}
+.cl-card::before {
+    content: '';
+    position: absolute;
+    top: 0; left: 0; right: 0;
+    height: 5px;
+    background: linear-gradient(90deg, var(--mw-cyan) 0%, var(--mw-cyan-light) 100%);
+}
+.cl-header { text-align: center; margin-bottom: 28px; }
+.cl-icon {
+    width: 72px; height: 72px;
+    margin: 0 auto 14px;
+    background: linear-gradient(135deg, var(--mw-cyan) 0%, var(--mw-cyan-dark) 100%);
+    border-radius: 50%;
+    display: flex; align-items: center; justify-content: center;
+    color: #fff;
+    font-size: 1.9rem;
+    box-shadow: 0 6px 18px rgba(74,185,224,.35);
+}
+.cl-header h2 { font-weight: 800; font-size: 1.6rem; color: var(--mw-text); margin-bottom: 6px; }
+.cl-header p { color: var(--mw-text-soft); font-size: .95rem; margin: 0; }
+.cl-card .form-floating { margin-bottom: 14px; }
+.cl-card .form-floating > .form-control {
+    height: calc(3.4rem + 2px);
+    padding: 1rem .85rem;
+    border-radius: 12px;
+    border: 2px solid var(--mw-line);
+    background: var(--mw-navy-deep);
+    color: var(--mw-text);
+}
+.cl-card .form-floating > .form-control:focus {
+    border-color: var(--mw-cyan);
+    box-shadow: 0 0 0 .2rem rgba(74,185,224,.25);
+    background: var(--mw-navy-deep);
+}
+.cl-card .form-floating > label { color: var(--mw-text-soft); padding: 1rem .85rem; }
+.cl-help { color: var(--mw-text-soft); font-size: .88rem; }
+.cl-errors {
+    background: rgba(220,53,69,.12);
+    border: 1px solid rgba(220,53,69,.45);
+    color: #ffb3bb;
+    border-radius: 12px;
+    padding: 10px 14px;
+    font-size: .88rem;
+    margin-bottom: 14px;
+}
+.cl-errors ul { margin: 0; padding-left: 18px; }
+.btn-link-soft { color: var(--mw-cyan-light) !important; text-decoration: none; font-size: .9rem; }
+.btn-link-soft:hover { color: var(--mw-cyan) !important; }
+</style>
