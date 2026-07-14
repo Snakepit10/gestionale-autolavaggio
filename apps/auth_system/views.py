@@ -97,14 +97,36 @@ def completa_profilo(request):
     if request.method == 'POST':
         from apps.clienti.utils import normalizza_telefono, trova_cliente_per_telefono
         telefono = (request.POST.get('telefono') or '').strip()
+        esistente = None
+        if normalizza_telefono(telefono):
+            esistente = trova_cliente_per_telefono(telefono, escludi_pk=cliente.pk)
+
         if not normalizza_telefono(telefono):
             messages.error(request, 'Numero di telefono non valido: ricontrollalo.')
-        elif trova_cliente_per_telefono(telefono, escludi_pk=cliente.pk):
+        elif esistente and esistente.user_id:
+            # La scheda col numero appartiene gia' a un ALTRO account
+            # online: non possiamo agganciarla senza intervento umano.
             messages.error(
                 request,
-                'Questo numero risulta gia\' associato a un altro cliente. '
+                'Questo numero risulta gia\' collegato a un altro account. '
                 'Se e\' il tuo, chiamaci al 379 233 7051 e sistemiamo noi.'
             )
+        elif esistente:
+            # Cliente abituale gia' in anagrafica (es. creato in cassa,
+            # con storico/punti) senza account online: colleghiamo il
+            # login a QUELLA scheda e assorbiamo quella appena creata
+            # dalla registrazione Google, invece di duplicare. Il merge
+            # riusa unisci_clienti (pulizia clienti): sposta lo user,
+            # completa i campi vuoti (email/nome da Google) ed elimina
+            # la scheda vuota.
+            from apps.clienti.services_pulizia import unisci_clienti
+            unisci_clienti(esistente, [cliente])
+            messages.success(
+                request,
+                f'Bentornato, {esistente.nome_completo}! Abbiamo collegato il '
+                f'tuo account alla tua scheda cliente: ritrovi storico e punti.'
+            )
+            return redirect('clients:dashboard')
         else:
             cliente.telefono = telefono
             cliente.save(update_fields=['telefono'])
