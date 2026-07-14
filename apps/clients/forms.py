@@ -64,8 +64,10 @@ class RegistrazioneClienteForm(forms.Form):
 
     def clean_email(self):
         email = (self.cleaned_data.get('email') or '').strip().lower()
-        if User.objects.filter(email__iexact=email).exists() or \
-           Cliente.objects.filter(email__iexact=email).exists():
+        # Blocca solo se esiste gia' un ACCOUNT con questa email. Una
+        # scheda Cliente senza account (creata in cassa o da prenotazione
+        # guest) non blocca: viene collegata in save().
+        if User.objects.filter(email__iexact=email).exists():
             raise ValidationError('Email gia registrata. Prova ad accedere.')
         return email
 
@@ -73,6 +75,31 @@ class RegistrazioneClienteForm(forms.Form):
         data = super().clean()
         if data.get('password') != data.get('password_conferma'):
             raise ValidationError({'password_conferma': 'Le password non coincidono'})
+
+        # Telefono: valido + regola di collegamento all'anagrafica.
+        # Se il numero appartiene a una scheda esistente senza account e
+        # il nominativo combacia (>= 90%), la registrazione COLLEGA quella
+        # scheda (storico/punti preservati) invece di duplicare. Se il
+        # nominativo non combacia, o la scheda e' gia' di un altro
+        # account, serve l'intervento dell'operatore.
+        telefono = (data.get('telefono') or '').strip()
+        self._cliente_da_collegare = None
+        if telefono and data.get('nome') is not None:
+            from apps.clienti.utils import normalizza_telefono, valuta_collegamento_telefono
+            if not normalizza_telefono(telefono):
+                raise ValidationError({'telefono': 'Numero di telefono non valido: ricontrollalo.'})
+            esito, esistente = valuta_collegamento_telefono(
+                telefono, data.get('nome'), data.get('cognome'))
+            if esito == 'occupato':
+                raise ValidationError({'telefono':
+                    'Questo numero e\' gia\' collegato a un altro account. '
+                    'Se e\' il tuo, chiamaci o scrivici al 379 233 7051 per lo sblocco.'})
+            if esito == 'verifica_fallita':
+                raise ValidationError({'telefono':
+                    'Questo numero risulta gia\' in anagrafica con un altro '
+                    'nominativo. Chiamaci o scrivici al 379 233 7051 per lo sblocco.'})
+            if esito == 'collega':
+                self._cliente_da_collegare = esistente
         return data
 
     def save(self):
@@ -85,12 +112,40 @@ class RegistrazioneClienteForm(forms.Form):
             last_name=d['cognome'],
             password=d['password'],
         )
-        cliente = Cliente.objects.create(
-            user=user,
-            tipo='privato',
-            nome=d['nome'],
-            cognome=d['cognome'],
-            email=d['email'],
-            telefono=d['telefono'],
-        )
+
+        cliente = getattr(self, '_cliente_da_collegare', None)
+        if cliente is None and d.get('email'):
+            # Scheda esistente con la stessa email e senza account
+            # (es. creata da prenotazione guest): collega anche qui se
+            # il nominativo combacia.
+            from apps.clienti.utils import somiglianza_nomi, SOGLIA_SOMIGLIANZA_NOMI
+            candidata = Cliente.objects.filter(
+                email__iexact=d['email'], user__isnull=True,
+            ).order_by('pk').first()
+            if candidata and somiglianza_nomi(
+                    d['nome'], d['cognome'],
+                    candidata.nome, candidata.cognome) >= SOGLIA_SOMIGLIANZA_NOMI:
+                cliente = candidata
+
+        if cliente is not None:
+            # Collega l'account alla scheda esistente e completa i vuoti
+            cliente.user = user
+            if not cliente.email:
+                cliente.email = d['email']
+            if not cliente.telefono:
+                cliente.telefono = d['telefono']
+            if not cliente.nome:
+                cliente.nome = d['nome']
+            if not cliente.cognome:
+                cliente.cognome = d['cognome']
+            cliente.save()
+        else:
+            cliente = Cliente.objects.create(
+                user=user,
+                tipo='privato',
+                nome=d['nome'],
+                cognome=d['cognome'],
+                email=d['email'],
+                telefono=d['telefono'],
+            )
         return user, cliente

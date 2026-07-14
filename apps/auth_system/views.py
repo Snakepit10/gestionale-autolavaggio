@@ -95,43 +95,49 @@ def completa_profilo(request):
         return redirect('clients:dashboard')
 
     if request.method == 'POST':
-        from apps.clienti.utils import normalizza_telefono, trova_cliente_per_telefono
+        from apps.clienti.utils import normalizza_telefono, valuta_collegamento_telefono
         telefono = (request.POST.get('telefono') or '').strip()
-        esistente = None
-        if normalizza_telefono(telefono):
-            esistente = trova_cliente_per_telefono(telefono, escludi_pk=cliente.pk)
 
         if not normalizza_telefono(telefono):
             messages.error(request, 'Numero di telefono non valido: ricontrollalo.')
-        elif esistente and esistente.user_id:
-            # La scheda col numero appartiene gia' a un ALTRO account
-            # online: non possiamo agganciarla senza intervento umano.
-            messages.error(
-                request,
-                'Questo numero risulta gia\' collegato a un altro account. '
-                'Se e\' il tuo, chiamaci al 379 233 7051 e sistemiamo noi.'
-            )
-        elif esistente:
-            # Cliente abituale gia' in anagrafica (es. creato in cassa,
-            # con storico/punti) senza account online: colleghiamo il
-            # login a QUELLA scheda e assorbiamo quella appena creata
-            # dalla registrazione Google, invece di duplicare. Il merge
-            # riusa unisci_clienti (pulizia clienti): sposta lo user,
-            # completa i campi vuoti (email/nome da Google) ed elimina
-            # la scheda vuota.
-            from apps.clienti.services_pulizia import unisci_clienti
-            unisci_clienti(esistente, [cliente])
-            messages.success(
-                request,
-                f'Bentornato, {esistente.nome_completo}! Abbiamo collegato il '
-                f'tuo account alla tua scheda cliente: ritrovi storico e punti.'
-            )
-            return redirect('clients:dashboard')
         else:
-            cliente.telefono = telefono
-            cliente.save(update_fields=['telefono'])
-            messages.success(request, f'Benvenuto, {cliente.nome_completo}! Profilo completato.')
-            return redirect('clients:dashboard')
+            # Stessa regola di tutte le registrazioni: numero gia' in
+            # anagrafica -> verifica del nominativo (>= 90% di
+            # somiglianza, dati Google vs scheda). Se combacia colleghiamo
+            # la scheda esistente (storico/punti preservati), altrimenti
+            # serve lo sblocco dell'operatore.
+            esito, esistente = valuta_collegamento_telefono(
+                telefono, cliente.nome, cliente.cognome, escludi_pk=cliente.pk)
+
+            if esito == 'occupato':
+                messages.error(
+                    request,
+                    'Questo numero risulta gia\' collegato a un altro account. '
+                    'Se e\' il tuo, chiamaci o scrivici al 379 233 7051 per lo sblocco.'
+                )
+            elif esito == 'verifica_fallita':
+                messages.error(
+                    request,
+                    'Questo numero risulta gia\' in anagrafica con un altro '
+                    'nominativo. Chiamaci o scrivici al 379 233 7051 per lo sblocco.'
+                )
+            elif esito == 'collega':
+                # Merge nella scheda storica via unisci_clienti (pulizia
+                # clienti): sposta lo user, completa i campi vuoti con i
+                # dati Google, elimina la scheda vuota appena creata.
+                from apps.clienti.services_pulizia import unisci_clienti
+                unisci_clienti(esistente, [cliente])
+                messages.success(
+                    request,
+                    f'Bentornato, {esistente.nome_completo}! Abbiamo collegato il '
+                    f'tuo account alla tua scheda cliente: ritrovi storico e punti.'
+                )
+                return redirect('clients:dashboard')
+            else:  # libero
+                cliente.telefono = telefono
+                cliente.save(update_fields=['telefono'])
+                messages.success(request, f'Benvenuto, {cliente.nome_completo}! Profilo completato.')
+                return redirect('clients:dashboard')
 
     return render(request, 'auth/client_completa_profilo.html', {'cliente': cliente})
 

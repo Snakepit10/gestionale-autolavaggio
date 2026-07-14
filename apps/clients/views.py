@@ -71,7 +71,9 @@ def register(request):
         form = RegistrazioneClienteForm(request.POST)
         if form.is_valid():
             user, cliente = form.save()
-            login(request, user)
+            # backend esplicito: con allauth attivo ci sono piu' backend
+            # e login() senza authenticate() non sa quale attribuire
+            login(request, user, backend='django.contrib.auth.backends.ModelBackend')
             messages.success(request, f"Benvenuto {cliente.nome}! Account creato.")
             return redirect('clients:dashboard')
     else:
@@ -490,17 +492,30 @@ def crea_prenotazione_pub(request):
                     telefono=telefono,
                 )
 
-            # Se richiesto crea User per accesso futuro
+            # Se richiesto crea User per accesso futuro. Stessa regola
+            # delle registrazioni: l'account si aggancia a una scheda
+            # preesistente solo se il nominativo combacia (>= 90%);
+            # altrimenti la prenotazione procede comunque ma SENZA
+            # creare l'account (il cliente puo' registrarsi poi, dove
+            # ricevera' il messaggio di sblocco operatore).
             if password and email and not cliente.user_id:
-                user_creato = User.objects.create_user(
-                    username=email,
-                    email=email,
-                    first_name=nome,
-                    last_name=cognome,
-                    password=password,
+                from apps.clienti.utils import somiglianza_nomi, SOGLIA_SOMIGLIANZA_NOMI
+                aggancio_sicuro = (
+                    not existing_cliente
+                    or somiglianza_nomi(nome, cognome,
+                                        cliente.nome, cliente.cognome)
+                       >= SOGLIA_SOMIGLIANZA_NOMI
                 )
-                cliente.user = user_creato
-                cliente.save(update_fields=['user'])
+                if aggancio_sicuro:
+                    user_creato = User.objects.create_user(
+                        username=email,
+                        email=email,
+                        first_name=nome,
+                        last_name=cognome,
+                        password=password,
+                    )
+                    cliente.user = user_creato
+                    cliente.save(update_fields=['user'])
 
             # Memorizza email scelta per la prenotazione (potrebbe
             # differire da cliente.email se cliente esisteva gia con
@@ -560,9 +575,11 @@ def crea_prenotazione_pub(request):
             for prodotto, qty in prodotti_validi
         ])
 
-    # Auto-login se ha appena creato un User
+    # Auto-login se ha appena creato un User (backend esplicito: con
+    # allauth attivo ci sono piu' backend configurati)
     if user_creato:
-        auth_login(request, user_creato)
+        auth_login(request, user_creato,
+                   backend='django.contrib.auth.backends.ModelBackend')
 
     # Email cliente: usa email fornita nel form (se guest), altrimenti
     # quella del cliente. Logga sempre quale viene usata.
