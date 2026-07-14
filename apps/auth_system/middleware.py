@@ -4,6 +4,31 @@ from django.contrib import messages
 from django.utils.deprecation import MiddlewareMixin
 
 
+class CompletamentoProfiloMiddleware(MiddlewareMixin):
+    """Cliente loggato senza telefono (tipicamente registrato con
+    Google, che non lo fornisce) -> rimandato al form 'completa
+    profilo' quando naviga l'area clienti. Il telefono e' obbligatorio
+    per notifiche WhatsApp e anti-duplicati anagrafica."""
+
+    SCOPE_PREFIXES = ('/app/', '/auth/clienti/dashboard/')
+    # No redirect su asset PWA e chiamate API (romperebbe fetch/manifest)
+    EXCLUDE_SUBSTRINGS = ('/api/', 'manifest', 'sw.js', 'service-worker')
+
+    def process_request(self, request):
+        path = request.path
+        if not any(path.startswith(p) for p in self.SCOPE_PREFIXES):
+            return None
+        if any(s in path for s in self.EXCLUDE_SUBSTRINGS):
+            return None
+        user = request.user
+        if not user.is_authenticated:
+            return None
+        cliente = getattr(user, 'cliente', None)
+        if cliente is None or (cliente.telefono or '').strip():
+            return None
+        return redirect('auth:completa-profilo')
+
+
 class AuthenticationMiddleware(MiddlewareMixin):
     """
     Middleware per gestire l'autenticazione e i redirect automatici

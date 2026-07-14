@@ -12,6 +12,7 @@ urlpatterns = [
     path('clienti/login/', views.client_login, name='client-login'),
     path('clienti/logout/', views.client_logout, name='client-logout'),
     path('clienti/dashboard/', views.ClientDashboardView.as_view(), name='client-dashboard'),
+    path('clienti/completa-profilo/', views.completa_profilo, name='completa-profilo'),
 
     # Recupero password clienti
     path('clienti/password/reset/',

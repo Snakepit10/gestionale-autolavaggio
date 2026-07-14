@@ -1,0 +1,44 @@
+{% extends "clients/base_public.html" %}
+{% load static %}
+
+{% block title %}Completa il profilo &mdash; MasterWash{% endblock %}
+
+{% block extra_css %}{% include "auth/_client_card_css.html" %}{% endblock %}
+
+{% block content %}
+<div class="cl-wrap">
+    <div class="cl-card">
+        <div class="cl-header">
+            <div class="cl-icon"><i class="bi bi-telephone"></i></div>
+            <h2>Un ultimo passo{% if cliente.nome %}, {{ cliente.nome }}{% endif %}!</h2>
+            <p>Per confermare le prenotazioni e avvisarti quando l'auto
+               &egrave; pronta usiamo WhatsApp: ci serve il tuo numero di
+               cellulare.</p>
+        </div>
+
+        {% if messages %}
+            {% for message in messages %}
+                <div class="cl-errors {% if message.tags == 'success' %}d-none{% endif %}">{{ message }}</div>
+            {% endfor %}
+        {% endif %}
+
+        <form method="post">
+            {% csrf_token %}
+            <div class="form-floating">
+                <input type="tel" class="form-control" id="id_telefono" name="telefono"
+                       placeholder="333 1234567" required autocomplete="tel"
+                       inputmode="tel" autofocus value="{{ request.POST.telefono|default:'' }}">
+                <label for="id_telefono"><i class="bi bi-phone me-2"></i>Numero di cellulare</label>
+            </div>
+            <button type="submit" class="btn-cta w-100 justify-content-center">
+                <i class="bi bi-check-circle"></i> Salva e continua
+            </button>
+        </form>
+
+        <div class="text-center mt-3 cl-help">
+            Il numero serve solo per le comunicazioni di servizio:
+            niente spam.
+        </div>
+    </div>
+</div>
+{% endblock %}

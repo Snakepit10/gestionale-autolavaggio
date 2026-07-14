@@ -79,6 +79,41 @@ def client_login(request):
     return render(request, 'auth/client_login.html')
 
 
+@login_required(login_url='/auth/clienti/login/')
+def completa_profilo(request):
+    """Step obbligatorio post-registrazione Google: telefono mancante.
+
+    Google fornisce nome/cognome/email ma non il numero di telefono,
+    che per noi e' obbligatorio (notifiche WhatsApp, anti-duplicati).
+    Il CompletamentoProfiloMiddleware rimanda qui i clienti loggati
+    senza telefono finche' non lo salvano.
+    """
+    cliente = getattr(request.user, 'cliente', None)
+    if cliente is None:
+        return redirect('auth:client-login')
+    if (cliente.telefono or '').strip():
+        return redirect('clients:dashboard')
+
+    if request.method == 'POST':
+        from apps.clienti.utils import normalizza_telefono, trova_cliente_per_telefono
+        telefono = (request.POST.get('telefono') or '').strip()
+        if not normalizza_telefono(telefono):
+            messages.error(request, 'Numero di telefono non valido: ricontrollalo.')
+        elif trova_cliente_per_telefono(telefono, escludi_pk=cliente.pk):
+            messages.error(
+                request,
+                'Questo numero risulta gia\' associato a un altro cliente. '
+                'Se e\' il tuo, chiamaci al 379 233 7051 e sistemiamo noi.'
+            )
+        else:
+            cliente.telefono = telefono
+            cliente.save(update_fields=['telefono'])
+            messages.success(request, f'Benvenuto, {cliente.nome_completo}! Profilo completato.')
+            return redirect('clients:dashboard')
+
+    return render(request, 'auth/client_completa_profilo.html', {'cliente': cliente})
+
+
 # ---------------------------------------------------------------------
 # Recupero password clienti
 #

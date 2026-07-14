@@ -105,6 +105,8 @@ urlpatterns = [
 
     # Sistema di Autenticazione
     path('auth/', include('apps.auth_system.urls')),
+    # Login social clienti (django-allauth): /accounts/google/login/ + callback
+    path('accounts/', include('allauth.urls')),
 
     # Lato cliente (frontend pubblico PWA): landing, register, booking, dashboard
     path('app/', include('apps.clients.urls')),

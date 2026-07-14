@@ -45,12 +45,17 @@ INSTALLED_APPS = [
     'django.contrib.sessions',
     'django.contrib.messages',
     'django.contrib.staticfiles',
-    
+    'django.contrib.sites',  # richiesto da allauth
+
     # Third party apps
     'crispy_forms',
     'crispy_bootstrap5',
     'formtools',
     'channels',
+    'allauth',
+    'allauth.account',
+    'allauth.socialaccount',
+    'allauth.socialaccount.providers.google',
 
     # App del gestionale autolavaggio (core essenziali)
     'apps.auth_system',
@@ -81,9 +86,13 @@ MIDDLEWARE = [
     'django.middleware.csrf.CsrfViewMiddleware',
     'django.contrib.auth.middleware.AuthenticationMiddleware',
     'apps.auth_system.middleware.AuthenticationMiddleware',
+    'apps.auth_system.middleware.CompletamentoProfiloMiddleware',
+    'allauth.account.middleware.AccountMiddleware',
     'django.contrib.messages.middleware.MessageMiddleware',
     'django.middleware.clickjacking.XFrameOptionsMiddleware',
 ]
+
+SITE_ID = 1
 
 # URL configuration
 ROOT_URLCONF = 'config.urls'
@@ -101,6 +110,7 @@ TEMPLATES = [
                 'django.contrib.auth.context_processors.auth',
                 'django.contrib.messages.context_processors.messages',
                 'apps.cq.context_processors.oggi',
+                'apps.auth_system.context_processors.google_oauth',
             ],
         },
     },
@@ -186,6 +196,38 @@ CRISPY_TEMPLATE_PACK = "bootstrap5"
 LOGIN_URL = '/auth/operatori/login/'
 LOGIN_REDIRECT_URL = '/'
 LOGOUT_REDIRECT_URL = '/auth/operatori/login/'
+
+AUTHENTICATION_BACKENDS = [
+    'django.contrib.auth.backends.ModelBackend',
+    'allauth.account.auth_backends.AuthenticationBackend',
+]
+
+# === Login social clienti (Google via django-allauth) ===
+# Il bottone "Continua con Google" compare solo se le credenziali OAuth
+# sono configurate via env (Google Cloud Console -> credenziali OAuth,
+# redirect URI: https://<dominio>/accounts/google/login/callback/).
+GOOGLE_CLIENT_ID = os.environ.get('GOOGLE_CLIENT_ID', '')
+GOOGLE_CLIENT_SECRET = os.environ.get('GOOGLE_CLIENT_SECRET', '')
+GOOGLE_OAUTH_ENABLED = bool(GOOGLE_CLIENT_ID and GOOGLE_CLIENT_SECRET)
+
+ACCOUNT_EMAIL_VERIFICATION = 'none'   # l'email Google e' gia' verificata
+ACCOUNT_UNIQUE_EMAIL = True
+SOCIALACCOUNT_AUTO_SIGNUP = True      # niente form intermedio allauth
+SOCIALACCOUNT_LOGIN_ON_GET = True     # dal bottone dritto a Google
+SOCIALACCOUNT_ADAPTER = 'apps.auth_system.adapters.ClienteSocialAdapter'
+ACCOUNT_ADAPTER = 'apps.auth_system.adapters.ClienteAccountAdapter'
+SOCIALACCOUNT_PROVIDERS = {
+    'google': {
+        'SCOPE': ['profile', 'email'],
+        'AUTH_PARAMS': {'prompt': 'select_account'},
+    },
+}
+if GOOGLE_OAUTH_ENABLED:
+    SOCIALACCOUNT_PROVIDERS['google']['APP'] = {
+        'client_id': GOOGLE_CLIENT_ID,
+        'secret': GOOGLE_CLIENT_SECRET,
+        'key': '',
+    }
 
 # Dietro il proxy Railway la connessione app-side e' http ma il client
 # arriva in https: senza questo header request.is_secure() = False e i
