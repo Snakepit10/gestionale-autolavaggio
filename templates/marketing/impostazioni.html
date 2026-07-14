@@ -58,6 +58,21 @@
                            value="{{ cfg.intervallo_max_secondi }}">
                     <div class="form-text">La pausa effettiva è casuale nel range.</div>
                 </div>
+                <div class="col-md-3">
+                    <label class="form-label">Invia dalle</label>
+                    <input type="time" class="form-control" name="orario_invio_da"
+                           value="{{ cfg.orario_invio_da|time:'H:i' }}">
+                </div>
+                <div class="col-md-3">
+                    <label class="form-label">Invia fino alle</label>
+                    <input type="time" class="form-control" name="orario_invio_a"
+                           value="{{ cfg.orario_invio_a|time:'H:i' }}">
+                    <div class="form-text">
+                        Fuori da questa fascia la coda resta ferma: gli invii
+                        ripartono al primo run dentro l'orario. Il bottone
+                        "Invia ora" per singolo cliente ignora la fascia.
+                    </div>
+                </div>
                 <div class="col-md-6">
                     <label class="form-label">Finestra anti-duplicati (giorni)</label>
                     <input type="number" min="0" class="form-control" name="finestra_no_ricontatto_giorni"

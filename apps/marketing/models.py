@@ -13,6 +13,8 @@ Design notes:
   _log_outgoing_msg). InvioCampagna ci si collega via FK per lo stato
   di consegna (i webhook Meta aggiornano MessaggioWhatsApp.stato).
 """
+import datetime
+
 from django.conf import settings
 from django.db import models
 from django.utils import timezone
@@ -52,6 +54,26 @@ class ImpostazioniMarketing(models.Model):
         help_text="Pausa massima tra due invii consecutivi (secondi). "
                   "La pausa effettiva e' un valore casuale nel range.",
     )
+    orario_invio_da = models.TimeField(
+        default=datetime.time(9, 0),
+        help_text="La coda invia messaggi promozionali solo a partire da "
+                  "quest'ora (ora locale).",
+    )
+    orario_invio_a = models.TimeField(
+        default=datetime.time(20, 0),
+        help_text="La coda smette di inviare dopo quest'ora. Il bottone "
+                  "'Invia ora' per singolo destinatario ignora la fascia "
+                  "(scelta esplicita dell'operatore).",
+    )
+
+    def in_fascia_invio(self, ora=None) -> bool:
+        """True se l'ora locale rientra nella fascia di invio consentita.
+        Gestisce anche fasce a cavallo di mezzanotte (da > a)."""
+        ora = ora or timezone.localtime(timezone.now()).time()
+        da, a = self.orario_invio_da, self.orario_invio_a
+        if da <= a:
+            return da <= ora <= a
+        return ora >= da or ora <= a
 
     # --- Anti-duplicati ---
     finestra_no_ricontatto_giorni = models.PositiveSmallIntegerField(

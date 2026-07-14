@@ -79,6 +79,12 @@ messaggio e l'altro. Serve a non far bloccare il numero WhatsApp
 Business dai sistemi anti-spam Meta. Una campagna da 200 destinatari
 con i default impiega ~5 giorni: è voluto.
 
+Gli invii partono solo nella **fascia oraria** configurata in
+Impostazioni (default 09:00–20:00, ammessa anche a cavallo di
+mezzanotte): fuori fascia la coda resta ferma e riparte al primo run
+del cron dentro l'orario. Il bottone "Invia ora" sul singolo
+destinatario ignora la fascia (scelta esplicita dell'operatore).
+
 Una campagna con invii ancora in coda si può **annullare** dal
 dettaglio: gli invii in coda diventano "saltato", quelli già inviati
 restano.

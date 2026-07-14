@@ -278,8 +278,17 @@ def processa_coda_ora(request):
 
     n_in_coda = InvioCampagna.objects.filter(
         stato='in_coda', campagna__stato__in=['in_coda', 'in_corso']).count()
+    cfg_fascia = ImpostazioniMarketing.get_solo()
     if n_in_coda == 0:
         messages.info(request, 'Nessun invio in coda.')
+    elif not cfg_fascia.in_fascia_invio():
+        messages.warning(
+            request,
+            f'Fuori fascia di invio ({cfg_fascia.orario_invio_da:%H:%M}-'
+            f'{cfg_fascia.orario_invio_a:%H:%M}): la coda non parte. '
+            f'Modifica la fascia nelle impostazioni oppure usa "Invia ora" '
+            f'sul singolo cliente.'
+        )
     else:
         avvia_processamento_background(max_batch=8)
         cfg = ImpostazioniMarketing.get_solo()
@@ -423,6 +432,18 @@ def impostazioni(request):
 
         if cfg.intervallo_min_secondi > cfg.intervallo_max_secondi:
             messages.error(request, "L'intervallo minimo non puo' superare il massimo.")
+            return redirect('marketing:impostazioni')
+
+        # Fascia oraria di invio (HH:MM). Ammessa anche a cavallo di
+        # mezzanotte (es. 21:00-02:00): in_fascia_invio la gestisce.
+        from datetime import datetime as _dt
+        try:
+            for campo in ('orario_invio_da', 'orario_invio_a'):
+                raw = (request.POST.get(campo) or '').strip()
+                if raw:
+                    setattr(cfg, campo, _dt.strptime(raw, '%H:%M').time())
+        except (TypeError, ValueError):
+            messages.error(request, 'Fascia oraria non valida: usa il formato HH:MM.')
             return redirect('marketing:impostazioni')
 
         cfg.richiamo_automatico_attivo = request.POST.get('richiamo_automatico_attivo') == 'on'

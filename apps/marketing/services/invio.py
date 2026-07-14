@@ -44,6 +44,15 @@ def _processa(max_batch, log, dry):
     cfg = ImpostazioniMarketing.get_solo()
     esiti = {'inviati': 0, 'falliti': 0, 'saltati': 0}
 
+    # Fascia oraria di invio: fuori orario la coda non parte proprio
+    # (gli invii restano in_coda e ripartono al prossimo run utile).
+    # L'invio singolo da UI (invia_singolo) NON passa da qui: e' una
+    # scelta esplicita dell'operatore e ignora la fascia.
+    if not cfg.in_fascia_invio():
+        log(f'Fuori fascia di invio ({cfg.orario_invio_da:%H:%M}-'
+            f'{cfg.orario_invio_a:%H:%M}): rimando al prossimo run.')
+        return esiti
+
     # Budget giornaliero: tetto - inviati oggi (tutte le campagne)
     inizio_oggi = timezone.localtime(timezone.now()).replace(
         hour=0, minute=0, second=0, microsecond=0)
