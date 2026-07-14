@@ -254,6 +254,8 @@ def campagna_dettaglio(request, pk):
     return render(request, 'marketing/campagna_dettaglio.html', {
         'campagna': campagna,
         'invii': invii,
+        'n_letti': stats['n_letti'],
+        'tasso_lettura': stats['tasso_lettura'],
         'n_conversioni': stats['n_conversioni'],
         'tasso_conversione': stats['tasso_conversione'],
         'fatturato': stats['fatturato'],

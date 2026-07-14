@@ -34,6 +34,7 @@
                     <tr>
                         <th>Segmento</th>
                         <th class="text-center">Inviati</th>
+                        <th class="text-center" title="Spunte blu Meta: chi ha le conferme di lettura disattivate non viene contato">Letti</th>
                         <th class="text-center">Conversioni</th>
                         <th class="text-center">Tasso</th>
                         <th class="text-end">Fatturato attribuito</th>
@@ -44,6 +45,10 @@
                     <tr>
                         <td><span class="fw-bold">{{ r.label }}</span></td>
                         <td class="text-center">{{ r.n_inviati }}</td>
+                        <td class="text-center">
+                            {{ r.n_letti }}
+                            <span class="text-muted small">({{ r.tasso_lettura|floatformat:0 }}%)</span>
+                        </td>
                         <td class="text-center">{{ r.n_conversioni }}</td>
                         <td class="text-center fw-bold">{{ r.tasso_conversione|floatformat:1 }}%</td>
                         <td class="text-end">€ {{ r.fatturato|floatformat:0 }}</td>
@@ -67,6 +72,7 @@
                     <th>Creata</th>
                     <th class="text-center">Destinatari</th>
                     <th class="text-center">Inviati</th>
+                    <th class="text-center" title="Spunte blu Meta: chi ha le conferme di lettura disattivate non viene contato">Letti</th>
                     <th class="text-center">Falliti</th>
                     <th class="text-center">In coda</th>
                     <th class="text-center">Conversioni</th>
@@ -102,6 +108,10 @@
                     <td>{{ c.creata_il|date:"d/m/Y H:i" }}</td>
                     <td class="text-center">{{ stats.n_destinatari }}</td>
                     <td class="text-center text-success fw-bold">{{ stats.n_inviati }}</td>
+                    <td class="text-center">
+                        {{ stats.n_letti }}
+                        <span class="text-muted small">({{ stats.tasso_lettura|floatformat:0 }}%)</span>
+                    </td>
                     <td class="text-center {% if stats.n_falliti %}text-danger fw-bold{% endif %}">{{ stats.n_falliti }}</td>
                     <td class="text-center">{{ stats.n_in_coda }}</td>
                     <td class="text-center">
@@ -112,7 +122,7 @@
                 </tr>
                 {% empty %}
                 <tr>
-                    <td colspan="10" class="text-center text-muted py-4">
+                    <td colspan="11" class="text-center text-muted py-4">
                         Nessuna campagna ancora. <a href="{% url 'marketing:campagna-nuova' %}">Creane una</a>.
                     </td>
                 </tr>

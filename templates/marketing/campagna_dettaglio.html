@@ -59,37 +59,44 @@
 </div>
 
 <div class="row g-3 mb-4">
-    <div class="col-6 col-lg-2">
+    <div class="col-6 col-lg">
         <div class="card border-0 shadow-sm h-100"><div class="card-body text-center">
             <div class="fs-3 fw-bold">{{ campagna.n_destinatari }}</div>
             <div class="text-muted small">destinatari</div>
         </div></div>
     </div>
-    <div class="col-6 col-lg-2">
+    <div class="col-6 col-lg">
         <div class="card border-0 shadow-sm h-100"><div class="card-body text-center">
             <div class="fs-3 fw-bold text-success">{{ campagna.n_inviati }}</div>
             <div class="text-muted small">inviati</div>
         </div></div>
     </div>
-    <div class="col-6 col-lg-2">
+    <div class="col-6 col-lg">
         <div class="card border-0 shadow-sm h-100"><div class="card-body text-center">
             <div class="fs-3 fw-bold {% if campagna.n_falliti %}text-danger{% endif %}">{{ campagna.n_falliti }}</div>
             <div class="text-muted small">falliti</div>
         </div></div>
     </div>
-    <div class="col-6 col-lg-2">
+    <div class="col-6 col-lg">
         <div class="card border-0 shadow-sm h-100"><div class="card-body text-center">
             <div class="fs-3 fw-bold">{{ campagna.n_in_coda }}</div>
             <div class="text-muted small">in coda</div>
         </div></div>
     </div>
-    <div class="col-6 col-lg-2">
+    <div class="col-6 col-lg">
+        <div class="card border-0 shadow-sm h-100"><div class="card-body text-center"
+             title="Spunte blu Meta: chi ha le conferme di lettura disattivate non viene mai contato come letto">
+            <div class="fs-3 fw-bold" style="color:#53bdeb;">{{ n_letti }}</div>
+            <div class="text-muted small">letti ({{ tasso_lettura|floatformat:1 }}%)</div>
+        </div></div>
+    </div>
+    <div class="col-6 col-lg">
         <div class="card border-0 shadow-sm h-100"><div class="card-body text-center">
             <div class="fs-3 fw-bold text-primary">{{ n_conversioni }}</div>
             <div class="text-muted small">conversioni ({{ tasso_conversione|floatformat:1 }}%)</div>
         </div></div>
     </div>
-    <div class="col-6 col-lg-2">
+    <div class="col-6 col-lg">
         <div class="card border-0 shadow-sm h-100"><div class="card-body text-center">
             <div class="fs-3 fw-bold text-primary">€ {{ fatturato|floatformat:0 }}</div>
             <div class="text-muted small">fatturato attribuito</div>

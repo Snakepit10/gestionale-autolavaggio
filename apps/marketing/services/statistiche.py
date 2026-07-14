@@ -28,6 +28,14 @@ def statistiche_campagna(campagna: Campagna) -> dict:
     n_in_coda = base.filter(stato='in_coda').count()
     n_saltati = base.filter(stato='saltato').count()
 
+    # Letture: stato consegna Meta sul MessaggioWhatsApp collegato
+    # (aggiornato dai webhook). 'read' implica 'delivered'. Nota: chi
+    # ha disattivato le conferme di lettura non arriva mai a 'read',
+    # quindi il tasso di lettura reale e' >= di quello misurato.
+    n_letti = base.filter(stato='inviato', messaggio_wa__stato='read').count()
+    n_recapitati = base.filter(
+        stato='inviato', messaggio_wa__stato__in=['delivered', 'read']).count()
+
     # Join invio -> ordini del cliente completati nella finestra.
     # Ogni riga del join e' una coppia (invio, ordine) valida.
     qualificati = base.filter(
@@ -52,6 +60,9 @@ def statistiche_campagna(campagna: Campagna) -> dict:
         'n_falliti': n_falliti,
         'n_in_coda': n_in_coda,
         'n_saltati': n_saltati,
+        'n_letti': n_letti,
+        'n_recapitati': n_recapitati,
+        'tasso_lettura': (n_letti / n_inviati * 100) if n_inviati else 0.0,
         'n_conversioni': n_conversioni,
         'tasso_conversione': tasso,
         'fatturato': float(fatturato),
@@ -87,15 +98,20 @@ def statistiche_per_segmento() -> list[dict]:
         if seg not in out:
             out[seg] = {
                 'segmento': seg, 'label': _label_segmento(seg),
-                'n_inviati': 0, 'n_conversioni': 0, 'fatturato': 0.0,
+                'n_inviati': 0, 'n_letti': 0, 'n_conversioni': 0,
+                'fatturato': 0.0,
             }
         out[seg]['n_inviati'] += stats['n_inviati']
+        out[seg]['n_letti'] += stats['n_letti']
         out[seg]['n_conversioni'] += stats['n_conversioni']
         out[seg]['fatturato'] += stats['fatturato']
     righe = []
     for seg, r in out.items():
         r['tasso_conversione'] = (
             r['n_conversioni'] / r['n_inviati'] * 100 if r['n_inviati'] else 0.0
+        )
+        r['tasso_lettura'] = (
+            r['n_letti'] / r['n_inviati'] * 100 if r['n_inviati'] else 0.0
         )
         righe.append(r)
     righe.sort(key=lambda r: -r['tasso_conversione'])
