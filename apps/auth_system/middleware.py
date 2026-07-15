@@ -30,78 +30,50 @@ class CompletamentoProfiloMiddleware(MiddlewareMixin):
 
 
 class AuthenticationMiddleware(MiddlewareMixin):
+    """Vieta le pagine del gestionale agli utenti non-staff.
+
+    Storia: la versione precedente aveva PUBLIC_PATHS = [..., '/'] con
+    match per prefisso: '/' e' prefisso di QUALSIASI path, quindi il
+    middleware usciva subito e non proteggeva nulla. La protezione
+    reale era solo il login_required delle view, che pero' un CLIENTE
+    loggato supera: poteva aprire /ordini/, la cassa, ecc.
+
+    Ora: un utente autenticato senza permessi staff (niente is_staff,
+    niente gruppi operativi) che visita un prefisso del gestionale
+    viene rimandato alla sua area cliente. Gli anonimi non vengono
+    toccati qui (le view protette rimandano gia' al login giusto, e i
+    webhook/endpoint pubblici come quello Meta restano raggiungibili).
     """
-    Middleware per gestire l'autenticazione e i redirect automatici
-    """
-    
-    # URL che richiedono autenticazione operatori (staff)
-    OPERATOR_REQUIRED_PATHS = [
-        '/ordini/',
-        '/postazioni/',
-        '/clienti/admin/',
-        '/abbonamenti/configurazioni/',
-        '/api/',
-        '/scorte/',
-        '/stampanti/',
-        '/sconti/',
-        '/categorie/',
-        '/catalogo/',
-        '/cq/',
-        '/turni/',
-        '/finanze/',
-        '/prenotazioni/',
-        '/abbonamenti/',
-        '/clienti/',
-    ]
-    
-    # URL che richiedono autenticazione clienti
-    CLIENT_REQUIRED_PATHS = [
+
+    # Prefissi del gestionale (staff-only)
+    STAFF_PREFIXES = (
+        '/ordini/', '/postazioni/', '/finanze/', '/cq/', '/turni/',
+        '/cartellini/', '/messaggi/', '/marketing/',
+        '/categorie/', '/catalogo/', '/sconti/', '/stampanti/', '/scorte/',
+        '/clienti/', '/prenotazioni/', '/abbonamenti/', '/api/',
+    )
+
+    # Sotto-percorsi CLIENTE dentro prefissi staff: restano accessibili
+    CLIENT_ALLOWED_PREFIXES = (
         '/clienti/area-cliente/',
         '/prenotazioni/prenota/',
         '/abbonamenti/shop/',
-    ]
-    
-    # URL pubblici (non richiedono autenticazione)
-    PUBLIC_PATHS = [
-        '/auth/',
-        '/admin/',
-        '/',
         '/abbonamenti/verifica/',
-        '/api/servizi/',
-    ]
-    
+        '/api/servizi/',  # catalogo pubblico (core), usato dalle pagine cliente
+    )
+
     def process_request(self, request):
-        path = request.path
         user = request.user
-        
-        # Skip per URL pubblici
-        if any(path.startswith(public_path) for public_path in self.PUBLIC_PATHS):
-            return None
-        
-        # Skip per utenti non autenticati sulle pagine pubbliche
         if not user.is_authenticated:
-            # Verifica se sta tentando di accedere a URL protetti
-            if any(path.startswith(protected_path) for protected_path in self.OPERATOR_REQUIRED_PATHS + self.CLIENT_REQUIRED_PATHS):
-                # Determina il tipo di login necessario
-                if any(path.startswith(op_path) for op_path in self.OPERATOR_REQUIRED_PATHS):
-                    messages.warning(request, 'Effettua il login per accedere a questa area.')
-                    return redirect('auth:operator-login')
-                else:
-                    messages.warning(request, 'Effettua il login per accedere a questa area.')
-                    return redirect('auth:client-login')
             return None
-        
-        # Verifica autorizzazioni per utenti autenticati
-        if any(path.startswith(op_path) for op_path in self.OPERATOR_REQUIRED_PATHS):
-            # Richiede permessi staff o appartenenza a un gruppo operativo
-            if not user.is_staff and not user.groups.exists():
-                messages.error(request, 'Non hai i permessi per accedere a questa area.')
-                return redirect('auth:client-dashboard' if hasattr(user, 'cliente') else 'core:home')
-        
-        elif any(path.startswith(client_path) for client_path in self.CLIENT_REQUIRED_PATHS):
-            # Richiede account cliente
-            if not hasattr(user, 'cliente'):
-                messages.error(request, 'Devi essere un cliente registrato per accedere a questa area.')
-                return redirect('auth:client-login')
-        
+        if user.is_staff or user.groups.exists():
+            return None
+
+        path = request.path
+        if any(path.startswith(p) for p in self.CLIENT_ALLOWED_PREFIXES):
+            return None
+        # '/' esatto = dashboard staff; il resto per prefisso
+        if path == '/' or any(path.startswith(p) for p in self.STAFF_PREFIXES):
+            messages.error(request, 'Area riservata agli operatori.')
+            return redirect('clients:dashboard')
         return None

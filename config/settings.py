@@ -85,10 +85,12 @@ MIDDLEWARE = [
     'django.middleware.common.CommonMiddleware',
     'django.middleware.csrf.CsrfViewMiddleware',
     'django.contrib.auth.middleware.AuthenticationMiddleware',
-    'apps.auth_system.middleware.AuthenticationMiddleware',
-    'apps.auth_system.middleware.CompletamentoProfiloMiddleware',
     'allauth.account.middleware.AccountMiddleware',
     'django.contrib.messages.middleware.MessageMiddleware',
+    # I middleware custom stanno DOPO MessageMiddleware: usano
+    # messages.error prima del redirect.
+    'apps.auth_system.middleware.AuthenticationMiddleware',
+    'apps.auth_system.middleware.CompletamentoProfiloMiddleware',
     'django.middleware.clickjacking.XFrameOptionsMiddleware',
 ]
 
