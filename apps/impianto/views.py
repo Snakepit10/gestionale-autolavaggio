@@ -12,8 +12,9 @@ def test_moneta(request):
     """POST /api/test/moneta/ - collaudo manuale della moneta virtuale.
 
     Riservato allo staff loggato. Body JSON:
-        {"nodo": "pista2", "impulsi": 1}
-    `impulsi` opzionale (default 1, max 10 per sicurezza in collaudo).
+        {"nodo": "pista2", "impulsi": 1, "switch_id": 1}
+    `impulsi` opzionale (default 1, max 10 per sicurezza in collaudo);
+    `switch_id` opzionale (default 1 = OUT2, il rele' gettoniera di pista2).
     """
     if not (request.user.is_authenticated and
             (request.user.is_staff or request.user.groups.exists())):
@@ -36,7 +37,13 @@ def test_moneta(request):
         return JsonResponse({'error': "'impulsi' deve essere un intero."}, status=400)
     if not 1 <= impulsi <= 10:
         return JsonResponse({'error': "'impulsi' deve essere tra 1 e 10."}, status=400)
+    try:
+        switch_id = int(dati.get('switch_id', 1))
+    except (TypeError, ValueError):
+        return JsonResponse({'error': "'switch_id' deve essere un intero."}, status=400)
+    if switch_id not in (0, 1):
+        return JsonResponse({'error': "'switch_id' deve essere 0 o 1."}, status=400)
 
-    ok, messaggio = moneta_virtuale(nodo, impulsi)
+    ok, messaggio = moneta_virtuale(nodo, impulsi, switch_id=switch_id)
     return JsonResponse({'ok': ok, 'messaggio': messaggio},
                         status=200 if ok else 502)

@@ -161,13 +161,14 @@ def crea_listener() -> mqtt.Client:
 # Comandi verso i nodi
 # ---------------------------------------------------------------------
 
-def moneta_virtuale(nodo: str, impulsi: int = 1) -> tuple:
+def moneta_virtuale(nodo: str, impulsi: int = 1, switch_id: int = 1) -> tuple:
     """Simula l'inserimento di monete sul nodo indicato.
 
     Pubblica su autolavaggio/<nodo>/rpc il comando RPC Shelly
-    Switch.Set(id=0, on=true): OUT1 ha l'auto-off hardware di 1 s,
-    quindi NON inviamo alcun comando di spegnimento. Per piu' impulsi
-    il comando viene ripetuto con 1 s di pausa (l'auto-off ha gia'
+    Switch.Set(on=true) sull'uscita `switch_id`. Sulla pista2 il rele'
+    della gettoniera e' OUT2 (Switch id 1) con auto-off hardware di
+    1 s: NON inviamo alcun comando di spegnimento. Per piu' impulsi il
+    comando viene ripetuto con 1 s di pausa (l'auto-off ha gia'
     riaperto il rele').
 
     Ritorna (ok, messaggio) per il chiamante (endpoint di test, ecc.).
@@ -182,7 +183,7 @@ def moneta_virtuale(nodo: str, impulsi: int = 1) -> tuple:
         'id': 1,
         'src': 'crm',
         'method': 'Switch.Set',
-        'params': {'id': 0, 'on': True},
+        'params': {'id': switch_id, 'on': True},
     })
 
     # Connessione usa-e-getta: funziona da qualunque processo (web,
