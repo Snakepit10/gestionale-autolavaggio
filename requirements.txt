@@ -27,3 +27,6 @@ requests>=2.31
 # Login social clienti (Google OAuth)
 django-allauth>=65.0
 PyJWT[crypto]>=2.8
+
+# Impianto IoT (broker Mosquitto)
+paho-mqtt>=2.0

@@ -73,6 +73,7 @@ INSTALLED_APPS = [
     'apps.cartellini',
     'apps.messaggi',
     'apps.marketing',
+    'apps.impianto',
     # 'apps.reportistica',  # Temporarily disabled due to pandas dependency
     # 'apps.shop',
 ]
@@ -282,6 +283,15 @@ EMAIL_USE_TLS = os.environ.get('EMAIL_USE_TLS', 'true').lower() == 'true'
 EMAIL_HOST_USER = os.environ.get('EMAIL_HOST_USER', '')
 EMAIL_HOST_PASSWORD = os.environ.get('EMAIL_HOST_PASSWORD', '')
 DEFAULT_FROM_EMAIL = os.environ.get('DEFAULT_FROM_EMAIL', 'no-reply@autolavaggio.it')
+
+# === MQTT (broker Mosquitto - impianto IoT) ===
+# Il CRM parla col broker sulla rete privata Railway
+# (es. MQTT_HOST=mosquitto-broker.railway.internal). Utente 'crm' del
+# file passwd del broker. Senza MQTT_HOST il modulo resta spento.
+MQTT_HOST = os.environ.get('MQTT_HOST', '')
+MQTT_PORT = int(os.environ.get('MQTT_PORT', '1883'))
+MQTT_USER = os.environ.get('MQTT_USER', '')
+MQTT_PASSWORD = os.environ.get('MQTT_PASSWORD', '')
 
 # === WhatsApp Cloud API (Meta) ===
 # Notifiche prenotazione cliente via WhatsApp Business. Senza le env vars

@@ -1,0 +1,4 @@
+# Mai committare credenziali: il file passwd si genera in locale con
+# mosquitto_passwd e finisce SOLO nella variabile Railway MOSQUITTO_PASSWD
+passwd
+passwd.*

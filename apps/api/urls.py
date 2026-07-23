@@ -1,5 +1,7 @@
 from django.urls import path
 
+from apps.impianto.views import test_moneta
+
 from . import views
 
 app_name = 'api'
@@ -24,4 +26,8 @@ urlpatterns = [
     # Proxy media (audio/foto/video/document) - usa bearer token Meta
     path('whatsapp/media/<int:msg_id>/',
          views.media_proxy, name='wa-media'),
+
+    # === Impianto IoT (MQTT) ===
+    # Collaudo manuale moneta virtuale (staff only)
+    path('test/moneta/', test_moneta, name='test-moneta'),
 ]
