@@ -31,11 +31,20 @@
                 <small class="text-muted">disponibili</small>
             </div>
         </div>
-        <div class="col-12 col-md-6">
+        <div class="col-6 col-md-3">
+            <a href="{% url 'monete_client:home' %}" class="text-decoration-none">
+                <div class="pub-card text-center">
+                    <div class="text-muted small fw-bold text-uppercase">Monete</div>
+                    <div class="fs-3 fw-bold text-warning">{{ saldo_monete }} <i class="bi bi-coin" style="font-size:1.2rem;"></i></div>
+                    <small class="text-muted">per i lavaggi</small>
+                </div>
+            </a>
+        </div>
+        <div class="col-6 col-md-3">
             <div class="pub-card">
                 <div class="text-muted small fw-bold text-uppercase mb-1">Account</div>
                 <div class="fw-bold">{{ cliente.nome_completo }}</div>
-                <div class="small text-muted">{{ cliente.email }} &middot; {{ cliente.telefono }}</div>
+                <div class="small text-muted">{{ cliente.telefono }}</div>
             </div>
         </div>
     </div>

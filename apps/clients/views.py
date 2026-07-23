@@ -121,11 +121,16 @@ def dashboard(request):
     except Exception:
         pass
 
+    # Saldo monete virtuali
+    from apps.monete.services.wallet import saldo_di
+    saldo_monete = saldo_di(cliente)
+
     return render(request, 'clients/dashboard.html', {
         'cliente': cliente,
         'prenotazioni_prossime': prenotazioni_prossime,
         'prenotazioni_passate': prenotazioni_passate,
         'punti_totali': punti_totali,
+        'saldo_monete': saldo_monete,
     })
 
 

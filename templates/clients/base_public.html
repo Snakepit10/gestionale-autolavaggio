@@ -349,6 +349,9 @@
         <i class="bi bi-telephone"></i> Chiama
     </a>
     {% if user.is_authenticated %}
+    <a href="{% url 'monete_client:home' %}" class="{% block nav_monete %}{% endblock %}">
+        <i class="bi bi-coin"></i> Monete
+    </a>
     <a href="{% url 'clients:dashboard' %}" class="{% block nav_area %}{% endblock %}">
         <i class="bi bi-person-circle"></i> Area
     </a>

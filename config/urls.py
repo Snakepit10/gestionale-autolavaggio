@@ -108,6 +108,9 @@ urlpatterns = [
     # Login social clienti (django-allauth): /accounts/google/login/ + callback
     path('accounts/', include('allauth.urls')),
 
+    # Monete virtuali lato cliente (saldo, avvio lavaggi, acquisti)
+    path('app/monete/', include('apps.monete.urls_client', namespace='monete_client')),
+
     # Lato cliente (frontend pubblico PWA): landing, register, booking, dashboard
     path('app/', include('apps.clients.urls')),
 

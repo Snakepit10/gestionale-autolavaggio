@@ -1,0 +1,103 @@
+{% extends "clients/base_public.html" %}
+{% block title %}Le mie monete &mdash; MasterWash{% endblock %}
+{% block nav_monete %}active{% endblock %}
+
+{% block content %}
+<div class="container py-4" style="max-width:720px">
+
+    <div class="d-flex justify-content-between align-items-center mb-4 flex-wrap gap-2">
+        <div>
+            <h3 class="mb-0" style="font-weight:800"><i class="bi bi-coin text-warning"></i> Le mie monete</h3>
+            <p class="text-muted mb-0">Il tuo credito per i lavaggi self-service.</p>
+        </div>
+    </div>
+
+    {% if messages %}
+        {% for message in messages %}
+        <div class="alert alert-{% if message.tags == 'error' %}danger{% else %}{{ message.tags }}{% endif %}">{{ message }}</div>
+        {% endfor %}
+    {% endif %}
+
+    {# Saldo + azione principale #}
+    <div class="pub-card text-center mb-4">
+        <div class="text-muted small fw-bold text-uppercase">Saldo disponibile</div>
+        <div style="font-size:3rem; font-weight:800;" class="text-warning">
+            {{ saldo }} <i class="bi bi-coin" style="font-size:2rem;"></i>
+        </div>
+        <a href="{% url 'monete_client:lavaggio' %}" class="btn-cta w-100 justify-content-center mt-2">
+            <i class="bi bi-play-circle"></i> Avvia un lavaggio
+        </a>
+    </div>
+
+    {# Pacchetti acquistabili (attivi da F4/F5) #}
+    {% if acquisto_disponibile and pacchetti %}
+    <h5 class="fw-bold mb-2"><i class="bi bi-bag-plus text-primary"></i> Ricarica il saldo</h5>
+    {% if cfg.testo_pagina_acquisto %}
+        <p class="text-muted small">{{ cfg.testo_pagina_acquisto }}</p>
+    {% endif %}
+    <div class="row g-2 mb-4">
+        {% for p in pacchetti %}
+        <div class="col-6 col-md-4">
+            <div class="pub-card text-center h-100 d-flex flex-column">
+                <div class="fw-bold">{{ p.nome }}</div>
+                <div class="fs-4 fw-bold text-warning my-1">
+                    {{ p.monete_totali }} <i class="bi bi-coin"></i>
+                </div>
+                {% if p.bonus %}
+                    <small class="text-success">{{ p.monete }} + {{ p.bonus }} bonus</small>
+                {% endif %}
+                <div class="fs-5 fw-bold mt-auto">€ {{ p.prezzo }}</div>
+                {% if stripe_ok %}
+                <form method="post" action="{% url 'monete_client:acquista' p.pk %}" class="mt-2">
+                    {% csrf_token %}
+                    <input type="hidden" name="provider" value="stripe">
+                    <button type="submit" class="btn btn-sm btn-primary w-100">
+                        <i class="bi bi-credit-card"></i> Carta
+                    </button>
+                </form>
+                {% endif %}
+                {% if paypal_ok %}
+                <form method="post" action="{% url 'monete_client:acquista' p.pk %}" class="mt-1">
+                    {% csrf_token %}
+                    <input type="hidden" name="provider" value="paypal">
+                    <button type="submit" class="btn btn-sm btn-outline-primary w-100">
+                        <i class="bi bi-paypal"></i> PayPal
+                    </button>
+                </form>
+                {% endif %}
+            </div>
+        </div>
+        {% endfor %}
+    </div>
+    {% endif %}
+
+    {# Movimenti #}
+    <h5 class="fw-bold mb-2"><i class="bi bi-clock-history text-primary"></i> Movimenti</h5>
+    {% if movimenti %}
+    <div class="pub-card p-0">
+        {% for m in movimenti %}
+        <div class="d-flex justify-content-between align-items-center px-3 py-2
+                    {% if not forloop.last %}border-bottom{% endif %}" style="border-color:var(--mw-line)!important;">
+            <div>
+                <div class="fw-bold" style="font-size:.95rem">{{ m.descrizione }}</div>
+                <small class="text-muted">{{ m.creato_il|date:"d/m/Y H:i" }}</small>
+            </div>
+            <div class="text-end">
+                {% if m.monete > 0 %}
+                    <span class="text-success fw-bold">+{{ m.monete }}</span>
+                {% else %}
+                    <span class="text-danger fw-bold">{{ m.monete }}</span>
+                {% endif %}
+                <br><small class="text-muted">saldo {{ m.saldo_dopo }}</small>
+            </div>
+        </div>
+        {% endfor %}
+    </div>
+    {% else %}
+    <div class="pub-card text-center text-muted">
+        Nessun movimento ancora: chiedi in cassa la tua prima ricarica!
+    </div>
+    {% endif %}
+
+</div>
+{% endblock %}

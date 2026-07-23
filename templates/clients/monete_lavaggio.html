@@ -1,0 +1,120 @@
+{% extends "clients/base_public.html" %}
+{% block title %}Avvia lavaggio &mdash; MasterWash{% endblock %}
+{% block nav_monete %}active{% endblock %}
+
+{% block content %}
+<div class="container py-4" style="max-width:560px">
+
+    <div class="mb-4">
+        <h3 class="mb-0" style="font-weight:800"><i class="bi bi-play-circle text-primary"></i> Avvia un lavaggio</h3>
+        <p class="text-muted mb-0">Scegli la postazione e quanti impulsi inserire.
+           Saldo: <strong class="text-warning">{{ saldo }} <i class="bi bi-coin"></i></strong></p>
+    </div>
+
+    {% if messages %}
+        {% for message in messages %}
+        <div class="alert alert-{% if message.tags == 'error' %}danger{% else %}{{ message.tags }}{% endif %}">{{ message }}</div>
+        {% endfor %}
+    {% endif %}
+
+    {% if not nodi %}
+    <div class="pub-card text-center text-muted">
+        Nessuna postazione disponibile al momento.
+    </div>
+    {% else %}
+    <form method="post" action="{% url 'monete_client:lavaggio-avvia' %}" id="form-lavaggio">
+        {% csrf_token %}
+        <input type="hidden" name="chiave" value="{{ chiave }}">
+
+        <h6 class="fw-bold text-uppercase small text-muted mb-2">Postazione</h6>
+        <div class="d-flex flex-column gap-2 mb-4">
+            {% for n in nodi %}
+            <input type="radio" class="btn-check" name="nodo_id" id="nodo-{{ n.pk }}"
+                   value="{{ n.pk }}" data-costo="{{ n.monete_per_impulso }}"
+                   data-max="{{ n.max_impulsi }}" {% if forloop.first %}checked{% endif %}>
+            <label class="pub-card d-flex justify-content-between align-items-center mb-0"
+                   for="nodo-{{ n.pk }}" style="cursor:pointer;">
+                <span class="fw-bold"><i class="bi bi-droplet text-primary"></i> {{ n.nome }}</span>
+                <span class="badge bg-warning text-dark">{{ n.monete_per_impulso }}
+                    <i class="bi bi-coin"></i>/impulso</span>
+            </label>
+            {% endfor %}
+        </div>
+
+        <h6 class="fw-bold text-uppercase small text-muted mb-2">Impulsi</h6>
+        <div class="pub-card text-center mb-4">
+            <div class="d-flex justify-content-center align-items-center gap-3">
+                <button type="button" class="btn btn-outline-light btn-lg" id="btn-meno"
+                        style="width:56px;">&minus;</button>
+                <input type="number" name="impulsi" id="impulsi" value="1" min="1"
+                       class="form-control text-center fw-bold fs-2"
+                       style="max-width:110px; background:var(--mw-navy-deep); color:var(--mw-text); border-color:var(--mw-line);">
+                <button type="button" class="btn btn-outline-light btn-lg" id="btn-piu"
+                        style="width:56px;">+</button>
+            </div>
+            <div class="mt-2 text-muted">
+                Costo totale:
+                <strong class="text-warning fs-5"><span id="costo-totale">1</span>
+                    <i class="bi bi-coin"></i></strong>
+            </div>
+            <div class="small mt-1 {% if saldo == 0 %}text-danger{% else %}text-muted{% endif %}" id="avviso-saldo"></div>
+        </div>
+
+        <button type="submit" class="btn-cta w-100 justify-content-center" id="btn-avvia">
+            <i class="bi bi-play-circle"></i> Avvia adesso
+        </button>
+        <p class="text-muted small text-center mt-2">
+            Premi solo quando sei alla postazione: gli impulsi partono subito.
+        </p>
+    </form>
+    {% endif %}
+</div>
+
+<script>
+(function() {
+    const impulsi = document.getElementById('impulsi');
+    if (!impulsi) return;
+    const costoEl = document.getElementById('costo-totale');
+    const avviso = document.getElementById('avviso-saldo');
+    const btn = document.getElementById('btn-avvia');
+    const saldo = {{ saldo }};
+
+    function nodoSel() { return document.querySelector('input[name="nodo_id"]:checked'); }
+    function aggiorna() {
+        const n = nodoSel();
+        const max = n ? parseInt(n.dataset.max) : 10;
+        const costoImp = n ? parseInt(n.dataset.costo) : 1;
+        let v = parseInt(impulsi.value) || 1;
+        v = Math.min(Math.max(v, 1), max);
+        impulsi.value = v;
+        const costo = v * costoImp;
+        costoEl.textContent = costo;
+        if (costo > saldo) {
+            avviso.textContent = 'Saldo insufficiente: hai ' + saldo + ' monete.';
+            avviso.classList.add('text-danger');
+            btn.disabled = true;
+        } else {
+            avviso.textContent = 'Dopo l\'avvio ti resteranno ' + (saldo - costo) + ' monete.';
+            avviso.classList.remove('text-danger');
+            btn.disabled = false;
+        }
+    }
+    document.getElementById('btn-meno').addEventListener('click', () => {
+        impulsi.value = (parseInt(impulsi.value) || 1) - 1; aggiorna();
+    });
+    document.getElementById('btn-piu').addEventListener('click', () => {
+        impulsi.value = (parseInt(impulsi.value) || 1) + 1; aggiorna();
+    });
+    impulsi.addEventListener('input', aggiorna);
+    document.querySelectorAll('input[name="nodo_id"]').forEach(r =>
+        r.addEventListener('change', aggiorna));
+    aggiorna();
+
+    // Anti doppio tap: disabilita e mostra lo spinner al submit
+    document.getElementById('form-lavaggio').addEventListener('submit', () => {
+        btn.disabled = true;
+        btn.innerHTML = '<span class="spinner-border spinner-border-sm"></span> Avvio in corso...';
+    });
+})();
+</script>
+{% endblock %}
