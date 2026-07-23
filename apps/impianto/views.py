@@ -44,6 +44,6 @@ def test_moneta(request):
     if switch_id not in (0, 1):
         return JsonResponse({'error': "'switch_id' deve essere 0 o 1."}, status=400)
 
-    ok, messaggio = moneta_virtuale(nodo, impulsi, switch_id=switch_id)
-    return JsonResponse({'ok': ok, 'messaggio': messaggio},
+    ok, messaggio, inviati = moneta_virtuale(nodo, impulsi, switch_id=switch_id)
+    return JsonResponse({'ok': ok, 'messaggio': messaggio, 'inviati': inviati},
                         status=200 if ok else 502)

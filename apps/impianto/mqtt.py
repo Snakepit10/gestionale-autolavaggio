@@ -182,12 +182,15 @@ def moneta_virtuale(nodo: str, impulsi: int = 1, switch_id: int = 1) -> tuple:
     comando viene ripetuto con 1 s di pausa (l'auto-off ha gia'
     riaperto il rele').
 
-    Ritorna (ok, messaggio) per il chiamante (endpoint di test, ecc.).
+    Ritorna (ok, messaggio, inviati): `inviati` e' il numero di impulsi
+    effettivamente confermati dal broker, indispensabile al modulo
+    monete per stornare gli impulsi non partiti in caso di errore a
+    meta' sequenza.
     """
     if not mqtt_configurato():
-        return False, 'MQTT non configurato (MQTT_HOST/MQTT_USER mancanti).'
+        return False, 'MQTT non configurato (MQTT_HOST/MQTT_USER mancanti).', 0
     if impulsi < 1:
-        return False, 'Il numero di impulsi deve essere >= 1.'
+        return False, 'Il numero di impulsi deve essere >= 1.', 0
 
     topic = f'autolavaggio/{nodo}/rpc'
     payload = json.dumps({
@@ -201,6 +204,7 @@ def moneta_virtuale(nodo: str, impulsi: int = 1, switch_id: int = 1) -> tuple:
     # shell) senza dipendere dal listener. client_id univoco per non
     # scalzare la sessione del listener che usa l'utente 'crm'.
     client = _nuovo_client(f'crm-pub-{uuid.uuid4().hex[:8]}')
+    inviati = 0
     try:
         client.connect(settings.MQTT_HOST, settings.MQTT_PORT, keepalive=30)
         client.loop_start()
@@ -209,15 +213,16 @@ def moneta_virtuale(nodo: str, impulsi: int = 1, switch_id: int = 1) -> tuple:
             info.wait_for_publish(timeout=10)
             if not info.is_published():
                 return False, (f'Impulso {i + 1}/{impulsi} NON confermato dal '
-                               f'broker (timeout).')
+                               f'broker (timeout).'), inviati
+            inviati += 1
             logger.info('moneta_virtuale: impulso %s/%s inviato a %s',
                         i + 1, impulsi, topic)
             if i < impulsi - 1:
                 time.sleep(1)  # lascia all'auto-off il tempo di riaprire
-        return True, f'{impulsi} impulso/i inviato/i a {topic}.'
+        return True, f'{impulsi} impulso/i inviato/i a {topic}.', inviati
     except Exception as exc:  # rete giu', DNS, auth: riporta l'errore
         logger.error('moneta_virtuale fallita: %s', exc)
-        return False, f'Errore di pubblicazione: {exc}'
+        return False, f'Errore di pubblicazione: {exc}', inviati
     finally:
         client.loop_stop()
         try:
