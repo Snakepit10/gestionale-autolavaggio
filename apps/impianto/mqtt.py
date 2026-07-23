@@ -48,6 +48,9 @@ def _nuovo_client(client_id: str) -> mqtt.Client:
     client.username_pw_set(settings.MQTT_USER, settings.MQTT_PASSWORD)
     # Riconnessione automatica con backoff esponenziale
     client.reconnect_delay_set(min_delay=1, max_delay=120)
+    # I tentativi di connessione falliti (DNS, refused, timeout) finiscono
+    # nel logger: senza questo il listener ritenterebbe in silenzio
+    client.enable_logger(logger)
     return client
 
 
