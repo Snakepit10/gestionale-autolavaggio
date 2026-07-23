@@ -9,7 +9,9 @@ from functools import wraps
 
 from django.contrib import messages
 from django.contrib.auth.decorators import login_required
+from django.http import HttpResponse
 from django.shortcuts import get_object_or_404, redirect, render
+from django.views.decorators.csrf import csrf_exempt
 
 from apps.clienti.models import Cliente
 
@@ -98,6 +100,21 @@ def movimento_cliente(request, pk):
         messages.error(request, str(exc))
 
     return redirect('clienti:storico-cliente', pk=pk)
+
+
+@csrf_exempt
+def webhook_stripe(request):
+    """POST anonimo da Stripe (firma verificata nel service).
+
+    Il middleware di autorizzazione non lo tocca: blocca solo utenti
+    AUTENTICATI non-staff, e Stripe arriva senza sessione.
+    """
+    if request.method != 'POST':
+        return HttpResponse(status=405)
+    from .services.stripe_pay import gestisci_evento_webhook
+    status, _msg = gestisci_evento_webhook(
+        request.body, request.headers.get('Stripe-Signature', ''))
+    return HttpResponse(status=status)
 
 
 @_staff_required

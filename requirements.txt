@@ -30,3 +30,6 @@ PyJWT[crypto]>=2.8
 
 # Impianto IoT (broker Mosquitto)
 paho-mqtt>=2.0
+
+# Pagamenti online monete virtuali
+stripe>=9.0

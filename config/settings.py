@@ -294,6 +294,15 @@ MQTT_PORT = int(os.environ.get('MQTT_PORT', '1883'))
 MQTT_USER = os.environ.get('MQTT_USER', '')
 MQTT_PASSWORD = os.environ.get('MQTT_PASSWORD', '')
 
+# === Pagamenti online (monete virtuali) ===
+# Vuoti = provider spento (il bottone non compare nell'area cliente).
+STRIPE_SECRET_KEY = os.environ.get('STRIPE_SECRET_KEY', '')
+STRIPE_WEBHOOK_SECRET = os.environ.get('STRIPE_WEBHOOK_SECRET', '')
+PAYPAL_CLIENT_ID = os.environ.get('PAYPAL_CLIENT_ID', '')
+PAYPAL_SECRET = os.environ.get('PAYPAL_SECRET', '')
+PAYPAL_BASE_URL = os.environ.get(
+    'PAYPAL_BASE_URL', 'https://api-m.sandbox.paypal.com')
+
 # === WhatsApp Cloud API (Meta) ===
 # Notifiche prenotazione cliente via WhatsApp Business. Senza le env vars
 # il sistema cade automaticamente sul fallback email (notifications.py).

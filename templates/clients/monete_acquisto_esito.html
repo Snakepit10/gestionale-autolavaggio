@@ -1,0 +1,31 @@
+{% extends "clients/base_public.html" %}
+{% block title %}Esito acquisto &mdash; MasterWash{% endblock %}
+{% block nav_monete %}active{% endblock %}
+
+{% block content %}
+<div class="container py-4" style="max-width:520px">
+    <div class="pub-card text-center">
+        {% if ok %}
+            <div class="fs-1 text-success mb-2"><i class="bi bi-check-circle-fill"></i></div>
+            <h4 class="fw-bold">Ricarica completata!</h4>
+            <p class="text-muted">
+                {% if acquisto %}Hai acquistato <strong>{{ acquisto.monete }}</strong> monete
+                per € {{ acquisto.importo }}.{% else %}{{ messaggio }}{% endif %}
+            </p>
+        {% else %}
+            <div class="fs-1 text-warning mb-2"><i class="bi bi-hourglass-split"></i></div>
+            <h4 class="fw-bold">Pagamento in verifica</h4>
+            <p class="text-muted">{{ messaggio }} Se hai completato il pagamento,
+               il saldo si aggiorna a breve: ricarica la pagina tra qualche
+               istante o contattaci al 379 233 7051.</p>
+        {% endif %}
+        <div class="my-3">
+            <span class="text-muted small text-uppercase fw-bold">Saldo attuale</span><br>
+            <span class="fs-3 fw-bold text-warning">{{ saldo }} <i class="bi bi-coin"></i></span>
+        </div>
+        <a href="{% url 'monete_client:home' %}" class="btn-cta w-100 justify-content-center">
+            <i class="bi bi-coin"></i> Le mie monete
+        </a>
+    </div>
+</div>
+{% endblock %}

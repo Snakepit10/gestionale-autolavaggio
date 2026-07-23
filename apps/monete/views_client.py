@@ -70,6 +70,86 @@ def lavaggio_scegli(request, cliente):
 
 
 @_cliente_required
+def acquista(request, cliente, pacchetto_id):
+    """POST dai bottoni pacchetto: crea l'acquisto e redirige al provider."""
+    if request.method != 'POST':
+        return redirect('monete_client:home')
+
+    cfg = ImpostazioniMonete.get_solo()
+    pacchetto = PacchettoMonete.objects.filter(
+        pk=pacchetto_id, attivo=True).first()
+    provider = request.POST.get('provider', '')
+
+    if pacchetto is None or not cfg.vendita_online_attiva:
+        messages.error(request, 'Pacchetto non disponibile.')
+        return redirect('monete_client:home')
+
+    from .models import AcquistoMonete
+
+    if provider == 'stripe':
+        from .services import stripe_pay
+        if not (cfg.stripe_attivo and stripe_pay.stripe_configurato()):
+            messages.error(request, 'Pagamento con carta non disponibile al momento.')
+            return redirect('monete_client:home')
+        acquisto = AcquistoMonete.objects.create(
+            cliente=cliente, pacchetto=pacchetto,
+            monete=pacchetto.monete_totali, importo=pacchetto.prezzo,
+            provider='stripe',
+        )
+        try:
+            url = stripe_pay.crea_sessione(acquisto, request)
+        except Exception:
+            import logging
+            logging.getLogger('apps.monete.stripe').exception(
+                'Creazione Checkout Session fallita (acquisto %s)', acquisto.pk)
+            acquisto.stato = 'fallito'
+            acquisto.save(update_fields=['stato', 'aggiornato_il'])
+            messages.error(request, 'Errore nell\'avvio del pagamento: riprova.')
+            return redirect('monete_client:home')
+        return redirect(url)
+
+    if provider == 'paypal':
+        # F5: integrazione PayPal
+        messages.error(request, 'PayPal sara\' disponibile a breve.')
+        return redirect('monete_client:home')
+
+    messages.error(request, 'Metodo di pagamento non valido.')
+    return redirect('monete_client:home')
+
+
+@_cliente_required
+def acquisto_esito(request, cliente):
+    """Ritorno da Stripe: verifica la session e accredita (fallback
+    del webhook, copre anche il webhook non ancora configurato)."""
+    from .services import stripe_pay
+    session_id = request.GET.get('session_id', '')
+    if not session_id:
+        return redirect('monete_client:home')
+
+    ok, msg, acquisto = stripe_pay.verifica_e_accredita(session_id, cliente)
+    return render(request, 'clients/monete_acquisto_esito.html', {
+        'cliente': cliente,
+        'ok': ok,
+        'messaggio': msg,
+        'acquisto': acquisto,
+        'saldo': wallet.saldo_di(cliente),
+    })
+
+
+@_cliente_required
+def acquisto_annullato(request, cliente):
+    """Ritorno dal cancel di Stripe: marca l'acquisto annullato."""
+    from .models import AcquistoMonete
+    pk = request.GET.get('acquisto')
+    if pk:
+        AcquistoMonete.objects.filter(
+            pk=pk, cliente=cliente, stato='creato',
+        ).update(stato='annullato')
+    messages.info(request, 'Pagamento annullato: nessun addebito.')
+    return redirect('monete_client:home')
+
+
+@_cliente_required
 def lavaggio_avvia(request, cliente):
     """POST dal form di conferma: spende le monete e invia gli impulsi."""
     if request.method != 'POST':
