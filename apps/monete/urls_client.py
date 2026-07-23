@@ -11,4 +11,5 @@ urlpatterns = [
     path('acquista/<int:pacchetto_id>/', views_client.acquista, name='acquista'),
     path('acquisto/esito/', views_client.acquisto_esito, name='acquisto-esito'),
     path('acquisto/annullato/', views_client.acquisto_annullato, name='acquisto-annullato'),
+    path('paypal/ritorno/', views_client.paypal_ritorno, name='paypal-ritorno'),
 ]

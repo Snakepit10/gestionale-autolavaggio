@@ -109,9 +109,26 @@ def acquista(request, cliente, pacchetto_id):
         return redirect(url)
 
     if provider == 'paypal':
-        # F5: integrazione PayPal
-        messages.error(request, 'PayPal sara\' disponibile a breve.')
-        return redirect('monete_client:home')
+        from .services import paypal_pay
+        if not (cfg.paypal_attivo and paypal_pay.paypal_configurato()):
+            messages.error(request, 'PayPal non disponibile al momento.')
+            return redirect('monete_client:home')
+        acquisto = AcquistoMonete.objects.create(
+            cliente=cliente, pacchetto=pacchetto,
+            monete=pacchetto.monete_totali, importo=pacchetto.prezzo,
+            provider='paypal',
+        )
+        try:
+            url = paypal_pay.crea_ordine(acquisto, request)
+        except Exception:
+            import logging
+            logging.getLogger('apps.monete.paypal').exception(
+                'Creazione Order PayPal fallita (acquisto %s)', acquisto.pk)
+            acquisto.stato = 'fallito'
+            acquisto.save(update_fields=['stato', 'aggiornato_il'])
+            messages.error(request, 'Errore nell\'avvio del pagamento: riprova.')
+            return redirect('monete_client:home')
+        return redirect(url)
 
     messages.error(request, 'Metodo di pagamento non valido.')
     return redirect('monete_client:home')
@@ -127,6 +144,26 @@ def acquisto_esito(request, cliente):
         return redirect('monete_client:home')
 
     ok, msg, acquisto = stripe_pay.verifica_e_accredita(session_id, cliente)
+    return render(request, 'clients/monete_acquisto_esito.html', {
+        'cliente': cliente,
+        'ok': ok,
+        'messaggio': msg,
+        'acquisto': acquisto,
+        'saldo': wallet.saldo_di(cliente),
+    })
+
+
+@_cliente_required
+def paypal_ritorno(request, cliente):
+    """Ritorno dall'approvazione PayPal (?token=<order_id>): cattura
+    l'ordine e accredita. Idempotente anche sul refresh della pagina
+    (ORDER_ALREADY_CAPTURED gestito nel service)."""
+    from .services import paypal_pay
+    order_id = request.GET.get('token', '')
+    if not order_id:
+        return redirect('monete_client:home')
+
+    ok, msg, acquisto = paypal_pay.cattura_e_accredita(order_id, cliente=cliente)
     return render(request, 'clients/monete_acquisto_esito.html', {
         'cliente': cliente,
         'ok': ok,
