@@ -171,6 +171,12 @@ class StoricoClienteView(LoginRequiredMixin, DetailView):
         context['movimenti_punti'] = MovimentoPunti.objects.filter(
             cliente=cliente
         ).order_by('-data_movimento')[:10]
+
+        # Monete virtuali
+        from apps.monete.services.wallet import saldo_di
+        context['saldo_monete'] = saldo_di(cliente)
+        context['movimenti_monete'] = cliente.movimenti_monete.select_related(
+            'nodo')[:10]
         
         # Abbonamenti attivi
         context['abbonamenti_attivi'] = cliente.abbonamenti.filter(stato='attivo')

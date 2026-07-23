@@ -141,6 +141,9 @@ urlpatterns = [
     # Marketing / CRM (segmentazione + campagne WhatsApp)
     path('marketing/', include('apps.marketing.urls', namespace='marketing')),
 
+    # Monete virtuali (staff + webhook pagamenti)
+    path('monete/', include('apps.monete.urls', namespace='monete')),
+
     # path('shop/', include('apps.shop.urls')),
     # path('cassa/', include('apps.ordini.urls', namespace='cassa')),
     # path('report/', include('apps.reportistica.urls')),  # Temporarily disabled

@@ -1,0 +1,162 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}Avvia lavaggio - Monete virtuali{% endblock %}
+
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <h1><i class="bi bi-coin"></i> Avvia lavaggio</h1>
+    {% if cliente_pre %}
+    <a href="{% url 'clienti:storico-cliente' cliente_pre.pk %}" class="btn btn-outline-primary">
+        <i class="bi bi-arrow-left"></i> Scheda cliente
+    </a>
+    {% endif %}
+</div>
+
+<div class="row">
+    <div class="col-lg-7">
+        <div class="card border-0 shadow-sm">
+            <div class="card-body">
+                <form method="post" id="form-avvia">
+                    {% csrf_token %}
+                    <input type="hidden" name="chiave" value="{{ chiave }}">
+
+                    {# --- Cliente --- #}
+                    <label class="form-label fw-bold">Cliente</label>
+                    {% if cliente_pre %}
+                        <input type="hidden" name="cliente_id" value="{{ cliente_pre.pk }}">
+                        <div class="alert alert-light border d-flex justify-content-between align-items-center">
+                            <div>
+                                <strong>{{ cliente_pre.nome_completo }}</strong>
+                                {% if cliente_pre.telefono %}<span class="text-muted ms-2">{{ cliente_pre.telefono }}</span>{% endif %}
+                            </div>
+                            <div>
+                                <span class="badge bg-primary fs-6" title="Saldo monete">
+                                    <i class="bi bi-coin"></i> {{ saldo_pre }}
+                                </span>
+                                <a href="{% url 'monete:avvia' %}" class="btn btn-sm btn-outline-secondary ms-2">Cambia</a>
+                            </div>
+                        </div>
+                    {% else %}
+                        <input type="text" class="form-control" id="cerca-cliente"
+                               placeholder="Cerca per nome, cognome o telefono (min 2 lettere)..."
+                               autocomplete="off" autofocus>
+                        <div class="list-group position-absolute shadow" id="risultati-cliente"
+                             style="z-index:1050; max-height:280px; overflow-y:auto;"></div>
+                        <div class="form-text">Seleziona il cliente a cui scalare le monete.</div>
+                    {% endif %}
+
+                    {# --- Nodo --- #}
+                    <label class="form-label fw-bold mt-3">Nodo</label>
+                    {% if nodi %}
+                    <div class="d-flex flex-wrap gap-2">
+                        {% for n in nodi %}
+                        <input type="radio" class="btn-check" name="nodo_id" id="nodo-{{ n.pk }}"
+                               value="{{ n.pk }}" data-costo="{{ n.monete_per_impulso }}"
+                               data-max="{{ n.max_impulsi }}" {% if forloop.first %}checked{% endif %}>
+                        <label class="btn btn-outline-primary" for="nodo-{{ n.pk }}">
+                            <i class="bi bi-droplet"></i> {{ n.nome }}
+                            <span class="badge bg-light text-dark border ms-1">{{ n.monete_per_impulso }} monete/impulso</span>
+                        </label>
+                        {% endfor %}
+                    </div>
+                    {% else %}
+                    <div class="alert alert-warning">Nessun nodo attivo: configurali in admin &rarr; Nodi impianto.</div>
+                    {% endif %}
+
+                    {# --- Impulsi --- #}
+                    <label class="form-label fw-bold mt-3">Impulsi</label>
+                    <div class="input-group" style="max-width:220px;">
+                        <button type="button" class="btn btn-outline-secondary" id="btn-meno">&minus;</button>
+                        <input type="number" class="form-control text-center" name="impulsi"
+                               id="impulsi" value="1" min="1">
+                        <button type="button" class="btn btn-outline-secondary" id="btn-piu">+</button>
+                    </div>
+                    <div class="form-text">
+                        Costo totale: <strong id="costo-totale">1</strong> monete
+                    </div>
+
+                    <div class="form-check mt-3">
+                        <input type="checkbox" class="form-check-input" name="forza" id="forza">
+                        <label class="form-check-label" for="forza">
+                            Forza (ignora l'attesa anti doppio-avvio di {{ cfg.cooldown_lavaggio_sec }}s)
+                        </label>
+                    </div>
+
+                    <button type="submit" class="btn btn-primary btn-lg mt-3" id="btn-avvia"
+                            {% if not nodi or not cliente_pre %}disabled{% endif %}>
+                        <i class="bi bi-play-circle"></i> Avvia e scala monete
+                    </button>
+                    <div class="form-text">
+                        Le monete vengono scalate prima dell'invio; gli impulsi non
+                        erogati vengono stornati in automatico.
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+(function() {
+    // Stepper impulsi + costo live dal nodo selezionato
+    const impulsi = document.getElementById('impulsi');
+    const costoEl = document.getElementById('costo-totale');
+    function nodoSel() {
+        return document.querySelector('input[name="nodo_id"]:checked');
+    }
+    function aggiorna() {
+        const n = nodoSel();
+        const max = n ? parseInt(n.dataset.max) : 10;
+        const costo = n ? parseInt(n.dataset.costo) : 1;
+        impulsi.max = max;
+        let v = parseInt(impulsi.value) || 1;
+        v = Math.min(Math.max(v, 1), max);
+        impulsi.value = v;
+        costoEl.textContent = v * costo;
+    }
+    document.getElementById('btn-meno').addEventListener('click', () => {
+        impulsi.value = (parseInt(impulsi.value) || 1) - 1; aggiorna();
+    });
+    document.getElementById('btn-piu').addEventListener('click', () => {
+        impulsi.value = (parseInt(impulsi.value) || 1) + 1; aggiorna();
+    });
+    impulsi.addEventListener('input', aggiorna);
+    document.querySelectorAll('input[name="nodo_id"]').forEach(r =>
+        r.addEventListener('change', aggiorna));
+    aggiorna();
+
+    // Anti doppio click: disabilita il bottone al submit
+    document.getElementById('form-avvia').addEventListener('submit', () => {
+        const btn = document.getElementById('btn-avvia');
+        btn.disabled = true;
+        btn.innerHTML = '<span class="spinner-border spinner-border-sm"></span> Invio impulsi...';
+    });
+
+    // Ricerca cliente (solo se non preselezionato)
+    const cerca = document.getElementById('cerca-cliente');
+    if (cerca) {
+        const box = document.getElementById('risultati-cliente');
+        let timer = null;
+        cerca.addEventListener('input', () => {
+            clearTimeout(timer);
+            const term = cerca.value.trim();
+            if (term.length < 2) { box.innerHTML = ''; return; }
+            timer = setTimeout(async () => {
+                const r = await fetch(`{% url 'clienti:cerca-cliente' %}?term=${encodeURIComponent(term)}`);
+                const dati = await r.json();
+                box.innerHTML = '';
+                (dati.results || []).forEach(c => {
+                    const a = document.createElement('a');
+                    a.className = 'list-group-item list-group-item-action';
+                    a.href = `{% url 'monete:avvia' %}?cliente=${c.id}`;
+                    a.innerHTML = `<strong>${c.text}</strong>` +
+                        (c.telefono ? ` <span class="text-muted">${c.telefono}</span>` : '');
+                    box.appendChild(a);
+                });
+            }, 250);
+        });
+    }
+})();
+</script>
+{% endblock %}

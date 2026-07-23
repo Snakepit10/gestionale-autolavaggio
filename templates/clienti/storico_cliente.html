@@ -239,6 +239,145 @@
     </div>
 </div>
 
+<!-- Monete Virtuali -->
+<div class="row mb-4">
+    <div class="col-lg-6">
+        <div class="card">
+            <div class="card-header d-flex justify-content-between align-items-center">
+                <h5 class="mb-0">
+                    <i class="bi bi-coin"></i>
+                    Monete Virtuali
+                </h5>
+                <div>
+                    <a href="{% url 'monete:avvia' %}?cliente={{ cliente.pk }}"
+                       class="btn btn-sm btn-outline-success">
+                        <i class="bi bi-play-circle"></i> Avvia lavaggio
+                    </a>
+                    <button class="btn btn-sm btn-outline-primary" data-bs-toggle="modal"
+                            data-bs-target="#modalGestisciMonete">
+                        <i class="bi bi-gear"></i> Gestisci
+                    </button>
+                </div>
+            </div>
+            <div class="card-body text-center">
+                <h2 class="text-primary mb-0">{{ saldo_monete }}</h2>
+                <small class="text-muted">monete disponibili</small>
+            </div>
+        </div>
+    </div>
+
+    <!-- Ultimi Movimenti Monete -->
+    <div class="col-lg-6">
+        <div class="card">
+            <div class="card-header">
+                <h5 class="mb-0">
+                    <i class="bi bi-clock-history"></i>
+                    Ultimi Movimenti Monete
+                </h5>
+            </div>
+            <div class="card-body">
+                {% if movimenti_monete %}
+                    <div class="list-group list-group-flush">
+                        {% for m in movimenti_monete %}
+                        <div class="list-group-item d-flex justify-content-between align-items-center">
+                            <div>
+                                <strong>{{ m.descrizione }}</strong>
+                                <br><small class="text-muted">
+                                    {{ m.get_tipo_display }} &middot; {{ m.creato_il|date:"d/m/Y H:i" }}
+                                    {% if m.importo %} &middot; € {{ m.importo }}{% endif %}
+                                </small>
+                            </div>
+                            <div class="text-end">
+                                {% if m.monete > 0 %}
+                                    <span class="text-success fw-bold">+{{ m.monete }}</span>
+                                {% else %}
+                                    <span class="text-danger fw-bold">{{ m.monete }}</span>
+                                {% endif %}
+                                <br><small class="text-muted">saldo {{ m.saldo_dopo }}</small>
+                            </div>
+                        </div>
+                        {% endfor %}
+                    </div>
+                {% else %}
+                    <p class="text-muted text-center">Nessun movimento monete</p>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Modal Gestisci Monete -->
+<div class="modal fade" id="modalGestisciMonete" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <form method="post" action="{% url 'monete:movimento' cliente.pk %}">
+                {% csrf_token %}
+                <div class="modal-header">
+                    <h5 class="modal-title"><i class="bi bi-coin"></i> Gestisci monete</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <div class="mb-3">
+                        <label class="form-label">Azione</label>
+                        <select class="form-select" name="azione" id="monete-azione">
+                            <option value="accredita">Aggiungi monete</option>
+                            <option value="addebita">Rimuovi monete (rettifica)</option>
+                        </select>
+                    </div>
+                    <div class="mb-3" id="monete-tipo-box">
+                        <label class="form-label">Causale</label>
+                        <select class="form-select" name="tipo" id="monete-tipo">
+                            <option value="ricarica_cassa">Ricarica in cassa (pagata)</option>
+                            <option value="regalo">Regalo</option>
+                            <option value="promozione">Promozione</option>
+                            <option value="rettifica">Rettifica manuale</option>
+                        </select>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Monete</label>
+                        <input type="number" class="form-control" name="monete" min="1" value="1" required>
+                    </div>
+                    <div class="mb-3" id="monete-importo-box">
+                        <label class="form-label">Importo incassato (€)</label>
+                        <input type="text" class="form-control" name="importo"
+                               placeholder="es. 10,00" inputmode="decimal">
+                        <div class="form-text">Solo per la ricarica in cassa: quanto ha pagato il cliente.</div>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Descrizione (opzionale)</label>
+                        <input type="text" class="form-control" name="descrizione"
+                               maxlength="200" placeholder="es. Promo apertura estate">
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Annulla</button>
+                    <button type="submit" class="btn btn-primary">
+                        <i class="bi bi-check-circle"></i> Conferma
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    // Il box causale/importo ha senso solo per gli accrediti;
+    // l'importo solo per la ricarica in cassa.
+    const azione = document.getElementById('monete-azione');
+    const tipo = document.getElementById('monete-tipo');
+    const tipoBox = document.getElementById('monete-tipo-box');
+    const importoBox = document.getElementById('monete-importo-box');
+    function aggiornaModalMonete() {
+        const accredito = azione.value === 'accredita';
+        tipoBox.style.display = accredito ? '' : 'none';
+        importoBox.style.display = (accredito && tipo.value === 'ricarica_cassa') ? '' : 'none';
+    }
+    azione.addEventListener('change', aggiornaModalMonete);
+    tipo.addEventListener('change', aggiornaModalMonete);
+    aggiornaModalMonete();
+});
+</script>
+
 <!-- Ultimi Ordini -->
 <div class="card mb-4">
     <div class="card-header d-flex justify-content-between align-items-center">
