@@ -119,6 +119,17 @@ def _gestisci_messaggio(client, userdata, msg):
     # fuori dal ciclo request/response).
     close_old_connections()
     for tipo_evento, valore in eventi:
+        # Lo Shelly ripubblica il contatore ogni minuto anche a valore
+        # invariato: salviamo solo i CAMBI, altrimenti ~1.400 righe
+        # identiche al giorno per nodo.
+        if tipo_evento == 'contatore':
+            ultimo = (EventoImpianto.objects
+                      .filter(nodo=nodo, tipo_evento='contatore')
+                      .order_by('-pk')
+                      .values_list('valore', flat=True)
+                      .first())
+            if ultimo == valore:
+                continue
         EventoImpianto.objects.create(
             nodo=nodo,
             tipo_evento=tipo_evento,
