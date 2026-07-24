@@ -226,6 +226,16 @@ class ImpostazioniMonete(models.Model):
         default=15,
         help_text='Secondi minimi tra due avvii dello stesso cliente '
                   'sullo stesso nodo (anti double-tap).')
+
+    # Acquisto a quantita' libera ("compro 8 monete", "13 monete"...)
+    prezzo_moneta = models.DecimalField(
+        max_digits=5, decimal_places=2, default=1,
+        help_text='Prezzo in euro di UNA moneta per l\'acquisto a '
+                  'quantita\' libera (i pacchetti hanno il loro prezzo).')
+    acquisto_min_monete = models.PositiveSmallIntegerField(
+        default=1, help_text='Minimo monete acquistabili in una volta.')
+    acquisto_max_monete = models.PositiveSmallIntegerField(
+        default=200, help_text='Massimo monete acquistabili in una volta.')
     testo_pagina_acquisto = models.TextField(
         blank=True, default='',
         help_text='Testo libero mostrato sopra i pacchetti in Le mie monete.')

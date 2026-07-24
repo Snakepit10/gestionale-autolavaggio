@@ -1,0 +1,117 @@
+{% comment %}
+Sezione "Ricarica il saldo": pacchetti + quantita' libera.
+Inclusa sia in monete.html sia nella dashboard di ingresso area
+cliente. Richiede nel contesto: acquisto_disponibile, pacchetti, cfg
+(ImpostazioniMonete), stripe_ok, paypal_ok (vedi
+apps/monete/views_client.contesto_ricarica).
+{% endcomment %}
+{% if acquisto_disponibile %}
+<h5 class="fw-bold mb-2"><i class="bi bi-bag-plus text-primary"></i> Ricarica il saldo</h5>
+{% if cfg.testo_pagina_acquisto %}
+    <p class="text-muted small">{{ cfg.testo_pagina_acquisto }}</p>
+{% endif %}
+
+{# --- Quantita' libera: decidi tu quante monete --- #}
+<div class="pub-card mb-3">
+    <form method="post" action="{% url 'monete_client:acquista-libero' %}" id="form-ricarica-libera">
+        {% csrf_token %}
+        <div class="d-flex flex-wrap align-items-center justify-content-between gap-3">
+            <div>
+                <div class="fw-bold mb-1">Quante monete vuoi?</div>
+                <div class="d-flex align-items-center gap-2">
+                    <button type="button" class="btn btn-outline-light" id="rl-meno" style="width:44px;">&minus;</button>
+                    <input type="number" name="monete" id="rl-monete"
+                           value="{{ cfg.acquisto_min_monete|default:1 }}"
+                           min="{{ cfg.acquisto_min_monete }}" max="{{ cfg.acquisto_max_monete }}"
+                           data-prezzo="{{ cfg.prezzo_moneta|stringformat:'f' }}"
+                           class="form-control text-center fw-bold fs-4"
+                           style="max-width:90px; background:var(--mw-navy-deep); color:var(--mw-text); border-color:var(--mw-line);">
+                    <button type="button" class="btn btn-outline-light" id="rl-piu" style="width:44px;">+</button>
+                </div>
+                <small class="text-muted">{{ cfg.prezzo_moneta }} &euro; a moneta
+                    (max {{ cfg.acquisto_max_monete }})</small>
+            </div>
+            <div class="text-center">
+                <div class="text-muted small text-uppercase fw-bold">Totale</div>
+                <div class="fs-3 fw-bold text-warning">&euro; <span id="rl-totale">-</span></div>
+            </div>
+            <div class="d-flex flex-column gap-1" style="min-width:130px;">
+                {% if stripe_ok %}
+                <button type="submit" name="provider" value="stripe" class="btn btn-primary btn-sm">
+                    <i class="bi bi-credit-card"></i> Carta
+                </button>
+                {% endif %}
+                {% if paypal_ok %}
+                <button type="submit" name="provider" value="paypal" class="btn btn-outline-primary btn-sm">
+                    <i class="bi bi-paypal"></i> PayPal
+                </button>
+                {% endif %}
+            </div>
+        </div>
+    </form>
+</div>
+
+{# --- Pacchetti convenienti --- #}
+{% if pacchetti %}
+<div class="row g-2 mb-4">
+    {% for p in pacchetti %}
+    <div class="col-6 col-md-4">
+        <div class="pub-card text-center h-100 d-flex flex-column">
+            <div class="fw-bold">{{ p.nome }}</div>
+            <div class="fs-4 fw-bold text-warning my-1">
+                {{ p.monete_totali }} <i class="bi bi-coin"></i>
+            </div>
+            {% if p.bonus %}
+                <small class="text-success">{{ p.monete }} + {{ p.bonus }} bonus</small>
+            {% endif %}
+            <div class="fs-5 fw-bold mt-auto">&euro; {{ p.prezzo }}</div>
+            {% if stripe_ok %}
+            <form method="post" action="{% url 'monete_client:acquista' p.pk %}" class="mt-2">
+                {% csrf_token %}
+                <input type="hidden" name="provider" value="stripe">
+                <button type="submit" class="btn btn-sm btn-primary w-100">
+                    <i class="bi bi-credit-card"></i> Carta
+                </button>
+            </form>
+            {% endif %}
+            {% if paypal_ok %}
+            <form method="post" action="{% url 'monete_client:acquista' p.pk %}" class="mt-1">
+                {% csrf_token %}
+                <input type="hidden" name="provider" value="paypal">
+                <button type="submit" class="btn btn-sm btn-outline-primary w-100">
+                    <i class="bi bi-paypal"></i> PayPal
+                </button>
+            </form>
+            {% endif %}
+        </div>
+    </div>
+    {% endfor %}
+</div>
+{% endif %}
+
+<script>
+(function() {
+    // Totale live della quantita' libera: monete x prezzo unitario
+    const input = document.getElementById('rl-monete');
+    if (!input) return;
+    const totale = document.getElementById('rl-totale');
+    const prezzo = parseFloat(input.dataset.prezzo) || 1;
+    const min = parseInt(input.min) || 1;
+    const max = parseInt(input.max) || 200;
+    function aggiornaTotale() {
+        let v = parseInt(input.value) || min;
+        v = Math.min(Math.max(v, min), max);
+        input.value = v;
+        totale.textContent = (v * prezzo).toFixed(2).replace('.', ',');
+    }
+    document.getElementById('rl-meno').addEventListener('click', () => {
+        input.value = (parseInt(input.value) || min) - 1; aggiornaTotale();
+    });
+    document.getElementById('rl-piu').addEventListener('click', () => {
+        input.value = (parseInt(input.value) || min) + 1; aggiornaTotale();
+    });
+    input.addEventListener('input', aggiornaTotale);
+    aggiornaTotale();
+})();
+</script>
+{% endif %}

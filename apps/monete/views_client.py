@@ -41,20 +41,14 @@ def _acquisto_disponibile(cfg) -> bool:
 
 @_cliente_required
 def monete_home(request, cliente):
-    """'Le mie monete': saldo, movimenti recenti, pacchetti acquistabili."""
-    cfg = ImpostazioniMonete.get_solo()
-    return render(request, 'clients/monete.html', {
+    """'Le mie monete': saldo, movimenti recenti, ricarica."""
+    contesto = {
         'cliente': cliente,
         'saldo': wallet.saldo_di(cliente),
         'movimenti': cliente.movimenti_monete.select_related('nodo')[:30],
-        'cfg': cfg,
-        'acquisto_disponibile': _acquisto_disponibile(cfg),
-        'pacchetti': PacchettoMonete.objects.filter(attivo=True),
-        'stripe_ok': cfg.stripe_attivo and bool(
-            getattr(settings, 'STRIPE_SECRET_KEY', '')),
-        'paypal_ok': cfg.paypal_attivo and bool(
-            getattr(settings, 'PAYPAL_CLIENT_ID', '')),
-    })
+    }
+    contesto.update(contesto_ricarica())
+    return render(request, 'clients/monete.html', contesto)
 
 
 @_cliente_required
@@ -79,6 +73,60 @@ def api_saldo(request, cliente):
     return JsonResponse({'saldo': wallet.saldo_di(cliente), 'nodi_online': nodi})
 
 
+def contesto_ricarica():
+    """Contesto della sezione 'Ricarica il saldo': usato sia da
+    'Le mie monete' sia dalla dashboard di ingresso area cliente."""
+    cfg = ImpostazioniMonete.get_solo()
+    return {
+        'cfg': cfg,
+        'acquisto_disponibile': _acquisto_disponibile(cfg),
+        'pacchetti': PacchettoMonete.objects.filter(attivo=True),
+        'stripe_ok': cfg.stripe_attivo and bool(
+            getattr(settings, 'STRIPE_SECRET_KEY', '')),
+        'paypal_ok': cfg.paypal_attivo and bool(
+            getattr(settings, 'PAYPAL_CLIENT_ID', '')),
+    }
+
+
+def _crea_e_redirigi(request, cliente, cfg, provider, monete, importo,
+                     pacchetto=None):
+    """Crea l'AcquistoMonete e redirige al checkout del provider scelto."""
+    import logging
+
+    from .models import AcquistoMonete
+
+    if provider == 'stripe':
+        from .services import stripe_pay
+        if not (cfg.stripe_attivo and stripe_pay.stripe_configurato()):
+            messages.error(request, 'Pagamento con carta non disponibile al momento.')
+            return redirect('monete_client:home')
+        crea_url, log_name = stripe_pay.crea_sessione, 'apps.monete.stripe'
+    elif provider == 'paypal':
+        from .services import paypal_pay
+        if not (cfg.paypal_attivo and paypal_pay.paypal_configurato()):
+            messages.error(request, 'PayPal non disponibile al momento.')
+            return redirect('monete_client:home')
+        crea_url, log_name = paypal_pay.crea_ordine, 'apps.monete.paypal'
+    else:
+        messages.error(request, 'Metodo di pagamento non valido.')
+        return redirect('monete_client:home')
+
+    acquisto = AcquistoMonete.objects.create(
+        cliente=cliente, pacchetto=pacchetto,
+        monete=monete, importo=importo, provider=provider,
+    )
+    try:
+        url = crea_url(acquisto, request)
+    except Exception:
+        logging.getLogger(log_name).exception(
+            'Avvio pagamento fallito (acquisto %s)', acquisto.pk)
+        acquisto.stato = 'fallito'
+        acquisto.save(update_fields=['stato', 'aggiornato_il'])
+        messages.error(request, 'Errore nell\'avvio del pagamento: riprova.')
+        return redirect('monete_client:home')
+    return redirect(url)
+
+
 @_cliente_required
 def acquista(request, cliente, pacchetto_id):
     """POST dai bottoni pacchetto: crea l'acquisto e redirige al provider."""
@@ -88,60 +136,45 @@ def acquista(request, cliente, pacchetto_id):
     cfg = ImpostazioniMonete.get_solo()
     pacchetto = PacchettoMonete.objects.filter(
         pk=pacchetto_id, attivo=True).first()
-    provider = request.POST.get('provider', '')
-
     if pacchetto is None or not cfg.vendita_online_attiva:
         messages.error(request, 'Pacchetto non disponibile.')
         return redirect('monete_client:home')
 
-    from .models import AcquistoMonete
+    return _crea_e_redirigi(
+        request, cliente, cfg, request.POST.get('provider', ''),
+        monete=pacchetto.monete_totali, importo=pacchetto.prezzo,
+        pacchetto=pacchetto)
 
-    if provider == 'stripe':
-        from .services import stripe_pay
-        if not (cfg.stripe_attivo and stripe_pay.stripe_configurato()):
-            messages.error(request, 'Pagamento con carta non disponibile al momento.')
-            return redirect('monete_client:home')
-        acquisto = AcquistoMonete.objects.create(
-            cliente=cliente, pacchetto=pacchetto,
-            monete=pacchetto.monete_totali, importo=pacchetto.prezzo,
-            provider='stripe',
-        )
-        try:
-            url = stripe_pay.crea_sessione(acquisto, request)
-        except Exception:
-            import logging
-            logging.getLogger('apps.monete.stripe').exception(
-                'Creazione Checkout Session fallita (acquisto %s)', acquisto.pk)
-            acquisto.stato = 'fallito'
-            acquisto.save(update_fields=['stato', 'aggiornato_il'])
-            messages.error(request, 'Errore nell\'avvio del pagamento: riprova.')
-            return redirect('monete_client:home')
-        return redirect(url)
 
-    if provider == 'paypal':
-        from .services import paypal_pay
-        if not (cfg.paypal_attivo and paypal_pay.paypal_configurato()):
-            messages.error(request, 'PayPal non disponibile al momento.')
-            return redirect('monete_client:home')
-        acquisto = AcquistoMonete.objects.create(
-            cliente=cliente, pacchetto=pacchetto,
-            monete=pacchetto.monete_totali, importo=pacchetto.prezzo,
-            provider='paypal',
-        )
-        try:
-            url = paypal_pay.crea_ordine(acquisto, request)
-        except Exception:
-            import logging
-            logging.getLogger('apps.monete.paypal').exception(
-                'Creazione Order PayPal fallita (acquisto %s)', acquisto.pk)
-            acquisto.stato = 'fallito'
-            acquisto.save(update_fields=['stato', 'aggiornato_il'])
-            messages.error(request, 'Errore nell\'avvio del pagamento: riprova.')
-            return redirect('monete_client:home')
-        return redirect(url)
+@_cliente_required
+def acquista_libero(request, cliente):
+    """POST dal box quantita' libera: il cliente decide quante monete
+    comprare (es. 8, 13); importo = monete x prezzo_moneta."""
+    if request.method != 'POST':
+        return redirect('monete_client:home')
 
-    messages.error(request, 'Metodo di pagamento non valido.')
-    return redirect('monete_client:home')
+    cfg = ImpostazioniMonete.get_solo()
+    if not cfg.vendita_online_attiva:
+        messages.error(request, 'Acquisto online non disponibile.')
+        return redirect('monete_client:home')
+
+    try:
+        monete = int(request.POST.get('monete', 0))
+    except (TypeError, ValueError):
+        monete = 0
+    if not cfg.acquisto_min_monete <= monete <= cfg.acquisto_max_monete:
+        messages.error(
+            request,
+            f'Puoi acquistare da {cfg.acquisto_min_monete} a '
+            f'{cfg.acquisto_max_monete} monete per volta.')
+        return redirect('monete_client:home')
+
+    from decimal import Decimal
+    importo = (Decimal(monete) * cfg.prezzo_moneta).quantize(Decimal('0.01'))
+
+    return _crea_e_redirigi(
+        request, cliente, cfg, request.POST.get('provider', ''),
+        monete=monete, importo=importo)
 
 
 @_cliente_required

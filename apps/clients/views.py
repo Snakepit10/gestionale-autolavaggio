@@ -121,17 +121,19 @@ def dashboard(request):
     except Exception:
         pass
 
-    # Saldo monete virtuali
+    # Saldo monete virtuali + sezione ricarica (pacchetti e quantita'
+    # libera direttamente nella pagina di ingresso dell'area cliente)
     from apps.monete.services.wallet import saldo_di
-    saldo_monete = saldo_di(cliente)
-
-    return render(request, 'clients/dashboard.html', {
+    from apps.monete.views_client import contesto_ricarica
+    contesto = {
         'cliente': cliente,
         'prenotazioni_prossime': prenotazioni_prossime,
         'prenotazioni_passate': prenotazioni_passate,
         'punti_totali': punti_totali,
-        'saldo_monete': saldo_monete,
-    })
+        'saldo_monete': saldo_di(cliente),
+    }
+    contesto.update(contesto_ricarica())
+    return render(request, 'clients/dashboard.html', contesto)
 
 
 @ensure_csrf_cookie
