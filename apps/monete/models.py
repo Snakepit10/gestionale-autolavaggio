@@ -37,6 +37,13 @@ class NodoImpianto(models.Model):
     max_impulsi = models.PositiveSmallIntegerField(
         default=10,
         help_text="Tetto di impulsi per singola operazione di avvio.")
+    pausa_impulsi_sec = models.FloatField(
+        default=2.0,
+        help_text="Pausa tra un impulso e il successivo (secondi). DEVE "
+                  "essere maggiore dell'auto-off del rele' (1s), altrimenti "
+                  "il comando successivo arriva a rele' ancora chiuso e gli "
+                  "impulsi si fondono in uno solo (la gettoniera conta i "
+                  "fronti di salita).")
     attivo = models.BooleanField(default=True)
     ordine = models.PositiveSmallIntegerField(
         default=0, help_text="Ordinamento nelle liste (0 = primo).")

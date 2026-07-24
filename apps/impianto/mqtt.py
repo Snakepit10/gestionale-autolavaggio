@@ -209,15 +209,20 @@ def crea_listener() -> mqtt.Client:
 # Comandi verso i nodi
 # ---------------------------------------------------------------------
 
-def moneta_virtuale(nodo: str, impulsi: int = 1, switch_id: int = 1) -> tuple:
+def moneta_virtuale(nodo: str, impulsi: int = 1, switch_id: int = 1,
+                    pausa_s: float = 2.0) -> tuple:
     """Simula l'inserimento di monete sul nodo indicato.
 
     Pubblica su autolavaggio/<nodo>/rpc il comando RPC Shelly
     Switch.Set(on=true) sull'uscita `switch_id`. Sulla pista2 il rele'
     della gettoniera e' OUT2 (Switch id 1) con auto-off hardware di
-    1 s: NON inviamo alcun comando di spegnimento. Per piu' impulsi il
-    comando viene ripetuto con 1 s di pausa (l'auto-off ha gia'
-    riaperto il rele').
+    1 s: NON inviamo alcun comando di spegnimento.
+
+    `pausa_s` (default 2.0) e' l'attesa tra un impulso e il successivo
+    e DEVE superare la durata dell'auto-off: un Switch.Set on=true a
+    rele' ancora chiuso non genera un nuovo impulso, allunga quello in
+    corso (la gettoniera conta i fronti di salita) — con pause troppo
+    corte N comandi diventano UN solo impulso contato.
 
     Ritorna (ok, messaggio, inviati): `inviati` e' il numero di impulsi
     effettivamente confermati dal broker, indispensabile al modulo
@@ -255,7 +260,9 @@ def moneta_virtuale(nodo: str, impulsi: int = 1, switch_id: int = 1) -> tuple:
             logger.info('moneta_virtuale: impulso %s/%s inviato a %s',
                         i + 1, impulsi, topic)
             if i < impulsi - 1:
-                time.sleep(1)  # lascia all'auto-off il tempo di riaprire
+                # lascia all'auto-off il tempo di RIAPRIRE il rele':
+                # senza gap di off gli impulsi si fondono
+                time.sleep(max(pausa_s, 1.2))
         return True, f'{impulsi} impulso/i inviato/i a {topic}.', inviati
     except Exception as exc:  # rete giu', DNS, auth: riporta l'errore
         logger.error('moneta_virtuale fallita: %s', exc)

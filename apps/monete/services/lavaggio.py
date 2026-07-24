@@ -89,9 +89,11 @@ def avvia_lavaggio(*, cliente, nodo: NodoImpianto, impulsi: int,
             False, 'Operazione gia\' registrata: gli impulsi sono gia\' '
                    'stati inviati, non serve ripetere.')
 
-    # 4. Impulsi via MQTT (fuori da ogni transazione)
+    # 4. Impulsi via MQTT (fuori da ogni transazione), con la pausa
+    # inter-impulso del nodo (> auto-off, altrimenti si fondono)
     ok, msg, inviati = moneta_virtuale(
-        nodo.slug, impulsi, switch_id=nodo.switch_id)
+        nodo.slug, impulsi, switch_id=nodo.switch_id,
+        pausa_s=nodo.pausa_impulsi_sec)
 
     # 5. Storno degli impulsi non erogati
     storno = None

@@ -100,6 +100,7 @@ Stripe/PayPal e allinea il saldo con una Rettifica manuale.
 
 | Sintomo | Causa probabile |
 |---|---|
+| Invio N impulsi ma la macchina ne conta 1 | pausa tra impulsi troppo corta rispetto all'auto-off del relè: gli impulsi si fondono. Alza `pausa_impulsi_sec` sul nodo (deve superare l'auto-off, default 2s per auto-off 1s) |
 | "Impianto non raggiungibile" | variabili `MQTT_*` mancanti sul CRM o broker giù |
 | Avvio ok ma il relè non scatta | slug nodo ≠ MQTT prefix dello Shelly, o switch_id sbagliato |
 | Monete scalate senza impulsi | mai: lo storno automatico le restituisce (vedi movimento "Storno") |
