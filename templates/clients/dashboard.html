@@ -5,14 +5,9 @@
 {% block content %}
 <div class="container py-4">
 
-    <div class="d-flex justify-content-between align-items-center mb-4 flex-wrap gap-2">
-        <div>
-            <h3 class="mb-0" style="font-weight:800">Ciao {{ cliente.nome }} 👋</h3>
-            <p class="text-muted mb-0">Bentornato. Ecco il riepilogo del tuo account.</p>
-        </div>
-        <a href="{% url 'clients:booking' %}" class="btn-cta">
-            <i class="bi bi-calendar-plus"></i> Nuova prenotazione
-        </a>
+    <div class="mb-4">
+        <h3 class="mb-0" style="font-weight:800">Ciao {{ cliente.nome }} 👋</h3>
+        <p class="text-muted mb-0">Bentornato. Ecco il riepilogo del tuo account.</p>
     </div>
 
     {# KPI cards #}

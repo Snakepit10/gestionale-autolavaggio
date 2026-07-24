@@ -54,7 +54,7 @@ def avvia_lavaggio(*, cliente, nodo: NodoImpianto, impulsi: int,
             f'avviare. Riprova tra poco.')
     if not 1 <= impulsi <= nodo.max_impulsi:
         return EsitoAvvio(
-            False, f'Numero di impulsi non valido (1-{nodo.max_impulsi}).')
+            False, f'Numero di gettoni non valido (1-{nodo.max_impulsi}).')
     if not mqtt_configurato():
         return EsitoAvvio(False, 'Impianto non raggiungibile (MQTT non configurato).')
 
@@ -83,7 +83,7 @@ def avvia_lavaggio(*, cliente, nodo: NodoImpianto, impulsi: int,
     try:
         movimento = wallet.addebita(
             cliente, costo, 'lavaggio',
-            f'Avvio {nodo.nome}: {impulsi} impulso/i',
+            f'Avvio {nodo.nome}: {impulsi} gettone/i',
             nodo=nodo, impulsi=impulsi, operatore=operatore,
             chiave_idempotenza=chiave_idempotenza,
         )
@@ -112,7 +112,7 @@ def avvia_lavaggio(*, cliente, nodo: NodoImpianto, impulsi: int,
         try:
             storno = wallet.accredita(
                 cliente, monete_storno, 'storno',
-                f'Storno {non_erogati} impulso/i non erogati su {nodo.nome} ({msg})',
+                f'Storno {non_erogati} gettone/i non erogati su {nodo.nome} ({msg})',
                 operatore=operatore,
                 chiave_idempotenza=(f'{chiave_idempotenza}:storno'
                                     if chiave_idempotenza else ''),
@@ -126,14 +126,14 @@ def avvia_lavaggio(*, cliente, nodo: NodoImpianto, impulsi: int,
 
     if ok:
         return EsitoAvvio(True,
-                          f'{inviati} impulso/i inviati a {nodo.nome} '
+                          f'{inviati} gettone/i inviati a {nodo.nome} '
                           f'({costo} monete).',
                           inviati, movimento, storno)
     if inviati > 0:
         return EsitoAvvio(False,
-                          f'Inviati solo {inviati}/{impulsi} impulsi: '
+                          f'Inviati solo {inviati}/{impulsi} gettoni: '
                           f'stornate le monete rimanenti. ({msg})',
                           inviati, movimento, storno)
     return EsitoAvvio(False,
-                      f'Nessun impulso inviato: monete stornate. ({msg})',
+                      f'Nessun gettone inviato: monete stornate. ({msg})',
                       0, movimento, storno)

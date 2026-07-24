@@ -2,13 +2,24 @@
 {% block title %}Avvia lavaggio &mdash; MasterWash{% endblock %}
 {% block nav_monete %}active{% endblock %}
 
+{% block extra_css %}
+<style>
+.nodo-card { cursor: pointer; transition: border-color .15s; }
+.nodo-card.offline { cursor: not-allowed; opacity: .55; }
+.nodo-card.sel { border-color: var(--mw-cyan) !important; box-shadow: 0 0 0 2px rgba(74,185,224,.25); }
+.nodo-pannello { display: none; margin-top: 14px; padding-top: 14px;
+                 border-top: 1px solid var(--mw-line); }
+.nodo-card.sel .nodo-pannello { display: block; }
+</style>
+{% endblock %}
+
 {% block content %}
 <div class="container py-4" style="max-width:560px">
 
     <div class="mb-4">
         <h3 class="mb-0" style="font-weight:800"><i class="bi bi-play-circle text-primary"></i> Avvia un lavaggio</h3>
-        <p class="text-muted mb-0">Scegli la postazione e quanti impulsi inserire.
-           Saldo: <strong class="text-warning">{{ saldo }} <i class="bi bi-coin"></i></strong></p>
+        <p class="text-muted mb-0">Tocca una postazione e scegli quanti gettoni inserire.
+           Saldo: <strong class="text-warning"><span id="saldo-live">{{ saldo }}</span> <i class="bi bi-coin"></i></strong></p>
     </div>
 
     {% if messages %}
@@ -25,6 +36,7 @@
     <form method="post" action="{% url 'monete_client:lavaggio-avvia' %}" id="form-lavaggio">
         {% csrf_token %}
         <input type="hidden" name="chiave" value="{{ chiave }}">
+        <input type="hidden" name="nodo_id" id="nodo-id" value="">
 
         {% regroup nodi by zona as zone %}
         {% for gruppo in zone %}
@@ -36,105 +48,93 @@
         {% endif %}
         <div class="d-flex flex-column gap-2 mb-2">
             {% for n in gruppo.list %}
-            <input type="radio" class="btn-check" name="nodo_id" id="nodo-{{ n.pk }}"
-                   value="{{ n.pk }}" data-costo="{{ n.monete_per_impulso }}"
-                   data-max="{{ n.max_impulsi }}" data-slug="{{ n.slug }}"
-                   {% if not n.online %}disabled{% endif %}>
-            <label class="pub-card d-flex justify-content-between align-items-center mb-0"
-                   for="nodo-{{ n.pk }}" id="label-nodo-{{ n.pk }}"
-                   style="cursor:pointer; {% if not n.online %}opacity:.55;{% endif %}">
-                <span>
-                    <span class="fw-bold"><i class="bi bi-droplet text-primary"></i> {{ n.nome }}</span>
-                    {% if n.descrizione %}
-                        <br><small class="text-muted">{{ n.descrizione }}</small>
-                    {% endif %}
-                </span>
-                <span class="text-end flex-shrink-0">
-                    <span class="badge bg-danger badge-offline" id="offline-{{ n.pk }}"
-                          {% if n.online %}style="display:none;"{% endif %}>
-                        <i class="bi bi-wifi-off"></i> OFFLINE
+            <div class="pub-card nodo-card mb-0 {% if not n.online %}offline{% endif %}"
+                 id="card-{{ n.pk }}" data-pk="{{ n.pk }}" data-slug="{{ n.slug }}"
+                 data-costo="{{ n.monete_per_impulso }}" data-max="{{ n.max_impulsi }}"
+                 data-online="{{ n.online|yesno:'1,0' }}">
+                <div class="d-flex justify-content-between align-items-center">
+                    <span>
+                        <span class="fw-bold"><i class="bi bi-droplet text-primary"></i> {{ n.nome }}</span>
+                        {% if n.descrizione %}
+                            <br><small class="text-muted">{{ n.descrizione }}</small>
+                        {% endif %}
                     </span>
-                    <span class="badge bg-warning text-dark">{{ n.monete_per_impulso }}
-                        <i class="bi bi-coin"></i>/impulso</span>
-                </span>
-            </label>
+                    <span class="text-end flex-shrink-0">
+                        <span class="badge bg-danger badge-offline" id="offline-{{ n.pk }}"
+                              {% if n.online %}style="display:none;"{% endif %}>
+                            <i class="bi bi-wifi-off"></i> OFFLINE
+                        </span>
+                        <span class="badge bg-warning text-dark">{{ n.monete_per_impulso }}
+                            <i class="bi bi-coin"></i>/gettone</span>
+                    </span>
+                </div>
+                {# La card selezionata si allarga: il blocco gettoni viene spostato qui #}
+                <div class="nodo-pannello" id="pannello-{{ n.pk }}"></div>
+            </div>
             {% endfor %}
         </div>
         {% endfor %}
-        <div class="mb-2"></div>
 
-        <h6 class="fw-bold text-uppercase small text-muted mb-2">Impulsi</h6>
-        <div class="pub-card text-center mb-4">
-            <div class="d-flex justify-content-center align-items-center gap-3">
-                <button type="button" class="btn btn-outline-light btn-lg" id="btn-meno"
-                        style="width:56px;">&minus;</button>
-                <input type="number" name="impulsi" id="impulsi" value="1" min="1"
-                       class="form-control text-center fw-bold fs-2"
-                       style="max-width:110px; background:var(--mw-navy-deep); color:var(--mw-text); border-color:var(--mw-line);">
-                <button type="button" class="btn btn-outline-light btn-lg" id="btn-piu"
-                        style="width:56px;">+</button>
+        {# Blocco gettoni: unico, viene spostato dentro la card selezionata #}
+        <div id="blocco-gettoni" style="display:none;">
+            <div class="text-center">
+                <div class="fw-bold text-uppercase small text-muted mb-2">Quanti gettoni?</div>
+                <div class="d-flex justify-content-center align-items-center gap-3">
+                    <button type="button" class="btn btn-outline-light btn-lg" id="btn-meno"
+                            style="width:56px;">&minus;</button>
+                    <input type="number" name="impulsi" id="gettoni" value="1" min="1"
+                           class="form-control text-center fw-bold fs-2"
+                           style="max-width:110px; background:var(--mw-navy-deep); color:var(--mw-text); border-color:var(--mw-line);">
+                    <button type="button" class="btn btn-outline-light btn-lg" id="btn-piu"
+                            style="width:56px;">+</button>
+                </div>
+                <div class="mt-2 text-muted">
+                    Costo totale:
+                    <strong class="text-warning fs-5"><span id="costo-totale">-</span>
+                        <i class="bi bi-coin"></i></strong>
+                </div>
+                <div class="small mt-1 text-muted" id="avviso-saldo"></div>
+                <button type="submit" class="btn-cta w-100 justify-content-center mt-3" id="btn-avvia">
+                    <i class="bi bi-play-circle"></i> Avvia adesso
+                </button>
+                <p class="text-muted small mt-2 mb-0">
+                    Premi solo quando sei alla postazione: i gettoni partono subito.
+                </p>
             </div>
-            <div class="mt-2 text-muted">
-                Costo totale:
-                <strong class="text-warning fs-5"><span id="costo-totale">1</span>
-                    <i class="bi bi-coin"></i></strong>
-            </div>
-            <div class="small mt-1 {% if saldo == 0 %}text-danger{% else %}text-muted{% endif %}" id="avviso-saldo"></div>
         </div>
-
-        <button type="submit" class="btn-cta w-100 justify-content-center" id="btn-avvia">
-            <i class="bi bi-play-circle"></i> Avvia adesso
-        </button>
-        <p class="text-muted small text-center mt-2">
-            Premi solo quando sei alla postazione: gli impulsi partono subito.
-        </p>
     </form>
     {% endif %}
 </div>
 
 <script>
 (function() {
-    const impulsi = document.getElementById('impulsi');
-    if (!impulsi) return;
+    const form = document.getElementById('form-lavaggio');
+    if (!form) return;
+    const blocco = document.getElementById('blocco-gettoni');
+    const nodoIdInput = document.getElementById('nodo-id');
+    const gettoni = document.getElementById('gettoni');
     const costoEl = document.getElementById('costo-totale');
     const avviso = document.getElementById('avviso-saldo');
     const btn = document.getElementById('btn-avvia');
+    const saldoEl = document.getElementById('saldo-live');
     let saldo = {{ saldo }};
     let inInvio = false;
 
-    function nodoSel() { return document.querySelector('input[name="nodo_id"]:checked'); }
-
-    function selezionaPrimoOnline() {
-        // Se nessun nodo e' selezionato (o quello selezionato e' offline),
-        // sposta la selezione sul primo disponibile.
-        const sel = nodoSel();
-        if (sel && !sel.disabled) return;
-        if (sel) sel.checked = false;
-        const primo = document.querySelector('input[name="nodo_id"]:not(:disabled)');
-        if (primo) primo.checked = true;
+    function cardSel() {
+        const pk = nodoIdInput.value;
+        return pk ? document.getElementById('card-' + pk) : null;
     }
 
     function aggiorna() {
         if (inInvio) return;
-        selezionaPrimoOnline();
-        const n = nodoSel();
-        if (!n) {
-            // Nessuna postazione selezionabile: congela anche lo stepper,
-            // cosi' il costo non resta "vecchio" mentre si cambiano gli impulsi
-            avviso.textContent = 'Tutte le postazioni sono offline al momento: riprova tra poco.';
-            avviso.classList.add('text-danger');
-            btn.disabled = true;
-            costoEl.textContent = '—';
-            impulsi.disabled = true;
-            return;
-        }
-        impulsi.disabled = false;
-        const max = parseInt(n.dataset.max) || 10;
-        const costoImp = parseInt(n.dataset.costo) || 1;
-        let v = parseInt(impulsi.value) || 1;
+        const card = cardSel();
+        if (!card) return;
+        const max = parseInt(card.dataset.max) || 10;
+        const costoGet = parseInt(card.dataset.costo) || 1;
+        let v = parseInt(gettoni.value) || 1;
         v = Math.min(Math.max(v, 1), max);
-        impulsi.value = v;
-        const costo = v * costoImp;
+        gettoni.value = v;
+        const costo = v * costoGet;
         costoEl.textContent = costo;
         if (costo > saldo) {
             avviso.textContent = 'Saldo insufficiente: hai ' + saldo + ' monete.';
@@ -146,42 +146,70 @@
             btn.disabled = false;
         }
     }
+
+    function deseleziona() {
+        nodoIdInput.value = '';
+        document.querySelectorAll('.nodo-card.sel').forEach(c => c.classList.remove('sel'));
+        blocco.style.display = 'none';
+        form.appendChild(blocco);   // parcheggia il blocco fuori dalle card
+    }
+
+    function seleziona(card) {
+        if (card.dataset.online !== '1' || inInvio) return;
+        if (nodoIdInput.value === card.dataset.pk) return;  // gia' selezionata
+        document.querySelectorAll('.nodo-card.sel').forEach(c => c.classList.remove('sel'));
+        nodoIdInput.value = card.dataset.pk;
+        card.classList.add('sel');
+        // Sposta il blocco gettoni dentro la card: e' questo che la "allarga"
+        document.getElementById('pannello-' + card.dataset.pk).appendChild(blocco);
+        blocco.style.display = '';
+        aggiorna();
+        card.scrollIntoView({behavior: 'smooth', block: 'nearest'});
+    }
+
+    document.querySelectorAll('.nodo-card').forEach(card => {
+        card.addEventListener('click', (e) => {
+            // I click sul blocco gettoni (stepper, bottoni) non ri-selezionano
+            if (e.target.closest('#blocco-gettoni')) return;
+            seleziona(card);
+        });
+    });
+
     document.getElementById('btn-meno').addEventListener('click', () => {
-        impulsi.value = (parseInt(impulsi.value) || 1) - 1; aggiorna();
+        gettoni.value = (parseInt(gettoni.value) || 1) - 1; aggiorna();
     });
     document.getElementById('btn-piu').addEventListener('click', () => {
-        impulsi.value = (parseInt(impulsi.value) || 1) + 1; aggiorna();
+        gettoni.value = (parseInt(gettoni.value) || 1) + 1; aggiorna();
     });
-    impulsi.addEventListener('input', aggiorna);
-    document.querySelectorAll('input[name="nodo_id"]').forEach(r =>
-        r.addEventListener('change', aggiorna));
-    aggiorna();
+    gettoni.addEventListener('input', aggiorna);
 
-    // Anti doppio tap: disabilita e mostra lo spinner al submit
-    document.getElementById('form-lavaggio').addEventListener('submit', () => {
+    form.addEventListener('submit', (e) => {
+        if (!nodoIdInput.value) { e.preventDefault(); return; }
         inInvio = true;
         btn.disabled = true;
         btn.innerHTML = '<span class="spinner-border spinner-border-sm"></span> Avvio in corso...';
     });
 
-    // Polling saldo + stato online dei nodi (ricariche fatte in cassa,
-    // nodi che vanno/tornano online) senza dover ricaricare la pagina.
+    // Polling: saldo + stato online dei nodi (la card selezionata che va
+    // offline viene chiusa)
     async function poll() {
+        if (inInvio) return;
         try {
             const r = await fetch("{% url 'monete_client:api-saldo' %}");
             if (!r.ok) return;
             const dati = await r.json();
             saldo = dati.saldo;
-            document.querySelectorAll('input[name="nodo_id"]').forEach(radio => {
-                const online = !!dati.nodi_online[radio.dataset.slug];
-                radio.disabled = !online;
-                const label = document.getElementById('label-' + radio.id);
-                const badge = document.getElementById('offline-' + radio.value);
-                if (label) label.style.opacity = online ? '' : '.55';
+            if (saldoEl && String(saldo) !== saldoEl.textContent) saldoEl.textContent = saldo;
+            document.querySelectorAll('.nodo-card').forEach(card => {
+                const online = !!dati.nodi_online[card.dataset.slug];
+                card.dataset.online = online ? '1' : '0';
+                card.classList.toggle('offline', !online);
+                const badge = document.getElementById('offline-' + card.dataset.pk);
                 if (badge) badge.style.display = online ? 'none' : '';
+                if (!online && nodoIdInput.value === card.dataset.pk) deseleziona();
             });
             aggiorna();
-        } catch (e) { /* offline momentaneo del client: riprova al giro dopo */ }
+        } catch (e) { /* riprova al giro dopo */ }
     }
     setInterval(poll, 8000);
 })();
