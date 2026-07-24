@@ -26,9 +26,16 @@
         {% csrf_token %}
         <input type="hidden" name="chiave" value="{{ chiave }}">
 
-        <h6 class="fw-bold text-uppercase small text-muted mb-2">Postazione</h6>
-        <div class="d-flex flex-column gap-2 mb-4">
-            {% for n in nodi %}
+        {% regroup nodi by zona as zone %}
+        {% for gruppo in zone %}
+        <h6 class="fw-bold text-uppercase small text-muted mb-1 {% if not forloop.first %}mt-3{% endif %}">
+            {% if gruppo.grouper %}{{ gruppo.grouper.nome }}{% else %}Postazioni{% endif %}
+        </h6>
+        {% if gruppo.grouper.descrizione %}
+            <p class="text-muted small mb-2">{{ gruppo.grouper.descrizione }}</p>
+        {% endif %}
+        <div class="d-flex flex-column gap-2 mb-2">
+            {% for n in gruppo.list %}
             <input type="radio" class="btn-check" name="nodo_id" id="nodo-{{ n.pk }}"
                    value="{{ n.pk }}" data-costo="{{ n.monete_per_impulso }}"
                    data-max="{{ n.max_impulsi }}" data-slug="{{ n.slug }}"
@@ -36,8 +43,13 @@
             <label class="pub-card d-flex justify-content-between align-items-center mb-0"
                    for="nodo-{{ n.pk }}" id="label-nodo-{{ n.pk }}"
                    style="cursor:pointer; {% if not n.online %}opacity:.55;{% endif %}">
-                <span class="fw-bold"><i class="bi bi-droplet text-primary"></i> {{ n.nome }}</span>
                 <span>
+                    <span class="fw-bold"><i class="bi bi-droplet text-primary"></i> {{ n.nome }}</span>
+                    {% if n.descrizione %}
+                        <br><small class="text-muted">{{ n.descrizione }}</small>
+                    {% endif %}
+                </span>
+                <span class="text-end flex-shrink-0">
                     <span class="badge bg-danger badge-offline" id="offline-{{ n.pk }}"
                           {% if n.online %}style="display:none;"{% endif %}>
                         <i class="bi bi-wifi-off"></i> OFFLINE
@@ -48,6 +60,8 @@
             </label>
             {% endfor %}
         </div>
+        {% endfor %}
+        <div class="mb-2"></div>
 
         <h6 class="fw-bold text-uppercase small text-muted mb-2">Impulsi</h6>
         <div class="pub-card text-center mb-4">
@@ -105,11 +119,16 @@
         selezionaPrimoOnline();
         const n = nodoSel();
         if (!n) {
+            // Nessuna postazione selezionabile: congela anche lo stepper,
+            // cosi' il costo non resta "vecchio" mentre si cambiano gli impulsi
             avviso.textContent = 'Tutte le postazioni sono offline al momento: riprova tra poco.';
             avviso.classList.add('text-danger');
             btn.disabled = true;
+            costoEl.textContent = '—';
+            impulsi.disabled = true;
             return;
         }
+        impulsi.disabled = false;
         const max = parseInt(n.dataset.max) || 10;
         const costoImp = parseInt(n.dataset.costo) || 1;
         let v = parseInt(impulsi.value) || 1;

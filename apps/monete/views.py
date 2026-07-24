@@ -127,7 +127,11 @@ def avvia_staff(request):
     (UUID generato al render) cosi' un doppio submit non addebita due
     volte; lo staff puo' forzare il cooldown.
     """
-    nodi = NodoImpianto.objects.filter(attivo=True)
+    from django.db.models import F
+    nodi = (NodoImpianto.objects.filter(attivo=True)
+            .select_related('zona')
+            .order_by(F('zona__ordine').asc(nulls_last=True),
+                      'zona__nome', 'ordine', 'slug'))
     cliente_pre = None
     pre_pk = request.GET.get('cliente') or request.POST.get('cliente_id')
     if pre_pk:

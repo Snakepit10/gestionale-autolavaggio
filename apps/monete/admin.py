@@ -1,14 +1,19 @@
 from django.contrib import admin
 
 from .models import (AcquistoMonete, ImpostazioniMonete, MovimentoMoneta,
-                     NodoImpianto, PacchettoMonete, SaldoMonete)
+                     NodoImpianto, PacchettoMonete, SaldoMonete, ZonaImpianto)
+
+
+@admin.register(ZonaImpianto)
+class ZonaImpiantoAdmin(admin.ModelAdmin):
+    list_display = ('nome', 'descrizione', 'ordine')
 
 
 @admin.register(NodoImpianto)
 class NodoImpiantoAdmin(admin.ModelAdmin):
-    list_display = ('nome', 'slug', 'switch_id', 'monete_per_impulso',
-                    'max_impulsi', 'attivo', 'ordine')
-    list_filter = ('attivo',)
+    list_display = ('nome', 'zona', 'slug', 'switch_id', 'monete_per_impulso',
+                    'max_impulsi', 'online', 'attivo', 'ordine')
+    list_filter = ('attivo', 'zona', 'online')
     prepopulated_fields = {'slug': ('nome',)}
 
 

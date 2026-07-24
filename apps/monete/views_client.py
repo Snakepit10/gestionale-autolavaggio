@@ -53,8 +53,15 @@ def monete_home(request, cliente):
 
 @_cliente_required
 def lavaggio_scegli(request, cliente):
-    """Scelta nodo + numero impulsi (stepper con costo live)."""
-    nodi = NodoImpianto.objects.filter(attivo=True)
+    """Scelta nodo + numero impulsi (stepper con costo live).
+
+    I nodi sono ordinati e raggruppati per zona (il template usa
+    regroup, che richiede l'ordinamento per zona)."""
+    from django.db.models import F
+    nodi = (NodoImpianto.objects.filter(attivo=True)
+            .select_related('zona')
+            .order_by(F('zona__ordine').asc(nulls_last=True),
+                      'zona__nome', 'ordine', 'slug'))
     return render(request, 'clients/monete_lavaggio.html', {
         'cliente': cliente,
         'saldo': wallet.saldo_di(cliente),

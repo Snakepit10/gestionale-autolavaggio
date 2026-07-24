@@ -15,6 +15,27 @@ from django.conf import settings
 from django.db import models
 
 
+class ZonaImpianto(models.Model):
+    """Zona/sezione dell'impianto a cui appartengono le postazioni
+    (es. Spazzole, Zona interni, Zona esterni). Configurabile da admin,
+    niente hardcoded: le pagine di avvio raggruppano i nodi per zona.
+    """
+    nome = models.CharField(max_length=100)
+    descrizione = models.CharField(
+        max_length=200, blank=True, default='',
+        help_text='Riga descrittiva mostrata sotto il nome della zona.')
+    ordine = models.PositiveSmallIntegerField(
+        default=0, help_text='Ordinamento delle zone (0 = prima).')
+
+    class Meta:
+        ordering = ['ordine', 'nome']
+        verbose_name = 'Zona impianto'
+        verbose_name_plural = 'Zone impianto'
+
+    def __str__(self):
+        return self.nome
+
+
 class NodoImpianto(models.Model):
     """Un punto di erogazione comandabile via MQTT (pista, portale...).
 
@@ -47,6 +68,13 @@ class NodoImpianto(models.Model):
     attivo = models.BooleanField(default=True)
     ordine = models.PositiveSmallIntegerField(
         default=0, help_text="Ordinamento nelle liste (0 = primo).")
+    zona = models.ForeignKey(
+        ZonaImpianto, null=True, blank=True, on_delete=models.SET_NULL,
+        related_name='nodi',
+        help_text='Zona in cui compare la postazione (es. Spazzole).')
+    descrizione = models.CharField(
+        max_length=200, blank=True, default='',
+        help_text='Riga descrittiva mostrata al cliente sotto il nome.')
     note = models.TextField(blank=True, default='')
 
     # Stato di connessione del dispositivo, aggiornato dal listener MQTT
@@ -266,6 +294,13 @@ class ImpostazioniMonete(models.Model):
     testo_pagina_acquisto = models.TextField(
         blank=True, default='',
         help_text='Testo libero mostrato sopra i pacchetti in Le mie monete.')
+    testo_avvio_lavaggio = models.CharField(
+        max_length=250, blank=True,
+        default='Usa le tue monete per avviare spazzole, aspiratori e '
+                'lance direttamente dal telefono: scegli la postazione, '
+                'decidi gli impulsi e premi Avvia.',
+        help_text='Breve descrizione mostrata nella card "Avvia un '
+                  'lavaggio" all\'ingresso dell\'area cliente.')
     aggiornato_il = models.DateTimeField(auto_now=True)
 
     class Meta:

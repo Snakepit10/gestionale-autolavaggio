@@ -49,6 +49,17 @@
         </div>
     </div>
 
+    {# Avvia lavaggio: azione principale dell'area, ben visibile #}
+    <div class="pub-card mb-4 d-flex flex-wrap justify-content-between align-items-center gap-3">
+        <div style="flex:1; min-width:220px;">
+            <div class="fs-5 fw-bold"><i class="bi bi-droplet-fill text-primary"></i> Avvia un lavaggio</div>
+            <p class="text-muted small mb-0">{{ cfg.testo_avvio_lavaggio }}</p>
+        </div>
+        <a href="{% url 'monete_client:lavaggio' %}" class="btn-cta flex-shrink-0">
+            <i class="bi bi-play-circle"></i> Avvia ora
+        </a>
+    </div>
+
     {# Ricarica monete: visibile direttamente all'ingresso dell'area #}
     {% include "clients/_ricarica_monete.html" %}
 
