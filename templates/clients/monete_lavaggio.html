@@ -31,12 +31,20 @@
             {% for n in nodi %}
             <input type="radio" class="btn-check" name="nodo_id" id="nodo-{{ n.pk }}"
                    value="{{ n.pk }}" data-costo="{{ n.monete_per_impulso }}"
-                   data-max="{{ n.max_impulsi }}" {% if forloop.first %}checked{% endif %}>
+                   data-max="{{ n.max_impulsi }}" data-slug="{{ n.slug }}"
+                   {% if not n.online %}disabled{% endif %}>
             <label class="pub-card d-flex justify-content-between align-items-center mb-0"
-                   for="nodo-{{ n.pk }}" style="cursor:pointer;">
+                   for="nodo-{{ n.pk }}" id="label-nodo-{{ n.pk }}"
+                   style="cursor:pointer; {% if not n.online %}opacity:.55;{% endif %}">
                 <span class="fw-bold"><i class="bi bi-droplet text-primary"></i> {{ n.nome }}</span>
-                <span class="badge bg-warning text-dark">{{ n.monete_per_impulso }}
-                    <i class="bi bi-coin"></i>/impulso</span>
+                <span>
+                    <span class="badge bg-danger badge-offline" id="offline-{{ n.pk }}"
+                          {% if n.online %}style="display:none;"{% endif %}>
+                        <i class="bi bi-wifi-off"></i> OFFLINE
+                    </span>
+                    <span class="badge bg-warning text-dark">{{ n.monete_per_impulso }}
+                        <i class="bi bi-coin"></i>/impulso</span>
+                </span>
             </label>
             {% endfor %}
         </div>
@@ -77,13 +85,33 @@
     const costoEl = document.getElementById('costo-totale');
     const avviso = document.getElementById('avviso-saldo');
     const btn = document.getElementById('btn-avvia');
-    const saldo = {{ saldo }};
+    let saldo = {{ saldo }};
+    let inInvio = false;
 
     function nodoSel() { return document.querySelector('input[name="nodo_id"]:checked'); }
+
+    function selezionaPrimoOnline() {
+        // Se nessun nodo e' selezionato (o quello selezionato e' offline),
+        // sposta la selezione sul primo disponibile.
+        const sel = nodoSel();
+        if (sel && !sel.disabled) return;
+        if (sel) sel.checked = false;
+        const primo = document.querySelector('input[name="nodo_id"]:not(:disabled)');
+        if (primo) primo.checked = true;
+    }
+
     function aggiorna() {
+        if (inInvio) return;
+        selezionaPrimoOnline();
         const n = nodoSel();
-        const max = n ? parseInt(n.dataset.max) : 10;
-        const costoImp = n ? parseInt(n.dataset.costo) : 1;
+        if (!n) {
+            avviso.textContent = 'Tutte le postazioni sono offline al momento: riprova tra poco.';
+            avviso.classList.add('text-danger');
+            btn.disabled = true;
+            return;
+        }
+        const max = parseInt(n.dataset.max) || 10;
+        const costoImp = parseInt(n.dataset.costo) || 1;
         let v = parseInt(impulsi.value) || 1;
         v = Math.min(Math.max(v, 1), max);
         impulsi.value = v;
@@ -112,9 +140,31 @@
 
     // Anti doppio tap: disabilita e mostra lo spinner al submit
     document.getElementById('form-lavaggio').addEventListener('submit', () => {
+        inInvio = true;
         btn.disabled = true;
         btn.innerHTML = '<span class="spinner-border spinner-border-sm"></span> Avvio in corso...';
     });
+
+    // Polling saldo + stato online dei nodi (ricariche fatte in cassa,
+    // nodi che vanno/tornano online) senza dover ricaricare la pagina.
+    async function poll() {
+        try {
+            const r = await fetch("{% url 'monete_client:api-saldo' %}");
+            if (!r.ok) return;
+            const dati = await r.json();
+            saldo = dati.saldo;
+            document.querySelectorAll('input[name="nodo_id"]').forEach(radio => {
+                const online = !!dati.nodi_online[radio.dataset.slug];
+                radio.disabled = !online;
+                const label = document.getElementById('label-' + radio.id);
+                const badge = document.getElementById('offline-' + radio.value);
+                if (label) label.style.opacity = online ? '' : '.55';
+                if (badge) badge.style.display = online ? 'none' : '';
+            });
+            aggiorna();
+        } catch (e) { /* offline momentaneo del client: riprova al giro dopo */ }
+    }
+    setInterval(poll, 8000);
 })();
 </script>
 {% endblock %}

@@ -31,6 +31,8 @@ logger = logging.getLogger('apps.impianto.mqtt')
 # Topic dove i nodi pubblicano le notifiche RPC (Shelly Gen2+):
 # autolavaggio/<nodo>/events/rpc
 TOPIC_EVENTI = 'autolavaggio/+/events/rpc'
+# Presenza del dispositivo: retained true/false + LWT del broker
+TOPIC_ONLINE = 'autolavaggio/+/online'
 
 
 def mqtt_configurato() -> bool:
@@ -93,13 +95,45 @@ def estrai_eventi(payload: dict) -> list:
     return eventi
 
 
+def _gestisci_online(nodo: str, payload_raw: bytes):
+    """Aggiorna lo stato online del NodoImpianto (se censito) e logga
+    il cambio in EventoImpianto (dedup sui replay retained)."""
+    from django.utils import timezone
+
+    from apps.monete.models import NodoImpianto
+
+    from .models import EventoImpianto
+
+    stato = payload_raw.decode('utf-8', 'ignore').strip().lower() == 'true'
+    close_old_connections()
+    aggiornati = NodoImpianto.objects.filter(slug=nodo).update(
+        online=stato, online_aggiornato_il=timezone.now())
+    if aggiornati:
+        logger.info('[%s] nodo %s', nodo, 'ONLINE' if stato else 'OFFLINE')
+
+    ultimo = (EventoImpianto.objects
+              .filter(nodo=nodo, tipo_evento='online')
+              .order_by('-pk').values_list('valore', flat=True).first())
+    if ultimo != int(stato):
+        EventoImpianto.objects.create(
+            nodo=nodo, tipo_evento='online', valore=int(stato),
+            payload={'online': stato})
+
+
 def _gestisci_messaggio(client, userdata, msg):
     """Callback on_message del listener: parse + salvataggio evento."""
     from .models import EventoImpianto
 
-    # Il topic e' autolavaggio/<nodo>/events/rpc -> nodo in posizione 1
+    # Topic: autolavaggio/<nodo>/events/rpc oppure autolavaggio/<nodo>/online
     parti = msg.topic.split('/')
     nodo = parti[1] if len(parti) > 1 else '?'
+
+    if parti[-1] == 'online':
+        try:
+            _gestisci_online(nodo, msg.payload)
+        except Exception:
+            logger.exception('[%s] errore gestione stato online', nodo)
+        return
 
     try:
         payload = json.loads(msg.payload.decode('utf-8'))
@@ -151,10 +185,13 @@ def crea_listener() -> mqtt.Client:
 
     def on_connect(cl, userdata, flags, reason_code, properties):
         if reason_code == 0:
-            logger.info('Connesso al broker %s:%s, sottoscrivo %s',
-                        settings.MQTT_HOST, settings.MQTT_PORT, TOPIC_EVENTI)
-            # (Ri)sottoscrizione qui: vale anche dopo ogni riconnessione
-            cl.subscribe(TOPIC_EVENTI, qos=1)
+            logger.info('Connesso al broker %s:%s, sottoscrivo %s e %s',
+                        settings.MQTT_HOST, settings.MQTT_PORT,
+                        TOPIC_EVENTI, TOPIC_ONLINE)
+            # (Ri)sottoscrizione qui: vale anche dopo ogni riconnessione.
+            # I topic online sono retained: lo stato corrente dei nodi
+            # arriva subito, anche dopo un riavvio del listener.
+            cl.subscribe([(TOPIC_EVENTI, 1), (TOPIC_ONLINE, 1)])
         else:
             logger.error('Connessione rifiutata dal broker: %s', reason_code)
 

@@ -44,6 +44,14 @@ def avvia_lavaggio(*, cliente, nodo: NodoImpianto, impulsi: int,
     # 1. Validazioni
     if not nodo.attivo:
         return EsitoAvvio(False, f'Il nodo "{nodo.nome}" non e\' attivo.')
+    if not nodo.online:
+        # Col nodo offline il broker accetterebbe comunque il publish
+        # (impulsi persi, monete scalate senza lavaggio): blocco totale,
+        # anche per lo staff.
+        return EsitoAvvio(
+            False,
+            f'"{nodo.nome}" risulta offline in questo momento: impossibile '
+            f'avviare. Riprova tra poco.')
     if not 1 <= impulsi <= nodo.max_impulsi:
         return EsitoAvvio(
             False, f'Numero di impulsi non valido (1-{nodo.max_impulsi}).')

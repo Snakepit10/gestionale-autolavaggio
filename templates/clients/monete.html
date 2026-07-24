@@ -22,7 +22,7 @@
     <div class="pub-card text-center mb-4">
         <div class="text-muted small fw-bold text-uppercase">Saldo disponibile</div>
         <div style="font-size:3rem; font-weight:800;" class="text-warning">
-            {{ saldo }} <i class="bi bi-coin" style="font-size:2rem;"></i>
+            <span id="saldo-live">{{ saldo }}</span> <i class="bi bi-coin" style="font-size:2rem;"></i>
         </div>
         <a href="{% url 'monete_client:lavaggio' %}" class="btn-cta w-100 justify-content-center mt-2">
             <i class="bi bi-play-circle"></i> Avvia un lavaggio
@@ -100,4 +100,22 @@
     {% endif %}
 
 </div>
+
+<script>
+// Aggiorna il saldo da solo (es. ricarica fatta in cassa mentre la
+// pagina e' aperta): polling leggero ogni 10s.
+(function() {
+    const el = document.getElementById('saldo-live');
+    if (!el) return;
+    setInterval(async () => {
+        try {
+            const r = await fetch("{% url 'monete_client:api-saldo' %}");
+            if (r.ok) {
+                const dati = await r.json();
+                if (String(dati.saldo) !== el.textContent) el.textContent = dati.saldo;
+            }
+        } catch (e) { /* riprova al prossimo giro */ }
+    }, 10000);
+})();
+</script>
 {% endblock %}

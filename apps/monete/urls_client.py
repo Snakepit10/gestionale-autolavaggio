@@ -12,4 +12,6 @@ urlpatterns = [
     path('acquisto/esito/', views_client.acquisto_esito, name='acquisto-esito'),
     path('acquisto/annullato/', views_client.acquisto_annullato, name='acquisto-annullato'),
     path('paypal/ritorno/', views_client.paypal_ritorno, name='paypal-ritorno'),
+    # sotto /api/ cosi' il CompletamentoProfiloMiddleware non lo redirige
+    path('api/saldo/', views_client.api_saldo, name='api-saldo'),
 ]

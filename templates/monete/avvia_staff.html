@@ -53,9 +53,14 @@
                         {% for n in nodi %}
                         <input type="radio" class="btn-check" name="nodo_id" id="nodo-{{ n.pk }}"
                                value="{{ n.pk }}" data-costo="{{ n.monete_per_impulso }}"
-                               data-max="{{ n.max_impulsi }}" {% if forloop.first %}checked{% endif %}>
-                        <label class="btn btn-outline-primary" for="nodo-{{ n.pk }}">
+                               data-max="{{ n.max_impulsi }}"
+                               {% if not n.online %}disabled{% endif %}>
+                        <label class="btn btn-outline-primary" for="nodo-{{ n.pk }}"
+                               {% if not n.online %}style="opacity:.55;"{% endif %}>
                             <i class="bi bi-droplet"></i> {{ n.nome }}
+                            {% if not n.online %}
+                                <span class="badge bg-danger ms-1"><i class="bi bi-wifi-off"></i> OFFLINE</span>
+                            {% endif %}
                             <span class="badge bg-light text-dark border ms-1">{{ n.monete_per_impulso }} monete/impulso</span>
                         </label>
                         {% endfor %}
@@ -105,6 +110,11 @@
     function nodoSel() {
         return document.querySelector('input[name="nodo_id"]:checked');
     }
+    // Seleziona il primo nodo ONLINE (i radio offline sono disabilitati)
+    (function() {
+        const primo = document.querySelector('input[name="nodo_id"]:not(:disabled)');
+        if (primo && !nodoSel()) primo.checked = true;
+    })();
     function aggiorna() {
         const n = nodoSel();
         const max = n ? parseInt(n.dataset.max) : 10;

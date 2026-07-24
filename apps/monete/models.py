@@ -42,6 +42,13 @@ class NodoImpianto(models.Model):
         default=0, help_text="Ordinamento nelle liste (0 = primo).")
     note = models.TextField(blank=True, default='')
 
+    # Stato di connessione del dispositivo, aggiornato dal listener MQTT
+    # (topic autolavaggio/<slug>/online, retained + LWT). Con il nodo
+    # offline l'avvio viene RIFIUTATO: il broker accetterebbe comunque
+    # gli impulsi ma il rele' non li riceverebbe mai (monete perse).
+    online = models.BooleanField(default=False)
+    online_aggiornato_il = models.DateTimeField(null=True, blank=True)
+
     class Meta:
         ordering = ['ordine', 'slug']
         verbose_name = 'Nodo impianto'

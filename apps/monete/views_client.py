@@ -70,6 +70,16 @@ def lavaggio_scegli(request, cliente):
 
 
 @_cliente_required
+def api_saldo(request, cliente):
+    """Polling leggero del saldo (JSON): usato dalle pagine monete per
+    aggiornarsi da sole (es. ricarica fatta in cassa mentre la pagina
+    e' aperta). Include lo stato online dei nodi per il form avvio."""
+    from django.http import JsonResponse
+    nodi = {n.slug: n.online for n in NodoImpianto.objects.filter(attivo=True)}
+    return JsonResponse({'saldo': wallet.saldo_di(cliente), 'nodi_online': nodi})
+
+
+@_cliente_required
 def acquista(request, cliente, pacchetto_id):
     """POST dai bottoni pacchetto: crea l'acquisto e redirige al provider."""
     if request.method != 'POST':
