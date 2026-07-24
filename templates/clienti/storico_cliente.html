@@ -282,6 +282,16 @@
                         <div class="list-group-item d-flex justify-content-between align-items-center">
                             <div>
                                 <strong>{{ m.descrizione }}</strong>
+                                {% if m.verifica == 'ok' %}
+                                    <i class="bi bi-patch-check-fill text-success"
+                                       title="Impulsi confermati dal contatore della macchina ({{ m.impulsi_contati }})"></i>
+                                {% elif m.verifica == 'in_attesa' %}
+                                    <i class="bi bi-hourglass-split text-muted"
+                                       title="In attesa di conferma dal contatore"></i>
+                                {% elif m.verifica == 'discrepanza' %}
+                                    <i class="bi bi-exclamation-triangle-fill text-danger"
+                                       title="DISCREPANZA: contati {{ m.impulsi_contati|default:'0' }} impulsi su {{ m.impulsi }} pagati"></i>
+                                {% endif %}
                                 <br><small class="text-muted">
                                     {{ m.get_tipo_display }} &middot; {{ m.creato_il|date:"d/m/Y H:i" }}
                                     {% if m.importo %} &middot; € {{ m.importo }}{% endif %}

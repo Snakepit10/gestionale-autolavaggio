@@ -29,11 +29,22 @@ class Command(BaseCommand):
                             help='Mostra cosa verrebbe fatto senza catturare.')
 
     def handle(self, *args, **options):
-        if not paypal_pay.paypal_configurato():
-            self.stdout.write('PayPal non configurato: skip.')
-            return
-
         dry = options['dry_run']
+
+        # 1. Verifica contatore <-> credito: lavaggi non confermati
+        #    entro la finestra -> discrepanza (log + visibile in admin)
+        if not dry:
+            from apps.monete.services.verifica import scadenza_verifiche
+            discrepanze = scadenza_verifiche()
+            if discrepanze:
+                self.stdout.write(self.style.WARNING(
+                    f'{discrepanze} lavaggi con DISCREPANZA contatore: '
+                    f'controlla admin -> Movimenti monete.'))
+
+        # 2. Riconciliazione acquisti PayPal
+        if not paypal_pay.paypal_configurato():
+            self.stdout.write('PayPal non configurato: skip acquisti.')
+            return
         soglia = timezone.now() - timedelta(minutes=15)
         pendenti = AcquistoMonete.objects.filter(
             provider='paypal', stato='creato',

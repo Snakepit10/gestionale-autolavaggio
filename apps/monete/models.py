@@ -201,6 +201,26 @@ class MovimentoMoneta(models.Model):
     chiave_idempotenza = models.CharField(max_length=64, blank=True, default='')
     creato_il = models.DateTimeField(auto_now_add=True, db_index=True)
 
+    # --- Riconciliazione col contatore fisico (solo tipo 'lavaggio') ---
+    # Il COUNT IN dello Shelly conta gli impulsi REALMENTE visti dalla
+    # macchina: fotografiamo il totale prima dell'invio e verifichiamo
+    # che salga di conseguenza. verifica='discrepanza' = credito scalato
+    # ma impulsi non (tutti) contati -> da controllare/rimborsare.
+    VERIFICA_CHOICES = [
+        ('', '-'),
+        ('in_attesa', 'In attesa conferma'),
+        ('ok', 'Confermato dal contatore'),
+        ('discrepanza', 'DISCREPANZA'),
+        ('non_verificabile', 'Non verificabile'),
+    ]
+    contatore_prima = models.BigIntegerField(null=True, blank=True)
+    contatore_atteso = models.BigIntegerField(null=True, blank=True)
+    impulsi_contati = models.BigIntegerField(
+        null=True, blank=True,
+        help_text='Avanzamento del contatore osservato dopo l\'invio.')
+    verifica = models.CharField(
+        max_length=20, blank=True, default='', choices=VERIFICA_CHOICES)
+
     class Meta:
         ordering = ['-creato_il']
         verbose_name = 'Movimento monete'

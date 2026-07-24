@@ -74,6 +74,11 @@ def avvia_lavaggio(*, cliente, nodo: NodoImpianto, impulsi: int,
 
     costo = nodo.costo_monete(impulsi)
 
+    # Fotografa il contatore fisico PRIMA dell'invio: servira' alla
+    # riconciliazione credito scalato <-> impulsi realmente contati.
+    from .verifica import baseline_contatore, registra_esito_invio
+    baseline = baseline_contatore(nodo)
+
     # 3. Addebito PRIMA degli impulsi (transazione autonoma)
     try:
         movimento = wallet.addebita(
@@ -94,6 +99,10 @@ def avvia_lavaggio(*, cliente, nodo: NodoImpianto, impulsi: int,
     ok, msg, inviati = moneta_virtuale(
         nodo.slug, impulsi, switch_id=nodo.switch_id,
         pausa_s=nodo.pausa_impulsi_sec)
+
+    # Registra i dati per la verifica col contatore (in_attesa: sara'
+    # il listener a confermare quando il totale raggiunge l'atteso)
+    registra_esito_invio(movimento, baseline, inviati)
 
     # 5. Storno degli impulsi non erogati
     storno = None

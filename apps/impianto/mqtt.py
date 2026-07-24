@@ -173,6 +173,15 @@ def _gestisci_messaggio(client, userdata, msg):
         logger.info('[%s] %s%s', nodo, tipo_evento,
                     f' = {valore}' if valore is not None else '')
 
+        # Riconciliazione monete: un nuovo totale del contatore puo'
+        # confermare i lavaggi in attesa di verifica
+        if tipo_evento == 'contatore' and valore is not None:
+            try:
+                from apps.monete.services.verifica import aggiorna_verifiche
+                aggiorna_verifiche(nodo, valore)
+            except Exception:
+                logger.exception('[%s] errore verifica lavaggi', nodo)
+
 
 def crea_listener() -> mqtt.Client:
     """Costruisce il client listener (senza avviare il loop).

@@ -27,8 +27,9 @@ class SaldoMoneteAdmin(admin.ModelAdmin):
 @admin.register(MovimentoMoneta)
 class MovimentoMonetaAdmin(admin.ModelAdmin):
     list_display = ('creato_il', 'cliente', 'tipo', 'monete', 'saldo_dopo',
-                    'nodo', 'operatore', 'descrizione')
-    list_filter = ('tipo', 'nodo')
+                    'nodo', 'verifica', 'impulsi_contati', 'operatore',
+                    'descrizione')
+    list_filter = ('tipo', 'verifica', 'nodo')
     search_fields = ('cliente__nome', 'cliente__cognome', 'descrizione')
     date_hierarchy = 'creato_il'
     readonly_fields = [f.name for f in MovimentoMoneta._meta.fields]
