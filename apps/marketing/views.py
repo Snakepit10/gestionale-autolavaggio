@@ -15,6 +15,35 @@ from .models import ImpostazioniMarketing
 from .services.segmentazione import SEGMENTI_LABEL, segmenta_clienti
 
 
+def _chiavi_segmenti_valide(post_list):
+    """Filtra le chiavi segmento arrivate dal form: automatici, 'tutti'
+    e personalizzati esistenti ('custom:<pk>')."""
+    from .models import SegmentoPersonalizzato
+    valide = []
+    for s in post_list:
+        if s in SEGMENTI_LABEL or s == 'tutti':
+            valide.append(s)
+        elif s.startswith('custom:') and s[7:].isdigit() and \
+                SegmentoPersonalizzato.objects.filter(pk=int(s[7:])).exists():
+            valide.append(s)
+    return valide
+
+
+def _label_chiavi(chiavi):
+    """Label leggibile di una lista di chiavi segmento (anche custom)."""
+    from .models import SegmentoPersonalizzato
+    if 'tutti' in chiavi:
+        return 'Tutti i clienti'
+    labels = []
+    for s in chiavi:
+        if s in SEGMENTI_LABEL:
+            labels.append(SEGMENTI_LABEL[s])
+        elif s.startswith('custom:'):
+            seg = SegmentoPersonalizzato.objects.filter(pk=int(s[7:])).first()
+            labels.append(seg.nome if seg else 'Segmento eliminato')
+    return ' + '.join(labels)
+
+
 def _staff_required(view):
     """Il modulo marketing e' riservato allo staff."""
     from functools import wraps
@@ -135,14 +164,23 @@ def campagne_list(request):
 def campagna_nuova(request):
     """Step 1 del composer: nome, segmenti (multi), template Meta, parametri."""
     from apps.clienti.models import Cliente
+    from .models import SegmentoPersonalizzato
     from .services.campagne import PLACEHOLDER_SUPPORTATI
-    ris = segmenta_clienti()
+    from .services.segmentazione import (filtra_segmento_personalizzato,
+                                         statistiche_clienti)
+    stats = statistiche_clienti()
+    ris = segmenta_clienti(stats=stats)
     segmenti = [
         (chiave, SEGMENTI_LABEL[chiave], len(ris.get(chiave)))
         for chiave in ('attivi', 'rallentamento', 'dormienti', 'one_shot')
     ]
+    segmenti_custom = [
+        (s.chiave, s.nome, len(filtra_segmento_personalizzato(s, stats)))
+        for s in SegmentoPersonalizzato.objects.filter(attivo=True)
+    ]
     return render(request, 'marketing/campagna_nuova.html', {
         'segmenti': segmenti,
+        'segmenti_custom': segmenti_custom,
         'n_tutti': Cliente.objects.exclude(telefono='').count(),
         'placeholder': PLACEHOLDER_SUPPORTATI,
     })
@@ -162,14 +200,31 @@ def _risolvi_destinatari_da_segmenti(segmenti_scelti: list[str]) -> list[int]:
         return list(
             Cliente.objects.exclude(telefono='').values_list('pk', flat=True)
         )
-    ris = segmenta_clienti()
+    from .models import SegmentoPersonalizzato
+    from .services.segmentazione import (filtra_segmento_personalizzato,
+                                         statistiche_clienti)
+
+    chiavi_auto = [s for s in segmenti_scelti if s in SEGMENTI_LABEL]
+    chiavi_custom = [s for s in segmenti_scelti if s.startswith('custom:')]
+
+    stats = statistiche_clienti()
+    ris = segmenta_clienti(stats=stats) if chiavi_auto else None
+
     ids = []
     visti = set()
-    for seg in segmenti_scelti:
-        for cs in ris.get(seg):
+
+    def aggiungi(lista):
+        for cs in lista:
             if cs.cliente.pk not in visti:
                 visti.add(cs.cliente.pk)
                 ids.append(cs.cliente.pk)
+
+    for seg in chiavi_auto:
+        aggiungi(ris.get(seg))
+    for chiave in chiavi_custom:
+        seg = SegmentoPersonalizzato.objects.filter(pk=int(chiave[7:])).first()
+        if seg is not None:
+            aggiungi(filtra_segmento_personalizzato(seg, stats))
     return ids
 
 
@@ -182,10 +237,7 @@ def campagna_preview(request):
         return redirect('marketing:campagna-nuova')
 
     nome = (request.POST.get('nome') or '').strip()
-    segmenti_scelti = [
-        s for s in request.POST.getlist('segmenti')
-        if s in SEGMENTI_LABEL or s == 'tutti'
-    ]
+    segmenti_scelti = _chiavi_segmenti_valide(request.POST.getlist('segmenti'))
     template_meta = (request.POST.get('template_meta') or '').strip()
     # Un parametro per riga nella textarea
     params_raw = request.POST.get('template_params') or ''
@@ -207,10 +259,7 @@ def campagna_preview(request):
         for c in eleggibili[:3]
     ]
 
-    if 'tutti' in segmenti_scelti:
-        segmento_label = 'Tutti i clienti'
-    else:
-        segmento_label = ' + '.join(SEGMENTI_LABEL[s] for s in segmenti_scelti)
+    segmento_label = _label_chiavi(segmenti_scelti)
 
     return render(request, 'marketing/campagna_preview.html', {
         'nome': nome,
@@ -234,10 +283,7 @@ def campagna_crea(request):
         return redirect('marketing:campagna-nuova')
 
     nome = (request.POST.get('nome') or '').strip()
-    segmenti_scelti = [
-        s for s in request.POST.getlist('segmenti')
-        if s in SEGMENTI_LABEL or s == 'tutti'
-    ]
+    segmenti_scelti = _chiavi_segmenti_valide(request.POST.getlist('segmenti'))
     template_meta = (request.POST.get('template_meta') or '').strip()
     params_raw = request.POST.get('template_params') or ''
     template_params = [r.strip() for r in params_raw.splitlines() if r.strip()]
@@ -481,3 +527,146 @@ def impostazioni(request):
         return redirect('marketing:impostazioni')
 
     return render(request, 'marketing/impostazioni.html', {'cfg': cfg})
+
+
+# ---------------------------------------------------------------------
+# Segmenti personalizzati (criteri configurabili dall'operatore)
+# ---------------------------------------------------------------------
+
+_CAMPI_SEGMENTO_INT = ('lavaggi_min', 'lavaggi_max',
+                       'giorni_ultimo_min', 'giorni_ultimo_max')
+_CAMPI_SEGMENTO_FLOAT = ('frequenza_min', 'frequenza_max')
+_CAMPI_SEGMENTO_DEC = ('spesa_totale_min', 'spesa_totale_max',
+                       'spesa_media_min', 'spesa_media_max')
+
+
+@_staff_required
+def segmenti_custom(request):
+    """Lista dei segmenti personalizzati con conteggio clienti."""
+    from .models import SegmentoPersonalizzato
+    from .services.segmentazione import (filtra_segmento_personalizzato,
+                                         statistiche_clienti)
+    stats = statistiche_clienti()
+    righe = [
+        (s, len(filtra_segmento_personalizzato(s, stats)))
+        for s in SegmentoPersonalizzato.objects.all()
+    ]
+    return render(request, 'marketing/segmenti_custom.html', {'righe': righe})
+
+
+@_staff_required
+def segmento_custom_form(request, pk=None):
+    """Crea/modifica un segmento personalizzato (form unico)."""
+    from django.shortcuts import get_object_or_404
+    from .models import SegmentoPersonalizzato
+
+    seg = get_object_or_404(SegmentoPersonalizzato, pk=pk) if pk else None
+
+    if request.method == 'POST':
+        nome = (request.POST.get('nome') or '').strip()
+        if not nome:
+            messages.error(request, 'Il nome del segmento e\' obbligatorio.')
+            return redirect(request.path)
+
+        def _numero(campo, conv):
+            raw = (request.POST.get(campo) or '').strip().replace(',', '.')
+            if raw == '':
+                return None
+            return conv(raw)
+
+        valori = {}
+        try:
+            for campo in _CAMPI_SEGMENTO_INT:
+                valori[campo] = _numero(campo, int)
+            for campo in _CAMPI_SEGMENTO_FLOAT:
+                valori[campo] = _numero(campo, float)
+            from decimal import Decimal
+            for campo in _CAMPI_SEGMENTO_DEC:
+                valori[campo] = _numero(campo, Decimal)
+        except (ValueError, ArithmeticError):
+            messages.error(request, 'Criteri non validi: usa solo numeri '
+                                    '(campo vuoto = nessun filtro).')
+            return redirect(request.path)
+
+        tipo_cliente = request.POST.get('tipo_cliente') or ''
+        if tipo_cliente not in ('', 'privato', 'azienda'):
+            tipo_cliente = ''
+
+        if seg is None:
+            seg = SegmentoPersonalizzato()
+        seg.nome = nome
+        seg.descrizione = (request.POST.get('descrizione') or '').strip()
+        seg.attivo = request.POST.get('attivo') == 'on'
+        seg.tipo_cliente = tipo_cliente
+        for campo, val in valori.items():
+            setattr(seg, campo, val)
+        seg.save()
+        messages.success(request, f'Segmento "{seg.nome}" salvato.')
+        return redirect('marketing:segmenti-custom')
+
+    return render(request, 'marketing/segmento_custom_form.html', {'seg': seg})
+
+
+@_staff_required
+def segmento_custom_elimina(request, pk):
+    from django.shortcuts import get_object_or_404
+    from .models import SegmentoPersonalizzato
+    if request.method != 'POST':
+        return redirect('marketing:segmenti-custom')
+    seg = get_object_or_404(SegmentoPersonalizzato, pk=pk)
+    nome = seg.nome
+    seg.delete()
+    messages.success(request, f'Segmento "{nome}" eliminato. Le campagne '
+                              f'gia\' inviate restano tracciate.')
+    return redirect('marketing:segmenti-custom')
+
+
+@_staff_required
+def segmento_custom_dettaglio(request, pk):
+    """Lista clienti di un segmento personalizzato (template condiviso)."""
+    from django.shortcuts import get_object_or_404
+    from django.urls import reverse
+    from .models import SegmentoPersonalizzato
+    from .services.segmentazione import filtra_segmento_personalizzato
+    seg = get_object_or_404(SegmentoPersonalizzato, pk=pk)
+    return render(request, 'marketing/segmento.html', {
+        'label': seg.nome,
+        'clienti': filtra_segmento_personalizzato(seg),
+        'export_url': reverse('marketing:segmento-custom-export', args=[seg.pk]),
+        'criteri': seg.criteri_leggibili(),
+    })
+
+
+@_staff_required
+def segmento_custom_export(request, pk):
+    """Export CSV del segmento personalizzato."""
+    from django.shortcuts import get_object_or_404
+    from .models import SegmentoPersonalizzato
+    from .services.segmentazione import filtra_segmento_personalizzato
+    seg = get_object_or_404(SegmentoPersonalizzato, pk=pk)
+    oggi = timezone.localtime(timezone.now()).strftime('%Y%m%d')
+
+    response = HttpResponse(content_type='text/csv; charset=utf-8')
+    response['Content-Disposition'] = (
+        f'attachment; filename="segmento_custom_{seg.pk}_{oggi}.csv"'
+    )
+    response.write('﻿')
+    writer = csv.writer(response, delimiter=';')
+    writer.writerow([
+        'Nome', 'Telefono', 'Email', 'Ultimo lavaggio', 'Totale lavaggi',
+        'Frequenza media (gg)', 'Giorni da ultimo',
+        'Spesa totale', 'Spesa media',
+    ])
+    for cs in filtra_segmento_personalizzato(seg):
+        writer.writerow([
+            cs.nome_completo,
+            cs.telefono,
+            cs.cliente.email or '',
+            timezone.localtime(cs.ultimo_lavaggio).strftime('%d/%m/%Y'),
+            cs.totale_lavaggi,
+            f'{cs.frequenza_media_giorni:.0f}' if cs.frequenza_media_giorni else '',
+            cs.giorni_da_ultimo,
+            f'{cs.totale_speso:.2f}',
+            f'{cs.spesa_media:.2f}',
+        ])
+    return response

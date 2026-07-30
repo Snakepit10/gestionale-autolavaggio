@@ -125,6 +125,95 @@ class ImpostazioniMarketing(models.Model):
         return obj
 
 
+class SegmentoPersonalizzato(models.Model):
+    """Segmento clienti definito dall'operatore con criteri numerici.
+
+    Ogni criterio e' opzionale (vuoto = non filtrare): si combinano in
+    AND. Il calcolo resta al volo come per i segmenti automatici
+    (statistiche da Ordine completato, vedi services/segmentazione).
+    Usabile come destinatario campagne con chiave 'custom:<pk>'.
+    """
+
+    TIPO_CLIENTE_CHOICES = [
+        ('', 'Tutti'),
+        ('privato', 'Solo privati'),
+        ('azienda', 'Solo aziende'),
+    ]
+
+    nome = models.CharField(max_length=100)
+    descrizione = models.CharField(max_length=200, blank=True, default='')
+    attivo = models.BooleanField(default=True)
+
+    # --- Criteri (tutti opzionali, in AND) ---
+    lavaggi_min = models.PositiveIntegerField(
+        null=True, blank=True, verbose_name='Totale lavaggi (min)')
+    lavaggi_max = models.PositiveIntegerField(
+        null=True, blank=True, verbose_name='Totale lavaggi (max)')
+    giorni_ultimo_min = models.PositiveIntegerField(
+        null=True, blank=True, verbose_name='Giorni da ultimo lavaggio (min)')
+    giorni_ultimo_max = models.PositiveIntegerField(
+        null=True, blank=True, verbose_name='Giorni da ultimo lavaggio (max)')
+    frequenza_min = models.FloatField(
+        null=True, blank=True, verbose_name='Frequenza media gg (min)',
+        help_text='Clienti che tornano ogni ALMENO N giorni. I clienti '
+                  'con 1 solo lavaggio sono esclusi dai filtri frequenza.')
+    frequenza_max = models.FloatField(
+        null=True, blank=True, verbose_name='Frequenza media gg (max)',
+        help_text='Clienti che tornano ogni AL MASSIMO N giorni '
+                  '(frequenti). Es. max 30 = almeno un lavaggio al mese.')
+    spesa_totale_min = models.DecimalField(
+        max_digits=9, decimal_places=2, null=True, blank=True,
+        verbose_name='Spesa totale EUR (min)')
+    spesa_totale_max = models.DecimalField(
+        max_digits=9, decimal_places=2, null=True, blank=True,
+        verbose_name='Spesa totale EUR (max)')
+    spesa_media_min = models.DecimalField(
+        max_digits=7, decimal_places=2, null=True, blank=True,
+        verbose_name='Spesa media a lavaggio EUR (min)')
+    spesa_media_max = models.DecimalField(
+        max_digits=7, decimal_places=2, null=True, blank=True,
+        verbose_name='Spesa media a lavaggio EUR (max)')
+    tipo_cliente = models.CharField(
+        max_length=10, choices=TIPO_CLIENTE_CHOICES, blank=True, default='')
+
+    creato_il = models.DateTimeField(auto_now_add=True)
+    aggiornato_il = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ['nome']
+        verbose_name = 'Segmento personalizzato'
+        verbose_name_plural = 'Segmenti personalizzati'
+
+    def __str__(self):
+        return self.nome
+
+    @property
+    def chiave(self) -> str:
+        """Chiave usata nel composer campagne e in segmento_origine."""
+        return f'custom:{self.pk}'
+
+    def criteri_leggibili(self) -> list:
+        """Riassunto testuale dei criteri attivi (per liste e card)."""
+        out = []
+
+        def intervallo(etichetta, minimo, massimo, unita=''):
+            if minimo is not None and massimo is not None:
+                out.append(f'{etichetta} {minimo}-{massimo}{unita}')
+            elif minimo is not None:
+                out.append(f'{etichetta} >= {minimo}{unita}')
+            elif massimo is not None:
+                out.append(f'{etichetta} <= {massimo}{unita}')
+
+        intervallo('lavaggi', self.lavaggi_min, self.lavaggi_max)
+        intervallo('giorni da ultimo', self.giorni_ultimo_min, self.giorni_ultimo_max)
+        intervallo('frequenza', self.frequenza_min, self.frequenza_max, ' gg')
+        intervallo('spesa tot.', self.spesa_totale_min, self.spesa_totale_max, ' EUR')
+        intervallo('spesa media', self.spesa_media_min, self.spesa_media_max, ' EUR')
+        if self.tipo_cliente:
+            out.append(dict(self.TIPO_CLIENTE_CHOICES)[self.tipo_cliente])
+        return out or ['nessun criterio (tutti i clienti con storico)']
+
+
 class Campagna(models.Model):
     TIPO_CHOICES = [
         ('manuale', 'Manuale'),

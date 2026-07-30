@@ -43,6 +43,25 @@
                             </label>
                         </div>
                         {% endfor %}
+                        {% if segmenti_custom %}
+                        <hr class="my-2">
+                        <div class="small text-muted fw-bold text-uppercase mb-1">
+                            <i class="bi bi-funnel"></i> Segmenti personalizzati
+                        </div>
+                        {% for chiave, label, conteggio in segmenti_custom %}
+                        <div class="form-check">
+                            <input class="form-check-input seg-chk seg-specifico" type="checkbox"
+                                   name="segmenti" value="{{ chiave }}" id="seg-{{ forloop.counter }}-custom">
+                            <label class="form-check-label" for="seg-{{ forloop.counter }}-custom">
+                                {{ label }} ({{ conteggio }} clienti)
+                            </label>
+                        </div>
+                        {% endfor %}
+                        {% endif %}
+                    </div>
+                    <div class="form-text">
+                        Servono segmenti su misura (lavaggi, frequenza, spesa)?
+                        <a href="{% url 'marketing:segmenti-custom' %}">Creali qui</a>.
                     </div>
                     <div class="form-text">
                         Puoi combinare piu' segmenti (es. Dormienti + One-shot);

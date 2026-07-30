@@ -8,6 +8,14 @@ urlpatterns = [
     path('segmento/<str:chiave>/', views.segmento_dettaglio, name='segmento'),
     path('segmento/<str:chiave>/export/', views.segmento_export_csv, name='segmento-export'),
     path('impostazioni/', views.impostazioni, name='impostazioni'),
+
+    # Segmenti personalizzati (criteri configurabili)
+    path('segmenti-personalizzati/', views.segmenti_custom, name='segmenti-custom'),
+    path('segmenti-personalizzati/nuovo/', views.segmento_custom_form, name='segmento-custom-nuovo'),
+    path('segmenti-personalizzati/<int:pk>/', views.segmento_custom_dettaglio, name='segmento-custom'),
+    path('segmenti-personalizzati/<int:pk>/modifica/', views.segmento_custom_form, name='segmento-custom-modifica'),
+    path('segmenti-personalizzati/<int:pk>/elimina/', views.segmento_custom_elimina, name='segmento-custom-elimina'),
+    path('segmenti-personalizzati/<int:pk>/export/', views.segmento_custom_export, name='segmento-custom-export'),
     path('cliente/<int:cliente_id>/toggle-optout/', views.toggle_opt_out, name='toggle-optout'),
 
     # Campagne

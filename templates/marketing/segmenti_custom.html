@@ -1,0 +1,93 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}Segmenti personalizzati - Marketing{% endblock %}
+
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <h1><i class="bi bi-funnel"></i> Segmenti personalizzati</h1>
+    <div>
+        <a href="{% url 'marketing:segmento-custom-nuovo' %}" class="btn btn-primary me-2">
+            <i class="bi bi-plus-circle"></i> Nuovo segmento
+        </a>
+        <a href="{% url 'marketing:dashboard' %}" class="btn btn-outline-primary">
+            <i class="bi bi-arrow-left"></i> Marketing
+        </a>
+    </div>
+</div>
+
+<p class="text-muted">
+    Definisci segmenti su misura combinando totale lavaggi, giorni
+    dall'ultimo lavaggio, frequenza media, spesa e tipo cliente. I
+    segmenti attivi compaiono tra i destinatari selezionabili in
+    "Nuova campagna".
+</p>
+
+<div class="card border-0 shadow-sm">
+    <div class="table-responsive">
+        <table class="table table-hover align-middle mb-0">
+            <thead class="table-light">
+                <tr>
+                    <th>Nome</th>
+                    <th>Criteri</th>
+                    <th class="text-center">Clienti</th>
+                    <th class="text-center">Attivo</th>
+                    <th class="text-end">Azioni</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for seg, conteggio in righe %}
+                <tr>
+                    <td>
+                        <a href="{% url 'marketing:segmento-custom' seg.pk %}" class="text-decoration-none fw-bold">
+                            {{ seg.nome }}
+                        </a>
+                        {% if seg.descrizione %}
+                            <br><small class="text-muted">{{ seg.descrizione }}</small>
+                        {% endif %}
+                    </td>
+                    <td>
+                        {% for c in seg.criteri_leggibili %}
+                            <span class="badge bg-light text-dark border me-1">{{ c }}</span>
+                        {% endfor %}
+                    </td>
+                    <td class="text-center fw-bold">{{ conteggio }}</td>
+                    <td class="text-center">
+                        {% if seg.attivo %}
+                            <span class="badge bg-success">Sì</span>
+                        {% else %}
+                            <span class="badge bg-secondary">No</span>
+                        {% endif %}
+                    </td>
+                    <td class="text-end">
+                        <a href="{% url 'marketing:segmento-custom' seg.pk %}"
+                           class="btn btn-sm btn-outline-secondary" title="Vedi clienti">
+                            <i class="bi bi-people"></i>
+                        </a>
+                        <a href="{% url 'marketing:segmento-custom-modifica' seg.pk %}"
+                           class="btn btn-sm btn-outline-primary" title="Modifica">
+                            <i class="bi bi-pencil"></i>
+                        </a>
+                        <form method="post" action="{% url 'marketing:segmento-custom-elimina' seg.pk %}"
+                              class="d-inline"
+                              onsubmit="return confirm('Eliminare il segmento \'{{ seg.nome|escapejs }}\'?');">
+                            {% csrf_token %}
+                            <button type="submit" class="btn btn-sm btn-outline-danger" title="Elimina">
+                                <i class="bi bi-trash"></i>
+                            </button>
+                        </form>
+                    </td>
+                </tr>
+                {% empty %}
+                <tr>
+                    <td colspan="5" class="text-center text-muted py-4">
+                        Nessun segmento personalizzato ancora.
+                        <a href="{% url 'marketing:segmento-custom-nuovo' %}">Creane uno</a>.
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+{% endblock %}

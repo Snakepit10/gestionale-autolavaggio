@@ -1,0 +1,120 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}{% if seg %}Modifica{% else %}Nuovo{% endif %} segmento - Marketing{% endblock %}
+
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <h1><i class="bi bi-funnel"></i>
+        {% if seg %}Modifica "{{ seg.nome }}"{% else %}Nuovo segmento personalizzato{% endif %}
+    </h1>
+    <a href="{% url 'marketing:segmenti-custom' %}" class="btn btn-outline-primary">
+        <i class="bi bi-arrow-left"></i> Segmenti
+    </a>
+</div>
+
+<form method="post">
+    {% csrf_token %}
+    <div class="card border-0 shadow-sm mb-4">
+        <div class="card-body">
+            <div class="row g-3">
+                <div class="col-md-5">
+                    <label class="form-label fw-bold">Nome *</label>
+                    <input type="text" class="form-control" name="nome" required
+                           value="{{ seg.nome|default:'' }}"
+                           placeholder="es. Big spender dormienti">
+                </div>
+                <div class="col-md-5">
+                    <label class="form-label fw-bold">Descrizione</label>
+                    <input type="text" class="form-control" name="descrizione"
+                           value="{{ seg.descrizione|default:'' }}"
+                           placeholder="promemoria interno sull'uso del segmento">
+                </div>
+                <div class="col-md-2">
+                    <label class="form-label fw-bold">Attivo</label>
+                    <div class="form-check form-switch mt-2">
+                        <input class="form-check-input" type="checkbox" name="attivo"
+                               id="seg-attivo" {% if not seg or seg.attivo %}checked{% endif %}>
+                        <label class="form-check-label" for="seg-attivo">
+                            selezionabile nelle campagne
+                        </label>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="card border-0 shadow-sm mb-4">
+        <div class="card-body">
+            <h5 class="card-title"><i class="bi bi-sliders text-primary"></i> Criteri</h5>
+            <p class="text-muted small">
+                Tutti i campi sono opzionali: lasciali vuoti per non filtrare.
+                I criteri compilati si combinano in AND. La base sono i
+                clienti con almeno 1 lavaggio completato.
+            </p>
+            <div class="row g-3">
+                <div class="col-md-3">
+                    <label class="form-label fw-bold">Totale lavaggi</label>
+                    <div class="input-group">
+                        <input type="number" min="1" class="form-control" name="lavaggi_min"
+                               placeholder="min" value="{{ seg.lavaggi_min|default_if_none:'' }}">
+                        <input type="number" min="1" class="form-control" name="lavaggi_max"
+                               placeholder="max" value="{{ seg.lavaggi_max|default_if_none:'' }}">
+                    </div>
+                </div>
+                <div class="col-md-3">
+                    <label class="form-label fw-bold">Giorni da ultimo lavaggio</label>
+                    <div class="input-group">
+                        <input type="number" min="0" class="form-control" name="giorni_ultimo_min"
+                               placeholder="min" value="{{ seg.giorni_ultimo_min|default_if_none:'' }}">
+                        <input type="number" min="0" class="form-control" name="giorni_ultimo_max"
+                               placeholder="max" value="{{ seg.giorni_ultimo_max|default_if_none:'' }}">
+                    </div>
+                </div>
+                <div class="col-md-3">
+                    <label class="form-label fw-bold">Frequenza media (giorni)</label>
+                    <div class="input-group">
+                        <input type="text" inputmode="decimal" class="form-control" name="frequenza_min"
+                               placeholder="min" value="{{ seg.frequenza_min|default_if_none:'' }}">
+                        <input type="text" inputmode="decimal" class="form-control" name="frequenza_max"
+                               placeholder="max" value="{{ seg.frequenza_max|default_if_none:'' }}">
+                    </div>
+                    <div class="form-text">es. max 30 = torna almeno una volta al mese</div>
+                </div>
+                <div class="col-md-3">
+                    <label class="form-label fw-bold">Tipo cliente</label>
+                    <select class="form-select" name="tipo_cliente">
+                        <option value="" {% if not seg.tipo_cliente %}selected{% endif %}>Tutti</option>
+                        <option value="privato" {% if seg.tipo_cliente == 'privato' %}selected{% endif %}>Solo privati</option>
+                        <option value="azienda" {% if seg.tipo_cliente == 'azienda' %}selected{% endif %}>Solo aziende</option>
+                    </select>
+                </div>
+                <div class="col-md-3">
+                    <label class="form-label fw-bold">Spesa totale (€)</label>
+                    <div class="input-group">
+                        <input type="text" inputmode="decimal" class="form-control" name="spesa_totale_min"
+                               placeholder="min" value="{{ seg.spesa_totale_min|default_if_none:'' }}">
+                        <input type="text" inputmode="decimal" class="form-control" name="spesa_totale_max"
+                               placeholder="max" value="{{ seg.spesa_totale_max|default_if_none:'' }}">
+                    </div>
+                </div>
+                <div class="col-md-3">
+                    <label class="form-label fw-bold">Spesa media a lavaggio (€)</label>
+                    <div class="input-group">
+                        <input type="text" inputmode="decimal" class="form-control" name="spesa_media_min"
+                               placeholder="min" value="{{ seg.spesa_media_min|default_if_none:'' }}">
+                        <input type="text" inputmode="decimal" class="form-control" name="spesa_media_max"
+                               placeholder="max" value="{{ seg.spesa_media_max|default_if_none:'' }}">
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="d-flex justify-content-end">
+        <button type="submit" class="btn btn-primary">
+            <i class="bi bi-check-circle"></i> Salva segmento
+        </button>
+    </div>
+</form>
+{% endblock %}

@@ -80,8 +80,19 @@ _SEGMENTO_LABELS = {
 
 
 def _label_segmento(seg: str) -> str:
-    """Label leggibile anche per segmenti combinati ('dormienti,one_shot')."""
-    return ' + '.join(_SEGMENTO_LABELS.get(p, p) for p in seg.split(',') if p)
+    """Label leggibile anche per segmenti combinati ('dormienti,one_shot')
+    e personalizzati ('custom:<pk>')."""
+    parti = []
+    for p in seg.split(','):
+        if not p:
+            continue
+        if p.startswith('custom:') and p[7:].isdigit():
+            from apps.marketing.models import SegmentoPersonalizzato
+            s = SegmentoPersonalizzato.objects.filter(pk=int(p[7:])).first()
+            parti.append(s.nome if s else 'Segmento eliminato')
+        else:
+            parti.append(_SEGMENTO_LABELS.get(p, p))
+    return ' + '.join(parti)
 
 
 def statistiche_per_segmento() -> list[dict]:

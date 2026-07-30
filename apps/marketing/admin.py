@@ -1,6 +1,13 @@
 from django.contrib import admin
 
-from .models import Campagna, ImpostazioniMarketing, InvioCampagna
+from .models import (Campagna, ImpostazioniMarketing, InvioCampagna,
+                     SegmentoPersonalizzato)
+
+
+@admin.register(SegmentoPersonalizzato)
+class SegmentoPersonalizzatoAdmin(admin.ModelAdmin):
+    list_display = ('nome', 'attivo', 'tipo_cliente', 'aggiornato_il')
+    list_filter = ('attivo',)
 
 
 @admin.register(ImpostazioniMarketing)

@@ -4,19 +4,31 @@
 {% block title %}{{ label }} - Marketing{% endblock %}
 
 {% block content %}
-<div class="d-flex justify-content-between align-items-center mb-4">
+<div class="d-flex justify-content-between align-items-center mb-2">
     <h1><i class="bi bi-people"></i> {{ label }}
         <span class="badge bg-secondary fs-6 align-middle">{{ clienti|length }}</span>
     </h1>
     <div>
-        <a href="{% url 'marketing:segmento-export' chiave %}" class="btn btn-outline-secondary me-2">
-            <i class="bi bi-download"></i> Esporta CSV
-        </a>
+        {% if export_url %}
+            <a href="{{ export_url }}" class="btn btn-outline-secondary me-2">
+                <i class="bi bi-download"></i> Esporta CSV
+            </a>
+        {% elif chiave %}
+            <a href="{% url 'marketing:segmento-export' chiave %}" class="btn btn-outline-secondary me-2">
+                <i class="bi bi-download"></i> Esporta CSV
+            </a>
+        {% endif %}
         <a href="{% url 'marketing:dashboard' %}" class="btn btn-outline-primary">
             <i class="bi bi-arrow-left"></i> Marketing
         </a>
     </div>
 </div>
+{% if criteri %}
+<p class="text-muted mb-3">
+    <i class="bi bi-funnel"></i> Criteri:
+    {% for c in criteri %}<span class="badge bg-light text-dark border me-1">{{ c }}</span>{% endfor %}
+</p>
+{% endif %}
 
 <div class="card border-0 shadow-sm">
     <div class="table-responsive">
@@ -29,6 +41,7 @@
                     <th class="text-center">Totale lavaggi</th>
                     <th class="text-center">Frequenza media</th>
                     <th class="text-center">Giorni da ultimo</th>
+                    <th class="text-end">Spesa totale</th>
                     <th class="text-center">Contattabile</th>
                 </tr>
             </thead>
@@ -67,6 +80,9 @@
                             {{ cs.giorni_da_ultimo }}
                         </span>
                     </td>
+                    <td class="text-end" title="Spesa media a lavaggio: € {{ cs.spesa_media }}">
+                        € {{ cs.totale_speso|floatformat:0 }}
+                    </td>
                     <td class="text-center">
                         <form method="post" action="{% url 'marketing:toggle-optout' cs.cliente.pk %}" class="d-inline">
                             {% csrf_token %}
@@ -87,7 +103,7 @@
                 </tr>
                 {% empty %}
                 <tr>
-                    <td colspan="7" class="text-center text-muted py-4">
+                    <td colspan="8" class="text-center text-muted py-4">
                         Nessun cliente in questo segmento.
                     </td>
                 </tr>
