@@ -59,16 +59,51 @@ def _staff_required(view):
 
 @_staff_required
 def dashboard(request):
-    """Pagina principale: 4 card segmento con conteggi."""
-    ris = segmenta_clienti()
+    """Pagina principale: KPI, card segmento, grafici e consigli.
+
+    Le statistiche per-cliente si calcolano UNA volta e si riusano per
+    segmentazione e consigli. analisi_ai() e' il seam (oggi inerte)
+    per i futuri consigli generati dall'AI.
+    """
+    from .services.consigli import analisi_ai, genera_consigli
+    from .services.segmentazione import statistiche_clienti
+    from .services.statistiche import (kpi_dashboard, serie_mensile,
+                                       stats_ultime_campagne)
+
+    stats = statistiche_clienti()
+    ris = segmenta_clienti(stats=stats)
     segmenti = [
         (chiave, SEGMENTI_LABEL[chiave], len(ris.get(chiave)))
         for chiave in ('attivi', 'rallentamento', 'dormienti', 'one_shot')
     ]
     cfg = ImpostazioniMarketing.get_solo()
+
+    kpi = kpi_dashboard()
+    serie = serie_mensile(6)
+    ultime = stats_ultime_campagne(8)
+    consigli = genera_consigli(stats, ris, cfg) + analisi_ai()
+
+    chart_data = {
+        'serie': serie,
+        'segmenti': {
+            'labels': [label for _, label, _ in segmenti],
+            'valori': [n for _, _, n in segmenti],
+        },
+        'campagne': {
+            'labels': [c['nome'] for c in ultime],
+            'lettura': [c['tasso_lettura'] for c in ultime],
+            'conversione': [c['tasso_conversione'] for c in ultime],
+        },
+    }
+
     return render(request, 'marketing/dashboard.html', {
         'segmenti': segmenti,
         'cfg': cfg,
+        'kpi': kpi,
+        'consigli': consigli,
+        'chart_data': chart_data,
+        'ha_serie': any(serie['invii']) or any(serie['conversioni']),
+        'ha_campagne': bool(ultime),
     })
 
 
@@ -757,7 +792,33 @@ def segmento_custom_form(request, pk=None):
         messages.success(request, f'Segmento "{seg.nome}" salvato.')
         return redirect('marketing:segmenti-custom')
 
-    return render(request, 'marketing/segmento_custom_form.html', {'seg': seg})
+    # Prefill via querystring sul form "nuovo" (usato dai CTA dei
+    # consigli, es. ?spesa_totale_min=200&giorni_ultimo_min=60):
+    # istanza NON salvata solo per popolare i value del template.
+    pre = seg
+    if seg is None and request.GET:
+        pre = SegmentoPersonalizzato()
+        try:
+            for campo in _CAMPI_SEGMENTO_INT:
+                raw = (request.GET.get(campo) or '').strip()
+                if raw:
+                    setattr(pre, campo, int(raw))
+            for campo in _CAMPI_SEGMENTO_FLOAT:
+                raw = (request.GET.get(campo) or '').strip().replace(',', '.')
+                if raw:
+                    setattr(pre, campo, float(raw))
+            from decimal import Decimal
+            for campo in _CAMPI_SEGMENTO_DEC:
+                raw = (request.GET.get(campo) or '').strip().replace(',', '.')
+                if raw:
+                    setattr(pre, campo, Decimal(raw))
+        except (ValueError, ArithmeticError):
+            pre = None  # querystring malformata: form vuoto
+        if pre is not None:
+            pre.nome = (request.GET.get('nome') or '').strip()
+
+    return render(request, 'marketing/segmento_custom_form.html',
+                  {'seg': seg, 'v': pre})
 
 
 @_staff_required

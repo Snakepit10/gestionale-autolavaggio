@@ -127,3 +127,152 @@ def statistiche_per_segmento() -> list[dict]:
         righe.append(r)
     righe.sort(key=lambda r: -r['tasso_conversione'])
     return righe
+
+
+def kpi_dashboard() -> dict:
+    """KPI di testata per la dashboard marketing.
+
+    'Ultimi 30 giorni' = invii partiti negli ultimi 30 giorni; le loro
+    conversioni usano la finestra della campagna di appartenenza
+    (quindi un invio di ieri puo' ancora convertire domani).
+    """
+    from django.utils import timezone as tz
+
+    from apps.clienti.models import Cliente
+
+    ora = tz.now()
+    cutoff = ora - timedelta(days=30)
+
+    con_telefono = Cliente.objects.exclude(telefono='')
+    n_con_telefono = con_telefono.count()
+    n_opt_out = con_telefono.filter(blocca_marketing=True).count()
+    n_contattabili = n_con_telefono - n_opt_out
+
+    invii_30gg = InvioCampagna.objects.filter(
+        stato='inviato', inviato_il__gte=cutoff).count()
+
+    # Conversioni/fatturato per gli invii degli ultimi 30 giorni: la
+    # finestra di conversione e' per-campagna (timedelta costante nel
+    # SQL), quindi si somma campagna per campagna. Le campagne sono
+    # decine, non migliaia: il loop non pesa.
+    n_conversioni = 0
+    fatturato = 0.0
+    campagne_recenti = Campagna.objects.filter(
+        invii__stato='inviato', invii__inviato_il__gte=cutoff).distinct()
+    for campagna in campagne_recenti:
+        finestra = timedelta(days=campagna.finestra_conversione_giorni)
+        qualificati = InvioCampagna.objects.filter(
+            campagna=campagna,
+            stato='inviato',
+            inviato_il__gte=cutoff,
+            cliente__ordine__stato='completato',
+            cliente__ordine__data_ora__gt=F('inviato_il'),
+            cliente__ordine__data_ora__lte=F('inviato_il') + finestra,
+        )
+        n_conversioni += qualificati.values('cliente').distinct().count()
+        fatturato += float(qualificati.aggregate(
+            tot=Sum('cliente__ordine__totale_finale'))['tot'] or 0)
+
+    return {
+        'n_contattabili': n_contattabili,
+        'n_opt_out': n_opt_out,
+        'pct_opt_out': (n_opt_out / n_con_telefono * 100) if n_con_telefono else 0.0,
+        'invii_30gg': invii_30gg,
+        'conversioni_30gg': n_conversioni,
+        'fatturato_30gg': fatturato,
+        'campagne_attive': Campagna.objects.filter(
+            stato__in=('in_coda', 'in_corso', 'in_pausa')).count(),
+    }
+
+
+_MESI_IT = ['Gen', 'Feb', 'Mar', 'Apr', 'Mag', 'Giu',
+            'Lug', 'Ago', 'Set', 'Ott', 'Nov', 'Dic']
+
+
+def serie_mensile(n_mesi: int = 6) -> dict:
+    """Serie storica mensile: invii e conversioni degli ultimi N mesi.
+
+    La conversione e' attribuita al mese dell'INVIO (non dell'ordine):
+    misura quanto hanno reso i messaggi partiti quel mese. Mesi senza
+    attivita' compaiono con zero (il grafico non deve avere buchi).
+    """
+    from django.db.models import Count
+    from django.db.models.functions import TruncMonth
+    from django.utils import timezone as tz
+
+    oggi = tz.localtime(tz.now())
+    # Lista (anno, mese) dal piu' vecchio al corrente, senza dateutil.
+    anno, mese = oggi.year, oggi.month
+    mesi = []
+    for _ in range(n_mesi):
+        mesi.append((anno, mese))
+        mese -= 1
+        if mese == 0:
+            anno, mese = anno - 1, 12
+    mesi.reverse()
+    inizio = tz.make_aware(
+        tz.datetime(mesi[0][0], mesi[0][1], 1, 0, 0, 0))
+
+    invii_per_mese = {m: 0 for m in mesi}
+    righe = (
+        InvioCampagna.objects
+        .filter(stato='inviato', inviato_il__gte=inizio)
+        .annotate(mese=TruncMonth('inviato_il'))
+        .values('mese').annotate(n=Count('id'))
+    )
+    for r in righe:
+        # TruncMonth restituisce datetime aware in UTC: riportarlo in
+        # ora locale prima di estrarre (anno, mese), o gli invii di
+        # inizio mese finiscono nel mese sbagliato.
+        m = tz.localtime(r['mese'])
+        chiave = (m.year, m.month)
+        if chiave in invii_per_mese:
+            invii_per_mese[chiave] += r['n']
+
+    conversioni_per_mese = {m: 0 for m in mesi}
+    for campagna in Campagna.objects.exclude(stato='bozza'):
+        finestra = timedelta(days=campagna.finestra_conversione_giorni)
+        righe = (
+            InvioCampagna.objects
+            .filter(
+                campagna=campagna,
+                stato='inviato', inviato_il__gte=inizio,
+                cliente__ordine__stato='completato',
+                cliente__ordine__data_ora__gt=F('inviato_il'),
+                cliente__ordine__data_ora__lte=F('inviato_il') + finestra,
+            )
+            .annotate(mese=TruncMonth('inviato_il'))
+            # Un invio con piu' ordini in finestra e' UNA conversione
+            .values('mese').annotate(n=Count('id', distinct=True))
+        )
+        for r in righe:
+            m = tz.localtime(r['mese'])
+            chiave = (m.year, m.month)
+            if chiave in conversioni_per_mese:
+                conversioni_per_mese[chiave] += r['n']
+
+    return {
+        'labels': [f'{_MESI_IT[m - 1]} {a % 100:02d}' for a, m in mesi],
+        'invii': [invii_per_mese[m] for m in mesi],
+        'conversioni': [conversioni_per_mese[m] for m in mesi],
+    }
+
+
+def stats_ultime_campagne(n: int = 8) -> list[dict]:
+    """Ultime N campagne con invii partiti, per il grafico a barre
+    lettura/conversione. Ordinate dalla piu' vecchia alla piu' recente
+    (asse del grafico che si legge in avanti nel tempo)."""
+    out = []
+    for campagna in Campagna.objects.exclude(stato='bozza').order_by('-creata_il')[:n]:
+        stats = statistiche_campagna(campagna)
+        if stats['n_inviati'] == 0:
+            continue
+        out.append({
+            'pk': campagna.pk,
+            'nome': campagna.nome,
+            'n_inviati': stats['n_inviati'],
+            'tasso_lettura': round(stats['tasso_lettura'], 1),
+            'tasso_conversione': round(stats['tasso_conversione'], 1),
+        })
+    out.reverse()
+    return out

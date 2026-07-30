@@ -19,6 +19,99 @@
     </div>
 </div>
 
+{% comment %} ------- Riga KPI ------- {% endcomment %}
+<div class="row g-3 mb-4">
+    <div class="col-6 col-md-4 col-xl-2">
+        <div class="card border-0 shadow-sm h-100"><div class="card-body text-center">
+            <div class="fs-3 fw-bold">{{ kpi.n_contattabili }}</div>
+            <div class="text-muted small">clienti contattabili</div>
+        </div></div>
+    </div>
+    <div class="col-6 col-md-4 col-xl-2">
+        <div class="card border-0 shadow-sm h-100"><div class="card-body text-center"
+             title="Clienti con telefono che hanno chiesto di non ricevere messaggi promozionali">
+            <div class="fs-3 fw-bold {% if kpi.pct_opt_out > 5 %}text-danger{% endif %}">{{ kpi.pct_opt_out|floatformat:1 }}%</div>
+            <div class="text-muted small">opt-out ({{ kpi.n_opt_out }})</div>
+        </div></div>
+    </div>
+    <div class="col-6 col-md-4 col-xl-2">
+        <div class="card border-0 shadow-sm h-100"><div class="card-body text-center">
+            <div class="fs-3 fw-bold text-success">{{ kpi.invii_30gg }}</div>
+            <div class="text-muted small">invii ultimi 30 gg</div>
+        </div></div>
+    </div>
+    <div class="col-6 col-md-4 col-xl-2">
+        <div class="card border-0 shadow-sm h-100"><div class="card-body text-center"
+             title="Clienti tornati a lavare entro la finestra di conversione, tra i contattati degli ultimi 30 giorni">
+            <div class="fs-3 fw-bold text-primary">{{ kpi.conversioni_30gg }}</div>
+            <div class="text-muted small">conversioni 30 gg</div>
+        </div></div>
+    </div>
+    <div class="col-6 col-md-4 col-xl-2">
+        <div class="card border-0 shadow-sm h-100"><div class="card-body text-center">
+            <div class="fs-3 fw-bold text-primary">€ {{ kpi.fatturato_30gg|floatformat:0 }}</div>
+            <div class="text-muted small">fatturato attribuito 30 gg</div>
+        </div></div>
+    </div>
+    <div class="col-6 col-md-4 col-xl-2">
+        <div class="card border-0 shadow-sm h-100"><div class="card-body text-center">
+            <div class="fs-3 fw-bold">{{ kpi.campagne_attive }}</div>
+            <div class="text-muted small">campagne attive</div>
+        </div></div>
+    </div>
+</div>
+
+{% comment %} ------- Consigli per vendere di piu' ------- {% endcomment %}
+<div class="card border-0 shadow-sm mb-4">
+    <div class="card-body">
+        <h5 class="card-title"><i class="bi bi-lightbulb text-warning"></i> Consigli per vendere di piu'</h5>
+        {% if consigli %}
+        <div class="row g-3">
+            {% for c in consigli|slice:":5" %}
+            <div class="col-md-6 col-xl-4">
+                <div class="border rounded p-3 h-100 d-flex flex-column">
+                    <div class="fw-bold mb-1"><i class="bi {{ c.icona }} text-primary"></i> {{ c.titolo }}</div>
+                    <div class="text-muted small flex-grow-1">{{ c.testo }}</div>
+                    <div class="mt-2">
+                        <a href="{{ c.cta_url }}" class="btn btn-sm btn-primary">
+                            {{ c.cta_label }} <i class="bi bi-arrow-right"></i>
+                        </a>
+                    </div>
+                </div>
+            </div>
+            {% endfor %}
+        </div>
+        {% if consigli|length > 5 %}
+        <details class="mt-3">
+            <summary class="text-muted small">Altri {{ consigli|length|add:"-5" }} consigli</summary>
+            <div class="row g-3 mt-1">
+                {% for c in consigli|slice:"5:" %}
+                <div class="col-md-6 col-xl-4">
+                    <div class="border rounded p-3 h-100 d-flex flex-column">
+                        <div class="fw-bold mb-1"><i class="bi {{ c.icona }} text-primary"></i> {{ c.titolo }}</div>
+                        <div class="text-muted small flex-grow-1">{{ c.testo }}</div>
+                        <div class="mt-2">
+                            <a href="{{ c.cta_url }}" class="btn btn-sm btn-primary">
+                                {{ c.cta_label }} <i class="bi bi-arrow-right"></i>
+                            </a>
+                        </div>
+                    </div>
+                </div>
+                {% endfor %}
+            </div>
+        </details>
+        {% endif %}
+        {% else %}
+        <div class="text-muted">
+            <i class="bi bi-check-circle text-success"></i>
+            Tutto sotto controllo: richiamo attivo, nessun segmento trascurato.
+            Continua a monitorare i grafici qui sotto.
+        </div>
+        {% endif %}
+    </div>
+</div>
+
+{% comment %} ------- Card segmenti automatici ------- {% endcomment %}
 <p class="text-muted">
     Segmentazione automatica dei clienti in base allo storico lavaggi.
     Le soglie sono configurabili dalle
@@ -61,6 +154,56 @@
     {% endfor %}
 </div>
 
+{% comment %} ------- Grafici ------- {% endcomment %}
+<div class="row g-3 mb-4">
+    <div class="col-lg-6">
+        <div class="card border-0 shadow-sm h-100">
+            <div class="card-body">
+                <h6 class="card-title text-muted"><i class="bi bi-bar-chart text-primary"></i>
+                    Invii e conversioni per mese</h6>
+                {% if ha_serie %}
+                <div style="position:relative; height:260px;">
+                    <canvas id="chart-mensile"></canvas>
+                </div>
+                {% else %}
+                <div class="text-muted text-center py-5">
+                    Nessun invio negli ultimi 6 mesi: il grafico si popola
+                    con le prime campagne.
+                </div>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+    <div class="col-lg-3 col-md-6">
+        <div class="card border-0 shadow-sm h-100">
+            <div class="card-body">
+                <h6 class="card-title text-muted"><i class="bi bi-pie-chart text-primary"></i>
+                    Clienti per segmento</h6>
+                <div style="position:relative; height:260px;">
+                    <canvas id="chart-segmenti"></canvas>
+                </div>
+            </div>
+        </div>
+    </div>
+    <div class="col-lg-3 col-md-6">
+        <div class="card border-0 shadow-sm h-100">
+            <div class="card-body">
+                <h6 class="card-title text-muted"><i class="bi bi-graph-up text-primary"></i>
+                    Ultime campagne: % lettura e conversione</h6>
+                {% if ha_campagne %}
+                <div style="position:relative; height:260px;">
+                    <canvas id="chart-campagne"></canvas>
+                </div>
+                {% else %}
+                <div class="text-muted text-center py-5">
+                    Ancora nessuna campagna con invii.
+                </div>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+</div>
+
 <div class="card border-0 shadow-sm">
     <div class="card-body">
         <h5 class="card-title"><i class="bi bi-info-circle text-primary"></i> Come funziona</h5>
@@ -69,7 +212,99 @@
             <li><strong>In rallentamento</strong>: la distanza dall'ultimo lavaggio supera la loro media storica di oltre {{ cfg.giorni_rallentamento_delta }} giorni.</li>
             <li><strong>Dormienti</strong>: nessun lavaggio da piu' di {{ cfg.giorni_dormiente }} giorni.</li>
             <li><strong>One-shot</strong>: un solo lavaggio in totale, mai tornati.</li>
+            <li><strong>Conversione</strong>: cliente contattato che torna a lavare entro {{ cfg.giorni_finestra_conversione }} giorni dal messaggio; il fatturato attribuito somma i suoi ordini in quella finestra.</li>
         </ul>
     </div>
 </div>
+
+{{ chart_data|json_script:"chart-data" }}
+<script>
+document.addEventListener('DOMContentLoaded', () => {
+    const dati = JSON.parse(document.getElementById('chart-data').textContent);
+
+    // Colori coerenti con le card segmento (success/warning/danger/secondary)
+    const coloriSegmenti = ['#198754', '#ffc107', '#dc3545', '#6c757d'];
+
+    const elMensile = document.getElementById('chart-mensile');
+    if (elMensile) {
+        new Chart(elMensile, {
+            data: {
+                labels: dati.serie.labels,
+                datasets: [
+                    {
+                        type: 'bar',
+                        label: 'Invii',
+                        data: dati.serie.invii,
+                        backgroundColor: 'rgba(13, 110, 253, 0.55)',
+                        borderRadius: 4,
+                    },
+                    {
+                        type: 'line',
+                        label: 'Conversioni',
+                        data: dati.serie.conversioni,
+                        borderColor: '#198754',
+                        backgroundColor: '#198754',
+                        tension: 0.3,
+                    },
+                ],
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                scales: { y: { beginAtZero: true, ticks: { precision: 0 } } },
+            },
+        });
+    }
+
+    const elSegmenti = document.getElementById('chart-segmenti');
+    if (elSegmenti) {
+        new Chart(elSegmenti, {
+            type: 'doughnut',
+            data: {
+                labels: dati.segmenti.labels,
+                datasets: [{
+                    data: dati.segmenti.valori,
+                    backgroundColor: coloriSegmenti,
+                }],
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: { legend: { position: 'bottom' } },
+            },
+        });
+    }
+
+    const elCampagne = document.getElementById('chart-campagne');
+    if (elCampagne) {
+        new Chart(elCampagne, {
+            type: 'bar',
+            data: {
+                labels: dati.campagne.labels,
+                datasets: [
+                    {
+                        label: '% lettura',
+                        data: dati.campagne.lettura,
+                        backgroundColor: 'rgba(83, 189, 235, 0.75)',
+                        borderRadius: 3,
+                    },
+                    {
+                        label: '% conversione',
+                        data: dati.campagne.conversione,
+                        backgroundColor: 'rgba(25, 135, 84, 0.75)',
+                        borderRadius: 3,
+                    },
+                ],
+            },
+            options: {
+                indexAxis: 'y',
+                responsive: true,
+                maintainAspectRatio: false,
+                scales: { x: { min: 0, max: 100 } },
+                plugins: { legend: { position: 'bottom' } },
+            },
+        });
+    }
+});
+</script>
 {% endblock %}

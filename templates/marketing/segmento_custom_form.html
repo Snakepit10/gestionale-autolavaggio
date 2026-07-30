@@ -21,13 +21,13 @@
                 <div class="col-md-5">
                     <label class="form-label fw-bold">Nome *</label>
                     <input type="text" class="form-control" name="nome" required
-                           value="{{ seg.nome|default:'' }}"
+                           value="{{ v.nome|default:'' }}"
                            placeholder="es. Big spender dormienti">
                 </div>
                 <div class="col-md-5">
                     <label class="form-label fw-bold">Descrizione</label>
                     <input type="text" class="form-control" name="descrizione"
-                           value="{{ seg.descrizione|default:'' }}"
+                           value="{{ v.descrizione|default:'' }}"
                            placeholder="promemoria interno sull'uso del segmento">
                 </div>
                 <div class="col-md-2">
@@ -57,27 +57,27 @@
                     <label class="form-label fw-bold">Totale lavaggi</label>
                     <div class="input-group">
                         <input type="number" min="1" class="form-control" name="lavaggi_min"
-                               placeholder="min" value="{{ seg.lavaggi_min|default_if_none:'' }}">
+                               placeholder="min" value="{{ v.lavaggi_min|default_if_none:'' }}">
                         <input type="number" min="1" class="form-control" name="lavaggi_max"
-                               placeholder="max" value="{{ seg.lavaggi_max|default_if_none:'' }}">
+                               placeholder="max" value="{{ v.lavaggi_max|default_if_none:'' }}">
                     </div>
                 </div>
                 <div class="col-md-3">
                     <label class="form-label fw-bold">Giorni da ultimo lavaggio</label>
                     <div class="input-group">
                         <input type="number" min="0" class="form-control" name="giorni_ultimo_min"
-                               placeholder="min" value="{{ seg.giorni_ultimo_min|default_if_none:'' }}">
+                               placeholder="min" value="{{ v.giorni_ultimo_min|default_if_none:'' }}">
                         <input type="number" min="0" class="form-control" name="giorni_ultimo_max"
-                               placeholder="max" value="{{ seg.giorni_ultimo_max|default_if_none:'' }}">
+                               placeholder="max" value="{{ v.giorni_ultimo_max|default_if_none:'' }}">
                     </div>
                 </div>
                 <div class="col-md-3">
                     <label class="form-label fw-bold">Frequenza media (giorni)</label>
                     <div class="input-group">
                         <input type="text" inputmode="decimal" class="form-control" name="frequenza_min"
-                               placeholder="min" value="{{ seg.frequenza_min|default_if_none:'' }}">
+                               placeholder="min" value="{{ v.frequenza_min|default_if_none:'' }}">
                         <input type="text" inputmode="decimal" class="form-control" name="frequenza_max"
-                               placeholder="max" value="{{ seg.frequenza_max|default_if_none:'' }}">
+                               placeholder="max" value="{{ v.frequenza_max|default_if_none:'' }}">
                     </div>
                     <div class="form-text">es. max 30 = torna almeno una volta al mese</div>
                 </div>
@@ -93,18 +93,18 @@
                     <label class="form-label fw-bold">Spesa totale (€)</label>
                     <div class="input-group">
                         <input type="text" inputmode="decimal" class="form-control" name="spesa_totale_min"
-                               placeholder="min" value="{{ seg.spesa_totale_min|default_if_none:'' }}">
+                               placeholder="min" value="{{ v.spesa_totale_min|default_if_none:'' }}">
                         <input type="text" inputmode="decimal" class="form-control" name="spesa_totale_max"
-                               placeholder="max" value="{{ seg.spesa_totale_max|default_if_none:'' }}">
+                               placeholder="max" value="{{ v.spesa_totale_max|default_if_none:'' }}">
                     </div>
                 </div>
                 <div class="col-md-3">
                     <label class="form-label fw-bold">Spesa media a lavaggio (€)</label>
                     <div class="input-group">
                         <input type="text" inputmode="decimal" class="form-control" name="spesa_media_min"
-                               placeholder="min" value="{{ seg.spesa_media_min|default_if_none:'' }}">
+                               placeholder="min" value="{{ v.spesa_media_min|default_if_none:'' }}">
                         <input type="text" inputmode="decimal" class="form-control" name="spesa_media_max"
-                               placeholder="max" value="{{ seg.spesa_media_max|default_if_none:'' }}">
+                               placeholder="max" value="{{ v.spesa_media_max|default_if_none:'' }}">
                     </div>
                 </div>
             </div>
