@@ -52,6 +52,35 @@
             </button>
         </form>
         {% endif %}
+        {% if campagna.n_falliti and campagna.stato != 'annullata' %}
+        <form method="post" action="{% url 'marketing:campagna-riprova-falliti' campagna.pk %}" class="d-inline">
+            {% csrf_token %}
+            <button type="submit" class="btn btn-outline-danger me-2"
+                    title="Rimette in coda tutti gli invii falliti: partiranno dal prossimo batch"
+                    onclick="return confirm('Rimettere in coda {{ campagna.n_falliti }} invio/i fallito/i? Partiranno dal prossimo batch (cron o Processa coda ora).');">
+                <i class="bi bi-arrow-repeat"></i> Riprova {{ campagna.n_falliti }} falliti
+            </button>
+        </form>
+        {% endif %}
+        <a href="{% url 'marketing:campagna-nuova' %}?duplica={{ campagna.pk }}"
+           class="btn btn-outline-secondary me-2"
+           title="Apre il composer con nome, template, parametri e segmenti gia' compilati">
+            <i class="bi bi-copy"></i> Duplica
+        </a>
+        <a href="{% url 'marketing:campagna-export' campagna.pk %}"
+           class="btn btn-outline-secondary me-2"
+           title="Scarica il CSV degli invii con stato, consegna WhatsApp e conversione">
+            <i class="bi bi-download"></i> CSV
+        </a>
+        {% if campagna.stato == 'bozza' or campagna.stato == 'completata' or campagna.stato == 'annullata' %}
+        <form method="post" action="{% url 'marketing:campagna-elimina' campagna.pk %}" class="d-inline">
+            {% csrf_token %}
+            <button type="submit" class="btn btn-outline-danger me-2"
+                    onclick="return confirm('Eliminare DEFINITIVAMENTE la campagna e i suoi invii?\n\nAttenzione:\n- le statistiche aggregate (rendimento per segmento, dashboard) perderanno questi numeri;\n- i clienti contattati torneranno subito ricontattabili dalle prossime campagne (la finestra anti-ricontatto si basa sugli invii registrati).\n\nLe chat WhatsApp restano intatte.');">
+                <i class="bi bi-trash"></i> Elimina
+            </button>
+        </form>
+        {% endif %}
         <a href="{% url 'marketing:campagne' %}" class="btn btn-outline-primary">
             <i class="bi bi-arrow-left"></i> Campagne
         </a>

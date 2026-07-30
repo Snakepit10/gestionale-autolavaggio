@@ -162,9 +162,16 @@ def campagne_list(request):
 
 @_staff_required
 def campagna_nuova(request):
-    """Step 1 del composer: nome, segmenti (multi), template Meta, parametri."""
+    """Step 1 del composer: nome, segmenti (multi), template Meta, parametri.
+
+    Supporta il prefill via querystring:
+    - ?duplica=<pk>   copia nome/template/parametri/segmenti da una
+      campagna esistente (anche automatica: la copia nasce manuale);
+    - ?segmenti=a,b   preseleziona i segmenti (usato dai CTA dei
+      consigli in dashboard).
+    """
     from apps.clienti.models import Cliente
-    from .models import SegmentoPersonalizzato
+    from .models import Campagna, SegmentoPersonalizzato
     from .services.campagne import PLACEHOLDER_SUPPORTATI
     from .services.segmentazione import (filtra_segmento_personalizzato,
                                          statistiche_clienti)
@@ -178,11 +185,35 @@ def campagna_nuova(request):
         (s.chiave, s.nome, len(filtra_segmento_personalizzato(s, stats)))
         for s in SegmentoPersonalizzato.objects.filter(attivo=True)
     ]
+
+    prefill = {'nome': '', 'template_meta': '', 'params_raw': '', 'segmenti': []}
+    duplica_pk = request.GET.get('duplica', '')
+    if duplica_pk.isdigit():
+        orig = Campagna.objects.filter(pk=int(duplica_pk)).first()
+        if orig is not None:
+            prefill['nome'] = f'{orig.nome} (copia)'
+            prefill['template_meta'] = orig.template_meta
+            prefill['params_raw'] = '\n'.join(orig.template_params or [])
+            chiavi = [s for s in orig.segmento_origine.split(',') if s]
+            prefill['segmenti'] = _chiavi_segmenti_valide(chiavi)
+            # Segmenti custom eliminati nel frattempo, o chiavi non piu'
+            # selezionabili (es. 'richiamo_automatico'): avvisa che la
+            # preselezione e' parziale.
+            if len(prefill['segmenti']) < len(chiavi):
+                messages.info(
+                    request,
+                    'Alcuni segmenti della campagna originale non esistono '
+                    'piu\': controlla la selezione dei destinatari.')
+    elif request.GET.get('segmenti'):
+        prefill['segmenti'] = _chiavi_segmenti_valide(
+            request.GET['segmenti'].split(','))
+
     return render(request, 'marketing/campagna_nuova.html', {
         'segmenti': segmenti,
         'segmenti_custom': segmenti_custom,
         'n_tutti': Cliente.objects.exclude(telefono='').count(),
         'placeholder': PLACEHOLDER_SUPPORTATI,
+        'prefill': prefill,
     })
 
 
@@ -458,6 +489,128 @@ def campagna_annulla(request, pk):
     else:
         messages.error(request, 'La campagna non e\' annullabile in questo stato.')
     return redirect('marketing:campagna-dettaglio', pk=pk)
+
+
+@_staff_required
+def campagna_elimina(request, pk):
+    """Elimina definitivamente una campagna e i suoi invii (CASCADE).
+
+    Ammessa solo su stati "fermi" (bozza, completata, annullata): una
+    campagna con invii in movimento va prima annullata. L'inbox
+    WhatsApp resta intatta (MessaggioWhatsApp non e' in cascade), ma:
+    - le statistiche aggregate (rendimento per segmento, dashboard)
+      perdono i numeri di questa campagna;
+    - i clienti contattati tornano subito ricontattabili, perche' la
+      finestra anti-ricontatto conta gli InvioCampagna 'inviato'.
+    Il confirm nel template avvisa di entrambe le cose.
+    """
+    from django.shortcuts import get_object_or_404
+    from .models import Campagna
+
+    if request.method != 'POST':
+        return redirect('marketing:campagne')
+    campagna = get_object_or_404(Campagna, pk=pk)
+    if campagna.stato not in ('bozza', 'completata', 'annullata'):
+        messages.error(
+            request,
+            'La campagna e\' ancora attiva: prima annullala (o attendi il '
+            'completamento), poi potrai eliminarla.')
+        return redirect('marketing:campagna-dettaglio', pk=pk)
+    nome = campagna.nome
+    campagna.delete()
+    messages.success(
+        request,
+        f'Campagna "{nome}" eliminata con tutti i suoi invii. I clienti '
+        f'contattati non contano piu\' per la finestra anti-ricontatto.')
+    return redirect('marketing:campagne')
+
+
+@_staff_required
+def campagna_riprova_falliti(request, pk):
+    """Rimette in coda in blocco tutti gli invii falliti della campagna.
+
+    Il reset di inviato_il e' obbligatorio: il claim atomico di
+    services/invio.py pretende inviato_il IS NULL, e le righe fallite
+    conservano il timestamp del tentativo. I 'saltato' NON vengono
+    ritentati in blocco (hanno un motivo: opt-out, no telefono, ...):
+    per quelli resta il bottone per-riga nel dettaglio.
+    """
+    from django.shortcuts import get_object_or_404
+    from .models import Campagna
+
+    if request.method != 'POST':
+        return redirect('marketing:campagne')
+    campagna = get_object_or_404(Campagna, pk=pk)
+    if campagna.stato == 'annullata':
+        messages.error(request, 'Campagna annullata: gli invii non si riprovano.')
+        return redirect('marketing:campagna-dettaglio', pk=pk)
+
+    n = campagna.invii.filter(stato='fallito').update(
+        stato='in_coda', inviato_il=None, motivo_salto='')
+    if n == 0:
+        messages.info(request, 'Nessun invio fallito da riprovare.')
+    else:
+        # Una completata torna in_corso cosi' la coda la riprende; il
+        # loop di chiusura del cron la ri-completera' da solo.
+        if campagna.stato == 'completata':
+            campagna.stato = 'in_corso'
+            campagna.completata_il = None
+            campagna.save(update_fields=['stato', 'completata_il'])
+        messages.success(
+            request,
+            f'{n} invio/i fallito/i rimesso/i in coda: partiranno dal '
+            f'prossimo batch (cron o "Processa coda ora").')
+    return redirect('marketing:campagna-dettaglio', pk=pk)
+
+
+@_staff_required
+def campagna_export_csv(request, pk):
+    """Export CSV degli invii della campagna, con esito conversione."""
+    from datetime import timedelta
+
+    from django.db.models import F
+    from django.shortcuts import get_object_or_404
+    from .models import Campagna
+
+    campagna = get_object_or_404(Campagna, pk=pk)
+    finestra = timedelta(days=campagna.finestra_conversione_giorni)
+    # Convertiti in UNA query (stesso join di statistiche_campagna),
+    # niente ha_convertito() per riga che farebbe N+1.
+    convertiti = set(
+        campagna.invii.filter(
+            stato='inviato',
+            cliente__ordine__stato='completato',
+            cliente__ordine__data_ora__gt=F('inviato_il'),
+            cliente__ordine__data_ora__lte=F('inviato_il') + finestra,
+        ).values_list('cliente_id', flat=True)
+    )
+
+    oggi = timezone.localtime(timezone.now()).strftime('%Y%m%d')
+    response = HttpResponse(content_type='text/csv; charset=utf-8')
+    response['Content-Disposition'] = (
+        f'attachment; filename="campagna_{campagna.pk}_{oggi}.csv"'
+    )
+    response.write('﻿')
+    writer = csv.writer(response, delimiter=';')
+    writer.writerow([
+        'Cliente', 'Telefono', 'Stato', 'Inviato il', 'Consegna WA',
+        'Motivo salto', 'Convertito',
+    ])
+    consegna_label = {'read': 'letto', 'delivered': 'recapitato',
+                      'sent': 'inviato', 'failed': 'fallito'}
+    for i in campagna.invii.select_related('cliente', 'messaggio_wa'):
+        writer.writerow([
+            i.cliente.nome_completo,
+            i.cliente.telefono,
+            i.get_stato_display(),
+            timezone.localtime(i.inviato_il).strftime('%d/%m/%Y %H:%M')
+            if i.inviato_il else '',
+            consegna_label.get(i.messaggio_wa.stato, '')
+            if i.messaggio_wa else '',
+            i.motivo_salto,
+            'SI' if i.cliente_id in convertiti else '',
+        ])
+    return response
 
 
 @_staff_required

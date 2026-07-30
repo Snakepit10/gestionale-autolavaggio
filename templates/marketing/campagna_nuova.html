@@ -20,6 +20,7 @@
                 <div class="col-md-6">
                     <label class="form-label fw-bold">Nome campagna *</label>
                     <input type="text" class="form-control" name="nome" required
+                           value="{{ prefill.nome }}"
                            placeholder="es. Riattivazione dormienti luglio">
                 </div>
                 <div class="col-md-6">
@@ -28,6 +29,7 @@
                         <div class="form-check">
                             <input class="form-check-input seg-chk" type="checkbox"
                                    name="segmenti" value="tutti" id="seg-tutti"
+                                   {% if 'tutti' in prefill.segmenti %}checked{% endif %}
                                    onchange="toggleTutti(this)">
                             <label class="form-check-label fw-bold" for="seg-tutti">
                                 Tutti i clienti ({{ n_tutti }} con telefono)
@@ -37,7 +39,8 @@
                         {% for chiave, label, conteggio in segmenti %}
                         <div class="form-check">
                             <input class="form-check-input seg-chk seg-specifico" type="checkbox"
-                                   name="segmenti" value="{{ chiave }}" id="seg-{{ chiave }}">
+                                   name="segmenti" value="{{ chiave }}" id="seg-{{ chiave }}"
+                                   {% if chiave in prefill.segmenti %}checked{% endif %}>
                             <label class="form-check-label" for="seg-{{ chiave }}">
                                 {{ label }} ({{ conteggio }} clienti)
                             </label>
@@ -51,7 +54,8 @@
                         {% for chiave, label, conteggio in segmenti_custom %}
                         <div class="form-check">
                             <input class="form-check-input seg-chk seg-specifico" type="checkbox"
-                                   name="segmenti" value="{{ chiave }}" id="seg-{{ forloop.counter }}-custom">
+                                   name="segmenti" value="{{ chiave }}" id="seg-{{ forloop.counter }}-custom"
+                                   {% if chiave in prefill.segmenti %}checked{% endif %}>
                             <label class="form-check-label" for="seg-{{ forloop.counter }}-custom">
                                 {{ label }} ({{ conteggio }} clienti)
                             </label>
@@ -73,6 +77,7 @@
                 <div class="col-md-6">
                     <label class="form-label fw-bold">Template Meta *</label>
                     <input type="text" class="form-control" name="template_meta" required
+                           value="{{ prefill.template_meta }}"
                            placeholder="es. riattivazione_cliente">
                     <div class="form-text">
                         Nome esatto del template <strong>approvato</strong> su Meta
@@ -83,7 +88,7 @@
                 <div class="col-md-6">
                     <label class="form-label fw-bold">Parametri template (uno per riga)</label>
                     <textarea class="form-control" name="template_params" rows="3"
-                              placeholder="{nome}&#10;20%"></textarea>
+                              placeholder="{nome}&#10;20%">{{ prefill.params_raw }}</textarea>
                     <div class="form-text">
                         Nell'ordine dei segnaposto {1}, {2}, ... del template.
                         Placeholder disponibili:
@@ -111,5 +116,10 @@ function toggleTutti(chk) {
         if (chk.checked) c.checked = false;
     });
 }
+// Con il prefill (duplica / CTA consigli) "tutti" puo' arrivare gia'
+// spuntato dal server: riallinea lo stato disabled degli altri.
+document.addEventListener('DOMContentLoaded', () => {
+    toggleTutti(document.getElementById('seg-tutti'));
+});
 </script>
 {% endblock %}
