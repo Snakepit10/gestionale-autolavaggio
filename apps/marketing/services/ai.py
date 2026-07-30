@@ -185,13 +185,13 @@ _SCHEMA_ANALISI = {
                            'opportunita. 2-4 paragrafi.',
         },
         'best_practice': {
-            'type': 'array', 'maxItems': 6,
+            'type': 'array',
             'items': {'type': 'string'},
             'description': 'Best practice concrete e applicabili a un '
                            'autolavaggio con marketing WhatsApp.',
         },
         'proposte_segmenti': {
-            'type': 'array', 'maxItems': 4,
+            'type': 'array',
             'items': {
                 'type': 'object',
                 'properties': {
@@ -206,7 +206,7 @@ _SCHEMA_ANALISI = {
             },
         },
         'proposte_campagne': {
-            'type': 'array', 'maxItems': 4,
+            'type': 'array',
             'items': {
                 'type': 'object',
                 'properties': {
@@ -236,7 +236,7 @@ _SCHEMA_ANALISI = {
             },
         },
         'promozioni': {
-            'type': 'array', 'maxItems': 4,
+            'type': 'array',
             'items': {
                 'type': 'object',
                 'properties': {
@@ -277,6 +277,9 @@ bundle interni+esterni, gettoni omaggio del sistema monete, tessere lavaggi) \
 e coerenti con i margini: mai regalare piu' del necessario.
 - Rispetta i vincoli anti-spam del contesto (tetto giornaliero, fascia \
 oraria, finestra no-ricontatto): non proporre volumi impossibili.
+- Quantita': al massimo 6 best practice e al massimo 4 voci ciascuno per \
+proposte_segmenti, proposte_campagne e promozioni. Meglio poche proposte \
+forti che tante deboli.
 - Basa TUTTO sui numeri del contesto: cita i dati che giustificano ogni \
 proposta nella motivazione. Non inventare dati.
 - Nessun messaggio parte in automatico: le tue proposte sono bozze che \
