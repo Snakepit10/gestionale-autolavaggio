@@ -249,32 +249,32 @@ def genera_consigli(stats, ris, cfg) -> list[dict]:
 
 
 # ---------------------------------------------------------------------
-# Seam per la futura analisi AI (oggi inerte, per scelta dell'utente)
+# Consulente AI (la generazione vera e' in services/ai.py)
 # ---------------------------------------------------------------------
 
-def raccogli_contesto() -> dict:
-    """Aggregati anonimi del modulo marketing, pronti da passare a un
-    modello AI. SOLO numeri aggregati: niente nomi, telefoni o dati
-    personali dei clienti."""
-    from .segmentazione import segmenta_clienti
-    from .statistiche import kpi_dashboard, stats_ultime_campagne
-
-    ris = segmenta_clienti()
-    return {
-        'kpi': kpi_dashboard(),
-        'segmenti': {k: len(ris.get(k))
-                     for k in ('attivi', 'rallentamento', 'dormienti', 'one_shot')},
-        'ultime_campagne': stats_ultime_campagne(8),
-    }
-
-
 def analisi_ai(contesto: dict | None = None) -> list[dict]:
-    """Punto di aggancio per i consigli generati dall'AI (Claude API).
+    """Card del consulente AI in dashboard.
 
-    Oggi ritorna sempre [] — l'integrazione e' stata rimandata su
-    scelta dell'utente. Quando verra' attivata dovra' partire da
-    raccogli_contesto() (se contesto non e' passato) e restituire card
-    nello stesso formato di genera_consigli(); la vista le concatena
-    gia', quindi non servira' toccare vista ne' template.
+    NON chiama la Claude API (costerebbe a ogni caricamento pagina):
+    mostra una card se l'ultima analisi salvata e' recente e ha
+    proposte, rimandando alla pagina del consulente. La generazione
+    vera avviene solo on-demand da quella pagina (services/ai.py).
     """
-    return []
+    from apps.marketing.models import AnalisiAI
+
+    ultima = AnalisiAI.objects.first()   # ordering -creata_il
+    if ultima is None or ultima.n_proposte == 0:
+        return []
+    if (timezone.now() - ultima.creata_il).days > 30:
+        return []
+    return [{
+        'icona': 'bi-stars', 'priorita': 85,
+        'titolo': f'Il consulente AI ha {ultima.n_proposte} proposte pronte',
+        'testo': (f'Analisi del {timezone.localtime(ultima.creata_il):%d/%m/%Y}: '
+                  f'{len(ultima.proposte_campagne)} campagne, '
+                  f'{len(ultima.proposte_segmenti)} segmenti e '
+                  f'{len(ultima.promozioni)} promozioni da rivedere. '
+                  f'Nulla parte senza la tua approvazione.'),
+        'cta_url': reverse('marketing:ai'),
+        'cta_label': 'Apri il consulente AI',
+    }]

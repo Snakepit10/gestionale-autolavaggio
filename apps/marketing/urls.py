@@ -9,6 +9,11 @@ urlpatterns = [
     path('segmento/<str:chiave>/export/', views.segmento_export_csv, name='segmento-export'),
     path('impostazioni/', views.impostazioni, name='impostazioni'),
 
+    # Consulente AI
+    path('ai/', views.ai_consulente, name='ai'),
+    path('ai/genera/', views.ai_genera, name='ai-genera'),
+    path('ai/<int:pk>/segmento/<int:idx>/crea/', views.ai_crea_segmento, name='ai-crea-segmento'),
+
     # Segmenti personalizzati (criteri configurabili)
     path('segmenti-personalizzati/', views.segmenti_custom, name='segmenti-custom'),
     path('segmenti-personalizzati/nuovo/', views.segmento_custom_form, name='segmento-custom-nuovo'),

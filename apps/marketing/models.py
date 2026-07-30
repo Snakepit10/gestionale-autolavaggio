@@ -214,6 +214,52 @@ class SegmentoPersonalizzato(models.Model):
         return out or ['nessun criterio (tutti i clienti con storico)']
 
 
+class AnalisiAI(models.Model):
+    """Un'analisi del consulente AI marketing (Claude API).
+
+    Ogni generazione e' salvata: l'operatore puo' rileggere le analisi
+    passate senza rispendere token. Le proposte (segmenti, campagne,
+    promozioni) restano JSON: diventano oggetti veri solo quando
+    l'operatore le approva coi bottoni della pagina AI — l'AI non
+    invia MAI nulla da sola.
+    """
+
+    creata_il = models.DateTimeField(auto_now_add=True)
+    creata_da = models.ForeignKey(
+        settings.AUTH_USER_MODEL, null=True, blank=True,
+        on_delete=models.SET_NULL, related_name='+',
+    )
+    modello = models.CharField(
+        max_length=60, default='',
+        help_text='Modello Claude usato per questa analisi.')
+
+    # Cosa ha visto l'AI (solo aggregati anonimi) e cosa ha risposto.
+    contesto = models.JSONField(default=dict)
+    analisi = models.TextField(
+        default='', help_text="Analisi generale dell'andamento marketing.")
+    best_practice = models.JSONField(default=list)
+    proposte_segmenti = models.JSONField(default=list)
+    proposte_campagne = models.JSONField(default=list)
+    promozioni = models.JSONField(default=list)
+
+    # Trasparenza costi
+    token_input = models.PositiveIntegerField(default=0)
+    token_output = models.PositiveIntegerField(default=0)
+
+    class Meta:
+        ordering = ['-creata_il']
+        verbose_name = 'Analisi AI'
+        verbose_name_plural = 'Analisi AI'
+
+    def __str__(self):
+        return f'Analisi AI del {self.creata_il:%d/%m/%Y %H:%M}'
+
+    @property
+    def n_proposte(self) -> int:
+        return (len(self.proposte_segmenti) + len(self.proposte_campagne)
+                + len(self.promozioni))
+
+
 class Campagna(models.Model):
     TIPO_CHOICES = [
         ('manuale', 'Manuale'),

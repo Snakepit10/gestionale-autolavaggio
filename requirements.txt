@@ -33,3 +33,6 @@ paho-mqtt>=2.0
 
 # Pagamenti online monete virtuali
 stripe>=9.0
+
+# Consulente AI marketing (Claude API)
+anthropic>=0.120

@@ -82,6 +82,7 @@ def dashboard(request):
     serie = serie_mensile(6)
     ultime = stats_ultime_campagne(8)
     consigli = genera_consigli(stats, ris, cfg) + analisi_ai()
+    consigli.sort(key=lambda c: -c['priorita'])
 
     chart_data = {
         'serie': serie,
@@ -242,6 +243,15 @@ def campagna_nuova(request):
     elif request.GET.get('segmenti'):
         prefill['segmenti'] = _chiavi_segmenti_valide(
             request.GET['segmenti'].split(','))
+
+    # Prefill esplicito (usato dalle proposte del consulente AI):
+    # sovrascrive i singoli campi se presenti in querystring.
+    if request.GET.get('nome'):
+        prefill['nome'] = request.GET['nome']
+    if request.GET.get('template'):
+        prefill['template_meta'] = request.GET['template']
+    if request.GET.getlist('param'):
+        prefill['params_raw'] = '\n'.join(request.GET.getlist('param'))
 
     return render(request, 'marketing/campagna_nuova.html', {
         'segmenti': segmenti,
@@ -715,6 +725,137 @@ def impostazioni(request):
         return redirect('marketing:impostazioni')
 
     return render(request, 'marketing/impostazioni.html', {'cfg': cfg})
+
+
+# ---------------------------------------------------------------------
+# Consulente AI (analisi e proposte via Claude API)
+# ---------------------------------------------------------------------
+
+def _prepara_proposte_campagne(analisi):
+    """Arricchisce le proposte campagna dell'analisi con l'URL del
+    composer precompilato e la label leggibile dei segmenti."""
+    from urllib.parse import urlencode
+
+    from django.urls import reverse
+
+    out = []
+    for p in analisi.proposte_campagne:
+        chiavi = _chiavi_segmenti_valide(p.get('segmenti') or [])
+        coppie = [('nome', p.get('nome', '')),
+                  ('template', p.get('template_meta', ''))]
+        if chiavi:
+            coppie.append(('segmenti', ','.join(chiavi)))
+        coppie += [('param', x) for x in (p.get('template_params') or [])]
+        out.append({
+            **p,
+            'segmenti_label': _label_chiavi(chiavi) if chiavi else '',
+            'segmenti_spariti': len(chiavi) < len(p.get('segmenti') or []),
+            'cta_url': reverse('marketing:campagna-nuova') + '?' + urlencode(coppie),
+        })
+    return out
+
+
+@_staff_required
+def ai_consulente(request):
+    """Pagina del consulente AI: ultima analisi (o una passata via
+    ?id=) con proposte azionabili + storico."""
+    from .models import AnalisiAI
+    from .services.ai import ai_disponibile, template_approvati
+
+    analisi = None
+    analisi_id = request.GET.get('id', '')
+    if analisi_id.isdigit():
+        analisi = AnalisiAI.objects.filter(pk=int(analisi_id)).first()
+    if analisi is None:
+        analisi = AnalisiAI.objects.first()   # ordering -creata_il
+
+    proposte_campagne = _prepara_proposte_campagne(analisi) if analisi else []
+    costo_stimato = None
+    if analisi and (analisi.token_input or analisi.token_output):
+        # Prezzi Claude Opus 5: 5 USD/1M input, 25 USD/1M output.
+        costo_stimato = (analisi.token_input * 5 +
+                         analisi.token_output * 25) / 1_000_000
+
+    return render(request, 'marketing/ai.html', {
+        'disponibile': ai_disponibile(),
+        'analisi': analisi,
+        'proposte_campagne': proposte_campagne,
+        'storico': AnalisiAI.objects.all()[:12],
+        'n_template': len(template_approvati()),
+        'costo_stimato': costo_stimato,
+    })
+
+
+@_staff_required
+def ai_genera(request):
+    """POST: genera una nuova analisi AI (chiamata sincrona a Claude,
+    puo' richiedere fino a un minuto)."""
+    from .services.ai import genera_analisi
+
+    if request.method != 'POST':
+        return redirect('marketing:ai')
+    try:
+        analisi = genera_analisi(user=request.user)
+    except RuntimeError as e:
+        messages.error(request, str(e))
+        return redirect('marketing:ai')
+    except Exception:
+        import logging
+        logging.getLogger(__name__).exception('analisi AI: errore inatteso')
+        messages.error(request, 'Errore inatteso durante l\'analisi: '
+                                'riprova tra qualche minuto.')
+        return redirect('marketing:ai')
+    messages.success(
+        request,
+        f'Analisi completata: {analisi.n_proposte} proposte. Rivedile e '
+        f'attiva solo quelle che ti convincono — nulla parte da solo.')
+    return redirect('marketing:ai')
+
+
+@_staff_required
+def ai_crea_segmento(request, pk, idx):
+    """POST: crea un SegmentoPersonalizzato da una proposta dell'AI."""
+    from decimal import Decimal
+
+    from django.shortcuts import get_object_or_404
+    from .models import AnalisiAI, SegmentoPersonalizzato
+    from .services.ai import CRITERI_SEGMENTO
+
+    if request.method != 'POST':
+        return redirect('marketing:ai')
+    analisi = get_object_or_404(AnalisiAI, pk=pk)
+    try:
+        proposta = analisi.proposte_segmenti[idx]
+    except (IndexError, TypeError):
+        messages.error(request, 'Proposta di segmento non trovata.')
+        return redirect('marketing:ai')
+
+    nome = (proposta.get('nome') or 'Segmento AI').strip()[:100]
+    if SegmentoPersonalizzato.objects.filter(nome=nome).exists():
+        messages.info(request, f'Il segmento "{nome}" esiste gia\'.')
+        return redirect('marketing:segmenti-custom')
+
+    seg = SegmentoPersonalizzato(
+        nome=nome,
+        descrizione=(proposta.get('descrizione') or '')[:200],
+        attivo=True,
+    )
+    for campo in CRITERI_SEGMENTO:
+        val = proposta.get(campo)
+        if val is None:
+            continue
+        if campo.startswith(('lavaggi', 'giorni')):
+            setattr(seg, campo, int(val))
+        elif campo.startswith('frequenza'):
+            setattr(seg, campo, float(val))
+        else:
+            setattr(seg, campo, Decimal(str(val)))
+    seg.save()
+    messages.success(
+        request,
+        f'Segmento "{seg.nome}" creato dalla proposta AI: ora e\' '
+        f'selezionabile nelle campagne.')
+    return redirect('marketing:segmento-custom', pk=seg.pk)
 
 
 # ---------------------------------------------------------------------

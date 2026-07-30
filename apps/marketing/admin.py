@@ -1,7 +1,18 @@
 from django.contrib import admin
 
-from .models import (Campagna, ImpostazioniMarketing, InvioCampagna,
-                     SegmentoPersonalizzato)
+from .models import (AnalisiAI, Campagna, ImpostazioniMarketing,
+                     InvioCampagna, SegmentoPersonalizzato)
+
+
+@admin.register(AnalisiAI)
+class AnalisiAIAdmin(admin.ModelAdmin):
+    list_display = ('creata_il', 'creata_da', 'modello',
+                    'token_input', 'token_output')
+    readonly_fields = [f.name for f in AnalisiAI._meta.fields]
+
+    def has_add_permission(self, request):
+        # Si crea solo dalla pagina Consulente AI (chiamata API).
+        return False
 
 
 @admin.register(SegmentoPersonalizzato)

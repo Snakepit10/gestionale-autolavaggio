@@ -303,6 +303,12 @@ PAYPAL_SECRET = os.environ.get('PAYPAL_SECRET', '')
 PAYPAL_BASE_URL = os.environ.get(
     'PAYPAL_BASE_URL', 'https://api-m.sandbox.paypal.com')
 
+# === Consulente AI marketing (Claude API) ===
+# Chiave da console.anthropic.com. Vuota = la pagina AI mostra le
+# istruzioni di attivazione invece del bottone di analisi.
+ANTHROPIC_API_KEY = os.environ.get('ANTHROPIC_API_KEY', '')
+ANTHROPIC_MODEL = os.environ.get('ANTHROPIC_MODEL', 'claude-opus-5')
+
 # === WhatsApp Cloud API (Meta) ===
 # Notifiche prenotazione cliente via WhatsApp Business. Senza le env vars
 # il sistema cade automaticamente sul fallback email (notifications.py).

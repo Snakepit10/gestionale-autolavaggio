@@ -146,3 +146,35 @@ python manage.py esegui_campagne_marketing --dry-run
   costruito reputazione: Meta valuta il tasso di block/report.
 - Ogni messaggio promozionale resta visibile nell'inbox `/messaggi/`
   del gestionale (stesso storico delle altre comunicazioni).
+
+
+## Consulente AI (Claude API)
+
+Pagina **Marketing -> Consulente AI**: analizza i dati aggregati del
+modulo (KPI, segmenti, rendimento campagne, impostazioni) e produce:
+
+- analisi discorsiva dell andamento + best practice;
+- **proposte di segmenti** (un click -> crea il SegmentoPersonalizzato);
+- **proposte di campagne** (un click -> composer precompilato: si passa
+  comunque da preview e conferma, NULLA parte in automatico);
+- **promozioni** realistiche (sconti, bundle, gettoni omaggio).
+
+Garanzie:
+
+- le campagne proposte possono usare SOLO template Meta con stato
+  APPROVED (lista letta dalla Graph API e riverificata lato server);
+- al modello vengono inviati SOLO aggregati anonimi: mai nomi,
+  telefoni o dati personali dei clienti;
+- ogni analisi e salvata con i token consumati (costo tipico: pochi
+  centesimi) ed e consultabile dallo storico in alto a destra.
+
+### Setup
+
+1. Creare una API key su console.anthropic.com.
+2. Su Railway (servizio web) impostare `ANTHROPIC_API_KEY`.
+3. Facoltativo: `ANTHROPIC_MODEL` per cambiare modello (default
+   `claude-opus-5`).
+
+Senza chiave la pagina mostra le istruzioni e il resto del modulo
+funziona normalmente (i consigli rule-based della dashboard non usano
+l AI e sono sempre gratuiti).
