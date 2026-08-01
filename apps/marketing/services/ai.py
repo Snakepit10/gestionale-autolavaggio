@@ -443,9 +443,13 @@ def genera_analisi(user=None):
         max_retries=1,
     )
     try:
+        # max_tokens abbondante: su Opus 5 il "ragionamento" adattivo
+        # (attivo di default) consuma token da questo stesso budget
+        # PRIMA del JSON finale — con un tetto basso la risposta arriva
+        # troncata a meta' (JSONDecodeError gia' visto in produzione).
         response = client.messages.create(
             model=settings.ANTHROPIC_MODEL,
-            max_tokens=8000,
+            max_tokens=16000,
             system=_SYSTEM_PROMPT,
             messages=[{
                 'role': 'user',
@@ -468,8 +472,22 @@ def genera_analisi(user=None):
         logger.error('analisi AI fallita: %s', e)
         raise RuntimeError(f'Errore dalla Claude API: {e}')
 
+    if response.stop_reason == 'max_tokens':
+        # Il JSON e' certamente incompleto: inutile provare a leggerlo.
+        logger.error('analisi AI troncata: max_tokens raggiunto '
+                     '(in=%s out=%s)', response.usage.input_tokens,
+                     response.usage.output_tokens)
+        raise RuntimeError(
+            'L\'analisi e\' risultata troppo lunga ed e\' stata troncata: '
+            'riprova (di solito al secondo tentativo riesce).')
+
     testo = next(b.text for b in response.content if b.type == 'text')
-    dati = json.loads(testo)
+    try:
+        dati = json.loads(testo)
+    except json.JSONDecodeError as e:
+        logger.error('analisi AI: JSON non valido (%s). Inizio risposta: %s',
+                     e, testo[:300])
+        raise RuntimeError('La risposta dell\'AI non era leggibile: riprova.')
 
     # Etichetta lato server lo stato del template di ogni campagna
     # proposta (mai fidarsi solo del prompt): 'approvato' se e' nella
