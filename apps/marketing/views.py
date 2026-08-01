@@ -733,10 +733,15 @@ def impostazioni(request):
 
 def _prepara_proposte_campagne(analisi):
     """Arricchisce le proposte campagna dell'analisi con l'URL del
-    composer precompilato e la label leggibile dei segmenti."""
+    composer precompilato, la label dei segmenti e lo stato del
+    template (approvato / proposto dall'AI / da verificare)."""
     from urllib.parse import urlencode
 
     from django.urls import reverse
+    from .services.ai import template_approvati
+
+    approvati = {t['nome'] for t in template_approvati()}
+    proposti = {t.get('nome') for t in analisi.proposte_template}
 
     out = []
     for p in analisi.proposte_campagne:
@@ -746,8 +751,18 @@ def _prepara_proposte_campagne(analisi):
         if chiavi:
             coppie.append(('segmenti', ','.join(chiavi)))
         coppie += [('param', x) for x in (p.get('template_params') or [])]
+
+        # Stato salvato alla generazione; per le analisi vecchie (o se
+        # nel frattempo il template e' stato approvato) si ricalcola.
+        stato = p.get('stato_template', 'da_verificare')
+        if p.get('template_meta') in approvati:
+            stato = 'approvato'
+        elif p.get('template_meta') in proposti:
+            stato = 'proposto'
+
         out.append({
             **p,
+            'stato_template': stato,
             'segmenti_label': _label_chiavi(chiavi) if chiavi else '',
             'segmenti_spariti': len(chiavi) < len(p.get('segmenti') or []),
             'cta_url': reverse('marketing:campagna-nuova') + '?' + urlencode(coppie),

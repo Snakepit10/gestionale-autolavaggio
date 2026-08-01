@@ -157,12 +157,22 @@ modulo (KPI, segmenti, rendimento campagne, impostazioni) e produce:
 - **proposte di segmenti** (un click -> crea il SegmentoPersonalizzato);
 - **proposte di campagne** (un click -> composer precompilato: si passa
   comunque da preview e conferma, NULLA parte in automatico);
-- **promozioni** realistiche (sconti, bundle, gettoni omaggio).
+- **proposte di template WhatsApp**: bozze con testo pronto ("Copia
+  testo") da incollare in Meta WhatsApp Manager -> Message templates;
+- **promozioni** realistiche (sconti, bundle, gettoni omaggio)
+  calibrate su listino prezzi e vendite reali.
+
+Oltre ai dati marketing, l AI legge il listino servizi con i prezzi e
+gli aggregati di vendita (fatturato 30/90gg, scontrino medio, top
+servizi, fatturato per giorno della settimana, self-service) per
+analisi piu profonde.
 
 Garanzie:
 
-- le campagne proposte possono usare SOLO template Meta con stato
-  APPROVED (lista letta dalla Graph API e riverificata lato server);
+- ogni campagna proposta mostra lo stato del template con un badge:
+  verde "approvato", giallo "da creare su Meta" (bozza proposta nella
+  stessa analisi), grigio "verifica approvazione". L invio reale
+  funziona solo con template approvati da Meta;
 - al modello vengono inviati SOLO aggregati anonimi: mai nomi,
   telefoni o dati personali dei clienti;
 - ogni analisi e salvata con i token consumati (costo tipico: pochi

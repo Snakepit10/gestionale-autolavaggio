@@ -97,6 +97,19 @@
                 <div class="fw-bold">{{ p.nome }}</div>
                 <div class="small text-muted mb-2">
                     Template: <code>{{ p.template_meta }}</code>
+                    {% if p.stato_template == 'approvato' %}
+                    <span class="badge bg-success">approvato</span>
+                    {% elif p.stato_template == 'proposto' %}
+                    <span class="badge bg-warning text-dark"
+                          title="Bozza proposta qui sotto: crealo su Meta WhatsApp Manager e attendi l'approvazione prima di inviare">
+                        da creare su Meta
+                    </span>
+                    {% else %}
+                    <span class="badge bg-secondary"
+                          title="Verifica su Meta WhatsApp Manager che questo template esista e sia approvato">
+                        verifica approvazione
+                    </span>
+                    {% endif %}
                     {% if p.segmenti_label %} · Destinatari: {{ p.segmenti_label }}{% endif %}
                     {% if p.segmenti_spariti %}
                     <span class="badge bg-warning text-dark">segmenti da ricontrollare</span>
@@ -153,6 +166,43 @@
                             <i class="bi bi-plus-circle"></i> Crea segmento
                         </button>
                     </form>
+                </div>
+            </div>
+        </div>
+    </div>
+    {% endfor %}
+</div>
+{% endif %}
+
+{% if analisi.proposte_template %}
+<h5 class="mt-4 mb-3"><i class="bi bi-chat-square-text text-primary"></i> Template proposti (da approvare su Meta)</h5>
+<p class="text-muted small">
+    Bozze pronte: copiale in <strong>Meta WhatsApp Manager &rarr; Message
+    templates &rarr; Create template</strong> (stesso nome e categoria).
+    Dopo l'approvazione di Meta (in genere qualche ora) le campagne che
+    li usano si possono inviare.
+</p>
+<div class="row g-3 mb-4">
+    {% for p in analisi.proposte_template %}
+    <div class="col-lg-6">
+        <div class="card border-0 shadow-sm h-100">
+            <div class="card-body d-flex flex-column">
+                <div class="d-flex justify-content-between align-items-start">
+                    <div class="fw-bold"><code>{{ p.nome }}</code></div>
+                    <span class="badge {% if p.categoria == 'UTILITY' %}bg-info text-dark{% else %}bg-primary{% endif %}">{{ p.categoria }}</span>
+                </div>
+                <pre class="border rounded p-2 mt-2 mb-1 small" style="white-space: pre-wrap; background:#f8fafc;" id="tpl-body-{{ forloop.counter }}">{{ p.testo_body }}</pre>
+                {% if p.esempio_parametri %}
+                <div class="small text-muted mb-1">Parametri di esempio:
+                    {% for par in p.esempio_parametri %}<code>{{ par }}</code>{% if not forloop.last %}, {% endif %}{% endfor %}
+                </div>
+                {% endif %}
+                <div class="text-muted small flex-grow-1">{{ p.motivazione }}</div>
+                <div class="mt-2">
+                    <button type="button" class="btn btn-sm btn-outline-secondary"
+                            onclick="navigator.clipboard.writeText(document.getElementById('tpl-body-{{ forloop.counter }}').textContent).then(() => { this.innerHTML = '<i class=\'bi bi-check\'></i> Copiato'; });">
+                        <i class="bi bi-clipboard"></i> Copia testo
+                    </button>
                 </div>
             </div>
         </div>

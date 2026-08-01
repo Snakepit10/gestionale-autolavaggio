@@ -240,6 +240,9 @@ class AnalisiAI(models.Model):
     best_practice = models.JSONField(default=list)
     proposte_segmenti = models.JSONField(default=list)
     proposte_campagne = models.JSONField(default=list)
+    proposte_template = models.JSONField(
+        default=list,
+        help_text='Bozze di template WhatsApp da creare/approvare su Meta.')
     promozioni = models.JSONField(default=list)
 
     # Trasparenza costi
@@ -257,7 +260,7 @@ class AnalisiAI(models.Model):
     @property
     def n_proposte(self) -> int:
         return (len(self.proposte_segmenti) + len(self.proposte_campagne)
-                + len(self.promozioni))
+                + len(self.proposte_template) + len(self.promozioni))
 
 
 class Campagna(models.Model):

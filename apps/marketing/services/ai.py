@@ -9,9 +9,12 @@ Le proposte diventano operative SOLO con un click dell'operatore:
 - proposta segmento  -> crea un SegmentoPersonalizzato
 - proposta campagna  -> apre il composer precompilato (poi il solito
   flusso preview -> conferma: e' li' l'autorizzazione all'invio)
-Vincolo concordato: le campagne proposte possono usare SOLO template
-Meta gia' APPROVATI (la lista viene passata all'AI nel contesto e la
-proposta viene comunque riverificata qui prima di mostrarla).
+- proposta template  -> bozza pronta da incollare in Meta WhatsApp
+  Manager (l'invio reale resta possibile solo dopo l'approvazione
+  Meta: se la campagna usa un template non approvato, l'invio fallisce
+  e la UI lo segnala col badge sullo stato del template)
+Il contesto include anche listino servizi e aggregati di vendita
+(fatturato, top servizi, giorni deboli) per analisi piu' profonde.
 
 Costi: una analisi consuma qualche migliaio di token (centesimi).
 I token di ogni analisi sono salvati per trasparenza.
@@ -97,22 +100,111 @@ def template_approvati() -> list[dict]:
     return out
 
 
-def _nomi_template_utilizzabili(templates: list[dict]) -> list[str]:
-    """Nomi template proponibili: quelli approvati su Meta, oppure (se
-    il listing non e' disponibile) quelli gia' usati con successo in
-    campagne passate + il template del richiamo."""
-    from apps.marketing.models import Campagna, ImpostazioniMarketing
+# ---------------------------------------------------------------------
+# Listino e vendite (per analisi su prezzi e andamento)
+# ---------------------------------------------------------------------
 
-    if templates:
-        return [t['nome'] for t in templates]
-    nomi = set(
-        Campagna.objects.exclude(template_meta='')
-        .values_list('template_meta', flat=True)
+def listino_servizi() -> list[dict]:
+    """Catalogo servizi/prodotti attivi con prezzo, per proposte con
+    numeri realistici (sconti sostenibili, bundle sensati)."""
+    from apps.core.models import ServizioProdotto
+
+    return [
+        {
+            'titolo': s.titolo,
+            'tipo': s.tipo,
+            'prezzo': float(s.prezzo),
+            'categoria': s.categoria.nome if s.categoria_id else '',
+            'durata_minuti': s.durata_minuti if s.tipo == 'servizio' else None,
+        }
+        for s in (ServizioProdotto.objects.filter(attivo=True)
+                  .select_related('categoria').order_by('categoria__nome', 'titolo'))
+    ]
+
+
+def report_vendite() -> dict:
+    """Aggregati di vendita (stessa base dei report giornata/periodo di
+    /finanze/): fatturato, scontrino medio, top servizi, giorni deboli.
+    Solo numeri aggregati, nessun dato del singolo cliente."""
+    from datetime import timedelta
+
+    from django.db.models import Count, Sum
+    from django.utils import timezone as tz
+
+    from apps.ordini.models import ItemOrdine, Ordine
+
+    oggi = tz.localtime(tz.now()).date()
+
+    def _fatturato_ordini(da, a):
+        qs = Ordine.objects.filter(
+            data_ora__date__gte=da, data_ora__date__lte=a,
+        ).exclude(stato='annullato')
+        agg = qs.aggregate(tot=Sum('totale_finale'), n=Count('id'))
+        tot = float(agg['tot'] or 0)
+        n = agg['n'] or 0
+        return {'fatturato': round(tot, 2), 'n_ordini': n,
+                'scontrino_medio': round(tot / n, 2) if n else 0.0}
+
+    ultimi_30 = _fatturato_ordini(oggi - timedelta(days=29), oggi)
+    prec_30 = _fatturato_ordini(oggi - timedelta(days=59),
+                                oggi - timedelta(days=30))
+
+    # Vendite self-service (portali/cambia gettoni) dalle chiusure
+    # automatiche: contesto utile ma non indispensabile, quindi non
+    # deve mai far fallire l'analisi.
+    self_service_30 = None
+    try:
+        from apps.finanze.models import ChiusuraCassaAutomatica
+        tot = 0.0
+        for c in (ChiusuraCassaAutomatica.objects
+                  .filter(data__gte=oggi - timedelta(days=29), data__lte=oggi)
+                  .select_related('cassa')):
+            if not c.cassa.modalita_registratore:
+                tot += float(c.vendita_totale)
+        self_service_30 = round(tot, 2)
+    except Exception:
+        pass
+
+    # Top servizi per ricavo negli ultimi 90 giorni
+    from django.db.models import DecimalField, ExpressionWrapper, F
+    top = (
+        ItemOrdine.objects
+        .filter(ordine__data_ora__date__gte=oggi - timedelta(days=89))
+        .exclude(ordine__stato='annullato')
+        .values('servizio_prodotto__titolo')
+        .annotate(
+            ricavo=Sum(ExpressionWrapper(
+                F('prezzo_unitario') * F('quantita'),
+                output_field=DecimalField(max_digits=12, decimal_places=2))),
+            qta=Sum('quantita'),
+        )
+        .order_by('-ricavo')[:12]
     )
-    tpl_richiamo = ImpostazioniMarketing.get_solo().richiamo_template_meta
-    if tpl_richiamo:
-        nomi.add(tpl_richiamo)
-    return sorted(nomi)
+    top_servizi = [
+        {'servizio': r['servizio_prodotto__titolo'],
+         'ricavo': float(r['ricavo'] or 0), 'quantita': r['qta'] or 0}
+        for r in top
+    ]
+
+    # Fatturato per giorno della settimana (90gg): trova i giorni deboli
+    per_giorno = {i: 0.0 for i in range(7)}
+    for o in (Ordine.objects
+              .filter(data_ora__date__gte=oggi - timedelta(days=89))
+              .exclude(stato='annullato')
+              .values_list('data_ora', 'totale_finale')):
+        per_giorno[tz.localtime(o[0]).weekday()] += float(o[1] or 0)
+    giorni_it = ['lunedi', 'martedi', 'mercoledi', 'giovedi',
+                 'venerdi', 'sabato', 'domenica']
+    fatturato_settimana = {giorni_it[i]: round(per_giorno[i], 2)
+                           for i in range(7)}
+
+    return {
+        'ordini_ultimi_30gg': ultimi_30,
+        'ordini_30gg_precedenti': prec_30,
+        'self_service_ultimi_30gg': self_service_30,
+        'top_servizi_90gg': top_servizi,
+        'fatturato_per_giorno_settimana_90gg': fatturato_settimana,
+    }
 
 
 # ---------------------------------------------------------------------
@@ -166,6 +258,8 @@ def contesto_per_ai() -> dict:
         },
         'template_meta_approvati': templates,
         'placeholder_supportati': list(PLACEHOLDER_SUPPORTATI),
+        'listino': listino_servizi(),
+        'vendite': report_vendite(),
     }
 
 
@@ -219,8 +313,10 @@ _SCHEMA_ANALISI = {
                     },
                     'template_meta': {
                         'type': 'string',
-                        'description': 'ESCLUSIVAMENTE un nome dalla lista '
-                                       'template_meta_approvati del contesto.',
+                        'description': 'Nome di un template approvato dal '
+                                       'contesto, OPPURE il nome di un '
+                                       'template proposto in '
+                                       'proposte_template di questa analisi.',
                     },
                     'template_params': {
                         'type': 'array', 'items': {'type': 'string'},
@@ -232,6 +328,36 @@ _SCHEMA_ANALISI = {
                 },
                 'required': ['nome', 'segmenti', 'template_meta',
                              'template_params', 'promozione', 'motivazione'],
+                'additionalProperties': False,
+            },
+        },
+        'proposte_template': {
+            'type': 'array',
+            'items': {
+                'type': 'object',
+                'properties': {
+                    'nome': {
+                        'type': 'string',
+                        'description': 'Nome template stile Meta: minuscolo, '
+                                       'parole separate da underscore.',
+                    },
+                    'categoria': {'type': 'string',
+                                  'enum': ['MARKETING', 'UTILITY']},
+                    'testo_body': {
+                        'type': 'string',
+                        'description': 'Testo del messaggio con segnaposto '
+                                       '{{1}}, {{2}}... pronto da incollare '
+                                       'in Meta WhatsApp Manager.',
+                    },
+                    'esempio_parametri': {
+                        'type': 'array', 'items': {'type': 'string'},
+                        'description': 'Un valore di esempio per ogni '
+                                       'segnaposto, nell ordine.',
+                    },
+                    'motivazione': {'type': 'string'},
+                },
+                'required': ['nome', 'categoria', 'testo_body',
+                             'esempio_parametri', 'motivazione'],
                 'additionalProperties': False,
             },
         },
@@ -250,7 +376,7 @@ _SCHEMA_ANALISI = {
         },
     },
     'required': ['analisi', 'best_practice', 'proposte_segmenti',
-                 'proposte_campagne', 'promozioni'],
+                 'proposte_campagne', 'proposte_template', 'promozioni'],
     'additionalProperties': False,
 }
 
@@ -260,13 +386,21 @@ proponi azioni concrete per aumentare i lavaggi e il fatturato.
 
 Regole vincolanti:
 - Rispondi SEMPRE in italiano, con tono pratico da consulente, senza gergo.
-- Le campagne proposte devono usare ESCLUSIVAMENTE i nomi template presenti \
-in template_meta_approvati nel contesto. Se la lista e' vuota, proponi \
-campagne solo con i template gia' usati (visibili in ultime_campagne) e \
-segnala nell'analisi che conviene far approvare template dedicati su Meta.
+- Le campagne proposte usano un template in template_meta_approvati del \
+contesto OPPURE un template che proponi tu in proposte_template (stesso \
+nome): in quel caso l'operatore dovra' prima crearlo e farlo approvare su \
+Meta WhatsApp Manager. Preferisci i template gia' approvati quando adatti.
+- proposte_template (max 3): bozze di template WhatsApp nuovi quando quelli \
+approvati non bastano. Nome in minuscolo_con_underscore, testo body con \
+segnaposto {{1}}, {{2}}..., tono cordiale ma professionale, sempre con un \
+invito all'azione chiaro (e ricordati che il cliente puo' rispondere STOP). \
+Categoria MARKETING per promo, UTILITY solo per messaggi di servizio.
 - Nei template_params usa i placeholder supportati ({nome}, \
 {giorni_ultimo_lavaggio}, {totale_lavaggi}) o testo fisso, nell'ordine dei \
 segnaposto {{1}}, {{2}}... del template scelto.
+- Usa listino e vendite del contesto per proposte economicamente sensate: \
+sconti calibrati sui prezzi reali, bundle tra servizi complementari, spinta \
+sui giorni della settimana piu' deboli e sui servizi ad alto margine.
 - I segmenti delle campagne devono essere chiavi esistenti nel contesto \
 (segmenti_automatici o segmenti_personalizzati); se serve un segmento nuovo, \
 proponilo in proposte_segmenti e NON usarlo nelle campagne di questa analisi.
@@ -337,19 +471,23 @@ def genera_analisi(user=None):
     testo = next(b.text for b in response.content if b.type == 'text')
     dati = json.loads(testo)
 
-    # Riverifica lato server del vincolo template: mai fidarsi solo del
-    # prompt. Le proposte con template non approvato vengono scartate.
-    ammessi = set(_nomi_template_utilizzabili(
-        contesto['template_meta_approvati']))
-    campagne_ok, scartate = [], 0
+    # Etichetta lato server lo stato del template di ogni campagna
+    # proposta (mai fidarsi solo del prompt): 'approvato' se e' nella
+    # lista Meta, 'proposto' se e' una bozza di questa analisi (da
+    # creare e approvare prima dell'invio), 'da_verificare' altrimenti.
+    # Nessuna proposta viene scartata: la UI mostra il badge giusto.
+    approvati = {t['nome'] for t in contesto['template_meta_approvati']}
+    proposti = {t.get('nome') for t in dati.get('proposte_template', [])}
+    campagne_ok = []
     for p in dati.get('proposte_campagne', []):
-        if ammessi and p.get('template_meta') not in ammessi:
-            scartate += 1
-            continue
-        campagne_ok.append(p)
-    if scartate:
-        logger.warning('analisi AI: %d proposte campagna scartate per '
-                       'template non approvato', scartate)
+        nome_tpl = p.get('template_meta', '')
+        if nome_tpl in approvati:
+            stato = 'approvato'
+        elif nome_tpl in proposti:
+            stato = 'proposto'
+        else:
+            stato = 'da_verificare'
+        campagne_ok.append({**p, 'stato_template': stato})
 
     return AnalisiAI.objects.create(
         creata_da=user if (user and user.is_authenticated) else None,
@@ -359,6 +497,7 @@ def genera_analisi(user=None):
         best_practice=dati.get('best_practice', []),
         proposte_segmenti=dati.get('proposte_segmenti', []),
         proposte_campagne=campagne_ok,
+        proposte_template=dati.get('proposte_template', []),
         promozioni=dati.get('promozioni', []),
         token_input=response.usage.input_tokens,
         token_output=response.usage.output_tokens,

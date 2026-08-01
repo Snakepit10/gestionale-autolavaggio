@@ -272,7 +272,8 @@ def analisi_ai(contesto: dict | None = None) -> list[dict]:
         'titolo': f'Il consulente AI ha {ultima.n_proposte} proposte pronte',
         'testo': (f'Analisi del {timezone.localtime(ultima.creata_il):%d/%m/%Y}: '
                   f'{len(ultima.proposte_campagne)} campagne, '
-                  f'{len(ultima.proposte_segmenti)} segmenti e '
+                  f'{len(ultima.proposte_segmenti)} segmenti, '
+                  f'{len(ultima.proposte_template)} template e '
                   f'{len(ultima.promozioni)} promozioni da rivedere. '
                   f'Nulla parte senza la tua approvazione.'),
         'cta_url': reverse('marketing:ai'),
