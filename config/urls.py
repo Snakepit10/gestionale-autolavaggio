@@ -69,11 +69,13 @@ def apple_app_site_association(request):
     return response
 
 
-def _service_worker(request):
-    """Serve /service-worker.js dalla root con scope corretto.
+def _service_worker(request, sw_file='service-worker.js'):
+    """Serve un service worker dalla root con scope corretto.
 
-    Il SW deve essere alla root del dominio per intercettare tutto il sito.
-    Cerca il file prima in STATIC_ROOT (post-collectstatic), poi nelle
+    I SW devono stare alla root del dominio per poter dichiarare scope
+    ampi: service-worker.js (PWA clienti, scope /app/) e
+    service-worker-staff.js (PWA gestionale, scope /). Cerca il file
+    prima in STATIC_ROOT (post-collectstatic), poi nelle
     STATICFILES_DIRS (dev), poi in <BASE_DIR>/static.
     """
     candidates = []
@@ -82,13 +84,13 @@ def _service_worker(request):
     candidates.extend(settings.STATICFILES_DIRS)
     candidates.append(os.path.join(settings.BASE_DIR, 'static'))
     for d in candidates:
-        full = os.path.join(d, 'service-worker.js')
+        full = os.path.join(d, sw_file)
         if os.path.exists(full):
-            response = static_serve(request, path='service-worker.js', document_root=d)
+            response = static_serve(request, path=sw_file, document_root=d)
             response['Service-Worker-Allowed'] = '/'
             response['Cache-Control'] = 'no-cache'
             return response
-    return HttpResponse('// service-worker.js not found', status=404, content_type='application/javascript')
+    return HttpResponse(f'// {sw_file} not found', status=404, content_type='application/javascript')
 
 
 urlpatterns = [
@@ -97,6 +99,8 @@ urlpatterns = [
 
     # PWA: service worker dalla root (scope /) e pagina offline
     path('service-worker.js', _service_worker, name='service-worker'),
+    path('service-worker-staff.js', _service_worker,
+         {'sw_file': 'service-worker-staff.js'}, name='service-worker-staff'),
     path('offline.html', TemplateView.as_view(template_name='offline.html'), name='offline'),
 
     # TWA/Universal Links: Digital Asset Links Android + AASA iOS

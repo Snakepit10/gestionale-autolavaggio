@@ -1,0 +1,42 @@
+{
+  "name": "MasterWash Gestionale",
+  "short_name": "Gestionale",
+  "description": "Gestionale operatori Autolavaggio MasterWash: ordini, cassa, task, turni.",
+  "id": "/",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "orientation": "any",
+  "background_color": "#0a2540",
+  "theme_color": "#0a2540",
+  "lang": "it",
+  "dir": "ltr",
+  "categories": ["business", "productivity"],
+  "icons": [
+    { "src": "/static/icons/staff/icon-72x72.png", "sizes": "72x72", "type": "image/png", "purpose": "maskable any" },
+    { "src": "/static/icons/staff/icon-96x96.png", "sizes": "96x96", "type": "image/png", "purpose": "maskable any" },
+    { "src": "/static/icons/staff/icon-128x128.png", "sizes": "128x128", "type": "image/png", "purpose": "maskable any" },
+    { "src": "/static/icons/staff/icon-144x144.png", "sizes": "144x144", "type": "image/png", "purpose": "maskable any" },
+    { "src": "/static/icons/staff/icon-152x152.png", "sizes": "152x152", "type": "image/png", "purpose": "maskable any" },
+    { "src": "/static/icons/staff/icon-192x192.png", "sizes": "192x192", "type": "image/png", "purpose": "maskable any" },
+    { "src": "/static/icons/staff/icon-384x384.png", "sizes": "384x384", "type": "image/png", "purpose": "maskable any" },
+    { "src": "/static/icons/staff/icon-512x512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable any" }
+  ],
+  "shortcuts": [
+    {
+      "name": "Task",
+      "short_name": "Task",
+      "description": "Task interni degli operatori",
+      "url": "/tasks/",
+      "icons": [{ "src": "/static/icons/staff/shortcut-task.png", "sizes": "96x96" }]
+    },
+    {
+      "name": "Cassa Mobile",
+      "short_name": "Cassa",
+      "description": "Cassa rapida da smartphone",
+      "url": "/ordini/cassa/mobile/",
+      "icons": [{ "src": "/static/icons/staff/shortcut-cassa.png", "sizes": "96x96" }]
+    }
+  ],
+  "prefer_related_applications": false
+}

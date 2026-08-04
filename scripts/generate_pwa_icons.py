@@ -35,12 +35,12 @@ def font_for(size):
     return ImageFont.load_default()
 
 
-def make_icon(size, letter='A', radius_ratio=0.18):
+def make_icon(size, letter='A', radius_ratio=0.18, bg=BG):
     img = Image.new('RGBA', (size, size), (0, 0, 0, 0))
     draw = ImageDraw.Draw(img)
     radius = int(size * radius_ratio)
     # Rounded rect background
-    draw.rounded_rectangle([(0, 0), (size, size)], radius=radius, fill=BG)
+    draw.rounded_rectangle([(0, 0), (size, size)], radius=radius, fill=bg)
     # Letter centrata
     fnt = font_for(size)
     bbox = draw.textbbox((0, 0), letter, font=fnt)
@@ -74,6 +74,30 @@ def main():
     fav.save(os.path.join(STATIC_DIR, 'favicon.ico'),
              format='ICO', sizes=[(16, 16), (32, 32), (64, 64)])
     print('Generato favicon.ico')
+
+    main_staff()
+
+
+# --- Icone PWA staff ("MasterWash Gestionale") ---------------------
+# Identita' visiva DIVERSA dalla PWA clienti (navy scuro, lettera G):
+# Android/Chrome distingue le due app installate dall'icona.
+STAFF_BG = (10, 37, 64)   # navy #0a2540
+STAFF_ICONS_DIR = os.path.join(ICONS_DIR, 'staff')
+
+
+def main_staff():
+    os.makedirs(STAFF_ICONS_DIR, exist_ok=True)
+    for s in SIZES:
+        path = os.path.join(STAFF_ICONS_DIR, f'icon-{s}x{s}.png')
+        make_icon(s, letter='G', bg=STAFF_BG).save(path, 'PNG')
+        print('Generato', path)
+    make_icon(180, letter='G', bg=STAFF_BG).save(
+        os.path.join(STAFF_ICONS_DIR, 'apple-touch-icon.png'), 'PNG')
+    make_icon(96, letter='T', bg=STAFF_BG).save(
+        os.path.join(STAFF_ICONS_DIR, 'shortcut-task.png'), 'PNG')
+    make_icon(96, letter='+', bg=STAFF_BG).save(
+        os.path.join(STAFF_ICONS_DIR, 'shortcut-cassa.png'), 'PNG')
+    print('Generate icone staff')
 
 
 if __name__ == '__main__':
