@@ -343,6 +343,30 @@
 }
 .v2-cta-final .v2-btn-primary:hover { color: #0d1f2e; }
 
+/* ====== COME AVVIARE UN LAVAGGIO (step con anelli) ====== */
+.v2-howto {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+    gap: 30px 22px;
+}
+.v2-howto .step { text-align: center; }
+.v2-howto .ring {
+    width: 150px; height: 150px; border-radius: 50%;
+    margin: 0 auto 20px;
+    padding: 5px;   /* spessore dell'anello sfumato */
+    background: linear-gradient(135deg, var(--mw-cyan) 0%, var(--mw-cyan-dark) 60%, #1b6c8c 100%);
+    box-shadow: 0 10px 28px rgba(74,185,224,.28);
+}
+.v2-howto .ring .inner {
+    width: 100%; height: 100%; border-radius: 50%;
+    background: radial-gradient(circle at 32% 28%, #1a3a52 0%, var(--mw-navy-deep) 75%);
+    display: flex; align-items: center; justify-content: center;
+}
+.v2-howto .ring i { font-size: 3.2rem; color: var(--mw-cyan-light); }
+.v2-howto .t { font-weight: 800; color: var(--mw-text); margin-bottom: 6px; }
+.v2-howto .t .n { color: var(--mw-cyan-light); margin-right: 4px; }
+.v2-howto p { color: var(--mw-text-soft); font-size: .92rem; line-height: 1.5; margin: 0 auto; max-width: 240px; }
+
 .v2-section-title { text-align: center; margin-bottom: 44px; }
 .v2-section-title h2 {
     color: var(--mw-text); font-weight: 900; letter-spacing: -.02em;
@@ -515,6 +539,49 @@
             </a>
         </div>
         {% endif %}
+    </div>
+</section>
+
+{# ========== COME AVVIARE UN LAVAGGIO DALL'APP ========== #}
+<section class="pub-section" style="background:var(--mw-navy-deep);">
+    <div class="container">
+        <div class="v2-section-title">
+            <h2>Scopri com'&egrave; facile avviare un lavaggio dall'app!</h2>
+            <p>Niente monete, niente attese al cambiamonete: fai tutto dal telefono.</p>
+        </div>
+        <div class="v2-howto">
+            <div class="step">
+                <div class="ring"><div class="inner"><i class="bi bi-phone"></i></div></div>
+                <div class="t"><span class="n">1.</span>Scarica l'app MasterWash</div>
+                <p>Registrati gratis o accedi, anche con Google. Bastano 2 minuti.</p>
+            </div>
+            <div class="step">
+                <div class="ring"><div class="inner"><i class="bi bi-coin"></i></div></div>
+                <div class="t"><span class="n">2.</span>Ricarica i gettoni</div>
+                <p>Con carta o PayPal, direttamente dall'app: il saldo &egrave; subito disponibile.</p>
+            </div>
+            <div class="step">
+                <div class="ring"><div class="inner"><i class="bi bi-droplet-half"></i></div></div>
+                <div class="t"><span class="n">3.</span>Scegli la postazione</div>
+                <p>Pista, spazzole o aspiratore: vedi in tempo reale cosa &egrave; disponibile.</p>
+            </div>
+            <div class="step">
+                <div class="ring"><div class="inner"><i class="bi bi-play-circle"></i></div></div>
+                <div class="t"><span class="n">4.</span>Avvia dal telefono</div>
+                <p>Decidi quanti gettoni inviare e tocca Avvia: la macchina parte da sola.</p>
+            </div>
+        </div>
+        <div class="d-flex gap-3 justify-content-center flex-wrap mt-5">
+            {% if user.is_authenticated %}
+            <a href="{% url 'monete_client:lavaggio' %}" class="v2-btn-primary">
+                <i class="bi bi-play-circle"></i> Avvia un lavaggio
+            </a>
+            {% else %}
+            <a href="{% url 'clients:register' %}" class="v2-btn-primary">
+                <i class="bi bi-person-plus"></i> Inizia ora: registrati gratis
+            </a>
+            {% endif %}
+        </div>
     </div>
 </section>
 
