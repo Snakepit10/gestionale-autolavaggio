@@ -72,6 +72,19 @@
                             </a>
                         </li>
 
+                        <li class="nav-item">
+                            <a class="nav-link" href="{% url 'tasks:lista' %}" id="navTaskLink"
+                               title="Task interni">
+                                <i class="bi bi-check2-square"></i> Task
+                                <span id="navbar-task-badge" class="ms-1"
+                                      style="display:none;background:#fd7e14;color:#fff;
+                                             font-size:.75rem;font-weight:700;line-height:1;
+                                             padding:3px 8px;border-radius:11px;min-width:22px;
+                                             text-align:center;vertical-align:middle;
+                                             box-shadow:0 1px 4px rgba(0,0,0,.25);"></span>
+                            </a>
+                        </li>
+
                         {% if user.is_staff %}
                         <li class="nav-item">
                             <a class="nav-link" href="{% url 'marketing:dashboard' %}">

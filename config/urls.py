@@ -144,6 +144,9 @@ urlpatterns = [
     # Marketing / CRM (segmentazione + campagne WhatsApp)
     path('marketing/', include('apps.marketing.urls', namespace='marketing')),
 
+    # Task interni operatori (stile Todoist)
+    path('tasks/', include('apps.tasks.urls', namespace='tasks')),
+
     # Monete virtuali (staff + webhook pagamenti)
     path('monete/', include('apps.monete.urls', namespace='monete')),
 

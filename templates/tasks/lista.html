@@ -1,0 +1,230 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}Task - Gestionale Autolavaggio{% endblock %}
+
+{% block extra_css %}
+<style>
+.task-sidebar .nav-link { color: var(--bs-body-color); border-radius: 8px; padding: 6px 10px; }
+.task-sidebar .nav-link.active { background: #e7f1ff; color: #0d6efd; font-weight: 600; }
+.task-sidebar .nav-link .cnt { float: right; font-size: .8rem; color: #6c757d; }
+.dot { display: inline-block; width: 10px; height: 10px; border-radius: 50%; margin-right: 4px; vertical-align: baseline; }
+.task-item .task-chk { width: 1.15em; height: 1.15em; border-radius: 50%; cursor: pointer; flex-shrink: 0; }
+.task-item { border-left: 3px solid transparent; }
+.task-item.prio-1 { border-left-color: #dc3545; }
+.task-item.prio-2 { border-left-color: #fd7e14; }
+.task-item.prio-3 { border-left-color: #0d6efd; }
+.task-item.task-done { opacity: .6; }
+.prio-badge-1 { background: #dc3545; }
+.prio-badge-2 { background: #fd7e14; }
+.prio-badge-3 { background: #0d6efd; }
+.prio-badge-4 { background: #6c757d; }
+.min-w-0 { min-width: 0; }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-4 flex-wrap gap-2">
+    <h1><i class="bi bi-check2-square"></i> Task</h1>
+    <div>
+        <button class="btn btn-primary me-2" data-bs-toggle="modal" data-bs-target="#modalNuovaTask">
+            <i class="bi bi-plus-circle"></i> Nuova task
+        </button>
+        <a href="{% url 'tasks:progetti' %}" class="btn btn-outline-primary me-2">
+            <i class="bi bi-folder"></i> Progetti
+        </a>
+        <a href="{% url 'tasks:etichette' %}" class="btn btn-outline-secondary">
+            <i class="bi bi-tags"></i> Etichette
+        </a>
+    </div>
+</div>
+
+<div class="row g-4">
+    {# ---------- SIDEBAR ---------- #}
+    <div class="col-lg-3">
+        <div class="card border-0 shadow-sm task-sidebar">
+            <div class="card-body">
+                <nav class="nav flex-column gap-1">
+                    <a class="nav-link {% if filtro == 'oggi' %}active{% endif %}"
+                       href="{% url 'tasks:lista' %}?filtro=oggi">
+                        <i class="bi bi-calendar-day"></i> Oggi
+                        <span class="cnt">{{ conteggi.oggi }}</span>
+                    </a>
+                    <a class="nav-link {% if filtro == 'prossimi' %}active{% endif %}"
+                       href="{% url 'tasks:lista' %}?filtro=prossimi">
+                        <i class="bi bi-calendar-week"></i> Prossimi 7 giorni
+                    </a>
+                    <a class="nav-link {% if filtro == 'mie' %}active{% endif %}"
+                       href="{% url 'tasks:lista' %}?filtro=mie">
+                        <i class="bi bi-person-check"></i> Assegnate a me
+                        <span class="cnt">{{ conteggi.mie }}</span>
+                    </a>
+                    <a class="nav-link {% if filtro == 'create' %}active{% endif %}"
+                       href="{% url 'tasks:lista' %}?filtro=create">
+                        <i class="bi bi-pencil"></i> Create da me
+                    </a>
+                    <a class="nav-link {% if filtro == 'aperte' and not progetto_sel and not etichetta_sel %}active{% endif %}"
+                       href="{% url 'tasks:lista' %}">
+                        <i class="bi bi-inbox"></i> Tutte le aperte
+                        <span class="cnt">{{ conteggi.aperte }}</span>
+                    </a>
+                    <a class="nav-link {% if filtro == 'completate' %}active{% endif %}"
+                       href="{% url 'tasks:lista' %}?filtro=completate">
+                        <i class="bi bi-check-circle"></i> Completate
+                    </a>
+                </nav>
+
+                {% if progetti %}
+                <hr>
+                <div class="small text-muted text-uppercase fw-bold mb-1">Progetti</div>
+                <nav class="nav flex-column gap-1">
+                    {% for p in progetti %}
+                    <a class="nav-link {% if progetto_sel and progetto_sel.pk == p.pk %}active{% endif %}"
+                       href="{% url 'tasks:lista' %}?progetto={{ p.pk }}">
+                        <span class="dot" style="background:{{ p.colore }};"></span>{{ p.nome }}
+                        <span class="cnt">{{ p.n_aperte }}</span>
+                    </a>
+                    {% endfor %}
+                </nav>
+                {% endif %}
+
+                {% if etichette %}
+                <hr>
+                <div class="small text-muted text-uppercase fw-bold mb-1">Etichette</div>
+                <div class="d-flex flex-wrap gap-1">
+                    {% for e in etichette %}
+                    <a href="{% url 'tasks:lista' %}?etichetta={{ e.pk }}"
+                       class="badge text-decoration-none {% if etichetta_sel and etichetta_sel.pk == e.pk %}border border-2 border-dark{% endif %}"
+                       style="background:{{ e.colore }};">{{ e.nome }}</a>
+                    {% endfor %}
+                </div>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+
+    {# ---------- LISTA ---------- #}
+    <div class="col-lg-9">
+        <div class="card border-0 shadow-sm">
+            <div class="card-body">
+                {# quick add #}
+                <form method="post" action="{% url 'tasks:task-crea' %}" class="d-flex gap-2 mb-3">
+                    {% csrf_token %}
+                    <input type="hidden" name="quick" value="1">
+                    <input type="hidden" name="next" value="{{ request.get_full_path }}">
+                    {% if progetto_sel %}<input type="hidden" name="progetto" value="{{ progetto_sel.pk }}">{% endif %}
+                    <input type="text" name="titolo" class="form-control"
+                           placeholder="Aggiungi una task veloce{% if progetto_sel %} in {{ progetto_sel.nome }}{% endif %}... (invio per salvare)" required>
+                    <button type="submit" class="btn btn-outline-primary"><i class="bi bi-plus-lg"></i></button>
+                </form>
+
+                <div class="d-flex justify-content-between align-items-center mb-2 flex-wrap gap-2">
+                    <h5 class="mb-0">
+                        {% if progetto_sel %}<span class="dot" style="background:{{ progetto_sel.colore }};"></span>{{ progetto_sel.nome }}
+                        {% elif etichetta_sel %}Etichetta: {{ etichetta_sel.nome }}
+                        {% else %}{{ filtro_label }}{% endif %}
+                    </h5>
+                    <form method="get" class="d-flex gap-2">
+                        {% if filtro != 'aperte' %}<input type="hidden" name="filtro" value="{{ filtro }}">{% endif %}
+                        {% if progetto_sel %}<input type="hidden" name="progetto" value="{{ progetto_sel.pk }}">{% endif %}
+                        <input type="search" name="q" value="{{ q }}" class="form-control form-control-sm"
+                               placeholder="Cerca..." style="max-width:200px;">
+                    </form>
+                </div>
+
+                {% for t in tasks %}
+                    {% include 'tasks/_task_item.html' %}
+                {% empty %}
+                <div class="text-center text-muted py-5">
+                    <i class="bi bi-check2-all fs-1"></i>
+                    <p class="mb-0 mt-2">Nessuna task qui. Aggiungine una con la barra sopra.</p>
+                </div>
+                {% endfor %}
+            </div>
+        </div>
+    </div>
+</div>
+
+{# ---------- MODAL NUOVA TASK (form completo) ---------- #}
+<div class="modal fade" id="modalNuovaTask" tabindex="-1">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <form method="post" action="{% url 'tasks:task-crea' %}">
+                {% csrf_token %}
+                <div class="modal-header">
+                    <h5 class="modal-title"><i class="bi bi-plus-circle"></i> Nuova task</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <div class="row g-3">
+                        <div class="col-12">
+                            <label class="form-label fw-bold">Titolo *</label>
+                            {{ form.titolo }}
+                        </div>
+                        <div class="col-12">
+                            <label class="form-label fw-bold">Descrizione</label>
+                            {{ form.descrizione }}
+                        </div>
+                        <div class="col-md-4">
+                            <label class="form-label fw-bold">Progetto</label>
+                            {{ form.progetto }}
+                        </div>
+                        <div class="col-md-4">
+                            <label class="form-label fw-bold">Priorit&agrave;</label>
+                            {{ form.priorita }}
+                        </div>
+                        <div class="col-md-4">
+                            <label class="form-label fw-bold">Scadenza</label>
+                            {{ form.scadenza }}
+                        </div>
+                        <div class="col-md-4">
+                            <label class="form-label fw-bold">Assegna a</label>
+                            {{ form.assegnatari }}
+                            <div class="form-text">Ctrl+click per selezionarne piu' di uno.</div>
+                        </div>
+                        <div class="col-md-4">
+                            <label class="form-label fw-bold">Etichette</label>
+                            {{ form.etichette }}
+                        </div>
+                        <div class="col-md-4">
+                            <label class="form-label fw-bold">Visibilit&agrave;</label>
+                            {{ form.visibilita }}
+                            <div class="form-text">"Riservata" = la vedono solo creatore e assegnatari.</div>
+                        </div>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Annulla</button>
+                    <button type="submit" class="btn btn-primary"><i class="bi bi-check-circle"></i> Crea task</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<script>
+function getCookie(name) {
+    const v = document.cookie.match('(^|;)\\s*' + name + '\\s*=\\s*([^;]+)');
+    return v ? v.pop() : '';
+}
+function toggleTask(pk, chk) {
+    chk.disabled = true;
+    fetch(`/tasks/${pk}/toggle/`, {
+        method: 'POST',
+        headers: {'X-CSRFToken': getCookie('csrftoken')},
+    }).then(r => r.json()).then(d => {
+        if (!d.ok) { chk.checked = !chk.checked; return; }
+        const row = document.getElementById('task-row-' + pk);
+        if (row) {
+            row.classList.toggle('task-done', d.completata);
+            const title = row.querySelector('.task-title');
+            if (title) {
+                title.classList.toggle('text-muted', d.completata);
+                title.classList.toggle('text-decoration-line-through', d.completata);
+            }
+        }
+    }).catch(() => { chk.checked = !chk.checked; })
+      .finally(() => { chk.disabled = false; });
+}
+</script>
+{% endblock %}

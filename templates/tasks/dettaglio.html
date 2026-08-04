@@ -1,0 +1,208 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}{{ task.titolo }} - Task{% endblock %}
+
+{% block extra_css %}
+<style>
+.task-item .task-chk { width: 1.15em; height: 1.15em; border-radius: 50%; cursor: pointer; flex-shrink: 0; }
+.task-item { border-left: 3px solid transparent; }
+.task-item.prio-1 { border-left-color: #dc3545; }
+.task-item.prio-2 { border-left-color: #fd7e14; }
+.task-item.prio-3 { border-left-color: #0d6efd; }
+.task-item.task-done { opacity: .6; }
+.prio-badge-1 { background: #dc3545; }
+.prio-badge-2 { background: #fd7e14; }
+.prio-badge-3 { background: #0d6efd; }
+.prio-badge-4 { background: #6c757d; }
+.dot { display: inline-block; width: 10px; height: 10px; border-radius: 50%; margin-right: 4px; }
+.min-w-0 { min-width: 0; }
+.commento { border-left: 3px solid #e9ecef; }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-4 flex-wrap gap-2">
+    <h1 class="mb-0" style="font-size:1.6rem;">
+        <i class="bi bi-check2-square"></i>
+        {% if task.parent %}
+            <a href="{% url 'tasks:task-dettaglio' task.parent.pk %}" class="text-decoration-none text-muted">
+                {{ task.parent.titolo }}</a>
+            <i class="bi bi-chevron-right small"></i>
+        {% endif %}
+        {{ task.titolo }}
+        {% if task.completata %}<span class="badge bg-success align-middle">Completata</span>{% endif %}
+        {% if task.in_ritardo %}<span class="badge bg-danger align-middle">In ritardo</span>{% endif %}
+        {% if task.visibilita == 'riservata' %}
+            <span class="badge bg-secondary align-middle"><i class="bi bi-lock-fill"></i> Riservata</span>
+        {% endif %}
+    </h1>
+    <div>
+        <form method="post" action="{% url 'tasks:task-toggle' task.pk %}" class="d-inline" id="form-toggle">
+            {% csrf_token %}
+            <button type="submit" class="btn {% if task.completata %}btn-outline-warning{% else %}btn-success{% endif %} me-2">
+                {% if task.completata %}<i class="bi bi-arrow-counterclockwise"></i> Riapri
+                {% else %}<i class="bi bi-check-circle"></i> Completa{% endif %}
+            </button>
+        </form>
+        {% if puo_modificare %}
+        <form method="post" action="{% url 'tasks:task-elimina' task.pk %}" class="d-inline">
+            {% csrf_token %}
+            <button type="submit" class="btn btn-outline-danger me-2"
+                    onclick="return confirm('Eliminare la task{% if task.sottotask.count %} e le sue {{ task.sottotask.count }} sotto-task{% endif %}?');">
+                <i class="bi bi-trash"></i> Elimina
+            </button>
+        </form>
+        {% endif %}
+        <a href="{% url 'tasks:lista' %}" class="btn btn-outline-primary">
+            <i class="bi bi-arrow-left"></i> Task
+        </a>
+    </div>
+</div>
+
+<div class="row g-4">
+    <div class="col-lg-7">
+        {# ---------- FORM MODIFICA ---------- #}
+        <div class="card border-0 shadow-sm mb-4">
+            <div class="card-body">
+                <h5 class="card-title"><i class="bi bi-pencil text-primary"></i> Dettagli</h5>
+                {% if puo_modificare %}
+                <form method="post" action="{% url 'tasks:task-modifica' task.pk %}">
+                    {% csrf_token %}
+                    <div class="row g-3">
+                        <div class="col-12">
+                            <label class="form-label fw-bold">Titolo *</label>
+                            {{ form.titolo }}
+                        </div>
+                        <div class="col-12">
+                            <label class="form-label fw-bold">Descrizione</label>
+                            {{ form.descrizione }}
+                        </div>
+                        <div class="col-md-4">
+                            <label class="form-label fw-bold">Progetto</label>
+                            {{ form.progetto }}
+                        </div>
+                        <div class="col-md-4">
+                            <label class="form-label fw-bold">Priorit&agrave;</label>
+                            {{ form.priorita }}
+                        </div>
+                        <div class="col-md-4">
+                            <label class="form-label fw-bold">Scadenza</label>
+                            {{ form.scadenza }}
+                        </div>
+                        <div class="col-md-4">
+                            <label class="form-label fw-bold">Assegna a</label>
+                            {{ form.assegnatari }}
+                        </div>
+                        <div class="col-md-4">
+                            <label class="form-label fw-bold">Etichette</label>
+                            {{ form.etichette }}
+                        </div>
+                        <div class="col-md-4">
+                            <label class="form-label fw-bold">Visibilit&agrave;</label>
+                            {{ form.visibilita }}
+                        </div>
+                    </div>
+                    <div class="d-flex justify-content-end mt-3">
+                        <button type="submit" class="btn btn-primary">
+                            <i class="bi bi-check-circle"></i> Salva modifiche
+                        </button>
+                    </div>
+                </form>
+                {% else %}
+                <p class="mb-1">{{ task.descrizione|default:"Nessuna descrizione."|linebreaksbr }}</p>
+                <div class="text-muted small">
+                    Solo creatore, assegnatari o titolare possono modificare questa task.
+                </div>
+                {% endif %}
+                <hr>
+                <div class="text-muted small">
+                    Creata da {{ task.creato_da.get_full_name|default:task.creato_da.username|default:"—" }}
+                    il {{ task.creato_il|date:"d/m/Y H:i" }}
+                    {% if task.completata %}
+                    · completata da {{ task.completata_da.get_full_name|default:task.completata_da.username|default:"—" }}
+                    il {{ task.completata_il|date:"d/m/Y H:i" }}
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+
+        {# ---------- COMMENTI ---------- #}
+        <div class="card border-0 shadow-sm">
+            <div class="card-body">
+                <h5 class="card-title"><i class="bi bi-chat-left-text text-primary"></i>
+                    Commenti {% if commenti %}({{ commenti|length }}){% endif %}</h5>
+                {% for c in commenti %}
+                <div class="commento ps-3 py-2 mb-2">
+                    <div class="small">
+                        <strong>{{ c.autore.get_full_name|default:c.autore.username|default:"—" }}</strong>
+                        <span class="text-muted">{{ c.creato_il|date:"d/m/Y H:i" }}</span>
+                    </div>
+                    <div>{{ c.testo|linebreaksbr }}</div>
+                </div>
+                {% empty %}
+                <p class="text-muted small">Nessun commento.</p>
+                {% endfor %}
+                <form method="post" action="{% url 'tasks:commento-crea' task.pk %}" class="mt-3">
+                    {% csrf_token %}
+                    {{ commento_form.testo }}
+                    <div class="d-flex justify-content-end mt-2">
+                        <button type="submit" class="btn btn-sm btn-primary">
+                            <i class="bi bi-send"></i> Commenta
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    {# ---------- SOTTO-TASK ---------- #}
+    <div class="col-lg-5">
+        <div class="card border-0 shadow-sm">
+            <div class="card-body">
+                <h5 class="card-title"><i class="bi bi-list-nested text-primary"></i>
+                    Sotto-task {% if sottotask %}({{ sottotask|length }}){% endif %}</h5>
+                {% if not task.parent %}
+                <form method="post" action="{% url 'tasks:sottotask-crea' task.pk %}" class="d-flex gap-2 mb-3">
+                    {% csrf_token %}
+                    <input type="text" name="titolo" class="form-control form-control-sm"
+                           placeholder="Aggiungi sotto-task..." required>
+                    <button type="submit" class="btn btn-sm btn-outline-primary"><i class="bi bi-plus-lg"></i></button>
+                </form>
+                {% endif %}
+                {% for t in sottotask %}
+                    {% include 'tasks/_task_item.html' %}
+                {% empty %}
+                <p class="text-muted small mb-0">Nessuna sotto-task.</p>
+                {% endfor %}
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+function getCookie(name) {
+    const v = document.cookie.match('(^|;)\\s*' + name + '\\s*=\\s*([^;]+)');
+    return v ? v.pop() : '';
+}
+function toggleTask(pk, chk) {
+    chk.disabled = true;
+    fetch(`/tasks/${pk}/toggle/`, {
+        method: 'POST',
+        headers: {'X-CSRFToken': getCookie('csrftoken')},
+    }).then(r => r.json()).then(d => {
+        if (!d.ok) { chk.checked = !chk.checked; return; }
+        const row = document.getElementById('task-row-' + pk);
+        if (row) row.classList.toggle('task-done', d.completata);
+    }).catch(() => { chk.checked = !chk.checked; })
+      .finally(() => { chk.disabled = false; });
+}
+// Il bottone Completa/Riapri in alto e' un form POST verso toggle che
+// risponde JSON: intercettiamo e ricarichiamo per aggiornare i badge.
+document.getElementById('form-toggle').addEventListener('submit', function (e) {
+    e.preventDefault();
+    fetch(this.action, {method: 'POST', headers: {'X-CSRFToken': getCookie('csrftoken')}})
+        .then(() => window.location.reload());
+});
+</script>
+{% endblock %}

@@ -1,0 +1,86 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}Progetti - Task{% endblock %}
+
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <h1><i class="bi bi-folder"></i> Progetti</h1>
+    <a href="{% url 'tasks:lista' %}" class="btn btn-outline-primary">
+        <i class="bi bi-arrow-left"></i> Task
+    </a>
+</div>
+
+<div class="row g-4">
+    <div class="col-lg-4">
+        <div class="card border-0 shadow-sm">
+            <div class="card-body">
+                <h5 class="card-title"><i class="bi bi-plus-circle text-primary"></i> Nuovo progetto</h5>
+                <form method="post">
+                    {% csrf_token %}
+                    <div class="mb-2">
+                        <label class="form-label fw-bold">Nome *</label>
+                        {{ form.nome }}
+                    </div>
+                    <div class="row g-2">
+                        <div class="col-6">
+                            <label class="form-label fw-bold">Colore</label>
+                            {{ form.colore }}
+                        </div>
+                        <div class="col-6">
+                            <label class="form-label fw-bold">Ordine</label>
+                            {{ form.ordine }}
+                        </div>
+                    </div>
+                    <button type="submit" class="btn btn-primary mt-3 w-100">
+                        <i class="bi bi-check-circle"></i> Crea progetto
+                    </button>
+                </form>
+            </div>
+        </div>
+    </div>
+    <div class="col-lg-8">
+        <div class="card border-0 shadow-sm">
+            <div class="table-responsive">
+                <table class="table table-hover align-middle mb-0">
+                    <thead class="table-light">
+                        <tr>
+                            <th>Progetto</th>
+                            <th class="text-center">Task aperte</th>
+                            <th>Stato</th>
+                            <th class="text-end">Azioni</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for p in righe %}
+                        <tr {% if p.archiviato %}class="text-muted"{% endif %}>
+                            <td>
+                                <span style="display:inline-block;width:12px;height:12px;border-radius:50%;background:{{ p.colore }};margin-right:6px;"></span>
+                                <a href="{% url 'tasks:lista' %}?progetto={{ p.pk }}" class="text-decoration-none fw-bold">
+                                    {{ p.nome }}</a>
+                            </td>
+                            <td class="text-center">{{ p.n_aperte }}</td>
+                            <td>
+                                {% if p.archiviato %}<span class="badge bg-secondary">Archiviato</span>
+                                {% else %}<span class="badge bg-success">Attivo</span>{% endif %}
+                            </td>
+                            <td class="text-end text-nowrap">
+                                <form method="post" action="{% url 'tasks:progetto-archivia' p.pk %}" class="d-inline">
+                                    {% csrf_token %}
+                                    <button type="submit" class="btn btn-sm btn-outline-secondary"
+                                            title="{% if p.archiviato %}Ripristina{% else %}Archivia (le task restano){% endif %}">
+                                        <i class="bi {% if p.archiviato %}bi-arrow-counterclockwise{% else %}bi-archive{% endif %}"></i>
+                                    </button>
+                                </form>
+                            </td>
+                        </tr>
+                        {% empty %}
+                        <tr><td colspan="4" class="text-center text-muted py-4">Nessun progetto ancora.</td></tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

@@ -1,0 +1,47 @@
+{% comment %}
+Riga task riusata da lista e (per le sotto-task) dal dettaglio.
+Contesto richiesto: t (Task). Il toggle usa fetch su tasks:task-toggle
+(funzione toggleTask definita in lista.html/dettaglio.html).
+{% endcomment %}
+<div class="task-item d-flex align-items-start gap-2 py-2 px-2 border-bottom prio-{{ t.priorita }} {% if t.completata %}task-done{% endif %}"
+     id="task-row-{{ t.pk }}">
+    <input type="checkbox" class="form-check-input task-chk mt-1"
+           {% if t.completata %}checked{% endif %}
+           onchange="toggleTask({{ t.pk }}, this)"
+           title="{% if t.completata %}Riapri{% else %}Completa{% endif %}">
+    <div class="flex-grow-1 min-w-0">
+        <a href="{% url 'tasks:task-dettaglio' t.pk %}"
+           class="text-decoration-none task-title {% if t.completata %}text-muted text-decoration-line-through{% endif %}">
+            {{ t.titolo }}
+        </a>
+        {% if t.visibilita == 'riservata' %}
+            <i class="bi bi-lock-fill text-muted small" title="Riservata: visibile solo a creatore e assegnatari"></i>
+        {% endif %}
+        {% if t.sottotask.count %}
+            <span class="text-muted small"><i class="bi bi-list-nested"></i> {{ t.sottotask.count }}</span>
+        {% endif %}
+        <div class="small d-flex flex-wrap gap-2 mt-1 align-items-center">
+            {% if t.progetto %}
+            <span class="text-muted">
+                <span class="dot" style="background:{{ t.progetto.colore }};"></span>
+                {{ t.progetto.nome }}
+            </span>
+            {% endif %}
+            {% for e in t.etichette.all %}
+            <span class="badge" style="background:{{ e.colore }};">{{ e.nome }}</span>
+            {% endfor %}
+            {% if t.scadenza %}
+            <span class="{% if t.in_ritardo %}text-danger fw-bold{% else %}text-muted{% endif %}">
+                <i class="bi bi-calendar-event"></i> {{ t.scadenza|date:"d/m H:i" }}
+                {% if t.in_ritardo %}(in ritardo){% endif %}
+            </span>
+            {% endif %}
+            {% for a in t.assegnatari.all %}
+            <span class="badge bg-light text-dark border">
+                <i class="bi bi-person"></i> {{ a.get_full_name|default:a.username }}
+            </span>
+            {% endfor %}
+        </div>
+    </div>
+    <span class="badge prio-badge-{{ t.priorita }}" title="{{ t.get_priorita_display }}">P{{ t.priorita }}</span>
+</div>
