@@ -140,6 +140,9 @@
             color: var(--mw-text-soft);
             font-size: .68rem;
             font-weight: 600;
+            /* etichette a due parole (es. "Avvia lavaggio") vanno a
+               capo in modo ordinato sotto l'icona */
+            line-height: 1.15;
         }
         .pub-bottom-nav a i { display: block; font-size: 1.3rem; margin-bottom: 2px; }
         .pub-bottom-nav a.active { color: var(--mw-cyan-light); }
@@ -345,8 +348,8 @@
     <a href="{% url 'clients:booking' %}" class="{% block nav_booking %}{% endblock %}">
         <i class="bi bi-calendar-plus"></i> Prenota
     </a>
-    <a href="tel:+393792337051" class="{% block nav_call %}{% endblock %}">
-        <i class="bi bi-telephone"></i> Chiama
+    <a href="{% url 'monete_client:lavaggio' %}" class="{% block nav_lavaggio %}{% endblock %}">
+        <i class="bi bi-play-circle"></i> Avvia lavaggio
     </a>
     {% if user.is_authenticated %}
     <a href="{% url 'monete_client:home' %}" class="{% block nav_monete %}{% endblock %}">
