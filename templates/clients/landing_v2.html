@@ -459,6 +459,65 @@
     </div>
 </section>
 
+{# ========== PERCHE' CREARE UN ACCOUNT ========== #}
+<section class="pub-section">
+    <div class="container">
+        <div class="v2-section-title">
+            <h2>Crea il tuo account: conviene</h2>
+            <p>Gratis in 1 minuto, anche con Google. Ecco cosa ti sblocca.</p>
+        </div>
+        <div class="v2-sol-grid">
+            <div class="v2-sol">
+                <span class="tag">Novit&agrave;</span>
+                <div class="ico"><i class="bi bi-coin"></i></div>
+                <h4>Gettoni virtuali</h4>
+                <p>
+                    Ricarica i gettoni direttamente dall'app con carta o PayPal e
+                    aziona pi&ugrave; accessori dell'impianto dal telefono: niente monete,
+                    niente cambiamonete, il saldo &egrave; sempre con te.
+                </p>
+            </div>
+            <div class="v2-sol">
+                <div class="ico"><i class="bi bi-tag-fill"></i></div>
+                <h4>Sconti e promozioni</h4>
+                <p>
+                    Offerte e promozioni riservate ai clienti registrati,
+                    direttamente su WhatsApp: sconti di rientro, promo stagionali
+                    e vantaggi dedicati a chi ci sceglie pi&ugrave; spesso.
+                </p>
+            </div>
+            <div class="v2-sol">
+                <div class="ico"><i class="bi bi-star-fill"></i></div>
+                <h4>Raccolta punti</h4>
+                <p>
+                    Ogni lavaggio ti fa accumulare punti fedelt&agrave;:
+                    pi&ugrave; torni, pi&ugrave; vantaggi ottieni. I punti sono
+                    sempre visibili nella tua area personale.
+                </p>
+            </div>
+            <div class="v2-sol">
+                <div class="ico"><i class="bi bi-bell-fill"></i></div>
+                <h4>Sempre aggiornato</h4>
+                <p>
+                    Novit&agrave;, nuovi servizi e promemoria: ti avvisiamo noi
+                    quando c'&egrave; qualcosa che ti conviene sapere, insieme
+                    allo storico dei tuoi lavaggi e delle prenotazioni.
+                </p>
+            </div>
+        </div>
+        {% if not user.is_authenticated %}
+        <div class="d-flex gap-3 justify-content-center flex-wrap mt-4">
+            <a href="{% url 'clients:register' %}" class="v2-btn-primary">
+                <i class="bi bi-person-plus"></i> Crea il tuo account gratis
+            </a>
+            <a href="{% url 'auth:client-login' %}" class="v2-btn-ghost" style="border-color:var(--mw-line);color:var(--mw-text);">
+                <i class="bi bi-box-arrow-in-right"></i> Ho gi&agrave; un account
+            </a>
+        </div>
+        {% endif %}
+    </div>
+</section>
+
 {# ========== SCARICA L'APP (stessa logica JS della v1) ========== #}
 <section class="pub-section" id="scarica-app" style="background:var(--mw-bg);">
   <div class="container" style="max-width:980px;">
