@@ -6,4 +6,5 @@ websocket_urlpatterns = [
     re_path(r'ws/ordini/$', consumers.OrdiniConsumer.as_asgi()),
     re_path(r'ws/dashboard/$', consumers.DashboardConsumer.as_asgi()),
     re_path(r'ws/messaggi/$', consumers.MessaggiConsumer.as_asgi()),
+    re_path(r'ws/tasks/$', consumers.TasksConsumer.as_asgi()),
 ]

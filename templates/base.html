@@ -397,6 +397,80 @@
     </script>
     {% endif %}
 
+    {% if user.is_authenticated %}{% if user.is_staff or user.is_superuser or user|in_group:"operatore" or user|in_group:"responsabile" or user|in_group:"titolare" %}
+    {# Badge "Task assegnate a me" nella navbar: arancione, rosso se in ritardo.
+       Condizione sui GRUPPI (non solo is_staff): gli operatori semplici
+       possono non avere is_staff ma devono vedere il badge. #}
+    <style>
+        @keyframes task-badge-pulse {
+            0%   { transform: scale(1);   box-shadow: 0 1px 4px rgba(0,0,0,.25), 0 0 0 0 rgba(253,126,20,.6); }
+            50%  { transform: scale(1.2); box-shadow: 0 2px 8px rgba(0,0,0,.35), 0 0 0 8px rgba(253,126,20,0); }
+            100% { transform: scale(1);   box-shadow: 0 1px 4px rgba(0,0,0,.25), 0 0 0 0 rgba(253,126,20,0); }
+        }
+        #navbar-task-badge.pulse { animation: task-badge-pulse .9s ease-out 2; }
+    </style>
+    <script>
+    (function() {
+        const badge = document.getElementById('navbar-task-badge');
+        if (!badge) return;
+        const IO_ID = {{ user.id }};
+        let ultimoTotale = -1;
+
+        function aggiornaBadge(aperte, inRitardo, pulseSeNuove=true) {
+            const nuove = ultimoTotale >= 0 && aperte > ultimoTotale;
+            ultimoTotale = aperte;
+            if (aperte > 0) {
+                badge.textContent = aperte > 99 ? '99+' : aperte;
+                badge.style.display = '';
+                badge.style.background = inRitardo > 0 ? '#dc3545' : '#fd7e14';
+                badge.title = aperte + ' task da fare' +
+                    (inRitardo > 0 ? ' (' + inRitardo + ' in ritardo)' : '');
+                if (nuove && pulseSeNuove) {
+                    badge.classList.remove('pulse');
+                    void badge.offsetWidth;
+                    badge.classList.add('pulse');
+                }
+            } else {
+                badge.style.display = 'none';
+                badge.title = '';
+            }
+        }
+
+        async function caricaConteggio(pulseSeNuove=true) {
+            try {
+                const r = await fetch('/tasks/api/conteggio/', { credentials: 'same-origin' });
+                if (!r.ok) return;
+                const d = await r.json();
+                aggiornaBadge(d.aperte || 0, d.in_ritardo || 0, pulseSeNuove);
+            } catch (e) { /* rete assente: riprova al prossimo giro */ }
+        }
+
+        let ws = null;
+        function connettiWS() {
+            try {
+                const proto = location.protocol === 'https:' ? 'wss' : 'ws';
+                ws = new WebSocket(`${proto}://${location.host}/ws/tasks/`);
+                ws.onmessage = (e) => {
+                    let ev = null;
+                    try { ev = JSON.parse(e.data); } catch(_) {}
+                    if (!ev) return;
+                    // Pulse solo se la task e' assegnata proprio a me
+                    const perMe = ev.type === 'task_assegnata' &&
+                        (ev.assegnatari_ids || []).includes(IO_ID);
+                    caricaConteggio(perMe);
+                };
+                ws.onclose = () => setTimeout(connettiWS, 5000);
+                ws.onerror = () => { try { ws.close(); } catch(e){} };
+            } catch(e) { /* ignora */ }
+        }
+
+        setInterval(() => caricaConteggio(false), 60000);
+        caricaConteggio(false);
+        connettiWS();
+    })();
+    </script>
+    {% endif %}{% endif %}
+
     <!-- IMPORTANT: le pagine staff/operatore non usano il Service Worker.
          Lo SW e' attivo SOLO sul lato cliente /app/ (in base_public.html).
          Qui sotto disinstalliamo eventuali SW residui (operatori che hanno

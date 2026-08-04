@@ -254,3 +254,53 @@ class MessaggiConsumer(AsyncWebsocketConsumer):
             'type': 'segna_letti_wa',
             'conv_id': event.get('conv_id'),
         }))
+
+
+class TasksConsumer(AsyncWebsocketConsumer):
+    """Consumer del modulo task operatori (badge navbar).
+
+    Group 'tasks_staff'. A differenza degli altri consumer, oltre agli
+    anonimi rifiuta anche i CLIENTI autenticati: il broadcast contiene
+    titoli di task interne (quelle riservate viaggiano comunque con
+    titolo generico, vedi apps/tasks/views._notifica_assegnazione).
+    """
+
+    async def connect(self):
+        from django.contrib.auth.models import AnonymousUser
+        user = self.scope['user']
+        if isinstance(user, AnonymousUser):
+            await self.close()
+            return
+        if not await self._utente_operativo(user):
+            await self.close()
+            return
+        self.room_group_name = 'tasks_staff'
+        await self.channel_layer.group_add(self.room_group_name, self.channel_name)
+        await self.accept()
+
+    @database_sync_to_async
+    def _utente_operativo(self, user):
+        return bool(
+            user.is_staff or user.is_superuser
+            or user.groups.filter(
+                name__in=['operatore', 'responsabile', 'titolare']).exists()
+        )
+
+    async def disconnect(self, close_code):
+        await _safe_group_discard(self)
+
+    async def task_assegnata(self, event):
+        await self.send(text_data=json.dumps({
+            'type': 'task_assegnata',
+            'task_id': event.get('task_id'),
+            'titolo': event.get('titolo', ''),
+            'assegnatari_ids': event.get('assegnatari_ids', []),
+            'da': event.get('da', ''),
+        }))
+
+    async def task_completata(self, event):
+        await self.send(text_data=json.dumps({
+            'type': 'task_completata',
+            'task_id': event.get('task_id'),
+            'assegnatari_ids': event.get('assegnatari_ids', []),
+        }))
