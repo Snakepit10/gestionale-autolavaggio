@@ -13,13 +13,16 @@
     <!-- Custom CSS -->
     <link href="{% static 'css/style.css' %}" rel="stylesheet">
 
-    <!-- PWA -->
-    <link rel="manifest" href="{% static 'manifest.json' %}">
-    <meta name="theme-color" content="#0d6efd">
+    <!-- PWA Gestionale: manifest esposto SOLO agli utenti operativi
+         (la pagina di login e i non-staff non sono installabili) -->
+    {% if user.is_authenticated %}{% if user.is_staff or user.is_superuser or user|in_group:"operatore" or user|in_group:"responsabile" or user|in_group:"titolare" %}
+    <link rel="manifest" href="{% static 'staff-manifest.json' %}">
+    <meta name="theme-color" content="#0a2540">
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="default">
-    <meta name="apple-mobile-web-app-title" content="Autolavaggio">
-    <link rel="apple-touch-icon" href="{% static 'icons/apple-touch-icon.png' %}">
+    <meta name="apple-mobile-web-app-title" content="Gestionale">
+    <link rel="apple-touch-icon" href="{% static 'icons/staff/apple-touch-icon.png' %}">
+    {% endif %}{% endif %}
     <link rel="icon" type="image/png" sizes="192x192" href="{% static 'icons/icon-192x192.png' %}">
     <link rel="icon" type="image/png" sizes="32x32" href="{% static 'icons/icon-72x72.png' %}">
     <link rel="shortcut icon" href="{% static 'favicon.ico' %}">
@@ -240,6 +243,8 @@
                             </a>
                             <ul class="dropdown-menu dropdown-menu-end">
                                 <li><a class="dropdown-item" href="{% url 'admin:index' %}">Amministrazione</a></li>
+                                <li><a class="dropdown-item d-none" href="#" id="pwa-install-item">
+                                    <i class="bi bi-download"></i> Installa app Gestionale</a></li>
                                 <li><hr class="dropdown-divider"></li>
                                 <li><a class="dropdown-item" href="{% url 'admin:logout' %}">Logout</a></li>
                             </ul>
@@ -471,38 +476,71 @@
     </script>
     {% endif %}{% endif %}
 
-    <!-- IMPORTANT: le pagine staff/operatore non usano il Service Worker.
-         Lo SW e' attivo SOLO sul lato cliente /app/ (in base_public.html).
-         Qui sotto disinstalliamo eventuali SW residui (operatori che hanno
-         visitato il sito quando il SW era globale) per evitare latenza
-         aggiunta e cache stale. -->
+    {% if user.is_authenticated %}{% if user.is_staff or user.is_superuser or user|in_group:"operatore" or user|in_group:"responsabile" or user|in_group:"titolare" %}
+    <!-- PWA Gestionale: registra il SW staff (scope /). La register()
+         sullo stesso scope sostituisce da sola eventuali SW legacy;
+         quella del lato cliente (scope /app/) non viene toccata. -->
+    <script>
+    (function () {
+        if (!('serviceWorker' in navigator)) return;
+        window.addEventListener('load', function () {
+            navigator.serviceWorker.register('/service-worker-staff.js', { scope: '/' })
+                .catch(function (err) { console.warn('SW gestionale non registrato:', err); });
+        });
+        // Pulizia one-shot delle cache del vecchio SW globale: SOLO se
+        // nel browser non c'e' la PWA cliente /app/ (le sue cache
+        // autolavaggio-* devono sopravvivere).
+        navigator.serviceWorker.getRegistrations().then(function (regs) {
+            var haClientSW = regs.some(function (r) {
+                return r.scope && r.scope.indexOf('/app/') !== -1;
+            });
+            if (!haClientSW && 'caches' in window) {
+                caches.keys().then(function (keys) {
+                    keys.forEach(function (k) {
+                        if (k.indexOf('autolavaggio-') === 0) caches.delete(k);
+                    });
+                }).catch(function () {});
+            }
+        }).catch(function () {});
+
+        // Voce "Installa app" nel dropdown utente (Chrome/Edge/Android)
+        var deferredPrompt = null;
+        var item = document.getElementById('pwa-install-item');
+        window.addEventListener('beforeinstallprompt', function (e) {
+            e.preventDefault();
+            deferredPrompt = e;
+            if (item) item.classList.remove('d-none');
+        });
+        if (item) item.addEventListener('click', function (ev) {
+            ev.preventDefault();
+            if (!deferredPrompt) return;
+            deferredPrompt.prompt();
+            deferredPrompt.userChoice.finally(function () {
+                deferredPrompt = null;
+                item.classList.add('d-none');
+            });
+        });
+        window.addEventListener('appinstalled', function () {
+            if (item) item.classList.add('d-none');
+        });
+    })();
+    </script>
+    {% else %}
+    <!-- Utenti autenticati NON operativi su pagine staff (caso residuale):
+         nessuna PWA, disinstalla eventuali SW legacy con scope staff. -->
     <script>
     (function () {
         if (!('serviceWorker' in navigator)) return;
         navigator.serviceWorker.getRegistrations().then(function (regs) {
             regs.forEach(function (reg) {
-                // Disinstalla solo SW con scope che include la pagina staff
-                // (esclude eventuale SW scope '/app/' del lato cliente).
                 if (reg.scope && reg.scope.indexOf('/app/') === -1) {
-                    reg.unregister().then(function (ok) {
-                        if (ok) console.log('SW staff disinstallato:', reg.scope);
-                    });
+                    reg.unregister();
                 }
             });
         }).catch(function () {});
-
-        // Pulisci anche le cache create dal SW (autolavaggio-cache-vN, ecc)
-        if ('caches' in window) {
-            caches.keys().then(function (keys) {
-                keys.forEach(function (k) {
-                    if (k.indexOf('autolavaggio-') === 0) {
-                        caches.delete(k);
-                    }
-                });
-            }).catch(function () {});
-        }
     })();
     </script>
+    {% endif %}{% endif %}
 
     {% block extra_body_end %}{% endblock %}
 </body>

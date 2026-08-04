@@ -632,10 +632,9 @@ class MobileCashRegister {
     
     init() {
         this.setupTouchEvents();
-        this.setupServiceWorker();
         this.loadOfflineData();
         this.setupVibration();
-        
+
         // Update cart display
         this.updateCartDisplay();
     }
@@ -658,14 +657,9 @@ class MobileCashRegister {
         }, false);
     }
     
-    setupServiceWorker() {
-        if ('serviceWorker' in navigator) {
-            navigator.serviceWorker.register('/service-worker.js')
-                .then(() => console.log('Service Worker registered'))
-                .catch(err => console.log('Service Worker registration failed'));
-        }
-    }
-    
+    // NOTA: service worker e install prompt sono gestiti da base.html
+    // (PWA Gestionale): qui non va registrato nulla.
+
     setupVibration() {
         this.canVibrate = 'vibrate' in navigator;
     }
@@ -1043,30 +1037,5 @@ document.addEventListener('DOMContentLoaded', function() {
     mobileApp = new MobileCashRegister();
 });
 
-// PWA Install prompt
-let deferredPrompt;
-window.addEventListener('beforeinstallprompt', (e) => {
-    e.preventDefault();
-    deferredPrompt = e;
-    
-    // Show install button
-    const installBtn = document.createElement('button');
-    installBtn.textContent = 'Installa App';
-    installBtn.className = 'btn btn-success btn-sm position-fixed';
-    installBtn.style.top = '10px';
-    installBtn.style.left = '10px';
-    installBtn.style.zIndex = '9999';
-    
-    installBtn.addEventListener('click', async () => {
-        if (deferredPrompt) {
-            deferredPrompt.prompt();
-            const { outcome } = await deferredPrompt.userChoice;
-            deferredPrompt = null;
-            installBtn.remove();
-        }
-    });
-    
-    document.body.appendChild(installBtn);
-});
 </script>
 {% endblock %}
