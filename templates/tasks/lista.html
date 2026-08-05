@@ -107,16 +107,31 @@
     <div class="col-lg-9">
         <div class="card border-0 shadow-sm">
             <div class="card-body">
-                {# quick add #}
-                <form method="post" action="{% url 'tasks:task-crea' %}" class="d-flex gap-2 mb-3">
+                {# quick add con sintassi in linguaggio naturale #}
+                <form method="post" action="{% url 'tasks:task-crea' %}" class="mb-1">
                     {% csrf_token %}
                     <input type="hidden" name="quick" value="1">
                     <input type="hidden" name="next" value="{{ request.get_full_path }}">
                     {% if progetto_sel %}<input type="hidden" name="progetto" value="{{ progetto_sel.pk }}">{% endif %}
-                    <input type="text" name="titolo" class="form-control"
-                           placeholder="Aggiungi una task veloce{% if progetto_sel %} in {{ progetto_sel.nome }}{% endif %}... (invio per salvare)" required>
-                    <button type="submit" class="btn btn-outline-primary"><i class="bi bi-plus-lg"></i></button>
+                    <div class="d-flex gap-2">
+                        <input type="text" name="titolo" class="form-control"
+                               placeholder="Es: Ordinare shampoo domani alle 10 #Magazzino @acquisti +Marco p2" required>
+                        <button type="submit" class="btn btn-outline-primary"><i class="bi bi-plus-lg"></i></button>
+                    </div>
                 </form>
+                <details class="mb-3">
+                    <summary class="small text-muted" style="cursor:pointer;">
+                        <i class="bi bi-magic"></i> Sintassi rapida: #progetto @etichetta +persona p1-p4 e date in italiano
+                    </summary>
+                    <div class="small text-muted mt-2 ps-3">
+                        <div><code>#Magazzino</code> &rarr; assegna al progetto esistente</div>
+                        <div><code>@acquisti</code> &rarr; etichetta (creata se non esiste)</div>
+                        <div><code>+Marco</code> &rarr; assegna all'operatore</div>
+                        <div><code>p1</code> <code>p2</code> <code>p3</code> &rarr; priorit&agrave; (P1 = urgente)</div>
+                        <div><code>domani alle 16</code>, <code>venerdi</code>, <code>3 marzo</code>, <code>15/08</code>,
+                             <code>stasera</code> &rarr; scadenza (senza orario: ore 18)</div>
+                    </div>
+                </details>
 
                 <div class="d-flex justify-content-between align-items-center mb-2 flex-wrap gap-2">
                     <h5 class="mb-0">

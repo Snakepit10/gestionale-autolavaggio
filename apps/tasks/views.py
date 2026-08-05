@@ -155,12 +155,33 @@ def task_crea(request):
         if not form.is_valid():
             messages.error(request, 'Scrivi un titolo per la task.')
             return redirect(request.POST.get('next') or 'tasks:lista')
+
+        # Aggiunta Rapida stile Todoist: #progetto @etichetta +persona
+        # p1..p4 e date in linguaggio naturale dentro il testo.
+        from .quick_add import parse_quick
+        dati = parse_quick(form.cleaned_data['titolo'].strip(), request.user)
+
         task = Task.objects.create(
-            titolo=form.cleaned_data['titolo'].strip(),
-            progetto=form.cleaned_data.get('progetto'),
+            titolo=dati['titolo'],
+            # il #progetto nel testo vince sul progetto della vista corrente
+            progetto=dati['progetto'] or form.cleaned_data.get('progetto'),
+            priorita=dati['priorita'],
+            scadenza=dati['scadenza'],
             creato_da=request.user,
         )
-        messages.success(request, f'Task "{task.titolo}" creata.')
+        if dati['etichette']:
+            task.etichette.set(dati['etichette'])
+        if dati['assegnatari']:
+            task.assegnatari.set(dati['assegnatari'])
+            _notifica_assegnazione(
+                task,
+                {u.pk for u in dati['assegnatari']} - {request.user.pk},
+                request.user)
+
+        msg = f'Task "{task.titolo}" creata'
+        if dati['riconosciuti']:
+            msg += ' (' + ', '.join(dati['riconosciuti']) + ')'
+        messages.success(request, msg + '.')
         return redirect(request.POST.get('next') or 'tasks:lista')
 
     form = TaskForm(request.POST)
