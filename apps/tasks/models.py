@@ -141,6 +141,15 @@ class Task(models.Model):
         return self.titolo
 
     @property
+    def n_sottotask_tot(self) -> int:
+        # len() sulla cache del prefetch: niente query extra per riga
+        return len(self.sottotask.all())
+
+    @property
+    def n_sottotask_fatte(self) -> int:
+        return sum(1 for s in self.sottotask.all() if s.completata)
+
+    @property
     def in_ritardo(self) -> bool:
         return bool(not self.completata and self.scadenza
                     and self.scadenza < timezone.now())

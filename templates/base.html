@@ -403,9 +403,11 @@
     {% endif %}
 
     {% if user.is_authenticated %}{% if user.is_staff or user.is_superuser or user|in_group:"operatore" or user|in_group:"responsabile" or user|in_group:"titolare" %}
-    {# Badge "Task assegnate a me" nella navbar: arancione, rosso se in ritardo.
-       Condizione sui GRUPPI (non solo is_staff): gli operatori semplici
-       possono non avere is_staff ma devono vedere il badge. #}
+    {% comment %}
+    Badge "Task assegnate a me" nella navbar: arancione, rosso se in
+    ritardo. Condizione sui GRUPPI (non solo is_staff): gli operatori
+    semplici possono non avere is_staff ma devono vedere il badge.
+    {% endcomment %}
     <style>
         @keyframes task-badge-pulse {
             0%   { transform: scale(1);   box-shadow: 0 1px 4px rgba(0,0,0,.25), 0 0 0 0 rgba(253,126,20,.6); }

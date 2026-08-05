@@ -1,10 +1,19 @@
 {% comment %}
 Riga task riusata da lista e (per le sotto-task) dal dettaglio.
-Contesto richiesto: t (Task). Il toggle usa fetch su tasks:task-toggle
-(funzione toggleTask definita in lista.html/dettaglio.html).
+Contesto richiesto: t (Task). Il toggle completamento usa fetch su
+tasks:task-toggle (funzione toggleTask definita nelle pagine); la
+freccetta espandi/comprimi sotto-task usa toggleSubtasks (lista.html).
+Le sotto-task sono renderizzate SOLO per le task radice (un livello).
 {% endcomment %}
 <div class="task-item d-flex align-items-start gap-2 py-2 px-2 border-bottom prio-{{ t.priorita }} {% if t.completata %}task-done{% endif %}"
      id="task-row-{{ t.pk }}">
+    {% if not t.parent and t.n_sottotask_tot %}
+    <button type="button" class="btn btn-link p-0 border-0 sub-toggle mt-1"
+            id="sub-toggle-{{ t.pk }}" onclick="toggleSubtasks({{ t.pk }}, this)"
+            title="Mostra/nascondi sotto-task">
+        <i class="bi bi-chevron-down"></i>
+    </button>
+    {% endif %}
     <input type="checkbox" class="form-check-input task-chk mt-1"
            {% if t.completata %}checked{% endif %}
            onchange="toggleTask({{ t.pk }}, this)"
@@ -17,10 +26,15 @@ Contesto richiesto: t (Task). Il toggle usa fetch su tasks:task-toggle
         {% if t.visibilita == 'riservata' %}
             <i class="bi bi-lock-fill text-muted small" title="Riservata: visibile solo a creatore e assegnatari"></i>
         {% endif %}
-        {% if t.sottotask.count %}
-            <span class="text-muted small"><i class="bi bi-list-nested"></i> {{ t.sottotask.count }}</span>
+        {% if t.descrizione %}
+        <div class="small text-muted task-desc">{{ t.descrizione|truncatechars:140 }}</div>
         {% endif %}
         <div class="small d-flex flex-wrap gap-2 mt-1 align-items-center">
+            {% if not t.parent and t.n_sottotask_tot %}
+            <span class="text-muted" title="Sotto-task completate">
+                <i class="bi bi-list-nested"></i> {{ t.n_sottotask_fatte }}/{{ t.n_sottotask_tot }}
+            </span>
+            {% endif %}
             {% if t.progetto %}
             <span class="text-muted">
                 <span class="dot" style="background:{{ t.progetto.colore }};"></span>
@@ -45,3 +59,10 @@ Contesto richiesto: t (Task). Il toggle usa fetch su tasks:task-toggle
     </div>
     <span class="badge prio-badge-{{ t.priorita }}" title="{{ t.get_priorita_display }}">P{{ t.priorita }}</span>
 </div>
+{% if not t.parent and t.n_sottotask_tot %}
+<div class="subtask-wrap ps-4 border-start ms-3" id="subtasks-{{ t.pk }}">
+    {% for st in t.sottotask.all %}
+        {% include 'tasks/_task_item.html' with t=st %}
+    {% endfor %}
+</div>
+{% endif %}

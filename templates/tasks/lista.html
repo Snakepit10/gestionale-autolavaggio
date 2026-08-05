@@ -20,6 +20,12 @@
 .prio-badge-3 { background: #0d6efd; }
 .prio-badge-4 { background: #6c757d; }
 .min-w-0 { min-width: 0; }
+.task-desc { margin-top: 2px; line-height: 1.3; }
+.sub-toggle { color: #6c757d; line-height: 1; width: 18px; flex-shrink: 0; }
+.sub-toggle i { display: inline-block; transition: transform .15s; }
+.sub-toggle.collapsed i { transform: rotate(-90deg); }
+.subtask-wrap { border-color: #e9ecef !important; }
+.subtask-wrap.collapsed { display: none; }
 </style>
 {% endblock %}
 
@@ -241,5 +247,28 @@ function toggleTask(pk, chk) {
     }).catch(() => { chk.checked = !chk.checked; })
       .finally(() => { chk.disabled = false; });
 }
+// Espandi/comprimi le sotto-task; lo stato e' ricordato per task
+// in localStorage cosi' sopravvive ai reload della lista.
+function toggleSubtasks(pk, btn) {
+    const wrap = document.getElementById('subtasks-' + pk);
+    if (!wrap) return;
+    const chiuso = wrap.classList.toggle('collapsed');
+    btn.classList.toggle('collapsed', chiuso);
+    try {
+        localStorage.setItem('task-sub-' + pk, chiuso ? '0' : '1');
+    } catch (e) { /* storage pieno/negato: pazienza */ }
+}
+document.addEventListener('DOMContentLoaded', () => {
+    document.querySelectorAll('.subtask-wrap').forEach((wrap) => {
+        const pk = wrap.id.replace('subtasks-', '');
+        let stato = null;
+        try { stato = localStorage.getItem('task-sub-' + pk); } catch (e) {}
+        if (stato === '0') {
+            wrap.classList.add('collapsed');
+            const btn = document.getElementById('sub-toggle-' + pk);
+            if (btn) btn.classList.add('collapsed');
+        }
+    });
+});
 </script>
 {% endblock %}
