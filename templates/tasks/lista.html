@@ -97,13 +97,15 @@
                 {% if etichette %}
                 <hr>
                 <div class="small text-muted text-uppercase fw-bold mb-1">Etichette</div>
-                <div class="d-flex flex-wrap gap-1">
+                <nav class="nav flex-column gap-1">
                     {% for e in etichette %}
-                    <a href="{% url 'tasks:lista' %}?etichetta={{ e.pk }}"
-                       class="badge text-decoration-none {% if etichetta_sel and etichetta_sel.pk == e.pk %}border border-2 border-dark{% endif %}"
-                       style="background:{{ e.colore }};">{{ e.nome }}</a>
+                    <a class="nav-link {% if etichetta_sel and etichetta_sel.pk == e.pk %}active{% endif %}"
+                       href="{% url 'tasks:lista' %}?etichetta={{ e.pk }}">
+                        <i class="bi bi-tag-fill" style="color:{{ e.colore }};"></i> {{ e.nome }}
+                        <span class="cnt">{{ e.n_aperte }}</span>
+                    </a>
                     {% endfor %}
-                </div>
+                </nav>
                 {% endif %}
             </div>
         </div>

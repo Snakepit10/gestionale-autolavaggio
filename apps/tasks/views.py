@@ -129,6 +129,8 @@ def lista(request):
     progetti = (Progetto.objects.filter(archiviato=False)
                 .annotate(n_aperte=Count('tasks', filter=Q(
                     tasks__completata=False, tasks__parent__isnull=True))))
+    etichette_sidebar = Etichetta.objects.annotate(
+        n_aperte=Count('tasks', filter=Q(tasks__completata=False)))
 
     return render(request, 'tasks/lista.html', {
         'tasks': qs,
@@ -136,7 +138,7 @@ def lista(request):
         'filtro_label': FILTRI_LABEL[filtro],
         'conteggi': conteggi,
         'progetti': progetti,
-        'etichette': Etichetta.objects.all(),
+        'etichette': etichette_sidebar,
         'progetto_sel': progetto_sel,
         'etichetta_sel': etichetta_sel,
         'q': q,
