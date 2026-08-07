@@ -278,20 +278,63 @@ def _whatsapp_target(prenotazione) -> str | None:
     return _to_e164(raw)
 
 
+# Errori Meta piu' comuni tradotti per l'operatore (colonna Note del
+# dettaglio campagna). Fonte: developers.facebook.com/docs/whatsapp/
+# cloud-api/support/error-codes
+_ERRORI_META = {
+    100: 'parametro non valido nella richiesta',
+    131026: 'numero non raggiungibile su WhatsApp (inesistente o senza WhatsApp)',
+    131047: 'finestra di 24 ore chiusa: serve un template approvato',
+    131048: 'invii limitati da Meta per qualita\' del numero (spam rate)',
+    131049: 'Meta ha limitato i messaggi marketing verso questo utente',
+    131050: 'l\'utente ha bloccato i messaggi marketing del numero',
+    131056: 'troppi messaggi ravvicinati verso questo numero: riprovare piu\' tardi',
+    132000: 'numero di parametri diverso dalle variabili del template',
+    132001: 'template inesistente o non approvato (controlla nome e lingua)',
+    132005: 'testo tradotto del template non disponibile nella lingua richiesta',
+    132015: 'template disabilitato da Meta',
+    132016: 'template in pausa da Meta per bassa qualita\'',
+    133010: 'numero WhatsApp Business non registrato sulla Cloud API',
+}
+
+
+def _errore_meta_leggibile(response_text: str) -> str:
+    """Estrae dall'errore JSON di Meta un motivo comprensibile."""
+    import json as _json
+    try:
+        err = _json.loads(response_text).get('error') or {}
+    except (ValueError, AttributeError):
+        return (response_text or 'errore sconosciuto')[:150]
+    codice = err.get('code')
+    dettaglio = (err.get('error_data') or {}).get('details') or err.get('message') or ''
+    tradotto = _ERRORI_META.get(codice)
+    if tradotto:
+        return f'{tradotto} [Meta {codice}]'
+    return f'{dettaglio[:130]} [Meta {codice}]' if codice else dettaglio[:150]
+
+
 def _send_template_blocking(to_e164: str, template_name: str, params: list[str]) -> tuple[bool, str]:
+    """Come _send_template_blocking_ex ma senza il motivo di errore
+    (firma storica: usata dalle notifiche prenotazioni/auto pronta)."""
+    ok, wa_id, _err = _send_template_blocking_ex(to_e164, template_name, params)
+    return ok, wa_id
+
+
+def _send_template_blocking_ex(to_e164: str, template_name: str, params: list[str]) -> tuple[bool, str, str]:
     """Invio sincrono di un template Meta (chiamato dal thread daemon).
 
     `params` sono i valori per {{1}}, {{2}}, ... del body template.
     Tutti i parametri sono stringhe; tronca a 60 char ognuno per
     rispettare i limiti Meta sul body parameter (1024 totali).
 
-    Ritorna `(success, wa_message_id)`. wa_message_id e' l'id Meta del
-    messaggio (es. 'wamid.HBg...') utile per agganciarlo lato chiamante
-    e seguirne lo stato di consegna. Stringa vuota se fallisce o se
-    Meta non ha restituito l'id.
+    Ritorna `(success, wa_message_id, errore)`. wa_message_id e' l'id
+    Meta del messaggio (es. 'wamid.HBg...') utile per agganciarlo lato
+    chiamante e seguirne lo stato di consegna (vuoto se fallisce o
+    assente). `errore` e' il motivo leggibile del fallimento (vuoto se
+    success): usato dalle campagne per la colonna Note.
     """
     if not settings.WHATSAPP_ENABLED:
-        return False, ''
+        return False, '', 'WhatsApp non configurato (variabili META_* mancanti)'
     url = (
         f"{_GRAPH_URL}/{settings.META_WHATSAPP_API_VERSION}"
         f"/{settings.META_WHATSAPP_PHONE_ID}/messages"
@@ -338,7 +381,7 @@ def _send_template_blocking(to_e164: str, template_name: str, params: list[str])
                 'WhatsApp send fallito (%s) to=%s template=%s: %s',
                 r.status_code, to_e164, template_name, r.text[:300],
             )
-            return False, ''
+            return False, '', _errore_meta_leggibile(r.text)
         logger.info('WhatsApp inviato to=%s template=%s', to_e164, template_name)
         # Salva nel storico inbox: ricostruisce il corpo "umano" del
         # template con le variabili sostituite e crea il MessaggioWhatsApp.
@@ -348,13 +391,13 @@ def _send_template_blocking(to_e164: str, template_name: str, params: list[str])
         except (KeyError, IndexError, TypeError, ValueError):
             pass
         _log_outgoing_msg(to_e164, _format_preview(template_name, params), wa_id)
-        return True, wa_id
+        return True, wa_id, ''
     except requests.RequestException as e:
         logger.warning(
             'WhatsApp request error to=%s template=%s: %s',
             to_e164, template_name, e,
         )
-        return False, ''
+        return False, '', f'errore di rete verso Meta: {str(e)[:120]}'
 
 
 def _send_text_blocking(to_e164: str, text: str) -> tuple[bool, str]:

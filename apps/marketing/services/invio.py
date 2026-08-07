@@ -117,7 +117,8 @@ def _processa(max_batch, log, dry):
             continue
 
         params = risolvi_params(campagna.template_params, cliente)
-        ok, wa_id = wa._send_template_blocking(to_e164, campagna.template_meta, params)
+        ok, wa_id, errore = wa._send_template_blocking_ex(
+            to_e164, campagna.template_meta, params)
 
         if ok:
             msg = MessaggioWhatsApp.objects.filter(wa_message_id=wa_id).first() if wa_id else None
@@ -127,9 +128,12 @@ def _processa(max_batch, log, dry):
             esiti['inviati'] += 1
             log(f'Inviato a {cliente}')
         else:
-            InvioCampagna.objects.filter(pk=invio.pk).update(stato='fallito')
+            # Il motivo del fallimento (errore Meta tradotto) finisce
+            # nella colonna Note del dettaglio campagna.
+            InvioCampagna.objects.filter(pk=invio.pk).update(
+                stato='fallito', motivo_salto=(errore or 'errore sconosciuto')[:200])
             esiti['falliti'] += 1
-            log(f'FALLITO invio a {cliente}')
+            log(f'FALLITO invio a {cliente}: {errore}')
 
         # Pausa casuale tra invii (non dopo l'ultimo)
         if idx < len(in_coda) - 1:
@@ -200,11 +204,13 @@ def invia_singolo(invio) -> tuple:
         campagna.save(update_fields=['stato'])
 
     params = risolvi_params(campagna.template_params, cliente)
-    ok, wa_id = wa._send_template_blocking(to_e164, campagna.template_meta, params)
+    ok, wa_id, errore = wa._send_template_blocking_ex(
+        to_e164, campagna.template_meta, params)
 
     if not ok:
-        InvioCampagna.objects.filter(pk=invio.pk).update(stato='fallito')
-        return False, f'Invio a {cliente} fallito: controlla template e numero nei log.'
+        InvioCampagna.objects.filter(pk=invio.pk).update(
+            stato='fallito', motivo_salto=(errore or 'errore sconosciuto')[:200])
+        return False, f'Invio a {cliente} fallito: {errore or "errore sconosciuto"}'
 
     msg = MessaggioWhatsApp.objects.filter(wa_message_id=wa_id).first() if wa_id else None
     InvioCampagna.objects.filter(pk=invio.pk).update(
