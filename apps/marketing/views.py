@@ -65,18 +65,41 @@ def dashboard(request):
     segmentazione e consigli. analisi_ai() e' il seam (oggi inerte)
     per i futuri consigli generati dall'AI.
     """
+    from .models import SegmentoPersonalizzato
     from .services.consigli import analisi_ai, genera_consigli
-    from .services.segmentazione import statistiche_clienti
+    from .services.segmentazione import (filtra_segmento_personalizzato,
+                                         statistiche_clienti)
     from .services.statistiche import (kpi_dashboard, serie_mensile,
                                        stats_ultime_campagne)
 
     stats = statistiche_clienti()
     ris = segmenta_clienti(stats=stats)
+    cfg = ImpostazioniMarketing.get_solo()
+
+    # Come viene filtrato ogni segmento automatico (mostrato in card,
+    # con le soglie correnti delle impostazioni).
+    descrizioni_auto = {
+        'attivi': 'Ultimo lavaggio in linea con la frequenza abituale del '
+                  'cliente (entro la sua media personale + '
+                  f'{cfg.giorni_rallentamento_delta} giorni).',
+        'rallentamento': 'Fermi da piu\' della loro frequenza media '
+                         f'personale + {cfg.giorni_rallentamento_delta} '
+                         'giorni, ma non ancora dormienti.',
+        'dormienti': f'Nessun lavaggio da oltre {cfg.giorni_dormiente} '
+                     'giorni.',
+        'one_shot': 'Un solo lavaggio in totale, mai tornati (anche se '
+                    'vecchissimo: la comunicazione per loro e\' diversa).',
+    }
     segmenti = [
-        (chiave, SEGMENTI_LABEL[chiave], len(ris.get(chiave)))
+        (chiave, SEGMENTI_LABEL[chiave], len(ris.get(chiave)),
+         descrizioni_auto[chiave])
         for chiave in ('attivi', 'rallentamento', 'dormienti', 'one_shot')
     ]
-    cfg = ImpostazioniMarketing.get_solo()
+    segmenti_custom = [
+        (s, len(filtra_segmento_personalizzato(s, stats)),
+         s.criteri_leggibili())
+        for s in SegmentoPersonalizzato.objects.filter(attivo=True)
+    ]
 
     kpi = kpi_dashboard()
     serie = serie_mensile(6)
@@ -87,8 +110,8 @@ def dashboard(request):
     chart_data = {
         'serie': serie,
         'segmenti': {
-            'labels': [label for _, label, _ in segmenti],
-            'valori': [n for _, _, n in segmenti],
+            'labels': [label for _, label, _, _ in segmenti],
+            'valori': [n for _, _, n, _ in segmenti],
         },
         'campagne': {
             'labels': [c['nome'] for c in ultime],
@@ -99,6 +122,7 @@ def dashboard(request):
 
     return render(request, 'marketing/dashboard.html', {
         'segmenti': segmenti,
+        'segmenti_custom': segmenti_custom,
         'cfg': cfg,
         'kpi': kpi,
         'consigli': consigli,

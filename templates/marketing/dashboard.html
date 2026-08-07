@@ -124,14 +124,14 @@
 </p>
 
 <div class="row g-3 mb-4">
-    {% for chiave, label, conteggio in segmenti %}
+    {% for chiave, label, conteggio, descrizione in segmenti %}
     <div class="col-sm-6 col-lg-3">
         <div class="card h-100 border-0 shadow-sm
              {% if chiave == 'attivi' %}border-start border-success border-4
              {% elif chiave == 'rallentamento' %}border-start border-warning border-4
              {% elif chiave == 'dormienti' %}border-start border-danger border-4
              {% else %}border-start border-secondary border-4{% endif %}">
-            <div class="card-body">
+            <div class="card-body d-flex flex-column">
                 <div class="d-flex justify-content-between align-items-start">
                     <div>
                         <h6 class="text-muted mb-1">{{ label }}</h6>
@@ -143,12 +143,51 @@
                         {% elif chiave == 'dormienti' %}bi-moon text-danger
                         {% else %}bi-person-dash text-secondary{% endif %}"></i>
                 </div>
+                <div class="text-muted small mt-1 flex-grow-1">
+                    <i class="bi bi-funnel"></i> {{ descrizione }}
+                </div>
                 <div class="mt-3 d-flex gap-2">
                     <a href="{% url 'marketing:segmento' chiave %}" class="btn btn-sm btn-outline-primary">
                         <i class="bi bi-list-ul"></i> Vedi lista
                     </a>
                     <a href="{% url 'marketing:segmento-export' chiave %}" class="btn btn-sm btn-outline-secondary">
                         <i class="bi bi-download"></i> CSV
+                    </a>
+                </div>
+            </div>
+        </div>
+    </div>
+    {% endfor %}
+
+    {% for seg, conteggio, criteri in segmenti_custom %}
+    <div class="col-sm-6 col-lg-3">
+        <div class="card h-100 border-0 shadow-sm border-start border-primary border-4">
+            <div class="card-body d-flex flex-column">
+                <div class="d-flex justify-content-between align-items-start">
+                    <div>
+                        <h6 class="text-muted mb-1">
+                            {{ seg.nome }}
+                            <span class="badge bg-primary-subtle text-primary border">personalizzato</span>
+                        </h6>
+                        <div class="fs-2 fw-bold">{{ conteggio }}</div>
+                    </div>
+                    <i class="bi bi-funnel-fill fs-3 text-primary"></i>
+                </div>
+                <div class="text-muted small mt-1 flex-grow-1">
+                    <i class="bi bi-funnel"></i>
+                    {% for c in criteri %}{{ c }}{% if not forloop.last %} &middot; {% endif %}{% endfor %}
+                    {% if seg.descrizione %}<br><em>{{ seg.descrizione }}</em>{% endif %}
+                </div>
+                <div class="mt-3 d-flex gap-2">
+                    <a href="{% url 'marketing:segmento-custom' seg.pk %}" class="btn btn-sm btn-outline-primary">
+                        <i class="bi bi-list-ul"></i> Vedi lista
+                    </a>
+                    <a href="{% url 'marketing:segmento-custom-export' seg.pk %}" class="btn btn-sm btn-outline-secondary">
+                        <i class="bi bi-download"></i> CSV
+                    </a>
+                    <a href="{% url 'marketing:segmento-custom-modifica' seg.pk %}" class="btn btn-sm btn-outline-secondary"
+                       title="Modifica i criteri del segmento">
+                        <i class="bi bi-pencil"></i>
                     </a>
                 </div>
             </div>
