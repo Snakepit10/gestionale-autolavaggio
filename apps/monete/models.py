@@ -200,6 +200,7 @@ class MovimentoMoneta(models.Model):
         ('storno', 'Storno'),
         ('rettifica', 'Rettifica manuale'),
         ('abbonamento', 'Abbonamento'),  # riservato per sviluppi futuri
+        ('premio', 'Premio percorso'),   # gamification garage
     ]
 
     cliente = models.ForeignKey(
