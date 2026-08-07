@@ -86,36 +86,13 @@
         </div>
     </div>
 
-    <div class="card border-0 shadow-sm mb-4">
-        <div class="card-body">
-            <h5 class="card-title"><i class="bi bi-alarm text-primary"></i> Richiamo automatico</h5>
-            <div class="row g-3">
-                <div class="col-md-4">
-                    <div class="form-check form-switch mt-4">
-                        <input class="form-check-input" type="checkbox" name="richiamo_automatico_attivo"
-                               id="richiamo-attivo" {% if cfg.richiamo_automatico_attivo %}checked{% endif %}>
-                        <label class="form-check-label fw-bold" for="richiamo-attivo">
-                            Richiamo automatico attivo
-                        </label>
-                    </div>
-                </div>
-                <div class="col-md-4">
-                    <label class="form-label">Giorni dopo l'ultimo lavaggio</label>
-                    <input type="number" min="1" class="form-control" name="richiamo_giorni_dopo"
-                           value="{{ cfg.richiamo_giorni_dopo }}">
-                </div>
-                <div class="col-md-4">
-                    <label class="form-label">Template Meta per il richiamo</label>
-                    <input type="text" class="form-control" name="richiamo_template_meta"
-                           value="{{ cfg.richiamo_template_meta }}"
-                           placeholder="es. richiamo_45_giorni">
-                    <div class="form-text">
-                        Nome del template approvato su Meta WhatsApp Manager.
-                        Vuoto = il richiamo non parte anche se l'interruttore è ON.
-                    </div>
-                </div>
-            </div>
-        </div>
+    <div class="alert alert-light border small mb-4">
+        <i class="bi bi-infinity text-primary"></i>
+        <strong>Richiami automatici:</strong> il vecchio richiamo hardcoded
+        non esiste piu'. Per ricontattare in automatico i clienti fermi,
+        crea una <a href="{% url 'marketing:campagna-nuova' %}">campagna</a>
+        con la spunta <em>flusso continuo</em> su un segmento adatto
+        (es. segmento personalizzato "fermi da 45+ giorni").
     </div>
 
     <div class="card border-0 shadow-sm mb-4">

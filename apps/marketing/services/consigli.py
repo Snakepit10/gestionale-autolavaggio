@@ -38,27 +38,22 @@ def _attiva_su_segmento(chiave: str) -> bool:
     )
 
 
-def _regola_richiamo_spento(ctx):
-    """[100] Il richiamo automatico e' la rete di sicurezza: se e'
-    spento o senza template, nessun cliente viene ricontattato da solo."""
-    cfg = ctx['cfg']
-    if cfg.richiamo_automatico_attivo and cfg.richiamo_template_meta:
+def _regola_flusso_continuo_mancante(ctx):
+    """[100] Un flusso continuo e' la rete di sicurezza: senza, nessun
+    cliente fermo viene ricontattato da solo."""
+    if Campagna.objects.filter(flusso_continuo=True,
+                               stato__in=('in_coda', 'in_corso')).exists():
         return None
-    if not cfg.richiamo_automatico_attivo:
-        testo = (f'Il richiamo automatico e\' spento: i clienti spariti da '
-                 f'{cfg.richiamo_giorni_dopo} giorni non ricevono nessun '
-                 f'promemoria. E\' la campagna che lavora da sola, senza '
-                 f'muovere un dito.')
-    else:
-        testo = ('L\'interruttore del richiamo automatico e\' ON ma manca '
-                 'il template Meta: i promemoria NON partono. Inserisci il '
-                 'nome del template approvato nelle impostazioni.')
     return {
-        'icona': 'bi-alarm', 'priorita': 100,
-        'titolo': 'Accendi il richiamo automatico',
-        'testo': testo,
-        'cta_url': reverse('marketing:impostazioni'),
-        'cta_label': 'Vai alle impostazioni',
+        'icona': 'bi-infinity', 'priorita': 100,
+        'titolo': 'Attiva una campagna a flusso continuo',
+        'testo': ('Nessuna campagna a flusso continuo attiva: i clienti '
+                  'che smettono di venire non ricevono alcun richiamo '
+                  'automatico. Crea una campagna sui dormienti (o su un '
+                  'segmento "fermi da 45+ giorni") con la spunta flusso '
+                  'continuo: lavora da sola, giorno dopo giorno.'),
+        'cta_url': reverse('marketing:campagna-nuova') + '?segmenti=dormienti',
+        'cta_label': 'Crea il flusso di richiamo',
     }
 
 
@@ -220,7 +215,7 @@ def _regola_nessuna_campagna(ctx):
 
 
 _REGOLE = (
-    _regola_richiamo_spento,
+    _regola_flusso_continuo_mancante,
     _regola_dormienti,
     _regola_big_spender_fermi,
     _regola_one_shot_recenti,

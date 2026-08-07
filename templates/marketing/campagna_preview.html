@@ -72,6 +72,18 @@
     {% endfor %}
     <input type="hidden" name="template_meta" value="{{ template_meta }}">
     <input type="hidden" name="template_params" value="{{ params_raw }}">
+    {% if flusso_continuo %}
+    <input type="hidden" name="flusso_continuo" value="on">
+    <input type="hidden" name="riaggancio_giorni" value="{{ riaggancio_giorni }}">
+    <div class="alert alert-info">
+        <i class="bi bi-infinity"></i> <strong>Flusso continuo:</strong>
+        qui sotto vedi i destinatari di OGGI. Dopo la conferma, la campagna
+        restera' attiva e il sistema accodera' automaticamente i nuovi
+        clienti che entreranno nei segmenti scelti
+        {% if riaggancio_giorni %}(ricontatto ciclico ogni {{ riaggancio_giorni }} giorni){% else %}(ogni cliente al massimo una volta){% endif %}.
+        Si ferma con Pausa o Annulla.
+    </div>
+    {% endif %}
 
     <div class="card border-0 shadow-sm mb-4">
         <div class="card-body">

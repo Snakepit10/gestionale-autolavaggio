@@ -296,6 +296,26 @@ class Campagna(models.Model):
                   '{totale_lavaggi}. Esempio: ["{nome}", "20%"]',
     )
 
+    # --- Flusso continuo ---
+    # Una campagna a flusso continuo non fotografa i destinatari una
+    # volta sola: il cron rivaluta periodicamente i suoi segmenti e
+    # accoda da solo i clienti che vi entrano (rispettando opt-out e
+    # finestra no-ricontatto). Non si auto-completa mai: si ferma con
+    # Pausa o Annulla. Sostituisce il vecchio richiamo automatico
+    # hardcoded.
+    flusso_continuo = models.BooleanField(
+        default=False,
+        help_text='Il cron riaccoda automaticamente i nuovi clienti che '
+                  'entrano nei segmenti della campagna.',
+    )
+    riaggancio_giorni = models.PositiveSmallIntegerField(
+        default=0,
+        help_text='Solo flusso continuo: dopo N giorni dall\'invio, un '
+                  'cliente che rientra nel segmento puo\' essere '
+                  'ricontattato da questa campagna. 0 = mai (ogni '
+                  'cliente riceve al massimo un messaggio).',
+    )
+
     # Snapshot del segmento al momento del lancio (lista di cliente_id).
     # Fotografato perche' la segmentazione e' dinamica: senza snapshot i
     # destinatari cambierebbero tra il lancio e l'ultimo invio scaglionato.

@@ -213,7 +213,8 @@ def report_vendite() -> dict:
 
 def contesto_per_ai() -> dict:
     """Fotografia aggregata del marketing da passare al modello."""
-    from apps.marketing.models import ImpostazioniMarketing, SegmentoPersonalizzato
+    from apps.marketing.models import (Campagna, ImpostazioniMarketing,
+                                       SegmentoPersonalizzato)
     from .campagne import PLACEHOLDER_SUPPORTATI
     from .segmentazione import (SEGMENTI_LABEL, filtra_segmento_personalizzato,
                                 segmenta_clienti, statistiche_clienti)
@@ -281,12 +282,13 @@ def contesto_per_ai() -> dict:
             'fascia_invio': f'{cfg.orario_invio_da:%H:%M}-{cfg.orario_invio_a:%H:%M}',
             'finestra_no_ricontatto_giorni': cfg.finestra_no_ricontatto_giorni,
             'finestra_conversione_giorni': cfg.giorni_finestra_conversione,
-            'richiamo_automatico': {
-                'attivo': cfg.richiamo_automatico_attivo,
-                'giorni_dopo': cfg.richiamo_giorni_dopo,
-                'template': cfg.richiamo_template_meta,
-            },
         },
+        'campagne_flusso_continuo_attive': [
+            {'nome': c.nome, 'segmenti': c.segmento_origine,
+             'riaggancio_giorni': c.riaggancio_giorni}
+            for c in Campagna.objects.filter(
+                flusso_continuo=True, stato__in=('in_coda', 'in_corso'))
+        ],
         'template_meta_approvati': templates,
         'placeholder_supportati': list(PLACEHOLDER_SUPPORTATI),
         'listino': listino_servizi(),

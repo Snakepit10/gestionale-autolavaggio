@@ -89,21 +89,31 @@ Una campagna con invii ancora in coda si può **annullare** dal
 dettaglio: gli invii in coda diventano "saltato", quelli già inviati
 restano.
 
-## 4. Richiamo automatico
+## 4. Campagne a flusso continuo
 
-**Marketing → Impostazioni → Richiamo automatico**:
+Il vecchio "richiamo automatico" hardcoded non esiste piu': al suo
+posto qualsiasi campagna puo' diventare **a flusso continuo** con la
+spunta nel composer. Il cron, a ogni run:
 
-- Interruttore ON/OFF
-- Giorni dopo l'ultimo lavaggio (default 45)
-- Nome del template Meta da usare (obbligatorio: senza, il richiamo
-  non parte anche con l'interruttore ON)
+- rivaluta i segmenti della campagna e accoda i clienti che vi sono
+  ENTRATI nel frattempo (stesse esclusioni delle campagne manuali:
+  opt-out, telefono, finestra no-ricontatto);
+- ritenta gli invii "saltato" per motivi temporanei appena il cliente
+  torna contattabile (l'opt-out resta escluso);
+- con **Ricontatto ciclico = N giorni**, un cliente gia' contattato
+  che dopo N giorni e' di nuovo nel segmento viene ricontattato
+  (0 = ogni cliente riceve la campagna al massimo una volta).
 
-Ogni giorno il cron trova i clienti il cui *ultimo* lavaggio risale
-esattamente a N giorni fa e li accoda alla campagna mensile
-"Richiamo automatico YYYY-MM" (tipo *automatica*, visibile e
-misurabile in dashboard come le altre). Stesse esclusioni delle
-campagne manuali. Parametri template: `{nome}`,
-`{giorni_ultimo_lavaggio}` (il template Meta deve avere 2 variabili).
+Un flusso continuo non si auto-completa mai: si ferma con Pausa
+(riprendibile) o Annulla (definitivo). In lista campagne ha il badge
+"flusso continuo".
+
+**Richiamo classico dei clienti fermi**: crea un segmento
+personalizzato "giorni da ultimo >= 45", poi una campagna su quel
+segmento con flusso continuo attivo e ricontatto ciclico es. 120
+giorni. Parametri template: `{nome}` e/o `{giorni_ultimo_lavaggio}`
+(il numero di variabili del template Meta viene rispettato in
+automatico).
 
 ## 5. Misurazione
 

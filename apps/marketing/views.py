@@ -188,35 +188,10 @@ def campagne_list(request):
         (c, statistiche_campagna(c)) for c in Campagna.objects.all()
     ]
 
-    # Il richiamo automatico e' una campagna ricorrente: il cron crea un
-    # contenitore mensile 'Richiamo automatico YYYY-MM' (gia' in lista),
-    # ma qui mostriamo sempre un riepilogo con le metriche cumulate,
-    # anche prima che esista il primo contenitore.
-    cfg = ImpostazioniMarketing.get_solo()
-    stats_ric = [s for c, s in campagne if c.tipo == 'automatica_richiamo']
-    tot = {
-        chiave: sum(s[chiave] for s in stats_ric)
-        for chiave in ('n_destinatari', 'n_inviati', 'n_letti', 'n_in_coda',
-                       'n_falliti', 'n_conversioni')
-    }
-    tot['fatturato'] = sum(s['fatturato'] for s in stats_ric)
-    tot['tasso_lettura'] = (
-        tot['n_letti'] / tot['n_inviati'] * 100 if tot['n_inviati'] else 0.0)
-    tot['tasso_conversione'] = (
-        tot['n_conversioni'] / tot['n_inviati'] * 100 if tot['n_inviati'] else 0.0)
-    richiamo = {
-        'attivo': cfg.richiamo_automatico_attivo,
-        'template': cfg.richiamo_template_meta,
-        'giorni': cfg.richiamo_giorni_dopo,
-        'n_campagne': len(stats_ric),
-        'stats': tot,
-    }
-
     return render(request, 'marketing/campagne_list.html', {
         'campagne': campagne,
         'per_segmento': statistiche_per_segmento(),
         'segmenti_label': SEGMENTI_LABEL,
-        'richiamo': richiamo,
     })
 
 
@@ -246,7 +221,8 @@ def campagna_nuova(request):
         for s in SegmentoPersonalizzato.objects.filter(attivo=True)
     ]
 
-    prefill = {'nome': '', 'template_meta': '', 'params_raw': '', 'segmenti': []}
+    prefill = {'nome': '', 'template_meta': '', 'params_raw': '', 'segmenti': [],
+               'flusso_continuo': False, 'riaggancio_giorni': 0}
     duplica_pk = request.GET.get('duplica', '')
     if duplica_pk.isdigit():
         orig = Campagna.objects.filter(pk=int(duplica_pk)).first()
@@ -254,6 +230,8 @@ def campagna_nuova(request):
             prefill['nome'] = f'{orig.nome} (copia)'
             prefill['template_meta'] = orig.template_meta
             prefill['params_raw'] = '\n'.join(orig.template_params or [])
+            prefill['flusso_continuo'] = orig.flusso_continuo
+            prefill['riaggancio_giorni'] = orig.riaggancio_giorni
             chiavi = [s for s in orig.segmento_origine.split(',') if s]
             prefill['segmenti'] = _chiavi_segmenti_valide(chiavi)
             # Segmenti custom eliminati nel frattempo, o chiavi non piu'
@@ -361,6 +339,12 @@ def campagna_preview(request):
 
     segmento_label = _label_chiavi(segmenti_scelti)
 
+    flusso_continuo = request.POST.get('flusso_continuo') == 'on'
+    try:
+        riaggancio_giorni = max(0, int(request.POST.get('riaggancio_giorni') or 0))
+    except (TypeError, ValueError):
+        riaggancio_giorni = 0
+
     return render(request, 'marketing/campagna_preview.html', {
         'nome': nome,
         'segmenti_scelti': segmenti_scelti,
@@ -371,6 +355,8 @@ def campagna_preview(request):
         'eleggibili': eleggibili,
         'esclusi': esclusi,
         'esempi': esempi,
+        'flusso_continuo': flusso_continuo,
+        'riaggancio_giorni': riaggancio_giorni,
     })
 
 
@@ -398,17 +384,26 @@ def campagna_crea(request):
         messages.error(request, 'Seleziona almeno un destinatario.')
         return redirect('marketing:campagna-nuova')
 
+    flusso_continuo = request.POST.get('flusso_continuo') == 'on'
+    try:
+        riaggancio_giorni = max(0, int(request.POST.get('riaggancio_giorni') or 0))
+    except (TypeError, ValueError):
+        riaggancio_giorni = 0
+
     campagna = crea_campagna(
         nome=nome, template_meta=template_meta,
         template_params=template_params,
         cliente_ids_selezionati=cliente_ids,
         segmento=','.join(segmenti_scelti), user=request.user,
+        flusso_continuo=flusso_continuo,
+        riaggancio_giorni=riaggancio_giorni,
     )
-    messages.success(
-        request,
-        f'Campagna "{campagna.nome}" creata: {campagna.n_in_coda} invii in coda. '
-        f"L'invio parte scaglionato (max {ImpostazioniMarketing.get_solo().max_invii_giorno}/giorno)."
-    )
+    msg = (f'Campagna "{campagna.nome}" creata: {campagna.n_in_coda} invii in coda. '
+           f"L'invio parte scaglionato (max {ImpostazioniMarketing.get_solo().max_invii_giorno}/giorno).")
+    if campagna.flusso_continuo:
+        msg += (' Flusso continuo attivo: i nuovi clienti che entreranno nei '
+                'segmenti verranno accodati automaticamente dal cron.')
+    messages.success(request, msg)
     return redirect('marketing:campagna-dettaglio', pk=campagna.pk)
 
 
@@ -714,7 +709,7 @@ def impostazioni(request):
             'giorni_dormiente', 'giorni_rallentamento_delta',
             'max_invii_giorno', 'intervallo_min_secondi',
             'intervallo_max_secondi', 'finestra_no_ricontatto_giorni',
-            'richiamo_giorni_dopo', 'giorni_finestra_conversione',
+            'giorni_finestra_conversione',
         ]
         try:
             for campo in campi_int:
@@ -742,8 +737,8 @@ def impostazioni(request):
             messages.error(request, 'Fascia oraria non valida: usa il formato HH:MM.')
             return redirect('marketing:impostazioni')
 
-        cfg.richiamo_automatico_attivo = request.POST.get('richiamo_automatico_attivo') == 'on'
-        cfg.richiamo_template_meta = (request.POST.get('richiamo_template_meta') or '').strip()
+        # NB: il vecchio richiamo automatico hardcoded non esiste piu':
+        # i campi richiamo_* del modello restano solo per storicita'.
         cfg.save()
         messages.success(request, 'Impostazioni salvate.')
         return redirect('marketing:impostazioni')

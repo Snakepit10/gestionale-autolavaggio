@@ -15,6 +15,12 @@
             {% else %}bg-light text-dark border{% endif %}">
             {{ campagna.get_stato_display }}
         </span>
+        {% if campagna.flusso_continuo %}
+        <span class="badge fs-6 align-middle bg-warning text-dark"
+              title="Il cron accoda automaticamente i nuovi clienti che entrano nei segmenti. Si ferma con Pausa o Annulla.">
+            <i class="bi bi-infinity"></i> flusso continuo
+        </span>
+        {% endif %}
     </h1>
     <div>
         {% if campagna.stato == 'in_coda' or campagna.stato == 'in_corso' %}
@@ -142,6 +148,10 @@
             {% endif %}
             · Segmento: {{ campagna.segmento_origine|default:"—" }}
             · Conversione entro {{ campagna.finestra_conversione_giorni }} giorni dall'invio
+            {% if campagna.flusso_continuo %}
+            · <i class="bi bi-infinity"></i> Flusso continuo:
+              {% if campagna.riaggancio_giorni %}ricontatto ciclico ogni {{ campagna.riaggancio_giorni }} giorni{% else %}ogni cliente al massimo una volta{% endif %}
+            {% endif %}
         </span>
     </div>
 </div>

@@ -95,6 +95,35 @@
                         {% for ph in placeholder %}<code>{{ ph }}</code>{% if not forloop.last %}, {% endif %}{% endfor %}
                     </div>
                 </div>
+                <div class="col-12">
+                    <div class="border rounded p-3" style="background:#f8fafc;">
+                        <div class="form-check form-switch">
+                            <input class="form-check-input" type="checkbox" name="flusso_continuo"
+                                   id="flusso-continuo" {% if prefill.flusso_continuo %}checked{% endif %}
+                                   onchange="document.getElementById('riaggancio-box').style.display = this.checked ? '' : 'none';">
+                            <label class="form-check-label fw-bold" for="flusso-continuo">
+                                <i class="bi bi-infinity"></i> Campagna a flusso continuo
+                            </label>
+                        </div>
+                        <div class="form-text">
+                            La campagna resta attiva: ogni giorno il sistema ricontrolla i
+                            segmenti scelti e accoda da solo i clienti che vi entrano
+                            (rispettando opt-out e finestra anti-ricontatto). Si ferma
+                            solo con Pausa o Annulla. Ideale per i richiami: es. segmento
+                            "fermi da 45+ giorni" + questa spunta.
+                        </div>
+                        <div id="riaggancio-box" class="mt-2" {% if not prefill.flusso_continuo %}style="display:none;"{% endif %}>
+                            <label class="form-label fw-bold mb-1">Ricontatto ciclico (giorni)</label>
+                            <input type="number" min="0" class="form-control" name="riaggancio_giorni"
+                                   value="{{ prefill.riaggancio_giorni }}" style="max-width:180px;">
+                            <div class="form-text">
+                                0 = ogni cliente riceve questa campagna al massimo UNA volta.
+                                Es. 180 = se dopo 6 mesi dall'invio il cliente e' di nuovo nel
+                                segmento, viene ricontattato.
+                            </div>
+                        </div>
+                    </div>
+                </div>
             </div>
         </div>
     </div>

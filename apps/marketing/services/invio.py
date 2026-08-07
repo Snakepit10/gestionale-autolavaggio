@@ -137,9 +137,12 @@ def _processa(max_batch, log, dry):
             log(f'  pausa {pausa}s...')
             time.sleep(pausa)
 
-    # Chiudi le campagne manuali esaurite
+    # Chiudi le campagne manuali esaurite. I flussi continui NON si
+    # auto-completano mai: restano attivi finche' l'operatore non li
+    # mette in pausa o li annulla.
     if not dry:
-        for campagna in Campagna.objects.filter(stato='in_corso', tipo='manuale'):
+        for campagna in Campagna.objects.filter(
+                stato='in_corso', tipo='manuale', flusso_continuo=False):
             if not campagna.invii.filter(stato='in_coda').exists():
                 campagna.stato = 'completata'
                 campagna.completata_il = timezone.now()
@@ -208,8 +211,10 @@ def invia_singolo(invio) -> tuple:
         stato='inviato', inviato_il=timezone.now(), messaggio_wa=msg)
 
     # Se era l'ultimo invio pendente di una campagna manuale, chiudila
-    # (stessa regola di fine batch in _processa).
-    if campagna.tipo == 'manuale' and campagna.stato == 'in_corso' \
+    # (stessa regola di fine batch in _processa; i flussi continui
+    # restano aperti).
+    if campagna.tipo == 'manuale' and not campagna.flusso_continuo \
+            and campagna.stato == 'in_corso' \
             and not campagna.invii.filter(stato='in_coda').exists():
         campagna.stato = 'completata'
         campagna.completata_il = timezone.now()
