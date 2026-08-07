@@ -345,6 +345,25 @@ def campagna_preview(request):
     except (TypeError, ValueError):
         riaggancio_giorni = 0
 
+    # Confronta i parametri con le variabili REALI del template su Meta:
+    # un mismatch produce l'errore 132000 a ogni invio. Se il body non
+    # e' recuperabile (template nuovo, rete) non si avvisa.
+    from apps.clients.whatsapp import _conta_variabili_template
+    n_variabili = _conta_variabili_template(template_meta)
+    avviso_parametri = None
+    if n_variabili is not None and n_variabili != len(template_params):
+        if n_variabili == 0:
+            avviso_parametri = (
+                f'Il template "{template_meta}" non ha variabili: i '
+                f'{len(template_params)} parametri inseriti verranno ignorati.')
+        else:
+            avviso_parametri = (
+                f'Il template "{template_meta}" ha {n_variabili} '
+                f'variabile/i ma hai inserito {len(template_params)} '
+                f'parametro/i: gli invii FALLIRANNO (errore Meta 132000). '
+                f'Torna indietro e inserisci una riga per ogni variabile '
+                f'(es. {{nome}} per il nome del cliente).')
+
     return render(request, 'marketing/campagna_preview.html', {
         'nome': nome,
         'segmenti_scelti': segmenti_scelti,
@@ -357,6 +376,7 @@ def campagna_preview(request):
         'esempi': esempi,
         'flusso_continuo': flusso_continuo,
         'riaggancio_giorni': riaggancio_giorni,
+        'avviso_parametri': avviso_parametri,
     })
 
 

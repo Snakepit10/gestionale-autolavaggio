@@ -64,6 +64,13 @@
 </div>
 {% endif %}
 
+{% if avviso_parametri %}
+<div class="alert alert-danger">
+    <i class="bi bi-exclamation-triangle-fill"></i>
+    <strong>Controlla i parametri:</strong> {{ avviso_parametri }}
+</div>
+{% endif %}
+
 <form method="post" action="{% url 'marketing:campagna-crea' %}">
     {% csrf_token %}
     <input type="hidden" name="nome" value="{{ nome }}">

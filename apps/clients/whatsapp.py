@@ -381,6 +381,13 @@ def _send_template_blocking_ex(to_e164: str, template_name: str, params: list[st
                 'WhatsApp send fallito (%s) to=%s template=%s: %s',
                 r.status_code, to_e164, template_name, r.text[:300],
             )
+            # 132000 = conteggio parametri sbagliato: spesso il body in
+            # cache (24h) e' di una versione vecchia del template (es.
+            # appena modificato su Meta per aggiungere {{1}}). Butta la
+            # cache cosi' il prossimo tentativo rilegge il template vero.
+            if '132000' in r.text:
+                from django.core.cache import cache as _cache
+                _cache.delete(f'wa_tpl_body:{template_name}')
             return False, '', _errore_meta_leggibile(r.text)
         logger.info('WhatsApp inviato to=%s template=%s', to_e164, template_name)
         # Salva nel storico inbox: ricostruisce il corpo "umano" del
