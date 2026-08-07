@@ -55,6 +55,41 @@
         </a>
     </div>
 
+    {# Il mio Garage: veicolo principale con salute e livello #}
+    <div class="pub-card mb-4 d-flex flex-wrap justify-content-between align-items-center gap-3">
+        <div style="flex:1; min-width:220px;">
+            <div class="fs-5 fw-bold"><i class="bi bi-car-front-fill text-primary"></i> Il mio Garage</div>
+            {% if garage_primo %}
+            <div class="d-flex align-items-center gap-2 mt-1 flex-wrap">
+                <span class="badge fs-6
+                    {% if garage_primo.salute >= 80 %}bg-success{% elif garage_primo.salute >= 60 %}bg-warning text-dark{% elif garage_primo.salute >= 40 %}bg-warning text-dark{% else %}bg-danger{% endif %}"
+                    title="Punteggio salute">{{ garage_primo.salute }}/100</span>
+                <span class="fw-bold">{{ garage_primo.veicolo.targa }}</span>
+                <span class="text-muted small">{{ garage_primo.veicolo.marca }} {{ garage_primo.veicolo.modello }}</span>
+            </div>
+            <p class="text-muted small mb-0 mt-1">
+                {% if garage_primo.percorso.nel_club %}
+                    <i class="bi bi-trophy-fill" style="color:#6f42c1;"></i> Club Auto Perfetta
+                {% else %}
+                    {{ garage_primo.percorso.label_livello }}
+                    {% if garage_primo.percorso.corrente %}
+                        &middot; {{ garage_primo.percorso.corrente.n_fatti }}/{{ garage_primo.percorso.corrente.n_totali }} servizi
+                    {% endif %}
+                {% endif %}
+                {% if n_veicoli > 1 %} &middot; {{ n_veicoli }} veicoli nel garage{% endif %}
+            </p>
+            {% else %}
+            <p class="text-muted small mb-0">
+                Registra il tuo veicolo: libretto digitale dei lavaggi,
+                punteggio salute e premi in gettoni a ogni traguardo.
+            </p>
+            {% endif %}
+        </div>
+        <a href="{% url 'garage_client:garage' %}" class="btn-cta flex-shrink-0">
+            <i class="bi bi-car-front"></i> {% if garage_primo %}Apri il garage{% else %}Registra veicolo{% endif %}
+        </a>
+    </div>
+
     {# Ricarica monete: visibile direttamente all'ingresso dell'area #}
     {% include "clients/_ricarica_monete.html" %}
 

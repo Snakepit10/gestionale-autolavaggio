@@ -1,0 +1,121 @@
+{% extends "clients/base_public.html" %}
+{% block title %}Il mio Garage &mdash; MasterWash{% endblock %}
+{% block nav_area %}active{% endblock %}
+
+{% block extra_css %}
+<style>
+.salute-ring {
+    width: 74px; height: 74px; border-radius: 50%;
+    display: flex; flex-direction: column;
+    align-items: center; justify-content: center;
+    color: #fff; font-weight: 800; flex-shrink: 0;
+}
+.salute-ring .val { font-size: 1.4rem; line-height: 1; }
+.salute-ring .lbl { font-size: .6rem; text-transform: uppercase; opacity: .85; }
+.salute-verde   { background: #198754; }
+.salute-gialla  { background: #d4a017; }
+.salute-arancio { background: #fd7e14; }
+.salute-rossa   { background: #dc3545; }
+.progress-slim { height: 8px; border-radius: 4px; }
+.targa-plate {
+    display: inline-block; font-family: 'Arial Black', Arial, sans-serif;
+    background: #fff; border: 2px solid #1d3557; border-radius: 6px;
+    padding: 2px 10px; letter-spacing: 2px; font-size: 1.05rem;
+    color: #1d3557;
+}
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="container py-4">
+
+    <div class="d-flex justify-content-between align-items-center mb-1">
+        <h3 class="mb-0" style="font-weight:800"><i class="bi bi-car-front-fill text-primary"></i> Il mio Garage</h3>
+        <a href="{% url 'clients:dashboard' %}" class="btn btn-sm btn-outline-secondary">
+            <i class="bi bi-arrow-left"></i> Area
+        </a>
+    </div>
+    <p class="text-muted mb-4">
+        Registra i tuoi veicoli e segui il loro percorso di manutenzione:
+        ogni servizio fa salire il punteggio salute e sblocca premi in gettoni.
+    </p>
+
+    {% for r in veicoli %}
+    <div class="pub-card mb-3">
+        <div class="d-flex gap-3 align-items-center flex-wrap">
+            <div class="salute-ring
+                {% if r.salute >= 80 %}salute-verde{% elif r.salute >= 60 %}salute-gialla{% elif r.salute >= 40 %}salute-arancio{% else %}salute-rossa{% endif %}"
+                 title="Punteggio salute del veicolo (0-100)">
+                <span class="val">{{ r.salute }}</span>
+                <span class="lbl">salute</span>
+            </div>
+            <div class="flex-grow-1" style="min-width:200px;">
+                <div class="d-flex align-items-center gap-2 flex-wrap">
+                    <span class="targa-plate">{{ r.veicolo.targa }}</span>
+                    <span class="fw-bold">{{ r.veicolo.marca }} {{ r.veicolo.modello }}</span>
+                </div>
+                <div class="small mt-2">
+                    {% if r.percorso.nel_club %}
+                        <span class="badge" style="background:#6f42c1;"><i class="bi bi-trophy-fill"></i> Club Auto Perfetta</span>
+                    {% else %}
+                        <span class="fw-bold text-primary">{{ r.percorso.label_livello }}</span>
+                        {% if r.percorso.corrente %}
+                        <div class="progress progress-slim mt-1" style="max-width:260px;">
+                            <div class="progress-bar bg-primary" style="width:{{ r.percorso.corrente.percentuale }}%"></div>
+                        </div>
+                        <span class="text-muted">{{ r.percorso.corrente.n_fatti }}/{{ r.percorso.corrente.n_totali }} servizi del livello</span>
+                        {% endif %}
+                    {% endif %}
+                    {% if r.veicolo.streak_attiva %}
+                        <span class="badge bg-warning text-dark ms-1" title="Serie di servizi consecutivi attiva">
+                            <i class="bi bi-fire"></i> streak {{ r.veicolo.streak_conteggio }}
+                        </span>
+                    {% endif %}
+                </div>
+            </div>
+            <div class="d-flex flex-column gap-2 flex-shrink-0">
+                <a href="#" class="btn-cta btn-sm text-center" style="pointer-events:none;opacity:.5;"
+                   title="Arriva con la prossima fase">
+                    <i class="bi bi-clipboard-heart"></i> Scheda
+                </a>
+                <form method="post" action="{% url 'garage_client:veicolo-elimina' r.veicolo.pk %}"
+                      onsubmit="return confirm('Rimuovere {{ r.veicolo.targa }} dal garage?');">
+                    {% csrf_token %}
+                    <button type="submit" class="btn btn-sm btn-outline-danger w-100">
+                        <i class="bi bi-trash"></i>
+                    </button>
+                </form>
+            </div>
+        </div>
+    </div>
+    {% empty %}
+    <div class="pub-card text-center py-5 mb-3">
+        <i class="bi bi-car-front" style="font-size:2.5rem; color:#cbd5e1"></i>
+        <p class="text-muted mb-0 mt-2">
+            Nessun veicolo ancora. Aggiungi il primo qui sotto: bastano
+            targa, marca e modello.
+        </p>
+    </div>
+    {% endfor %}
+
+    {# ---- Aggiungi veicolo ---- #}
+    <div class="pub-card mb-4">
+        <div class="fs-5 fw-bold mb-2"><i class="bi bi-plus-circle text-primary"></i> Aggiungi un veicolo</div>
+        <form method="post" action="{% url 'garage_client:veicolo-aggiungi' %}">
+            {% csrf_token %}
+            <div class="row g-2">
+                <div class="col-12 col-md-3">{{ form.targa }}</div>
+                <div class="col-6 col-md-3">{{ form.marca }}</div>
+                <div class="col-6 col-md-4">{{ form.modello }}</div>
+                <div class="col-12 col-md-2">
+                    <button type="submit" class="btn-cta w-100">
+                        <i class="bi bi-check-lg"></i> Aggiungi
+                    </button>
+                </div>
+            </div>
+            <div class="form-text">La targa viene salvata in maiuscolo, senza spazi.</div>
+        </form>
+    </div>
+
+</div>
+{% endblock %}

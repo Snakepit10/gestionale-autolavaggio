@@ -125,12 +125,32 @@ def dashboard(request):
     # libera direttamente nella pagina di ingresso dell'area cliente)
     from apps.monete.services.wallet import saldo_di
     from apps.monete.views_client import contesto_ricarica
+
+    # Card "Il mio Garage": primo veicolo con salute e livello
+    garage_primo = None
+    n_veicoli = 0
+    try:
+        from apps.garage.services.percorso import stato_percorso
+        veicoli = list(cliente.veicoli.filter(attivo=True))
+        n_veicoli = len(veicoli)
+        if veicoli:
+            v = veicoli[0]
+            garage_primo = {
+                'veicolo': v,
+                'salute': v.salute_attuale,
+                'percorso': stato_percorso(v),
+            }
+    except Exception:
+        pass  # il garage non deve mai rompere la dashboard
+
     contesto = {
         'cliente': cliente,
         'prenotazioni_prossime': prenotazioni_prossime,
         'prenotazioni_passate': prenotazioni_passate,
         'punti_totali': punti_totali,
         'saldo_monete': saldo_di(cliente),
+        'garage_primo': garage_primo,
+        'n_veicoli': n_veicoli,
     }
     contesto.update(contesto_ricarica())
     return render(request, 'clients/dashboard.html', contesto)

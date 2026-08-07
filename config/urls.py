@@ -114,6 +114,7 @@ urlpatterns = [
 
     # Monete virtuali lato cliente (saldo, avvio lavaggi, acquisti)
     path('app/monete/', include('apps.monete.urls_client', namespace='monete_client')),
+    path('app/garage/', include('apps.garage.urls_client', namespace='garage_client')),
 
     # Lato cliente (frontend pubblico PWA): landing, register, booking, dashboard
     path('app/', include('apps.clients.urls')),
