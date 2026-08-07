@@ -146,6 +146,25 @@ def _fetch_template_body(template_name: str) -> str | None:
     return body
 
 
+def _conta_variabili_template(template_name: str) -> int | None:
+    """Quante variabili {{n}} ha il body del template su Meta.
+
+    Usa il body in cache di _fetch_template_body (che converte {{1}}
+    in {0}, {{2}} in {1}, ...). Ritorna None se il body non e'
+    recuperabile (WABA non configurato, template sconosciuto, errore
+    rete): in quel caso il chiamante non altera i parametri.
+    """
+    import re
+
+    base = TEMPLATE_PREVIEWS.get(template_name)
+    if base is None:
+        base = _fetch_template_body(template_name)
+    if base is None:
+        return None
+    indici = [int(m) for m in re.findall(r'\{(\d+)\}', base)]
+    return (max(indici) + 1) if indici else 0
+
+
 def _format_preview(template_name: str, params: list[str]) -> str:
     """Genera il testo da mostrare nella inbox per un template Meta.
 
@@ -287,9 +306,18 @@ def _send_template_blocking(to_e164: str, template_name: str, params: list[str])
     if settings.META_WA_OMIT_BODY_PARAMS:
         body_params = []
     else:
+        # Adatta i parametri alle variabili REALI del template: Meta
+        # rifiuta l'invio se il conteggio non corrisponde. Cosi' un
+        # template senza variabili (o con la sola {{1}} nome) funziona
+        # anche se il chiamante passa piu' parametri (es. il richiamo
+        # automatico ne passa sempre 2: nome e giorni dall'ultimo).
+        params_effettivi = list(params)
+        n_var = _conta_variabili_template(template_name)
+        if n_var is not None and len(params_effettivi) > n_var:
+            params_effettivi = params_effettivi[:n_var]
         body_params = [
             {'type': 'text', 'text': (str(p) if p is not None else '')[:60]}
-            for p in params
+            for p in params_effettivi
         ]
     payload = {
         'messaging_product': 'whatsapp',
