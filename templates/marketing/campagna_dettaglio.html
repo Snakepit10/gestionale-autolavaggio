@@ -156,6 +156,53 @@
     </div>
 </div>
 
+{% if convertiti %}
+<div class="card border-0 shadow-sm mb-4">
+    <div class="card-body pb-2">
+        <h5 class="card-title mb-1"><i class="bi bi-cash-coin text-primary"></i>
+            Clienti convertiti ({{ convertiti|length }})</h5>
+        <p class="text-muted small mb-0">
+            Sono tornati a lavare entro {{ campagna.finestra_conversione_giorni }}
+            giorni dal messaggio. La spesa somma tutti i loro ordini completati
+            nella finestra.
+        </p>
+    </div>
+    <div class="table-responsive">
+        <table class="table table-sm table-hover align-middle mb-0">
+            <thead class="table-light">
+                <tr>
+                    <th>Cliente</th>
+                    <th>Messaggio inviato</th>
+                    <th>Tornato dopo</th>
+                    <th class="text-center">Lavaggi in finestra</th>
+                    <th class="text-end">Spesa attribuita</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for c in convertiti %}
+                <tr>
+                    <td>
+                        <a href="{% url 'clienti:storico-cliente' c.cliente_id %}"
+                           class="text-decoration-none fw-bold"
+                           title="Apri lo storico del cliente">
+                            {{ c.nome }}
+                        </a>
+                    </td>
+                    <td>{{ c.inviato_il|date:"d/m/Y H:i" }}</td>
+                    <td>
+                        {{ c.giorni_al_ritorno }} giorn{{ c.giorni_al_ritorno|pluralize:"o,i" }}
+                        <span class="text-muted small">({{ c.primo_ritorno|date:"d/m/Y" }})</span>
+                    </td>
+                    <td class="text-center">{{ c.n_ordini }}</td>
+                    <td class="text-end fw-bold text-primary">€ {{ c.speso|floatformat:2 }}</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+{% endif %}
+
 <div class="card border-0 shadow-sm">
     <div class="table-responsive">
         <table class="table table-hover align-middle mb-0">

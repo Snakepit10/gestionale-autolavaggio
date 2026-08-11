@@ -432,7 +432,7 @@ def campagna_dettaglio(request, pk):
     """Dettaglio campagna: stati invii + conversioni (F6)."""
     from django.shortcuts import get_object_or_404
     from .models import Campagna
-    from .services.statistiche import statistiche_campagna
+    from .services.statistiche import clienti_convertiti, statistiche_campagna
 
     campagna = get_object_or_404(Campagna, pk=pk)
     invii = campagna.invii.select_related('cliente', 'messaggio_wa').order_by('stato', '-inviato_il')
@@ -446,6 +446,7 @@ def campagna_dettaglio(request, pk):
         'n_conversioni': stats['n_conversioni'],
         'tasso_conversione': stats['tasso_conversione'],
         'fatturato': stats['fatturato'],
+        'convertiti': clienti_convertiti(campagna),
     })
 
 

@@ -69,6 +69,51 @@ def statistiche_campagna(campagna: Campagna) -> dict:
     }
 
 
+def clienti_convertiti(campagna: Campagna) -> list[dict]:
+    """I clienti convertiti dalla campagna, con la spesa attribuita.
+
+    Stesso join di statistiche_campagna, aggregato per cliente: ogni
+    cliente ha al massimo un invio per campagna, quindi il group-by
+    non duplica ordini. Ordinati per spesa decrescente.
+    """
+    from django.db.models import Count, Min
+
+    finestra = timedelta(days=campagna.finestra_conversione_giorni)
+    righe = (
+        InvioCampagna.objects.filter(
+            campagna=campagna,
+            stato='inviato',
+            cliente__ordine__stato='completato',
+            cliente__ordine__data_ora__gt=F('inviato_il'),
+            cliente__ordine__data_ora__lte=F('inviato_il') + finestra,
+        )
+        .values('cliente_id', 'cliente__nome', 'cliente__cognome',
+                'cliente__ragione_sociale', 'inviato_il')
+        .annotate(
+            n_ordini=Count('cliente__ordine', distinct=True),
+            speso=Sum('cliente__ordine__totale_finale'),
+            primo_ritorno=Min('cliente__ordine__data_ora'),
+        )
+        .order_by('-speso')
+    )
+    out = []
+    for r in righe:
+        # Stesso ordine di Cliente.nome_completo: "Cognome Nome"
+        nome = (f"{r['cliente__cognome']} {r['cliente__nome']}".strip()
+                or r['cliente__ragione_sociale'] or f"Cliente {r['cliente_id']}")
+        giorni = (r['primo_ritorno'] - r['inviato_il']).days
+        out.append({
+            'cliente_id': r['cliente_id'],
+            'nome': nome,
+            'inviato_il': r['inviato_il'],
+            'primo_ritorno': r['primo_ritorno'],
+            'giorni_al_ritorno': giorni,
+            'n_ordini': r['n_ordini'],
+            'speso': float(r['speso'] or 0),
+        })
+    return out
+
+
 _SEGMENTO_LABELS = {
     'attivi': 'Attivi regolari',
     'rallentamento': 'In rallentamento',
