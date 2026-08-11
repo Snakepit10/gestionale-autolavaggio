@@ -74,28 +74,40 @@ SEGMENTI_LABEL = {
 }
 
 
-def statistiche_clienti() -> list[ClienteSegmentato]:
+def statistiche_clienti(alla_data=None) -> list[ClienteSegmentato]:
     """Statistiche per-cliente (una query aggregata + loop Python).
 
     Base comune dei segmenti automatici e di quelli personalizzati:
     n. lavaggi, primo/ultimo, frequenza media stimata come
     (ultimo - primo) / (n - 1), spesa totale e media a lavaggio.
     Solo clienti con almeno 1 lavaggio completato.
+
+    `alla_data`: fotografia storica — considera solo gli ordini fino a
+    quella data e calcola giorni_da_ultimo rispetto ad essa. Usata dai
+    trend KPI dei segmenti (la segmentazione dipende solo dallo storico
+    ordini, quindi il passato e' ricostruibile esattamente).
     """
-    oggi = timezone.now()
+    from django.db.models import Q
+
+    oggi = alla_data or timezone.now()
+    filtro = Q(ordine__stato='completato')
+    if alla_data is not None:
+        filtro &= Q(ordine__data_ora__lte=alla_data)
     stats = (
         Cliente.objects
-        .filter(ordine__stato='completato')
+        .filter(filtro)
         .annotate(
-            n_lavaggi=Count('ordine', distinct=True),
-            primo=Min('ordine__data_ora'),
-            ultimo=Max('ordine__data_ora'),
-            speso=Sum('ordine__totale_finale'),
+            n_lavaggi=Count('ordine', distinct=True, filter=filtro),
+            primo=Min('ordine__data_ora', filter=filtro),
+            ultimo=Max('ordine__data_ora', filter=filtro),
+            speso=Sum('ordine__totale_finale', filter=filtro),
         )
     )
 
     out = []
     for c in stats:
+        if not c.n_lavaggi or c.ultimo is None:
+            continue  # nessun lavaggio entro alla_data
         if c.n_lavaggi == 1:
             freq = None
         else:
@@ -116,10 +128,15 @@ def statistiche_clienti() -> list[ClienteSegmentato]:
 
 
 def segmenta_clienti(cfg: ImpostazioniMarketing | None = None,
-                     stats: list[ClienteSegmentato] | None = None) -> RisultatoSegmentazione:
-    """Classifica tutti i clienti con almeno 1 lavaggio completato."""
+                     stats: list[ClienteSegmentato] | None = None,
+                     adesso=None) -> RisultatoSegmentazione:
+    """Classifica tutti i clienti con almeno 1 lavaggio completato.
+
+    `adesso`: riferimento temporale per le soglie (deve combaciare con
+    l'`alla_data` usata per calcolare `stats` nei trend storici).
+    """
     cfg = cfg or ImpostazioniMarketing.get_solo()
-    oggi = timezone.now()
+    oggi = adesso or timezone.now()
     stats = stats if stats is not None else statistiche_clienti()
 
     out = RisultatoSegmentazione()

@@ -90,14 +90,19 @@ def dashboard(request):
         'one_shot': 'Un solo lavaggio in totale, mai tornati (anche se '
                     'vecchissimo: la comunicazione per loro e\' diversa).',
     }
+    # Trend KPI dei segmenti (serie storiche ricostruite, cache 1h):
+    # i delta finiscono anche sulle card come indicatore di andamento.
+    from .services.trend import serie_trend_segmenti
+    trend = serie_trend_segmenti()
+
     segmenti = [
         (chiave, SEGMENTI_LABEL[chiave], len(ris.get(chiave)),
-         descrizioni_auto[chiave])
+         descrizioni_auto[chiave], trend['delta'].get(chiave))
         for chiave in ('attivi', 'rallentamento', 'dormienti', 'one_shot')
     ]
     segmenti_custom = [
         (s, len(filtra_segmento_personalizzato(s, stats)),
-         s.criteri_leggibili())
+         s.criteri_leggibili(), trend['delta'].get(s.chiave))
         for s in SegmentoPersonalizzato.objects.filter(attivo=True)
     ]
 
@@ -109,9 +114,14 @@ def dashboard(request):
 
     chart_data = {
         'serie': serie,
+        'trend_segmenti': {
+            'labels': trend['labels'],
+            'serie': [{'nome': s['nome'], 'colore': s['colore'],
+                       'valori': s['valori']} for s in trend['serie']],
+        },
         'segmenti': {
-            'labels': [label for _, label, _, _ in segmenti],
-            'valori': [n for _, _, n, _ in segmenti],
+            'labels': [label for _, label, _, _, _ in segmenti],
+            'valori': [n for _, _, n, _, _ in segmenti],
         },
         'campagne': {
             'labels': [c['nome'] for c in ultime],
@@ -123,6 +133,7 @@ def dashboard(request):
     return render(request, 'marketing/dashboard.html', {
         'segmenti': segmenti,
         'segmenti_custom': segmenti_custom,
+        'trend_delta': trend['delta'],
         'cfg': cfg,
         'kpi': kpi,
         'consigli': consigli,
