@@ -55,17 +55,46 @@ def _chiave_cache(n_punti, passo_giorni):
             f'{cfg.aggiornato_il:%Y%m%d%H%M%S}:{tag_custom}')
 
 
-def serie_trend_segmenti(n_punti: int = 26, passo_giorni: int = 7) -> dict:
+def calcola_delta(trend: dict, giorni_confronto: int = 30) -> dict:
+    """Delta KPI: oggi vs ~giorni_confronto fa, sulla serie gia'
+    calcolata (nessuna query). `verso` = 'buono'|'cattivo'|'neutro'
+    secondo la semantica del segmento."""
+    passo = trend.get('passo_giorni', 7)
+    n_labels = len(trend['labels'])
+    indietro = max(1, round(giorni_confronto / passo))
+    idx_confronto = max(0, n_labels - 1 - indietro)
+    delta = {}
+    for s in trend['serie']:
+        v_oggi = s['valori'][-1]
+        v_prima = s['valori'][idx_confronto]
+        d = v_oggi - v_prima
+        if s['semantica'] == 0 or d == 0:
+            verso = 'neutro'
+        elif (d > 0) == (s['semantica'] > 0):
+            verso = 'buono'
+        else:
+            verso = 'cattivo'
+        delta[s['chiave']] = {
+            'valore': v_oggi, 'precedente': v_prima,
+            'delta': d, 'verso': verso,
+        }
+    return delta
+
+
+def serie_trend_segmenti(n_punti: int = 26, passo_giorni: int = 7,
+                         giorni_confronto: int = 30) -> dict:
     """Serie storiche dei conteggi segmento (automatici + custom attivi).
 
-    Ritorna {labels: [...], serie: [{chiave, nome, colore, semantica,
-    valori: [...]}, ...], delta: {chiave: {valore, precedente, delta,
-    verso}}} dove delta confronta oggi con ~4 settimane fa e `verso` e'
-    'buono'|'cattivo'|'neutro' secondo la semantica del segmento.
+    Ritorna {labels, serie: [{chiave, nome, colore, tipo, semantica,
+    valori}], delta, passo_giorni, generato_il}. Le serie sono in cache
+    1h; il delta viene ricalcolato a ogni chiamata sulla finestra
+    `giorni_confronto` richiesta (7/30/90...).
     """
     chiave = _chiave_cache(n_punti, passo_giorni)
     cached = cache.get(chiave)
     if cached is not None:
+        cached = dict(cached)
+        cached['delta'] = calcola_delta(cached, giorni_confronto)
         return cached
 
     cfg = ImpostazioniMarketing.get_solo()
@@ -92,12 +121,15 @@ def serie_trend_segmenti(n_punti: int = 26, passo_giorni: int = 7) -> dict:
             valori[seg.chiave].append(
                 len(filtra_segmento_personalizzato(seg, stats)))
 
-    palette_custom = ['#0d6efd', '#6f42c1', '#20c997', '#e83e8c', '#17a2b8']
+    palette_custom = ['#0d6efd', '#6f42c1', '#20c997', '#e83e8c',
+                      '#17a2b8', '#795548', '#ff7043', '#5c6bc0',
+                      '#8bc34a', '#00897b', '#c2185b']
     serie = []
     for c in CHIAVI_AUTO:
         serie.append({
             'chiave': c, 'nome': SEGMENTI_LABEL[c],
             'colore': COLORI_AUTO[c],
+            'tipo': 'auto',
             'semantica': SEGNO_CRESCITA[c],
             'valori': valori[c],
         })
@@ -105,34 +137,18 @@ def serie_trend_segmenti(n_punti: int = 26, passo_giorni: int = 7) -> dict:
         serie.append({
             'chiave': seg.chiave, 'nome': seg.nome,
             'colore': palette_custom[i % len(palette_custom)],
+            'tipo': 'custom',
             'semantica': 0,
             'valori': valori[seg.chiave],
         })
 
-    # Delta KPI: oggi vs ~4 settimane fa (o il punto piu' vecchio se la
-    # serie e' piu' corta).
-    idx_confronto = max(0, len(punti) - 1 - max(1, 28 // passo_giorni))
-    delta = {}
-    for s in serie:
-        v_oggi = s['valori'][-1]
-        v_prima = s['valori'][idx_confronto]
-        d = v_oggi - v_prima
-        if s['semantica'] == 0 or d == 0:
-            verso = 'neutro'
-        elif (d > 0) == (s['semantica'] > 0):
-            verso = 'buono'
-        else:
-            verso = 'cattivo'
-        delta[s['chiave']] = {
-            'valore': v_oggi, 'precedente': v_prima,
-            'delta': d, 'verso': verso,
-        }
-
     out = {
         'labels': [p.strftime('%d/%m') for p in punti],
         'serie': serie,
-        'delta': delta,
         'passo_giorni': passo_giorni,
+        'generato_il': timezone.localtime(timezone.now()).strftime('%d/%m %H:%M'),
     }
     cache.set(chiave, out, 60 * 60)
+    out = dict(out)
+    out['delta'] = calcola_delta(out, giorni_confronto)
     return out

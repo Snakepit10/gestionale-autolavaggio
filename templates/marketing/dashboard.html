@@ -123,47 +123,77 @@
     media personale + {{ cfg.giorni_rallentamento_delta }} giorni).
 </p>
 
+<div class="d-flex justify-content-between align-items-center flex-wrap gap-2 mb-2">
+    <div class="text-muted small">
+        <i class="bi bi-clock"></i> Card e liste: calcolate in tempo reale a
+        ogni caricamento &middot; Trend: aggiornato alle {{ trend_generato_il }}
+        (cache 1 ora) &middot; Variazioni confrontate con
+        <strong>{{ confronto }} giorni fa</strong>:
+    </div>
+    <div class="btn-group btn-group-sm">
+        <a href="?confronto=7" class="btn {% if confronto == 7 %}btn-primary{% else %}btn-outline-primary{% endif %}">7 gg</a>
+        <a href="?confronto=30" class="btn {% if confronto == 30 %}btn-primary{% else %}btn-outline-primary{% endif %}">30 gg</a>
+        <a href="?confronto=90" class="btn {% if confronto == 90 %}btn-primary{% else %}btn-outline-primary{% endif %}">90 gg</a>
+    </div>
+</div>
+
 <div class="row g-3 mb-4">
-    {% for chiave, label, conteggio, descrizione, delta in segmenti %}
+    {% for c in segmenti %}
     <div class="col-sm-6 col-lg-3">
         <div class="card h-100 border-0 shadow-sm
-             {% if chiave == 'attivi' %}border-start border-success border-4
-             {% elif chiave == 'rallentamento' %}border-start border-warning border-4
-             {% elif chiave == 'dormienti' %}border-start border-danger border-4
+             {% if c.chiave == 'attivi' %}border-start border-success border-4
+             {% elif c.chiave == 'rallentamento' %}border-start border-warning border-4
+             {% elif c.chiave == 'dormienti' %}border-start border-danger border-4
              {% else %}border-start border-secondary border-4{% endif %}">
             <div class="card-body d-flex flex-column">
                 <div class="d-flex justify-content-between align-items-start">
                     <div>
-                        <h6 class="text-muted mb-1">{{ label }}</h6>
+                        <h6 class="text-muted mb-1">{{ c.label }}</h6>
                         <div class="fs-2 fw-bold">
-                            {{ conteggio }}
-                            {% if delta %}
+                            {{ c.conteggio }}
+                            <span class="fs-6 text-muted fw-normal">({{ c.pct }}%)</span>
+                            {% if c.delta %}
                             <span class="badge align-middle fs-6
-                                {% if delta.verso == 'buono' %}bg-success
-                                {% elif delta.verso == 'cattivo' %}bg-danger
+                                {% if c.delta.verso == 'buono' %}bg-success
+                                {% elif c.delta.verso == 'cattivo' %}bg-danger
                                 {% else %}bg-light text-dark border{% endif %}"
-                                  title="Variazione nelle ultime 4 settimane (era {{ delta.precedente }})">
-                                {% if delta.delta > 0 %}<i class="bi bi-arrow-up"></i> +{{ delta.delta }}
-                                {% elif delta.delta < 0 %}<i class="bi bi-arrow-down"></i> {{ delta.delta }}
+                                  title="Era {{ c.delta.precedente }} {{ confronto }} giorni fa">
+                                {% if c.delta.delta > 0 %}<i class="bi bi-arrow-up"></i> +{{ c.delta.delta }}
+                                {% elif c.delta.delta < 0 %}<i class="bi bi-arrow-down"></i> {{ c.delta.delta }}
                                 {% else %}={% endif %}
                             </span>
                             {% endif %}
                         </div>
+                        {% if c.delta %}
+                        <div class="text-muted" style="font-size:.72rem;">vs {{ confronto }} giorni fa</div>
+                        {% endif %}
                     </div>
                     <i class="bi fs-3
-                        {% if chiave == 'attivi' %}bi-emoji-smile text-success
-                        {% elif chiave == 'rallentamento' %}bi-hourglass-split text-warning
-                        {% elif chiave == 'dormienti' %}bi-moon text-danger
+                        {% if c.chiave == 'attivi' %}bi-emoji-smile text-success
+                        {% elif c.chiave == 'rallentamento' %}bi-hourglass-split text-warning
+                        {% elif c.chiave == 'dormienti' %}bi-moon text-danger
                         {% else %}bi-person-dash text-secondary{% endif %}"></i>
                 </div>
                 <div class="text-muted small mt-1 flex-grow-1">
-                    <i class="bi bi-funnel"></i> {{ descrizione }}
+                    <i class="bi bi-funnel"></i> {{ c.descrizione }}
+                </div>
+                <div class="small mt-2">
+                    <span title="Somma di tutto cio' che i clienti di questo segmento hanno speso nella loro storia">
+                        <i class="bi bi-cash-stack text-muted"></i>
+                        Spesa storica: <strong>€ {{ c.spesa_storica|floatformat:0 }}</strong>
+                    </span>
+                    {% if c.conv_campagne is not None %}
+                    <br><span title="Tasso di conversione delle campagne passate inviate a questo segmento">
+                        <i class="bi bi-bullseye text-muted"></i>
+                        Conv. campagne: <strong>{{ c.conv_campagne }}%</strong>
+                    </span>
+                    {% endif %}
                 </div>
                 <div class="mt-3 d-flex gap-2">
-                    <a href="{% url 'marketing:segmento' chiave %}" class="btn btn-sm btn-outline-primary">
+                    <a href="{% url 'marketing:segmento' c.chiave %}" class="btn btn-sm btn-outline-primary">
                         <i class="bi bi-list-ul"></i> Vedi lista
                     </a>
-                    <a href="{% url 'marketing:segmento-export' chiave %}" class="btn btn-sm btn-outline-secondary">
+                    <a href="{% url 'marketing:segmento-export' c.chiave %}" class="btn btn-sm btn-outline-secondary">
                         <i class="bi bi-download"></i> CSV
                     </a>
                 </div>
@@ -172,43 +202,59 @@
     </div>
     {% endfor %}
 
-    {% for seg, conteggio, criteri, delta in segmenti_custom %}
+    {% for c in segmenti_custom %}
     <div class="col-sm-6 col-lg-3">
         <div class="card h-100 border-0 shadow-sm border-start border-primary border-4">
             <div class="card-body d-flex flex-column">
                 <div class="d-flex justify-content-between align-items-start">
                     <div>
                         <h6 class="text-muted mb-1">
-                            {{ seg.nome }}
+                            {{ c.label }}
                             <span class="badge bg-primary-subtle text-primary border">personalizzato</span>
                         </h6>
                         <div class="fs-2 fw-bold">
-                            {{ conteggio }}
-                            {% if delta %}
+                            {{ c.conteggio }}
+                            <span class="fs-6 text-muted fw-normal">({{ c.pct }}%)</span>
+                            {% if c.delta %}
                             <span class="badge align-middle fs-6 bg-light text-dark border"
-                                  title="Variazione nelle ultime 4 settimane (era {{ delta.precedente }})">
-                                {% if delta.delta > 0 %}<i class="bi bi-arrow-up"></i> +{{ delta.delta }}
-                                {% elif delta.delta < 0 %}<i class="bi bi-arrow-down"></i> {{ delta.delta }}
+                                  title="Era {{ c.delta.precedente }} {{ confronto }} giorni fa">
+                                {% if c.delta.delta > 0 %}<i class="bi bi-arrow-up"></i> +{{ c.delta.delta }}
+                                {% elif c.delta.delta < 0 %}<i class="bi bi-arrow-down"></i> {{ c.delta.delta }}
                                 {% else %}={% endif %}
                             </span>
                             {% endif %}
                         </div>
+                        {% if c.delta %}
+                        <div class="text-muted" style="font-size:.72rem;">vs {{ confronto }} giorni fa</div>
+                        {% endif %}
                     </div>
                     <i class="bi bi-funnel-fill fs-3 text-primary"></i>
                 </div>
                 <div class="text-muted small mt-1 flex-grow-1">
                     <i class="bi bi-funnel"></i>
-                    {% for c in criteri %}{{ c }}{% if not forloop.last %} &middot; {% endif %}{% endfor %}
-                    {% if seg.descrizione %}<br><em>{{ seg.descrizione }}</em>{% endif %}
+                    {% for cr in c.criteri %}{{ cr }}{% if not forloop.last %} &middot; {% endif %}{% endfor %}
+                    {% if c.seg.descrizione %}<br><em>{{ c.seg.descrizione }}</em>{% endif %}
+                </div>
+                <div class="small mt-2">
+                    <span title="Somma di tutto cio' che i clienti di questo segmento hanno speso nella loro storia">
+                        <i class="bi bi-cash-stack text-muted"></i>
+                        Spesa storica: <strong>€ {{ c.spesa_storica|floatformat:0 }}</strong>
+                    </span>
+                    {% if c.conv_campagne is not None %}
+                    <br><span title="Tasso di conversione delle campagne passate inviate a questo segmento">
+                        <i class="bi bi-bullseye text-muted"></i>
+                        Conv. campagne: <strong>{{ c.conv_campagne }}%</strong>
+                    </span>
+                    {% endif %}
                 </div>
                 <div class="mt-3 d-flex gap-2">
-                    <a href="{% url 'marketing:segmento-custom' seg.pk %}" class="btn btn-sm btn-outline-primary">
+                    <a href="{% url 'marketing:segmento-custom' c.seg.pk %}" class="btn btn-sm btn-outline-primary">
                         <i class="bi bi-list-ul"></i> Vedi lista
                     </a>
-                    <a href="{% url 'marketing:segmento-custom-export' seg.pk %}" class="btn btn-sm btn-outline-secondary">
+                    <a href="{% url 'marketing:segmento-custom-export' c.seg.pk %}" class="btn btn-sm btn-outline-secondary">
                         <i class="bi bi-download"></i> CSV
                     </a>
-                    <a href="{% url 'marketing:segmento-custom-modifica' seg.pk %}" class="btn btn-sm btn-outline-secondary"
+                    <a href="{% url 'marketing:segmento-custom-modifica' c.seg.pk %}" class="btn btn-sm btn-outline-secondary"
                        title="Modifica i criteri del segmento">
                         <i class="bi bi-pencil"></i>
                     </a>
@@ -219,20 +265,127 @@
     {% endfor %}
 </div>
 
+{% comment %} ------- Incrocio segmenti ------- {% endcomment %}
+<div class="card border-0 shadow-sm mb-4">
+    <div class="card-body">
+        <h6 class="card-title text-muted"><i class="bi bi-intersect text-primary"></i>
+            Incrocia due segmenti</h6>
+        <form method="get" class="row g-2 align-items-end">
+            {% if confronto != 30 %}<input type="hidden" name="confronto" value="{{ confronto }}">{% endif %}
+            <div class="col-md-4">
+                <label class="form-label small fw-bold mb-1">Clienti che sono in...</label>
+                <select name="incrocio_a" class="form-select form-select-sm">
+                    <option value="">— scegli —</option>
+                    {% for chiave, label in opzioni_incrocio %}
+                    <option value="{{ chiave }}" {% if chiave == inc_a %}selected{% endif %}>{{ label }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div class="col-md-4">
+                <label class="form-label small fw-bold mb-1">...e anche in</label>
+                <select name="incrocio_b" class="form-select form-select-sm">
+                    <option value="">— scegli —</option>
+                    {% for chiave, label in opzioni_incrocio %}
+                    <option value="{{ chiave }}" {% if chiave == inc_b %}selected{% endif %}>{{ label }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div class="col-md-2">
+                <button type="submit" class="btn btn-sm btn-primary w-100">
+                    <i class="bi bi-search"></i> Incrocia
+                </button>
+            </div>
+        </form>
+        {% if incrocio %}
+        <div class="alert alert-light border mt-3 mb-0">
+            <strong>{{ incrocio.n }}</strong> client{{ incrocio.n|pluralize:"e,i" }} in
+            <strong>{{ incrocio.a }}</strong> ∩ <strong>{{ incrocio.b }}</strong>
+            &middot; spesa storica complessiva <strong>€ {{ incrocio.spesa|floatformat:0 }}</strong>
+            {% if incrocio.n %}
+            &middot; <a href="{% url 'marketing:campagna-nuova' %}?segmenti={{ incrocio.chiave_a }},{{ incrocio.chiave_b }}"
+                        title="NB: la campagna usa l'UNIONE dei due segmenti; nella preview deseleziona chi non ti interessa">
+                crea campagna</a>
+            <details class="mt-2">
+                <summary class="small text-muted" style="cursor:pointer;">
+                    Mostra i clienti (primi 50, ordinati per spesa)
+                </summary>
+                <div class="small mt-2">
+                    {% for cs in incrocio.clienti %}
+                    <span class="badge bg-light text-dark border mb-1">
+                        {{ cs.nome_completo }} · €{{ cs.totale_speso|floatformat:0 }}
+                    </span>
+                    {% endfor %}
+                </div>
+            </details>
+            {% endif %}
+        </div>
+        {% endif %}
+    </div>
+</div>
+
 {% comment %} ------- Trend segmenti (KPI) ------- {% endcomment %}
 <div class="card border-0 shadow-sm mb-4">
     <div class="card-body">
-        <h6 class="card-title text-muted"><i class="bi bi-activity text-primary"></i>
-            Trend dei segmenti (ultime 26 settimane)</h6>
-        <p class="text-muted small mb-2">
-            Ricostruito dallo storico ordini: come si e' spostata la base
-            clienti tra i segmenti, settimana per settimana. Dormienti in
-            crescita = campanello d'allarme; attivi in crescita = ottimo
-            segnale. Clicca le voci in legenda per nascondere una serie.
-        </p>
+        <div class="d-flex justify-content-between align-items-start flex-wrap gap-2">
+            <div>
+                <h6 class="card-title text-muted mb-1"><i class="bi bi-activity text-primary"></i>
+                    Trend dei segmenti (ultime 26 settimane)</h6>
+                <p class="text-muted small mb-2">
+                    Ricostruito dallo storico ordini, settimana per settimana.
+                    Dormienti in crescita = campanello d'allarme; attivi in
+                    crescita = ottimo segnale.
+                </p>
+            </div>
+            <a href="{% url 'marketing:trend-export' %}" class="btn btn-sm btn-outline-secondary">
+                <i class="bi bi-download"></i> CSV trend completo
+            </a>
+        </div>
+
+        {# Preset di visualizzazione + interruttori per singola serie #}
+        <div class="d-flex flex-wrap gap-2 align-items-center mb-2">
+            <div class="btn-group btn-group-sm" role="group">
+                <button type="button" class="btn btn-primary" id="preset-tutti"
+                        onclick="presetTrend('tutti', this)">Tutti</button>
+                <button type="button" class="btn btn-outline-primary" id="preset-auto"
+                        onclick="presetTrend('auto', this)">Solo automatici</button>
+                <button type="button" class="btn btn-outline-primary" id="preset-custom"
+                        onclick="presetTrend('custom', this)">Solo personalizzati</button>
+            </div>
+            <span class="text-muted small">oppure attiva/spegni le singole serie:</span>
+            <div class="d-flex flex-wrap gap-1" id="trend-chips"></div>
+        </div>
+
         <div style="position:relative; height:300px;">
             <canvas id="chart-trend-segmenti"></canvas>
         </div>
+
+        {# Tabella dati per analisi puntuale (Excel-friendly) #}
+        <details class="mt-2">
+            <summary class="small text-muted" style="cursor:pointer;">
+                <i class="bi bi-table"></i> Mostra la tabella dati (settimana per settimana)
+            </summary>
+            <div class="table-responsive mt-2" style="max-height:320px; overflow-y:auto;">
+                <table class="table table-sm table-striped mb-0" style="font-size:.82rem;">
+                    <thead class="table-light" style="position:sticky;top:0;">
+                        <tr>
+                            <th>Settimana</th>
+                            {% for nome in trend_tabella.intestazioni %}
+                            <th class="text-center">{{ nome }}</th>
+                            {% endfor %}
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for riga in trend_tabella.righe %}
+                        <tr>
+                            {% for v in riga %}
+                            <td {% if not forloop.first %}class="text-center"{% endif %}>{{ v }}</td>
+                            {% endfor %}
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </details>
     </div>
 </div>
 
@@ -339,12 +492,14 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     const elTrend = document.getElementById('chart-trend-segmenti');
+    let chartTrend = null;
     if (elTrend && dati.trend_segmenti) {
-        new Chart(elTrend, {
+        const serie = dati.trend_segmenti.serie;
+        chartTrend = new Chart(elTrend, {
             type: 'line',
             data: {
                 labels: dati.trend_segmenti.labels,
-                datasets: dati.trend_segmenti.serie.map(s => ({
+                datasets: serie.map(s => ({
                     label: s.nome,
                     data: s.valori,
                     borderColor: s.colore,
@@ -359,10 +514,50 @@ document.addEventListener('DOMContentLoaded', () => {
                 maintainAspectRatio: false,
                 interaction: { mode: 'index', intersect: false },
                 scales: { y: { beginAtZero: true, ticks: { precision: 0 } } },
-                plugins: { legend: { position: 'bottom' } },
+                // legenda nativa spenta: la sostituiscono i chip sopra
+                plugins: { legend: { display: false } },
             },
         });
+
+        // Chip per singola serie: cliccare accende/spegne la curva
+        const wrap = document.getElementById('trend-chips');
+        serie.forEach((s, i) => {
+            const chip = document.createElement('button');
+            chip.type = 'button';
+            chip.className = 'btn btn-sm trend-chip';
+            chip.style.cssText = 'border:1px solid ' + s.colore +
+                ';color:#fff;background:' + s.colore +
+                ';padding:1px 10px;font-size:.75rem;border-radius:999px;';
+            chip.textContent = s.nome;
+            chip.dataset.idx = i;
+            chip.dataset.tipo = s.tipo;
+            chip.dataset.colore = s.colore;
+            chip.onclick = () => setSerieVisibile(i, !isVisibile(i));
+            wrap.appendChild(chip);
+        });
     }
+    function isVisibile(i) {
+        return chartTrend && !chartTrend.getDatasetMeta(i).hidden;
+    }
+    function setSerieVisibile(i, visibile) {
+        if (!chartTrend) return;
+        chartTrend.getDatasetMeta(i).hidden = !visibile;
+        const chip = document.querySelector(`.trend-chip[data-idx="${i}"]`);
+        if (chip) {
+            chip.style.background = visibile ? chip.dataset.colore : 'transparent';
+            chip.style.color = visibile ? '#fff' : chip.dataset.colore;
+        }
+        chartTrend.update();
+    }
+    window.presetTrend = function (quale, btn) {
+        if (!chartTrend) return;
+        document.querySelectorAll('#preset-tutti, #preset-auto, #preset-custom')
+            .forEach(b => b.classList.replace('btn-primary', 'btn-outline-primary'));
+        btn.classList.replace('btn-outline-primary', 'btn-primary');
+        dati.trend_segmenti.serie.forEach((s, i) => {
+            setSerieVisibile(i, quale === 'tutti' || s.tipo === quale);
+        });
+    };
 
     const elSegmenti = document.getElementById('chart-segmenti');
     if (elSegmenti) {

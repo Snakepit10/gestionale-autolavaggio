@@ -90,25 +90,97 @@ def dashboard(request):
         'one_shot': 'Un solo lavaggio in totale, mai tornati (anche se '
                     'vecchissimo: la comunicazione per loro e\' diversa).',
     }
+    # Finestra di confronto dei delta KPI: selezionabile 7/30/90 giorni
+    # (default 30) per distinguere oscillazioni brevi da cambi
+    # strutturali.
+    try:
+        confronto = int(request.GET.get('confronto', 30))
+    except (TypeError, ValueError):
+        confronto = 30
+    if confronto not in (7, 30, 90):
+        confronto = 30
+
     # Trend KPI dei segmenti (serie storiche ricostruite, cache 1h):
     # i delta finiscono anche sulle card come indicatore di andamento.
+    from .services.statistiche import statistiche_per_segmento
     from .services.trend import serie_trend_segmenti
-    trend = serie_trend_segmenti()
+    trend = serie_trend_segmenti(giorni_confronto=confronto)
 
+    # Conversione storica delle campagne per segmento (match esatto
+    # sulla chiave: campagne multi-segmento restano fuori).
+    conversioni_seg = {
+        r['segmento']: r for r in statistiche_per_segmento()
+        if r['n_inviati'] >= 5
+    }
+    totale_clienti = len(stats) or 1
+
+    def _card(chiave, label, membri, descrizione, seg_obj=None,
+              criteri=None):
+        conv = conversioni_seg.get(chiave)
+        return {
+            'chiave': chiave, 'label': label,
+            'conteggio': len(membri),
+            'pct': round(len(membri) / totale_clienti * 100, 1),
+            'descrizione': descrizione,
+            'criteri': criteri,
+            'delta': trend['delta'].get(chiave),
+            'spesa_storica': sum(float(cs.totale_speso) for cs in membri),
+            'conv_campagne': round(conv['tasso_conversione'], 1) if conv else None,
+            'seg': seg_obj,
+        }
+
+    membri_per_chiave = {
+        chiave: ris.get(chiave)
+        for chiave in ('attivi', 'rallentamento', 'dormienti', 'one_shot')
+    }
     segmenti = [
-        (chiave, SEGMENTI_LABEL[chiave], len(ris.get(chiave)),
-         descrizioni_auto[chiave], trend['delta'].get(chiave))
+        _card(chiave, SEGMENTI_LABEL[chiave], membri_per_chiave[chiave],
+              descrizioni_auto[chiave])
         for chiave in ('attivi', 'rallentamento', 'dormienti', 'one_shot')
     ]
-    segmenti_custom = [
-        (s, len(filtra_segmento_personalizzato(s, stats)),
-         s.criteri_leggibili(), trend['delta'].get(s.chiave))
-        for s in SegmentoPersonalizzato.objects.filter(attivo=True)
-    ]
+    segmenti_custom = []
+    for s in SegmentoPersonalizzato.objects.filter(attivo=True):
+        membri = filtra_segmento_personalizzato(s, stats)
+        membri_per_chiave[s.chiave] = membri
+        segmenti_custom.append(
+            _card(s.chiave, s.nome, membri, s.descrizione, seg_obj=s,
+                  criteri=s.criteri_leggibili()))
+
+    # Incrocio segmenti dalla UI: ?incrocio_a=<chiave>&incrocio_b=<chiave>
+    opzioni_incrocio = (
+        [(c['chiave'], c['label']) for c in segmenti]
+        + [(c['chiave'], c['label']) for c in segmenti_custom]
+    )
+    incrocio = None
+    inc_a = request.GET.get('incrocio_a', '')
+    inc_b = request.GET.get('incrocio_b', '')
+    chiavi_valide = dict(opzioni_incrocio)
+    if inc_a in chiavi_valide and inc_b in chiavi_valide and inc_a != inc_b:
+        mappa_a = {cs.cliente.pk: cs for cs in membri_per_chiave[inc_a]}
+        comuni = [mappa_a[cs.cliente.pk] for cs in membri_per_chiave[inc_b]
+                  if cs.cliente.pk in mappa_a]
+        comuni.sort(key=lambda cs: -cs.totale_speso)
+        incrocio = {
+            'a': chiavi_valide[inc_a], 'b': chiavi_valide[inc_b],
+            'chiave_a': inc_a, 'chiave_b': inc_b,
+            'n': len(comuni),
+            'spesa': sum(float(cs.totale_speso) for cs in comuni),
+            'clienti': comuni[:50],
+        }
 
     kpi = kpi_dashboard()
     serie = serie_mensile(6)
     ultime = stats_ultime_campagne(8)
+
+    # Tabella dati del trend (collassabile sotto al grafico): una riga
+    # per settimana, una colonna per serie.
+    trend_tabella = {
+        'intestazioni': [s['nome'] for s in trend['serie']],
+        'righe': [
+            [trend['labels'][i]] + [s['valori'][i] for s in trend['serie']]
+            for i in range(len(trend['labels']))
+        ],
+    }
     consigli = genera_consigli(stats, ris, cfg) + analisi_ai()
     consigli.sort(key=lambda c: -c['priorita'])
 
@@ -117,11 +189,12 @@ def dashboard(request):
         'trend_segmenti': {
             'labels': trend['labels'],
             'serie': [{'nome': s['nome'], 'colore': s['colore'],
-                       'valori': s['valori']} for s in trend['serie']],
+                       'tipo': s['tipo'], 'valori': s['valori']}
+                      for s in trend['serie']],
         },
         'segmenti': {
-            'labels': [label for _, label, _, _, _ in segmenti],
-            'valori': [n for _, _, n, _, _ in segmenti],
+            'labels': [c['label'] for c in segmenti],
+            'valori': [c['conteggio'] for c in segmenti],
         },
         'campagne': {
             'labels': [c['nome'] for c in ultime],
@@ -133,7 +206,13 @@ def dashboard(request):
     return render(request, 'marketing/dashboard.html', {
         'segmenti': segmenti,
         'segmenti_custom': segmenti_custom,
-        'trend_delta': trend['delta'],
+        'totale_clienti': totale_clienti,
+        'confronto': confronto,
+        'trend_generato_il': trend.get('generato_il', ''),
+        'trend_tabella': trend_tabella,
+        'opzioni_incrocio': opzioni_incrocio,
+        'incrocio': incrocio,
+        'inc_a': inc_a, 'inc_b': inc_b,
         'cfg': cfg,
         'kpi': kpi,
         'consigli': consigli,
@@ -141,6 +220,27 @@ def dashboard(request):
         'ha_serie': any(serie['invii']) or any(serie['conversioni']),
         'ha_campagne': bool(ultime),
     })
+
+
+@_staff_required
+def trend_export_csv(request):
+    """Export CSV dell'intero andamento settimanale dei segmenti
+    (stessi dati del grafico trend: una riga per settimana, una
+    colonna per segmento)."""
+    from .services.trend import serie_trend_segmenti
+
+    trend = serie_trend_segmenti()
+    oggi = timezone.localtime(timezone.now()).strftime('%Y%m%d')
+    response = HttpResponse(content_type='text/csv; charset=utf-8')
+    response['Content-Disposition'] = (
+        f'attachment; filename="trend_segmenti_{oggi}.csv"'
+    )
+    response.write('﻿')
+    writer = csv.writer(response, delimiter=';')
+    writer.writerow(['Settimana'] + [s['nome'] for s in trend['serie']])
+    for i, label in enumerate(trend['labels']):
+        writer.writerow([label] + [s['valori'][i] for s in trend['serie']])
+    return response
 
 
 @_staff_required
