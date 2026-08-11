@@ -149,21 +149,67 @@ def report_vendite() -> dict:
     prec_30 = _fatturato_ordini(oggi - timedelta(days=59),
                                 oggi - timedelta(days=30))
 
-    # Vendite self-service (portali/cambia gettoni) dalle chiusure
-    # automatiche: contesto utile ma non indispensabile, quindi non
-    # deve mai far fallire l'analisi.
+    # Aggregati dai report giornata/periodo di /finanze/ (stessa base
+    # dati): self-service spezzato portali/cambia gettoni + cicli
+    # lavaggio, metodi di pagamento, insoluti. Contesto utile ma non
+    # indispensabile: mai far fallire l'analisi per questo.
     self_service_30 = None
+    finanze_30 = None
     try:
         from apps.finanze.models import ChiusuraCassaAutomatica
-        tot = 0.0
+        from apps.ordini.models import Pagamento
+        da = oggi - timedelta(days=29)
+        portali = cambia_gettoni = registratore = 0.0
+        wash_cycles = 0
         for c in (ChiusuraCassaAutomatica.objects
-                  .filter(data__gte=oggi - timedelta(days=29), data__lte=oggi)
+                  .filter(data__gte=da, data__lte=oggi)
                   .select_related('cassa')):
-            if not c.cassa.modalita_registratore:
-                tot += float(c.vendita_totale)
-        self_service_30 = round(tot, 2)
+            if c.cassa.modalita_registratore:
+                registratore += float(c.incasso_totale)
+                continue
+            if getattr(c.cassa, 'tracking_washcycles', False):
+                portali += float(c.vendita_totale)
+                wash_cycles += c.wash_cycles or 0
+            else:
+                cambia_gettoni += float(c.vendita_totale)
+        self_service_30 = round(portali + cambia_gettoni, 2)
+
+        from django.db.models import Sum as _Sum
+        metodi = {
+            (r['metodo'] or 'altro'): float(r['tot'] or 0)
+            for r in Pagamento.objects
+            .filter(data_pagamento__date__gte=da, data_pagamento__date__lte=oggi)
+            .values('metodo').annotate(tot=_Sum('importo'))
+        }
+
+        non_pagati = Ordine.objects.filter(
+            stato_pagamento__in=['non_pagato', 'parziale', 'differito']
+        ).exclude(stato='annullato')
+        finanze_30 = {
+            'self_service_portali': round(portali, 2),
+            'self_service_cambia_gettoni': round(cambia_gettoni, 2),
+            'cicli_lavaggio_portali': wash_cycles,
+            'registratore_cassa': round(registratore, 2),
+            'incassi_per_metodo_pagamento': metodi,
+            'ordini_non_pagati': non_pagati.count(),
+        }
     except Exception:
         pass
+
+    # Andamento giornaliero recente (ultimi 14 giorni): fa vedere
+    # all'AI i giorni forti/deboli reali, come il report giornata.
+    giorni_brevi = ['lun', 'mar', 'mer', 'gio', 'ven', 'sab', 'dom']
+    giornaliero = []
+    for i in range(13, -1, -1):
+        g = oggi - timedelta(days=i)
+        agg = (Ordine.objects
+               .filter(data_ora__date=g).exclude(stato='annullato')
+               .aggregate(tot=Sum('totale_finale'), n=Count('id')))
+        giornaliero.append({
+            'data': f'{g:%d/%m} ({giorni_brevi[g.weekday()]})',
+            'fatturato_ordini': round(float(agg['tot'] or 0), 2),
+            'n_ordini': agg['n'] or 0,
+        })
 
     # Top servizi per ricavo negli ultimi 90 giorni
     from django.db.models import DecimalField, ExpressionWrapper, F
@@ -202,6 +248,8 @@ def report_vendite() -> dict:
         'ordini_ultimi_30gg': ultimi_30,
         'ordini_30gg_precedenti': prec_30,
         'self_service_ultimi_30gg': self_service_30,
+        'report_finanze_30gg': finanze_30,
+        'giornaliero_ultimi_14gg': giornaliero,
         'top_servizi_90gg': top_servizi,
         'fatturato_per_giorno_settimana_90gg': fatturato_settimana,
     }
