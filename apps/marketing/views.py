@@ -102,9 +102,20 @@ def dashboard(request):
 
     # Trend KPI dei segmenti (serie storiche ricostruite, cache 1h):
     # i delta finiscono anche sulle card come indicatore di andamento.
+    # Periodo del grafico selezionabile: ?periodo=13|26|52|104 settimane.
     from .services.statistiche import statistiche_per_segmento
-    from .services.trend import serie_trend_segmenti
-    trend = serie_trend_segmenti(giorni_confronto=confronto)
+    from .services.trend import (PERIODI_TREND, PERIODO_DEFAULT,
+                                 serie_trend_segmenti)
+    try:
+        periodo = int(request.GET.get('periodo', PERIODO_DEFAULT))
+    except (TypeError, ValueError):
+        periodo = PERIODO_DEFAULT
+    if periodo not in PERIODI_TREND:
+        periodo = PERIODO_DEFAULT
+    cfg_periodo = PERIODI_TREND[periodo]
+    trend = serie_trend_segmenti(
+        n_punti=cfg_periodo['punti'], passo_giorni=cfg_periodo['passo'],
+        giorni_confronto=confronto)
 
     # Conversione storica delle campagne per segmento (match esatto
     # sulla chiave: campagne multi-segmento restano fuori).
@@ -208,6 +219,9 @@ def dashboard(request):
         'segmenti_custom': segmenti_custom,
         'totale_clienti': totale_clienti,
         'confronto': confronto,
+        'periodo': periodo,
+        'periodi_trend': [(k, v['label']) for k, v in PERIODI_TREND.items()],
+        'periodo_label': cfg_periodo['label'],
         'trend_generato_il': trend.get('generato_il', ''),
         'trend_tabella': trend_tabella,
         'opzioni_incrocio': opzioni_incrocio,
@@ -225,11 +239,20 @@ def dashboard(request):
 @_staff_required
 def trend_export_csv(request):
     """Export CSV dell'intero andamento settimanale dei segmenti
-    (stessi dati del grafico trend: una riga per settimana, una
-    colonna per segmento)."""
-    from .services.trend import serie_trend_segmenti
+    (stessi dati del grafico trend: una riga per punto, una colonna
+    per segmento). Rispetta il periodo selezionato (?periodo=)."""
+    from .services.trend import (PERIODI_TREND, PERIODO_DEFAULT,
+                                 serie_trend_segmenti)
 
-    trend = serie_trend_segmenti()
+    try:
+        periodo = int(request.GET.get('periodo', PERIODO_DEFAULT))
+    except (TypeError, ValueError):
+        periodo = PERIODO_DEFAULT
+    if periodo not in PERIODI_TREND:
+        periodo = PERIODO_DEFAULT
+    cfg_periodo = PERIODI_TREND[periodo]
+    trend = serie_trend_segmenti(
+        n_punti=cfg_periodo['punti'], passo_giorni=cfg_periodo['passo'])
     oggi = timezone.localtime(timezone.now()).strftime('%Y%m%d')
     response = HttpResponse(content_type='text/csv; charset=utf-8')
     response['Content-Disposition'] = (

@@ -23,6 +23,17 @@ from .segmentazione import (SEGMENTI_LABEL, filtra_segmento_personalizzato,
 
 CHIAVI_AUTO = ('attivi', 'rallentamento', 'dormienti', 'one_shot')
 
+# Periodi selezionabili dal grafico: settimane totali -> (punti, passo
+# in giorni). Oltre l'anno il passo diventa quindicinale per tenere il
+# grafico leggibile (e il costo di calcolo costante).
+PERIODI_TREND = {
+    13: {'punti': 13, 'passo': 7, 'label': '3 mesi'},
+    26: {'punti': 26, 'passo': 7, 'label': '6 mesi'},
+    52: {'punti': 52, 'passo': 7, 'label': '1 anno'},
+    104: {'punti': 52, 'passo': 14, 'label': '2 anni'},
+}
+PERIODO_DEFAULT = 26
+
 # Semantica KPI: crescere e' un bene o un male?
 # +1 = crescita positiva (verde), -1 = crescita negativa (rosso),
 # 0 = neutra (i segmenti personalizzati: dipende dal filtro).
@@ -142,8 +153,10 @@ def serie_trend_segmenti(n_punti: int = 26, passo_giorni: int = 7,
             'valori': valori[seg.chiave],
         })
 
+    # Oltre l'anno di storia le date si ripetono: aggiungi l'anno
+    fmt = '%d/%m/%y' if n_punti * passo_giorni > 360 else '%d/%m'
     out = {
-        'labels': [p.strftime('%d/%m') for p in punti],
+        'labels': [p.strftime(fmt) for p in punti],
         'serie': serie,
         'passo_giorni': passo_giorni,
         'generato_il': timezone.localtime(timezone.now()).strftime('%d/%m %H:%M'),

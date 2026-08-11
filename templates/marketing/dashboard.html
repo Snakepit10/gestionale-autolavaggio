@@ -131,9 +131,9 @@
         <strong>{{ confronto }} giorni fa</strong>:
     </div>
     <div class="btn-group btn-group-sm">
-        <a href="?confronto=7" class="btn {% if confronto == 7 %}btn-primary{% else %}btn-outline-primary{% endif %}">7 gg</a>
-        <a href="?confronto=30" class="btn {% if confronto == 30 %}btn-primary{% else %}btn-outline-primary{% endif %}">30 gg</a>
-        <a href="?confronto=90" class="btn {% if confronto == 90 %}btn-primary{% else %}btn-outline-primary{% endif %}">90 gg</a>
+        <a href="?confronto=7&periodo={{ periodo }}" class="btn {% if confronto == 7 %}btn-primary{% else %}btn-outline-primary{% endif %}">7 gg</a>
+        <a href="?confronto=30&periodo={{ periodo }}" class="btn {% if confronto == 30 %}btn-primary{% else %}btn-outline-primary{% endif %}">30 gg</a>
+        <a href="?confronto=90&periodo={{ periodo }}" class="btn {% if confronto == 90 %}btn-primary{% else %}btn-outline-primary{% endif %}">90 gg</a>
     </div>
 </div>
 
@@ -329,16 +329,24 @@
         <div class="d-flex justify-content-between align-items-start flex-wrap gap-2">
             <div>
                 <h6 class="card-title text-muted mb-1"><i class="bi bi-activity text-primary"></i>
-                    Trend dei segmenti (ultime 26 settimane)</h6>
+                    Trend dei segmenti (ultimo {{ periodo_label }})</h6>
                 <p class="text-muted small mb-2">
-                    Ricostruito dallo storico ordini, settimana per settimana.
+                    Ricostruito dallo storico ordini{% if periodo == 104 %}, un punto ogni 2 settimane{% else %}, settimana per settimana{% endif %}.
                     Dormienti in crescita = campanello d'allarme; attivi in
                     crescita = ottimo segnale.
                 </p>
             </div>
-            <a href="{% url 'marketing:trend-export' %}" class="btn btn-sm btn-outline-secondary">
-                <i class="bi bi-download"></i> CSV trend completo
-            </a>
+            <div class="d-flex gap-2 flex-wrap">
+                <div class="btn-group btn-group-sm" role="group" title="Periodo del grafico">
+                    {% for val, label in periodi_trend %}
+                    <a href="?periodo={{ val }}&confronto={{ confronto }}"
+                       class="btn {% if periodo == val %}btn-primary{% else %}btn-outline-primary{% endif %}">{{ label }}</a>
+                    {% endfor %}
+                </div>
+                <a href="{% url 'marketing:trend-export' %}?periodo={{ periodo }}" class="btn btn-sm btn-outline-secondary">
+                    <i class="bi bi-download"></i> CSV
+                </a>
+            </div>
         </div>
 
         {# Preset di visualizzazione + interruttori per singola serie #}
