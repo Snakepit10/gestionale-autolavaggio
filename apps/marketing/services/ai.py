@@ -208,19 +208,39 @@ def report_vendite() -> dict:
 
 
 def _trend_per_ai() -> dict:
-    """Le curve del grafico trend segmenti, in forma compatta per il
-    modello: un punto a settimana per 26 settimane (ultimo = oggi),
-    piu' la variazione a 30 giorni. Stessa cache della dashboard."""
+    """Le curve del trend segmenti su TUTTO lo storico ordini.
+
+    Il passo si adatta da solo per restare su ~60 punti (token
+    contenuti anche con anni di storia): fino a ~14 mesi e' un punto a
+    settimana, poi il passo cresce (2 settimane, 3...). Cache come per
+    la dashboard (per coppia punti/passo).
+    """
+    import math
+
+    from apps.ordini.models import Ordine
+    from django.utils import timezone as tz
+
     from .trend import serie_trend_segmenti
 
-    trend = serie_trend_segmenti()
+    MAX_PUNTI = 60
+    primo = (Ordine.objects.filter(stato='completato')
+             .order_by('data_ora').values_list('data_ora', flat=True).first())
+    giorni_storia = ((tz.now() - primo).days + 7) if primo else 180
+    passo = 7
+    if giorni_storia / passo > MAX_PUNTI:
+        # arrotonda a multipli di settimana (14, 21, 28...)
+        passo = math.ceil(giorni_storia / MAX_PUNTI / 7) * 7
+    n_punti = max(4, min(MAX_PUNTI, math.ceil(giorni_storia / passo)))
+
+    trend = serie_trend_segmenti(n_punti=n_punti, passo_giorni=passo)
     return {
-        'nota': 'Conteggio clienti per segmento nel tempo, un punto a '
-                'settimana (ultimo = oggi). Ricostruito dallo storico '
-                'ordini: usalo per capire gli SPOSTAMENTI tra segmenti '
-                '(es. attivi che scivolano in rallentamento e poi '
-                'dormienti) e se un cambiamento e\' recente o strutturale.',
-        'settimane': trend['labels'],
+        'nota': f'Conteggio clienti per segmento nel tempo, un punto ogni '
+                f'{passo} giorni su TUTTO lo storico ordini (ultimo punto '
+                f'= oggi). Usalo per capire gli SPOSTAMENTI tra segmenti '
+                f'(es. attivi che scivolano in rallentamento e poi '
+                f'dormienti) e se un cambiamento e\' recente, stagionale '
+                f'o strutturale.',
+        'date': trend['labels'],
         'serie': {s['nome']: s['valori'] for s in trend['serie']},
         'variazione_30gg': {
             s['nome']: trend['delta'][s['chiave']]['delta']
