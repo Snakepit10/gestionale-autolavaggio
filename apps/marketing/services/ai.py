@@ -207,6 +207,28 @@ def report_vendite() -> dict:
     }
 
 
+def _trend_per_ai() -> dict:
+    """Le curve del grafico trend segmenti, in forma compatta per il
+    modello: un punto a settimana per 26 settimane (ultimo = oggi),
+    piu' la variazione a 30 giorni. Stessa cache della dashboard."""
+    from .trend import serie_trend_segmenti
+
+    trend = serie_trend_segmenti()
+    return {
+        'nota': 'Conteggio clienti per segmento nel tempo, un punto a '
+                'settimana (ultimo = oggi). Ricostruito dallo storico '
+                'ordini: usalo per capire gli SPOSTAMENTI tra segmenti '
+                '(es. attivi che scivolano in rallentamento e poi '
+                'dormienti) e se un cambiamento e\' recente o strutturale.',
+        'settimane': trend['labels'],
+        'serie': {s['nome']: s['valori'] for s in trend['serie']},
+        'variazione_30gg': {
+            s['nome']: trend['delta'][s['chiave']]['delta']
+            for s in trend['serie']
+        },
+    }
+
+
 # ---------------------------------------------------------------------
 # Contesto (solo aggregati, zero dati personali)
 # ---------------------------------------------------------------------
@@ -275,6 +297,7 @@ def contesto_per_ai() -> dict:
             for s in SegmentoPersonalizzato.objects.filter(attivo=True)
         ],
         'serie_mensile': serie_mensile(6),
+        'trend_segmenti': _trend_per_ai(),
         'ultime_campagne': stats_ultime_campagne(8),
         'rendimento_per_segmento': statistiche_per_segmento(),
         'impostazioni': {
@@ -460,8 +483,11 @@ NON esistono: se servirebbero, dillo nell'analisi senza proporre il segmento.
 Copri sempre, coi numeri del contesto: andamento vendite vs periodo \
 precedente e ticket medio; mix servizi (top_servizi, cosa spingere); tasso \
 di ritorno; top_clienti_anonimi ad alto valore fermi da troppo (rischio \
-abbandono); giorni della settimana deboli. Chiudi con le 2-3 azioni piu' \
-importanti in ordine di priorita' con impatto stimato. Distingui sempre \
+abbandono); giorni della settimana deboli; le CURVE di trend_segmenti \
+(dove si sta spostando la base clienti settimana per settimana: dormienti \
+in crescita costante = problema strutturale da aggredire, picchi isolati = \
+stagionalita'; cita i numeri di inizio e fine periodo). Chiudi con le 2-3 \
+azioni piu' importanti in ordine di priorita' con impatto stimato. Distingui sempre \
 cio' che i dati mostrano dalle tue ipotesi; se un dato manca, dillo e \
 proponi come raccoglierlo. Non inventare mai numeri.
 
