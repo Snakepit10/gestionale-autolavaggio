@@ -9,6 +9,11 @@ def crea_supplementi(apps, schema_editor):
     cat = Categoria.objects.filter(nome__icontains='extra').first()
     if not cat:
         cat = Categoria.objects.first()
+    if not cat:
+        # DB vuoto (es. database di test): nessuna categoria a cui
+        # agganciare i supplementi, salta. In produzione la migration
+        # e' gia' stata applicata con le categorie presenti.
+        return
 
     supplementi = [
         ('Supplemento sporco eccessivo', 10.00),

@@ -67,10 +67,17 @@ def registra(request):
             data=data, note=(request.POST.get('note') or '').strip(),
             registrato_da=request.user,
         )
-        messages.success(
-            request,
-            f'{tipo.nome} registrato su {veicolo_pre.targa}: salute '
-            f'{esito.salute_prima} -> {esito.salute_dopo}.')
+        msg = (f'{tipo.nome} registrato su {veicolo_pre.targa}: salute '
+               f'{esito.salute_prima} -> {esito.salute_dopo}.')
+        if esito.livelli_completati:
+            nomi = ', '.join(f'Livello {l.numero} ({l.nome})'
+                             for l in esito.livelli_completati)
+            msg += f' 🎉 Completato: {nomi}!'
+        if esito.gettoni_premio:
+            msg += f' Premio: +{esito.gettoni_premio} gettoni al cliente.'
+        if esito.badge_nuovi:
+            msg += f' Badge sbloccati: {", ".join(esito.badge_nuovi)}.'
+        messages.success(request, msg)
         return redirect(f'{request.path}?veicolo={veicolo_pre.pk}')
 
     ultimi = []

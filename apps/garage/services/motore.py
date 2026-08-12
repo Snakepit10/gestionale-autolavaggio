@@ -2,20 +2,30 @@
 servizio su un veicolo, da qualsiasi canale (self service, operatore,
 import futuri).
 
-Fase attuale (F4): crea l'evento e aggiorna il punteggio salute
-(prima applica il decadimento maturato dall'ultimo aggiornamento, poi
-somma i punti del servizio, con cap 100 e floor 0).
-La gamification completa (livelli, premi gettoni, badge, streak,
-notifiche) si aggancia in _applica_gamification: F5 la riempie senza
-toccare i chiamanti.
+Cosa fa registra_evento, in transazione con lock sul veicolo:
+1. crea l'EventoLibretto;
+2. salute: applica il decadimento maturato, somma i punti (cap/floor);
+3. streak: la serie vive con almeno un servizio ogni
+   streak_finestra_giorni; ai traguardi configurati premia in gettoni
+   (una volta per serie: la chiave contiene l'inizio della serie);
+4. badge milestone del servizio (idempotenti via unique DB);
+5. livelli: se il percorso raggiunge un livello completato non ancora
+   premiato -> PremioVeicolo + accredito wallet con causale 'premio' e
+   chiave di idempotenza (doppia difesa: PremioVeicolo.chiave unique +
+   chiave_idempotenza del wallet) + badge di livello;
+6. eventi di dominio NotificaGarage (l'invio e' compito del notifier).
 """
+import logging
 from dataclasses import dataclass, field
 
-from django.db import transaction
+from django.db import IntegrityError, transaction
 from django.utils import timezone
 
-from apps.garage.models import (EventoLibretto, ImpostazioniGarage,
-                                TipoServizioGarage, Veicolo)
+from apps.garage.models import (BadgeVeicolo, EventoLibretto,
+                                ImpostazioniGarage, NotificaGarage,
+                                PremioVeicolo, TipoServizioGarage, Veicolo)
+
+logger = logging.getLogger(__name__)
 
 
 @dataclass
@@ -89,10 +99,140 @@ def registra_evento(veicolo: Veicolo, tipo_servizio: TipoServizioGarage,
     return esito
 
 
-def _applica_gamification(veicolo, evento, esito, cfg):
-    """Hook F5: livelli, premi gettoni, badge, streak, notifiche.
+def _premia(veicolo, chiave: str, gettoni: int, descrizione: str):
+    """Accredita gettoni UNA sola volta per (veicolo, chiave).
 
-    Volutamente vuoto in F4: i chiamanti (self service, staff) non
-    cambieranno quando verra' riempito.
+    Doppia difesa: PremioVeicolo.chiave unique (idempotenza
+    applicativa) + chiave_idempotenza sul wallet monete. Ritorna i
+    gettoni accreditati (0 se gia' premiato o premio nullo).
     """
-    return None
+    from apps.monete.services import wallet
+    from apps.monete.services.wallet import OperazioneDuplicataError
+
+    try:
+        # savepoint: su PostgreSQL un IntegrityError senza atomic
+        # interno manderebbe in errore l'INTERA transazione esterna
+        with transaction.atomic():
+            premio = PremioVeicolo.objects.create(
+                veicolo=veicolo, chiave=chiave, gettoni=gettoni,
+                descrizione=descrizione[:200])
+    except IntegrityError:
+        return 0  # gia' premiato (replay/doppio submit)
+
+    if gettoni < 1:
+        return 0
+    try:
+        movimento = wallet.accredita(
+            veicolo.cliente, gettoni, 'premio', descrizione[:200],
+            chiave_idempotenza=f'garage:{veicolo.pk}:{chiave}'[:64])
+        premio.movimento = movimento
+        premio.save(update_fields=['movimento'])
+    except OperazioneDuplicataError:
+        return 0
+    return gettoni
+
+
+def _sblocca_badge(veicolo, slug: str, nome: str, icona: str, esito):
+    badge, creato = BadgeVeicolo.objects.get_or_create(
+        veicolo=veicolo, slug=slug[:60],
+        defaults={'nome': nome[:100], 'icona': icona or 'bi-award'})
+    if creato:
+        esito.badge_nuovi.append(badge.nome)
+        _notifica(veicolo, 'badge_sbloccato', {'badge': badge.nome},
+                  chiave_dedup=f'badge:{slug}'[:100])
+    return creato
+
+
+def _notifica(veicolo, tipo: str, payload: dict, chiave_dedup: str = ''):
+    """Evento di dominio: il notifier (F7) decide se e come inviarlo."""
+    try:
+        with transaction.atomic():   # savepoint (vedi _premia)
+            NotificaGarage.objects.create(
+                veicolo=veicolo, tipo=tipo, payload=payload,
+                chiave_dedup=chiave_dedup)
+    except IntegrityError:
+        pass  # dedup: gia' notificato
+
+
+def _aggiorna_streak(veicolo, evento, esito, cfg):
+    """Serie di servizi consecutivi entro la finestra configurata.
+
+    Un evento retrodatato (data <= ultimo evento streak) allunga il
+    conteggio senza toccare il riferimento; il reset scatta solo
+    quando il NUOVO evento arriva oltre la finestra dall'ultimo.
+    """
+    data = evento.data
+    ultimo = veicolo.streak_ultimo_evento
+    if ultimo is None or veicolo.streak_conteggio == 0:
+        veicolo.streak_conteggio = 1
+        veicolo.streak_iniziata_il = data
+    elif data > ultimo and (timezone.localtime(data).date()
+                            - timezone.localtime(ultimo).date()).days \
+            > cfg.streak_finestra_giorni:
+        # finestra scaduta: la serie riparte da questo evento
+        veicolo.streak_conteggio = 1
+        veicolo.streak_iniziata_il = data
+    else:
+        veicolo.streak_conteggio += 1
+    if ultimo is None or data > ultimo:
+        veicolo.streak_ultimo_evento = data
+    veicolo.save(update_fields=['streak_conteggio', 'streak_iniziata_il',
+                                'streak_ultimo_evento'])
+    esito.streak = veicolo.streak_conteggio
+
+    # Traguardi: premio per OGNI serie che raggiunge la soglia (la
+    # chiave contiene l'inizio serie: una nuova serie ripremia).
+    traguardi = cfg.streak_traguardi or {}
+    gettoni = traguardi.get(str(veicolo.streak_conteggio))
+    if gettoni:
+        # microsecondi inclusi: due serie iniziate nello stesso secondo
+        # (improbabile ma possibile) non devono condividere la chiave
+        inizio = timezone.localtime(veicolo.streak_iniziata_il)
+        vinti = _premia(
+            veicolo,
+            f'streak:{inizio:%Y%m%d%H%M%S%f}:{veicolo.streak_conteggio}',
+            int(gettoni),
+            f'Premio streak {veicolo.streak_conteggio} servizi - {veicolo.targa}')
+        esito.gettoni_premio += vinti
+
+
+def _controlla_livelli(veicolo, esito, cfg):
+    """Premia i livelli completati non ancora premiati (idempotente)."""
+    from .percorso import stato_percorso
+
+    stato = stato_percorso(veicolo)
+    for ls in stato.livelli:
+        if ls.stato != 'completato':
+            continue
+        livello = ls.livello
+        if PremioVeicolo.objects.filter(
+                veicolo=veicolo, chiave=f'livello:{livello.pk}').exists():
+            continue
+        vinti = _premia(
+            veicolo, f'livello:{livello.pk}', livello.premio_gettoni,
+            f'Premio Livello {livello.numero} ({livello.nome}) - {veicolo.targa}')
+        esito.gettoni_premio += vinti
+        esito.livelli_completati.append(livello)
+        if livello.badge_nome:
+            _sblocca_badge(veicolo, f'livello-{livello.numero}',
+                           livello.badge_nome, livello.badge_icona, esito)
+        _notifica(veicolo, 'livello_completato',
+                  {'livello': livello.numero, 'nome': livello.nome,
+                   'gettoni': livello.premio_gettoni},
+                  chiave_dedup=f'livello:{livello.pk}')
+    if stato.nel_club:
+        _sblocca_badge(veicolo, 'club-auto-perfetta', 'Club Auto Perfetta',
+                       'bi-trophy-fill', esito)
+
+
+def _applica_gamification(veicolo, evento, esito, cfg):
+    """Streak, badge milestone, livelli con premi in gettoni, eventi
+    di dominio. Gira DENTRO la transazione di registra_evento."""
+    _aggiorna_streak(veicolo, evento, esito, cfg)
+
+    tipo = evento.tipo_servizio
+    if tipo.badge_nome:
+        _sblocca_badge(veicolo, f'servizio-{tipo.slug}', tipo.badge_nome,
+                       tipo.badge_icona, esito)
+
+    _controlla_livelli(veicolo, esito, cfg)
