@@ -91,11 +91,14 @@
         </div>
     </div>
     {% empty %}
-    <div class="pub-card text-center py-5 mb-3">
+    <div class="pub-card text-center py-4 mb-3">
         <i class="bi bi-car-front" style="font-size:2.5rem; color:#cbd5e1"></i>
-        <p class="text-muted mb-0 mt-2">
-            Nessun veicolo ancora. Aggiungi il primo qui sotto: bastano
-            targa, marca e modello.
+        <p class="fw-bold mb-1 mt-2">Il libretto digitale della tua auto</p>
+        <p class="text-muted mb-0">
+            Registra il tuo veicolo qui sotto: da quel momento ogni lavaggio
+            e trattamento resta scritto nel suo libretto, la salute dell'auto
+            diventa un punteggio da tenere alto e ogni traguardo ti regala
+            gettoni per i lavaggi. Leggi "Come funziona" per i dettagli.
         </p>
     </div>
     {% endfor %}
@@ -118,6 +121,100 @@
             <div class="form-text">La targa viene salvata in maiuscolo, senza spazi.</div>
         </form>
     </div>
+
+    {# ---- Come funziona ---- #}
+    <details class="pub-card mb-4" {% if not veicoli %}open{% endif %}>
+        <summary class="fw-bold fs-5" style="cursor:pointer; list-style:none;">
+            <i class="bi bi-question-circle text-primary"></i> Come funziona il Garage?
+        </summary>
+
+        <div class="mt-3">
+            <div class="d-flex gap-3 mb-3">
+                <div class="flex-shrink-0 text-primary fs-3"><i class="bi bi-journal-text"></i></div>
+                <div>
+                    <div class="fw-bold">1. Il libretto digitale</div>
+                    <p class="text-muted small mb-0">
+                        Come il libretto dei tagliandi, ma per la pulizia e la cura
+                        della tua auto. Ogni lavaggio self che avvii dall'app e ogni
+                        servizio fatto da noi in sede viene registrato da solo, con
+                        data e dettagli. Sempre consultabile, per sempre: sai
+                        esattamente cosa e' stato fatto e quando — utile anche il
+                        giorno in cui vorrai rivendere l'auto.
+                    </p>
+                </div>
+            </div>
+
+            <div class="d-flex gap-3 mb-3">
+                <div class="flex-shrink-0 text-primary fs-3"><i class="bi bi-heart-pulse"></i></div>
+                <div>
+                    <div class="fw-bold">2. Il punteggio salute (0-100)</div>
+                    <p class="text-muted small mb-0">
+                        La tua auto parte da {{ cfg.punteggio_iniziale }}. Ogni servizio
+                        la fa salire (piu' e' importante, piu' punti vale); se resta
+                        ferma, scende di {{ cfg.decadimento_punti }} punto ogni
+                        {{ cfg.decadimento_giorni }} giorni — perche' sporco, sale e
+                        smog lavorano anche quando l'auto e' parcheggiata. Verde =
+                        in forma, rosso = ha bisogno di te.
+                    </p>
+                </div>
+            </div>
+
+            <div class="d-flex gap-3 mb-3">
+                <div class="flex-shrink-0 text-primary fs-3"><i class="bi bi-map"></i></div>
+                <div>
+                    <div class="fw-bold">3. Il percorso a {{ livelli_std|length }} livelli</div>
+                    <p class="text-muted small mb-2">
+                        Un percorso di cura completo, dal lavaggio base alla protezione
+                        professionale. Completa i servizi di un livello (in qualsiasi
+                        ordine) per sbloccare il successivo — e a ogni livello completato
+                        <strong>vinci gettoni veri</strong> da usare al self service:
+                    </p>
+                    <ul class="small text-muted mb-0">
+                        {% for l in livelli_std %}
+                        <li><strong>Livello {{ l.numero }} — {{ l.nome }}</strong>: +{{ l.premio_gettoni }} gettoni</li>
+                        {% endfor %}
+                    </ul>
+                    {% if premio_totale %}
+                    <p class="small mb-0 mt-1"><strong>{{ premio_totale }} gettoni in palio</strong> per ogni veicolo che completa il percorso.</p>
+                    {% endif %}
+                </div>
+            </div>
+
+            <div class="d-flex gap-3 mb-3">
+                <div class="flex-shrink-0" style="color:#6f42c1; font-size:1.75rem;"><i class="bi bi-trophy"></i></div>
+                <div>
+                    <div class="fw-bold">4. Il Club Auto Perfetta</div>
+                    <p class="text-muted small mb-0">
+                        Completato l'ultimo livello, la tua auto entra nel Club: la
+                        cerchia delle auto tenute davvero bene. Da li' si mantiene:
+                        almeno un servizio (anche self) ogni
+                        {{ cfg.streak_finestra_giorni }} giorni tiene viva la
+                        <strong>streak</strong> 🔥
+                        {% if traguardi_streak %}
+                        ({% for n, g in traguardi_streak %}{{ n }} di fila = +{{ g }} getton{{ g|pluralize:"e,i" }}{% if not forloop.last %}, {% endif %}{% endfor %})
+                        {% endif %}
+                        e la scheda ti avvisa quando un trattamento sta per scadere
+                        ed e' ora di rinnovarlo.
+                    </p>
+                </div>
+            </div>
+
+            <div class="d-flex gap-3">
+                <div class="flex-shrink-0 text-success fs-3"><i class="bi bi-piggy-bank"></i></div>
+                <div>
+                    <div class="fw-bold">Perche' conviene</div>
+                    <p class="text-muted small mb-0">
+                        Un'auto curata con costanza vale di piu' (e il libretto lo
+                        dimostra), gli interni restano sani e igienizzati, la
+                        carrozzeria protetta invecchia meno — e nel frattempo
+                        accumuli gettoni gratis e badge da collezionare. Non devi
+                        ricordarti nulla: pensa a tutto la scheda del veicolo, col
+                        prossimo passo consigliato sempre in evidenza.
+                    </p>
+                </div>
+            </div>
+        </div>
+    </details>
 
 </div>
 {% endblock %}

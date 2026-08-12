@@ -25,7 +25,10 @@ def _veicolo_del_cliente(cliente, pk) -> Veicolo:
 
 @_cliente_required
 def garage(request, cliente):
-    """Schermata Garage: card per ogni veicolo + form aggiungi."""
+    """Schermata Garage: card per ogni veicolo + form aggiungi +
+    spiegazione di come funziona (coi numeri veri della config)."""
+    from .models import ImpostazioniGarage, Percorso
+
     veicoli = []
     for v in cliente.veicoli.filter(attivo=True):
         veicoli.append({
@@ -34,10 +37,24 @@ def garage(request, cliente):
             'percorso': stato_percorso(v),
             'n_eventi': v.eventi.count(),
         })
+
+    cfg = ImpostazioniGarage.get_solo()
+    std = Percorso.standard()
+    livelli_std = list(std.livelli.order_by('numero')) if std else []
+    premio_totale = sum(l.premio_gettoni for l in livelli_std)
+    # Traguardi streak ordinati per la spiegazione ("5 di fila = +1...")
+    traguardi = sorted(
+        ((int(k), v) for k, v in (cfg.streak_traguardi or {}).items()),
+        key=lambda x: x[0])
+
     return render(request, 'clients/garage.html', {
         'cliente': cliente,
         'veicoli': veicoli,
         'form': VeicoloForm(),
+        'cfg': cfg,
+        'livelli_std': livelli_std,
+        'premio_totale': premio_totale,
+        'traguardi_streak': traguardi,
     })
 
 
