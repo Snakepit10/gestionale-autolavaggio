@@ -74,7 +74,10 @@
                 </div>
             </div>
             <div class="d-flex flex-column gap-2 flex-shrink-0">
-                <a href="{% url 'garage_client:libretto' r.veicolo.pk %}" class="btn-cta btn-sm text-center">
+                <a href="{% url 'garage_client:scheda' r.veicolo.pk %}" class="btn-cta btn-sm text-center">
+                    <i class="bi bi-clipboard-heart"></i> Scheda
+                </a>
+                <a href="{% url 'garage_client:libretto' r.veicolo.pk %}" class="btn btn-sm btn-outline-primary">
                     <i class="bi bi-journal-text"></i> Libretto
                 </a>
                 <form method="post" action="{% url 'garage_client:veicolo-elimina' r.veicolo.pk %}"

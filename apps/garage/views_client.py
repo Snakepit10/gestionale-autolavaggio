@@ -69,6 +69,97 @@ def veicolo_aggiungi(request, cliente):
 
 
 @_cliente_required
+def scheda(request, cliente, pk):
+    """Scheda veicolo: salute con trend, livello con checklist, badge,
+    prossimo servizio consigliato, trattamenti e accesso al libretto."""
+    from .models import ImpostazioniGarage
+    from .services.scadenze import trattamenti_veicolo
+
+    veicolo = _veicolo_del_cliente(cliente, pk)
+    cfg = ImpostazioniGarage.get_solo()
+    stato = stato_percorso(veicolo)
+    trattamenti = trattamenti_veicolo(veicolo)
+
+    # Trend salute: se c'e' un servizio dentro l'ultima finestra di
+    # decadimento la salute sta tenendo/salendo, altrimenti sta
+    # scendendo di decadimento_punti ogni decadimento_giorni.
+    ultimo_evento = veicolo.eventi.order_by('-data').first()
+    giorni_da_ultimo = None
+    if ultimo_evento:
+        giorni_da_ultimo = (timezone_now_date()
+                            - localdate(ultimo_evento.data)).days
+    salute = veicolo.salute_attuale
+    if salute >= 100:
+        trend = 'stabile'
+    elif giorni_da_ultimo is not None and giorni_da_ultimo <= cfg.decadimento_giorni:
+        trend = 'su'
+    else:
+        trend = 'giu'
+
+    # Prossimo consigliato: primo item mancante del livello corrente;
+    # nel Club il trattamento da rinnovare (o in scadenza) piu' vicino.
+    consigliato = None
+    consigliato_scadenza = None
+    if stato.nel_club:
+        urgenti = [t for t in trattamenti if t.stato != 'attivo']
+        if urgenti:
+            consigliato_scadenza = urgenti[0]
+        elif trattamenti:
+            consigliato_scadenza = trattamenti[0]
+    else:
+        consigliato = stato.prossimo_item()
+
+    return render(request, 'clients/garage_scheda.html', {
+        'cliente': cliente,
+        'veicolo': veicolo,
+        'salute': salute,
+        'trend': trend,
+        'giorni_da_ultimo': giorni_da_ultimo,
+        'cfg': cfg,
+        'stato': stato,
+        'consigliato': consigliato,
+        'consigliato_scadenza': consigliato_scadenza,
+        'trattamenti': trattamenti,
+        'badges': veicolo.badges.all(),
+        'n_eventi': veicolo.eventi.count(),
+    })
+
+
+def timezone_now_date():
+    from django.utils import timezone
+    return timezone.localtime(timezone.now()).date()
+
+
+def localdate(dt):
+    from django.utils import timezone
+    return timezone.localtime(dt).date()
+
+
+@_cliente_required
+def percorso(request, cliente, pk):
+    """Vista dei livelli del percorso con stato e premi."""
+    from .models import PremioVeicolo
+
+    veicolo = _veicolo_del_cliente(cliente, pk)
+    stato = stato_percorso(veicolo)
+    premiati = set(
+        PremioVeicolo.objects.filter(
+            veicolo=veicolo, chiave__startswith='livello:')
+        .values_list('chiave', flat=True))
+    livelli = [
+        {'ls': ls, 'premiato': f'livello:{ls.livello.pk}' in premiati}
+        for ls in stato.livelli
+    ]
+    return render(request, 'clients/garage_percorso.html', {
+        'cliente': cliente,
+        'veicolo': veicolo,
+        'stato': stato,
+        'livelli': livelli,
+        'salute': veicolo.salute_attuale,
+    })
+
+
+@_cliente_required
 def libretto(request, cliente, pk):
     """Timeline cronologica del libretto, con filtro per tipo servizio."""
     from .models import TipoServizioGarage

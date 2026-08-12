@@ -1,0 +1,119 @@
+{% extends "clients/base_public.html" %}
+{% block title %}Percorso {{ veicolo.targa }} &mdash; MasterWash{% endblock %}
+{% block nav_area %}active{% endblock %}
+
+{% block extra_css %}
+<style>
+.liv-card { border-left: 5px solid #cbd5e1; }
+.liv-attivo { border-left-color: #0d6efd; }
+.liv-completato { border-left-color: #198754; }
+.liv-num {
+    width: 44px; height: 44px; border-radius: 50%;
+    display: flex; align-items: center; justify-content: center;
+    font-weight: 900; font-size: 1.2rem; color: #fff; flex-shrink: 0;
+}
+.liv-num-bloccato { background: #cbd5e1; }
+.liv-num-attivo { background: #0d6efd; }
+.liv-num-completato { background: #198754; }
+.club-card {
+    background: linear-gradient(135deg, #6f42c1, #4527a0);
+    color: #fff; border-radius: 16px;
+}
+.check-mini { font-size: .9rem; }
+.targa-plate {
+    display: inline-block; font-family: 'Arial Black', Arial, sans-serif;
+    background: #fff; border: 2px solid #1d3557; border-radius: 6px;
+    padding: 2px 10px; letter-spacing: 2px; color: #1d3557;
+}
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="container py-4">
+
+    <div class="d-flex justify-content-between align-items-center mb-1 flex-wrap gap-2">
+        <h3 class="mb-0" style="font-weight:800">
+            <i class="bi bi-map text-primary"></i> Percorso
+            <span class="targa-plate fs-6 align-middle">{{ veicolo.targa }}</span>
+        </h3>
+        <a href="{% url 'garage_client:scheda' veicolo.pk %}" class="btn btn-sm btn-outline-secondary">
+            <i class="bi bi-arrow-left"></i> Scheda
+        </a>
+    </div>
+    <p class="text-muted mb-4">
+        Completa i servizi di ogni livello (in qualsiasi ordine) per
+        sbloccare il successivo e vincere gettoni. Salute attuale: {{ salute }}/100.
+    </p>
+
+    {% for riga in livelli %}
+    {% with ls=riga.ls %}
+    <div class="pub-card mb-3 liv-card liv-{{ ls.stato }}">
+        <div class="d-flex gap-3">
+            <div class="liv-num liv-num-{{ ls.stato }}">
+                {% if ls.stato == 'completato' %}<i class="bi bi-check-lg"></i>
+                {% elif ls.stato == 'bloccato' %}<i class="bi bi-lock-fill" style="font-size:1rem;"></i>
+                {% else %}{{ ls.livello.numero }}{% endif %}
+            </div>
+            <div class="flex-grow-1">
+                <div class="d-flex justify-content-between align-items-start flex-wrap gap-1">
+                    <div class="fw-bold">
+                        Livello {{ ls.livello.numero }} · {{ ls.livello.nome }}
+                        {% if ls.stato == 'attivo' %}
+                            <span class="badge bg-primary">in corso {{ ls.n_fatti }}/{{ ls.n_totali }}</span>
+                        {% elif ls.stato == 'completato' %}
+                            <span class="badge bg-success">completato</span>
+                        {% else %}
+                            <span class="badge bg-secondary">bloccato</span>
+                        {% endif %}
+                    </div>
+                    <span class="badge bg-warning text-dark" title="Premio al completamento">
+                        <i class="bi bi-coin"></i>
+                        {% if riga.premiato %}+{{ ls.livello.premio_gettoni }} riscossi!
+                        {% else %}+{{ ls.livello.premio_gettoni }} gettoni{% endif %}
+                    </span>
+                </div>
+                <div class="mt-1 check-mini">
+                    {% for item in ls.items %}
+                    <div>
+                        {% if item.completato %}
+                            <i class="bi bi-check-circle-fill text-success"></i>
+                            <span class="text-muted text-decoration-line-through">{{ item.nome }}</span>
+                        {% else %}
+                            <i class="bi bi-circle text-muted"></i> {{ item.nome }}
+                            {% if item.soddisfatto_da_self %}
+                                <span class="badge bg-primary-subtle text-primary border">vale il self</span>
+                            {% endif %}
+                        {% endif %}
+                    </div>
+                    {% endfor %}
+                </div>
+            </div>
+        </div>
+    </div>
+    {% endwith %}
+    {% endfor %}
+
+    {# ---- CLUB ---- #}
+    <div class="club-card p-4 mb-3 {% if not stato.nel_club %}opacity-75{% endif %}">
+        <div class="d-flex gap-3 align-items-center">
+            <i class="bi bi-trophy-fill" style="font-size:2.2rem;"></i>
+            <div>
+                <div class="fw-bold fs-5">Club Auto Perfetta</div>
+                {% if stato.nel_club %}
+                <p class="mb-0 small">
+                    Ci sei! La tua auto ha completato tutto il percorso.
+                    Mantienila al top: streak attiva e rinnovi dei
+                    trattamenti quando scadono.
+                </p>
+                {% else %}
+                <p class="mb-0 small">
+                    Completa il Livello 4 per entrare: modalita'
+                    mantenimento, streak e rinnovi dei trattamenti.
+                </p>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+
+</div>
+{% endblock %}
