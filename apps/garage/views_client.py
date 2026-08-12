@@ -69,6 +69,36 @@ def veicolo_aggiungi(request, cliente):
 
 
 @_cliente_required
+def libretto(request, cliente, pk):
+    """Timeline cronologica del libretto, con filtro per tipo servizio."""
+    from .models import TipoServizioGarage
+
+    veicolo = _veicolo_del_cliente(cliente, pk)
+    eventi = (veicolo.eventi
+              .select_related('tipo_servizio', 'registrato_da')
+              .order_by('-data'))
+
+    tipo_sel = None
+    slug = request.GET.get('tipo', '')
+    if slug:
+        tipo_sel = TipoServizioGarage.objects.filter(slug=slug).first()
+        if tipo_sel is not None:
+            eventi = eventi.filter(tipo_servizio=tipo_sel)
+
+    tipi_presenti = (TipoServizioGarage.objects
+                     .filter(eventi__veicolo=veicolo).distinct()
+                     .order_by('ordine'))
+    return render(request, 'clients/garage_libretto.html', {
+        'cliente': cliente,
+        'veicolo': veicolo,
+        'salute': veicolo.salute_attuale,
+        'eventi': eventi[:200],
+        'tipi_presenti': tipi_presenti,
+        'tipo_sel': tipo_sel,
+    })
+
+
+@_cliente_required
 def veicolo_elimina(request, cliente, pk):
     """Rimuove un veicolo dal garage.
 

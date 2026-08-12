@@ -1,0 +1,144 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}Garage veicoli - Registra servizio{% endblock %}
+
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <h1><i class="bi bi-car-front-fill"></i> Garage veicoli</h1>
+</div>
+
+<div class="row g-4">
+    <div class="col-lg-5">
+        {# ---------- RICERCA PER TARGA ---------- #}
+        <div class="card border-0 shadow-sm mb-4">
+            <div class="card-body">
+                <h5 class="card-title"><i class="bi bi-search text-primary"></i> Cerca veicolo</h5>
+                <input type="text" id="cerca-targa" class="form-control"
+                       placeholder="Targa o nome cliente (min 2 caratteri)"
+                       autocomplete="off">
+                <div class="list-group mt-2" id="risultati-targa"></div>
+                <div class="form-text">
+                    Trovi solo i veicoli registrati dai clienti nel loro
+                    Garage (o creati da admin).
+                </div>
+            </div>
+        </div>
+
+        {% if veicolo_pre %}
+        {# ---------- SCHEDA VEICOLO ---------- #}
+        <div class="card border-0 shadow-sm">
+            <div class="card-body">
+                <h5 class="card-title mb-2">
+                    <span class="badge bg-dark fs-6">{{ veicolo_pre.targa }}</span>
+                    {{ veicolo_pre.marca }} {{ veicolo_pre.modello }}
+                </h5>
+                <div class="small text-muted mb-2">
+                    Cliente: <strong>{{ veicolo_pre.cliente.nome_completo|default:veicolo_pre.cliente }}</strong>
+                    · Salute: <strong>{{ salute_pre }}/100</strong>
+                    {% if veicolo_pre.streak_attiva %}· <i class="bi bi-fire text-warning"></i> streak {{ veicolo_pre.streak_conteggio }}{% endif %}
+                </div>
+                {% if ultimi %}
+                <div class="small fw-bold text-uppercase text-muted mb-1">Ultimi servizi</div>
+                <ul class="list-unstyled small mb-0">
+                    {% for e in ultimi %}
+                    <li class="border-bottom py-1">
+                        {{ e.data|date:"d/m/Y" }} · {{ e.tipo_servizio.nome }}
+                        <span class="badge bg-light text-dark border">{{ e.get_origine_display }}</span>
+                    </li>
+                    {% endfor %}
+                </ul>
+                {% else %}
+                <div class="text-muted small">Nessun servizio registrato finora.</div>
+                {% endif %}
+            </div>
+        </div>
+        {% endif %}
+    </div>
+
+    <div class="col-lg-7">
+        {# ---------- REGISTRAZIONE ---------- #}
+        <div class="card border-0 shadow-sm">
+            <div class="card-body">
+                <h5 class="card-title"><i class="bi bi-journal-plus text-primary"></i> Registra servizio</h5>
+                {% if not veicolo_pre %}
+                <p class="text-muted">Cerca prima un veicolo per targa.</p>
+                {% else %}
+                <form method="post" id="form-registra">
+                    {% csrf_token %}
+                    <input type="hidden" name="veicolo_id" value="{{ veicolo_pre.pk }}">
+                    <div class="row g-3">
+                        <div class="col-12">
+                            <label class="form-label fw-bold">Servizio effettuato *</label>
+                            <div class="row g-2">
+                                {% for t in tipi %}
+                                <div class="col-md-6">
+                                    <label class="border rounded p-2 d-flex align-items-center gap-2 w-100"
+                                           style="cursor:pointer;">
+                                        <input type="radio" name="tipo_id" value="{{ t.pk }}"
+                                               class="form-check-input mt-0" required>
+                                        <span>
+                                            {{ t.nome }}
+                                            <span class="text-muted small">(+{{ t.punti_salute }} salute{% if t.validita_giorni %}, vale {{ t.validita_giorni }}gg{% endif %})</span>
+                                        </span>
+                                    </label>
+                                </div>
+                                {% endfor %}
+                            </div>
+                        </div>
+                        <div class="col-md-5">
+                            <label class="form-label fw-bold">Data e ora</label>
+                            <input type="datetime-local" name="data" class="form-control">
+                            <div class="form-text">Vuoto = adesso. Puoi retrodatare.</div>
+                        </div>
+                        <div class="col-md-7">
+                            <label class="form-label fw-bold">Note</label>
+                            <input type="text" name="note" class="form-control" maxlength="300"
+                                   placeholder="es. sedili molto macchiati, secondo passaggio">
+                        </div>
+                    </div>
+                    <div class="d-flex justify-content-end mt-3">
+                        <button type="submit" class="btn btn-primary" id="btn-registra">
+                            <i class="bi bi-check-circle"></i> Registra su {{ veicolo_pre.targa }}
+                        </button>
+                    </div>
+                </form>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+// Ricerca targa: stesso pattern della pagina Avvia lavaggio staff
+(function () {
+    const input = document.getElementById('cerca-targa');
+    const box = document.getElementById('risultati-targa');
+    let timer = null;
+    input.addEventListener('input', function () {
+        clearTimeout(timer);
+        const term = this.value.trim();
+        if (term.length < 2) { box.innerHTML = ''; return; }
+        timer = setTimeout(() => {
+            fetch(`{% url 'garage:cerca-targa' %}?term=${encodeURIComponent(term)}`)
+                .then(r => r.json())
+                .then(d => {
+                    box.innerHTML = d.results.map(v =>
+                        `<a class="list-group-item list-group-item-action" href="?veicolo=${v.id}">
+                            <strong>${v.targa}</strong> · ${v.veicolo}
+                            <span class="text-muted">— ${v.cliente}</span>
+                        </a>`).join('') ||
+                        '<div class="list-group-item text-muted">Nessun veicolo trovato.</div>';
+                });
+        }, 250);
+    });
+    // Doppio click sul submit = doppio evento: disabilita al primo invio
+    const form = document.getElementById('form-registra');
+    if (form) form.addEventListener('submit', () => {
+        const b = document.getElementById('btn-registra');
+        b.disabled = true;
+        b.innerHTML = '<span class="spinner-border spinner-border-sm"></span> Registro...';
+    });
+})();
+</script>
+{% endblock %}

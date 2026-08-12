@@ -38,6 +38,25 @@
         <input type="hidden" name="chiave" value="{{ chiave }}">
         <input type="hidden" name="nodo_id" id="nodo-id" value="">
 
+        {% if veicoli|length > 1 %}
+        {# Piu' veicoli in garage: scegli a quale agganciare il lavaggio #}
+        <div class="pub-card mb-3 py-2">
+            <label class="fw-bold small text-uppercase text-muted mb-1" for="veicolo-id">
+                <i class="bi bi-car-front"></i> Per quale veicolo?
+            </label>
+            <select name="veicolo_id" id="veicolo-id" class="form-select">
+                {% for v in veicoli %}
+                <option value="{{ v.pk }}" {% if veicolo_default and v.pk == veicolo_default.pk %}selected{% endif %}>
+                    {{ v.targa }} · {{ v.marca }} {{ v.modello }}
+                </option>
+                {% endfor %}
+            </select>
+            <div class="form-text">Il lavaggio finira' nel libretto di questo veicolo.</div>
+        </div>
+        {% elif veicoli %}
+        <input type="hidden" name="veicolo_id" value="{{ veicoli.0.pk }}">
+        {% endif %}
+
         {% regroup nodi by zona as zone %}
         {% for gruppo in zone %}
         <h6 class="fw-bold text-uppercase small text-muted mb-1 {% if not forloop.first %}mt-3{% endif %}">

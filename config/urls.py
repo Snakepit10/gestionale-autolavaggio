@@ -152,6 +152,9 @@ urlpatterns = [
     # Task interni operatori (stile Todoist)
     path('tasks/', include('apps.tasks.urls', namespace='tasks')),
 
+    # Garage veicoli: pagine staff (registrazione servizi per targa)
+    path('garage/', include('apps.garage.urls', namespace='garage')),
+
     # Monete virtuali (staff + webhook pagamenti)
     path('monete/', include('apps.monete.urls', namespace='monete')),
 

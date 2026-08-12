@@ -74,9 +74,8 @@
                 </div>
             </div>
             <div class="d-flex flex-column gap-2 flex-shrink-0">
-                <a href="#" class="btn-cta btn-sm text-center" style="pointer-events:none;opacity:.5;"
-                   title="Arriva con la prossima fase">
-                    <i class="bi bi-clipboard-heart"></i> Scheda
+                <a href="{% url 'garage_client:libretto' r.veicolo.pk %}" class="btn-cta btn-sm text-center">
+                    <i class="bi bi-journal-text"></i> Libretto
                 </a>
                 <form method="post" action="{% url 'garage_client:veicolo-elimina' r.veicolo.pk %}"
                       onsubmit="return confirm('Rimuovere {{ r.veicolo.targa }} dal garage?');">

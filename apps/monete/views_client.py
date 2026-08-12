@@ -62,11 +62,30 @@ def lavaggio_scegli(request, cliente):
             .select_related('zona')
             .order_by(F('zona__ordine').asc(nulls_last=True),
                       'zona__nome', 'ordine', 'slug'))
+
+    # Veicoli del garage per agganciare il lavaggio al libretto: con
+    # un solo veicolo l'aggancio e' automatico, con piu' di uno si
+    # sceglie (default: l'ultimo usato). Import protetto: il garage
+    # non deve mai bloccare l'avvio lavaggi.
+    veicoli = []
+    veicolo_default = None
+    try:
+        veicoli = list(cliente.veicoli.filter(attivo=True))
+        if veicoli:
+            veicolo_default = max(
+                veicoli,
+                key=lambda v: (v.ultimo_uso_self is not None,
+                               v.ultimo_uso_self or v.creato_il))
+    except Exception:
+        pass
+
     return render(request, 'clients/monete_lavaggio.html', {
         'cliente': cliente,
         'saldo': wallet.saldo_di(cliente),
         'nodi': nodi,
         'chiave': uuid.uuid4().hex[:32],
+        'veicoli': veicoli,
+        'veicolo_default': veicolo_default,
     })
 
 
@@ -258,6 +277,31 @@ def lavaggio_avvia(request, cliente):
         cliente=cliente, nodo=nodo, impulsi=impulsi,
         chiave_idempotenza=f'app:{chiave}' if chiave else '',
     )
+
+    # Libretto garage: se l'avvio e' riuscito, registra l'evento sul
+    # veicolo scelto (o sull'unico). Try/except largo: un problema del
+    # garage non deve MAI far sembrare fallito un lavaggio partito.
+    if esito.ok:
+        try:
+            from apps.garage.models import TipoServizioGarage, Veicolo
+            from apps.garage.services.motore import registra_evento
+            veicolo = Veicolo.objects.filter(
+                pk=request.POST.get('veicolo_id'),
+                cliente=cliente, attivo=True).first()
+            if veicolo is None:
+                veicolo = (cliente.veicoli.filter(attivo=True).first()
+                           if cliente.veicoli.filter(attivo=True).count() == 1
+                           else None)
+            tipo = TipoServizioGarage.objects.filter(
+                slug='self_service', attivo=True).first()
+            if veicolo is not None and tipo is not None:
+                registra_evento(veicolo, tipo, 'self_service',
+                                movimento=esito.movimento)
+        except Exception:
+            import logging
+            logging.getLogger(__name__).exception(
+                'aggancio libretto garage fallito (lavaggio ok)')
+
     return render(request, 'clients/monete_esito.html', {
         'cliente': cliente,
         'esito': esito,

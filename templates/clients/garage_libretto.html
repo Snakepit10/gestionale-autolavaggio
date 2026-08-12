@@ -1,0 +1,94 @@
+{% extends "clients/base_public.html" %}
+{% block title %}Libretto {{ veicolo.targa }} &mdash; MasterWash{% endblock %}
+{% block nav_area %}active{% endblock %}
+
+{% block extra_css %}
+<style>
+.timeline { position: relative; padding-left: 26px; }
+.timeline::before {
+    content: ''; position: absolute; left: 9px; top: 6px; bottom: 6px;
+    width: 2px; background: #dbe7f0;
+}
+.tl-item { position: relative; padding-bottom: 18px; }
+.tl-dot {
+    position: absolute; left: -26px; top: 4px;
+    width: 20px; height: 20px; border-radius: 50%;
+    display: flex; align-items: center; justify-content: center;
+    color: #fff; font-size: .65rem;
+}
+.tl-self  { background: #0d6efd; }
+.tl-oper  { background: #198754; }
+.tl-imp   { background: #6c757d; }
+.targa-plate {
+    display: inline-block; font-family: 'Arial Black', Arial, sans-serif;
+    background: #fff; border: 2px solid #1d3557; border-radius: 6px;
+    padding: 2px 10px; letter-spacing: 2px; color: #1d3557;
+}
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="container py-4">
+
+    <div class="d-flex justify-content-between align-items-center mb-1 flex-wrap gap-2">
+        <h3 class="mb-0" style="font-weight:800">
+            <i class="bi bi-journal-text text-primary"></i> Libretto
+            <span class="targa-plate fs-6 align-middle">{{ veicolo.targa }}</span>
+        </h3>
+        <a href="{% url 'garage_client:garage' %}" class="btn btn-sm btn-outline-secondary">
+            <i class="bi bi-arrow-left"></i> Garage
+        </a>
+    </div>
+    <p class="text-muted mb-3">
+        {{ veicolo.marca }} {{ veicolo.modello }} · salute {{ salute }}/100
+        · tutti i servizi registrati, dal piu' recente.
+    </p>
+
+    {% if tipi_presenti|length > 1 %}
+    <div class="d-flex flex-wrap gap-1 mb-3">
+        <a href="{% url 'garage_client:libretto' veicolo.pk %}"
+           class="btn btn-sm {% if not tipo_sel %}btn-primary{% else %}btn-outline-primary{% endif %}">Tutti</a>
+        {% for t in tipi_presenti %}
+        <a href="?tipo={{ t.slug }}"
+           class="btn btn-sm {% if tipo_sel and tipo_sel.pk == t.pk %}btn-primary{% else %}btn-outline-primary{% endif %}">
+            {{ t.nome }}</a>
+        {% endfor %}
+    </div>
+    {% endif %}
+
+    <div class="pub-card">
+        {% if eventi %}
+        <div class="timeline mt-2">
+            {% for e in eventi %}
+            <div class="tl-item">
+                <span class="tl-dot {% if e.origine == 'self_service' %}tl-self{% elif e.origine == 'operatore' %}tl-oper{% else %}tl-imp{% endif %}">
+                    <i class="bi {% if e.origine == 'self_service' %}bi-droplet{% elif e.origine == 'operatore' %}bi-person-check{% else %}bi-box-arrow-in-down{% endif %}"></i>
+                </span>
+                <div class="fw-bold">{{ e.tipo_servizio.nome }}</div>
+                <div class="small text-muted">
+                    {{ e.data|date:"d/m/Y H:i" }} ·
+                    {% if e.origine == 'self_service' %}fatto da te al self service
+                    {% elif e.origine == 'operatore' %}registrato dall'autolavaggio
+                    {% else %}importato{% endif %}
+                    {% if e.tipo_servizio.punti_salute %}
+                        · <span class="text-success">+{{ e.tipo_servizio.punti_salute }} salute</span>
+                    {% endif %}
+                </div>
+                {% if e.note %}<div class="small">{{ e.note }}</div>{% endif %}
+            </div>
+            {% endfor %}
+        </div>
+        {% else %}
+        <div class="text-center text-muted py-4">
+            <i class="bi bi-journal" style="font-size:2rem; color:#cbd5e1"></i>
+            <p class="mb-0 mt-2">
+                Ancora nessun servizio{% if tipo_sel %} di questo tipo{% endif %} sul libretto.
+                Ogni lavaggio self avviato dall'app e ogni servizio in sede
+                finiranno qui automaticamente.
+            </p>
+        </div>
+        {% endif %}
+    </div>
+
+</div>
+{% endblock %}
