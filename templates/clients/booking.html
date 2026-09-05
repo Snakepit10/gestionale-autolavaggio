@@ -607,6 +607,10 @@ const IS_LOGGED = {% if user.is_authenticated %}true{% else %}false{% endif %};
 let serviziSelezionati = [];
 let dataSelezionata = '';
 let oraSelezionata = '';
+// Orario da preselezionare allo step Data (arriva dal widget della
+// landing via query string ?data=YYYY-MM-DD&ora=HH:MM). Consumato al
+// primo caricamento slot della data richiesta.
+let preselOra = '';
 
 // Lista ordinata delle chiavi degli step (cat-<id>, extra, profumazione,
 // data, conferma). Popolata al DOMContentLoaded leggendo i `.bk-step`
@@ -659,6 +663,11 @@ function goStepKey(key) {
             const t = new Date();
             inp.value = t.toISOString().split('T')[0];
             inp.min = inp.value;
+            caricaSlot();
+        } else if (!oraSelezionata &&
+                   !document.querySelector('#bk-slot-container .slot-pick')) {
+            // Data gia' prefillata (es. dal widget della landing) ma
+            // slot non ancora caricati.
             caricaSlot();
         }
     }
@@ -802,6 +811,14 @@ function caricaSlot() {
             cont.innerHTML = d.slot.map(s =>
                 `<div class="slot-pick" data-ora="${s.ora_inizio}" onclick="selSlot(this)">${s.ora_inizio}</div>`
             ).join('');
+            // Preselezione dal widget della landing (solo primo giro:
+            // se l'orario non c'e' piu', l'utente sceglie a mano).
+            if (preselOra) {
+                const match = cont.querySelector(
+                    `.slot-pick[data-ora="${CSS.escape(preselOra)}"]`);
+                preselOra = '';
+                if (match) selSlot(match);
+            }
         })
         .catch(() => {
             cont.innerHTML = '<div class="text-danger small text-center py-3" style="grid-column:1/-1">Errore caricamento slot</div>';
@@ -856,6 +873,21 @@ document.addEventListener('DOMContentLoaded', function() {
         .filter(Boolean);
     currentStepIdx = 0;
     aggiornaStatoPacchettoAvanti();
+
+    // Prefill data/ora dal widget della landing (?data=...&ora=...):
+    // la data viene messa nell'input dello step Data, l'orario viene
+    // preselezionato appena gli slot di quel giorno sono caricati.
+    const params = new URLSearchParams(location.search);
+    const pData = params.get('data');
+    if (pData && /^\d{4}-\d{2}-\d{2}$/.test(pData)) {
+        const inp = document.getElementById('bk-data');
+        const oggi = new Date().toISOString().split('T')[0];
+        inp.min = oggi;
+        if (pData >= oggi) {
+            inp.value = pData;
+            preselOra = params.get('ora') || '';
+        }
+    }
 });
 
 // Step intermedio: prima di inviare la prenotazione, l'utente deve

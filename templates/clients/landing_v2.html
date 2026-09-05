@@ -700,11 +700,12 @@
             boxOrari.innerHTML = '<span class="vuoto" style="grid-column:1/-1;">' +
                 'Nessun orario libero: prova le frecce per cambiare giorno.</span>';
             conferma.textContent = 'Vedi tutti gli orari →';
+            conferma.href = urlBooking;
             return;
         }
         posti.textContent = slot.length + (slot.length === 1 ? ' posto libero' : ' posti liberi');
         boxOrari.innerHTML = '';
-        slot.slice(0, 3).forEach((s, i) => {
+        slot.forEach((s, i) => {
             const b = document.createElement('button');
             b.type = 'button';
             b.className = 'chip' + (i === 0 ? ' attivo' : '');
@@ -713,11 +714,6 @@
             boxOrari.appendChild(b);
             if (i === 0) seleziona(b, s, true);
         });
-        const altri = document.createElement('a');
-        altri.className = 'chip altri';
-        altri.href = urlBooking;
-        altri.textContent = 'Altri';
-        boxOrari.appendChild(altri);
     }
 
     function seleziona(bottone, slot, primo) {
@@ -726,6 +722,9 @@
             c => c.classList.remove('attivo'));
         bottone.classList.add('attivo');
         conferma.textContent = 'Conferma le ' + slot.ora_inizio + ' →';
+        // Il wizard preseleziona giorno e orario passati in query string
+        conferma.href = urlBooking + '?data=' + dataISO(offset) +
+            '&ora=' + encodeURIComponent(slot.ora_inizio);
     }
 
     function caricaGiorno(nuovoOffset, autoAvanzaSeVuoto) {
@@ -736,6 +735,7 @@
         posti.textContent = '';
         selezionato = null;
         conferma.textContent = 'Prenota ora →';
+        conferma.href = urlBooking;
         boxOrari.innerHTML = '<span class="vuoto" style="grid-column:1/-1;">' +
             'Carico gli orari&hellip;</span>';
         const mioOffset = offset;
