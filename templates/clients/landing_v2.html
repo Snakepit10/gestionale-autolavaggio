@@ -83,16 +83,19 @@
 .hm-book .top .titolo {
     font-size: 12.5px; font-weight: 800; letter-spacing: .12em;
     text-transform: uppercase; color: var(--mw-cyan-dark);
+    min-width: 90px; text-align: center;
 }
 .hm-book .top .posti { font-size: 13px; font-weight: 700; color: #0f7a5a; }
-.hm-book .servizio {
-    background: #fff; border-radius: 12px; padding: 13px 16px;
-    display: flex; justify-content: space-between; align-items: center; gap: 10px;
-    font-size: 14.5px; font-weight: 700; color: var(--mw-ink);
-    box-shadow: 0 1px 4px rgba(14,51,80,.08);
-    margin-bottom: 12px;
+.hm-book .giorno-nav { display: flex; align-items: center; gap: 6px; }
+.hm-book .gn-btn {
+    width: 28px; height: 28px; border: 0; border-radius: 8px;
+    background: #26496b; color: #dbe9f4;
+    font-family: inherit; font-size: 16px; line-height: 1;
+    cursor: pointer; display: flex; align-items: center; justify-content: center;
+    transition: background .15s ease, opacity .15s ease;
 }
-.hm-book .servizio .prezzo { color: var(--mw-cyan-dark); white-space: nowrap; }
+.hm-book .gn-btn:hover:not(:disabled) { background: #2f5a83; color: #fff; }
+.hm-book .gn-btn:disabled { opacity: .35; cursor: default; }
 .hm-book .orari { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; margin-bottom: 12px; }
 .hm-book .chip {
     border: 0; border-radius: 10px; padding: 11px 4px;
@@ -368,12 +371,14 @@
         {% endcomment %}
         <div class="hm-book" id="hm-book">
             <div class="top">
-                <span class="titolo" id="hm-book-titolo">Prenota oggi</span>
+                <div class="giorno-nav">
+                    <button type="button" class="gn-btn" id="hm-book-prev"
+                            aria-label="Giorno precedente">&lsaquo;</button>
+                    <span class="titolo" id="hm-book-titolo">Oggi</span>
+                    <button type="button" class="gn-btn" id="hm-book-next"
+                            aria-label="Giorno successivo">&rsaquo;</button>
+                </div>
                 <span class="posti" id="hm-book-posti"></span>
-            </div>
-            <div class="servizio">
-                <span>Servizio Completo &middot; Interno + esterno</span>
-                <span class="prezzo">da &euro; 22</span>
             </div>
             <div class="orari" id="hm-book-orari">
                 <span class="vuoto" style="grid-column:1/-1;">Carico gli orari&hellip;</span>
@@ -652,14 +657,19 @@
     }
 })();
 
-// === Widget "Prenota oggi": slot reali da /app/api/slot/ ===
+// === Widget "Prenota": giorno navigabile con frecce, slot reali ===
 (function () {
     const boxOrari = document.getElementById('hm-book-orari');
     const titolo = document.getElementById('hm-book-titolo');
     const posti = document.getElementById('hm-book-posti');
     const conferma = document.getElementById('hm-book-conferma');
+    const btnPrev = document.getElementById('hm-book-prev');
+    const btnNext = document.getElementById('hm-book-next');
     const urlBooking = conferma.getAttribute('href');
+    const MAX_OFFSET = 13;          // fino a 2 settimane avanti
+    let offset = 0;                 // 0 = oggi
     let selezionato = null;
+    const cacheSlot = {};           // offset -> lista slot gia' scaricata
 
     function dataISO(offsetGiorni) {
         const d = new Date();
@@ -667,11 +677,28 @@
         return d.toISOString().slice(0, 10);
     }
 
-    function render(slot, labelGiorno) {
-        titolo.textContent = 'Prenota ' + labelGiorno;
+    function labelGiorno(offsetGiorni) {
+        if (offsetGiorni === 0) return 'Oggi';
+        if (offsetGiorni === 1) return 'Domani';
+        const d = new Date();
+        d.setDate(d.getDate() + offsetGiorni);
+        return d.toLocaleDateString('it-IT',
+            { weekday: 'short', day: 'numeric', month: 'short' });
+    }
+
+    function aggiornaFrecce() {
+        btnPrev.disabled = offset <= 0;
+        btnNext.disabled = offset >= MAX_OFFSET;
+    }
+
+    function render(slot) {
+        titolo.textContent = labelGiorno(offset);
+        aggiornaFrecce();
+        selezionato = null;
         if (!slot.length) {
+            posti.textContent = '';
             boxOrari.innerHTML = '<span class="vuoto" style="grid-column:1/-1;">' +
-                'Nessun orario libero: guarda gli altri giorni.</span>';
+                'Nessun orario libero: prova le frecce per cambiare giorno.</span>';
             conferma.textContent = 'Vedi tutti gli orari →';
             return;
         }
@@ -701,18 +728,42 @@
         conferma.textContent = 'Conferma le ' + slot.ora_inizio + ' →';
     }
 
-    fetch('/app/api/slot/?data=' + dataISO(0))
-        .then(r => r.json())
-        .then(d => {
-            if (d.slot && d.slot.length) { render(d.slot, 'oggi'); return null; }
-            return fetch('/app/api/slot/?data=' + dataISO(1))
-                .then(r => r.json())
-                .then(d2 => render((d2.slot || []), 'domani'));
-        })
-        .catch(() => {
-            boxOrari.innerHTML = '';
-            conferma.textContent = 'Prenota ora →';
-        });
+    function caricaGiorno(nuovoOffset, autoAvanzaSeVuoto) {
+        offset = Math.min(Math.max(nuovoOffset, 0), MAX_OFFSET);
+        titolo.textContent = labelGiorno(offset);
+        aggiornaFrecce();
+        if (cacheSlot[offset]) { render(cacheSlot[offset]); return; }
+        posti.textContent = '';
+        selezionato = null;
+        conferma.textContent = 'Prenota ora →';
+        boxOrari.innerHTML = '<span class="vuoto" style="grid-column:1/-1;">' +
+            'Carico gli orari&hellip;</span>';
+        const mioOffset = offset;
+        fetch('/app/api/slot/?data=' + dataISO(mioOffset))
+            .then(r => r.json())
+            .then(d => {
+                const slot = d.slot || [];
+                cacheSlot[mioOffset] = slot;
+                if (mioOffset !== offset) return;   // l'utente ha gia' cambiato giorno
+                if (!slot.length && autoAvanzaSeVuoto && mioOffset < MAX_OFFSET) {
+                    caricaGiorno(mioOffset + 1, false);
+                    return;
+                }
+                render(slot);
+            })
+            .catch(() => {
+                if (mioOffset !== offset) return;
+                boxOrari.innerHTML = '';
+                posti.textContent = '';
+                conferma.textContent = 'Prenota ora →';
+            });
+    }
+
+    btnPrev.addEventListener('click', () => { if (offset > 0) caricaGiorno(offset - 1); });
+    btnNext.addEventListener('click', () => { if (offset < MAX_OFFSET) caricaGiorno(offset + 1); });
+
+    // Primo caricamento: oggi; se oggi e' pieno salta a domani (solo qui).
+    caricaGiorno(0, true);
 })();
 
 // === Install PWA helper (stessa logica della versione precedente) ===
