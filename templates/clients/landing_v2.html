@@ -20,27 +20,105 @@
     position: relative;
     overflow: hidden;
 }
-.hm-hero-inner { padding: 64px 24px 92px; text-align: center; position: relative; z-index: 2; }
+.hm-hero-inner {
+    padding: 56px 24px 80px; position: relative; z-index: 2;
+    max-width: 1080px; margin: 0 auto;
+    display: grid; grid-template-columns: 1.05fr .95fr;
+    gap: 48px; align-items: center;
+}
+@media (max-width: 900px) {
+    .hm-hero-inner { grid-template-columns: 1fr; gap: 36px; text-align: center; }
+    .hm-hero-inner .hm-cta-row, .hm-hero-inner .hm-trust { justify-content: center; }
+    .hm-review-row { justify-content: center; }
+}
 .hm-badge {
     display: inline-flex; align-items: center; gap: 8px;
-    background: rgba(255,255,255,.12);
-    border: 1px solid rgba(255,255,255,.2);
-    color: var(--mw-cyan-light);
+    background: rgba(37, 211, 102, .14);
+    border: 1px solid rgba(37, 211, 102, .4);
+    color: #9df0bd;
     font-size: 13px; font-weight: 700;
     padding: 7px 16px; border-radius: 99px;
     margin-bottom: 22px;
 }
+.hm-badge .dot-verde { color: #25d366; }
+.hm-badge.hm-badge-neutro {
+    background: rgba(255,255,255,.12);
+    border-color: rgba(255,255,255,.2);
+    color: var(--mw-cyan-light);
+}
 .hm-hero h1 {
-    margin: 0 auto; max-width: 760px;
-    font-size: clamp(36px, 5.5vw, 54px);
+    margin: 0;
+    font-size: clamp(36px, 5vw, 54px);
     line-height: 1.06; letter-spacing: -.02em; font-weight: 800;
 }
 .hm-hero h1 .accent { color: var(--mw-cyan); }
 .hm-hero .sub {
-    margin: 22px auto 0; max-width: 520px;
+    margin: 22px 0 0; max-width: 520px;
     font-size: 17px; line-height: 1.6; color: #cfe6f4;
 }
-.hm-cta-row { display: flex; gap: 14px; justify-content: center; margin-top: 32px; flex-wrap: wrap; }
+@media (max-width: 900px) { .hm-hero .sub { margin-inline: auto; } }
+.hm-cta-row { display: flex; gap: 14px; margin-top: 32px; flex-wrap: wrap; }
+.hm-review-row {
+    display: flex; align-items: center; gap: 10px; margin-top: 30px;
+    font-size: 13.5px; font-weight: 700; flex-wrap: wrap;
+}
+.hm-review-row .stelle { color: #ffc107; letter-spacing: 2px; }
+.hm-review-row a { color: #cfe6f4 !important; text-decoration: none; }
+.hm-review-row a:hover { color: #fff !important; }
+
+/* ====== WIDGET PRENOTA OGGI ====== */
+.hm-book {
+    background: rgba(234, 244, 250, .96);
+    border: 1px solid rgba(255,255,255,.35);
+    border-radius: 20px;
+    padding: 24px 22px;
+    color: var(--mw-ink);
+    box-shadow: 0 24px 60px rgba(0, 10, 25, .35);
+    text-align: left;
+}
+.hm-book .top {
+    display: flex; justify-content: space-between; align-items: center;
+    margin-bottom: 14px;
+}
+.hm-book .top .titolo {
+    font-size: 12.5px; font-weight: 800; letter-spacing: .12em;
+    text-transform: uppercase; color: var(--mw-cyan-dark);
+}
+.hm-book .top .posti { font-size: 13px; font-weight: 700; color: #0f7a5a; }
+.hm-book .servizio {
+    background: #fff; border-radius: 12px; padding: 13px 16px;
+    display: flex; justify-content: space-between; align-items: center; gap: 10px;
+    font-size: 14.5px; font-weight: 700; color: var(--mw-ink);
+    box-shadow: 0 1px 4px rgba(14,51,80,.08);
+    margin-bottom: 12px;
+}
+.hm-book .servizio .prezzo { color: var(--mw-cyan-dark); white-space: nowrap; }
+.hm-book .orari { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; margin-bottom: 12px; }
+.hm-book .chip {
+    border: 0; border-radius: 10px; padding: 11px 4px;
+    background: #26496b; color: #dbe9f4;
+    font-family: inherit; font-size: 14px; font-weight: 700;
+    cursor: pointer; text-align: center; text-decoration: none;
+    transition: background .15s ease, transform .15s ease;
+}
+.hm-book .chip:hover { background: #2f5a83; color: #fff; }
+.hm-book .chip.attivo { background: var(--mw-cyan); color: var(--mw-on-cyan); }
+.hm-book .chip.altri { background: #3c5a77; color: #cfe0ee; }
+.hm-book .conferma {
+    display: block; width: 100%;
+    background: #fff; color: var(--mw-navy) !important;
+    border: 0; border-radius: 12px; padding: 14px;
+    font-family: inherit; font-size: 15px; font-weight: 800;
+    text-align: center; text-decoration: none; cursor: pointer;
+    box-shadow: 0 2px 10px rgba(14,51,80,.15);
+    transition: transform .15s ease, box-shadow .15s ease;
+}
+.hm-book .conferma:hover { transform: translateY(-1px); box-shadow: 0 6px 16px rgba(14,51,80,.22); }
+.hm-book .nota {
+    margin: 10px 0 0; text-align: center;
+    font-size: 12.5px; color: var(--mw-ink-soft); font-weight: 600;
+}
+.hm-book .vuoto { text-align: center; color: var(--mw-ink-soft); font-size: 14px; padding: 8px 0 4px; }
 .hm-cta {
     background: var(--mw-cyan); color: var(--mw-on-cyan);
     font-weight: 700; font-size: 15.5px;
@@ -253,23 +331,50 @@
 
 {% block content %}
 
-{# ========== HERO con onda ========== #}
+{# ========== HERO con onda: testo + widget prenota oggi ========== #}
 <section class="hm-hero" id="top">
     <div class="hm-hero-inner">
-        <div class="hm-badge">&#9679; Self service aperto tutti i giorni 7&ndash;22</div>
-        <h1>La tua auto perfetta,<br><span class="accent">quando preferisci tu.</span></h1>
-        <p class="sub">
-            Self service, portali automatici o operatori specializzati.
-            Prenota online e salta la fila.
-        </p>
-        <div class="hm-cta-row">
-            <a href="{% url 'clients:booking' %}" class="hm-cta">Prenota ora</a>
-            <a href="#scarica-app" class="hm-cta-ghost">Scarica l'app</a>
+        <div>
+            <div class="hm-badge" id="hm-badge-orario">
+                <span class="dot-verde">&#9679;</span>
+                <span id="hm-badge-testo">Self service aperto tutti i giorni 7&ndash;22</span>
+            </div>
+            <h1>La tua auto perfetta,<br><span class="accent">quando preferisci tu.</span></h1>
+            <p class="sub">
+                Self service, portali automatici o operatori specializzati.
+                Prenota online e salta la fila.
+            </p>
+            <div class="hm-cta-row">
+                <a href="{% url 'clients:booking' %}" class="hm-cta">Prenota ora &mdash; 2 min</a>
+                <a href="#scarica-app" class="hm-cta-ghost">Scarica l'app</a>
+            </div>
+            <div class="hm-review-row">
+                <span class="stelle" aria-hidden="true">&#9733;&#9733;&#9733;&#9733;&#9733;</span>
+                <a href="https://www.google.com/maps/search/?api=1&query=Autolavaggio+MasterWash+Via+Palma+302+Licata"
+                   target="_blank" rel="noopener">Recensioni Google</a>
+            </div>
         </div>
-        <div class="hm-trust">
-            <span>Via Palma 302, Licata</span><span class="dot">&middot;</span>
-            <span>Area relax e zona bimbi</span><span class="dot">&middot;</span>
-            <span>WiFi gratuito</span>
+
+        {% comment %}
+        Widget prenotazione rapida: slot REALI di oggi (o domani)
+        dall'API /app/api/slot/. Conferma -> wizard prenotazione.
+        {% endcomment %}
+        <div class="hm-book" id="hm-book">
+            <div class="top">
+                <span class="titolo" id="hm-book-titolo">Prenota oggi</span>
+                <span class="posti" id="hm-book-posti"></span>
+            </div>
+            <div class="servizio">
+                <span>Servizio Completo &middot; Interno + esterno</span>
+                <span class="prezzo">da &euro; 22</span>
+            </div>
+            <div class="orari" id="hm-book-orari">
+                <span class="vuoto" style="grid-column:1/-1;">Carico gli orari&hellip;</span>
+            </div>
+            <a href="{% url 'clients:booking' %}" class="conferma" id="hm-book-conferma">
+                Prenota ora &rarr;
+            </a>
+            <p class="nota">Senza registrazione &middot; conferma su WhatsApp</p>
         </div>
     </div>
     <svg class="hm-wave" viewBox="0 0 1080 70" preserveAspectRatio="none" aria-hidden="true">
@@ -526,6 +631,83 @@
 </section>
 
 <script>
+// === Badge orario apertura (self 7-22, ora locale del visitatore) ===
+(function () {
+    const badge = document.getElementById('hm-badge-orario');
+    const testo = document.getElementById('hm-badge-testo');
+    const h = new Date().getHours();
+    if (h >= 7 && h < 22) {
+        testo.textContent = 'Aperto ora · self fino alle 22';
+    } else {
+        badge.classList.add('hm-badge-neutro');
+        badge.querySelector('.dot-verde').style.color = 'currentColor';
+        testo.textContent = 'Self service tutti i giorni 7–22';
+    }
+})();
+
+// === Widget "Prenota oggi": slot reali da /app/api/slot/ ===
+(function () {
+    const boxOrari = document.getElementById('hm-book-orari');
+    const titolo = document.getElementById('hm-book-titolo');
+    const posti = document.getElementById('hm-book-posti');
+    const conferma = document.getElementById('hm-book-conferma');
+    const urlBooking = conferma.getAttribute('href');
+    let selezionato = null;
+
+    function dataISO(offsetGiorni) {
+        const d = new Date();
+        d.setDate(d.getDate() + offsetGiorni);
+        return d.toISOString().slice(0, 10);
+    }
+
+    function render(slot, labelGiorno) {
+        titolo.textContent = 'Prenota ' + labelGiorno;
+        if (!slot.length) {
+            boxOrari.innerHTML = '<span class="vuoto" style="grid-column:1/-1;">' +
+                'Nessun orario libero: guarda gli altri giorni.</span>';
+            conferma.textContent = 'Vedi tutti gli orari →';
+            return;
+        }
+        posti.textContent = slot.length + (slot.length === 1 ? ' posto libero' : ' posti liberi');
+        boxOrari.innerHTML = '';
+        slot.slice(0, 3).forEach((s, i) => {
+            const b = document.createElement('button');
+            b.type = 'button';
+            b.className = 'chip' + (i === 0 ? ' attivo' : '');
+            b.textContent = s.ora_inizio;
+            b.onclick = () => seleziona(b, s);
+            boxOrari.appendChild(b);
+            if (i === 0) seleziona(b, s, true);
+        });
+        const altri = document.createElement('a');
+        altri.className = 'chip altri';
+        altri.href = urlBooking;
+        altri.textContent = 'Altri';
+        boxOrari.appendChild(altri);
+    }
+
+    function seleziona(bottone, slot, primo) {
+        selezionato = slot;
+        document.querySelectorAll('#hm-book-orari .chip').forEach(
+            c => c.classList.remove('attivo'));
+        bottone.classList.add('attivo');
+        conferma.textContent = 'Conferma le ' + slot.ora_inizio + ' →';
+    }
+
+    fetch('/app/api/slot/?data=' + dataISO(0))
+        .then(r => r.json())
+        .then(d => {
+            if (d.slot && d.slot.length) { render(d.slot, 'oggi'); return null; }
+            return fetch('/app/api/slot/?data=' + dataISO(1))
+                .then(r => r.json())
+                .then(d2 => render((d2.slot || []), 'domani'));
+        })
+        .catch(() => {
+            boxOrari.innerHTML = '';
+            conferma.textContent = 'Prenota ora →';
+        });
+})();
+
 // === Install PWA helper (stessa logica della versione precedente) ===
 (function() {
     const heroBtn = null; // il ghost "Scarica l'app" nell'hero e' un'ancora, sempre visibile

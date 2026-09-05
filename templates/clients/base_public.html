@@ -115,19 +115,31 @@
         background: rgba(74, 185, 224, .2);
         color: var(--mw-cyan-light) !important;
     }
-    /* CTA "Registrati": bianco con testo cyan per staccarsi sia dal
-       navy dell'header sia dal cyan del gradient hero subito sotto. */
+    /* CTA header "Prenota ora": ciano brand con testo blu notte. */
     .pub-nav a.btn-primary, .pub-nav a.nav-cta {
-        background: #ffffff;
-        color: var(--mw-cyan-dark) !important;
+        background: var(--mw-cyan);
+        color: var(--mw-on-cyan) !important;
         font-weight: 700;
+        border-radius: 10px;
         box-shadow: 0 2px 8px rgba(0,0,0,.2);
     }
     .pub-nav a.btn-primary:hover, .pub-nav a.nav-cta:hover {
-        background: var(--mw-cyan-light);
-        color: #ffffff !important;
+        background: #6fd0f9;
+        color: var(--mw-on-cyan) !important;
         transform: translateY(-1px);
         box-shadow: 0 4px 12px rgba(0,0,0,.25);
+    }
+    /* Bottone WhatsApp nel nav: pill verde con pallino */
+    .pub-nav a.nav-wa {
+        background: rgba(37, 211, 102, .16);
+        border: 1px solid rgba(37, 211, 102, .45);
+        color: #7ce6a8 !important;
+        font-weight: 700;
+        border-radius: 99px;
+    }
+    .pub-nav a.nav-wa:hover {
+        background: rgba(37, 211, 102, .3);
+        color: #a5f0c4 !important;
     }
 
     /* === Bottom nav mobile === */
@@ -283,6 +295,36 @@
     /* Bordi neutri Bootstrap */
     .border { border-color: var(--mw-line) !important; }
 
+    /* Refresh design 2026 lato client: i bottoni primari Bootstrap
+       usati nelle pagine interne (booking, area, monete, garage)
+       diventano ciano brand con testo blu notte, come le CTA. */
+    .btn-primary {
+        --bs-btn-bg: var(--mw-cyan);
+        --bs-btn-border-color: var(--mw-cyan);
+        --bs-btn-color: var(--mw-on-cyan);
+        --bs-btn-hover-bg: #6fd0f9;
+        --bs-btn-hover-border-color: #6fd0f9;
+        --bs-btn-hover-color: var(--mw-on-cyan);
+        --bs-btn-active-bg: var(--mw-cyan-dark);
+        --bs-btn-active-border-color: var(--mw-cyan-dark);
+        --bs-btn-active-color: #fff;
+        --bs-btn-disabled-bg: var(--mw-cyan);
+        --bs-btn-disabled-border-color: var(--mw-cyan);
+        --bs-btn-disabled-color: var(--mw-on-cyan);
+        font-weight: 700;
+    }
+    .btn-outline-primary {
+        --bs-btn-color: var(--mw-cyan-light);
+        --bs-btn-border-color: var(--mw-cyan);
+        --bs-btn-hover-bg: var(--mw-cyan);
+        --bs-btn-hover-border-color: var(--mw-cyan);
+        --bs-btn-hover-color: var(--mw-on-cyan);
+        --bs-btn-active-bg: var(--mw-cyan);
+        --bs-btn-active-color: var(--mw-on-cyan);
+    }
+    .progress { background-color: rgba(255,255,255,.14); }
+    .progress-bar { background-color: var(--mw-cyan); }
+
     /* Bootstrap btn-outline-* su sfondo dark: assicura contrasto */
     .btn-outline-secondary {
         color: var(--mw-text);
@@ -321,17 +363,20 @@
             <span class="brand-text" style="display:none;">MasterWash</span>
         </a>
         <nav class="pub-nav">
-            <a href="tel:+393792337051" class="hide-mobile" title="Chiama">
-                <i class="bi bi-telephone-fill"></i> 379 233 7051
-            </a>
-            <a href="{% url 'clients:booking' %}" class="hide-mobile">Prenota</a>
+            <a href="{% url 'clients:landing' %}#soluzioni" class="hide-mobile">Soluzioni</a>
+            <a href="{% url 'clients:landing' %}#come-funziona" class="hide-mobile">Come funziona</a>
+            <a href="{% url 'clients:landing' %}#dove-siamo" class="hide-mobile">Dove siamo</a>
             {% if user.is_authenticated %}
                 <a href="{% url 'clients:dashboard' %}" class="hide-mobile">Area cliente</a>
-                <a href="{% url 'auth:client-logout' %}">Esci</a>
+                <a href="{% url 'auth:client-logout' %}" class="hide-mobile">Esci</a>
             {% else %}
                 <a href="{% url 'auth:client-login' %}" class="hide-mobile">Accedi</a>
-                <a href="{% url 'clients:register' %}" class="nav-cta">Registrati</a>
             {% endif %}
+            <a href="https://wa.me/393792337051" target="_blank" rel="noopener"
+               class="nav-wa" title="Scrivici su WhatsApp">
+                <span style="color:#25d366;">&#9679;</span> WhatsApp
+            </a>
+            <a href="{% url 'clients:booking' %}" class="nav-cta">Prenota ora</a>
         </nav>
     </div>
 </header>
