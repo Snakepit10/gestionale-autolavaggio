@@ -347,6 +347,100 @@
         .pub-brand .brand-text { font-size: 1.25rem; }
         .pub-brand img { height: 28px; }
     }
+
+    /* ============================================================
+       TEMA CHIARO (redesign 2026): opt-in per pagina impostando il
+       blocco body_class a "mw-light" nel template figlio. Stessi
+       token della homepage; header, footer e bottom nav restano scuri.
+       ============================================================ */
+    body.mw-light { background: var(--mw-light-bg); color: var(--mw-ink); }
+    /* Rimappa i token dark SOLO dentro il main: i CSS custom dei
+       template interni (booking, monete, garage) che usano
+       --mw-navy-soft/--mw-text/--mw-line si convertono da soli al
+       chiaro, mentre header/footer/bottom-nav (fuori dal main)
+       restano scuri. */
+    body.mw-light main {
+        --mw-bg: var(--mw-light-bg);
+        --mw-navy-soft: #ffffff;
+        --mw-navy-deep: var(--mw-light-bg2);
+        --mw-text: var(--mw-ink);
+        --mw-text-soft: var(--mw-ink-soft);
+        --mw-line: var(--mw-light-line);
+        --mw-cyan-light: var(--mw-cyan-dark);
+    }
+    body.mw-light .pub-card {
+        background: #fff;
+        border: 1px solid var(--mw-light-line);
+        color: var(--mw-ink);
+        box-shadow: 0 2px 10px rgba(14, 51, 80, .06);
+    }
+    body.mw-light .pub-card:hover { box-shadow: 0 8px 20px rgba(14, 51, 80, .1); }
+    body.mw-light .pub-section h2 { color: var(--mw-ink); }
+    body.mw-light .pub-section .lead { color: var(--mw-ink-soft); }
+    body.mw-light .text-muted, body.mw-light .text-secondary { color: var(--mw-ink-soft) !important; }
+    body.mw-light .text-dark { color: var(--mw-ink) !important; }
+    body.mw-light .bg-light, body.mw-light .bg-white {
+        background-color: #fff !important; color: var(--mw-ink);
+    }
+    body.mw-light .form-control, body.mw-light .form-select,
+    body.mw-light textarea.form-control {
+        background-color: #fff;
+        border: 1px solid var(--mw-light-line);
+        color: var(--mw-ink);
+    }
+    body.mw-light .form-control:focus, body.mw-light .form-select:focus {
+        background-color: #fff; color: var(--mw-ink);
+        border-color: var(--mw-cyan);
+        box-shadow: 0 0 0 .2rem rgba(79, 195, 247, .25);
+    }
+    body.mw-light .form-control::placeholder { color: #93a9ba; opacity: 1; }
+    body.mw-light .form-label { color: var(--mw-ink); }
+    body.mw-light .form-text, body.mw-light .form-check-label { color: var(--mw-ink-soft); }
+    body.mw-light .alert-light, body.mw-light .alert-info {
+        background-color: #fff; color: var(--mw-ink);
+        border: 1px solid var(--mw-light-line);
+    }
+    body.mw-light .list-group-item {
+        background-color: #fff; color: var(--mw-ink);
+        border-color: var(--mw-light-line);
+    }
+    body.mw-light .list-group-flush > .list-group-item { background-color: transparent; }
+    body.mw-light .badge.bg-light.text-dark, body.mw-light .badge.bg-light {
+        background-color: var(--mw-light-bg) !important;
+        color: var(--mw-navy) !important;
+        border: 1px solid var(--mw-light-line);
+    }
+    body.mw-light .border { border-color: var(--mw-light-line) !important; }
+    body.mw-light .btn-outline-secondary {
+        color: var(--mw-ink-soft); border-color: #cfdeea;
+    }
+    body.mw-light .btn-outline-secondary:hover {
+        background-color: var(--mw-light-bg2); color: var(--mw-ink);
+        border-color: var(--mw-cyan-dark);
+    }
+    body.mw-light .btn-outline-primary {
+        --bs-btn-color: var(--mw-cyan-dark);
+        --bs-btn-border-color: var(--mw-cyan-dark);
+        --bs-btn-hover-bg: var(--mw-cyan-dark);
+        --bs-btn-hover-border-color: var(--mw-cyan-dark);
+        --bs-btn-hover-color: #fff;
+    }
+    body.mw-light a:not(.btn):not(.btn-cta):not(.pub-brand):not(.nav-link) { color: var(--mw-cyan-dark); }
+    body.mw-light a:not(.btn):not(.btn-cta):not(.pub-brand):not(.nav-link):hover { color: var(--mw-navy); }
+    body.mw-light .text-primary { color: var(--mw-cyan-dark) !important; }
+    body.mw-light .progress { background-color: #dcebf5; }
+    body.mw-light .btn-outline-light {
+        color: var(--mw-navy); border-color: #cfdeea;
+    }
+    body.mw-light .btn-outline-light:hover {
+        background-color: var(--mw-navy); color: #fff; border-color: var(--mw-navy);
+    }
+    /* header/footer/bottom-nav restano scuri: ripristina i loro colori */
+    body.mw-light .pub-footer p, body.mw-light .pub-footer a { color: #cbe2ee; }
+    body.mw-light .pub-footer a:hover { color: var(--mw-cyan-light); }
+    body.mw-light .pub-nav a { color: #ffffff !important; }
+    body.mw-light .pub-nav a.nav-cta { color: var(--mw-on-cyan) !important; }
+    body.mw-light .pub-nav a.nav-wa { color: #7ce6a8 !important; }
     </style>
 
     {% block extra_css %}{% endblock %}

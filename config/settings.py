@@ -305,6 +305,11 @@ PAYPAL_SECRET = os.environ.get('PAYPAL_SECRET', '')
 PAYPAL_BASE_URL = os.environ.get(
     'PAYPAL_BASE_URL', 'https://api-m.sandbox.paypal.com')
 
+# === Recensioni Google sulla landing (Places API) ===
+# Vuoti = la landing mostra il link recensioni senza voto/numero.
+GOOGLE_PLACES_API_KEY = os.environ.get('GOOGLE_PLACES_API_KEY', '')
+GOOGLE_PLACE_ID = os.environ.get('GOOGLE_PLACE_ID', '')
+
 # === Consulente AI marketing (Claude API) ===
 # Chiave da console.anthropic.com. Vuota = la pagina AI mostra le
 # istruzioni di attivazione invece del bottone di analisi.

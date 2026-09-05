@@ -59,7 +59,10 @@ def landing(request):
     Design v2 (approvato 2026-07): il vecchio template resta in
     templates/clients/landing.html come riferimento/rollback.
     """
-    return render(request, 'clients/landing_v2.html', {})
+    from .google_reviews import rating_google
+    return render(request, 'clients/landing_v2.html', {
+        'recensioni': rating_google(),  # None se Places API non configurata
+    })
 
 
 def register(request):

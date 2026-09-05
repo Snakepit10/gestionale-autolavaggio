@@ -351,7 +351,14 @@
             <div class="hm-review-row">
                 <span class="stelle" aria-hidden="true">&#9733;&#9733;&#9733;&#9733;&#9733;</span>
                 <a href="https://www.google.com/maps/search/?api=1&query=Autolavaggio+MasterWash+Via+Palma+302+Licata"
-                   target="_blank" rel="noopener">Recensioni Google</a>
+                   target="_blank" rel="noopener">
+                    {% if recensioni %}
+                        {{ recensioni.rating|floatformat:1 }} su Google &middot;
+                        {{ recensioni.totale }} recension{{ recensioni.totale|pluralize:"e,i" }}
+                    {% else %}
+                        Recensioni Google
+                    {% endif %}
+                </a>
             </div>
         </div>
 
