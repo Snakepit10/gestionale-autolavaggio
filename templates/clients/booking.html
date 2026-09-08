@@ -27,15 +27,14 @@
     transition: background .25s, box-shadow .25s;
 }
 .bk-progress .pi.done {
-    background: linear-gradient(90deg, var(--mw-cyan) 0%, var(--mw-cyan-light) 100%);
-    box-shadow: 0 0 10px rgba(74, 185, 224, .5);
+    background: var(--mw-cyan);
 }
 
 /* Titoli step piu' incisivi (stesso peso del hero v2) */
 .bk-step h3 { font-weight: 900; letter-spacing: -.02em; color: var(--mw-text); }
 
 .servizio-pick {
-    background: linear-gradient(160deg, rgba(255,255,255,.05) 0%, rgba(255,255,255,.015) 100%);
+    background: var(--mw-navy-soft);
     border: 1px solid var(--mw-line);
     border-radius: 16px;
     padding: 16px;
@@ -46,14 +45,13 @@
     align-items: center;
     gap: 12px;
     color: var(--mw-text);
-    backdrop-filter: blur(8px);
 }
 .servizio-pick:hover { transform: translateY(-2px); border-color: rgba(74,185,224,.5); }
 .servizio-pick:active { transform: scale(.985); }
 .servizio-pick.selected {
     border-color: var(--mw-cyan);
-    background: linear-gradient(160deg, rgba(74,185,224,.16) 0%, rgba(74,185,224,.06) 100%);
-    box-shadow: 0 0 0 2px rgba(74,185,224,.25), 0 10px 24px rgba(74,185,224,.18);
+    background: rgba(74, 185, 224, .10);
+    box-shadow: 0 0 0 2px rgba(74,185,224,.25);
 }
 .servizio-pick .titolo { font-weight: 800; color: var(--mw-text); }
 .servizio-pick .meta { font-size: .82rem; color: var(--mw-text-soft); }
@@ -76,23 +74,22 @@
 .slot-pick:active { transform: scale(.95); }
 .slot-pick.selected {
     border-color: transparent;
-    background: linear-gradient(135deg, var(--mw-cyan) 0%, var(--mw-cyan-dark) 100%);
-    color: #fff;
-    box-shadow: 0 8px 20px rgba(74, 185, 224, .45);
+    background: var(--mw-cyan);
+    color: var(--mw-on-cyan);
+    box-shadow: 0 2px 10px rgba(14, 51, 80, .15);
 }
 .slot-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(84px, 1fr)); gap: 10px; }
 
+/* Card riepilogo: navy pieno come la card "premium" della landing
+   (niente gradient). Tinta fissa: i token navy dentro main vengono
+   rimappati al chiaro dal tema mw-light. */
 .bk-summary {
-    position: relative;
-    overflow: hidden;
-    background:
-        radial-gradient(ellipse 70% 90% at 50% -20%, rgba(255,255,255,.18), transparent 60%),
-        linear-gradient(135deg, var(--mw-cyan) 0%, var(--mw-cyan-dark) 100%);
+    background: #0e3350;
     color: #fff;
     padding: 24px;
     border-radius: 20px;
     margin-bottom: 16px;
-    box-shadow: 0 14px 34px rgba(74, 185, 224, .3);
+    box-shadow: 0 10px 24px rgba(14, 51, 80, .18);
 }
 
 .bk-actions {
@@ -106,17 +103,19 @@
     .bk-actions { bottom: 60px; }
 }
 
-/* CTA pill v2 (override locale del .btn-cta di base_public) */
+/* CTA pill (override locale del .btn-cta di base_public): ciano
+   pieno come i bottoni della landing, niente gradient. */
 .bk-actions .btn-cta {
     border-radius: 999px;
     font-weight: 800;
     padding: 15px 30px;
-    background: linear-gradient(135deg, var(--mw-cyan) 0%, var(--mw-cyan-dark) 100%);
-    box-shadow: 0 10px 26px rgba(74,185,224,.4), inset 0 1px 0 rgba(255,255,255,.25);
+    background: var(--mw-cyan);
+    color: var(--mw-on-cyan);
+    box-shadow: 0 2px 10px rgba(14, 51, 80, .15);
     border: 0;
     transition: transform .15s, box-shadow .15s, opacity .15s;
 }
-.bk-actions .btn-cta:hover:not(:disabled) { transform: translateY(-2px); box-shadow: 0 14px 34px rgba(74,185,224,.5); }
+.bk-actions .btn-cta:hover:not(:disabled) { transform: translateY(-2px); box-shadow: 0 6px 16px rgba(14, 51, 80, .22); }
 .bk-actions .btn-cta:disabled { opacity: .45; box-shadow: none; }
 .bk-actions .btn-outline-secondary {
     border-radius: 999px;
