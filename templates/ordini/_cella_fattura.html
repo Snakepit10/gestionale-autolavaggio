@@ -1,25 +1,31 @@
 {% comment %}
 Cella "Fattura" della gestione ordini (inclusa nelle 3 tabelle).
-Badge cliccabile: apre il modal richiesta fattura con targa/matricola/
-nota. Se l'ordine e' gia' dentro una fattura il badge e' bloccato.
+Flag compatto: spuntarlo apre il modal con targa/matricola/nota
+(il flag resta acceso solo se si salva); toglierlo rimuove subito
+la richiesta. La matita riapre il modal per modificare i dati.
+Se l'ordine e' gia' in una fattura il flag e' bloccato.
 {% endcomment %}
-<td class="fattura-cell" data-ordine-id="{{ ordine.pk }}">
+<td class="fattura-cell text-center" data-ordine-id="{{ ordine.pk }}">
     {% if ordine.fattura %}
-        <span class="badge bg-secondary"
-              title="Gia' nella fattura {{ ordine.fattura.numero }}: gestiscila dalla pagina Fatture">
-            <i class="bi bi-receipt"></i> {{ ordine.fattura.numero }}
-        </span>
+        <input type="checkbox" class="form-check-input" checked disabled
+               title="Gia' nella fattura {{ ordine.fattura.numero }}: gestiscila dalla pagina Fatture">
+        <br><small class="text-muted">{{ ordine.fattura.numero }}</small>
     {% elif ordine.stato == 'annullato' %}
         <span class="text-muted">&mdash;</span>
     {% else %}
-        <span class="badge cursor-pointer fattura-badge {% if ordine.richiede_fattura %}bg-warning text-dark{% else %}bg-light text-muted border{% endif %}"
-              onclick="apriModalFattura('{{ ordine.pk }}', this)"
-              data-richiede="{% if ordine.richiede_fattura %}1{% else %}0{% endif %}"
-              data-targa="{{ ordine.fattura_targa }}"
-              data-matricola="{{ ordine.fattura_matricola }}"
-              data-nota="{{ ordine.fattura_nota }}"
-              title="{% if ordine.richiede_fattura %}Richiede fattura: clicca per modificare{% else %}Clicca per richiedere fattura{% endif %}">
-            <i class="bi bi-receipt"></i> Fattura
-        </span>
+        <input type="checkbox" class="form-check-input fattura-check"
+               {% if ordine.richiede_fattura %}checked{% endif %}
+               onchange="cambioFlagFattura(this, '{{ ordine.pk }}')"
+               data-richiede="{% if ordine.richiede_fattura %}1{% else %}0{% endif %}"
+               data-targa="{{ ordine.fattura_targa }}"
+               data-matricola="{{ ordine.fattura_matricola }}"
+               data-nota="{{ ordine.fattura_nota }}"
+               title="Richiede fattura">
+        <a href="#" class="fattura-edit d-block small"
+           {% if not ordine.richiede_fattura %}style="display:none!important"{% endif %}
+           onclick="apriModalFattura('{{ ordine.pk }}', this.previousElementSibling); return false;"
+           title="Modifica targa/matricola/nota">
+            <i class="bi bi-pencil-square"></i>
+        </a>
     {% endif %}
 </td>

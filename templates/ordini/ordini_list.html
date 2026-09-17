@@ -1107,9 +1107,9 @@ function ckEliminaPrenotazione() {
                                     <th>Cliente</th>
                                     <th>Tipo Auto</th>
                                     <th>Servizi</th>
+                                    <th>Fattura</th>
                                     <th>Totale</th>
                                     <th>Pagamento</th>
-                                    <th>Fattura</th>
                                     <th>Stato</th>
                                     <th>Ora di Consegna</th>
                                     <th class="text-center">Avvisa</th>
@@ -1206,6 +1206,7 @@ function ckEliminaPrenotazione() {
                                     {% endif %}
                                 </div>
                             </td>
+                            {% include 'ordini/_cella_fattura.html' %}
                             <td>
                                 <div>
                                     {% if ordine.importo_sconto > 0 %}
@@ -1268,7 +1269,6 @@ function ckEliminaPrenotazione() {
                                     </span>
                                 {% endif %}
                             </td>
-                            {% include 'ordini/_cella_fattura.html' %}
                             <td class="stato-cell">
                                 {% if ordine.stato == 'in_attesa' %}
                                     <span class="badge bg-primary cursor-pointer"
@@ -1380,9 +1380,9 @@ function ckEliminaPrenotazione() {
                                     <th>Cliente</th>
                                     <th>Tipo Auto</th>
                                     <th>Servizi</th>
+                                    <th>Fattura</th>
                                     <th>Totale</th>
                                     <th>Pagamento</th>
-                                    <th>Fattura</th>
                                     <th>Stato</th>
                                     <th>Ora di Consegna</th>
                                     <th>Auto Ritirata</th>
@@ -1477,6 +1477,7 @@ function ckEliminaPrenotazione() {
                                     {% endif %}
                                 </div>
                             </td>
+                            {% include 'ordini/_cella_fattura.html' %}
                             <td>
                                 <div>
                                     {% if ordine.importo_sconto > 0 %}
@@ -1539,7 +1540,6 @@ function ckEliminaPrenotazione() {
                                     </span>
                                 {% endif %}
                             </td>
-                            {% include 'ordini/_cella_fattura.html' %}
                             <td class="stato-cell">
                                 <span class="badge bg-success">
                                     <i class="bi bi-check-circle"></i> Completato
@@ -1626,9 +1626,9 @@ function ckEliminaPrenotazione() {
                                     <th>Cliente</th>
                                     <th>Tipo Auto</th>
                                     <th>Servizi</th>
+                                    <th>Fattura</th>
                                     <th>Totale</th>
                                     <th>Pagamento</th>
-                                    <th>Fattura</th>
                                     <th>Stato</th>
                                     <th>Ora di Consegna</th>
                                     <th>Auto Ritirata</th>
@@ -1723,6 +1723,7 @@ function ckEliminaPrenotazione() {
                                     {% endif %}
                                 </div>
                             </td>
+                            {% include 'ordini/_cella_fattura.html' %}
                             <td>
                                 <div>
                                     {% if ordine.importo_sconto > 0 %}
@@ -1785,7 +1786,6 @@ function ckEliminaPrenotazione() {
                                     </span>
                                 {% endif %}
                             </td>
-                            {% include 'ordini/_cella_fattura.html' %}
                             <td class="stato-cell">
                                 <span class="badge bg-success">
                                     <i class="bi bi-check-circle"></i> Completato
@@ -3764,13 +3764,9 @@ setTimeout(_pollAvvisiStato, 3000);
                 </div>
             </div>
             <div class="modal-footer">
-                <button type="button" class="btn btn-outline-danger me-auto"
-                        id="fat-btn-rimuovi" onclick="salvaRichiestaFattura(false)">
-                    <i class="bi bi-x-circle"></i> Rimuovi richiesta
-                </button>
                 <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Annulla</button>
-                <button type="button" class="btn btn-warning" onclick="salvaRichiestaFattura(true)">
-                    <i class="bi bi-receipt"></i> Richiedi fattura
+                <button type="button" class="btn btn-warning" onclick="salvaRichiestaFattura()">
+                    <i class="bi bi-receipt"></i> Salva richiesta
                 </button>
             </div>
         </div>
@@ -3778,57 +3774,94 @@ setTimeout(_pollAvvisiStato, 3000);
 </div>
 
 <script>
-// Badge "Fattura" -> modal con targa/matricola/nota facoltative.
-// Il badge cliccato viene ricordato per aggiornarlo in place al salvataggio.
-let _fatBadgeCorrente = null;
+// Flag "Fattura" -> spuntandolo si apre il modal con targa/matricola/
+// nota: la richiesta parte solo al salvataggio (chiudere il modal
+// senza salvare riporta il flag spento). Togliere la spunta rimuove
+// subito la richiesta. La matita riapre il modal per modificare.
+let _fatCheckCorrente = null;
 let _fatModal = null;
+let _fatSalvato = false;
 
-function apriModalFattura(ordineId, badge) {
-    _fatBadgeCorrente = badge;
-    document.getElementById('fat-ordine-id').value = ordineId;
-    document.getElementById('fat-targa').value = badge.dataset.targa || '';
-    document.getElementById('fat-matricola').value = badge.dataset.matricola || '';
-    document.getElementById('fat-nota').value = badge.dataset.nota || '';
-    // "Rimuovi richiesta" ha senso solo se il flag e' gia' attivo
-    document.getElementById('fat-btn-rimuovi').style.display =
-        badge.dataset.richiede === '1' ? '' : 'none';
-    if (!_fatModal) _fatModal = new bootstrap.Modal(document.getElementById('modalFattura'));
-    _fatModal.show();
-}
-
-function salvaRichiestaFattura(richiede) {
-    const ordineId = document.getElementById('fat-ordine-id').value;
-    if (!ordineId || !_fatBadgeCorrente) return;
-    fetch(`{% url 'ordini:imposta-richiede-fattura' 0 %}`.replace('0', ordineId), {
+function _fatPostRichiesta(ordineId, payload) {
+    return fetch(`{% url 'ordini:imposta-richiede-fattura' 0 %}`.replace('0', ordineId), {
         method: 'POST',
         headers: {
             'Content-Type': 'application/json',
             'X-CSRFToken': _avvisaCsrf(),
         },
         credentials: 'same-origin',
-        body: JSON.stringify({
-            richiede_fattura: richiede,
-            targa: document.getElementById('fat-targa').value.trim(),
-            matricola: document.getElementById('fat-matricola').value.trim(),
-            nota: document.getElementById('fat-nota').value.trim(),
-        }),
+        body: JSON.stringify(payload),
+    }).then(r => r.json());
+}
+
+function _fatMatita(chk) {
+    return chk.parentElement.querySelector('.fattura-edit');
+}
+
+function cambioFlagFattura(chk, ordineId) {
+    if (chk.checked) {
+        // La spunta diventa definitiva solo se l'operatore salva il modal
+        apriModalFattura(ordineId, chk);
+        return;
+    }
+    _fatPostRichiesta(ordineId, { richiede_fattura: false })
+        .then(d => {
+            if (!d.success) {
+                alert('Errore: ' + (d.error || 'operazione fallita'));
+                chk.checked = true;
+                return;
+            }
+            chk.dataset.richiede = '0';
+            chk.dataset.targa = '';
+            chk.dataset.matricola = '';
+            chk.dataset.nota = '';
+            const matita = _fatMatita(chk);
+            if (matita) matita.style.setProperty('display', 'none', 'important');
+        })
+        .catch(() => { alert('Errore di rete'); chk.checked = true; });
+}
+
+function apriModalFattura(ordineId, chk) {
+    _fatCheckCorrente = chk;
+    _fatSalvato = false;
+    document.getElementById('fat-ordine-id').value = ordineId;
+    document.getElementById('fat-targa').value = chk.dataset.targa || '';
+    document.getElementById('fat-matricola').value = chk.dataset.matricola || '';
+    document.getElementById('fat-nota').value = chk.dataset.nota || '';
+    if (!_fatModal) {
+        _fatModal = new bootstrap.Modal(document.getElementById('modalFattura'));
+        // Chiusura senza salvare: se la richiesta non era gia' attiva
+        // sul server, il flag torna spento.
+        document.getElementById('modalFattura').addEventListener('hidden.bs.modal', () => {
+            if (!_fatSalvato && _fatCheckCorrente
+                && _fatCheckCorrente.dataset.richiede !== '1') {
+                _fatCheckCorrente.checked = false;
+            }
+        });
+    }
+    _fatModal.show();
+}
+
+function salvaRichiestaFattura() {
+    const ordineId = document.getElementById('fat-ordine-id').value;
+    if (!ordineId || !_fatCheckCorrente) return;
+    _fatPostRichiesta(ordineId, {
+        richiede_fattura: true,
+        targa: document.getElementById('fat-targa').value.trim(),
+        matricola: document.getElementById('fat-matricola').value.trim(),
+        nota: document.getElementById('fat-nota').value.trim(),
     })
-    .then(r => r.json())
     .then(d => {
         if (!d.success) { alert('Errore: ' + (d.error || 'salvataggio fallito')); return; }
-        const b = _fatBadgeCorrente;
-        b.dataset.richiede = d.richiede_fattura ? '1' : '0';
-        b.dataset.targa = d.targa;
-        b.dataset.matricola = d.matricola;
-        b.dataset.nota = d.nota;
-        b.classList.toggle('bg-warning', d.richiede_fattura);
-        b.classList.toggle('text-dark', d.richiede_fattura);
-        b.classList.toggle('bg-light', !d.richiede_fattura);
-        b.classList.toggle('text-muted', !d.richiede_fattura);
-        b.classList.toggle('border', !d.richiede_fattura);
-        b.title = d.richiede_fattura
-            ? 'Richiede fattura: clicca per modificare'
-            : 'Clicca per richiedere fattura';
+        _fatSalvato = true;
+        const chk = _fatCheckCorrente;
+        chk.checked = true;
+        chk.dataset.richiede = '1';
+        chk.dataset.targa = d.targa;
+        chk.dataset.matricola = d.matricola;
+        chk.dataset.nota = d.nota;
+        const matita = _fatMatita(chk);
+        if (matita) matita.style.removeProperty('display');
         _fatModal.hide();
     })
     .catch(() => alert('Errore di rete durante il salvataggio'));
