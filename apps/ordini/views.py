@@ -13,6 +13,7 @@ from django.db import transaction
 from django.views.decorators.csrf import csrf_exempt
 import json
 from datetime import timedelta, datetime
+from decimal import Decimal
 from .models import Ordine, ItemOrdine, Pagamento, ConfigurazionePianificazione
 from .forms import OrdineForm, PagamentoForm
 from apps.clienti.models import Cliente
@@ -1107,11 +1108,49 @@ class OrdiniNonPagatiView(LoginRequiredMixin, ListView):
     model = Ordine
     template_name = 'ordini/ordini_non_pagati.html'
     context_object_name = 'ordini'
-    
+
     def get_queryset(self):
         return Ordine.objects.filter(
             stato_pagamento__in=['non_pagato', 'parziale']
-        ).select_related('cliente').order_by('-data_ora')
+        ).select_related('cliente', 'fattura').order_by('-data_ora')
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        ordini = list(context['ordini'])
+
+        # Raggruppa per cliente (ordini anonimi in coda, gruppo a parte);
+        # dentro al gruppo resta l'ordinamento -data_ora della queryset.
+        per_cliente = {}
+        senza_cliente = []
+        for ordine in ordini:
+            if ordine.cliente_id:
+                per_cliente.setdefault(ordine.cliente, []).append(ordine)
+            else:
+                senza_cliente.append(ordine)
+
+        def _gruppo(cliente, lista):
+            return {
+                'cliente': cliente,
+                'ordini': lista,
+                'residuo': sum((o.saldo_dovuto for o in lista), Decimal('0')),
+            }
+
+        gruppi = [_gruppo(c, lst) for c, lst in per_cliente.items()]
+        gruppi.sort(key=lambda g: g['cliente'].nome_completo.lower())
+        if senza_cliente:
+            gruppi.append(_gruppo(None, senza_cliente))
+        context['gruppi_clienti'] = gruppi
+
+        # Statistiche in testa alla pagina (prima restavano a 0)
+        context['totale_non_pagati'] = sum(
+            1 for o in ordini if o.stato_pagamento == 'non_pagato')
+        context['totale_parziali'] = sum(
+            1 for o in ordini if o.stato_pagamento == 'parziale')
+        context['totale_differiti'] = Ordine.objects.filter(
+            stato_pagamento='differito').count()
+        context['importo_totale_crediti'] = sum(
+            (o.saldo_dovuto for o in ordini), Decimal('0'))
+        return context
 
 
 @login_required

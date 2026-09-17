@@ -107,24 +107,58 @@
                             </th>
                             <th>N° Ordine</th>
                             <th>Data</th>
-                            <th>Cliente</th>
                             <th>Totale</th>
                             <th>Pagato</th>
                             <th>Residuo</th>
                             <th>Stato Pagamento</th>
+                            <th>Fattura</th>
                             <th>Scadenza</th>
                             <th>Giorni</th>
                             <th class="text-center">Azioni</th>
                         </tr>
                     </thead>
                     <tbody>
-                        {% for ordine in ordini %}
+                        {% for gruppo in gruppi_clienti %}
+                        {# Riga di intestazione del gruppo cliente #}
+                        <tr class="table-secondary">
+                            <td colspan="11">
+                                <div class="d-flex justify-content-between align-items-center flex-wrap gap-2">
+                                    <span>
+                                        {% if gruppo.cliente %}
+                                            <i class="bi bi-person"></i>
+                                            <strong>{{ gruppo.cliente.nome_completo }}</strong>
+                                            {% if gruppo.cliente.telefono %}
+                                                <small class="text-muted ms-2">
+                                                    <i class="bi bi-telephone"></i> {{ gruppo.cliente.telefono }}
+                                                </small>
+                                            {% endif %}
+                                            {% if gruppo.cliente.email %}
+                                                <small class="text-muted ms-2">
+                                                    <i class="bi bi-envelope"></i> {{ gruppo.cliente.email }}
+                                                </small>
+                                            {% endif %}
+                                        {% else %}
+                                            <i class="bi bi-person-x"></i>
+                                            <strong>Ordini senza cliente</strong>
+                                        {% endif %}
+                                        <span class="badge bg-light text-dark border ms-2">
+                                            {{ gruppo.ordini|length }} ordin{{ gruppo.ordini|length|pluralize:"e,i" }}
+                                        </span>
+                                    </span>
+                                    <span>
+                                        Residuo totale:
+                                        <strong class="text-danger">€{{ gruppo.residuo }}</strong>
+                                    </span>
+                                </div>
+                            </td>
+                        </tr>
+                        {% for ordine in gruppo.ordini %}
                         <tr class="{% if ordine.giorni_scadenza < 0 %}table-danger{% elif ordine.giorni_scadenza <= 7 %}table-warning{% endif %}">
                             <td>
                                 <input type="checkbox" class="ordine-checkbox" value="{{ ordine.pk }}">
                             </td>
                             <td>
-                                <a href="{% url 'ordini:ordine-detail' ordine.pk %}" 
+                                <a href="{% url 'ordini:ordine-detail' ordine.pk %}"
                                    class="text-decoration-none fw-bold">
                                     #{{ ordine.numero_progressivo }}
                                 </a>
@@ -139,25 +173,6 @@
                                     <strong>{{ ordine.data_ora|date:"d/m/Y" }}</strong>
                                     <br><small class="text-muted">{{ ordine.data_ora|date:"H:i" }}</small>
                                 </div>
-                            </td>
-                            <td>
-                                {% if ordine.cliente %}
-                                    <div>
-                                        <strong>{{ ordine.cliente.nome_completo }}</strong>
-                                        <br><small class="text-muted">
-                                            <i class="bi bi-telephone"></i> {{ ordine.cliente.telefono }}
-                                        </small>
-                                        {% if ordine.cliente.email %}
-                                            <br><small class="text-muted">
-                                                <i class="bi bi-envelope"></i> {{ ordine.cliente.email }}
-                                            </small>
-                                        {% endif %}
-                                    </div>
-                                {% else %}
-                                    <span class="text-muted">
-                                        <i class="bi bi-person-x"></i> Anonimo
-                                    </span>
-                                {% endif %}
                             </td>
                             <td>
                                 <strong class="h6">€{{ ordine.totale_finale }}</strong>
@@ -175,9 +190,7 @@
                                 {% endif %}
                             </td>
                             <td>
-                                {% with residuo=ordine.totale_finale|floatformat:2|add:0|add:ordine.importo_pagato %}
-                                    <strong class="text-danger">€{{ residuo|stringformat:"+.2f"|slice:"1:" }}</strong>
-                                {% endwith %}
+                                <strong class="text-danger">€{{ ordine.saldo_dovuto }}</strong>
                             </td>
                             <td>
                                 {% if ordine.stato_pagamento == 'non_pagato' %}
@@ -195,6 +208,21 @@
                                 {% endif %}
                                 {% if ordine.metodo_pagamento %}
                                     <br><small class="text-muted">{{ ordine.metodo_pagamento|title }}</small>
+                                {% endif %}
+                            </td>
+                            <td>
+                                {% if ordine.fattura %}
+                                    <span class="badge bg-secondary"
+                                          title="Ordine nella fattura {{ ordine.fattura.numero }} ({{ ordine.fattura.ragione_sociale }})">
+                                        <i class="bi bi-receipt"></i> {{ ordine.fattura.numero }}
+                                    </span>
+                                    <br><small class="text-muted">{{ ordine.fattura.data|date:"d/m/Y" }}</small>
+                                {% elif ordine.richiede_fattura %}
+                                    <small class="text-warning" title="Richiesta fattura attiva, non ancora raggruppata">
+                                        <i class="bi bi-receipt"></i> richiesta
+                                    </small>
+                                {% else %}
+                                    <span class="text-muted">-</span>
                                 {% endif %}
                             </td>
                             <td>
@@ -253,6 +281,7 @@
                                 </div>
                             </td>
                         </tr>
+                        {% endfor %}
                         {% endfor %}
                     </tbody>
                 </table>
