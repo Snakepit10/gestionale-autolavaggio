@@ -1110,13 +1110,22 @@ class OrdiniNonPagatiView(LoginRequiredMixin, ListView):
     context_object_name = 'ordini'
 
     def get_queryset(self):
+        # Toggle "Mostra archiviati": la pagina mostra o gli ordini
+        # attivi o quelli archiviati a mano, mai insieme.
+        self.mostra_archiviati = self.request.GET.get('archiviati') == '1'
         return Ordine.objects.filter(
-            stato_pagamento__in=['non_pagato', 'parziale']
+            stato_pagamento__in=['non_pagato', 'parziale'],
+            non_pagato_archiviato=self.mostra_archiviati,
         ).select_related('cliente', 'fattura').order_by('-data_ora')
 
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
         ordini = list(context['ordini'])
+        context['mostra_archiviati'] = self.mostra_archiviati
+        context['n_archiviati'] = Ordine.objects.filter(
+            stato_pagamento__in=['non_pagato', 'parziale'],
+            non_pagato_archiviato=True,
+        ).count()
 
         # Raggruppa per cliente (ordini anonimi in coda, gruppo a parte);
         # dentro al gruppo resta l'ordinamento -data_ora della queryset.
@@ -1342,6 +1351,31 @@ def cambia_stato_pagamento(request, pk):
         'success': False,
         'error': 'Metodo non consentito'
     })
+
+
+@login_required
+def archivia_non_pagati(request):
+    """Archivia (o ripristina) piu' ordini dalla pagina non pagati.
+
+    L'ordine resta non pagato: viene solo nascosto dall'elenco.
+    """
+    if request.method != 'POST':
+        return JsonResponse({'success': False, 'error': 'Metodo non consentito'})
+    try:
+        data = json.loads(request.body)
+        ordini_ids = [int(i) for i in data.get('ordini', [])]
+        archivia = bool(data.get('archivia', True))
+    except (json.JSONDecodeError, ValueError, TypeError):
+        return JsonResponse({'success': False, 'error': 'Dati non validi'})
+    if not ordini_ids:
+        return JsonResponse({'success': False,
+                             'error': 'Nessun ordine selezionato'})
+
+    aggiornati = Ordine.objects.filter(
+        pk__in=ordini_ids,
+        stato_pagamento__in=['non_pagato', 'parziale'],
+    ).update(non_pagato_archiviato=archivia)
+    return JsonResponse({'success': True, 'aggiornati': aggiornati})
 
 
 @login_required

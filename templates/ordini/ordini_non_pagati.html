@@ -10,6 +10,15 @@
         Ordini Non Pagati
     </h1>
     <div>
+        {% if mostra_archiviati %}
+            <a href="{% url 'ordini:ordini-non-pagati' %}" class="btn btn-outline-secondary me-2">
+                <i class="bi bi-arrow-left"></i> Torna ai non pagati
+            </a>
+        {% else %}
+            <a href="?archiviati=1" class="btn btn-outline-secondary me-2">
+                <i class="bi bi-archive"></i> Mostra archiviati ({{ n_archiviati }})
+            </a>
+        {% endif %}
         <button class="btn btn-outline-primary me-2" onclick="inviaPromemoria()">
             <i class="bi bi-envelope"></i> Invia Promemoria
         </button>
@@ -18,6 +27,15 @@
         </a>
     </div>
 </div>
+
+{% if mostra_archiviati %}
+<div class="alert alert-secondary">
+    <i class="bi bi-archive"></i>
+    Stai vedendo gli ordini non pagati <strong>archiviati</strong>:
+    sono nascosti dall'elenco principale ma restano non pagati.
+    Selezionali e usa &laquo;Ripristina&raquo; per riportarli in elenco.
+</div>
+{% endif %}
 
 <!-- Statistiche -->
 <div class="row mb-4">
@@ -124,6 +142,10 @@
                             <td colspan="11">
                                 <div class="d-flex justify-content-between align-items-center flex-wrap gap-2">
                                     <span>
+                                        <input type="checkbox" class="form-check-input gruppo-checkbox me-1"
+                                               data-gruppo="{% if gruppo.cliente %}{{ gruppo.cliente.pk }}{% else %}anon{% endif %}"
+                                               onchange="toggleGruppo(this)"
+                                               title="Seleziona tutti gli ordini del cliente">
                                         {% if gruppo.cliente %}
                                             <i class="bi bi-person"></i>
                                             <strong>{{ gruppo.cliente.nome_completo }}</strong>
@@ -155,7 +177,8 @@
                         {% for ordine in gruppo.ordini %}
                         <tr class="{% if ordine.giorni_scadenza < 0 %}table-danger{% elif ordine.giorni_scadenza <= 7 %}table-warning{% endif %}">
                             <td>
-                                <input type="checkbox" class="ordine-checkbox" value="{{ ordine.pk }}">
+                                <input type="checkbox" class="ordine-checkbox" value="{{ ordine.pk }}"
+                                       data-gruppo="{% if gruppo.cliente %}{{ gruppo.cliente.pk }}{% else %}anon{% endif %}">
                             </td>
                             <td>
                                 <a href="{% url 'ordini:ordine-detail' ordine.pk %}"
@@ -296,9 +319,18 @@
                             <button class="btn btn-sm btn-warning me-2" onclick="inviaPromemoriaMassa()" disabled id="btn-promemoria-massa">
                                 <i class="bi bi-envelope"></i> Invia Promemoria
                             </button>
-                            <button class="btn btn-sm btn-info" onclick="esportaSelezionati()" disabled id="btn-esporta">
+                            <button class="btn btn-sm btn-info me-2" onclick="esportaSelezionati()" disabled id="btn-esporta">
                                 <i class="bi bi-download"></i> Esporta
                             </button>
+                            {% if mostra_archiviati %}
+                            <button class="btn btn-sm btn-secondary" onclick="archiviaSelezionati(false)" disabled id="btn-archivia">
+                                <i class="bi bi-arrow-counterclockwise"></i> Ripristina
+                            </button>
+                            {% else %}
+                            <button class="btn btn-sm btn-secondary" onclick="archiviaSelezionati(true)" disabled id="btn-archivia">
+                                <i class="bi bi-archive"></i> Archivia
+                            </button>
+                            {% endif %}
                         </div>
                     </div>
                     <div class="col-md-6 text-end">
@@ -445,16 +477,29 @@
     </div>
 </div>
 
+<form id="npCsrfForm" style="display:none">{% csrf_token %}</form>
 <script>
 // Gestione selezione multipla
 function toggleSelectAll() {
     const selectAll = document.getElementById('select-all');
     const checkboxes = document.querySelectorAll('.ordine-checkbox');
-    
+
     checkboxes.forEach(checkbox => {
         checkbox.checked = selectAll.checked;
     });
-    
+    document.querySelectorAll('.gruppo-checkbox').forEach(chk => {
+        chk.checked = selectAll.checked;
+    });
+
+    aggiornaContatori();
+}
+
+// Checkbox nell'intestazione del gruppo: seleziona/deseleziona tutti
+// gli ordini di quel cliente.
+function toggleGruppo(chkGruppo) {
+    document.querySelectorAll(
+        `.ordine-checkbox[data-gruppo="${chkGruppo.dataset.gruppo}"]`
+    ).forEach(chk => { chk.checked = chkGruppo.checked; });
     aggiornaContatori();
 }
 
@@ -463,16 +508,45 @@ function aggiornaContatori() {
     const contatore = document.getElementById('contatore-selezionati');
     const btnPromemoria = document.getElementById('btn-promemoria-massa');
     const btnEsporta = document.getElementById('btn-esporta');
-    
+    const btnArchivia = document.getElementById('btn-archivia');
+
     contatore.textContent = selezionati.length;
-    
-    if (selezionati.length > 0) {
-        btnPromemoria.disabled = false;
-        btnEsporta.disabled = false;
-    } else {
-        btnPromemoria.disabled = true;
-        btnEsporta.disabled = true;
-    }
+
+    const vuoto = selezionati.length === 0;
+    btnPromemoria.disabled = vuoto;
+    btnEsporta.disabled = vuoto;
+    if (btnArchivia) btnArchivia.disabled = vuoto;
+}
+
+// Archivia (o ripristina) gli ordini selezionati: spariscono
+// dall'elenco corrente ma restano non pagati.
+function archiviaSelezionati(archivia) {
+    const selezionati = Array.from(document.querySelectorAll('.ordine-checkbox:checked'))
+                             .map(cb => cb.value);
+    if (selezionati.length === 0) return;
+    const msg = archivia
+        ? `Archiviare ${selezionati.length} ordin${selezionati.length === 1 ? 'e' : 'i'}? Restano non pagati ma spariscono da questo elenco.`
+        : `Ripristinare ${selezionati.length} ordin${selezionati.length === 1 ? 'e' : 'i'} nell'elenco dei non pagati?`;
+    if (!confirm(msg)) return;
+
+    fetch(`{% url 'ordini:archivia-non-pagati' %}`, {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+            'X-CSRFToken': document.querySelector('#npCsrfForm [name=csrfmiddlewaretoken]').value
+        },
+        credentials: 'same-origin',
+        body: JSON.stringify({ ordini: selezionati, archivia: archivia })
+    })
+    .then(r => r.json())
+    .then(data => {
+        if (data.success) {
+            location.reload();
+        } else {
+            alert('Errore: ' + (data.error || 'operazione fallita'));
+        }
+    })
+    .catch(() => alert('Errore di rete'));
 }
 
 // Aggiungi listener a tutte le checkbox

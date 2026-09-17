@@ -86,6 +86,11 @@ class Ordine(models.Model):
     # Fatture. La FK viene valorizzata quando l'ordine entra in una
     # fattura (SET_NULL: eliminare la fattura libera l'ordine, che col
     # flag ancora attivo torna tra quelli da fatturare).
+    # Archiviazione manuale dalla pagina Ordini non pagati: l'ordine
+    # resta non pagato ma sparisce dall'elenco (recuperabile col
+    # toggle "Mostra archiviati").
+    non_pagato_archiviato = models.BooleanField(default=False)
+
     richiede_fattura = models.BooleanField(default=False)
     fattura = models.ForeignKey(
         'fatture.Fattura', null=True, blank=True,
