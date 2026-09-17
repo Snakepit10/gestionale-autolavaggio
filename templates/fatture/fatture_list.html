@@ -162,6 +162,7 @@
                                 <tr class="small text-muted">
                                     <th style="padding-left:2rem">Ordine</th>
                                     <th>Data</th>
+                                    <th>Tipo auto</th>
                                     <th>Servizi</th>
                                     <th>Targa</th>
                                     <th>Matricola</th>
@@ -177,6 +178,7 @@
                                         <a href="{% url 'ordini:ordine-detail' o.pk %}">#{{ o.numero_progressivo }}</a>
                                     </td>
                                     <td>{{ o.data_ora|date:"d/m/Y H:i" }}</td>
+                                    <td class="small">{{ o.tipo_auto|default:"-" }}</td>
                                     <td class="small">
                                         {% for item in o.items.all %}{{ item.servizio_prodotto.titolo }}{% if not forloop.last %}, {% endif %}{% endfor %}
                                     </td>
