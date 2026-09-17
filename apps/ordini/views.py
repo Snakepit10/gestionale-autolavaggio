@@ -1129,14 +1129,8 @@ class OrdiniNonPagatiView(LoginRequiredMixin, ListView):
 
         # Raggruppa per cliente (ordini anonimi in coda, gruppo a parte);
         # dentro al gruppo resta l'ordinamento -data_ora della queryset.
-        per_cliente = {}
-        senza_cliente = []
-        for ordine in ordini:
-            if ordine.cliente_id:
-                per_cliente.setdefault(ordine.cliente, []).append(ordine)
-            else:
-                senza_cliente.append(ordine)
-
+        # Gli ordini gia' dentro una fattura vanno in una sezione
+        # separata: si saldano di norma dalla pagina Fatture.
         def _gruppo(cliente, lista):
             return {
                 'cliente': cliente,
@@ -1144,11 +1138,24 @@ class OrdiniNonPagatiView(LoginRequiredMixin, ListView):
                 'residuo': sum((o.saldo_dovuto for o in lista), Decimal('0')),
             }
 
-        gruppi = [_gruppo(c, lst) for c, lst in per_cliente.items()]
-        gruppi.sort(key=lambda g: g['cliente'].nome_completo.lower())
-        if senza_cliente:
-            gruppi.append(_gruppo(None, senza_cliente))
-        context['gruppi_clienti'] = gruppi
+        def _raggruppa(lista_ordini):
+            per_cliente = {}
+            senza_cliente = []
+            for ordine in lista_ordini:
+                if ordine.cliente_id:
+                    per_cliente.setdefault(ordine.cliente, []).append(ordine)
+                else:
+                    senza_cliente.append(ordine)
+            gruppi = [_gruppo(c, lst) for c, lst in per_cliente.items()]
+            gruppi.sort(key=lambda g: g['cliente'].nome_completo.lower())
+            if senza_cliente:
+                gruppi.append(_gruppo(None, senza_cliente))
+            return gruppi
+
+        context['gruppi_clienti'] = _raggruppa(
+            [o for o in ordini if not o.fattura_id])
+        context['gruppi_in_fattura'] = _raggruppa(
+            [o for o in ordini if o.fattura_id])
 
         # Statistiche in testa alla pagina (prima restavano a 0)
         context['totale_non_pagati'] = sum(

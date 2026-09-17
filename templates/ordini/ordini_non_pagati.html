@@ -116,6 +116,39 @@
 <div class="card">
     <div class="card-body">
         {% if ordini %}
+            <!-- Azioni di massa: sopra la tabella, sempre visibili.
+                 I bottoni si attivano selezionando gli ordini (checkbox
+                 di riga o di gruppo cliente). -->
+            <div class="border-bottom pb-3 mb-3">
+                <div class="row align-items-center">
+                    <div class="col-md-8">
+                        <div class="d-flex align-items-center flex-wrap gap-2">
+                            <strong class="me-1">Azioni sui selezionati:</strong>
+                            {% if mostra_archiviati %}
+                            <button class="btn btn-sm btn-secondary" onclick="archiviaSelezionati(false)" disabled id="btn-archivia">
+                                <i class="bi bi-arrow-counterclockwise"></i> Ripristina
+                            </button>
+                            {% else %}
+                            <button class="btn btn-sm btn-dark" onclick="archiviaSelezionati(true)" disabled id="btn-archivia">
+                                <i class="bi bi-archive"></i> Archivia
+                            </button>
+                            {% endif %}
+                            <button class="btn btn-sm btn-warning" onclick="inviaPromemoriaMassa()" disabled id="btn-promemoria-massa">
+                                <i class="bi bi-envelope"></i> Invia Promemoria
+                            </button>
+                            <button class="btn btn-sm btn-info" onclick="esportaSelezionati()" disabled id="btn-esporta">
+                                <i class="bi bi-download"></i> Esporta
+                            </button>
+                        </div>
+                    </div>
+                    <div class="col-md-4 text-end">
+                        <small class="text-muted">
+                            <span id="contatore-selezionati">0</span> ordini selezionati
+                        </small>
+                    </div>
+                </div>
+            </div>
+
             <div class="table-responsive">
                 <table class="table table-hover">
                     <thead class="table-dark">
@@ -137,210 +170,50 @@
                     </thead>
                     <tbody>
                         {% for gruppo in gruppi_clienti %}
-                        {# Riga di intestazione del gruppo cliente #}
-                        <tr class="table-secondary">
-                            <td colspan="11">
-                                <div class="d-flex justify-content-between align-items-center flex-wrap gap-2">
-                                    <span>
-                                        <input type="checkbox" class="form-check-input gruppo-checkbox me-1"
-                                               data-gruppo="{% if gruppo.cliente %}{{ gruppo.cliente.pk }}{% else %}anon{% endif %}"
-                                               onchange="toggleGruppo(this)"
-                                               title="Seleziona tutti gli ordini del cliente">
-                                        {% if gruppo.cliente %}
-                                            <i class="bi bi-person"></i>
-                                            <strong>{{ gruppo.cliente.nome_completo }}</strong>
-                                            {% if gruppo.cliente.telefono %}
-                                                <small class="text-muted ms-2">
-                                                    <i class="bi bi-telephone"></i> {{ gruppo.cliente.telefono }}
-                                                </small>
-                                            {% endif %}
-                                            {% if gruppo.cliente.email %}
-                                                <small class="text-muted ms-2">
-                                                    <i class="bi bi-envelope"></i> {{ gruppo.cliente.email }}
-                                                </small>
-                                            {% endif %}
-                                        {% else %}
-                                            <i class="bi bi-person-x"></i>
-                                            <strong>Ordini senza cliente</strong>
-                                        {% endif %}
-                                        <span class="badge bg-light text-dark border ms-2">
-                                            {{ gruppo.ordini|length }} ordin{{ gruppo.ordini|length|pluralize:"e,i" }}
-                                        </span>
-                                    </span>
-                                    <span>
-                                        Residuo totale:
-                                        <strong class="text-danger">€{{ gruppo.residuo }}</strong>
-                                    </span>
-                                </div>
-                            </td>
-                        </tr>
-                        {% for ordine in gruppo.ordini %}
-                        <tr class="{% if ordine.giorni_scadenza < 0 %}table-danger{% elif ordine.giorni_scadenza <= 7 %}table-warning{% endif %}">
-                            <td>
-                                <input type="checkbox" class="ordine-checkbox" value="{{ ordine.pk }}"
-                                       data-gruppo="{% if gruppo.cliente %}{{ gruppo.cliente.pk }}{% else %}anon{% endif %}">
-                            </td>
-                            <td>
-                                <a href="{% url 'ordini:ordine-detail' ordine.pk %}"
-                                   class="text-decoration-none fw-bold">
-                                    #{{ ordine.numero_progressivo }}
-                                </a>
-                                {% if ordine.origine != 'operatore' %}
-                                    <br><small class="text-muted">
-                                        <i class="bi bi-globe"></i> {{ ordine.get_origine_display }}
-                                    </small>
-                                {% endif %}
-                            </td>
-                            <td>
-                                <div>
-                                    <strong>{{ ordine.data_ora|date:"d/m/Y" }}</strong>
-                                    <br><small class="text-muted">{{ ordine.data_ora|date:"H:i" }}</small>
-                                </div>
-                            </td>
-                            <td>
-                                <strong class="h6">€{{ ordine.totale_finale }}</strong>
-                                {% if ordine.importo_sconto > 0 %}
-                                    <br><small class="text-success">
-                                        <i class="bi bi-percent"></i> -€{{ ordine.importo_sconto }}
-                                    </small>
-                                {% endif %}
-                            </td>
-                            <td>
-                                {% if ordine.importo_pagato > 0 %}
-                                    <strong class="text-info">€{{ ordine.importo_pagato }}</strong>
-                                {% else %}
-                                    <span class="text-muted">€0.00</span>
-                                {% endif %}
-                            </td>
-                            <td>
-                                <strong class="text-danger">€{{ ordine.saldo_dovuto }}</strong>
-                            </td>
-                            <td>
-                                {% if ordine.stato_pagamento == 'non_pagato' %}
-                                    <span class="badge bg-danger">
-                                        <i class="bi bi-x-circle"></i> Non Pagato
-                                    </span>
-                                {% elif ordine.stato_pagamento == 'parziale' %}
-                                    <span class="badge bg-warning">
-                                        <i class="bi bi-clock"></i> Parziale
-                                    </span>
-                                {% elif ordine.stato_pagamento == 'differito' %}
-                                    <span class="badge bg-info">
-                                        <i class="bi bi-calendar"></i> Differito
-                                    </span>
-                                {% endif %}
-                                {% if ordine.metodo_pagamento %}
-                                    <br><small class="text-muted">{{ ordine.metodo_pagamento|title }}</small>
-                                {% endif %}
-                            </td>
-                            <td>
-                                {% if ordine.fattura %}
-                                    <span class="badge bg-secondary"
-                                          title="Ordine nella fattura {{ ordine.fattura.numero }} ({{ ordine.fattura.ragione_sociale }})">
-                                        <i class="bi bi-receipt"></i> {{ ordine.fattura.numero }}
-                                    </span>
-                                    <br><small class="text-muted">{{ ordine.fattura.data|date:"d/m/Y" }}</small>
-                                {% elif ordine.richiede_fattura %}
-                                    <small class="text-warning" title="Richiesta fattura attiva, non ancora raggruppata">
-                                        <i class="bi bi-receipt"></i> richiesta
-                                    </small>
-                                {% else %}
-                                    <span class="text-muted">-</span>
-                                {% endif %}
-                            </td>
-                            <td>
-                                {% if ordine.data_scadenza_pagamento %}
-                                    <div>
-                                        <strong>{{ ordine.data_scadenza_pagamento|date:"d/m/Y" }}</strong>
-                                    </div>
-                                {% else %}
-                                    <span class="text-muted">Non impostata</span>
-                                {% endif %}
-                            </td>
-                            <td>
-                                {% if ordine.giorni_scadenza %}
-                                    {% if ordine.giorni_scadenza < 0 %}
-                                        <span class="badge bg-danger">
-                                            <i class="bi bi-exclamation-triangle"></i>
-                                            {{ ordine.giorni_scadenza|stringformat:"+d"|slice:"1:" }} giorni fa
-                                        </span>
-                                    {% elif ordine.giorni_scadenza <= 7 %}
-                                        <span class="badge bg-warning">
-                                            <i class="bi bi-clock"></i>
-                                            {{ ordine.giorni_scadenza }} giorni
-                                        </span>
-                                    {% else %}
-                                        <span class="badge bg-success">
-                                            {{ ordine.giorni_scadenza }} giorni
-                                        </span>
-                                    {% endif %}
-                                {% else %}
-                                    <span class="text-muted">-</span>
-                                {% endif %}
-                            </td>
-                            <td class="text-center">
-                                <div class="btn-group" role="group">
-                                    <button class="btn btn-sm btn-success" 
-                                            onclick="registraPagamento('{{ ordine.pk }}')"
-                                            title="Registra Pagamento">
-                                        <i class="bi bi-credit-card"></i>
-                                    </button>
-                                    <a href="{% url 'ordini:ordine-detail' ordine.pk %}" 
-                                       class="btn btn-sm btn-outline-primary" title="Dettagli">
-                                        <i class="bi bi-eye"></i>
-                                    </a>
-                                    {% if ordine.cliente and ordine.cliente.email %}
-                                        <button class="btn btn-sm btn-outline-info" 
-                                                onclick="inviaPromemoriaSingolo('{{ ordine.pk }}')"
-                                                title="Invia Promemoria">
-                                            <i class="bi bi-envelope"></i>
-                                        </button>
-                                    {% endif %}
-                                    <button class="btn btn-sm btn-outline-secondary" 
-                                            onclick="impostaScadenza('{{ ordine.pk }}')"
-                                            title="Imposta Scadenza">
-                                        <i class="bi bi-calendar"></i>
-                                    </button>
-                                </div>
-                            </td>
-                        </tr>
-                        {% endfor %}
+                        {% include 'ordini/_gruppo_non_pagato.html' with sezione='att' %}
+                        {% empty %}
+                        <tr><td colspan="11" class="text-muted text-center py-3">
+                            Nessun ordine da incassare fuori fattura.
+                        </td></tr>
                         {% endfor %}
                     </tbody>
                 </table>
             </div>
-            
-            <!-- Azioni di massa -->
-            <div class="border-top pt-3">
-                <div class="row align-items-center">
-                    <div class="col-md-6">
-                        <div class="d-flex align-items-center">
-                            <strong class="me-3">Azioni selezionate:</strong>
-                            <button class="btn btn-sm btn-warning me-2" onclick="inviaPromemoriaMassa()" disabled id="btn-promemoria-massa">
-                                <i class="bi bi-envelope"></i> Invia Promemoria
-                            </button>
-                            <button class="btn btn-sm btn-info me-2" onclick="esportaSelezionati()" disabled id="btn-esporta">
-                                <i class="bi bi-download"></i> Esporta
-                            </button>
-                            {% if mostra_archiviati %}
-                            <button class="btn btn-sm btn-secondary" onclick="archiviaSelezionati(false)" disabled id="btn-archivia">
-                                <i class="bi bi-arrow-counterclockwise"></i> Ripristina
-                            </button>
-                            {% else %}
-                            <button class="btn btn-sm btn-secondary" onclick="archiviaSelezionati(true)" disabled id="btn-archivia">
-                                <i class="bi bi-archive"></i> Archivia
-                            </button>
-                            {% endif %}
-                        </div>
-                    </div>
-                    <div class="col-md-6 text-end">
-                        <small class="text-muted">
-                            <span id="contatore-selezionati">0</span> ordini selezionati
-                        </small>
-                    </div>
-                </div>
+
+            {# Sezione separata: non pagati gia' raggruppati in una fattura #}
+            {% if gruppi_in_fattura %}
+            <h5 class="mt-4 mb-1"><i class="bi bi-receipt"></i> Non pagati gia' in fattura</h5>
+            <p class="text-muted small mb-2">
+                Ordini in attesa di pagamento gia' dentro una fattura:
+                di norma si saldano dalla pagina Fatture con
+                &laquo;Segna pagata&raquo;.
+            </p>
+            <div class="table-responsive">
+                <table class="table table-hover">
+                    <thead class="table-dark">
+                        <tr>
+                            <th></th>
+                            <th>N° Ordine</th>
+                            <th>Data</th>
+                            <th>Totale</th>
+                            <th>Pagato</th>
+                            <th>Residuo</th>
+                            <th>Stato Pagamento</th>
+                            <th>Fattura</th>
+                            <th>Scadenza</th>
+                            <th>Giorni</th>
+                            <th class="text-center">Azioni</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for gruppo in gruppi_in_fattura %}
+                        {% include 'ordini/_gruppo_non_pagato.html' with sezione='fat' %}
+                        {% endfor %}
+                    </tbody>
+                </table>
             </div>
-            
+            {% endif %}
+
             <!-- Paginazione -->
             {% if is_paginated %}
                 <nav aria-label="Paginazione ordini" class="mt-4">
@@ -523,11 +396,21 @@ function aggiornaContatori() {
 function archiviaSelezionati(archivia) {
     const selezionati = Array.from(document.querySelectorAll('.ordine-checkbox:checked'))
                              .map(cb => cb.value);
-    if (selezionati.length === 0) return;
+    _archiviaOrdini(selezionati, archivia);
+}
+
+// Bottone archivio sulla singola riga ordine
+function archiviaSingolo(ordineId, archivia) {
+    _archiviaOrdini([ordineId], archivia);
+}
+
+function _archiviaOrdini(ids, archivia) {
+    if (ids.length === 0) return;
     const msg = archivia
-        ? `Archiviare ${selezionati.length} ordin${selezionati.length === 1 ? 'e' : 'i'}? Restano non pagati ma spariscono da questo elenco.`
-        : `Ripristinare ${selezionati.length} ordin${selezionati.length === 1 ? 'e' : 'i'} nell'elenco dei non pagati?`;
+        ? `Archiviare ${ids.length} ordin${ids.length === 1 ? 'e' : 'i'}? Restano non pagati ma spariscono da questo elenco.`
+        : `Ripristinare ${ids.length} ordin${ids.length === 1 ? 'e' : 'i'} nell'elenco dei non pagati?`;
     if (!confirm(msg)) return;
+    const selezionati = ids;
 
     fetch(`{% url 'ordini:archivia-non-pagati' %}`, {
         method: 'POST',

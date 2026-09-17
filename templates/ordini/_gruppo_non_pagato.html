@@ -1,0 +1,189 @@
+{% comment %}
+Un gruppo cliente della pagina Ordini non pagati: riga intestazione
++ righe ordine. Variabili attese:
+  gruppo   -> {cliente, ordini, residuo}
+  sezione  -> prefisso per data-gruppo ('att' elenco principale,
+              'fat' sezione ordini gia' in fattura) cosi' la checkbox
+              di gruppo non incrocia le due tabelle
+  mostra_archiviati -> il bottone riga diventa Ripristina
+{% endcomment %}
+<tr class="table-secondary">
+    <td colspan="11">
+        <div class="d-flex justify-content-between align-items-center flex-wrap gap-2">
+            <span>
+                <input type="checkbox" class="form-check-input gruppo-checkbox me-1"
+                       data-gruppo="{{ sezione }}-{% if gruppo.cliente %}{{ gruppo.cliente.pk }}{% else %}anon{% endif %}"
+                       onchange="toggleGruppo(this)"
+                       title="Seleziona tutti gli ordini del cliente">
+                {% if gruppo.cliente %}
+                    <i class="bi bi-person"></i>
+                    <strong>{{ gruppo.cliente.nome_completo }}</strong>
+                    {% if gruppo.cliente.telefono %}
+                        <small class="text-muted ms-2">
+                            <i class="bi bi-telephone"></i> {{ gruppo.cliente.telefono }}
+                        </small>
+                    {% endif %}
+                    {% if gruppo.cliente.email %}
+                        <small class="text-muted ms-2">
+                            <i class="bi bi-envelope"></i> {{ gruppo.cliente.email }}
+                        </small>
+                    {% endif %}
+                {% else %}
+                    <i class="bi bi-person-x"></i>
+                    <strong>Ordini senza cliente</strong>
+                {% endif %}
+                <span class="badge bg-light text-dark border ms-2">
+                    {{ gruppo.ordini|length }} ordin{{ gruppo.ordini|length|pluralize:"e,i" }}
+                </span>
+            </span>
+            <span>
+                Residuo totale:
+                <strong class="text-danger">€{{ gruppo.residuo }}</strong>
+            </span>
+        </div>
+    </td>
+</tr>
+{% for ordine in gruppo.ordini %}
+<tr class="{% if ordine.giorni_scadenza < 0 %}table-danger{% elif ordine.giorni_scadenza <= 7 %}table-warning{% endif %}">
+    <td>
+        <input type="checkbox" class="ordine-checkbox" value="{{ ordine.pk }}"
+               data-gruppo="{{ sezione }}-{% if gruppo.cliente %}{{ gruppo.cliente.pk }}{% else %}anon{% endif %}">
+    </td>
+    <td>
+        <a href="{% url 'ordini:ordine-detail' ordine.pk %}"
+           class="text-decoration-none fw-bold">
+            #{{ ordine.numero_progressivo }}
+        </a>
+        {% if ordine.origine != 'operatore' %}
+            <br><small class="text-muted">
+                <i class="bi bi-globe"></i> {{ ordine.get_origine_display }}
+            </small>
+        {% endif %}
+    </td>
+    <td>
+        <div>
+            <strong>{{ ordine.data_ora|date:"d/m/Y" }}</strong>
+            <br><small class="text-muted">{{ ordine.data_ora|date:"H:i" }}</small>
+        </div>
+    </td>
+    <td>
+        <strong class="h6">€{{ ordine.totale_finale }}</strong>
+        {% if ordine.importo_sconto > 0 %}
+            <br><small class="text-success">
+                <i class="bi bi-percent"></i> -€{{ ordine.importo_sconto }}
+            </small>
+        {% endif %}
+    </td>
+    <td>
+        {% if ordine.importo_pagato > 0 %}
+            <strong class="text-info">€{{ ordine.importo_pagato }}</strong>
+        {% else %}
+            <span class="text-muted">€0.00</span>
+        {% endif %}
+    </td>
+    <td>
+        <strong class="text-danger">€{{ ordine.saldo_dovuto }}</strong>
+    </td>
+    <td>
+        {% if ordine.stato_pagamento == 'non_pagato' %}
+            <span class="badge bg-danger">
+                <i class="bi bi-x-circle"></i> Non Pagato
+            </span>
+        {% elif ordine.stato_pagamento == 'parziale' %}
+            <span class="badge bg-warning">
+                <i class="bi bi-clock"></i> Parziale
+            </span>
+        {% elif ordine.stato_pagamento == 'differito' %}
+            <span class="badge bg-info">
+                <i class="bi bi-calendar"></i> Differito
+            </span>
+        {% endif %}
+        {% if ordine.metodo_pagamento %}
+            <br><small class="text-muted">{{ ordine.metodo_pagamento|title }}</small>
+        {% endif %}
+    </td>
+    <td>
+        {% if ordine.fattura %}
+            <span class="badge bg-secondary"
+                  title="Ordine nella fattura {{ ordine.fattura.numero }} ({{ ordine.fattura.ragione_sociale }})">
+                <i class="bi bi-receipt"></i> {{ ordine.fattura.numero }}
+            </span>
+            <br><small class="text-muted">{{ ordine.fattura.data|date:"d/m/Y" }}</small>
+        {% elif ordine.richiede_fattura %}
+            <small class="text-warning" title="Richiesta fattura attiva, non ancora raggruppata">
+                <i class="bi bi-receipt"></i> richiesta
+            </small>
+        {% else %}
+            <span class="text-muted">-</span>
+        {% endif %}
+    </td>
+    <td>
+        {% if ordine.data_scadenza_pagamento %}
+            <div>
+                <strong>{{ ordine.data_scadenza_pagamento|date:"d/m/Y" }}</strong>
+            </div>
+        {% else %}
+            <span class="text-muted">Non impostata</span>
+        {% endif %}
+    </td>
+    <td>
+        {% if ordine.giorni_scadenza %}
+            {% if ordine.giorni_scadenza < 0 %}
+                <span class="badge bg-danger">
+                    <i class="bi bi-exclamation-triangle"></i>
+                    {{ ordine.giorni_scadenza|stringformat:"+d"|slice:"1:" }} giorni fa
+                </span>
+            {% elif ordine.giorni_scadenza <= 7 %}
+                <span class="badge bg-warning">
+                    <i class="bi bi-clock"></i>
+                    {{ ordine.giorni_scadenza }} giorni
+                </span>
+            {% else %}
+                <span class="badge bg-success">
+                    {{ ordine.giorni_scadenza }} giorni
+                </span>
+            {% endif %}
+        {% else %}
+            <span class="text-muted">-</span>
+        {% endif %}
+    </td>
+    <td class="text-center">
+        <div class="btn-group" role="group">
+            <button class="btn btn-sm btn-success"
+                    onclick="registraPagamento('{{ ordine.pk }}')"
+                    title="Registra Pagamento">
+                <i class="bi bi-credit-card"></i>
+            </button>
+            <a href="{% url 'ordini:ordine-detail' ordine.pk %}"
+               class="btn btn-sm btn-outline-primary" title="Dettagli">
+                <i class="bi bi-eye"></i>
+            </a>
+            {% if ordine.cliente and ordine.cliente.email %}
+                <button class="btn btn-sm btn-outline-info"
+                        onclick="inviaPromemoriaSingolo('{{ ordine.pk }}')"
+                        title="Invia Promemoria">
+                    <i class="bi bi-envelope"></i>
+                </button>
+            {% endif %}
+            <button class="btn btn-sm btn-outline-secondary"
+                    onclick="impostaScadenza('{{ ordine.pk }}')"
+                    title="Imposta Scadenza">
+                <i class="bi bi-calendar"></i>
+            </button>
+            {% if mostra_archiviati %}
+                <button class="btn btn-sm btn-outline-dark"
+                        onclick="archiviaSingolo('{{ ordine.pk }}', false)"
+                        title="Ripristina nell'elenco non pagati">
+                    <i class="bi bi-arrow-counterclockwise"></i>
+                </button>
+            {% else %}
+                <button class="btn btn-sm btn-outline-dark"
+                        onclick="archiviaSingolo('{{ ordine.pk }}', true)"
+                        title="Archivia: nascondi da questo elenco">
+                    <i class="bi bi-archive"></i>
+                </button>
+            {% endif %}
+        </div>
+    </td>
+</tr>
+{% endfor %}
