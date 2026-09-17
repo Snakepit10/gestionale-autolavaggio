@@ -807,7 +807,7 @@ class OrdiniListView(LoginRequiredMixin, ListView):
 
         # Query base per tutti gli ordini del giorno selezionato
         queryset = Ordine.objects.select_related(
-            'cliente', 'operatore', 'prenotazione'
+            'cliente', 'operatore', 'prenotazione', 'fattura'
         ).prefetch_related(
             'items__servizio_prodotto', 'items__postazione_cq', 'items__aggiunto_da', 'pagamenti'
         ).filter(data_ora__date=data)
@@ -1302,6 +1302,51 @@ def cambia_stato_pagamento(request, pk):
     return JsonResponse({
         'success': False,
         'error': 'Metodo non consentito'
+    })
+
+
+@login_required
+def imposta_richiede_fattura(request, pk):
+    """Imposta/rimuove la richiesta fattura di un ordine, con i dati
+    facoltativi (targa, matricola, nota) mostrati nella pagina Fatture."""
+    ordine = get_object_or_404(Ordine, pk=pk)
+
+    if request.method != 'POST':
+        return JsonResponse({'success': False, 'error': 'Metodo non consentito'})
+    if ordine.fattura_id:
+        return JsonResponse({
+            'success': False,
+            'error': f'Ordine gia\' nella fattura {ordine.fattura.numero}: '
+                     'rimuovilo dalla pagina Fatture.'})
+    if ordine.stato == 'annullato':
+        return JsonResponse({'success': False,
+                             'error': 'Ordine annullato, non fatturabile'})
+
+    try:
+        data = json.loads(request.body)
+    except json.JSONDecodeError:
+        return JsonResponse({'success': False, 'error': 'Dati JSON non validi'})
+
+    richiede = bool(data.get('richiede_fattura'))
+    ordine.richiede_fattura = richiede
+    if richiede:
+        ordine.fattura_targa = (data.get('targa') or '').strip().upper()[:10]
+        ordine.fattura_matricola = (data.get('matricola') or '').strip()[:50]
+        ordine.fattura_nota = (data.get('nota') or '').strip()
+    else:
+        # Togliere la richiesta azzera anche i dati raccolti
+        ordine.fattura_targa = ''
+        ordine.fattura_matricola = ''
+        ordine.fattura_nota = ''
+    ordine.save(update_fields=['richiede_fattura', 'fattura_targa',
+                               'fattura_matricola', 'fattura_nota'])
+
+    return JsonResponse({
+        'success': True,
+        'richiede_fattura': ordine.richiede_fattura,
+        'targa': ordine.fattura_targa,
+        'matricola': ordine.fattura_matricola,
+        'nota': ordine.fattura_nota,
     })
 
 

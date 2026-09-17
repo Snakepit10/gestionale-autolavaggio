@@ -1,0 +1,11 @@
+from django.contrib import admin
+
+from .models import Fattura
+
+
+@admin.register(Fattura)
+class FatturaAdmin(admin.ModelAdmin):
+    list_display = ['numero', 'data', 'ragione_sociale', 'cliente', 'stato']
+    list_filter = ['stato', 'data']
+    search_fields = ['numero', 'ragione_sociale']
+    date_hierarchy = 'data'

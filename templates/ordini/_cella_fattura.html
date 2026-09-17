@@ -1,0 +1,25 @@
+{% comment %}
+Cella "Fattura" della gestione ordini (inclusa nelle 3 tabelle).
+Badge cliccabile: apre il modal richiesta fattura con targa/matricola/
+nota. Se l'ordine e' gia' dentro una fattura il badge e' bloccato.
+{% endcomment %}
+<td class="fattura-cell" data-ordine-id="{{ ordine.pk }}">
+    {% if ordine.fattura %}
+        <span class="badge bg-secondary"
+              title="Gia' nella fattura {{ ordine.fattura.numero }}: gestiscila dalla pagina Fatture">
+            <i class="bi bi-receipt"></i> {{ ordine.fattura.numero }}
+        </span>
+    {% elif ordine.stato == 'annullato' %}
+        <span class="text-muted">&mdash;</span>
+    {% else %}
+        <span class="badge cursor-pointer fattura-badge {% if ordine.richiede_fattura %}bg-warning text-dark{% else %}bg-light text-muted border{% endif %}"
+              onclick="apriModalFattura('{{ ordine.pk }}', this)"
+              data-richiede="{% if ordine.richiede_fattura %}1{% else %}0{% endif %}"
+              data-targa="{{ ordine.fattura_targa }}"
+              data-matricola="{{ ordine.fattura_matricola }}"
+              data-nota="{{ ordine.fattura_nota }}"
+              title="{% if ordine.richiede_fattura %}Richiede fattura: clicca per modificare{% else %}Clicca per richiedere fattura{% endif %}">
+            <i class="bi bi-receipt"></i> Fattura
+        </span>
+    {% endif %}
+</td>

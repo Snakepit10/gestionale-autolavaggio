@@ -80,7 +80,20 @@ class Ordine(models.Model):
     importo_pagato = models.DecimalField(max_digits=10, decimal_places=2, default=0)
     metodo_pagamento = models.CharField(max_length=50, blank=True)
     data_scadenza_pagamento = models.DateField(null=True, blank=True)
-    
+
+    # Fatturazione: il flag lo mette l'operatore dalla gestione ordini;
+    # targa/matricola/nota sono facoltativi e compaiono nella pagina
+    # Fatture. La FK viene valorizzata quando l'ordine entra in una
+    # fattura (SET_NULL: eliminare la fattura libera l'ordine, che col
+    # flag ancora attivo torna tra quelli da fatturare).
+    richiede_fattura = models.BooleanField(default=False)
+    fattura = models.ForeignKey(
+        'fatture.Fattura', null=True, blank=True,
+        on_delete=models.SET_NULL, related_name='ordini')
+    fattura_targa = models.CharField(max_length=10, blank=True)
+    fattura_matricola = models.CharField(max_length=50, blank=True)
+    fattura_nota = models.TextField(blank=True)
+
     nota = models.TextField(blank=True)
     tipo_auto = models.CharField(max_length=200, blank=True, help_text="Modello e colore dell'auto")
     stato = models.CharField(max_length=20, choices=STATO_CHOICES, default='in_attesa')

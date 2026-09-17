@@ -31,6 +31,7 @@ urlpatterns = [
     path('<int:pk>/registra-pagamento/', views.registra_pagamento, name='registra-pagamento'),
     path('<int:pk>/cambia-stato/', views.cambia_stato_ordine, name='cambia-stato'),
     path('<int:pk>/cambia-stato-pagamento/', views.cambia_stato_pagamento, name='cambia-stato-pagamento'),
+    path('<int:pk>/imposta-richiede-fattura/', views.imposta_richiede_fattura, name='imposta-richiede-fattura'),
     path('<int:pk>/modifica/', views.modifica_ordine, name='modifica-ordine'),
     path('<int:pk>/modifica-item/', views.modifica_item_ordine, name='modifica-item-ordine'),
     path('<int:pk>/aggiungi-item/', views.aggiungi_item_ordine, name='aggiungi-item-ordine'),

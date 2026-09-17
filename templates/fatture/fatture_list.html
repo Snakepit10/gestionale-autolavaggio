@@ -1,0 +1,412 @@
+{% extends 'base.html' %}
+{% block title %}Fatture - Gestionale Autolavaggio{% endblock %}
+
+{% block extra_css %}
+<style>
+.gruppo-card { border: 1px solid #dee2e6; border-radius: 10px; margin-bottom: 16px; }
+.gruppo-card .head {
+    display: flex; justify-content: space-between; align-items: center;
+    flex-wrap: wrap; gap: 8px;
+    padding: 10px 14px; background: #f8f9fa;
+    border-bottom: 1px solid #dee2e6;
+    border-radius: 10px 10px 0 0;
+}
+.gruppo-card table { margin-bottom: 0; }
+.fatt-dettaglio td { background: #fbfcfd; }
+.cursor-pointer { cursor: pointer; }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="container-fluid py-3">
+
+    <div class="d-flex justify-content-between align-items-center mb-3 flex-wrap gap-2">
+        <h2 class="mb-0"><i class="bi bi-receipt-cutoff"></i> Fatture</h2>
+        {% if mostra_archiviate %}
+            <a href="{% url 'fatture:fatture-list' %}" class="btn btn-sm btn-outline-secondary">
+                <i class="bi bi-eye-slash"></i> Nascondi archiviate
+            </a>
+        {% else %}
+            <a href="?archiviate=1" class="btn btn-sm btn-outline-secondary">
+                <i class="bi bi-archive"></i> Mostra archiviate ({{ n_archiviate }})
+            </a>
+        {% endif %}
+    </div>
+
+    {# ================= ORDINI DA FATTURARE ================= #}
+    <h5 class="mb-2"><i class="bi bi-inboxes"></i> Ordini da fatturare</h5>
+    <p class="text-muted small">
+        Qui trovi gli ordini con la richiesta fattura attivata nella
+        gestione ordini. Seleziona quelli da mettere insieme e clicca
+        &laquo;Raggruppa in fattura&raquo;.
+    </p>
+
+    {% if not gruppi_cliente and not senza_cliente %}
+    <div class="alert alert-light border">
+        Nessun ordine in attesa di fattura. Attiva la richiesta dal
+        badge <span class="badge bg-light text-muted border"><i class="bi bi-receipt"></i> Fattura</span>
+        nella <a href="{% url 'ordini:ordini-list' %}">gestione ordini</a>.
+    </div>
+    {% endif %}
+
+    {% for gruppo in gruppi_cliente %}
+    <div class="gruppo-card" data-gruppo="cliente-{{ gruppo.cliente.pk }}">
+        <div class="head">
+            <div>
+                <strong><i class="bi bi-person"></i> {{ gruppo.cliente.nome_completo }}</strong>
+                {% if gruppo.cliente.telefono %}
+                    <small class="text-muted ms-2">{{ gruppo.cliente.telefono }}</small>
+                {% endif %}
+                {% if gruppo.cliente.partita_iva %}
+                    <small class="text-muted ms-2">P.IVA {{ gruppo.cliente.partita_iva }}</small>
+                {% endif %}
+            </div>
+            <button class="btn btn-sm btn-primary btn-raggruppa" disabled
+                    onclick="apriModalCrea(this)"
+                    data-cliente-id="{{ gruppo.cliente.pk }}"
+                    data-ragione-sociale="{{ gruppo.cliente.nome_completo }}">
+                <i class="bi bi-collection"></i> Raggruppa in fattura
+            </button>
+        </div>
+        {% include 'fatture/_tabella_da_fatturare.html' with ordini=gruppo.ordini %}
+    </div>
+    {% endfor %}
+
+    {% if senza_cliente %}
+    <div class="gruppo-card" data-gruppo="senza-cliente">
+        <div class="head">
+            <div>
+                <strong><i class="bi bi-person-x"></i> Ordini senza cliente</strong>
+                <small class="text-muted ms-2">ragione sociale da inserire a mano</small>
+            </div>
+            <button class="btn btn-sm btn-primary btn-raggruppa" disabled
+                    onclick="apriModalCrea(this)"
+                    data-cliente-id="" data-ragione-sociale="">
+                <i class="bi bi-collection"></i> Raggruppa in fattura
+            </button>
+        </div>
+        {% include 'fatture/_tabella_da_fatturare.html' with ordini=senza_cliente %}
+    </div>
+    {% endif %}
+
+    {# ================= FATTURE EMESSE ================= #}
+    <h5 class="mt-4 mb-2"><i class="bi bi-journal-check"></i> Fatture emesse</h5>
+    {% if not fatture %}
+        <div class="alert alert-light border">Ancora nessuna fattura.</div>
+    {% else %}
+    <div class="table-responsive">
+        <table class="table table-hover align-middle">
+            <thead>
+                <tr>
+                    <th></th>
+                    <th>Numero</th>
+                    <th>Data</th>
+                    <th>Ragione sociale</th>
+                    <th class="text-center">Ordini</th>
+                    <th class="text-end">Totale</th>
+                    <th class="text-end">Saldo</th>
+                    <th>Stato</th>
+                    <th class="text-end">Azioni</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for f in fatture %}
+                <tr class="cursor-pointer" data-bs-toggle="collapse"
+                    data-bs-target="#fat-det-{{ f.pk }}">
+                    <td class="text-muted"><i class="bi bi-chevron-down small"></i></td>
+                    <td><strong>{{ f.numero }}</strong></td>
+                    <td>{{ f.data|date:"d/m/Y" }}</td>
+                    <td>{{ f.ragione_sociale }}
+                        {% if f.cliente and f.cliente.nome_completo != f.ragione_sociale %}
+                            <br><small class="text-muted">cliente: {{ f.cliente.nome_completo }}</small>
+                        {% endif %}
+                    </td>
+                    <td class="text-center">{{ f.ordini.all|length }}</td>
+                    <td class="text-end"><strong>&euro;{{ f.totale }}</strong></td>
+                    <td class="text-end {% if f.saldo_dovuto > 0 %}text-danger fw-bold{% else %}text-muted{% endif %}">
+                        &euro;{{ f.saldo_dovuto }}
+                    </td>
+                    <td>
+                        {% if f.stato == 'da_pagare' %}
+                            <span class="badge bg-danger"><i class="bi bi-hourglass-split"></i> Da pagare</span>
+                        {% elif f.stato == 'pagata' %}
+                            <span class="badge bg-success"><i class="bi bi-check-circle"></i> Pagata</span>
+                        {% else %}
+                            <span class="badge bg-secondary"><i class="bi bi-archive"></i> Archiviata</span>
+                        {% endif %}
+                    </td>
+                    <td class="text-end" onclick="event.stopPropagation()">
+                        {% if f.stato == 'da_pagare' %}
+                            <button class="btn btn-sm btn-success"
+                                    onclick="apriModalPagata({{ f.pk }}, '{{ f.numero }}', '{{ f.saldo_dovuto }}')">
+                                <i class="bi bi-cash-coin"></i> Segna pagata
+                            </button>
+                        {% elif f.stato == 'pagata' %}
+                            <button class="btn btn-sm btn-outline-secondary"
+                                    onclick="azioneFattura({{ f.pk }}, 'archivia', 'Archiviare la fattura {{ f.numero }}?')">
+                                <i class="bi bi-archive"></i> Archivia
+                            </button>
+                        {% endif %}
+                        {% if f.stato != 'archiviata' %}
+                            <button class="btn btn-sm btn-outline-danger"
+                                    onclick="azioneFattura({{ f.pk }}, 'elimina', 'Eliminare la fattura {{ f.numero }}? Gli ordini torneranno tra quelli da fatturare.')">
+                                <i class="bi bi-trash"></i>
+                            </button>
+                        {% endif %}
+                    </td>
+                </tr>
+                <tr class="collapse" id="fat-det-{{ f.pk }}">
+                    <td colspan="9" class="p-0">
+                        <table class="table table-sm mb-0 fatt-dettaglio">
+                            <thead>
+                                <tr class="small text-muted">
+                                    <th style="padding-left:2rem">Ordine</th>
+                                    <th>Data</th>
+                                    <th>Servizi</th>
+                                    <th>Targa</th>
+                                    <th>Matricola</th>
+                                    <th>Nota fattura</th>
+                                    <th class="text-end">Totale</th>
+                                    <th>Pagamento</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for o in f.ordini.all %}
+                                <tr>
+                                    <td style="padding-left:2rem">
+                                        <a href="{% url 'ordini:ordine-detail' o.pk %}">#{{ o.numero_progressivo }}</a>
+                                    </td>
+                                    <td>{{ o.data_ora|date:"d/m/Y H:i" }}</td>
+                                    <td class="small">
+                                        {% for item in o.items.all %}{{ item.servizio_prodotto.titolo }}{% if not forloop.last %}, {% endif %}{% endfor %}
+                                    </td>
+                                    <td>{{ o.fattura_targa|default:"-" }}</td>
+                                    <td>{{ o.fattura_matricola|default:"-" }}</td>
+                                    <td class="small">{{ o.fattura_nota|default:"-" }}</td>
+                                    <td class="text-end">&euro;{{ o.totale_finale }}</td>
+                                    <td>
+                                        {% if o.stato_pagamento == 'pagato' %}
+                                            <span class="badge bg-success">Pagato</span>
+                                        {% elif o.stato_pagamento == 'parziale' %}
+                                            <span class="badge bg-warning text-dark">Parziale</span>
+                                        {% elif o.stato_pagamento == 'differito' %}
+                                            <span class="badge bg-info">Differito</span>
+                                        {% else %}
+                                            <span class="badge bg-danger">Non pagato</span>
+                                        {% endif %}
+                                    </td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+    {% endif %}
+</div>
+
+{# ================= MODAL CREA FATTURA ================= #}
+<div class="modal fade" id="modalCrea" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title"><i class="bi bi-collection"></i> Crea fattura</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <div class="mb-3">
+                    <label class="form-label" for="crea-data">Data fattura</label>
+                    <input type="date" class="form-control" id="crea-data"
+                           value="{{ oggi|date:'Y-m-d' }}" onchange="aggiornaNumeroSuggerito()">
+                </div>
+                <div class="mb-3">
+                    <label class="form-label" for="crea-numero">Numero fattura</label>
+                    <input type="text" class="form-control" id="crea-numero"
+                           value="{{ numero_suggerito }}">
+                    <div class="form-text">Suggerito il progressivo dell'anno: puoi cambiarlo.</div>
+                </div>
+                <div class="mb-3">
+                    <label class="form-label" for="crea-ragione">Ragione sociale</label>
+                    <input type="text" class="form-control" id="crea-ragione"
+                           placeholder="Intestazione della fattura">
+                    <div class="form-text">Precompilata dal cliente, puoi usarne una diversa.</div>
+                </div>
+                <div class="border rounded p-2 bg-light small" id="crea-riepilogo"></div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Annulla</button>
+                <button type="button" class="btn btn-primary" id="crea-btn-conferma"
+                        onclick="confermaCrea()">
+                    <i class="bi bi-check-lg"></i> Crea fattura
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+{# ================= MODAL SEGNA PAGATA ================= #}
+<div class="modal fade" id="modalPagata" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title"><i class="bi bi-cash-coin"></i> Segna fattura pagata</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <p id="pagata-testo" class="mb-3"></p>
+                <input type="hidden" id="pagata-fattura-id">
+                <label class="form-label" for="pagata-metodo">Metodo di pagamento</label>
+                <select class="form-select" id="pagata-metodo">
+                    {% for valore, label in metodi_pagamento %}
+                    <option value="{{ valore }}" {% if valore == 'bonifico' %}selected{% endif %}>{{ label }}</option>
+                    {% endfor %}
+                </select>
+                <div class="form-text">
+                    Per ogni ordine non saldato viene registrato un pagamento
+                    a copertura del residuo: gli ordini passano a Pagato.
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Annulla</button>
+                <button type="button" class="btn btn-success" onclick="confermaPagata()">
+                    <i class="bi bi-check-lg"></i> Conferma pagamento
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<form id="fatCsrfForm" style="display:none">{% csrf_token %}</form>
+<script>
+function _fatCsrf() {
+    return document.querySelector('#fatCsrfForm [name=csrfmiddlewaretoken]').value;
+}
+function _fatPost(url, body) {
+    return fetch(url, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'X-CSRFToken': _fatCsrf() },
+        credentials: 'same-origin',
+        body: JSON.stringify(body || {}),
+    }).then(r => r.json());
+}
+
+// --- Selezione ordini nei gruppi -------------------------------------
+// Il bottone "Raggruppa" di ogni card si abilita con almeno 1 checkbox.
+document.querySelectorAll('.gruppo-card').forEach(card => {
+    const btn = card.querySelector('.btn-raggruppa');
+    card.querySelectorAll('.check-ordine').forEach(chk => {
+        chk.addEventListener('change', () => {
+            btn.disabled = !card.querySelector('.check-ordine:checked');
+        });
+    });
+});
+
+// --- Modal crea fattura ----------------------------------------------
+let _creaModal = null;
+let _gruppoCorrente = null;
+
+function apriModalCrea(btn) {
+    _gruppoCorrente = btn.closest('.gruppo-card');
+    const selezionati = _gruppoCorrente.querySelectorAll('.check-ordine:checked');
+    if (!selezionati.length) return;
+
+    document.getElementById('crea-ragione').value = btn.dataset.ragioneSociale || '';
+    let totale = 0;
+    const righe = [...selezionati].map(chk => {
+        totale += parseFloat(chk.dataset.totale || 0);
+        return `#${chk.dataset.numero} — €${chk.dataset.totale}`;
+    });
+    document.getElementById('crea-riepilogo').innerHTML =
+        `<strong>${righe.length} ordin${righe.length === 1 ? 'e' : 'i'}</strong> — totale €${totale.toFixed(2)}<br>` +
+        righe.join('<br>');
+
+    if (!_creaModal) _creaModal = new bootstrap.Modal(document.getElementById('modalCrea'));
+    _creaModal.show();
+}
+
+function aggiornaNumeroSuggerito() {
+    const data = document.getElementById('crea-data').value;
+    if (!data) return;
+    const anno = data.split('-')[0];
+    fetch(`{% url 'fatture:suggerisci-numero' %}?anno=${anno}`, { credentials: 'same-origin' })
+        .then(r => r.json())
+        .then(d => { if (d.success) document.getElementById('crea-numero').value = d.numero; })
+        .catch(() => {});
+}
+
+function confermaCrea(confermaDuplicato) {
+    if (!_gruppoCorrente) return;
+    const ordini = [..._gruppoCorrente.querySelectorAll('.check-ordine:checked')]
+        .map(chk => parseInt(chk.value));
+    const payload = {
+        ordini: ordini,
+        data: document.getElementById('crea-data').value,
+        numero: document.getElementById('crea-numero').value.trim(),
+        ragione_sociale: document.getElementById('crea-ragione').value.trim(),
+        conferma_duplicato: !!confermaDuplicato,
+    };
+    if (!payload.data) { alert('Inserisci la data della fattura'); return; }
+    if (!payload.numero) { alert('Inserisci il numero della fattura'); return; }
+    if (!payload.ragione_sociale) { alert('Inserisci la ragione sociale'); return; }
+
+    const btn = document.getElementById('crea-btn-conferma');
+    btn.disabled = true;
+    _fatPost(`{% url 'fatture:crea-fattura' %}`, payload)
+        .then(d => {
+            if (d.warning_duplicato) {
+                btn.disabled = false;
+                if (confirm(`Esiste gia' una fattura numero ${d.numero}. Creare comunque?`)) {
+                    confermaCrea(true);
+                }
+                return;
+            }
+            if (!d.success) {
+                btn.disabled = false;
+                alert('Errore: ' + (d.error || 'creazione fallita'));
+                return;
+            }
+            location.reload();
+        })
+        .catch(() => { btn.disabled = false; alert('Errore di rete'); });
+}
+
+// --- Segna pagata / archivia / elimina -------------------------------
+let _pagataModal = null;
+
+function apriModalPagata(pk, numero, saldo) {
+    document.getElementById('pagata-fattura-id').value = pk;
+    document.getElementById('pagata-testo').innerHTML =
+        `Fattura <strong>${numero}</strong>: saldo residuo <strong>€${saldo}</strong>.`;
+    if (!_pagataModal) _pagataModal = new bootstrap.Modal(document.getElementById('modalPagata'));
+    _pagataModal.show();
+}
+
+function confermaPagata() {
+    const pk = document.getElementById('pagata-fattura-id').value;
+    _fatPost(`{% url 'fatture:segna-pagata' 0 %}`.replace('0', pk), {
+        metodo: document.getElementById('pagata-metodo').value,
+    })
+    .then(d => {
+        if (!d.success) { alert('Errore: ' + (d.error || 'operazione fallita')); return; }
+        location.reload();
+    })
+    .catch(() => alert('Errore di rete'));
+}
+
+function azioneFattura(pk, azione, messaggio) {
+    if (!confirm(messaggio)) return;
+    const url = azione === 'archivia'
+        ? `{% url 'fatture:archivia' 0 %}`.replace('0', pk)
+        : `{% url 'fatture:elimina' 0 %}`.replace('0', pk);
+    _fatPost(url)
+        .then(d => {
+            if (!d.success) { alert('Errore: ' + (d.error || 'operazione fallita')); return; }
+            location.reload();
+        })
+        .catch(() => alert('Errore di rete'));
+}
+</script>
+{% endblock %}

@@ -1,0 +1,54 @@
+{% comment %}
+Tabella degli ordini da fatturare dentro una card gruppo (per cliente
+o "senza cliente"). Le checkbox portano i data-* usati dal riepilogo
+del modal crea fattura.
+{% endcomment %}
+<div class="table-responsive">
+    <table class="table table-sm table-hover align-middle">
+        <thead>
+            <tr class="small text-muted">
+                <th style="width:36px"></th>
+                <th>Ordine</th>
+                <th>Data</th>
+                <th>Servizi</th>
+                <th>Targa</th>
+                <th>Matricola</th>
+                <th>Nota fattura</th>
+                <th class="text-end">Totale</th>
+                <th>Pagamento</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for o in ordini %}
+            <tr>
+                <td class="text-center">
+                    <input type="checkbox" class="form-check-input check-ordine"
+                           value="{{ o.pk }}"
+                           data-numero="{{ o.numero_progressivo }}"
+                           data-totale="{{ o.totale_finale }}">
+                </td>
+                <td><a href="{% url 'ordini:ordine-detail' o.pk %}">#{{ o.numero_progressivo }}</a></td>
+                <td>{{ o.data_ora|date:"d/m/Y H:i" }}</td>
+                <td class="small">
+                    {% for item in o.items.all %}{{ item.servizio_prodotto.titolo }}{% if not forloop.last %}, {% endif %}{% endfor %}
+                </td>
+                <td>{{ o.fattura_targa|default:"-" }}</td>
+                <td>{{ o.fattura_matricola|default:"-" }}</td>
+                <td class="small">{{ o.fattura_nota|default:"-" }}</td>
+                <td class="text-end"><strong>&euro;{{ o.totale_finale }}</strong></td>
+                <td>
+                    {% if o.stato_pagamento == 'pagato' %}
+                        <span class="badge bg-success">Pagato</span>
+                    {% elif o.stato_pagamento == 'parziale' %}
+                        <span class="badge bg-warning text-dark">Parziale</span>
+                    {% elif o.stato_pagamento == 'differito' %}
+                        <span class="badge bg-info">Differito</span>
+                    {% else %}
+                        <span class="badge bg-danger">Non pagato</span>
+                    {% endif %}
+                </td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</div>

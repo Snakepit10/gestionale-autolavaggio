@@ -155,6 +155,9 @@ urlpatterns = [
     # Garage veicoli: pagine staff (registrazione servizi per targa)
     path('garage/', include('apps.garage.urls', namespace='garage')),
 
+    # Fatture: raggruppamento ordini da fatturare (staff)
+    path('fatture/', include('apps.fatture.urls', namespace='fatture')),
+
     # Monete virtuali (staff + webhook pagamenti)
     path('monete/', include('apps.monete.urls', namespace='monete')),
 
