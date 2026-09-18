@@ -1,0 +1,141 @@
+{% comment %}
+Modal "Richiesta fattura" + JS del flag nella colonna Fattura.
+Condiviso tra gestione ordini e ordini non pagati: va incluso una
+volta in fondo alla pagina, insieme alle celle _cella_fattura.html.
+Autonomo: ha il suo form CSRF.
+{% endcomment %}
+<div class="modal fade" id="modalFattura" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title"><i class="bi bi-receipt"></i> Richiesta fattura</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <p class="text-muted small mb-3">
+                    Dati facoltativi: compariranno nella pagina Fatture
+                    accanto all'ordine per aiutarti a raggrupparlo.
+                </p>
+                <input type="hidden" id="fat-ordine-id">
+                <div class="mb-3">
+                    <label class="form-label" for="fat-targa">Targa</label>
+                    <input type="text" class="form-control" id="fat-targa"
+                           maxlength="10" placeholder="es. AB123CD"
+                           style="text-transform:uppercase">
+                </div>
+                <div class="mb-3">
+                    <label class="form-label" for="fat-matricola">Numero matricola</label>
+                    <input type="text" class="form-control" id="fat-matricola"
+                           maxlength="50" placeholder="es. matricola mezzo/flotta">
+                </div>
+                <div class="mb-0">
+                    <label class="form-label" for="fat-nota">Nota fattura</label>
+                    <textarea class="form-control" id="fat-nota" rows="2"
+                              placeholder="es. riferimento ordine d'acquisto, note per la fattura"></textarea>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Annulla</button>
+                <button type="button" class="btn btn-warning" onclick="salvaRichiestaFattura()">
+                    <i class="bi bi-receipt"></i> Salva richiesta
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<form id="fatFlagCsrfForm" style="display:none">{% csrf_token %}</form>
+<script>
+// Flag "Fattura" -> spuntandolo si apre il modal con targa/matricola/
+// nota: la richiesta parte solo al salvataggio (chiudere il modal
+// senza salvare riporta il flag spento). Togliere la spunta rimuove
+// subito la richiesta. La matita riapre il modal per modificare.
+let _fatCheckCorrente = null;
+let _fatModal = null;
+let _fatSalvato = false;
+
+function _fatPostRichiesta(ordineId, payload) {
+    return fetch(`{% url 'ordini:imposta-richiede-fattura' 0 %}`.replace('0', ordineId), {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+            'X-CSRFToken': document.querySelector('#fatFlagCsrfForm [name=csrfmiddlewaretoken]').value,
+        },
+        credentials: 'same-origin',
+        body: JSON.stringify(payload),
+    }).then(r => r.json());
+}
+
+function _fatMatita(chk) {
+    return chk.parentElement.querySelector('.fattura-edit');
+}
+
+function cambioFlagFattura(chk, ordineId) {
+    if (chk.checked) {
+        // La spunta diventa definitiva solo se l'operatore salva il modal
+        apriModalFattura(ordineId, chk);
+        return;
+    }
+    _fatPostRichiesta(ordineId, { richiede_fattura: false })
+        .then(d => {
+            if (!d.success) {
+                alert('Errore: ' + (d.error || 'operazione fallita'));
+                chk.checked = true;
+                return;
+            }
+            chk.dataset.richiede = '0';
+            chk.dataset.targa = '';
+            chk.dataset.matricola = '';
+            chk.dataset.nota = '';
+            const matita = _fatMatita(chk);
+            if (matita) matita.style.setProperty('display', 'none', 'important');
+        })
+        .catch(() => { alert('Errore di rete'); chk.checked = true; });
+}
+
+function apriModalFattura(ordineId, chk) {
+    _fatCheckCorrente = chk;
+    _fatSalvato = false;
+    document.getElementById('fat-ordine-id').value = ordineId;
+    document.getElementById('fat-targa').value = chk.dataset.targa || '';
+    document.getElementById('fat-matricola').value = chk.dataset.matricola || '';
+    document.getElementById('fat-nota').value = chk.dataset.nota || '';
+    if (!_fatModal) {
+        _fatModal = new bootstrap.Modal(document.getElementById('modalFattura'));
+        // Chiusura senza salvare: se la richiesta non era gia' attiva
+        // sul server, il flag torna spento.
+        document.getElementById('modalFattura').addEventListener('hidden.bs.modal', () => {
+            if (!_fatSalvato && _fatCheckCorrente
+                && _fatCheckCorrente.dataset.richiede !== '1') {
+                _fatCheckCorrente.checked = false;
+            }
+        });
+    }
+    _fatModal.show();
+}
+
+function salvaRichiestaFattura() {
+    const ordineId = document.getElementById('fat-ordine-id').value;
+    if (!ordineId || !_fatCheckCorrente) return;
+    _fatPostRichiesta(ordineId, {
+        richiede_fattura: true,
+        targa: document.getElementById('fat-targa').value.trim(),
+        matricola: document.getElementById('fat-matricola').value.trim(),
+        nota: document.getElementById('fat-nota').value.trim(),
+    })
+    .then(d => {
+        if (!d.success) { alert('Errore: ' + (d.error || 'salvataggio fallito')); return; }
+        _fatSalvato = true;
+        const chk = _fatCheckCorrente;
+        chk.checked = true;
+        chk.dataset.richiede = '1';
+        chk.dataset.targa = d.targa;
+        chk.dataset.matricola = d.matricola;
+        chk.dataset.nota = d.nota;
+        const matita = _fatMatita(chk);
+        if (matita) matita.style.removeProperty('display');
+        _fatModal.hide();
+    })
+    .catch(() => alert('Errore di rete durante il salvataggio'));
+}
+</script>

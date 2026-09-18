@@ -102,21 +102,19 @@ Un gruppo cliente della pagina Ordini non pagati: riga intestazione
             <br><small class="text-muted">{{ ordine.metodo_pagamento|title }}</small>
         {% endif %}
     </td>
+    {% if ordine.fattura %}
     <td>
-        {% if ordine.fattura %}
-            <span class="badge bg-secondary"
-                  title="Ordine nella fattura {{ ordine.fattura.numero }} ({{ ordine.fattura.ragione_sociale }})">
-                <i class="bi bi-receipt"></i> {{ ordine.fattura.numero }}
-            </span>
-            <br><small class="text-muted">{{ ordine.fattura.data|date:"d/m/Y" }}</small>
-        {% elif ordine.richiede_fattura %}
-            <small class="text-warning" title="Richiesta fattura attiva, non ancora raggruppata">
-                <i class="bi bi-receipt"></i> richiesta
-            </small>
-        {% else %}
-            <span class="text-muted">-</span>
-        {% endif %}
+        <span class="badge bg-secondary"
+              title="Ordine nella fattura {{ ordine.fattura.numero }} ({{ ordine.fattura.ragione_sociale }})">
+            <i class="bi bi-receipt"></i> {{ ordine.fattura.numero }}
+        </span>
+        <br><small class="text-muted">{{ ordine.fattura.data|date:"d/m/Y" }}</small>
     </td>
+    {% else %}
+    {# Flag interattivo: stessa cella della gestione ordini (checkbox
+       che apre il modal targa/matricola/nota + matita per modificare) #}
+    {% include 'ordini/_cella_fattura.html' %}
+    {% endif %}
     <td>
         {% if ordine.data_scadenza_pagamento %}
             <div>
