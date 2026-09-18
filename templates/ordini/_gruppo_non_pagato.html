@@ -111,8 +111,9 @@ Un gruppo cliente della pagina Ordini non pagati: riga intestazione
         <br><small class="text-muted">{{ ordine.fattura.data|date:"d/m/Y" }}</small>
     </td>
     {% else %}
-    {# Flag interattivo: stessa cella della gestione ordini (checkbox
-       che apre il modal targa/matricola/nota + matita per modificare) #}
+    {% comment %}Flag interattivo: stessa cella della gestione ordini
+    (checkbox che apre il modal targa/matricola/nota + matita per
+    modificare){% endcomment %}
     {% include 'ordini/_cella_fattura.html' %}
     {% endif %}
     <td>
