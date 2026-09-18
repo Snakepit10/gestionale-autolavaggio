@@ -45,12 +45,21 @@ class Fattura(models.Model):
     def __str__(self):
         return f'Fattura {self.numero} - {self.ragione_sociale}'
 
-    # --- Totali (calcolati dagli ordini collegati) -----------------
+    # --- Totali (ordini collegati + righe manuali) -----------------
+
+    @property
+    def totale_ordini(self):
+        return sum((o.importo_in_fattura for o in self.ordini.all()),
+                   Decimal('0'))
+
+    @property
+    def totale_righe(self):
+        return sum((r.importo or Decimal('0') for r in self.righe.all()),
+                   Decimal('0'))
 
     @property
     def totale(self):
-        return sum((o.totale_finale or Decimal('0') for o in self.ordini.all()),
-                   Decimal('0'))
+        return self.totale_ordini + self.totale_righe
 
     @property
     def totale_pagato(self):
@@ -59,6 +68,10 @@ class Fattura(models.Model):
 
     @property
     def saldo_dovuto(self):
+        # Le righe manuali non hanno pagamenti tracciati: una fattura
+        # segnata pagata/archiviata e' saldata per definizione.
+        if self.stato in ('pagata', 'archiviata'):
+            return Decimal('0')
         return self.totale - self.totale_pagato
 
     @property
@@ -67,6 +80,8 @@ class Fattura(models.Model):
         return bool(ordini) and all(o.is_pagato for o in ordini)
 
     # --- Numerazione suggerita -------------------------------------
+
+
 
     @classmethod
     def suggerisci_numero(cls, anno):
@@ -81,3 +96,22 @@ class Fattura(models.Model):
             if m:
                 massimo = max(massimo, int(m.group(1)))
         return f'{massimo + 1}/{anno}'
+
+
+class RigaFattura(models.Model):
+    """Riga manuale di una fattura: voce libera (data, descrizione,
+    importo) non legata a un ordine del gestionale."""
+
+    fattura = models.ForeignKey(
+        Fattura, on_delete=models.CASCADE, related_name='righe')
+    data = models.DateField()
+    descrizione = models.CharField(max_length=200)
+    importo = models.DecimalField(max_digits=10, decimal_places=2)
+
+    class Meta:
+        ordering = ['data', 'id']
+        verbose_name = 'Riga fattura'
+        verbose_name_plural = 'Righe fattura'
+
+    def __str__(self):
+        return f'{self.descrizione} ({self.importo})'

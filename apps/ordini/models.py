@@ -98,6 +98,18 @@ class Ordine(models.Model):
     fattura_targa = models.CharField(max_length=10, blank=True)
     fattura_matricola = models.CharField(max_length=50, blank=True)
     fattura_nota = models.TextField(blank=True)
+    # Importo esposto in fattura per questo ordine, se l'operatore lo
+    # modifica in creazione/modifica fattura (None = totale_finale).
+    # Non tocca il totale reale dell'ordine ne' i pagamenti.
+    fattura_importo = models.DecimalField(
+        max_digits=10, decimal_places=2, null=True, blank=True)
+
+    @property
+    def importo_in_fattura(self):
+        from decimal import Decimal
+        if self.fattura_importo is not None:
+            return self.fattura_importo
+        return self.totale_finale or Decimal('0')
 
     nota = models.TextField(blank=True)
     tipo_auto = models.CharField(max_length=200, blank=True, help_text="Modello e colore dell'auto")

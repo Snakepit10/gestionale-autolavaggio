@@ -22,15 +22,18 @@ del modal crea fattura.
             {% for o in ordini %}
             <tr>
                 <td class="text-center">
+                    {% comment %}data-totale con stringformat: il render
+                    localizzato (virgola) non e' un value valido per gli
+                    input number del modal{% endcomment %}
                     <input type="checkbox" class="form-check-input check-ordine"
                            value="{{ o.pk }}"
                            data-numero="{{ o.numero_progressivo }}"
-                           data-totale="{{ o.totale_finale }}">
+                           data-totale="{{ o.totale_finale|stringformat:'.2f' }}">
                 </td>
                 <td><a href="{% url 'ordini:ordine-detail' o.pk %}">#{{ o.numero_progressivo }}</a></td>
                 <td>{{ o.data_ora|date:"d/m/Y H:i" }}</td>
                 <td class="small">
-                    {% for item in o.items.all %}{{ item.servizio_prodotto.titolo }}{% if not forloop.last %}, {% endif %}{% endfor %}
+                    {% for item in o.items.all %}{{ item.servizio_prodotto.titolo }}{% if not forloop.last %}, {% endif %}{% empty %}{{ o.nota|default:"-" }}{% endfor %}
                 </td>
                 <td>{{ o.fattura_targa|default:"-" }}</td>
                 <td>{{ o.fattura_matricola|default:"-" }}</td>

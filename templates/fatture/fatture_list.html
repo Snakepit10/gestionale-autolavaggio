@@ -34,11 +34,17 @@
     </div>
 
     {# ================= ORDINI DA FATTURARE ================= #}
-    <h5 class="mb-2"><i class="bi bi-inboxes"></i> Ordini da fatturare</h5>
+    <div class="d-flex justify-content-between align-items-center mb-2 flex-wrap gap-2">
+        <h5 class="mb-0"><i class="bi bi-inboxes"></i> Ordini da fatturare</h5>
+        <button class="btn btn-sm btn-outline-primary"
+                onclick="apriModalOrdineManuale()">
+            <i class="bi bi-plus-lg"></i> Aggiungi ordine manuale
+        </button>
+    </div>
     <p class="text-muted small">
         Qui trovi gli ordini con la richiesta fattura attivata nella
-        gestione ordini. Seleziona quelli da mettere insieme e clicca
-        &laquo;Raggruppa in fattura&raquo;.
+        gestione ordini, piu' quelli aggiunti a mano. Seleziona quelli
+        da mettere insieme e clicca &laquo;Raggruppa in fattura&raquo;.
     </p>
 
     {% if not gruppi_cliente and not senza_cliente %}
@@ -61,12 +67,19 @@
                     <small class="text-muted ms-2">P.IVA {{ gruppo.cliente.partita_iva }}</small>
                 {% endif %}
             </div>
-            <button class="btn btn-sm btn-primary btn-raggruppa" disabled
-                    onclick="apriModalCrea(this)"
-                    data-cliente-id="{{ gruppo.cliente.pk }}"
-                    data-ragione-sociale="{{ gruppo.cliente.nome_completo }}">
-                <i class="bi bi-collection"></i> Raggruppa in fattura
-            </button>
+            <span>
+                <button class="btn btn-sm btn-outline-primary"
+                        onclick="apriModalOrdineManuale('{{ gruppo.cliente.pk }}', '{{ gruppo.cliente.nome_completo }}')"
+                        title="Aggiungi un ordine manuale per questo cliente">
+                    <i class="bi bi-plus-lg"></i> Ordine
+                </button>
+                <button class="btn btn-sm btn-primary btn-raggruppa" disabled
+                        onclick="apriModalCrea(this)"
+                        data-cliente-id="{{ gruppo.cliente.pk }}"
+                        data-ragione-sociale="{{ gruppo.cliente.nome_completo }}">
+                    <i class="bi bi-collection"></i> Raggruppa in fattura
+                </button>
+            </span>
         </div>
         {% include 'fatture/_tabella_da_fatturare.html' with ordini=gruppo.ordini %}
     </div>
@@ -148,6 +161,10 @@
                             </button>
                         {% endif %}
                         {% if f.stato != 'archiviata' %}
+                            <button class="btn btn-sm btn-outline-primary"
+                                    onclick="apriModalModifica({{ f.pk }})" title="Modifica fattura">
+                                <i class="bi bi-pencil-square"></i>
+                            </button>
                             <button class="btn btn-sm btn-outline-danger"
                                     onclick="azioneFattura({{ f.pk }}, 'elimina', 'Eliminare la fattura {{ f.numero }}? Gli ordini torneranno tra quelli da fatturare.')">
                                 <i class="bi bi-trash"></i>
@@ -180,12 +197,18 @@
                                     <td>{{ o.data_ora|date:"d/m/Y H:i" }}</td>
                                     <td class="small">{{ o.tipo_auto|default:"-" }}</td>
                                     <td class="small">
-                                        {% for item in o.items.all %}{{ item.servizio_prodotto.titolo }}{% if not forloop.last %}, {% endif %}{% endfor %}
+                                        {% for item in o.items.all %}{{ item.servizio_prodotto.titolo }}{% if not forloop.last %}, {% endif %}{% empty %}{{ o.nota|default:"-" }}{% endfor %}
                                     </td>
                                     <td>{{ o.fattura_targa|default:"-" }}</td>
                                     <td>{{ o.fattura_matricola|default:"-" }}</td>
                                     <td class="small">{{ o.fattura_nota|default:"-" }}</td>
-                                    <td class="text-end">&euro;{{ o.totale_finale }}</td>
+                                    <td class="text-end">
+                                        &euro;{{ o.importo_in_fattura }}
+                                        {% if o.fattura_importo is not None and o.fattura_importo != o.totale_finale %}
+                                            <br><small class="text-muted text-decoration-line-through"
+                                                       title="Totale reale dell'ordine">&euro;{{ o.totale_finale }}</small>
+                                        {% endif %}
+                                    </td>
                                     <td>
                                         {% if o.stato_pagamento == 'pagato' %}
                                             <span class="badge bg-success">Pagato</span>
@@ -197,6 +220,17 @@
                                             <span class="badge bg-danger">Non pagato</span>
                                         {% endif %}
                                     </td>
+                                </tr>
+                                {% endfor %}
+                                {% for r in f.righe.all %}
+                                <tr>
+                                    <td style="padding-left:2rem">
+                                        <span class="badge bg-light text-dark border">voce manuale</span>
+                                    </td>
+                                    <td>{{ r.data|date:"d/m/Y" }}</td>
+                                    <td class="small" colspan="5">{{ r.descrizione }}</td>
+                                    <td class="text-end">&euro;{{ r.importo }}</td>
+                                    <td></td>
                                 </tr>
                                 {% endfor %}
                             </tbody>
@@ -236,13 +270,151 @@
                            placeholder="Intestazione della fattura">
                     <div class="form-text">Precompilata dal cliente, puoi usarne una diversa.</div>
                 </div>
-                <div class="border rounded p-2 bg-light small" id="crea-riepilogo"></div>
+
+                <div class="fw-bold small text-uppercase text-muted mb-1">Ordini selezionati</div>
+                <div id="crea-ordini" class="mb-3"></div>
+
+                <div class="d-flex justify-content-between align-items-center mb-1">
+                    <span class="fw-bold small text-uppercase text-muted">Righe manuali</span>
+                    <button type="button" class="btn btn-sm btn-outline-primary"
+                            onclick="aggiungiRiga('crea-righe')">
+                        <i class="bi bi-plus-lg"></i> Aggiungi riga
+                    </button>
+                </div>
+                <div id="crea-righe" class="mb-2"></div>
+                <div class="form-text mb-2">
+                    Voci libere non legate a un ordine: data, descrizione e prezzo.
+                </div>
+
+                <div class="border rounded p-2 bg-light text-end">
+                    Totale fattura: <strong>€<span id="crea-totale">0.00</span></strong>
+                </div>
             </div>
             <div class="modal-footer">
                 <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Annulla</button>
                 <button type="button" class="btn btn-primary" id="crea-btn-conferma"
                         onclick="confermaCrea()">
                     <i class="bi bi-check-lg"></i> Crea fattura
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+{# ================= MODAL ORDINE MANUALE ================= #}
+<div class="modal fade" id="modalOrdineManuale" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title"><i class="bi bi-plus-circle"></i>
+                    Ordine manuale da fatturare</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <p class="text-muted small mb-3">
+                    Per servizi svolti ma non registrati nel gestionale:
+                    l'ordine viene creato adesso, gia' segnato da
+                    fatturare e non pagato.
+                </p>
+                <div class="mb-3">
+                    <label class="form-label">Cliente</label>
+                    <input type="hidden" id="om-cliente-id">
+                    <div id="om-cliente-sel" class="alert alert-info py-2 mb-2" style="display:none;">
+                        <i class="bi bi-person-check"></i>
+                        <strong id="om-cliente-nome"></strong>
+                        <a href="#" class="ms-2 small" onclick="omCambiaCliente(); return false;">cambia</a>
+                    </div>
+                    <input type="text" class="form-control" id="om-cliente-search"
+                           placeholder="Cerca per nome, ragione sociale o telefono..."
+                           autocomplete="off" oninput="omCercaCliente()">
+                    <div class="list-group" id="om-cliente-risultati"
+                         style="max-height:200px; overflow-y:auto;"></div>
+                </div>
+                <div class="row g-2 mb-3">
+                    <div class="col-md-5">
+                        <label class="form-label" for="om-data">Data del servizio</label>
+                        <input type="date" class="form-control" id="om-data"
+                               value="{{ oggi|date:'Y-m-d' }}">
+                    </div>
+                    <div class="col-md-7">
+                        <label class="form-label" for="om-importo">Prezzo</label>
+                        <div class="input-group">
+                            <span class="input-group-text">&euro;</span>
+                            <input type="number" class="form-control" id="om-importo"
+                                   step="0.01" min="0" placeholder="0.00">
+                        </div>
+                    </div>
+                </div>
+                <div class="mb-0">
+                    <label class="form-label" for="om-descrizione">Servizi svolti</label>
+                    <textarea class="form-control" id="om-descrizione" rows="2"
+                              maxlength="500"
+                              placeholder="es. Lavaggio completo furgone + igienizzazione"></textarea>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Annulla</button>
+                <button type="button" class="btn btn-primary" id="om-btn-crea"
+                        onclick="confermaOrdineManuale()">
+                    <i class="bi bi-check-lg"></i> Crea ordine
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+{# ================= MODAL MODIFICA FATTURA ================= #}
+<div class="modal fade" id="modalModifica" tabindex="-1">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title"><i class="bi bi-pencil-square"></i>
+                    Modifica fattura</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <input type="hidden" id="mod-fattura-id">
+                <div class="row g-2 mb-3">
+                    <div class="col-md-3">
+                        <label class="form-label" for="mod-data">Data</label>
+                        <input type="date" class="form-control" id="mod-data">
+                    </div>
+                    <div class="col-md-3">
+                        <label class="form-label" for="mod-numero">Numero</label>
+                        <input type="text" class="form-control" id="mod-numero">
+                    </div>
+                    <div class="col-md-6">
+                        <label class="form-label" for="mod-ragione">Ragione sociale</label>
+                        <input type="text" class="form-control" id="mod-ragione">
+                    </div>
+                </div>
+
+                <div class="fw-bold small text-uppercase text-muted mb-1">Ordini in fattura</div>
+                <div id="mod-ordini" class="mb-1"></div>
+                <div class="form-text mb-3">
+                    Puoi correggere l'importo esposto in fattura (il totale
+                    reale dell'ordine non cambia) o togliere un ordine con la
+                    X: tornera' tra quelli da fatturare.
+                </div>
+
+                <div class="d-flex justify-content-between align-items-center mb-1">
+                    <span class="fw-bold small text-uppercase text-muted">Righe manuali</span>
+                    <button type="button" class="btn btn-sm btn-outline-primary"
+                            onclick="aggiungiRiga('mod-righe')">
+                        <i class="bi bi-plus-lg"></i> Aggiungi riga
+                    </button>
+                </div>
+                <div id="mod-righe" class="mb-2"></div>
+
+                <div class="border rounded p-2 bg-light text-end">
+                    Totale fattura: <strong>€<span id="mod-totale">0.00</span></strong>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Annulla</button>
+                <button type="button" class="btn btn-primary" id="mod-btn-salva"
+                        onclick="confermaModifica()">
+                    <i class="bi bi-check-lg"></i> Salva modifiche
                 </button>
             </div>
         </div>
@@ -282,6 +454,7 @@
 </div>
 
 <form id="fatCsrfForm" style="display:none">{% csrf_token %}</form>
+{{ fatture_json|json_script:"fatture-data" }}
 <script>
 function _fatCsrf() {
     return document.querySelector('#fatCsrfForm [name=csrfmiddlewaretoken]').value;
@@ -306,6 +479,80 @@ document.querySelectorAll('.gruppo-card').forEach(card => {
     });
 });
 
+// --- Costruttori condivisi (modal crea + modal modifica) -------------
+// Riga ordine: importo esposto in fattura, modificabile; nel modal
+// modifica la X toglie l'ordine dalla fattura.
+function _htmlRigaOrdine(prefisso, id, numero, importo, rimovibile) {
+    return `
+        <div class="d-flex align-items-center gap-2 mb-1 riga-ordine" data-ordine-id="${id}">
+            <span class="flex-grow-1 small">#${numero}</span>
+            <div class="input-group input-group-sm" style="width:130px">
+                <span class="input-group-text">€</span>
+                <input type="number" class="form-control importo-ordine text-end"
+                       step="0.01" min="0" value="${importo}"
+                       oninput="aggiornaTotale('${prefisso}')">
+            </div>
+            ${rimovibile ? `<button type="button" class="btn btn-sm btn-outline-danger"
+                    title="Togli dalla fattura: tornera' tra quelli da fatturare"
+                    onclick="this.closest('.riga-ordine').remove(); aggiornaTotale('${prefisso}')">
+                    <i class="bi bi-x-lg"></i></button>` : ''}
+        </div>`;
+}
+
+// Riga manuale: data + descrizione libera + prezzo
+function aggiungiRiga(contId, data, descrizione, importo) {
+    const prefisso = contId.split('-')[0];
+    const dataDefault = data || document.getElementById(prefisso + '-data').value || '';
+    const div = document.createElement('div');
+    div.className = 'd-flex align-items-center gap-2 mb-1 riga-manuale';
+    div.innerHTML = `
+        <input type="date" class="form-control form-control-sm riga-data"
+               style="width:150px" value="${dataDefault}">
+        <input type="text" class="form-control form-control-sm riga-desc flex-grow-1"
+               maxlength="200" placeholder="Descrizione servizio"
+               value="${(descrizione || '').replace(/"/g, '&quot;')}">
+        <div class="input-group input-group-sm" style="width:130px">
+            <span class="input-group-text">€</span>
+            <input type="number" class="form-control riga-importo text-end"
+                   step="0.01" min="0" value="${importo || ''}"
+                   oninput="aggiornaTotale('${prefisso}')">
+        </div>
+        <button type="button" class="btn btn-sm btn-outline-danger" title="Rimuovi riga"
+                onclick="this.closest('.riga-manuale').remove(); aggiornaTotale('${prefisso}')">
+            <i class="bi bi-x-lg"></i></button>`;
+    document.getElementById(contId).appendChild(div);
+    aggiornaTotale(prefisso);
+}
+
+function aggiornaTotale(prefisso) {
+    let totale = 0;
+    document.querySelectorAll(`#${prefisso}-ordini .importo-ordine, #${prefisso}-righe .riga-importo`)
+        .forEach(inp => { totale += parseFloat(inp.value) || 0; });
+    document.getElementById(prefisso + '-totale').textContent = totale.toFixed(2);
+}
+
+// Raccoglie ordini {id, importo} e righe manuali da un modal.
+// Ritorna null (con alert) se una riga manuale e' incompleta.
+function _raccogliRighe(prefisso) {
+    const ordini = [...document.querySelectorAll(`#${prefisso}-ordini .riga-ordine`)]
+        .map(div => ({
+            id: parseInt(div.dataset.ordineId),
+            importo: div.querySelector('.importo-ordine').value.trim(),
+        }));
+    const righe = [];
+    for (const div of document.querySelectorAll(`#${prefisso}-righe .riga-manuale`)) {
+        const data = div.querySelector('.riga-data').value;
+        const desc = div.querySelector('.riga-desc').value.trim();
+        const importo = div.querySelector('.riga-importo').value.trim();
+        if (!data || !desc || importo === '') {
+            alert('Completa data, descrizione e prezzo di ogni riga manuale (o rimuovila).');
+            return null;
+        }
+        righe.push({ data: data, descrizione: desc, importo: importo });
+    }
+    return { ordini, righe };
+}
+
 // --- Modal crea fattura ----------------------------------------------
 let _creaModal = null;
 let _gruppoCorrente = null;
@@ -316,14 +563,14 @@ function apriModalCrea(btn) {
     if (!selezionati.length) return;
 
     document.getElementById('crea-ragione').value = btn.dataset.ragioneSociale || '';
-    let totale = 0;
-    const righe = [...selezionati].map(chk => {
-        totale += parseFloat(chk.dataset.totale || 0);
-        return `#${chk.dataset.numero} — €${chk.dataset.totale}`;
+    const cont = document.getElementById('crea-ordini');
+    cont.innerHTML = '';
+    selezionati.forEach(chk => {
+        cont.insertAdjacentHTML('beforeend',
+            _htmlRigaOrdine('crea', chk.value, chk.dataset.numero, chk.dataset.totale, false));
     });
-    document.getElementById('crea-riepilogo').innerHTML =
-        `<strong>${righe.length} ordin${righe.length === 1 ? 'e' : 'i'}</strong> — totale €${totale.toFixed(2)}<br>` +
-        righe.join('<br>');
+    document.getElementById('crea-righe').innerHTML = '';
+    aggiornaTotale('crea');
 
     if (!_creaModal) _creaModal = new bootstrap.Modal(document.getElementById('modalCrea'));
     _creaModal.show();
@@ -341,10 +588,14 @@ function aggiornaNumeroSuggerito() {
 
 function confermaCrea(confermaDuplicato) {
     if (!_gruppoCorrente) return;
-    const ordini = [..._gruppoCorrente.querySelectorAll('.check-ordine:checked')]
-        .map(chk => parseInt(chk.value));
+    const raccolto = _raccogliRighe('crea');
+    if (!raccolto) return;
+    const importi = {};
+    raccolto.ordini.forEach(o => { importi[o.id] = o.importo; });
     const payload = {
-        ordini: ordini,
+        ordini: raccolto.ordini.map(o => o.id),
+        importi: importi,
+        righe: raccolto.righe,
         data: document.getElementById('crea-data').value,
         numero: document.getElementById('crea-numero').value.trim(),
         ragione_sociale: document.getElementById('crea-ragione').value.trim(),
@@ -368,6 +619,158 @@ function confermaCrea(confermaDuplicato) {
             if (!d.success) {
                 btn.disabled = false;
                 alert('Errore: ' + (d.error || 'creazione fallita'));
+                return;
+            }
+            location.reload();
+        })
+        .catch(() => { btn.disabled = false; alert('Errore di rete'); });
+}
+
+// --- Modal ordine manuale --------------------------------------------
+let _omModal = null;
+let _omTimer = null;
+
+function apriModalOrdineManuale(clienteId, nome) {
+    document.getElementById('om-descrizione').value = '';
+    document.getElementById('om-importo').value = '';
+    document.getElementById('om-cliente-risultati').innerHTML = '';
+    document.getElementById('om-cliente-search').value = '';
+    if (clienteId) {
+        omSelezionaCliente(clienteId, nome);
+    } else {
+        omCambiaCliente();
+    }
+    if (!_omModal) _omModal = new bootstrap.Modal(document.getElementById('modalOrdineManuale'));
+    _omModal.show();
+}
+
+function omSelezionaCliente(id, nome) {
+    document.getElementById('om-cliente-id').value = id;
+    document.getElementById('om-cliente-nome').textContent = nome;
+    document.getElementById('om-cliente-sel').style.display = '';
+    document.getElementById('om-cliente-search').style.display = 'none';
+    document.getElementById('om-cliente-risultati').innerHTML = '';
+}
+
+function omCambiaCliente() {
+    document.getElementById('om-cliente-id').value = '';
+    document.getElementById('om-cliente-sel').style.display = 'none';
+    const search = document.getElementById('om-cliente-search');
+    search.style.display = '';
+    search.value = '';
+}
+
+function omCercaCliente() {
+    clearTimeout(_omTimer);
+    _omTimer = setTimeout(() => {
+        const term = document.getElementById('om-cliente-search').value.trim();
+        const box = document.getElementById('om-cliente-risultati');
+        if (term.length < 2) { box.innerHTML = ''; return; }
+        fetch(`{% url 'clienti:cerca-cliente' %}?term=${encodeURIComponent(term)}`,
+              { credentials: 'same-origin' })
+            .then(r => r.json())
+            .then(d => {
+                box.innerHTML = '';
+                (d.results || []).forEach(c => {
+                    const a = document.createElement('a');
+                    a.href = '#';
+                    a.className = 'list-group-item list-group-item-action py-2';
+                    a.innerHTML = `<strong></strong> <small class="text-muted"></small>`;
+                    a.querySelector('strong').textContent = c.text;
+                    a.querySelector('small').textContent = c.telefono || '';
+                    a.onclick = (e) => { e.preventDefault(); omSelezionaCliente(c.id, c.text); };
+                    box.appendChild(a);
+                });
+            })
+            .catch(() => {});
+    }, 300);
+}
+
+function confermaOrdineManuale() {
+    const clienteId = document.getElementById('om-cliente-id').value;
+    if (!clienteId) { alert('Scegli il cliente'); return; }
+    const payload = {
+        cliente_id: clienteId,
+        data: document.getElementById('om-data').value,
+        descrizione: document.getElementById('om-descrizione').value.trim(),
+        importo: document.getElementById('om-importo').value.trim(),
+    };
+    if (!payload.data) { alert('Inserisci la data del servizio'); return; }
+    if (!payload.descrizione) { alert('Descrivi il servizio svolto'); return; }
+    if (payload.importo === '') { alert('Inserisci il prezzo'); return; }
+
+    const btn = document.getElementById('om-btn-crea');
+    btn.disabled = true;
+    _fatPost(`{% url 'fatture:crea-ordine-manuale' %}`, payload)
+        .then(d => {
+            if (!d.success) {
+                btn.disabled = false;
+                alert('Errore: ' + (d.error || 'creazione fallita'));
+                return;
+            }
+            location.reload();
+        })
+        .catch(() => { btn.disabled = false; alert('Errore di rete'); });
+}
+
+// --- Modal modifica fattura ------------------------------------------
+const FATTURE_DATA = JSON.parse(document.getElementById('fatture-data').textContent);
+let _modificaModal = null;
+
+function apriModalModifica(pk) {
+    const dati = FATTURE_DATA[String(pk)];
+    if (!dati) return;
+    document.getElementById('mod-fattura-id').value = pk;
+    document.getElementById('mod-data').value = dati.data;
+    document.getElementById('mod-numero').value = dati.numero;
+    document.getElementById('mod-ragione').value = dati.ragione_sociale;
+
+    const cont = document.getElementById('mod-ordini');
+    cont.innerHTML = dati.ordini.length ? '' :
+        '<div class="text-muted small mb-1">Nessun ordine collegato.</div>';
+    dati.ordini.forEach(o => {
+        cont.insertAdjacentHTML('beforeend',
+            _htmlRigaOrdine('mod', o.id, o.numero, o.importo, true));
+    });
+    document.getElementById('mod-righe').innerHTML = '';
+    dati.righe.forEach(r => aggiungiRiga('mod-righe', r.data, r.descrizione, r.importo));
+    aggiornaTotale('mod');
+
+    if (!_modificaModal) _modificaModal = new bootstrap.Modal(document.getElementById('modalModifica'));
+    _modificaModal.show();
+}
+
+function confermaModifica(confermaDuplicato) {
+    const pk = document.getElementById('mod-fattura-id').value;
+    if (!pk) return;
+    const raccolto = _raccogliRighe('mod');
+    if (!raccolto) return;
+    const payload = {
+        numero: document.getElementById('mod-numero').value.trim(),
+        data: document.getElementById('mod-data').value,
+        ragione_sociale: document.getElementById('mod-ragione').value.trim(),
+        ordini: raccolto.ordini,
+        righe: raccolto.righe,
+        conferma_duplicato: !!confermaDuplicato,
+    };
+    if (!payload.data) { alert('Inserisci la data della fattura'); return; }
+    if (!payload.numero) { alert('Inserisci il numero della fattura'); return; }
+    if (!payload.ragione_sociale) { alert('Inserisci la ragione sociale'); return; }
+
+    const btn = document.getElementById('mod-btn-salva');
+    btn.disabled = true;
+    _fatPost(`{% url 'fatture:modifica' 0 %}`.replace('0', pk), payload)
+        .then(d => {
+            if (d.warning_duplicato) {
+                btn.disabled = false;
+                if (confirm(`Esiste gia' una fattura numero ${d.numero}. Salvare comunque?`)) {
+                    confermaModifica(true);
+                }
+                return;
+            }
+            if (!d.success) {
+                btn.disabled = false;
+                alert('Errore: ' + (d.error || 'salvataggio fallito'));
                 return;
             }
             location.reload();

@@ -10,7 +10,7 @@ from django.urls import reverse
 from apps.clienti.models import Cliente
 from apps.ordini.models import Ordine, Pagamento
 
-from .models import Fattura
+from .models import Fattura, RigaFattura
 
 
 def _crea_ordine(cliente=None, totale='10.00', **extra):
@@ -195,6 +195,165 @@ class StatiFatturaTest(BaseFattureTest):
                         {'metodo': 'contanti'})
         self._post_json(reverse('fatture:archivia', args=[fattura2.pk]), {})
         r = self._post_json(reverse('fatture:elimina', args=[fattura2.pk]), {})
+        self.assertFalse(r.json()['success'])
+
+
+class ImportiERigheTest(BaseFattureTest):
+    def test_crea_con_importo_modificato_e_righe_manuali(self):
+        o1 = _crea_ordine(self.cliente_a, richiede_fattura=True)  # 10.00
+        r = self._post_json(reverse('fatture:crea-fattura'), {
+            'ordini': [o1.pk], 'importi': {str(o1.pk): '8.50'},
+            'righe': [{'data': '2026-09-10',
+                       'descrizione': 'Lavaggio tappezzeria furgone',
+                       'importo': '40.00'}],
+            'data': '2026-09-18', 'numero': '20/2026',
+            'ragione_sociale': 'X'})
+        dati = r.json()
+        self.assertTrue(dati['success'])
+        fattura = Fattura.objects.get(pk=dati['fattura_id'])
+        o1.refresh_from_db()
+        self.assertEqual(o1.fattura_importo, Decimal('8.50'))
+        self.assertEqual(o1.totale_finale, Decimal('10.00'))  # intatto
+        self.assertEqual(fattura.totale, Decimal('48.50'))
+        self.assertEqual(fattura.righe.count(), 1)
+
+    def test_righe_manuali_forzano_da_pagare(self):
+        o1 = _crea_ordine(self.cliente_a, richiede_fattura=True)
+        Pagamento.objects.create(ordine=o1, importo=Decimal('10.00'),
+                                 metodo='contanti')
+        r = self._post_json(reverse('fatture:crea-fattura'), {
+            'ordini': [o1.pk],
+            'righe': [{'data': '2026-09-10', 'descrizione': 'Extra',
+                       'importo': '5.00'}],
+            'data': '2026-09-18', 'numero': '21/2026',
+            'ragione_sociale': 'X'})
+        self.assertEqual(r.json()['stato'], 'da_pagare')
+
+    def test_riga_incompleta_rifiutata(self):
+        o1 = _crea_ordine(self.cliente_a, richiede_fattura=True)
+        r = self._post_json(reverse('fatture:crea-fattura'), {
+            'ordini': [o1.pk],
+            'righe': [{'data': '2026-09-10', 'descrizione': '',
+                       'importo': '5.00'}],
+            'data': '2026-09-18', 'numero': '22/2026',
+            'ragione_sociale': 'X'})
+        self.assertFalse(r.json()['success'])
+
+    def test_elimina_azzera_importo_personalizzato(self):
+        o1 = _crea_ordine(self.cliente_a, richiede_fattura=True)
+        r = self._post_json(reverse('fatture:crea-fattura'), {
+            'ordini': [o1.pk], 'importi': {str(o1.pk): '7.00'},
+            'data': '2026-09-18', 'numero': '23/2026',
+            'ragione_sociale': 'X'})
+        fattura_id = r.json()['fattura_id']
+        self._post_json(reverse('fatture:elimina', args=[fattura_id]), {})
+        o1.refresh_from_db()
+        self.assertIsNone(o1.fattura_importo)
+        self.assertIsNone(o1.fattura_id)
+
+
+class OrdineManualeTest(BaseFattureTest):
+    def test_crea_ordine_manuale_e_raggruppa(self):
+        r = self._post_json(reverse('fatture:crea-ordine-manuale'), {
+            'cliente_id': self.cliente_a.pk, 'data': '2026-09-10',
+            'descrizione': 'Lavaggio completo furgone', 'importo': '35.00'})
+        dati = r.json()
+        self.assertTrue(dati['success'])
+        ordine = Ordine.objects.get(pk=dati['ordine_id'])
+        self.assertTrue(ordine.richiede_fattura)
+        self.assertEqual(ordine.stato, 'completato')
+        self.assertEqual(ordine.stato_pagamento, 'non_pagato')
+        self.assertEqual(ordine.totale_finale, Decimal('35.00'))
+        self.assertEqual(ordine.nota, 'Lavaggio completo furgone')
+        self.assertEqual(ordine.data_ora.date().isoformat(), '2026-09-10')
+
+        r = self._post_json(reverse('fatture:crea-fattura'), {
+            'ordini': [ordine.pk], 'data': '2026-09-18',
+            'numero': '40/2026', 'ragione_sociale': 'X'})
+        self.assertTrue(r.json()['success'])
+        ordine.refresh_from_db()
+        self.assertIsNotNone(ordine.fattura_id)
+
+    def test_ordine_manuale_richiede_dati(self):
+        r = self._post_json(reverse('fatture:crea-ordine-manuale'), {
+            'cliente_id': self.cliente_a.pk, 'data': '2026-09-10',
+            'descrizione': '', 'importo': '35.00'})
+        self.assertFalse(r.json()['success'])
+        r = self._post_json(reverse('fatture:crea-ordine-manuale'), {
+            'cliente_id': 999999, 'data': '2026-09-10',
+            'descrizione': 'X', 'importo': '35.00'})
+        self.assertFalse(r.json()['success'])
+
+
+class ModificaFatturaTest(BaseFattureTest):
+    def _fattura(self, **kw):
+        o1 = _crea_ordine(self.cliente_a, richiede_fattura=True)
+        o2 = _crea_ordine(self.cliente_a, richiede_fattura=True,
+                          totale='15.00')
+        r = self._post_json(reverse('fatture:crea-fattura'), {
+            'ordini': [o1.pk, o2.pk], 'data': '2026-09-18',
+            'numero': '30/2026', 'ragione_sociale': 'Vecchia SRL'})
+        return Fattura.objects.get(pk=r.json()['fattura_id']), o1, o2
+
+    def test_modifica_testata_importi_e_righe(self):
+        fattura, o1, o2 = self._fattura()
+        r = self._post_json(reverse('fatture:modifica', args=[fattura.pk]), {
+            'numero': '31/2026', 'data': '2026-09-19',
+            'ragione_sociale': 'Nuova SRL',
+            'ordini': [{'id': o1.pk, 'importo': '9.99'},
+                       {'id': o2.pk, 'importo': ''}],
+            'righe': [{'data': '2026-09-19', 'descrizione': 'Supplemento',
+                       'importo': '3.00'}]})
+        self.assertTrue(r.json()['success'])
+        fattura.refresh_from_db()
+        o1.refresh_from_db()
+        o2.refresh_from_db()
+        self.assertEqual(fattura.numero, '31/2026')
+        self.assertEqual(fattura.ragione_sociale, 'Nuova SRL')
+        self.assertEqual(o1.fattura_importo, Decimal('9.99'))
+        self.assertIsNone(o2.fattura_importo)  # '' = usa il totale
+        self.assertEqual(fattura.totale,
+                         Decimal('9.99') + Decimal('15.00') + Decimal('3.00'))
+
+    def test_ordine_tolto_torna_da_fatturare(self):
+        fattura, o1, o2 = self._fattura()
+        r = self._post_json(reverse('fatture:modifica', args=[fattura.pk]), {
+            'numero': '30/2026', 'data': '2026-09-18',
+            'ragione_sociale': 'Vecchia SRL',
+            'ordini': [{'id': o1.pk, 'importo': ''}],
+            'righe': []})
+        self.assertTrue(r.json()['success'])
+        o2.refresh_from_db()
+        self.assertIsNone(o2.fattura_id)
+        self.assertTrue(o2.richiede_fattura)
+        self.assertEqual(fattura.ordini.count(), 1)
+
+    def test_pagata_con_ordine_non_saldato_torna_da_pagare(self):
+        fattura, o1, o2 = self._fattura()
+        self._post_json(reverse('fatture:segna-pagata', args=[fattura.pk]),
+                        {'metodo': 'bonifico'})
+        # Ordine nuovo non pagato flaggato, poi aggiunto? La modifica
+        # non aggiunge ordini: simuliamo un ordine tornato non saldato
+        # cancellando il suo pagamento.
+        o1.refresh_from_db()
+        o1.pagamenti.all().delete()
+        r = self._post_json(reverse('fatture:modifica', args=[fattura.pk]), {
+            'numero': '30/2026', 'data': '2026-09-18',
+            'ragione_sociale': 'Vecchia SRL',
+            'ordini': [{'id': o1.pk, 'importo': ''},
+                       {'id': o2.pk, 'importo': ''}],
+            'righe': []})
+        self.assertTrue(r.json()['success'])
+        self.assertEqual(r.json()['stato'], 'da_pagare')
+
+    def test_archiviata_non_modificabile(self):
+        fattura, o1, o2 = self._fattura()
+        self._post_json(reverse('fatture:segna-pagata', args=[fattura.pk]),
+                        {'metodo': 'bonifico'})
+        self._post_json(reverse('fatture:archivia', args=[fattura.pk]), {})
+        r = self._post_json(reverse('fatture:modifica', args=[fattura.pk]), {
+            'numero': 'X/2026', 'data': '2026-09-18',
+            'ragione_sociale': 'X', 'ordini': [], 'righe': []})
         self.assertFalse(r.json()['success'])
 
 

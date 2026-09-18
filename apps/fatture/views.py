@@ -11,7 +11,33 @@ from django.views.decorators.http import require_POST
 
 from apps.ordini.models import Ordine, Pagamento
 
-from .models import Fattura
+from .models import Fattura, RigaFattura
+
+
+def _parse_importo(valore):
+    """'12.50' -> Decimal; None/'' -> None (= usa il totale ordine)."""
+    if valore in (None, ''):
+        return None
+    importo = Decimal(str(valore))
+    if importo < 0:
+        raise ValueError('importo negativo')
+    return importo.quantize(Decimal('0.01'))
+
+
+def _parse_righe(raw):
+    """Valida le righe manuali [{data, descrizione, importo}, ...]."""
+    righe = []
+    for r in raw or []:
+        descrizione = (r.get('descrizione') or '').strip()[:200]
+        if not descrizione:
+            raise ValueError('descrizione riga mancante')
+        data_riga = datetime.strptime(r.get('data') or '', '%Y-%m-%d').date()
+        importo = _parse_importo(r.get('importo'))
+        if importo is None:
+            raise ValueError('importo riga mancante')
+        righe.append({'data': data_riga, 'descrizione': descrizione,
+                      'importo': importo})
+    return righe
 
 
 @login_required
@@ -47,12 +73,36 @@ def fatture_home(request):
     fatture = (
         Fattura.objects
         .select_related('cliente')
-        .prefetch_related('ordini__items__servizio_prodotto')
+        .prefetch_related('ordini__items__servizio_prodotto', 'righe')
     )
     if not mostra_archiviate:
         fatture = fatture.exclude(stato='archiviata')
+    fatture = list(fatture)
+
+    # Dati per il modal "Modifica fattura" (json_script nel template)
+    fatture_json = {
+        str(f.pk): {
+            'numero': f.numero,
+            'data': f.data.isoformat(),
+            'ragione_sociale': f.ragione_sociale,
+            'stato': f.stato,
+            'ordini': [
+                {'id': o.pk, 'numero': o.numero_progressivo,
+                 'importo': str(o.importo_in_fattura),
+                 'totale_finale': str(o.totale_finale or Decimal('0'))}
+                for o in f.ordini.all()
+            ],
+            'righe': [
+                {'data': r.data.isoformat(), 'descrizione': r.descrizione,
+                 'importo': str(r.importo)}
+                for r in f.righe.all()
+            ],
+        }
+        for f in fatture if f.stato != 'archiviata'
+    }
 
     return render(request, 'fatture/fatture_list.html', {
+        'fatture_json': fatture_json,
         'gruppi_cliente': gruppi_cliente,
         'senza_cliente': senza_cliente,
         'totale_senza_cliente': sum(
@@ -80,17 +130,72 @@ def suggerisci_numero(request):
 
 @login_required
 @require_POST
+def crea_ordine_manuale(request):
+    """Crea al volo un ordine da fatturare (servizio non registrato
+    a suo tempo nel gestionale): cliente, data, descrizione, prezzo.
+
+    E' un Ordine vero: nasce completato, non pagato e gia' flaggato
+    richiede_fattura, cosi' compare subito tra gli ordini da
+    raggruppare e il saldo passa dal flusso pagamenti normale.
+    """
+    from apps.clienti.models import Cliente
+
+    try:
+        payload = json.loads(request.body)
+        cliente = Cliente.objects.get(pk=int(payload.get('cliente_id')))
+        data_ordine = datetime.strptime(
+            payload.get('data') or '', '%Y-%m-%d').date()
+        descrizione = (payload.get('descrizione') or '').strip()
+        importo = _parse_importo(payload.get('importo'))
+    except (json.JSONDecodeError, ValueError, TypeError,
+            Cliente.DoesNotExist, ArithmeticError):
+        return JsonResponse({'success': False, 'error': 'Dati non validi'})
+
+    if not descrizione:
+        return JsonResponse({'success': False,
+                             'error': 'Descrivi il servizio svolto'})
+    if importo is None:
+        return JsonResponse({'success': False, 'error': 'Prezzo obbligatorio'})
+
+    ordine = Ordine.objects.create(
+        cliente=cliente,
+        origine='operatore',
+        operatore=request.user,
+        totale=importo,
+        totale_finale=importo,
+        nota=descrizione,
+        stato='completato',
+        auto_ritirata=True,
+        richiede_fattura=True,
+    )
+    # data_ora e' auto_now_add: la retrodatiamo dopo la creazione
+    # (mezzogiorno locale, cosi' resta nel giorno scelto).
+    quando = timezone.make_aware(
+        datetime.combine(data_ordine, datetime.min.time().replace(hour=12)))
+    Ordine.objects.filter(pk=ordine.pk).update(data_ora=quando)
+
+    return JsonResponse({'success': True, 'ordine_id': ordine.pk,
+                         'numero': ordine.numero_progressivo})
+
+
+@login_required
+@require_POST
 def crea_fattura(request):
     """Crea una fattura dagli ordini selezionati (stesso cliente)."""
     try:
         payload = json.loads(request.body)
         ordini_ids = [int(i) for i in payload.get('ordini', [])]
+        # Importi personalizzati per ordine: {'<id>': '12.50', ...}
+        importi = {int(k): _parse_importo(v)
+                   for k, v in (payload.get('importi') or {}).items()}
+        righe = _parse_righe(payload.get('righe'))
         data_fattura = datetime.strptime(
             payload.get('data', ''), '%Y-%m-%d').date()
         numero = (payload.get('numero') or '').strip()
         ragione_sociale = (payload.get('ragione_sociale') or '').strip()
         conferma_duplicato = bool(payload.get('conferma_duplicato'))
-    except (json.JSONDecodeError, ValueError, TypeError):
+    except (json.JSONDecodeError, ValueError, TypeError,
+            ArithmeticError):
         return JsonResponse({'success': False, 'error': 'Dati non validi'})
 
     if not ordini_ids:
@@ -136,16 +241,96 @@ def crea_fattura(request):
             ragione_sociale=ragione_sociale,
             creata_da=request.user,
         )
-        Ordine.objects.filter(pk__in=[o.pk for o in ordini]).update(
-            fattura=fattura)
-        # Stato iniziale: pagata se ogni ordine e' gia' saldato.
-        if all(o.is_pagato for o in ordini):
+        for ordine in ordini:
+            ordine.fattura = fattura
+            ordine.fattura_importo = importi.get(ordine.pk)
+            ordine.save(update_fields=['fattura', 'fattura_importo'])
+        for riga in righe:
+            RigaFattura.objects.create(fattura=fattura, **riga)
+        # Stato iniziale: pagata se ogni ordine e' gia' saldato e non
+        # ci sono righe manuali da incassare.
+        totale_righe = sum((r['importo'] for r in righe), Decimal('0'))
+        if all(o.is_pagato for o in ordini) and totale_righe == 0:
             fattura.stato = 'pagata'
             fattura.pagata_il = timezone.now()
             fattura.save(update_fields=['stato', 'pagata_il'])
 
     return JsonResponse({'success': True, 'fattura_id': fattura.pk,
                          'stato': fattura.stato})
+
+
+@login_required
+@require_POST
+def modifica_fattura(request, pk):
+    """Modifica una fattura emessa (non archiviata): testata, importi
+    per ordine, righe manuali; gli ordini tolti tornano da fatturare."""
+    fattura = get_object_or_404(Fattura, pk=pk)
+    if fattura.stato == 'archiviata':
+        return JsonResponse({
+            'success': False,
+            'error': 'Le fatture archiviate non si possono modificare.'})
+
+    try:
+        payload = json.loads(request.body)
+        numero = (payload.get('numero') or '').strip()
+        ragione_sociale = (payload.get('ragione_sociale') or '').strip()
+        data_fattura = datetime.strptime(
+            payload.get('data', ''), '%Y-%m-%d').date()
+        ordini_payload = [
+            {'id': int(o.get('id')), 'importo': _parse_importo(o.get('importo'))}
+            for o in (payload.get('ordini') or [])
+        ]
+        righe = _parse_righe(payload.get('righe'))
+        conferma_duplicato = bool(payload.get('conferma_duplicato'))
+    except (json.JSONDecodeError, ValueError, TypeError,
+            ArithmeticError):
+        return JsonResponse({'success': False, 'error': 'Dati non validi'})
+
+    if not numero:
+        return JsonResponse({'success': False,
+                             'error': 'Numero fattura obbligatorio'})
+    if not ragione_sociale:
+        return JsonResponse({'success': False,
+                             'error': 'Ragione sociale obbligatoria'})
+    if (numero != fattura.numero
+            and Fattura.objects.filter(numero=numero).exclude(pk=pk).exists()
+            and not conferma_duplicato):
+        return JsonResponse({'success': False, 'warning_duplicato': True,
+                             'numero': numero})
+
+    with transaction.atomic():
+        attuali = {o.pk: o for o in fattura.ordini.all()}
+        tenuti = {o['id']: o for o in ordini_payload if o['id'] in attuali}
+        # Ordini tolti dalla fattura: tornano nel pool da fatturare
+        # (il flag richiede_fattura resta attivo)
+        for pk_ordine, ordine in attuali.items():
+            if pk_ordine not in tenuti:
+                ordine.fattura = None
+                ordine.fattura_importo = None
+                ordine.save(update_fields=['fattura', 'fattura_importo'])
+            else:
+                ordine.fattura_importo = tenuti[pk_ordine]['importo']
+                ordine.save(update_fields=['fattura_importo'])
+        # Righe manuali: si sostituiscono in blocco
+        fattura.righe.all().delete()
+        for riga in righe:
+            RigaFattura.objects.create(fattura=fattura, **riga)
+
+        fattura.numero = numero
+        fattura.data = data_fattura
+        fattura.ragione_sociale = ragione_sociale
+        # Una fattura "pagata" che dopo la modifica contiene ordini non
+        # saldati torna da pagare (l'operatore ripassera' da Segna pagata)
+        campi = ['numero', 'data', 'ragione_sociale']
+        ordini_rimasti = list(fattura.ordini.all())
+        if (fattura.stato == 'pagata'
+                and any(not o.is_pagato for o in ordini_rimasti)):
+            fattura.stato = 'da_pagare'
+            fattura.pagata_il = None
+            campi += ['stato', 'pagata_il']
+        fattura.save(update_fields=campi)
+
+    return JsonResponse({'success': True, 'stato': fattura.stato})
 
 
 @login_required
@@ -208,5 +393,9 @@ def elimina_fattura(request, pk):
         return JsonResponse({
             'success': False,
             'error': 'Le fatture archiviate non si possono eliminare.'})
-    fattura.delete()
+    with transaction.atomic():
+        # Azzera gli importi personalizzati prima che SET_NULL liberi
+        # gli ordini: fuori fattura vale di nuovo il totale reale.
+        fattura.ordini.update(fattura_importo=None)
+        fattura.delete()
     return JsonResponse({'success': True})
