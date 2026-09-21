@@ -401,6 +401,51 @@ class ModificaFatturaTest(BaseFattureTest):
         self.assertFalse(r.json()['success'])
 
 
+class ModificaOrdineDaFatturareTest(BaseFattureTest):
+    def test_modifica_dati_ordine(self):
+        ordine = _crea_ordine(self.cliente_a, richiede_fattura=True)
+        r = self._post_json(
+            reverse('fatture:modifica-ordine', args=[ordine.pk]),
+            {'tipo_auto': 'Fiat Panda rossa', 'targa': 'aa000bb',
+             'matricola': 'M-1', 'nota': 'nota'})
+        self.assertTrue(r.json()['success'])
+        ordine.refresh_from_db()
+        self.assertEqual(ordine.tipo_auto, 'Fiat Panda rossa')
+        self.assertEqual(ordine.fattura_targa, 'AA000BB')
+        self.assertEqual(ordine.fattura_matricola, 'M-1')
+        self.assertEqual(ordine.fattura_nota, 'nota')
+
+    def test_solo_ordini_in_attesa(self):
+        fattura = Fattura.objects.create(
+            numero='1/2026', data=date(2026, 1, 1), ragione_sociale='X')
+        ordine = _crea_ordine(self.cliente_a, richiede_fattura=True,
+                              fattura=fattura)
+        r = self._post_json(
+            reverse('fatture:modifica-ordine', args=[ordine.pk]),
+            {'tipo_auto': 'X'})
+        self.assertFalse(r.json()['success'])
+
+
+class StampaPdfTest(BaseFattureTest):
+    def test_pdf_tre_sezioni(self):
+        _crea_ordine(self.cliente_a, richiede_fattura=True)
+        Fattura.objects.create(numero='1/2026', data=date(2026, 1, 1),
+                               ragione_sociale='X', cliente=self.cliente_a)
+        Fattura.objects.create(numero='2/2026', data=date(2026, 1, 2),
+                               ragione_sociale='X', cliente=self.cliente_a,
+                               stato='pagata')
+        for sezione in ['da-fatturare', 'da-pagare', 'pagate']:
+            r = self.client.get(reverse('fatture:stampa', args=[sezione]))
+            self.assertEqual(r.status_code, 200)
+            self.assertEqual(r['Content-Type'], 'application/pdf')
+            contenuto = b''.join(r.streaming_content)
+            self.assertTrue(contenuto.startswith(b'%PDF'))
+
+    def test_sezione_sconosciuta_404(self):
+        r = self.client.get(reverse('fatture:stampa', args=['boh']))
+        self.assertEqual(r.status_code, 404)
+
+
 class NumerazioneTest(BaseFattureTest):
     def test_suggerisci_numero(self):
         self.assertEqual(Fattura.suggerisci_numero(2026), '1/2026')

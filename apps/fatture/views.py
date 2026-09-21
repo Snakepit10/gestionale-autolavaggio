@@ -40,10 +40,9 @@ def _parse_righe(raw):
     return righe
 
 
-@login_required
-def fatture_home(request):
-    """Pagina Fatture: ordini da fatturare raggruppati per cliente
-    + elenco fatture emesse."""
+def _dati_da_fatturare():
+    """Ordini flaggati e voci manuali in attesa, raggruppati per
+    cliente (i senza-cliente a parte). Usato da pagina e stampa."""
     da_fatturare = (
         Ordine.objects
         .filter(richiede_fattura=True, fattura__isnull=True)
@@ -52,15 +51,10 @@ def fatture_home(request):
         .prefetch_related('items__servizio_prodotto')
         .order_by('cliente_id', 'data_ora')
     )
-
-    # Voci manuali in attesa (fattura=NULL): entrano nei gruppi
-    # accanto agli ordini
     voci_attesa = list(
         RigaFattura.objects.filter(fattura__isnull=True)
         .select_related('cliente').order_by('data', 'id'))
 
-    # Raggruppa per cliente mantenendo l'ordine; gli ordini senza
-    # cliente finiscono in un gruppo a parte (ragione sociale a mano).
     gruppi = {}
     senza_cliente = []
     for ordine in da_fatturare:
@@ -92,16 +86,45 @@ def fatture_home(request):
                     Decimal('0'))
                 + sum((v.importo for v in voci), Decimal('0'))),
         })
+    return gruppi_cliente, senza_cliente, voci_senza_cliente
 
-    mostra_archiviate = request.GET.get('archiviate') == '1'
-    fatture = (
+
+def _gruppo_fatture(cliente, lista):
+    return {
+        'cliente': cliente,
+        'fatture': lista,
+        'totale': sum((f.totale for f in lista), Decimal('0')),
+        'saldo': sum((f.saldo_dovuto for f in lista), Decimal('0')),
+    }
+
+
+def _raggruppa_fatture(lista):
+    per_cliente = {}
+    senza = []
+    for f in lista:
+        if f.cliente_id:
+            per_cliente.setdefault(f.cliente, []).append(f)
+        else:
+            senza.append(f)
+    gruppi = [_gruppo_fatture(c, lst) for c, lst in per_cliente.items()]
+    gruppi.sort(key=lambda g: g['cliente'].nome_completo.lower())
+    if senza:
+        gruppi.append(_gruppo_fatture(None, senza))
+    return gruppi
+
+
+def _fatture_emesse():
+    return list(
         Fattura.objects
         .select_related('cliente')
-        .prefetch_related('ordini__items__servizio_prodotto', 'righe')
-    )
-    if not mostra_archiviate:
-        fatture = fatture.exclude(stato='archiviata')
-    fatture = list(fatture)
+        .prefetch_related('ordini__items__servizio_prodotto', 'righe'))
+
+
+@login_required
+def fatture_home(request):
+    """Pagina Fatture in tre schede: da fatturare / da pagare / pagate."""
+    gruppi_cliente, senza_cliente, voci_senza_cliente = _dati_da_fatturare()
+    fatture = _fatture_emesse()
 
     # Dati per il modal "Modifica fattura" (json_script nel template)
     fatture_json = {
@@ -125,32 +148,8 @@ def fatture_home(request):
         for f in fatture if f.stato != 'archiviata'
     }
 
-    # Fatture emesse raggruppate per cliente (quelle senza cliente,
-    # es. cliente cancellato o gruppo anonimo, in coda)
-    def _gruppo_fatture(cliente, lista):
-        return {
-            'cliente': cliente,
-            'fatture': lista,
-            'totale': sum((f.totale for f in lista), Decimal('0')),
-            'saldo': sum((f.saldo_dovuto for f in lista), Decimal('0')),
-        }
-
-    def _raggruppa_fatture(lista):
-        per_cliente = {}
-        senza = []
-        for f in lista:
-            if f.cliente_id:
-                per_cliente.setdefault(f.cliente, []).append(f)
-            else:
-                senza.append(f)
-        gruppi = [_gruppo_fatture(c, lst) for c, lst in per_cliente.items()]
-        gruppi.sort(key=lambda g: g['cliente'].nome_completo.lower())
-        if senza:
-            gruppi.append(_gruppo_fatture(None, senza))
-        return gruppi
-
     # Tre schede: da fatturare / fatture da pagare / fatture pagate
-    # (le archiviate compaiono tra le pagate col toggle)
+    # (le archiviate stanno sempre tra le pagate)
     fatture_da_pagare = [f for f in fatture if f.stato == 'da_pagare']
     fatture_pagate = [f for f in fatture
                       if f.stato in ('pagata', 'archiviata')]
@@ -173,8 +172,6 @@ def fatture_home(request):
                 Decimal('0'))
             + sum((v.importo for v in voci_senza_cliente), Decimal('0'))),
         'fatture': fatture,
-        'mostra_archiviate': mostra_archiviate,
-        'n_archiviate': Fattura.objects.filter(stato='archiviata').count(),
         'metodi_pagamento': Pagamento.METODO_CHOICES,
         'oggi': timezone.localdate(),
         'numero_suggerito': Fattura.suggerisci_numero(timezone.localdate().year),
@@ -237,6 +234,32 @@ def elimina_voce(request, pk):
     """Elimina una voce manuale ancora in attesa (non in fattura)."""
     voce = get_object_or_404(RigaFattura, pk=pk, fattura__isnull=True)
     voce.delete()
+    return JsonResponse({'success': True})
+
+
+@login_required
+@require_POST
+def modifica_ordine_da_fatturare(request, pk):
+    """Corregge i dati di un ordine in attesa di fattura: tipo auto,
+    targa, matricola e nota fattura."""
+    ordine = Ordine.objects.filter(
+        pk=pk, richiede_fattura=True, fattura__isnull=True).first()
+    if ordine is None:
+        return JsonResponse({
+            'success': False,
+            'error': 'Ordine non modificabile (gia\' in fattura o '
+                     'senza richiesta attiva).'})
+    try:
+        payload = json.loads(request.body)
+    except json.JSONDecodeError:
+        return JsonResponse({'success': False, 'error': 'Dati non validi'})
+
+    ordine.tipo_auto = (payload.get('tipo_auto') or '').strip()[:200]
+    ordine.fattura_targa = (payload.get('targa') or '').strip().upper()[:10]
+    ordine.fattura_matricola = (payload.get('matricola') or '').strip()[:50]
+    ordine.fattura_nota = (payload.get('nota') or '').strip()
+    ordine.save(update_fields=['tipo_auto', 'fattura_targa',
+                               'fattura_matricola', 'fattura_nota'])
     return JsonResponse({'success': True})
 
 
@@ -493,3 +516,169 @@ def elimina_fattura(request, pk):
         fattura.ordini.update(fattura_importo=None)
         fattura.delete()
     return JsonResponse({'success': True})
+
+
+# ======================= STAMPA PDF =======================
+
+_STAMPA_TITOLI = {
+    'da-fatturare': 'Ordini da fatturare',
+    'da-pagare': 'Fatture da pagare',
+    'pagate': 'Fatture pagate',
+}
+
+
+def _pdf_intestazione_gruppo(gruppo, styles):
+    from reportlab.platypus import Paragraph
+    cliente = gruppo['cliente']
+    nome = cliente.nome_completo if cliente else 'Senza cliente'
+    extra = []
+    if cliente and cliente.telefono:
+        extra.append(cliente.telefono)
+    if cliente and getattr(cliente, 'partita_iva', ''):
+        extra.append(f'P.IVA {cliente.partita_iva}')
+    testo = f'<b>{nome}</b>'
+    if extra:
+        testo += f' <font color="#64748b" size="8">{" - ".join(extra)}</font>'
+    return Paragraph(testo, styles['gruppo'])
+
+
+@login_required
+def stampa_pdf(request, sezione):
+    """PDF stampabile di una delle tre schede della pagina Fatture."""
+    import io
+
+    from django.http import FileResponse, HttpResponse
+    from reportlab.lib import colors
+    from reportlab.lib.pagesizes import A4, landscape
+    from reportlab.lib.styles import ParagraphStyle, getSampleStyleSheet
+    from reportlab.lib.units import mm
+    from reportlab.platypus import (Paragraph, SimpleDocTemplate, Spacer,
+                                    Table, TableStyle)
+
+    if sezione not in _STAMPA_TITOLI:
+        return HttpResponse('Sezione sconosciuta', status=404)
+
+    base = getSampleStyleSheet()
+    styles = {
+        'titolo': ParagraphStyle('titolo', parent=base['Heading1'],
+                                 fontSize=15, spaceAfter=2),
+        'sotto': ParagraphStyle('sotto', parent=base['Normal'],
+                                fontSize=8, textColor=colors.HexColor('#64748b'),
+                                spaceAfter=10),
+        'gruppo': ParagraphStyle('gruppo', parent=base['Heading3'],
+                                 fontSize=11, spaceBefore=10, spaceAfter=3),
+        'cella': ParagraphStyle('cella', parent=base['Normal'], fontSize=8),
+    }
+    stile_tabella = TableStyle([
+        ('FONTSIZE', (0, 0), (-1, -1), 8),
+        ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
+        ('TEXTCOLOR', (0, 0), (-1, 0), colors.HexColor('#475569')),
+        ('LINEBELOW', (0, 0), (-1, 0), 0.75, colors.HexColor('#94a3b8')),
+        ('LINEBELOW', (0, 1), (-1, -2), 0.25, colors.HexColor('#e2e8f0')),
+        ('LINEABOVE', (0, -1), (-1, -1), 0.75, colors.HexColor('#94a3b8')),
+        ('FONTNAME', (0, -1), (-1, -1), 'Helvetica-Bold'),
+        ('VALIGN', (0, 0), (-1, -1), 'TOP'),
+        ('TOPPADDING', (0, 0), (-1, -1), 3),
+        ('BOTTOMPADDING', (0, 0), (-1, -1), 3),
+    ])
+
+    def _p(testo):
+        from django.utils.html import escape
+        return Paragraph(escape(str(testo or '-')), styles['cella'])
+
+    def _eur(valore):
+        return f'{valore:.2f} EUR'.replace('.', ',')
+
+    elementi = [
+        Paragraph(_STAMPA_TITOLI[sezione], styles['titolo']),
+        Paragraph(
+            'Generato il '
+            + timezone.localtime().strftime('%d/%m/%Y alle %H:%M'),
+            styles['sotto']),
+    ]
+    totale_generale = Decimal('0')
+
+    if sezione == 'da-fatturare':
+        gruppi, senza_cliente, voci_senza = _dati_da_fatturare()
+        if senza_cliente or voci_senza:
+            gruppi.append({
+                'cliente': None, 'ordini': senza_cliente,
+                'voci': voci_senza,
+                'totale': (
+                    sum((o.totale_finale or Decimal('0')
+                         for o in senza_cliente), Decimal('0'))
+                    + sum((v.importo for v in voci_senza), Decimal('0'))),
+            })
+        intest = ['Ordine', 'Data', 'Tipo auto', 'Servizi', 'Targa',
+                  'Matricola', 'Nota', 'Totale']
+        larghezze = [55, 42, 88, 320, 48, 55, 100, 55]
+        for gruppo in gruppi:
+            elementi.append(_pdf_intestazione_gruppo(gruppo, styles))
+            righe = [intest]
+            for o in gruppo['ordini']:
+                servizi = ', '.join(
+                    i.servizio_prodotto.titolo for i in o.items.all()
+                ) or (o.nota or '-')
+                righe.append([
+                    f'#{o.numero_breve}',
+                    timezone.localtime(o.data_ora).strftime('%d/%m/%y'),
+                    _p(o.tipo_auto), _p(servizi), _p(o.fattura_targa),
+                    _p(o.fattura_matricola), _p(o.fattura_nota),
+                    _eur(o.totale_finale or Decimal('0')),
+                ])
+            for v in gruppo['voci']:
+                righe.append([
+                    'voce', v.data.strftime('%d/%m/%y'),
+                    _p(v.tipo_auto), _p(v.descrizione), _p(v.targa),
+                    _p(v.matricola), _p(v.nota), _eur(v.importo),
+                ])
+            righe.append(['', '', '', '', '', '', 'Totale',
+                          _eur(gruppo['totale'])])
+            totale_generale += gruppo['totale']
+            elementi.append(Table(righe, colWidths=larghezze,
+                                  style=stile_tabella, repeatRows=1))
+    else:
+        stati = (['da_pagare'] if sezione == 'da-pagare'
+                 else ['pagata', 'archiviata'])
+        fatture = [f for f in _fatture_emesse() if f.stato in stati]
+        gruppi = _raggruppa_fatture(fatture)
+        intest = ['Numero', 'Data', 'Ragione sociale', 'Elementi',
+                  'Stato', 'Saldo', 'Totale']
+        larghezze = [70, 48, 330, 55, 70, 90, 90]
+        for gruppo in gruppi:
+            elementi.append(_pdf_intestazione_gruppo(gruppo, styles))
+            righe = [intest]
+            for f in gruppo['fatture']:
+                righe.append([
+                    f.numero, f.data.strftime('%d/%m/%y'),
+                    _p(f.ragione_sociale),
+                    str(f.ordini.count() + f.righe.count()),
+                    f.get_stato_display(),
+                    _eur(f.saldo_dovuto), _eur(f.totale),
+                ])
+            righe.append(['', '', '', '', '', 'Totale',
+                          _eur(gruppo['totale'])])
+            totale_generale += gruppo['totale']
+            elementi.append(Table(righe, colWidths=larghezze,
+                                  style=stile_tabella, repeatRows=1))
+
+    if len(elementi) == 2:
+        elementi.append(Paragraph('Nessun elemento.', styles['cella']))
+    else:
+        elementi.append(Spacer(1, 8 * mm))
+        elementi.append(Paragraph(
+            f'<b>Totale complessivo: {_eur(totale_generale)}</b>',
+            styles['gruppo']))
+
+    buffer = io.BytesIO()
+    doc = SimpleDocTemplate(
+        buffer, pagesize=landscape(A4),
+        leftMargin=12 * mm, rightMargin=12 * mm,
+        topMargin=12 * mm, bottomMargin=12 * mm,
+        title=_STAMPA_TITOLI[sezione])
+    doc.build(elementi)
+    buffer.seek(0)
+    nome_file = (f'{sezione}-'
+                 f'{timezone.localdate().strftime("%Y%m%d")}.pdf')
+    return FileResponse(buffer, filename=nome_file,
+                        content_type='application/pdf')

@@ -42,7 +42,7 @@ usati dal riepilogo del modal crea fattura.
                 <td>{{ o.fattura_matricola|default:"-" }}</td>
                 <td class="small">{{ o.fattura_nota|default:"-" }}</td>
                 <td class="text-end"><strong>&euro;{{ o.totale_finale }}</strong></td>
-                <td>
+                <td class="text-nowrap">
                     {% if o.stato_pagamento == 'pagato' %}
                         <span class="badge bg-success">Pagato</span>
                     {% elif o.stato_pagamento == 'parziale' %}
@@ -52,6 +52,16 @@ usati dal riepilogo del modal crea fattura.
                     {% else %}
                         <span class="badge bg-danger">Non pagato</span>
                     {% endif %}
+                    <button type="button" class="btn btn-sm btn-outline-primary py-0 ms-1"
+                            onclick="apriModalOrdineEdit(this)"
+                            data-id="{{ o.pk }}" data-numero="{{ o.numero_progressivo }}"
+                            data-tipo-auto="{{ o.tipo_auto }}"
+                            data-targa="{{ o.fattura_targa }}"
+                            data-matricola="{{ o.fattura_matricola }}"
+                            data-nota="{{ o.fattura_nota }}"
+                            title="Modifica tipo auto, targa, matricola e nota">
+                        <i class="bi bi-pencil-square"></i>
+                    </button>
                 </td>
             </tr>
             {% endfor %}

@@ -79,10 +79,16 @@
             Ordini con richiesta fattura attiva + voci manuali. Seleziona
             cosa mettere insieme e clicca &laquo;Raggruppa in fattura&raquo;.
         </p>
-        <button class="btn btn-sm btn-outline-primary"
-                onclick="apriModalOrdineManuale()">
-            <i class="bi bi-plus-lg"></i> Aggiungi voce manuale
-        </button>
+        <span>
+            <a href="{% url 'fatture:stampa' 'da-fatturare' %}" target="_blank"
+               class="btn btn-sm btn-outline-secondary">
+                <i class="bi bi-printer"></i> Stampa PDF
+            </a>
+            <button class="btn btn-sm btn-outline-primary"
+                    onclick="apriModalOrdineManuale()">
+                <i class="bi bi-plus-lg"></i> Aggiungi voce manuale
+            </button>
+        </span>
     </div>
 
     {% if not gruppi_cliente and not senza_cliente %}
@@ -165,6 +171,12 @@
 
     {# ================= SCHEDA 2: FATTURE DA PAGARE ================= #}
     <div class="tab-pane fade" id="tab-da-pagare">
+    <div class="d-flex justify-content-end mb-2">
+        <a href="{% url 'fatture:stampa' 'da-pagare' %}" target="_blank"
+           class="btn btn-sm btn-outline-secondary">
+            <i class="bi bi-printer"></i> Stampa PDF
+        </a>
+    </div>
     {% if not gruppi_fatture_da_pagare %}
         <div class="alert alert-light border">
             Nessuna fattura in attesa di pagamento.
@@ -178,20 +190,13 @@
     {# ================= SCHEDA 3: FATTURE PAGATE ================= #}
     <div class="tab-pane fade" id="tab-pagate">
     <div class="d-flex justify-content-end mb-2">
-        {% if mostra_archiviate %}
-            <a href="{% url 'fatture:fatture-list' %}#tab-pagate" class="btn btn-sm btn-outline-secondary">
-                <i class="bi bi-eye-slash"></i> Nascondi archiviate
-            </a>
-        {% else %}
-            <a href="?archiviate=1#tab-pagate" class="btn btn-sm btn-outline-secondary">
-                <i class="bi bi-archive"></i> Mostra archiviate ({{ n_archiviate }})
-            </a>
-        {% endif %}
+        <a href="{% url 'fatture:stampa' 'pagate' %}" target="_blank"
+           class="btn btn-sm btn-outline-secondary">
+            <i class="bi bi-printer"></i> Stampa PDF
+        </a>
     </div>
     {% if not gruppi_fatture_pagate %}
-        <div class="alert alert-light border">
-            Ancora nessuna fattura pagata{% if not mostra_archiviate and n_archiviate %} (le archiviate sono nascoste){% endif %}.
-        </div>
+        <div class="alert alert-light border">Ancora nessuna fattura pagata.</div>
     {% endif %}
     {% for gf in gruppi_fatture_pagate %}
         {% include 'fatture/_gruppo_fatture.html' %}
@@ -337,6 +342,51 @@
                 <button type="button" class="btn btn-primary" id="om-btn-crea"
                         onclick="confermaOrdineManuale()">
                     <i class="bi bi-check-lg"></i> Crea voce
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+{# ================= MODAL MODIFICA ORDINE DA FATTURARE ================= #}
+<div class="modal fade" id="modalOrdineEdit" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title"><i class="bi bi-pencil-square"></i>
+                    Modifica ordine <span id="oe-numero"></span></h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <input type="hidden" id="oe-ordine-id">
+                <div class="mb-3">
+                    <label class="form-label" for="oe-tipo-auto">Tipo auto</label>
+                    <input type="text" class="form-control" id="oe-tipo-auto"
+                           maxlength="200" placeholder="es. Fiat Ducato bianco">
+                </div>
+                <div class="row g-2 mb-3">
+                    <div class="col-md-5">
+                        <label class="form-label" for="oe-targa">Targa</label>
+                        <input type="text" class="form-control" id="oe-targa"
+                               maxlength="10" placeholder="AB123CD"
+                               style="text-transform:uppercase">
+                    </div>
+                    <div class="col-md-7">
+                        <label class="form-label" for="oe-matricola">Matricola</label>
+                        <input type="text" class="form-control" id="oe-matricola"
+                               maxlength="50" placeholder="es. mezzo flotta">
+                    </div>
+                </div>
+                <div class="mb-0">
+                    <label class="form-label" for="oe-nota">Nota fattura</label>
+                    <textarea class="form-control" id="oe-nota" rows="2"
+                              placeholder="es. riferimento ordine d'acquisto"></textarea>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Annulla</button>
+                <button type="button" class="btn btn-primary" onclick="salvaOrdineEdit()">
+                    <i class="bi bi-check-lg"></i> Salva
                 </button>
             </div>
         </div>
@@ -738,6 +788,36 @@ function confermaOrdineManuale() {
             location.reload();
         })
         .catch(() => { btn.disabled = false; alert('Errore di rete'); });
+}
+
+// --- Modifica ordine da fatturare (tipo auto, targa, matricola, nota)
+let _oeModal = null;
+
+function apriModalOrdineEdit(btn) {
+    document.getElementById('oe-ordine-id').value = btn.dataset.id;
+    document.getElementById('oe-numero').textContent = '#' + btn.dataset.numero;
+    document.getElementById('oe-tipo-auto').value = btn.dataset.tipoAuto || '';
+    document.getElementById('oe-targa').value = btn.dataset.targa || '';
+    document.getElementById('oe-matricola').value = btn.dataset.matricola || '';
+    document.getElementById('oe-nota').value = btn.dataset.nota || '';
+    if (!_oeModal) _oeModal = new bootstrap.Modal(document.getElementById('modalOrdineEdit'));
+    _oeModal.show();
+}
+
+function salvaOrdineEdit() {
+    const pk = document.getElementById('oe-ordine-id').value;
+    if (!pk) return;
+    _fatPost(`{% url 'fatture:modifica-ordine' 0 %}`.replace('0', pk), {
+        tipo_auto: document.getElementById('oe-tipo-auto').value.trim(),
+        targa: document.getElementById('oe-targa').value.trim(),
+        matricola: document.getElementById('oe-matricola').value.trim(),
+        nota: document.getElementById('oe-nota').value.trim(),
+    })
+    .then(d => {
+        if (!d.success) { alert('Errore: ' + (d.error || 'salvataggio fallito')); return; }
+        location.reload();
+    })
+    .catch(() => alert('Errore di rete'));
 }
 
 // Elimina una voce manuale ancora in attesa
