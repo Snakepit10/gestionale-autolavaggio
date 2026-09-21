@@ -3,15 +3,38 @@
 
 {% block extra_css %}
 <style>
-.gruppo-card { border: 1px solid #dee2e6; border-radius: 10px; margin-bottom: 16px; }
+/* Card gruppo cliente: chiusa di default, si apre dal titolo */
+.gruppo-card {
+    border: 1px solid #e4e9f0; border-radius: 12px; margin-bottom: 10px;
+    background: #fff; box-shadow: 0 1px 2px rgba(16, 24, 40, .05);
+    overflow: hidden;
+}
 .gruppo-card .head {
     display: flex; justify-content: space-between; align-items: center;
-    flex-wrap: wrap; gap: 8px;
-    padding: 10px 14px; background: #f8f9fa;
-    border-bottom: 1px solid #dee2e6;
-    border-radius: 10px 10px 0 0;
+    flex-wrap: wrap; gap: 10px;
+    padding: 12px 16px; cursor: pointer;
+    transition: background .12s ease;
 }
+.gruppo-card .head:hover { background: #f6f9fc; }
+.gruppo-chevron { color: #94a3b8; transition: transform .15s ease; font-size: .9rem; }
+.gruppo-card.aperto .gruppo-chevron { transform: rotate(90deg); }
+.gruppo-card .gruppo-body { display: none; border-top: 1px solid #eef2f6; }
+.gruppo-card.aperto .gruppo-body { display: block; }
+.gruppo-card .nome-cliente { font-weight: 700; }
+.gruppo-card .meta { font-size: .8rem; color: #64748b; }
 .gruppo-card table { margin-bottom: 0; }
+
+/* Badge morbidi per conteggi e totali */
+.badge-soft { background: #eef2f7; color: #334155; font-weight: 600; }
+.badge-tot { background: #e7f1fd; color: #1461c7; font-weight: 700; }
+
+/* Intestazioni tabella compatte e leggibili */
+.gruppo-body thead th, .tab-fatture thead th, .fatt-dettaglio thead th {
+    font-size: .72rem; text-transform: uppercase; letter-spacing: .04em;
+    color: #64748b; font-weight: 700; border-bottom-width: 1px;
+    white-space: nowrap;
+}
+.tab-fatture tbody > tr.riga-fattura > td { padding-top: .7rem; padding-bottom: .7rem; }
 .fatt-dettaglio td { background: #fbfcfd; }
 .cursor-pointer { cursor: pointer; }
 </style>
@@ -57,17 +80,24 @@
 
     {% for gruppo in gruppi_cliente %}
     <div class="gruppo-card" data-gruppo="cliente-{{ gruppo.cliente.pk }}">
-        <div class="head">
-            <div>
-                <strong><i class="bi bi-person"></i> {{ gruppo.cliente.nome_completo }}</strong>
-                {% if gruppo.cliente.telefono %}
-                    <small class="text-muted ms-2">{{ gruppo.cliente.telefono }}</small>
-                {% endif %}
-                {% if gruppo.cliente.partita_iva %}
-                    <small class="text-muted ms-2">P.IVA {{ gruppo.cliente.partita_iva }}</small>
-                {% endif %}
+        <div class="head" onclick="toggleGruppoCard(this)">
+            <div class="d-flex align-items-center gap-2 flex-wrap">
+                <i class="bi bi-chevron-right gruppo-chevron"></i>
+                <input type="checkbox" class="form-check-input gruppo-check m-0"
+                       onclick="event.stopPropagation()"
+                       onchange="toggleSelezioneGruppo(this)"
+                       title="Seleziona tutti gli ordini del cliente">
+                <span class="nome-cliente"><i class="bi bi-person text-primary"></i>
+                    {{ gruppo.cliente.nome_completo }}</span>
+                <span class="meta">
+                    {% if gruppo.cliente.telefono %}{{ gruppo.cliente.telefono }}{% endif %}
+                    {% if gruppo.cliente.partita_iva %}&middot; P.IVA {{ gruppo.cliente.partita_iva }}{% endif %}
+                </span>
             </div>
-            <span>
+            <div class="d-flex align-items-center gap-2 flex-wrap" onclick="event.stopPropagation()">
+                <span class="badge rounded-pill badge-soft">
+                    {{ gruppo.ordini|length }} ordin{{ gruppo.ordini|length|pluralize:"e,i" }}</span>
+                <span class="badge rounded-pill badge-tot">&euro;{{ gruppo.totale }}</span>
                 <button class="btn btn-sm btn-outline-primary"
                         onclick="apriModalOrdineManuale('{{ gruppo.cliente.pk }}', '{{ gruppo.cliente.nome_completo }}')"
                         title="Aggiungi un ordine manuale per questo cliente">
@@ -79,36 +109,53 @@
                         data-ragione-sociale="{{ gruppo.cliente.nome_completo }}">
                     <i class="bi bi-collection"></i> Raggruppa in fattura
                 </button>
-            </span>
+            </div>
         </div>
-        {% include 'fatture/_tabella_da_fatturare.html' with ordini=gruppo.ordini %}
+        <div class="gruppo-body">
+            {% include 'fatture/_tabella_da_fatturare.html' with ordini=gruppo.ordini %}
+        </div>
     </div>
     {% endfor %}
 
     {% if senza_cliente %}
     <div class="gruppo-card" data-gruppo="senza-cliente">
-        <div class="head">
-            <div>
-                <strong><i class="bi bi-person-x"></i> Ordini senza cliente</strong>
-                <small class="text-muted ms-2">ragione sociale da inserire a mano</small>
+        <div class="head" onclick="toggleGruppoCard(this)">
+            <div class="d-flex align-items-center gap-2 flex-wrap">
+                <i class="bi bi-chevron-right gruppo-chevron"></i>
+                <input type="checkbox" class="form-check-input gruppo-check m-0"
+                       onclick="event.stopPropagation()"
+                       onchange="toggleSelezioneGruppo(this)"
+                       title="Seleziona tutti">
+                <span class="nome-cliente"><i class="bi bi-person-x text-secondary"></i>
+                    Ordini senza cliente</span>
+                <span class="meta">ragione sociale da inserire a mano</span>
             </div>
-            <button class="btn btn-sm btn-primary btn-raggruppa" disabled
-                    onclick="apriModalCrea(this)"
-                    data-cliente-id="" data-ragione-sociale="">
-                <i class="bi bi-collection"></i> Raggruppa in fattura
-            </button>
+            <div class="d-flex align-items-center gap-2 flex-wrap" onclick="event.stopPropagation()">
+                <span class="badge rounded-pill badge-soft">
+                    {{ senza_cliente|length }} ordin{{ senza_cliente|length|pluralize:"e,i" }}</span>
+                <span class="badge rounded-pill badge-tot">&euro;{{ totale_senza_cliente }}</span>
+                <button class="btn btn-sm btn-primary btn-raggruppa" disabled
+                        onclick="apriModalCrea(this)"
+                        data-cliente-id="" data-ragione-sociale="">
+                    <i class="bi bi-collection"></i> Raggruppa in fattura
+                </button>
+            </div>
         </div>
-        {% include 'fatture/_tabella_da_fatturare.html' with ordini=senza_cliente %}
+        <div class="gruppo-body">
+            {% include 'fatture/_tabella_da_fatturare.html' with ordini=senza_cliente %}
+        </div>
     </div>
     {% endif %}
 
     {# ================= FATTURE EMESSE ================= #}
-    <h5 class="mt-4 mb-2"><i class="bi bi-journal-check"></i> Fatture emesse</h5>
+    <h5 class="mt-4 mb-2"><i class="bi bi-journal-check"></i> Fatture emesse
+        {% if fatture %}<span class="badge rounded-pill badge-soft align-middle">{{ fatture|length }}</span>{% endif %}
+    </h5>
     {% if not fatture %}
         <div class="alert alert-light border">Ancora nessuna fattura.</div>
     {% else %}
-    <div class="table-responsive">
-        <table class="table table-hover align-middle">
+    <div class="table-responsive gruppo-card p-0">
+        <table class="table table-hover align-middle tab-fatture mb-0">
             <thead>
                 <tr>
                     <th></th>
@@ -124,28 +171,33 @@
             </thead>
             <tbody>
                 {% for f in fatture %}
-                <tr class="cursor-pointer" data-bs-toggle="collapse"
+                <tr class="cursor-pointer riga-fattura" data-bs-toggle="collapse"
                     data-bs-target="#fat-det-{{ f.pk }}">
                     <td class="text-muted"><i class="bi bi-chevron-down small"></i></td>
-                    <td><strong>{{ f.numero }}</strong></td>
-                    <td>{{ f.data|date:"d/m/Y" }}</td>
-                    <td>{{ f.ragione_sociale }}
+                    <td><span class="fw-bold fs-6">{{ f.numero }}</span></td>
+                    <td class="text-muted">{{ f.data|date:"d/m/Y" }}</td>
+                    <td><span class="fw-semibold">{{ f.ragione_sociale }}</span>
                         {% if f.cliente and f.cliente.nome_completo != f.ragione_sociale %}
                             <br><small class="text-muted">cliente: {{ f.cliente.nome_completo }}</small>
                         {% endif %}
                     </td>
-                    <td class="text-center">{{ f.ordini.all|length }}</td>
+                    <td class="text-center">
+                        <span class="badge rounded-pill badge-soft">{{ f.ordini.all|length }}{% if f.righe.all %} +{{ f.righe.all|length }}{% endif %}</span>
+                    </td>
                     <td class="text-end"><strong>&euro;{{ f.totale }}</strong></td>
                     <td class="text-end {% if f.saldo_dovuto > 0 %}text-danger fw-bold{% else %}text-muted{% endif %}">
                         &euro;{{ f.saldo_dovuto }}
                     </td>
                     <td>
                         {% if f.stato == 'da_pagare' %}
-                            <span class="badge bg-danger"><i class="bi bi-hourglass-split"></i> Da pagare</span>
+                            <span class="badge rounded-pill bg-danger-subtle text-danger-emphasis border border-danger-subtle">
+                                <i class="bi bi-hourglass-split"></i> Da pagare</span>
                         {% elif f.stato == 'pagata' %}
-                            <span class="badge bg-success"><i class="bi bi-check-circle"></i> Pagata</span>
+                            <span class="badge rounded-pill bg-success-subtle text-success-emphasis border border-success-subtle">
+                                <i class="bi bi-check-circle"></i> Pagata</span>
                         {% else %}
-                            <span class="badge bg-secondary"><i class="bi bi-archive"></i> Archiviata</span>
+                            <span class="badge rounded-pill bg-secondary-subtle text-secondary-emphasis border border-secondary-subtle">
+                                <i class="bi bi-archive"></i> Archiviata</span>
                         {% endif %}
                     </td>
                     <td class="text-end" onclick="event.stopPropagation()">
@@ -468,10 +520,27 @@ function _fatPost(url, body) {
     }).then(r => r.json());
 }
 
+// --- Card gruppo: chiuse di default, si aprono dal titolo ------------
+function toggleGruppoCard(head) {
+    head.closest('.gruppo-card').classList.toggle('aperto');
+}
+
+// Checkbox nell'intestazione: seleziona/deseleziona tutti gli ordini
+// del gruppo (funziona anche a card chiusa).
+function toggleSelezioneGruppo(chkGruppo) {
+    const card = chkGruppo.closest('.gruppo-card');
+    card.querySelectorAll('.check-ordine').forEach(c => {
+        c.checked = chkGruppo.checked;
+    });
+    const btn = card.querySelector('.btn-raggruppa');
+    if (btn) btn.disabled = !card.querySelector('.check-ordine:checked');
+}
+
 // --- Selezione ordini nei gruppi -------------------------------------
 // Il bottone "Raggruppa" di ogni card si abilita con almeno 1 checkbox.
 document.querySelectorAll('.gruppo-card').forEach(card => {
     const btn = card.querySelector('.btn-raggruppa');
+    if (!btn) return;
     card.querySelectorAll('.check-ordine').forEach(chk => {
         chk.addEventListener('change', () => {
             btn.disabled = !card.querySelector('.check-ordine:checked');
