@@ -9,41 +9,34 @@ Un gruppo cliente della pagina Ordini non pagati: riga intestazione
 {% endcomment %}
 {% comment %}Intestazione cliccabile: apre/chiude le righe del gruppo
 (chiuse di default per tenere corta la lista){% endcomment %}
-<tr class="table-secondary gruppo-header" style="cursor:pointer"
+<tr class="gruppo-header" style="cursor:pointer"
     data-target="{{ sezione }}-{% if gruppo.cliente %}{{ gruppo.cliente.pk }}{% else %}anon{% endif %}"
     onclick="toggleRigheGruppo(this)">
     <td colspan="11">
         <div class="d-flex justify-content-between align-items-center flex-wrap gap-2">
-            <span>
-                <i class="bi bi-chevron-right gruppo-chevron me-1"></i>
-                <input type="checkbox" class="form-check-input gruppo-checkbox me-1"
+            <span class="d-flex align-items-center gap-2 flex-wrap">
+                <i class="bi bi-chevron-right gruppo-chevron"></i>
+                <input type="checkbox" class="form-check-input gruppo-checkbox m-0"
                        data-gruppo="{{ sezione }}-{% if gruppo.cliente %}{{ gruppo.cliente.pk }}{% else %}anon{% endif %}"
                        onchange="toggleGruppo(this)" onclick="event.stopPropagation()"
                        title="Seleziona tutti gli ordini del cliente">
                 {% if gruppo.cliente %}
-                    <i class="bi bi-person"></i>
-                    <strong>{{ gruppo.cliente.nome_completo }}</strong>
-                    {% if gruppo.cliente.telefono %}
-                        <small class="text-muted ms-2">
-                            <i class="bi bi-telephone"></i> {{ gruppo.cliente.telefono }}
-                        </small>
-                    {% endif %}
-                    {% if gruppo.cliente.email %}
-                        <small class="text-muted ms-2">
-                            <i class="bi bi-envelope"></i> {{ gruppo.cliente.email }}
-                        </small>
-                    {% endif %}
+                    <span class="nome-cliente"><i class="bi bi-person text-primary"></i>
+                        {{ gruppo.cliente.nome_completo }}</span>
+                    <span class="meta">
+                        {% if gruppo.cliente.telefono %}{{ gruppo.cliente.telefono }}{% endif %}
+                        {% if gruppo.cliente.email %}&middot; {{ gruppo.cliente.email }}{% endif %}
+                    </span>
                 {% else %}
-                    <i class="bi bi-person-x"></i>
-                    <strong>Ordini senza cliente</strong>
+                    <span class="nome-cliente"><i class="bi bi-person-x text-secondary"></i>
+                        Ordini senza cliente</span>
                 {% endif %}
-                <span class="badge bg-light text-dark border ms-2">
-                    {{ gruppo.ordini|length }} ordin{{ gruppo.ordini|length|pluralize:"e,i" }}
-                </span>
             </span>
-            <span>
-                Residuo totale:
-                <strong class="text-danger">€{{ gruppo.residuo }}</strong>
+            <span class="d-flex align-items-center gap-2">
+                <span class="badge rounded-pill badge-soft">
+                    {{ gruppo.ordini|length }} ordin{{ gruppo.ordini|length|pluralize:"e,i" }}</span>
+                <span class="badge rounded-pill badge-residuo">
+                    residuo &euro;{{ gruppo.residuo }}</span>
             </span>
         </div>
     </td>

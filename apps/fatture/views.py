@@ -127,14 +127,6 @@ def fatture_home(request):
 
     # Fatture emesse raggruppate per cliente (quelle senza cliente,
     # es. cliente cancellato o gruppo anonimo, in coda)
-    fatture_per_cliente = {}
-    fatture_senza_cliente = []
-    for f in fatture:
-        if f.cliente_id:
-            fatture_per_cliente.setdefault(f.cliente, []).append(f)
-        else:
-            fatture_senza_cliente.append(f)
-
     def _gruppo_fatture(cliente, lista):
         return {
             'cliente': cliente,
@@ -143,15 +135,35 @@ def fatture_home(request):
             'saldo': sum((f.saldo_dovuto for f in lista), Decimal('0')),
         }
 
-    gruppi_fatture = [_gruppo_fatture(c, lst)
-                      for c, lst in fatture_per_cliente.items()]
-    gruppi_fatture.sort(key=lambda g: g['cliente'].nome_completo.lower())
-    if fatture_senza_cliente:
-        gruppi_fatture.append(_gruppo_fatture(None, fatture_senza_cliente))
+    def _raggruppa_fatture(lista):
+        per_cliente = {}
+        senza = []
+        for f in lista:
+            if f.cliente_id:
+                per_cliente.setdefault(f.cliente, []).append(f)
+            else:
+                senza.append(f)
+        gruppi = [_gruppo_fatture(c, lst) for c, lst in per_cliente.items()]
+        gruppi.sort(key=lambda g: g['cliente'].nome_completo.lower())
+        if senza:
+            gruppi.append(_gruppo_fatture(None, senza))
+        return gruppi
+
+    # Tre schede: da fatturare / fatture da pagare / fatture pagate
+    # (le archiviate compaiono tra le pagate col toggle)
+    fatture_da_pagare = [f for f in fatture if f.stato == 'da_pagare']
+    fatture_pagate = [f for f in fatture
+                      if f.stato in ('pagata', 'archiviata')]
 
     return render(request, 'fatture/fatture_list.html', {
         'fatture_json': fatture_json,
-        'gruppi_fatture': gruppi_fatture,
+        'gruppi_fatture_da_pagare': _raggruppa_fatture(fatture_da_pagare),
+        'gruppi_fatture_pagate': _raggruppa_fatture(fatture_pagate),
+        'n_fatture_da_pagare': len(fatture_da_pagare),
+        'n_fatture_pagate': len(fatture_pagate),
+        'n_da_fatturare': (
+            sum(g['n_elementi'] for g in gruppi_cliente)
+            + len(senza_cliente) + len(voci_senza_cliente)),
         'gruppi_cliente': gruppi_cliente,
         'senza_cliente': senza_cliente,
         'voci_senza_cliente': voci_senza_cliente,
@@ -210,7 +222,12 @@ def crea_voce_manuale(request):
 
     voce = RigaFattura.objects.create(
         cliente=cliente, data=data_voce,
-        descrizione=descrizione, importo=importo)
+        descrizione=descrizione, importo=importo,
+        tipo_auto=(payload.get('tipo_auto') or '').strip()[:200],
+        targa=(payload.get('targa') or '').strip().upper()[:10],
+        matricola=(payload.get('matricola') or '').strip()[:50],
+        nota=(payload.get('nota') or '').strip(),
+    )
     return JsonResponse({'success': True, 'voce_id': voce.pk})
 
 
@@ -373,11 +390,23 @@ def modifica_fattura(request, pk):
             else:
                 ordine.fattura_importo = tenuti[pk_ordine]['importo']
                 ordine.save(update_fields=['fattura_importo'])
-        # Righe manuali: si sostituiscono in blocco
-        fattura.righe.all().delete()
+        # Righe manuali: le righe rimaste identiche (data, descrizione,
+        # importo) si conservano cosi' non perdono targa/matricola/nota;
+        # le altre si sostituiscono.
+        esistenti = list(fattura.righe.all())
         for riga in righe:
-            RigaFattura.objects.create(
-                fattura=fattura, cliente=fattura.cliente, **riga)
+            match = next(
+                (e for e in esistenti
+                 if e.data == riga['data']
+                 and e.descrizione == riga['descrizione']
+                 and e.importo == riga['importo']), None)
+            if match is not None:
+                esistenti.remove(match)
+            else:
+                RigaFattura.objects.create(
+                    fattura=fattura, cliente=fattura.cliente, **riga)
+        for rimossa in esistenti:
+            rimossa.delete()
 
         fattura.numero = numero
         fattura.data = data_fattura

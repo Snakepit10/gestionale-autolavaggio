@@ -116,6 +116,11 @@ class RigaFattura(models.Model):
     data = models.DateField()
     descrizione = models.CharField(max_length=200)
     importo = models.DecimalField(max_digits=10, decimal_places=2)
+    # Dettagli facoltativi, come sugli ordini da fatturare
+    tipo_auto = models.CharField(max_length=200, blank=True)
+    targa = models.CharField(max_length=10, blank=True)
+    matricola = models.CharField(max_length=50, blank=True)
+    nota = models.TextField(blank=True)
 
     class Meta:
         ordering = ['data', 'id']

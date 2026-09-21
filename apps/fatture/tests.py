@@ -256,7 +256,9 @@ class VoceManualeTest(BaseFattureTest):
     def test_crea_voce_e_raggruppa(self):
         r = self._post_json(reverse('fatture:crea-voce-manuale'), {
             'cliente_id': self.cliente_a.pk, 'data': '2026-09-10',
-            'descrizione': 'Lavaggio completo furgone', 'importo': '35.00'})
+            'descrizione': 'Lavaggio completo furgone', 'importo': '35.00',
+            'tipo_auto': 'Fiat Ducato', 'targa': 'ab111cd',
+            'matricola': 'M-9', 'nota': 'rif. ODA 3'})
         dati = r.json()
         self.assertTrue(dati['success'])
         voce = RigaFattura.objects.get(pk=dati['voce_id'])
@@ -265,6 +267,10 @@ class VoceManualeTest(BaseFattureTest):
         self.assertIsNone(voce.fattura_id)
         self.assertEqual(voce.cliente, self.cliente_a)
         self.assertEqual(voce.importo, Decimal('35.00'))
+        self.assertEqual(voce.tipo_auto, 'Fiat Ducato')
+        self.assertEqual(voce.targa, 'AB111CD')
+        self.assertEqual(voce.matricola, 'M-9')
+        self.assertEqual(voce.nota, 'rif. ODA 3')
 
         r = self._post_json(reverse('fatture:crea-fattura'), {
             'ordini': [], 'voci': [voce.pk], 'data': '2026-09-18',

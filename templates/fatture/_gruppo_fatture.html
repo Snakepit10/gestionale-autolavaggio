@@ -1,0 +1,35 @@
+{% comment %}
+Card collassabile con le fatture di un cliente (variabile `gf`:
+cliente, fatture, totale, saldo). Usata nelle schede "da pagare"
+e "pagate".
+{% endcomment %}
+<div class="gruppo-card">
+    <div class="head" onclick="toggleGruppoCard(this)">
+        <div class="d-flex align-items-center gap-2 flex-wrap">
+            <i class="bi bi-chevron-right gruppo-chevron"></i>
+            {% if gf.cliente %}
+            <span class="nome-cliente"><i class="bi bi-person text-primary"></i>
+                {{ gf.cliente.nome_completo }}</span>
+            <span class="meta">
+                {% if gf.cliente.telefono %}{{ gf.cliente.telefono }}{% endif %}
+                {% if gf.cliente.partita_iva %}&middot; P.IVA {{ gf.cliente.partita_iva }}{% endif %}
+            </span>
+            {% else %}
+            <span class="nome-cliente"><i class="bi bi-person-x text-secondary"></i>
+                Senza cliente</span>
+            {% endif %}
+        </div>
+        <div class="d-flex align-items-center gap-2 flex-wrap">
+            <span class="badge rounded-pill badge-soft">
+                {{ gf.fatture|length }} fattur{{ gf.fatture|length|pluralize:"a,e" }}</span>
+            <span class="badge rounded-pill badge-tot">&euro;{{ gf.totale }}</span>
+            {% if gf.saldo > 0 %}
+            <span class="badge rounded-pill bg-danger-subtle text-danger-emphasis border border-danger-subtle">
+                da incassare &euro;{{ gf.saldo }}</span>
+            {% endif %}
+        </div>
+    </div>
+    <div class="gruppo-body">
+        {% include 'fatture/_tabella_fatture.html' with fatture=gf.fatture %}
+    </div>
+</div>

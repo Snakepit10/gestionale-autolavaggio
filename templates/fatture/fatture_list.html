@@ -43,33 +43,47 @@
 {% block content %}
 <div class="container-fluid py-3">
 
-    <div class="d-flex justify-content-between align-items-center mb-3 flex-wrap gap-2">
-        <h2 class="mb-0"><i class="bi bi-receipt-cutoff"></i> Fatture</h2>
-        {% if mostra_archiviate %}
-            <a href="{% url 'fatture:fatture-list' %}" class="btn btn-sm btn-outline-secondary">
-                <i class="bi bi-eye-slash"></i> Nascondi archiviate
-            </a>
-        {% else %}
-            <a href="?archiviate=1" class="btn btn-sm btn-outline-secondary">
-                <i class="bi bi-archive"></i> Mostra archiviate ({{ n_archiviate }})
-            </a>
-        {% endif %}
-    </div>
+    <h2 class="mb-3"><i class="bi bi-receipt-cutoff"></i> Fatture</h2>
 
-    {# ================= ORDINI DA FATTURARE ================= #}
+    {# ================= SCHEDE ================= #}
+    <ul class="nav nav-tabs mb-3" role="tablist">
+        <li class="nav-item">
+            <button class="nav-link active" data-bs-toggle="tab"
+                    data-bs-target="#tab-da-fatturare" type="button">
+                <i class="bi bi-inboxes"></i> Da fatturare
+                <span class="badge rounded-pill badge-soft">{{ n_da_fatturare }}</span>
+            </button>
+        </li>
+        <li class="nav-item">
+            <button class="nav-link" data-bs-toggle="tab"
+                    data-bs-target="#tab-da-pagare" type="button">
+                <i class="bi bi-hourglass-split"></i> Fatture da pagare
+                <span class="badge rounded-pill badge-soft">{{ n_fatture_da_pagare }}</span>
+            </button>
+        </li>
+        <li class="nav-item">
+            <button class="nav-link" data-bs-toggle="tab"
+                    data-bs-target="#tab-pagate" type="button">
+                <i class="bi bi-check-circle"></i> Fatture pagate
+                <span class="badge rounded-pill badge-soft">{{ n_fatture_pagate }}</span>
+            </button>
+        </li>
+    </ul>
+
+    <div class="tab-content">
+
+    {# ================= SCHEDA 1: ORDINI DA FATTURARE ================= #}
+    <div class="tab-pane fade show active" id="tab-da-fatturare">
     <div class="d-flex justify-content-between align-items-center mb-2 flex-wrap gap-2">
-        <h5 class="mb-0"><i class="bi bi-inboxes"></i> Ordini da fatturare</h5>
+        <p class="text-muted small mb-0">
+            Ordini con richiesta fattura attiva + voci manuali. Seleziona
+            cosa mettere insieme e clicca &laquo;Raggruppa in fattura&raquo;.
+        </p>
         <button class="btn btn-sm btn-outline-primary"
                 onclick="apriModalOrdineManuale()">
             <i class="bi bi-plus-lg"></i> Aggiungi voce manuale
         </button>
     </div>
-    <p class="text-muted small">
-        Qui trovi gli ordini con la richiesta fattura attivata nella
-        gestione ordini, piu' le voci manuali aggiunte per far quadrare
-        le fatture. Seleziona cosa mettere insieme e clicca
-        &laquo;Raggruppa in fattura&raquo;.
-    </p>
 
     {% if not gruppi_cliente and not senza_cliente %}
     <div class="alert alert-light border">
@@ -147,47 +161,44 @@
         </div>
     </div>
     {% endif %}
-
-    {# ================= FATTURE EMESSE ================= #}
-    <h5 class="mt-4 mb-2"><i class="bi bi-journal-check"></i> Fatture emesse
-        {% if fatture %}<span class="badge rounded-pill badge-soft align-middle">{{ fatture|length }}</span>{% endif %}
-    </h5>
-    {% if not fatture %}
-        <div class="alert alert-light border">Ancora nessuna fattura.</div>
-    {% else %}
-    {% for gf in gruppi_fatture %}
-    <div class="gruppo-card">
-        <div class="head" onclick="toggleGruppoCard(this)">
-            <div class="d-flex align-items-center gap-2 flex-wrap">
-                <i class="bi bi-chevron-right gruppo-chevron"></i>
-                {% if gf.cliente %}
-                <span class="nome-cliente"><i class="bi bi-person text-primary"></i>
-                    {{ gf.cliente.nome_completo }}</span>
-                <span class="meta">
-                    {% if gf.cliente.telefono %}{{ gf.cliente.telefono }}{% endif %}
-                    {% if gf.cliente.partita_iva %}&middot; P.IVA {{ gf.cliente.partita_iva }}{% endif %}
-                </span>
-                {% else %}
-                <span class="nome-cliente"><i class="bi bi-person-x text-secondary"></i>
-                    Senza cliente</span>
-                {% endif %}
-            </div>
-            <div class="d-flex align-items-center gap-2 flex-wrap">
-                <span class="badge rounded-pill badge-soft">
-                    {{ gf.fatture|length }} fattur{{ gf.fatture|length|pluralize:"a,e" }}</span>
-                <span class="badge rounded-pill badge-tot">&euro;{{ gf.totale }}</span>
-                {% if gf.saldo > 0 %}
-                <span class="badge rounded-pill bg-danger-subtle text-danger-emphasis border border-danger-subtle">
-                    da incassare &euro;{{ gf.saldo }}</span>
-                {% endif %}
-            </div>
-        </div>
-        <div class="gruppo-body">
-            {% include 'fatture/_tabella_fatture.html' with fatture=gf.fatture %}
-        </div>
     </div>
-    {% endfor %}
+
+    {# ================= SCHEDA 2: FATTURE DA PAGARE ================= #}
+    <div class="tab-pane fade" id="tab-da-pagare">
+    {% if not gruppi_fatture_da_pagare %}
+        <div class="alert alert-light border">
+            Nessuna fattura in attesa di pagamento.
+        </div>
     {% endif %}
+    {% for gf in gruppi_fatture_da_pagare %}
+        {% include 'fatture/_gruppo_fatture.html' %}
+    {% endfor %}
+    </div>
+
+    {# ================= SCHEDA 3: FATTURE PAGATE ================= #}
+    <div class="tab-pane fade" id="tab-pagate">
+    <div class="d-flex justify-content-end mb-2">
+        {% if mostra_archiviate %}
+            <a href="{% url 'fatture:fatture-list' %}#tab-pagate" class="btn btn-sm btn-outline-secondary">
+                <i class="bi bi-eye-slash"></i> Nascondi archiviate
+            </a>
+        {% else %}
+            <a href="?archiviate=1#tab-pagate" class="btn btn-sm btn-outline-secondary">
+                <i class="bi bi-archive"></i> Mostra archiviate ({{ n_archiviate }})
+            </a>
+        {% endif %}
+    </div>
+    {% if not gruppi_fatture_pagate %}
+        <div class="alert alert-light border">
+            Ancora nessuna fattura pagata{% if not mostra_archiviate and n_archiviate %} (le archiviate sono nascoste){% endif %}.
+        </div>
+    {% endif %}
+    {% for gf in gruppi_fatture_pagate %}
+        {% include 'fatture/_gruppo_fatture.html' %}
+    {% endfor %}
+    </div>
+
+    </div>{# /tab-content #}
 </div>
 
 {# ================= MODAL CREA FATTURA ================= #}
@@ -291,11 +302,34 @@
                         </div>
                     </div>
                 </div>
-                <div class="mb-0">
+                <div class="mb-3">
                     <label class="form-label" for="om-descrizione">Servizi svolti</label>
                     <textarea class="form-control" id="om-descrizione" rows="2"
-                              maxlength="500"
+                              maxlength="200"
                               placeholder="es. Lavaggio completo furgone + igienizzazione"></textarea>
+                </div>
+                <div class="row g-2 mb-3">
+                    <div class="col-md-5">
+                        <label class="form-label" for="om-tipo-auto">Tipo auto</label>
+                        <input type="text" class="form-control" id="om-tipo-auto"
+                               maxlength="200" placeholder="es. Fiat Ducato bianco">
+                    </div>
+                    <div class="col-md-3">
+                        <label class="form-label" for="om-targa">Targa</label>
+                        <input type="text" class="form-control" id="om-targa"
+                               maxlength="10" placeholder="AB123CD"
+                               style="text-transform:uppercase">
+                    </div>
+                    <div class="col-md-4">
+                        <label class="form-label" for="om-matricola">Matricola</label>
+                        <input type="text" class="form-control" id="om-matricola"
+                               maxlength="50" placeholder="es. mezzo flotta">
+                    </div>
+                </div>
+                <div class="mb-0">
+                    <label class="form-label" for="om-nota">Nota fattura</label>
+                    <textarea class="form-control" id="om-nota" rows="2"
+                              placeholder="es. riferimento ordine d'acquisto"></textarea>
                 </div>
             </div>
             <div class="modal-footer">
@@ -618,6 +652,10 @@ let _omTimer = null;
 function apriModalOrdineManuale(clienteId, nome) {
     document.getElementById('om-descrizione').value = '';
     document.getElementById('om-importo').value = '';
+    document.getElementById('om-tipo-auto').value = '';
+    document.getElementById('om-targa').value = '';
+    document.getElementById('om-matricola').value = '';
+    document.getElementById('om-nota').value = '';
     document.getElementById('om-cliente-risultati').innerHTML = '';
     document.getElementById('om-cliente-search').value = '';
     if (clienteId) {
@@ -679,6 +717,10 @@ function confermaOrdineManuale() {
         data: document.getElementById('om-data').value,
         descrizione: document.getElementById('om-descrizione').value.trim(),
         importo: document.getElementById('om-importo').value.trim(),
+        tipo_auto: document.getElementById('om-tipo-auto').value.trim(),
+        targa: document.getElementById('om-targa').value.trim(),
+        matricola: document.getElementById('om-matricola').value.trim(),
+        nota: document.getElementById('om-nota').value.trim(),
     };
     if (!payload.data) { alert('Inserisci la data del servizio'); return; }
     if (!payload.descrizione) { alert('Descrivi il servizio svolto'); return; }
@@ -796,6 +838,18 @@ function confermaPagata() {
     })
     .catch(() => alert('Errore di rete'));
 }
+
+// Scheda attiva ricordata nell'hash dell'URL: i reload dopo le azioni
+// riaprono la stessa scheda.
+(function() {
+    const attiva = document.querySelector(`[data-bs-target="${location.hash}"]`);
+    if (attiva) new bootstrap.Tab(attiva).show();
+    document.querySelectorAll('[data-bs-toggle="tab"]').forEach(btn => {
+        btn.addEventListener('shown.bs.tab', () => {
+            history.replaceState(null, '', btn.dataset.bsTarget);
+        });
+    });
+})();
 
 function azioneFattura(pk, azione, messaggio) {
     if (!confirm(messaggio)) return;

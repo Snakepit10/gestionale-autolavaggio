@@ -1113,10 +1113,14 @@ class OrdiniNonPagatiView(LoginRequiredMixin, ListView):
         # Toggle "Mostra archiviati": la pagina mostra o gli ordini
         # attivi o quelli archiviati a mano, mai insieme.
         self.mostra_archiviati = self.request.GET.get('archiviati') == '1'
-        # Gli ordini annullati non sono crediti da incassare: fuori.
+        # Fuori: gli annullati (non sono crediti) e gli ordini avviati
+        # alla fatturazione (flag o gia' in fattura), che si gestiscono
+        # dalla pagina Fatture.
         return Ordine.objects.filter(
             stato_pagamento__in=['non_pagato', 'parziale'],
             non_pagato_archiviato=self.mostra_archiviati,
+            richiede_fattura=False,
+            fattura__isnull=True,
         ).exclude(stato='annullato').select_related(
             'cliente', 'fattura').order_by('-data_ora')
 
@@ -1127,12 +1131,12 @@ class OrdiniNonPagatiView(LoginRequiredMixin, ListView):
         context['n_archiviati'] = Ordine.objects.filter(
             stato_pagamento__in=['non_pagato', 'parziale'],
             non_pagato_archiviato=True,
+            richiede_fattura=False,
+            fattura__isnull=True,
         ).exclude(stato='annullato').count()
 
         # Raggruppa per cliente (ordini anonimi in coda, gruppo a parte);
         # dentro al gruppo resta l'ordinamento -data_ora della queryset.
-        # Gli ordini gia' dentro una fattura vanno in una sezione
-        # separata: si saldano di norma dalla pagina Fatture.
         def _gruppo(cliente, lista):
             return {
                 'cliente': cliente,
@@ -1154,10 +1158,7 @@ class OrdiniNonPagatiView(LoginRequiredMixin, ListView):
                 gruppi.append(_gruppo(None, senza_cliente))
             return gruppi
 
-        context['gruppi_clienti'] = _raggruppa(
-            [o for o in ordini if not o.fattura_id])
-        context['gruppi_in_fattura'] = _raggruppa(
-            [o for o in ordini if o.fattura_id])
+        context['gruppi_clienti'] = _raggruppa(ordini)
 
         # Statistiche in testa alla pagina (prima restavano a 0)
         context['totale_non_pagati'] = sum(

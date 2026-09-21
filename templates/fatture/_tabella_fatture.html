@@ -128,7 +128,11 @@ Tabella delle fatture emesse di un gruppo cliente (variabile
                                         <span class="badge bg-light text-dark border">voce manuale</span>
                                     </td>
                                     <td>{{ r.data|date:"d/m/Y" }}</td>
-                                    <td class="small" colspan="5">{{ r.descrizione }}</td>
+                                    <td class="small">{{ r.tipo_auto|default:"-" }}</td>
+                                    <td class="small">{{ r.descrizione }}</td>
+                                    <td>{{ r.targa|default:"-" }}</td>
+                                    <td>{{ r.matricola|default:"-" }}</td>
+                                    <td class="small">{{ r.nota|default:"-" }}</td>
                                     <td class="text-end">&euro;{{ r.importo }}</td>
                                     <td></td>
                                 </tr>

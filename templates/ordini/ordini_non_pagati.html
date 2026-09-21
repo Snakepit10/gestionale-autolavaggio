@@ -3,6 +3,28 @@
 
 {% block title %}Ordini Non Pagati - Gestionale Autolavaggio{% endblock %}
 
+{% block extra_css %}
+<style>
+/* Tabella pulita: niente grigio, intestazioni compatte */
+.table-np thead th {
+    font-size: .72rem; text-transform: uppercase; letter-spacing: .04em;
+    color: #64748b; font-weight: 700; background: #fff;
+    border-bottom: 1px solid #e2e8f0; white-space: nowrap;
+}
+/* Intestazione gruppo cliente: bianca, separata da un filo, hover */
+tr.gruppo-header td {
+    background: #fff; border-top: 2px solid #eef2f6;
+    padding-top: .7rem; padding-bottom: .7rem;
+}
+tr.gruppo-header:hover td { background: #f6f9fc; }
+tr.gruppo-header .nome-cliente { font-weight: 700; }
+tr.gruppo-header .meta { font-size: .8rem; color: #64748b; }
+.gruppo-chevron { color: #94a3b8; font-size: .85rem; }
+.badge-soft { background: #eef2f7; color: #334155; font-weight: 600; }
+.badge-residuo { background: #fdecec; color: #b42318; font-weight: 700; }
+</style>
+{% endblock %}
+
 {% block content %}
 <div class="d-flex justify-content-between align-items-center mb-4">
     <h1>
@@ -150,8 +172,8 @@
             </div>
 
             <div class="table-responsive">
-                <table class="table table-hover">
-                    <thead class="table-dark">
+                <table class="table table-hover align-middle table-np mb-0">
+                    <thead>
                         <tr>
                             <th>
                                 <input type="checkbox" id="select-all" onchange="toggleSelectAll()">
@@ -173,46 +195,12 @@
                         {% include 'ordini/_gruppo_non_pagato.html' with sezione='att' %}
                         {% empty %}
                         <tr><td colspan="11" class="text-muted text-center py-3">
-                            Nessun ordine da incassare fuori fattura.
+                            Nessun ordine da incassare.
                         </td></tr>
                         {% endfor %}
                     </tbody>
                 </table>
             </div>
-
-            {# Sezione separata: non pagati gia' raggruppati in una fattura #}
-            {% if gruppi_in_fattura %}
-            <h5 class="mt-4 mb-1"><i class="bi bi-receipt"></i> Non pagati gia' in fattura</h5>
-            <p class="text-muted small mb-2">
-                Ordini in attesa di pagamento gia' dentro una fattura:
-                di norma si saldano dalla pagina Fatture con
-                &laquo;Segna pagata&raquo;.
-            </p>
-            <div class="table-responsive">
-                <table class="table table-hover">
-                    <thead class="table-dark">
-                        <tr>
-                            <th></th>
-                            <th>N° Ordine</th>
-                            <th>Data</th>
-                            <th>Totale</th>
-                            <th>Pagato</th>
-                            <th>Residuo</th>
-                            <th>Stato Pagamento</th>
-                            <th>Fattura</th>
-                            <th>Scadenza</th>
-                            <th>Giorni</th>
-                            <th class="text-center">Azioni</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        {% for gruppo in gruppi_in_fattura %}
-                        {% include 'ordini/_gruppo_non_pagato.html' with sezione='fat' %}
-                        {% endfor %}
-                    </tbody>
-                </table>
-            </div>
-            {% endif %}
 
             <!-- Paginazione -->
             {% if is_paginated %}
