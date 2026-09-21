@@ -1,0 +1,143 @@
+{% comment %}
+Tabella delle fatture emesse di un gruppo cliente (variabile
+`fatture`): riga espandibile col dettaglio ordini + righe manuali.
+{% endcomment %}
+    <div class="table-responsive">
+        <table class="table table-hover align-middle tab-fatture mb-0">
+            <thead>
+                <tr>
+                    <th></th>
+                    <th>Numero</th>
+                    <th>Data</th>
+                    <th>Ragione sociale</th>
+                    <th class="text-center">Ordini</th>
+                    <th class="text-end">Totale</th>
+                    <th class="text-end">Saldo</th>
+                    <th>Stato</th>
+                    <th class="text-end">Azioni</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for f in fatture %}
+                <tr class="cursor-pointer riga-fattura" data-bs-toggle="collapse"
+                    data-bs-target="#fat-det-{{ f.pk }}">
+                    <td class="text-muted"><i class="bi bi-chevron-down small"></i></td>
+                    <td><span class="fw-bold fs-6">{{ f.numero }}</span></td>
+                    <td class="text-muted">{{ f.data|date:"d/m/Y" }}</td>
+                    <td><span class="fw-semibold">{{ f.ragione_sociale }}</span>
+                        {% if f.cliente and f.cliente.nome_completo != f.ragione_sociale %}
+                            <br><small class="text-muted">cliente: {{ f.cliente.nome_completo }}</small>
+                        {% endif %}
+                    </td>
+                    <td class="text-center">
+                        <span class="badge rounded-pill badge-soft">{{ f.ordini.all|length }}{% if f.righe.all %} +{{ f.righe.all|length }}{% endif %}</span>
+                    </td>
+                    <td class="text-end"><strong>&euro;{{ f.totale }}</strong></td>
+                    <td class="text-end {% if f.saldo_dovuto > 0 %}text-danger fw-bold{% else %}text-muted{% endif %}">
+                        &euro;{{ f.saldo_dovuto }}
+                    </td>
+                    <td>
+                        {% if f.stato == 'da_pagare' %}
+                            <span class="badge rounded-pill bg-danger-subtle text-danger-emphasis border border-danger-subtle">
+                                <i class="bi bi-hourglass-split"></i> Da pagare</span>
+                        {% elif f.stato == 'pagata' %}
+                            <span class="badge rounded-pill bg-success-subtle text-success-emphasis border border-success-subtle">
+                                <i class="bi bi-check-circle"></i> Pagata</span>
+                        {% else %}
+                            <span class="badge rounded-pill bg-secondary-subtle text-secondary-emphasis border border-secondary-subtle">
+                                <i class="bi bi-archive"></i> Archiviata</span>
+                        {% endif %}
+                    </td>
+                    <td class="text-end" onclick="event.stopPropagation()">
+                        {% if f.stato == 'da_pagare' %}
+                            <button class="btn btn-sm btn-success"
+                                    onclick="apriModalPagata({{ f.pk }}, '{{ f.numero }}', '{{ f.saldo_dovuto }}')">
+                                <i class="bi bi-cash-coin"></i> Segna pagata
+                            </button>
+                        {% elif f.stato == 'pagata' %}
+                            <button class="btn btn-sm btn-outline-secondary"
+                                    onclick="azioneFattura({{ f.pk }}, 'archivia', 'Archiviare la fattura {{ f.numero }}?')">
+                                <i class="bi bi-archive"></i> Archivia
+                            </button>
+                        {% endif %}
+                        {% if f.stato != 'archiviata' %}
+                            <button class="btn btn-sm btn-outline-primary"
+                                    onclick="apriModalModifica({{ f.pk }})" title="Modifica fattura">
+                                <i class="bi bi-pencil-square"></i>
+                            </button>
+                            <button class="btn btn-sm btn-outline-danger"
+                                    onclick="azioneFattura({{ f.pk }}, 'elimina', 'Eliminare la fattura {{ f.numero }}? Gli ordini torneranno tra quelli da fatturare.')">
+                                <i class="bi bi-trash"></i>
+                            </button>
+                        {% endif %}
+                    </td>
+                </tr>
+                <tr class="collapse" id="fat-det-{{ f.pk }}">
+                    <td colspan="9" class="p-0">
+                        <table class="table table-sm mb-0 fatt-dettaglio">
+                            <thead>
+                                <tr class="small text-muted">
+                                    <th style="padding-left:2rem">Ordine</th>
+                                    <th>Data</th>
+                                    <th>Tipo auto</th>
+                                    <th>Servizi</th>
+                                    <th>Targa</th>
+                                    <th>Matricola</th>
+                                    <th>Nota fattura</th>
+                                    <th class="text-end">Totale</th>
+                                    <th>Pagamento</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for o in f.ordini.all %}
+                                <tr>
+                                    <td style="padding-left:2rem">
+                                        <a href="{% url 'ordini:ordine-detail' o.pk %}">#{{ o.numero_progressivo }}</a>
+                                    </td>
+                                    <td>{{ o.data_ora|date:"d/m/Y H:i" }}</td>
+                                    <td class="small">{{ o.tipo_auto|default:"-" }}</td>
+                                    <td class="small">
+                                        {% for item in o.items.all %}{{ item.servizio_prodotto.titolo }}{% if not forloop.last %}, {% endif %}{% empty %}{{ o.nota|default:"-" }}{% endfor %}
+                                    </td>
+                                    <td>{{ o.fattura_targa|default:"-" }}</td>
+                                    <td>{{ o.fattura_matricola|default:"-" }}</td>
+                                    <td class="small">{{ o.fattura_nota|default:"-" }}</td>
+                                    <td class="text-end">
+                                        &euro;{{ o.importo_in_fattura }}
+                                        {% if o.fattura_importo is not None and o.fattura_importo != o.totale_finale %}
+                                            <br><small class="text-muted text-decoration-line-through"
+                                                       title="Totale reale dell'ordine">&euro;{{ o.totale_finale }}</small>
+                                        {% endif %}
+                                    </td>
+                                    <td>
+                                        {% if o.stato_pagamento == 'pagato' %}
+                                            <span class="badge bg-success">Pagato</span>
+                                        {% elif o.stato_pagamento == 'parziale' %}
+                                            <span class="badge bg-warning text-dark">Parziale</span>
+                                        {% elif o.stato_pagamento == 'differito' %}
+                                            <span class="badge bg-info">Differito</span>
+                                        {% else %}
+                                            <span class="badge bg-danger">Non pagato</span>
+                                        {% endif %}
+                                    </td>
+                                </tr>
+                                {% endfor %}
+                                {% for r in f.righe.all %}
+                                <tr>
+                                    <td style="padding-left:2rem">
+                                        <span class="badge bg-light text-dark border">voce manuale</span>
+                                    </td>
+                                    <td>{{ r.data|date:"d/m/Y" }}</td>
+                                    <td class="small" colspan="5">{{ r.descrizione }}</td>
+                                    <td class="text-end">&euro;{{ r.importo }}</td>
+                                    <td></td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>

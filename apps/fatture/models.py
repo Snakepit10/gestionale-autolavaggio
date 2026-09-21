@@ -99,11 +99,20 @@ class Fattura(models.Model):
 
 
 class RigaFattura(models.Model):
-    """Riga manuale di una fattura: voce libera (data, descrizione,
-    importo) non legata a un ordine del gestionale."""
+    """Voce manuale di fatturazione: data, descrizione libera, importo.
+
+    NON e' un ordine del gestionale: serve a far quadrare la fattura.
+    Con fattura=NULL e' una voce "da fatturare" in attesa nel gruppo
+    del cliente; quando viene raggruppata prende la FK alla fattura.
+    Se la fattura viene eliminata (SET_NULL) la voce torna in attesa.
+    """
 
     fattura = models.ForeignKey(
-        Fattura, on_delete=models.CASCADE, related_name='righe')
+        Fattura, null=True, blank=True,
+        on_delete=models.SET_NULL, related_name='righe')
+    cliente = models.ForeignKey(
+        'clienti.Cliente', null=True, blank=True,
+        on_delete=models.CASCADE, related_name='voci_da_fatturare')
     data = models.DateField()
     descrizione = models.CharField(max_length=200)
     importo = models.DecimalField(max_digits=10, decimal_places=2)

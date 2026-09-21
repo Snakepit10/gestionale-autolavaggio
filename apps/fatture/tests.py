@@ -252,36 +252,74 @@ class ImportiERigheTest(BaseFattureTest):
         self.assertIsNone(o1.fattura_id)
 
 
-class OrdineManualeTest(BaseFattureTest):
-    def test_crea_ordine_manuale_e_raggruppa(self):
-        r = self._post_json(reverse('fatture:crea-ordine-manuale'), {
+class VoceManualeTest(BaseFattureTest):
+    def test_crea_voce_e_raggruppa(self):
+        r = self._post_json(reverse('fatture:crea-voce-manuale'), {
             'cliente_id': self.cliente_a.pk, 'data': '2026-09-10',
             'descrizione': 'Lavaggio completo furgone', 'importo': '35.00'})
         dati = r.json()
         self.assertTrue(dati['success'])
-        ordine = Ordine.objects.get(pk=dati['ordine_id'])
-        self.assertTrue(ordine.richiede_fattura)
-        self.assertEqual(ordine.stato, 'completato')
-        self.assertEqual(ordine.stato_pagamento, 'non_pagato')
-        self.assertEqual(ordine.totale_finale, Decimal('35.00'))
-        self.assertEqual(ordine.nota, 'Lavaggio completo furgone')
-        self.assertEqual(ordine.data_ora.date().isoformat(), '2026-09-10')
+        voce = RigaFattura.objects.get(pk=dati['voce_id'])
+        # NON e' un ordine: nessun Ordine creato
+        self.assertEqual(Ordine.objects.count(), 0)
+        self.assertIsNone(voce.fattura_id)
+        self.assertEqual(voce.cliente, self.cliente_a)
+        self.assertEqual(voce.importo, Decimal('35.00'))
 
         r = self._post_json(reverse('fatture:crea-fattura'), {
-            'ordini': [ordine.pk], 'data': '2026-09-18',
+            'ordini': [], 'voci': [voce.pk], 'data': '2026-09-18',
             'numero': '40/2026', 'ragione_sociale': 'X'})
-        self.assertTrue(r.json()['success'])
-        ordine.refresh_from_db()
-        self.assertIsNotNone(ordine.fattura_id)
+        dati = r.json()
+        self.assertTrue(dati['success'])
+        voce.refresh_from_db()
+        fattura = Fattura.objects.get(pk=dati['fattura_id'])
+        self.assertEqual(voce.fattura_id, fattura.pk)
+        self.assertEqual(fattura.totale, Decimal('35.00'))
+        self.assertEqual(fattura.stato, 'da_pagare')
 
-    def test_ordine_manuale_richiede_dati(self):
-        r = self._post_json(reverse('fatture:crea-ordine-manuale'), {
+    def test_voce_torna_in_attesa_se_fattura_eliminata(self):
+        r = self._post_json(reverse('fatture:crea-voce-manuale'), {
+            'cliente_id': self.cliente_a.pk, 'data': '2026-09-10',
+            'descrizione': 'Extra', 'importo': '5.00'})
+        voce_id = r.json()['voce_id']
+        r = self._post_json(reverse('fatture:crea-fattura'), {
+            'ordini': [], 'voci': [voce_id], 'data': '2026-09-18',
+            'numero': '41/2026', 'ragione_sociale': 'X'})
+        fattura_id = r.json()['fattura_id']
+        self._post_json(reverse('fatture:elimina', args=[fattura_id]), {})
+        voce = RigaFattura.objects.get(pk=voce_id)
+        self.assertIsNone(voce.fattura_id)
+        self.assertEqual(voce.cliente, self.cliente_a)
+
+    def test_elimina_voce_in_attesa(self):
+        r = self._post_json(reverse('fatture:crea-voce-manuale'), {
+            'cliente_id': self.cliente_a.pk, 'data': '2026-09-10',
+            'descrizione': 'Da togliere', 'importo': '5.00'})
+        voce_id = r.json()['voce_id']
+        r = self._post_json(reverse('fatture:elimina-voce', args=[voce_id]), {})
+        self.assertTrue(r.json()['success'])
+        self.assertFalse(RigaFattura.objects.filter(pk=voce_id).exists())
+
+    def test_voce_richiede_dati(self):
+        r = self._post_json(reverse('fatture:crea-voce-manuale'), {
             'cliente_id': self.cliente_a.pk, 'data': '2026-09-10',
             'descrizione': '', 'importo': '35.00'})
         self.assertFalse(r.json()['success'])
-        r = self._post_json(reverse('fatture:crea-ordine-manuale'), {
+        r = self._post_json(reverse('fatture:crea-voce-manuale'), {
             'cliente_id': 999999, 'data': '2026-09-10',
             'descrizione': 'X', 'importo': '35.00'})
+        self.assertFalse(r.json()['success'])
+
+    def test_voce_cliente_diverso_rifiutata(self):
+        ordine = _crea_ordine(self.cliente_a, richiede_fattura=True)
+        r = self._post_json(reverse('fatture:crea-voce-manuale'), {
+            'cliente_id': self.cliente_b.pk, 'data': '2026-09-10',
+            'descrizione': 'X', 'importo': '5.00'})
+        voce_id = r.json()['voce_id']
+        r = self._post_json(reverse('fatture:crea-fattura'), {
+            'ordini': [ordine.pk], 'voci': [voce_id],
+            'data': '2026-09-18', 'numero': '42/2026',
+            'ragione_sociale': 'X'})
         self.assertFalse(r.json()['success'])
 
 

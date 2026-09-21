@@ -53,6 +53,12 @@ def fatture_home(request):
         .order_by('cliente_id', 'data_ora')
     )
 
+    # Voci manuali in attesa (fattura=NULL): entrano nei gruppi
+    # accanto agli ordini
+    voci_attesa = list(
+        RigaFattura.objects.filter(fattura__isnull=True)
+        .select_related('cliente').order_by('data', 'id'))
+
     # Raggruppa per cliente mantenendo l'ordine; gli ordini senza
     # cliente finiscono in un gruppo a parte (ragione sociale a mano).
     gruppi = {}
@@ -62,12 +68,30 @@ def fatture_home(request):
             gruppi.setdefault(ordine.cliente, []).append(ordine)
         else:
             senza_cliente.append(ordine)
-    gruppi_cliente = [
-        {'cliente': cliente, 'ordini': ordini,
-         'totale': sum((o.totale_finale or Decimal('0') for o in ordini),
-                       Decimal('0'))}
-        for cliente, ordini in gruppi.items()
-    ]
+    voci_per_cliente = {}
+    voci_senza_cliente = []
+    for voce in voci_attesa:
+        if voce.cliente_id:
+            voci_per_cliente.setdefault(voce.cliente, []).append(voce)
+        else:
+            voci_senza_cliente.append(voce)
+
+    clienti_gruppi = list(gruppi.keys())
+    for cliente in voci_per_cliente:
+        if cliente not in gruppi:
+            clienti_gruppi.append(cliente)
+    gruppi_cliente = []
+    for cliente in clienti_gruppi:
+        ordini = gruppi.get(cliente, [])
+        voci = voci_per_cliente.get(cliente, [])
+        gruppi_cliente.append({
+            'cliente': cliente, 'ordini': ordini, 'voci': voci,
+            'n_elementi': len(ordini) + len(voci),
+            'totale': (
+                sum((o.totale_finale or Decimal('0') for o in ordini),
+                    Decimal('0'))
+                + sum((v.importo for v in voci), Decimal('0'))),
+        })
 
     mostra_archiviate = request.GET.get('archiviate') == '1'
     fatture = (
@@ -101,13 +125,41 @@ def fatture_home(request):
         for f in fatture if f.stato != 'archiviata'
     }
 
+    # Fatture emesse raggruppate per cliente (quelle senza cliente,
+    # es. cliente cancellato o gruppo anonimo, in coda)
+    fatture_per_cliente = {}
+    fatture_senza_cliente = []
+    for f in fatture:
+        if f.cliente_id:
+            fatture_per_cliente.setdefault(f.cliente, []).append(f)
+        else:
+            fatture_senza_cliente.append(f)
+
+    def _gruppo_fatture(cliente, lista):
+        return {
+            'cliente': cliente,
+            'fatture': lista,
+            'totale': sum((f.totale for f in lista), Decimal('0')),
+            'saldo': sum((f.saldo_dovuto for f in lista), Decimal('0')),
+        }
+
+    gruppi_fatture = [_gruppo_fatture(c, lst)
+                      for c, lst in fatture_per_cliente.items()]
+    gruppi_fatture.sort(key=lambda g: g['cliente'].nome_completo.lower())
+    if fatture_senza_cliente:
+        gruppi_fatture.append(_gruppo_fatture(None, fatture_senza_cliente))
+
     return render(request, 'fatture/fatture_list.html', {
         'fatture_json': fatture_json,
+        'gruppi_fatture': gruppi_fatture,
         'gruppi_cliente': gruppi_cliente,
         'senza_cliente': senza_cliente,
-        'totale_senza_cliente': sum(
-            (o.totale_finale or Decimal('0') for o in senza_cliente),
-            Decimal('0')),
+        'voci_senza_cliente': voci_senza_cliente,
+        'n_senza_cliente': len(senza_cliente) + len(voci_senza_cliente),
+        'totale_senza_cliente': (
+            sum((o.totale_finale or Decimal('0') for o in senza_cliente),
+                Decimal('0'))
+            + sum((v.importo for v in voci_senza_cliente), Decimal('0'))),
         'fatture': fatture,
         'mostra_archiviate': mostra_archiviate,
         'n_archiviate': Fattura.objects.filter(stato='archiviata').count(),
@@ -130,22 +182,21 @@ def suggerisci_numero(request):
 
 @login_required
 @require_POST
-def crea_ordine_manuale(request):
-    """Crea al volo un ordine da fatturare (servizio non registrato
-    a suo tempo nel gestionale): cliente, data, descrizione, prezzo.
+def crea_voce_manuale(request):
+    """Crea una voce manuale da fatturare (data, descrizione, prezzo).
 
-    E' un Ordine vero: nasce completato, non pagato e gia' flaggato
-    richiede_fattura, cosi' compare subito tra gli ordini da
-    raggruppare e il saldo passa dal flusso pagamenti normale.
+    NON crea un ordine nel gestionale: e' una voce di comodo per far
+    quadrare la fattura. Resta in attesa nel gruppo del cliente
+    finche' non viene raggruppata in una fattura.
     """
     from apps.clienti.models import Cliente
 
     try:
         payload = json.loads(request.body)
         cliente = Cliente.objects.get(pk=int(payload.get('cliente_id')))
-        data_ordine = datetime.strptime(
+        data_voce = datetime.strptime(
             payload.get('data') or '', '%Y-%m-%d').date()
-        descrizione = (payload.get('descrizione') or '').strip()
+        descrizione = (payload.get('descrizione') or '').strip()[:200]
         importo = _parse_importo(payload.get('importo'))
     except (json.JSONDecodeError, ValueError, TypeError,
             Cliente.DoesNotExist, ArithmeticError):
@@ -157,25 +208,19 @@ def crea_ordine_manuale(request):
     if importo is None:
         return JsonResponse({'success': False, 'error': 'Prezzo obbligatorio'})
 
-    ordine = Ordine.objects.create(
-        cliente=cliente,
-        origine='operatore',
-        operatore=request.user,
-        totale=importo,
-        totale_finale=importo,
-        nota=descrizione,
-        stato='completato',
-        auto_ritirata=True,
-        richiede_fattura=True,
-    )
-    # data_ora e' auto_now_add: la retrodatiamo dopo la creazione
-    # (mezzogiorno locale, cosi' resta nel giorno scelto).
-    quando = timezone.make_aware(
-        datetime.combine(data_ordine, datetime.min.time().replace(hour=12)))
-    Ordine.objects.filter(pk=ordine.pk).update(data_ora=quando)
+    voce = RigaFattura.objects.create(
+        cliente=cliente, data=data_voce,
+        descrizione=descrizione, importo=importo)
+    return JsonResponse({'success': True, 'voce_id': voce.pk})
 
-    return JsonResponse({'success': True, 'ordine_id': ordine.pk,
-                         'numero': ordine.numero_progressivo})
+
+@login_required
+@require_POST
+def elimina_voce(request, pk):
+    """Elimina una voce manuale ancora in attesa (non in fattura)."""
+    voce = get_object_or_404(RigaFattura, pk=pk, fattura__isnull=True)
+    voce.delete()
+    return JsonResponse({'success': True})
 
 
 @login_required
@@ -185,6 +230,7 @@ def crea_fattura(request):
     try:
         payload = json.loads(request.body)
         ordini_ids = [int(i) for i in payload.get('ordini', [])]
+        voci_ids = [int(i) for i in payload.get('voci', [])]
         # Importi personalizzati per ordine: {'<id>': '12.50', ...}
         importi = {int(k): _parse_importo(v)
                    for k, v in (payload.get('importi') or {}).items()}
@@ -198,9 +244,9 @@ def crea_fattura(request):
             ArithmeticError):
         return JsonResponse({'success': False, 'error': 'Dati non validi'})
 
-    if not ordini_ids:
+    if not ordini_ids and not voci_ids:
         return JsonResponse({'success': False,
-                             'error': 'Seleziona almeno un ordine'})
+                             'error': 'Seleziona almeno un elemento'})
     if not numero:
         return JsonResponse({'success': False,
                              'error': 'Numero fattura obbligatorio'})
@@ -220,12 +266,22 @@ def crea_fattura(request):
             'error': 'Alcuni ordini non sono piu\' fatturabili: '
                      'ricarica la pagina.'})
 
-    # Una fattura = un cliente: tutti lo stesso, oppure tutti senza.
-    clienti_ids = {o.cliente_id for o in ordini}
+    voci = list(RigaFattura.objects.filter(
+        pk__in=voci_ids, fattura__isnull=True))
+    if len(voci) != len(set(voci_ids)):
+        return JsonResponse({
+            'success': False,
+            'error': 'Alcune voci non sono piu\' disponibili: '
+                     'ricarica la pagina.'})
+
+    # Una fattura = un cliente: ordini e voci tutti dello stesso
+    # cliente, oppure tutti senza.
+    clienti_ids = ({o.cliente_id for o in ordini}
+                   | {v.cliente_id for v in voci})
     if len(clienti_ids) > 1:
         return JsonResponse({
             'success': False,
-            'error': 'Gli ordini selezionati appartengono a clienti '
+            'error': 'Gli elementi selezionati appartengono a clienti '
                      'diversi: una fattura vale per un solo cliente.'})
 
     if (Fattura.objects.filter(numero=numero).exists()
@@ -245,12 +301,18 @@ def crea_fattura(request):
             ordine.fattura = fattura
             ordine.fattura_importo = importi.get(ordine.pk)
             ordine.save(update_fields=['fattura', 'fattura_importo'])
+        RigaFattura.objects.filter(
+            pk__in=[v.pk for v in voci]).update(fattura=fattura)
         for riga in righe:
-            RigaFattura.objects.create(fattura=fattura, **riga)
+            RigaFattura.objects.create(
+                fattura=fattura, cliente=fattura.cliente, **riga)
         # Stato iniziale: pagata se ogni ordine e' gia' saldato e non
-        # ci sono righe manuali da incassare.
-        totale_righe = sum((r['importo'] for r in righe), Decimal('0'))
-        if all(o.is_pagato for o in ordini) and totale_righe == 0:
+        # ci sono voci/righe manuali da incassare.
+        totale_righe = (
+            sum((r['importo'] for r in righe), Decimal('0'))
+            + sum((v.importo for v in voci), Decimal('0')))
+        if (ordini and all(o.is_pagato for o in ordini)
+                and totale_righe == 0):
             fattura.stato = 'pagata'
             fattura.pagata_il = timezone.now()
             fattura.save(update_fields=['stato', 'pagata_il'])
@@ -314,7 +376,8 @@ def modifica_fattura(request, pk):
         # Righe manuali: si sostituiscono in blocco
         fattura.righe.all().delete()
         for riga in righe:
-            RigaFattura.objects.create(fattura=fattura, **riga)
+            RigaFattura.objects.create(
+                fattura=fattura, cliente=fattura.cliente, **riga)
 
         fattura.numero = numero
         fattura.data = data_fattura
@@ -396,6 +459,8 @@ def elimina_fattura(request, pk):
     with transaction.atomic():
         # Azzera gli importi personalizzati prima che SET_NULL liberi
         # gli ordini: fuori fattura vale di nuovo il totale reale.
+        # Anche le voci manuali tornano in attesa (SET_NULL sulla FK),
+        # nel gruppo del loro cliente.
         fattura.ordini.update(fattura_importo=None)
         fattura.delete()
     return JsonResponse({'success': True})

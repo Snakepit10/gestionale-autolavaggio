@@ -61,13 +61,14 @@
         <h5 class="mb-0"><i class="bi bi-inboxes"></i> Ordini da fatturare</h5>
         <button class="btn btn-sm btn-outline-primary"
                 onclick="apriModalOrdineManuale()">
-            <i class="bi bi-plus-lg"></i> Aggiungi ordine manuale
+            <i class="bi bi-plus-lg"></i> Aggiungi voce manuale
         </button>
     </div>
     <p class="text-muted small">
         Qui trovi gli ordini con la richiesta fattura attivata nella
-        gestione ordini, piu' quelli aggiunti a mano. Seleziona quelli
-        da mettere insieme e clicca &laquo;Raggruppa in fattura&raquo;.
+        gestione ordini, piu' le voci manuali aggiunte per far quadrare
+        le fatture. Seleziona cosa mettere insieme e clicca
+        &laquo;Raggruppa in fattura&raquo;.
     </p>
 
     {% if not gruppi_cliente and not senza_cliente %}
@@ -96,12 +97,12 @@
             </div>
             <div class="d-flex align-items-center gap-2 flex-wrap" onclick="event.stopPropagation()">
                 <span class="badge rounded-pill badge-soft">
-                    {{ gruppo.ordini|length }} ordin{{ gruppo.ordini|length|pluralize:"e,i" }}</span>
+                    {{ gruppo.n_elementi }} element{{ gruppo.n_elementi|pluralize:"o,i" }}</span>
                 <span class="badge rounded-pill badge-tot">&euro;{{ gruppo.totale }}</span>
                 <button class="btn btn-sm btn-outline-primary"
                         onclick="apriModalOrdineManuale('{{ gruppo.cliente.pk }}', '{{ gruppo.cliente.nome_completo }}')"
-                        title="Aggiungi un ordine manuale per questo cliente">
-                    <i class="bi bi-plus-lg"></i> Ordine
+                        title="Aggiungi una voce manuale da fatturare per questo cliente">
+                    <i class="bi bi-plus-lg"></i> Voce
                 </button>
                 <button class="btn btn-sm btn-primary btn-raggruppa" disabled
                         onclick="apriModalCrea(this)"
@@ -112,12 +113,12 @@
             </div>
         </div>
         <div class="gruppo-body">
-            {% include 'fatture/_tabella_da_fatturare.html' with ordini=gruppo.ordini %}
+            {% include 'fatture/_tabella_da_fatturare.html' with ordini=gruppo.ordini voci=gruppo.voci %}
         </div>
     </div>
     {% endfor %}
 
-    {% if senza_cliente %}
+    {% if senza_cliente or voci_senza_cliente %}
     <div class="gruppo-card" data-gruppo="senza-cliente">
         <div class="head" onclick="toggleGruppoCard(this)">
             <div class="d-flex align-items-center gap-2 flex-wrap">
@@ -132,7 +133,7 @@
             </div>
             <div class="d-flex align-items-center gap-2 flex-wrap" onclick="event.stopPropagation()">
                 <span class="badge rounded-pill badge-soft">
-                    {{ senza_cliente|length }} ordin{{ senza_cliente|length|pluralize:"e,i" }}</span>
+                    {{ n_senza_cliente }} element{{ n_senza_cliente|pluralize:"o,i" }}</span>
                 <span class="badge rounded-pill badge-tot">&euro;{{ totale_senza_cliente }}</span>
                 <button class="btn btn-sm btn-primary btn-raggruppa" disabled
                         onclick="apriModalCrea(this)"
@@ -142,7 +143,7 @@
             </div>
         </div>
         <div class="gruppo-body">
-            {% include 'fatture/_tabella_da_fatturare.html' with ordini=senza_cliente %}
+            {% include 'fatture/_tabella_da_fatturare.html' with ordini=senza_cliente voci=voci_senza_cliente %}
         </div>
     </div>
     {% endif %}
@@ -154,145 +155,38 @@
     {% if not fatture %}
         <div class="alert alert-light border">Ancora nessuna fattura.</div>
     {% else %}
-    <div class="table-responsive gruppo-card p-0">
-        <table class="table table-hover align-middle tab-fatture mb-0">
-            <thead>
-                <tr>
-                    <th></th>
-                    <th>Numero</th>
-                    <th>Data</th>
-                    <th>Ragione sociale</th>
-                    <th class="text-center">Ordini</th>
-                    <th class="text-end">Totale</th>
-                    <th class="text-end">Saldo</th>
-                    <th>Stato</th>
-                    <th class="text-end">Azioni</th>
-                </tr>
-            </thead>
-            <tbody>
-                {% for f in fatture %}
-                <tr class="cursor-pointer riga-fattura" data-bs-toggle="collapse"
-                    data-bs-target="#fat-det-{{ f.pk }}">
-                    <td class="text-muted"><i class="bi bi-chevron-down small"></i></td>
-                    <td><span class="fw-bold fs-6">{{ f.numero }}</span></td>
-                    <td class="text-muted">{{ f.data|date:"d/m/Y" }}</td>
-                    <td><span class="fw-semibold">{{ f.ragione_sociale }}</span>
-                        {% if f.cliente and f.cliente.nome_completo != f.ragione_sociale %}
-                            <br><small class="text-muted">cliente: {{ f.cliente.nome_completo }}</small>
-                        {% endif %}
-                    </td>
-                    <td class="text-center">
-                        <span class="badge rounded-pill badge-soft">{{ f.ordini.all|length }}{% if f.righe.all %} +{{ f.righe.all|length }}{% endif %}</span>
-                    </td>
-                    <td class="text-end"><strong>&euro;{{ f.totale }}</strong></td>
-                    <td class="text-end {% if f.saldo_dovuto > 0 %}text-danger fw-bold{% else %}text-muted{% endif %}">
-                        &euro;{{ f.saldo_dovuto }}
-                    </td>
-                    <td>
-                        {% if f.stato == 'da_pagare' %}
-                            <span class="badge rounded-pill bg-danger-subtle text-danger-emphasis border border-danger-subtle">
-                                <i class="bi bi-hourglass-split"></i> Da pagare</span>
-                        {% elif f.stato == 'pagata' %}
-                            <span class="badge rounded-pill bg-success-subtle text-success-emphasis border border-success-subtle">
-                                <i class="bi bi-check-circle"></i> Pagata</span>
-                        {% else %}
-                            <span class="badge rounded-pill bg-secondary-subtle text-secondary-emphasis border border-secondary-subtle">
-                                <i class="bi bi-archive"></i> Archiviata</span>
-                        {% endif %}
-                    </td>
-                    <td class="text-end" onclick="event.stopPropagation()">
-                        {% if f.stato == 'da_pagare' %}
-                            <button class="btn btn-sm btn-success"
-                                    onclick="apriModalPagata({{ f.pk }}, '{{ f.numero }}', '{{ f.saldo_dovuto }}')">
-                                <i class="bi bi-cash-coin"></i> Segna pagata
-                            </button>
-                        {% elif f.stato == 'pagata' %}
-                            <button class="btn btn-sm btn-outline-secondary"
-                                    onclick="azioneFattura({{ f.pk }}, 'archivia', 'Archiviare la fattura {{ f.numero }}?')">
-                                <i class="bi bi-archive"></i> Archivia
-                            </button>
-                        {% endif %}
-                        {% if f.stato != 'archiviata' %}
-                            <button class="btn btn-sm btn-outline-primary"
-                                    onclick="apriModalModifica({{ f.pk }})" title="Modifica fattura">
-                                <i class="bi bi-pencil-square"></i>
-                            </button>
-                            <button class="btn btn-sm btn-outline-danger"
-                                    onclick="azioneFattura({{ f.pk }}, 'elimina', 'Eliminare la fattura {{ f.numero }}? Gli ordini torneranno tra quelli da fatturare.')">
-                                <i class="bi bi-trash"></i>
-                            </button>
-                        {% endif %}
-                    </td>
-                </tr>
-                <tr class="collapse" id="fat-det-{{ f.pk }}">
-                    <td colspan="9" class="p-0">
-                        <table class="table table-sm mb-0 fatt-dettaglio">
-                            <thead>
-                                <tr class="small text-muted">
-                                    <th style="padding-left:2rem">Ordine</th>
-                                    <th>Data</th>
-                                    <th>Tipo auto</th>
-                                    <th>Servizi</th>
-                                    <th>Targa</th>
-                                    <th>Matricola</th>
-                                    <th>Nota fattura</th>
-                                    <th class="text-end">Totale</th>
-                                    <th>Pagamento</th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                {% for o in f.ordini.all %}
-                                <tr>
-                                    <td style="padding-left:2rem">
-                                        <a href="{% url 'ordini:ordine-detail' o.pk %}">#{{ o.numero_progressivo }}</a>
-                                    </td>
-                                    <td>{{ o.data_ora|date:"d/m/Y H:i" }}</td>
-                                    <td class="small">{{ o.tipo_auto|default:"-" }}</td>
-                                    <td class="small">
-                                        {% for item in o.items.all %}{{ item.servizio_prodotto.titolo }}{% if not forloop.last %}, {% endif %}{% empty %}{{ o.nota|default:"-" }}{% endfor %}
-                                    </td>
-                                    <td>{{ o.fattura_targa|default:"-" }}</td>
-                                    <td>{{ o.fattura_matricola|default:"-" }}</td>
-                                    <td class="small">{{ o.fattura_nota|default:"-" }}</td>
-                                    <td class="text-end">
-                                        &euro;{{ o.importo_in_fattura }}
-                                        {% if o.fattura_importo is not None and o.fattura_importo != o.totale_finale %}
-                                            <br><small class="text-muted text-decoration-line-through"
-                                                       title="Totale reale dell'ordine">&euro;{{ o.totale_finale }}</small>
-                                        {% endif %}
-                                    </td>
-                                    <td>
-                                        {% if o.stato_pagamento == 'pagato' %}
-                                            <span class="badge bg-success">Pagato</span>
-                                        {% elif o.stato_pagamento == 'parziale' %}
-                                            <span class="badge bg-warning text-dark">Parziale</span>
-                                        {% elif o.stato_pagamento == 'differito' %}
-                                            <span class="badge bg-info">Differito</span>
-                                        {% else %}
-                                            <span class="badge bg-danger">Non pagato</span>
-                                        {% endif %}
-                                    </td>
-                                </tr>
-                                {% endfor %}
-                                {% for r in f.righe.all %}
-                                <tr>
-                                    <td style="padding-left:2rem">
-                                        <span class="badge bg-light text-dark border">voce manuale</span>
-                                    </td>
-                                    <td>{{ r.data|date:"d/m/Y" }}</td>
-                                    <td class="small" colspan="5">{{ r.descrizione }}</td>
-                                    <td class="text-end">&euro;{{ r.importo }}</td>
-                                    <td></td>
-                                </tr>
-                                {% endfor %}
-                            </tbody>
-                        </table>
-                    </td>
-                </tr>
-                {% endfor %}
-            </tbody>
-        </table>
+    {% for gf in gruppi_fatture %}
+    <div class="gruppo-card">
+        <div class="head" onclick="toggleGruppoCard(this)">
+            <div class="d-flex align-items-center gap-2 flex-wrap">
+                <i class="bi bi-chevron-right gruppo-chevron"></i>
+                {% if gf.cliente %}
+                <span class="nome-cliente"><i class="bi bi-person text-primary"></i>
+                    {{ gf.cliente.nome_completo }}</span>
+                <span class="meta">
+                    {% if gf.cliente.telefono %}{{ gf.cliente.telefono }}{% endif %}
+                    {% if gf.cliente.partita_iva %}&middot; P.IVA {{ gf.cliente.partita_iva }}{% endif %}
+                </span>
+                {% else %}
+                <span class="nome-cliente"><i class="bi bi-person-x text-secondary"></i>
+                    Senza cliente</span>
+                {% endif %}
+            </div>
+            <div class="d-flex align-items-center gap-2 flex-wrap">
+                <span class="badge rounded-pill badge-soft">
+                    {{ gf.fatture|length }} fattur{{ gf.fatture|length|pluralize:"a,e" }}</span>
+                <span class="badge rounded-pill badge-tot">&euro;{{ gf.totale }}</span>
+                {% if gf.saldo > 0 %}
+                <span class="badge rounded-pill bg-danger-subtle text-danger-emphasis border border-danger-subtle">
+                    da incassare &euro;{{ gf.saldo }}</span>
+                {% endif %}
+            </div>
+        </div>
+        <div class="gruppo-body">
+            {% include 'fatture/_tabella_fatture.html' with fatture=gf.fatture %}
+        </div>
     </div>
+    {% endfor %}
     {% endif %}
 </div>
 
@@ -359,14 +253,14 @@
         <div class="modal-content">
             <div class="modal-header">
                 <h5 class="modal-title"><i class="bi bi-plus-circle"></i>
-                    Ordine manuale da fatturare</h5>
+                    Voce manuale da fatturare</h5>
                 <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
             </div>
             <div class="modal-body">
                 <p class="text-muted small mb-3">
-                    Per servizi svolti ma non registrati nel gestionale:
-                    l'ordine viene creato adesso, gia' segnato da
-                    fatturare e non pagato.
+                    Voce di comodo per far quadrare la fattura: NON crea
+                    un ordine nel gestionale. Resta in attesa nel gruppo
+                    del cliente finche' non la raggruppi in una fattura.
                 </p>
                 <div class="mb-3">
                     <label class="form-label">Cliente</label>
@@ -408,7 +302,7 @@
                 <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Annulla</button>
                 <button type="button" class="btn btn-primary" id="om-btn-crea"
                         onclick="confermaOrdineManuale()">
-                    <i class="bi bi-check-lg"></i> Crea ordine
+                    <i class="bi bi-check-lg"></i> Crea voce
                 </button>
             </div>
         </div>
@@ -525,25 +419,27 @@ function toggleGruppoCard(head) {
     head.closest('.gruppo-card').classList.toggle('aperto');
 }
 
-// Checkbox nell'intestazione: seleziona/deseleziona tutti gli ordini
+// Checkbox nell'intestazione: seleziona/deseleziona ordini e voci
 // del gruppo (funziona anche a card chiusa).
 function toggleSelezioneGruppo(chkGruppo) {
     const card = chkGruppo.closest('.gruppo-card');
-    card.querySelectorAll('.check-ordine').forEach(c => {
+    card.querySelectorAll('.check-ordine, .check-voce').forEach(c => {
         c.checked = chkGruppo.checked;
     });
     const btn = card.querySelector('.btn-raggruppa');
-    if (btn) btn.disabled = !card.querySelector('.check-ordine:checked');
+    if (btn) btn.disabled =
+        !card.querySelector('.check-ordine:checked, .check-voce:checked');
 }
 
-// --- Selezione ordini nei gruppi -------------------------------------
+// --- Selezione ordini/voci nei gruppi --------------------------------
 // Il bottone "Raggruppa" di ogni card si abilita con almeno 1 checkbox.
 document.querySelectorAll('.gruppo-card').forEach(card => {
     const btn = card.querySelector('.btn-raggruppa');
     if (!btn) return;
-    card.querySelectorAll('.check-ordine').forEach(chk => {
+    card.querySelectorAll('.check-ordine, .check-voce').forEach(chk => {
         chk.addEventListener('change', () => {
-            btn.disabled = !card.querySelector('.check-ordine:checked');
+            btn.disabled =
+                !card.querySelector('.check-ordine:checked, .check-voce:checked');
         });
     });
 });
@@ -595,7 +491,7 @@ function aggiungiRiga(contId, data, descrizione, importo) {
 
 function aggiornaTotale(prefisso) {
     let totale = 0;
-    document.querySelectorAll(`#${prefisso}-ordini .importo-ordine, #${prefisso}-righe .riga-importo`)
+    document.querySelectorAll(`#${prefisso}-ordini .importo-ordine, #${prefisso}-ordini .importo-voce, #${prefisso}-righe .riga-importo`)
         .forEach(inp => { totale += parseFloat(inp.value) || 0; });
     document.getElementById(prefisso + '-totale').textContent = totale.toFixed(2);
 }
@@ -628,15 +524,32 @@ let _gruppoCorrente = null;
 
 function apriModalCrea(btn) {
     _gruppoCorrente = btn.closest('.gruppo-card');
-    const selezionati = _gruppoCorrente.querySelectorAll('.check-ordine:checked');
-    if (!selezionati.length) return;
+    const ordiniSel = _gruppoCorrente.querySelectorAll('.check-ordine:checked');
+    const vociSel = _gruppoCorrente.querySelectorAll('.check-voce:checked');
+    if (!ordiniSel.length && !vociSel.length) return;
 
     document.getElementById('crea-ragione').value = btn.dataset.ragioneSociale || '';
     const cont = document.getElementById('crea-ordini');
     cont.innerHTML = '';
-    selezionati.forEach(chk => {
+    ordiniSel.forEach(chk => {
         cont.insertAdjacentHTML('beforeend',
             _htmlRigaOrdine('crea', chk.value, chk.dataset.numero, chk.dataset.totale, false));
+    });
+    // Voci manuali selezionate: importo fisso (si cambia dalla voce)
+    vociSel.forEach(chk => {
+        const div = document.createElement('div');
+        div.className = 'd-flex align-items-center gap-2 mb-1 riga-voce';
+        div.dataset.voceId = chk.value;
+        div.innerHTML = `
+            <span class="flex-grow-1 small"></span>
+            <div class="input-group input-group-sm" style="width:130px">
+                <span class="input-group-text">€</span>
+                <input type="number" class="form-control importo-voce text-end"
+                       value="${chk.dataset.totale}" disabled>
+            </div>`;
+        div.querySelector('span.small').textContent =
+            'voce: ' + (chk.dataset.descrizione || '');
+        cont.appendChild(div);
     });
     document.getElementById('crea-righe').innerHTML = '';
     aggiornaTotale('crea');
@@ -661,8 +574,11 @@ function confermaCrea(confermaDuplicato) {
     if (!raccolto) return;
     const importi = {};
     raccolto.ordini.forEach(o => { importi[o.id] = o.importo; });
+    const vociIds = [...document.querySelectorAll('#crea-ordini .riga-voce')]
+        .map(div => parseInt(div.dataset.voceId));
     const payload = {
         ordini: raccolto.ordini.map(o => o.id),
+        voci: vociIds,
         importi: importi,
         righe: raccolto.righe,
         data: document.getElementById('crea-data').value,
@@ -770,7 +686,7 @@ function confermaOrdineManuale() {
 
     const btn = document.getElementById('om-btn-crea');
     btn.disabled = true;
-    _fatPost(`{% url 'fatture:crea-ordine-manuale' %}`, payload)
+    _fatPost(`{% url 'fatture:crea-voce-manuale' %}`, payload)
         .then(d => {
             if (!d.success) {
                 btn.disabled = false;
@@ -780,6 +696,17 @@ function confermaOrdineManuale() {
             location.reload();
         })
         .catch(() => { btn.disabled = false; alert('Errore di rete'); });
+}
+
+// Elimina una voce manuale ancora in attesa
+function eliminaVoce(pk) {
+    if (!confirm('Eliminare questa voce manuale?')) return;
+    _fatPost(`{% url 'fatture:elimina-voce' 0 %}`.replace('0', pk))
+        .then(d => {
+            if (!d.success) { alert('Errore: ' + (d.error || 'operazione fallita')); return; }
+            location.reload();
+        })
+        .catch(() => alert('Errore di rete'));
 }
 
 // --- Modal modifica fattura ------------------------------------------

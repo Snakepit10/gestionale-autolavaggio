@@ -1,15 +1,17 @@
 {% comment %}
-Tabella degli ordini da fatturare dentro una card gruppo (per cliente
-o "senza cliente"). Le checkbox portano i data-* usati dal riepilogo
-del modal crea fattura.
+Tabella degli elementi da fatturare dentro una card gruppo (per
+cliente o "senza cliente"): ordini del gestionale + voci manuali in
+attesa (variabili `ordini` e `voci`). Le checkbox portano i data-*
+usati dal riepilogo del modal crea fattura.
 {% endcomment %}
 <div class="table-responsive">
     <table class="table table-sm table-hover align-middle">
         <thead>
-            <tr class="small text-muted">
+            <tr>
                 <th style="width:36px"></th>
                 <th>Ordine</th>
                 <th>Data</th>
+                <th>Tipo auto</th>
                 <th>Servizi</th>
                 <th>Targa</th>
                 <th>Matricola</th>
@@ -32,6 +34,7 @@ del modal crea fattura.
                 </td>
                 <td><a href="{% url 'ordini:ordine-detail' o.pk %}">#{{ o.numero_progressivo }}</a></td>
                 <td>{{ o.data_ora|date:"d/m/Y H:i" }}</td>
+                <td class="small">{{ o.tipo_auto|default:"-" }}</td>
                 <td class="small">
                     {% for item in o.items.all %}{{ item.servizio_prodotto.titolo }}{% if not forloop.last %}, {% endif %}{% empty %}{{ o.nota|default:"-" }}{% endfor %}
                 </td>
@@ -49,6 +52,27 @@ del modal crea fattura.
                     {% else %}
                         <span class="badge bg-danger">Non pagato</span>
                     {% endif %}
+                </td>
+            </tr>
+            {% endfor %}
+            {% for v in voci %}
+            <tr>
+                <td class="text-center">
+                    <input type="checkbox" class="form-check-input check-voce"
+                           value="{{ v.pk }}"
+                           data-descrizione="{{ v.descrizione }}"
+                           data-totale="{{ v.importo|stringformat:'.2f' }}">
+                </td>
+                <td><span class="badge bg-light text-dark border">voce manuale</span></td>
+                <td>{{ v.data|date:"d/m/Y" }}</td>
+                <td class="small">-</td>
+                <td class="small" colspan="4">{{ v.descrizione }}</td>
+                <td class="text-end"><strong>&euro;{{ v.importo }}</strong></td>
+                <td>
+                    <button type="button" class="btn btn-sm btn-outline-danger py-0"
+                            onclick="eliminaVoce({{ v.pk }})" title="Elimina voce">
+                        <i class="bi bi-trash"></i>
+                    </button>
                 </td>
             </tr>
             {% endfor %}
