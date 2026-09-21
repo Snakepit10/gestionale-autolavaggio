@@ -369,6 +369,21 @@ function toggleSelectAll() {
     aggiornaContatori();
 }
 
+// Intestazione gruppo cliente: apre/chiude le righe ordine del gruppo
+// (chiuse di default per tenere corta la lista).
+function toggleRigheGruppo(headerRow) {
+    const target = headerRow.dataset.target;
+    const righe = document.querySelectorAll(`tr[data-gruppo-righe="${target}"]`);
+    if (!righe.length) return;
+    const daAprire = righe[0].classList.contains('d-none');
+    righe.forEach(r => r.classList.toggle('d-none', !daAprire));
+    const chevron = headerRow.querySelector('.gruppo-chevron');
+    if (chevron) {
+        chevron.classList.toggle('bi-chevron-down', daAprire);
+        chevron.classList.toggle('bi-chevron-right', !daAprire);
+    }
+}
+
 // Checkbox nell'intestazione del gruppo: seleziona/deseleziona tutti
 // gli ordini di quel cliente.
 function toggleGruppo(chkGruppo) {

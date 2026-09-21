@@ -7,13 +7,18 @@ Un gruppo cliente della pagina Ordini non pagati: riga intestazione
               di gruppo non incrocia le due tabelle
   mostra_archiviati -> il bottone riga diventa Ripristina
 {% endcomment %}
-<tr class="table-secondary">
+{% comment %}Intestazione cliccabile: apre/chiude le righe del gruppo
+(chiuse di default per tenere corta la lista){% endcomment %}
+<tr class="table-secondary gruppo-header" style="cursor:pointer"
+    data-target="{{ sezione }}-{% if gruppo.cliente %}{{ gruppo.cliente.pk }}{% else %}anon{% endif %}"
+    onclick="toggleRigheGruppo(this)">
     <td colspan="11">
         <div class="d-flex justify-content-between align-items-center flex-wrap gap-2">
             <span>
+                <i class="bi bi-chevron-right gruppo-chevron me-1"></i>
                 <input type="checkbox" class="form-check-input gruppo-checkbox me-1"
                        data-gruppo="{{ sezione }}-{% if gruppo.cliente %}{{ gruppo.cliente.pk }}{% else %}anon{% endif %}"
-                       onchange="toggleGruppo(this)"
+                       onchange="toggleGruppo(this)" onclick="event.stopPropagation()"
                        title="Seleziona tutti gli ordini del cliente">
                 {% if gruppo.cliente %}
                     <i class="bi bi-person"></i>
@@ -44,7 +49,8 @@ Un gruppo cliente della pagina Ordini non pagati: riga intestazione
     </td>
 </tr>
 {% for ordine in gruppo.ordini %}
-<tr class="{% if ordine.giorni_scadenza < 0 %}table-danger{% elif ordine.giorni_scadenza <= 7 %}table-warning{% endif %}">
+<tr class="d-none {% if ordine.giorni_scadenza < 0 %}table-danger{% elif ordine.giorni_scadenza <= 7 %}table-warning{% endif %}"
+    data-gruppo-righe="{{ sezione }}-{% if gruppo.cliente %}{{ gruppo.cliente.pk }}{% else %}anon{% endif %}">
     <td>
         <input type="checkbox" class="ordine-checkbox" value="{{ ordine.pk }}"
                data-gruppo="{{ sezione }}-{% if gruppo.cliente %}{{ gruppo.cliente.pk }}{% else %}anon{% endif %}">

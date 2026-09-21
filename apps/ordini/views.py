@@ -1113,10 +1113,12 @@ class OrdiniNonPagatiView(LoginRequiredMixin, ListView):
         # Toggle "Mostra archiviati": la pagina mostra o gli ordini
         # attivi o quelli archiviati a mano, mai insieme.
         self.mostra_archiviati = self.request.GET.get('archiviati') == '1'
+        # Gli ordini annullati non sono crediti da incassare: fuori.
         return Ordine.objects.filter(
             stato_pagamento__in=['non_pagato', 'parziale'],
             non_pagato_archiviato=self.mostra_archiviati,
-        ).select_related('cliente', 'fattura').order_by('-data_ora')
+        ).exclude(stato='annullato').select_related(
+            'cliente', 'fattura').order_by('-data_ora')
 
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
@@ -1125,7 +1127,7 @@ class OrdiniNonPagatiView(LoginRequiredMixin, ListView):
         context['n_archiviati'] = Ordine.objects.filter(
             stato_pagamento__in=['non_pagato', 'parziale'],
             non_pagato_archiviato=True,
-        ).count()
+        ).exclude(stato='annullato').count()
 
         # Raggruppa per cliente (ordini anonimi in coda, gruppo a parte);
         # dentro al gruppo resta l'ordinamento -data_ora della queryset.
