@@ -315,6 +315,12 @@ GOOGLE_PLACES_API_KEY = os.environ.get('GOOGLE_PLACES_API_KEY', '')
 # viene caricato solo se l'ID e' configurato E il visitatore ha dato
 # il consenso ai cookie di marketing (banner in base_public.html).
 META_PIXEL_ID = os.environ.get('META_PIXEL_ID', '')
+# Conversions API: token di accesso del dataset (Gestione eventi >
+# Impostazioni > API Conversions > Genera token). Vuoto = solo pixel
+# browser. META_CAPI_TEST_CODE (es. TEST57064) fa comparire gli invii
+# server in "Testa gli eventi": da svuotare a verifica finita.
+META_CAPI_TOKEN = os.environ.get('META_CAPI_TOKEN', '')
+META_CAPI_TEST_CODE = os.environ.get('META_CAPI_TEST_CODE', '')
 GOOGLE_PLACE_ID = os.environ.get('GOOGLE_PLACE_ID', '')
 
 # === Consulente AI marketing (Claude API) ===

@@ -685,6 +685,21 @@ def crea_prenotazione_pub(request):
         'timestamp': timezone.now().isoformat(),
     })
 
+    # Meta Conversions API: Schedule server-side con lo stesso
+    # event_id del pixel browser (deduplica). Best effort: mai
+    # bloccare la prenotazione.
+    from . import meta_capi
+    nota_testo = body.get('nota') or ''
+    meta_capi.invia_schedule(
+        request,
+        event_id=body.get('meta_event_id') or '',
+        email=email_target or '',
+        telefono=telefono or (cliente.telefono if cliente else ''),
+        valore=sum((s.prezzo or 0) for s in tutti_servizi),
+        promo='garanzia_pioggia' if 'garanzia_pioggia' in nota_testo else '',
+        fbp=(body.get('fbp') or '')[:100],
+    )
+
     return JsonResponse({
         'ok': True,
         'codice': prenotazione.codice_prenotazione,

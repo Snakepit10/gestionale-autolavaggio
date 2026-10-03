@@ -976,12 +976,21 @@ function confermaPrenotazione() {
             + (utmCampagna ? ' | ' + utmCampagna : '') + ']';
     }
 
+    // event_id condiviso browser/server: il server lo inoltra alla
+    // Conversions API, il pixel lo usa in fbq -> Meta deduplica.
+    const metaEventId = (crypto.randomUUID && crypto.randomUUID())
+        || ('sch-' + Date.now() + '-' + Math.random().toString(36).slice(2));
+    const fbpCookie = (document.cookie.split('; ')
+        .find(r => r.startsWith('_fbp=')) || '').split('=')[1] || '';
+
     const payload = {
         data: dataSelezionata,
         ora: oraSelezionata,
         servizi: serviziSelezionati.map(s => s.id),
         tipo_auto: document.getElementById('bk-tipo-auto').value,
         nota: nota,
+        meta_event_id: metaEventId,
+        fbp: fbpCookie,
     };
 
     if (!IS_LOGGED) {
@@ -1003,16 +1012,14 @@ function confermaPrenotazione() {
     .then(d => {
         if (d.ok) {
             // Meta Pixel: Schedule SOLO a salvataggio confermato dal
-            // server. event_id univoco per la deduplica con una futura
-            // Conversions API lato server.
+            // server, con LO STESSO event_id inviato alla Conversions
+            // API lato server (Meta deduplica i due invii).
             if (window.mwTrack) {
                 const totale = serviziSelezionati
                     .reduce((a, s) => a + (parseFloat(s.prezzo) || 0), 0);
                 const parametri = { value: totale, currency: 'EUR' };
                 if (promoAttiva) parametri.content_name = promoAttiva;
-                const eventId = (crypto.randomUUID && crypto.randomUUID())
-                    || ('sch-' + Date.now() + '-' + Math.random().toString(36).slice(2));
-                mwTrack('Schedule', parametri, eventId);
+                mwTrack('Schedule', parametri, metaEventId);
             }
             alert(
                 `Richiesta inviata! 🎉\n\n` +
