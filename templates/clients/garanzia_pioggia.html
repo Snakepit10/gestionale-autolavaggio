@@ -41,15 +41,62 @@
     background: #e7f1fd; color: #1461c7; font-size: 1.3rem;
     display: flex; align-items: center; justify-content: center;
 }
-.gp-foto { border-radius: 14px; width: 100%; object-fit: cover; aspect-ratio: 4/3; display: block; }
-.gp-foto-wrap { position: relative; }
+/* Slider prima/dopo: trascina il cursore per confrontare */
+.ba-slider {
+    position: relative; aspect-ratio: 3/2; border-radius: 14px;
+    overflow: hidden; --pos: 50%;
+    box-shadow: 0 6px 20px rgba(14, 51, 80, .15);
+}
+/* pan-y: il drag orizzontale muove il cursore, lo swipe verticale
+   continua a scorrere la pagina */
+.ba-range { touch-action: pan-y; }
+.ba-slider img {
+    position: absolute; inset: 0; width: 100%; height: 100%;
+    object-fit: cover; display: block; pointer-events: none;
+    user-select: none;
+}
+.ba-img-prima { clip-path: inset(0 calc(100% - var(--pos)) 0 0); }
+.ba-line {
+    position: absolute; top: 0; bottom: 0; left: var(--pos);
+    width: 3px; background: #fff; transform: translateX(-50%);
+    box-shadow: 0 0 10px rgba(0, 0, 0, .45); pointer-events: none;
+}
+.ba-knob {
+    position: absolute; top: 50%; left: var(--pos);
+    transform: translate(-50%, -50%);
+    width: 42px; height: 42px; border-radius: 50%;
+    background: #fff; color: #0e3350; font-size: 1.1rem;
+    display: flex; align-items: center; justify-content: center;
+    box-shadow: 0 2px 10px rgba(0, 0, 0, .4); pointer-events: none;
+}
+.ba-range {
+    position: absolute; inset: 0; width: 100%; height: 100%;
+    opacity: 0; cursor: ew-resize; margin: 0;
+}
 .gp-foto-label {
     position: absolute; top: 8px; left: 8px;
     background: rgba(14, 51, 80, .85); color: #fff;
     border-radius: 999px; padding: 3px 12px;
     font-size: .78rem; font-weight: 800; letter-spacing: .03em;
+    pointer-events: none;
 }
-.gp-foto-label.dopo { background: rgba(31, 170, 89, .92); }
+.gp-foto-label.dopo { left: auto; right: 8px; background: rgba(31, 170, 89, .92); }
+/* FAQ apribili */
+.gp-faq details {
+    border-bottom: 1px solid #eef2f6; padding: 12px 0;
+}
+.gp-faq details:last-child { border-bottom: 0; }
+.gp-faq summary {
+    font-weight: 700; cursor: pointer; list-style: none;
+    display: flex; justify-content: space-between; align-items: center; gap: 10px;
+}
+.gp-faq summary::-webkit-details-marker { display: none; }
+.gp-faq summary::after {
+    content: '\F282'; font-family: 'bootstrap-icons';
+    color: #94a3b8; transition: transform .15s ease;
+}
+.gp-faq details[open] summary::after { transform: rotate(180deg); }
+.gp-faq .risposta { color: #4a6274; font-size: .92rem; padding-top: 8px; }
 .gp-amenity { display: flex; gap: 10px; align-items: center; }
 .gp-amenity i { font-size: 1.4rem; color: #1b6fa3; }
 .gp-condizioni li { margin-bottom: 6px; }
@@ -151,20 +198,20 @@ body.mw-light main { padding-bottom: 80px; }
         effettivo di pulizia. Il prezzo definitivo viene confermato al ritiro.
     </p>
 
-    {# ============ 4. PRIMA / DOPO ============ #}
-    {% if foto_prima_dopo %}
-    <h4 class="mt-4 mb-3" style="font-weight:800">Prima e dopo</h4>
-    <div class="row g-2">
-        {% for foto in foto_prima_dopo %}
-        <div class="col-6">
-            <div class="gp-foto-wrap">
-                <img class="gp-foto" src="{{ foto }}"
-                     alt="{% if forloop.first %}Auto prima del lavaggio{% else %}Auto dopo il lavaggio{% endif %}">
-                <span class="gp-foto-label {% if not forloop.first %}dopo{% endif %}">
-                    {% if forloop.first %}Prima{% else %}Dopo{% endif %}</span>
-            </div>
-        </div>
-        {% endfor %}
+    {# ============ 4. PRIMA / DOPO (slider interattivo) ============ #}
+    {% if foto_prima_dopo|length == 2 %}
+    <h4 class="mt-4 mb-1" style="font-weight:800">Prima e dopo</h4>
+    <p class="text-muted small mb-2">Trascina il cursore per confrontare.</p>
+    <div class="ba-slider" id="ba-slider">
+        <img src="{{ foto_prima_dopo.1 }}" alt="Auto dopo il lavaggio completo">
+        <img class="ba-img-prima" src="{{ foto_prima_dopo.0 }}" alt="Auto prima del lavaggio">
+        <span class="gp-foto-label">Prima</span>
+        <span class="gp-foto-label dopo">Dopo</span>
+        <div class="ba-line"></div>
+        <div class="ba-knob"><i class="bi bi-arrows-left-right"></i></div>
+        <input type="range" class="ba-range" min="0" max="100" value="50"
+               aria-label="Confronta prima e dopo il lavaggio"
+               oninput="document.getElementById('ba-slider').style.setProperty('--pos', this.value + '%')">
     </div>
     {% endif %}
 
@@ -198,6 +245,59 @@ body.mw-light main { padding-bottom: 80px; }
             <li>Valida per la <strong>stessa auto</strong>, una sola volta.</li>
             <li>Prezzi orientativi: il prezzo definitivo viene confermato al ritiro.</li>
         </ul>
+    </div>
+
+    {# ============ 6b. DOMANDE FREQUENTI ============ #}
+    <h4 class="mt-4 mb-3" style="font-weight:800">Domande frequenti</h4>
+    <div class="pub-card gp-faq">
+        <details>
+            <summary>Come funziona la Garanzia Pioggia?</summary>
+            <div class="risposta">
+                Fai un lavaggio completo (a mano o con spazzole). Se nei
+                7 giorni successivi piove, torni e ti rilaviamo gli
+                esterni gratis: la tua auto resta pulita, senza rischi.
+            </div>
+        </details>
+        <details>
+            <summary>Cosa devo portare per il ri-lavaggio gratuito?</summary>
+            <div class="risposta">
+                Lo scontrino oppure il tagliando della garanzia che ti
+                consegniamo al ritiro dell'auto. Deve essere la stessa
+                auto del lavaggio originale.
+            </div>
+        </details>
+        <details>
+            <summary>Il ri-lavaggio comprende anche gli interni?</summary>
+            <div class="risposta">
+                No: il ri-lavaggio gratuito riguarda solo gli esterni,
+                che sono la parte rovinata dalla pioggia. Gli interni
+                restano puliti dal lavaggio completo.
+            </div>
+        </details>
+        <details>
+            <summary>Quante volte posso usare la garanzia?</summary>
+            <div class="risposta">
+                Una volta per ogni lavaggio completo, entro 7 giorni
+                dalla data del lavaggio.
+            </div>
+        </details>
+        <details>
+            <summary>Quanto costa il lavaggio completo?</summary>
+            <div class="risposta">
+                Da 22 &euro; con spazzole, da 25 &euro; a mano. I prezzi
+                sono orientativi: il prezzo definitivo dipende dalla
+                grandezza dell'auto e dallo stato di sporco, e viene
+                confermato al ritiro.
+            </div>
+        </details>
+        <details>
+            <summary>Devo prenotare?</summary>
+            <div class="risposta">
+                Conviene: prenoti online in 2 minuti e salti la fila.
+                Puoi anche chiamarci al 379&nbsp;233&nbsp;7051 o
+                scriverci su WhatsApp.
+            </div>
+        </details>
     </div>
 
     {# ============ 7. DOVE SIAMO ============ #}
