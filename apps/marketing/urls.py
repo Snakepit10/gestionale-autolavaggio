@@ -9,6 +9,7 @@ urlpatterns = [
     path('segmento/<str:chiave>/', views.segmento_dettaglio, name='segmento'),
     path('segmento/<str:chiave>/export/', views.segmento_export_csv, name='segmento-export'),
     path('impostazioni/', views.impostazioni, name='impostazioni'),
+    path('conversioni-web/', views.conversioni_web, name='conversioni-web'),
 
     # Consulente AI
     path('ai/', views.ai_consulente, name='ai'),

@@ -1,0 +1,174 @@
+{% extends 'base.html' %}
+{% block title %}Conversioni web - Marketing{% endblock %}
+
+{% block extra_css %}
+<style>
+.cw-card {
+    border: 1px solid #e4e9f0; border-radius: 12px; background: #fff;
+    box-shadow: 0 1px 2px rgba(16, 24, 40, .05); margin-bottom: 12px;
+    overflow: hidden;
+}
+.cw-card .head {
+    display: flex; justify-content: space-between; align-items: center;
+    flex-wrap: wrap; gap: 10px; padding: 12px 16px; cursor: pointer;
+}
+.cw-card .head:hover { background: #f6f9fc; }
+.cw-chevron { color: #94a3b8; transition: transform .15s ease; font-size: .9rem; }
+.cw-card.aperto .cw-chevron { transform: rotate(90deg); }
+.cw-card .corpo { display: none; border-top: 1px solid #eef2f6; }
+.cw-card.aperto .corpo { display: block; }
+.badge-soft { background: #eef2f7; color: #334155; font-weight: 600; }
+.badge-eur { background: #e7f6ec; color: #157347; font-weight: 700; }
+.cw-funnel { display: flex; gap: 8px; flex-wrap: wrap; padding: 14px 16px 2px; }
+.cw-step {
+    flex: 1; min-width: 110px; text-align: center;
+    background: #f6f9fc; border-radius: 10px; padding: 10px 6px;
+}
+.cw-step .n { font-size: 1.4rem; font-weight: 800; color: #0e2233; }
+.cw-step .lbl { font-size: .72rem; text-transform: uppercase;
+    letter-spacing: .04em; color: #64748b; font-weight: 700; }
+.cw-step.ok .n { color: #157347; }
+.cw-step.ko .n { color: #b42318; }
+.cw-tab thead th {
+    font-size: .72rem; text-transform: uppercase; letter-spacing: .04em;
+    color: #64748b; font-weight: 700; white-space: nowrap;
+    border-bottom: 1px solid #e2e8f0;
+}
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="container-fluid py-3">
+
+    <div class="d-flex justify-content-between align-items-center mb-1 flex-wrap gap-2">
+        <h2 class="mb-0"><i class="bi bi-funnel"></i> Conversioni web</h2>
+        <a href="{% url 'marketing:dashboard' %}" class="btn btn-sm btn-outline-secondary">
+            <i class="bi bi-arrow-left"></i> Marketing
+        </a>
+    </div>
+    <p class="text-muted small">
+        Prenotazioni arrivate dalle landing promo (Facebook/Instagram e
+        link con campagna), raggruppate per campagna: quante richieste,
+        quante confermate e quanto hanno incassato davvero gli ordini
+        collegati.
+    </p>
+
+    <form method="get" class="d-flex align-items-end gap-2 flex-wrap mb-3">
+        <div>
+            <label class="form-label small fw-bold text-muted mb-1">Dal</label>
+            <input type="date" name="dal" class="form-control form-control-sm"
+                   value="{{ dal|date:'Y-m-d' }}">
+        </div>
+        <div>
+            <label class="form-label small fw-bold text-muted mb-1">Al</label>
+            <input type="date" name="al" class="form-control form-control-sm"
+                   value="{{ al|date:'Y-m-d' }}">
+        </div>
+        <button class="btn btn-sm btn-primary"><i class="bi bi-search"></i> Applica</button>
+    </form>
+
+    {% if not gruppi %}
+    <div class="alert alert-light border">
+        Nessuna prenotazione da campagne web nel periodo
+        {{ dal|date:"d/m/Y" }} &ndash; {{ al|date:"d/m/Y" }}.
+        I dati arrivano dai link degli annunci
+        (<code>?promo=...&amp;utm_campaign=...</code>) verso la pagina
+        di prenotazione.
+    </div>
+    {% else %}
+
+    {# Riepilogo complessivo del periodo #}
+    <div class="cw-card aperto">
+        <div class="cw-funnel pb-3">
+            <div class="cw-step"><div class="n">{{ totale.n_richieste }}</div>
+                <div class="lbl">richieste</div></div>
+            <div class="cw-step ok"><div class="n">{{ totale.n_confermate }}</div>
+                <div class="lbl">confermate</div></div>
+            <div class="cw-step"><div class="n">{{ totale.n_ordini }}</div>
+                <div class="lbl">ordini generati</div></div>
+            <div class="cw-step ok"><div class="n">&euro;{{ totale.incassato }}</div>
+                <div class="lbl">incassato</div></div>
+            <div class="cw-step"><div class="n">&euro;{{ totale.fatturato }}</div>
+                <div class="lbl">fatturato ordini</div></div>
+        </div>
+    </div>
+
+    {% for g in gruppi %}
+    <div class="cw-card">
+        <div class="head" onclick="this.closest('.cw-card').classList.toggle('aperto')">
+            <div class="d-flex align-items-center gap-2 flex-wrap">
+                <i class="bi bi-chevron-right cw-chevron"></i>
+                <strong>{{ g.promo }}</strong>
+                <span class="text-muted small">{{ g.campagna }}</span>
+            </div>
+            <div class="d-flex align-items-center gap-2 flex-wrap">
+                <span class="badge rounded-pill badge-soft">
+                    {{ g.n_richieste }} richiest{{ g.n_richieste|pluralize:"a,e" }}</span>
+                <span class="badge rounded-pill badge-soft">
+                    {{ g.pct_confermate }}% confermate</span>
+                <span class="badge rounded-pill badge-eur">&euro;{{ g.incassato }} incassati</span>
+            </div>
+        </div>
+        <div class="corpo">
+            <div class="cw-funnel">
+                <div class="cw-step"><div class="n">{{ g.n_richieste }}</div>
+                    <div class="lbl">richieste</div></div>
+                <div class="cw-step"><div class="n">{{ g.stati.in_attesa }}</div>
+                    <div class="lbl">in attesa</div></div>
+                <div class="cw-step ok"><div class="n">{{ g.stati.confermata }}</div>
+                    <div class="lbl">confermate</div></div>
+                <div class="cw-step ok"><div class="n">{{ g.stati.completata }}</div>
+                    <div class="lbl">completate</div></div>
+                <div class="cw-step ko"><div class="n">{{ g.stati.annullata }}</div>
+                    <div class="lbl">annullate</div></div>
+                <div class="cw-step ko"><div class="n">{{ g.stati.no_show }}</div>
+                    <div class="lbl">no show</div></div>
+            </div>
+            <div class="px-3 pb-1 small text-muted">
+                Ordini generati: <strong>{{ g.n_ordini }}</strong> &middot;
+                fatturato <strong>&euro;{{ g.fatturato }}</strong> &middot;
+                incassato <strong class="text-success">&euro;{{ g.incassato }}</strong>
+            </div>
+            <div class="table-responsive">
+                <table class="table table-sm table-hover align-middle cw-tab mb-0">
+                    <thead><tr>
+                        <th>Data richiesta</th><th>Cliente</th><th>Servizi</th>
+                        <th>Appuntamento</th><th>Stato</th>
+                        <th class="text-end">Ordine</th>
+                    </tr></thead>
+                    <tbody>
+                        {% for p in g.prenotazioni %}
+                        <tr>
+                            <td>{{ p.creata_il|date:"d/m/Y H:i" }}</td>
+                            <td>{{ p.cliente.nome_completo }}</td>
+                            <td class="small">
+                                {% for s in p.servizi.all %}{{ s.titolo }}{% if not forloop.last %}, {% endif %}{% endfor %}
+                            </td>
+                            <td>{{ p.slot.data|date:"d/m/Y" }} {{ p.slot.ora_inizio|time:"H:i" }}</td>
+                            <td>
+                                {% if p.stato == 'completata' %}<span class="badge bg-success-subtle text-success-emphasis border border-success-subtle rounded-pill">Completata</span>
+                                {% elif p.stato == 'confermata' %}<span class="badge bg-primary-subtle text-primary-emphasis border border-primary-subtle rounded-pill">Confermata</span>
+                                {% elif p.stato == 'in_attesa' %}<span class="badge bg-warning-subtle text-warning-emphasis border border-warning-subtle rounded-pill">In attesa</span>
+                                {% elif p.stato == 'no_show' %}<span class="badge bg-danger-subtle text-danger-emphasis border border-danger-subtle rounded-pill">No show</span>
+                                {% else %}<span class="badge bg-secondary-subtle text-secondary-emphasis border border-secondary-subtle rounded-pill">Annullata</span>{% endif %}
+                            </td>
+                            <td class="text-end">
+                                {% if p.ordine %}
+                                    <a href="{% url 'ordini:ordine-detail' p.ordine.pk %}">
+                                        &euro;{{ p.ordine.totale_finale }}</a>
+                                    {% if p.ordine.stato_pagamento == 'pagato' %}
+                                        <i class="bi bi-check-circle-fill text-success small"></i>
+                                    {% endif %}
+                                {% else %}<span class="text-muted">-</span>{% endif %}
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+    {% endfor %}
+    {% endif %}
+</div>
+{% endblock %}

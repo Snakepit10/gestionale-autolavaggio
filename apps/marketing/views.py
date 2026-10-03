@@ -1214,3 +1214,30 @@ def segmento_custom_export(request, pk):
             f'{cs.spesa_media:.2f}',
         ])
     return response
+
+
+@_staff_required
+def conversioni_web(request):
+    """Conversioni dalle landing promo (marcatori [PROMO ...] nelle
+    prenotazioni): funnel per campagna e fatturato reale."""
+    from datetime import datetime, timedelta
+
+    from .services.conversioni_web import report_conversioni_web
+
+    oggi = timezone.localdate()
+    try:
+        dal = datetime.strptime(request.GET.get('dal', ''), '%Y-%m-%d').date()
+    except ValueError:
+        dal = oggi - timedelta(days=30)
+    try:
+        al = datetime.strptime(request.GET.get('al', ''), '%Y-%m-%d').date()
+    except ValueError:
+        al = oggi
+
+    gruppi, totale = report_conversioni_web(dal, al)
+    return render(request, 'marketing/conversioni_web.html', {
+        'gruppi': gruppi,
+        'totale': totale,
+        'dal': dal,
+        'al': al,
+    })
