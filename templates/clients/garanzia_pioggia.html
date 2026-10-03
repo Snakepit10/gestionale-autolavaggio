@@ -11,6 +11,13 @@
     color: #1b6fa3; font-size: .78rem; font-weight: 700;
     letter-spacing: .12em; text-transform: uppercase;
 }
+/* Banner promo sopra l'hero: pieno su mobile, centrato su desktop */
+.gp-banner { background: #eaf4fa; }
+.gp-banner img { display: block; width: 100%; max-width: 980px; margin: 0 auto; }
+@media (min-width: 768px) {
+    .gp-banner { padding: 20px 12px 0; }
+    .gp-banner img { border-radius: 16px; }
+}
 .gp-hero { background: #eaf4fa; padding: 36px 0 52px; }
 .gp-hero h1 {
     font-weight: 800; letter-spacing: -.03em; line-height: 1.07;
@@ -145,11 +152,19 @@ body.mw-light main { padding-bottom: 80px; }
 
 {% block content %}
 
+{# ============ BANNER PROMO (sopra l'hero) ============ #}
+{% if foto_hero %}
+<div class="gp-banner">
+    <img src="{{ foto_hero }}"
+         alt="Garanzia Pioggia 7 giorni: se piove il lavaggio esterno e' gratis">
+</div>
+{% endif %}
+
 {# ============ HERO ============ #}
 <section class="gp-hero">
     <div class="container" style="max-width:980px">
         <div class="row g-4 align-items-center">
-            <div class="col-md-6">
+            <div class="{% if foto_hero %}col-12{% else %}col-md-6{% endif %}">
                 <div class="gp-eyebrow">Lavaggio completo &middot; Garanzia Pioggia</div>
                 <h1>La tua auto pulita. <em>Anche se poi piove.</em></h1>
                 <p class="testo">
@@ -165,7 +180,7 @@ body.mw-light main { padding-bottom: 80px; }
                     e interventi degli operatori.
                 </p>
             </div>
-            {% if foto_prima_dopo|length == 2 %}
+            {% if not foto_hero and foto_prima_dopo|length == 2 %}
             <div class="col-md-6">
                 <div class="gp-visual">
                     <img src="{{ foto_prima_dopo.1 }}" alt="Auto pulita dopo il lavaggio completo">

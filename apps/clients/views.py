@@ -249,9 +249,15 @@ def garanzia_pioggia(request):
         if finders.find(nome):
             foto_prima_dopo.append(static_url(nome))
 
+    # Creativita' promo per l'hero (contiene gia' il sigillo 7 giorni)
+    foto_hero = None
+    if finders.find('img/garanzia-pioggia/hero.webp'):
+        foto_hero = static_url('img/garanzia-pioggia/hero.webp')
+
     return render(request, 'clients/garanzia_pioggia.html', {
         'servizi_completo': servizi_completo,
         'foto_prima_dopo': foto_prima_dopo,
+        'foto_hero': foto_hero,
     })
 
 
