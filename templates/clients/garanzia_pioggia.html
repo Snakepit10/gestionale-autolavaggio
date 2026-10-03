@@ -31,7 +31,15 @@
     background: #e7f1fd; color: #1461c7; font-size: 1.3rem;
     display: flex; align-items: center; justify-content: center;
 }
-.gp-foto { border-radius: 14px; width: 100%; object-fit: cover; aspect-ratio: 4/3; }
+.gp-foto { border-radius: 14px; width: 100%; object-fit: cover; aspect-ratio: 4/3; display: block; }
+.gp-foto-wrap { position: relative; }
+.gp-foto-label {
+    position: absolute; top: 8px; left: 8px;
+    background: rgba(14, 51, 80, .85); color: #fff;
+    border-radius: 999px; padding: 3px 12px;
+    font-size: .78rem; font-weight: 800; letter-spacing: .03em;
+}
+.gp-foto-label.dopo { background: rgba(31, 170, 89, .92); }
 .gp-amenity { display: flex; gap: 10px; align-items: center; }
 .gp-amenity i { font-size: 1.4rem; color: #1b6fa3; }
 .gp-condizioni li { margin-bottom: 6px; }
@@ -138,8 +146,14 @@ body.mw-light main { padding-bottom: 80px; }
     <h4 class="mt-4 mb-3" style="font-weight:800">Prima e dopo</h4>
     <div class="row g-2">
         {% for foto in foto_prima_dopo %}
-        <div class="col-6"><img class="gp-foto" src="{{ foto }}"
-             alt="Prima e dopo il lavaggio"></div>
+        <div class="col-6">
+            <div class="gp-foto-wrap">
+                <img class="gp-foto" src="{{ foto }}"
+                     alt="{% if forloop.first %}Auto prima del lavaggio{% else %}Auto dopo il lavaggio{% endif %}">
+                <span class="gp-foto-label {% if not forloop.first %}dopo{% endif %}">
+                    {% if forloop.first %}Prima{% else %}Dopo{% endif %}</span>
+            </div>
+        </div>
         {% endfor %}
     </div>
     {% endif %}
