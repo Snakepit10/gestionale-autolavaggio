@@ -1,0 +1,225 @@
+{% extends "clients/base_public.html" %}
+{% load static %}
+{% block title %}Garanzia Pioggia &mdash; MasterWash Licata{% endblock %}
+{% block body_class %}mw-light{% endblock %}
+
+{% block extra_css %}
+<style>
+/* Landing promo: mobile-first, un solo obiettivo (prenotare) */
+.gp-hero {
+    background: linear-gradient(160deg, #0e3350 0%, #134b73 60%, #1b6fa3 100%);
+    color: #fff; padding: 36px 0 44px;
+}
+.gp-hero h1 { font-weight: 900; letter-spacing: -.02em; font-size: 1.9rem; }
+.gp-hero .prezzo { font-size: 1.25rem; font-weight: 800; color: #9fdbff; }
+.gp-badge {
+    display: inline-flex; align-items: center; gap: 6px;
+    background: rgba(79, 195, 247, .18); border: 1px solid rgba(79, 195, 247, .5);
+    color: #bfe9ff; border-radius: 999px; padding: 5px 14px;
+    font-size: .85rem; font-weight: 700;
+}
+.gp-cta-row { display: flex; gap: 10px; flex-wrap: wrap; }
+.gp-cta-row .btn-chiama, .gp-cta-row .btn-wa {
+    display: inline-flex; align-items: center; gap: 8px;
+    border-radius: 12px; padding: 13px 18px; font-weight: 700;
+    text-decoration: none; border: 1px solid rgba(255,255,255,.4); color: #fff;
+}
+.gp-cta-row .btn-wa { background: #1faa59; border-color: #1faa59; }
+.gp-step { display: flex; gap: 14px; align-items: flex-start; }
+.gp-step .num {
+    width: 44px; height: 44px; border-radius: 50%; flex-shrink: 0;
+    background: #e7f1fd; color: #1461c7; font-size: 1.3rem;
+    display: flex; align-items: center; justify-content: center;
+}
+.gp-foto { border-radius: 14px; width: 100%; object-fit: cover; aspect-ratio: 4/3; }
+.gp-amenity { display: flex; gap: 10px; align-items: center; }
+.gp-amenity i { font-size: 1.4rem; color: #1b6fa3; }
+.gp-condizioni li { margin-bottom: 6px; }
+.gp-map { border: 0; width: 100%; height: 280px; border-radius: 14px; }
+/* Barra fissa mobile */
+.gp-bar {
+    position: fixed; left: 0; right: 0; bottom: 0; z-index: 1500;
+    background: #0e3350; padding: 10px 12px;
+    display: flex; gap: 10px;
+    box-shadow: 0 -6px 18px rgba(10, 30, 50, .3);
+}
+.gp-bar a {
+    flex: 1; text-align: center; border-radius: 10px; padding: 12px;
+    font-weight: 800; text-decoration: none;
+}
+.gp-bar .prenota { background: var(--mw-cyan); color: var(--mw-on-cyan) !important; }
+.gp-bar .chiama { background: transparent; border: 1px solid rgba(255,255,255,.5); color: #fff !important; }
+@media (min-width: 768px) {
+    .gp-hero h1 { font-size: 2.6rem; }
+    .gp-bar { display: none; }
+}
+body.mw-light main { padding-bottom: 80px; }
+</style>
+{% endblock %}
+
+{% block content %}
+
+{# ============ 1. HERO ============ #}
+<section class="gp-hero">
+    <div class="container" style="max-width:860px">
+        <span class="gp-badge"><i class="bi bi-cloud-rain"></i> Promo Garanzia Pioggia</span>
+        <h1 class="mt-3 mb-2">Lavaggio completo + 7 giorni di Garanzia Pioggia</h1>
+        <p class="mb-1" style="color:#cfe6f5; font-size:1.05rem;">
+            Se piove entro 7 giorni, ti rilaviamo gli esterni <strong>gratis</strong>.
+        </p>
+        <p class="prezzo mb-3">da 22 &euro; <span style="font-size:.85rem; font-weight:600; color:#9fc6dd;">(completo con spazzole &middot; a mano da 25 &euro;)</span></p>
+        <div class="gp-cta-row">
+            <a href="#" class="btn-cta gp-link-prenota" style="font-weight:800;">
+                <i class="bi bi-calendar-check"></i> Prenota ora
+            </a>
+            <a href="tel:+393792337051" class="btn-chiama"><i class="bi bi-telephone"></i> Chiama</a>
+            <a href="https://wa.me/393792337051" class="btn-wa" target="_blank" rel="noopener">
+                <i class="bi bi-whatsapp"></i> WhatsApp</a>
+        </div>
+    </div>
+</section>
+
+<div class="container py-4" style="max-width:860px">
+
+    {# ============ 2. COME FUNZIONA ============ #}
+    <h4 class="mt-2 mb-3" style="font-weight:800">Come funziona la garanzia</h4>
+    <div class="pub-card">
+        <div class="gp-step mb-3">
+            <div class="num"><i class="bi bi-droplet"></i></div>
+            <div><strong>1. Fai il lavaggio completo</strong><br>
+                <span class="text-muted">A mano o con spazzole, interni + esterni.
+                Al ritiro ti consegniamo il tagliando della garanzia.</span></div>
+        </div>
+        <div class="gp-step mb-3">
+            <div class="num"><i class="bi bi-cloud-rain-heavy"></i></div>
+            <div><strong>2. Piove entro 7 giorni?</strong><br>
+                <span class="text-muted">Capita, siamo in Sicilia ma capita.
+                Nessun problema: la tua auto &egrave; coperta.</span></div>
+        </div>
+        <div class="gp-step">
+            <div class="num"><i class="bi bi-arrow-repeat"></i></div>
+            <div><strong>3. Torna col tagliando o lo scontrino</strong><br>
+                <span class="text-muted">Ti rilaviamo gli esterni
+                <strong>gratis</strong>, stessa auto, entro i 7 giorni.</span></div>
+        </div>
+    </div>
+
+    {# ============ 3. COSA COMPRENDE ============ #}
+    <h4 class="mt-4 mb-3" style="font-weight:800">Cosa comprende il lavaggio completo</h4>
+    {% if servizi_completo %}
+        {% for s in servizi_completo %}
+        <div class="pub-card mb-2">
+            <div class="d-flex justify-content-between align-items-center gap-2 flex-wrap">
+                <strong>{{ s.titolo }}</strong>
+                <span class="badge rounded-pill" style="background:#e7f1fd; color:#1461c7; font-weight:700;">
+                    da &euro; {{ s.prezzo }}</span>
+            </div>
+            {% if s.descrizione %}<p class="text-muted small mb-0 mt-1">{{ s.descrizione|linebreaksbr }}</p>{% endif %}
+        </div>
+        {% endfor %}
+    {% else %}
+        <div class="pub-card">
+            <ul class="mb-0">
+                <li><strong>Completo con spazzole</strong> (da 22 &euro;): esterni con
+                    impianto a spazzole + aspirazione e pulizia interni.</li>
+                <li><strong>Completo a mano</strong> (da 25 &euro;): esterni lavati a
+                    mano da operatori specializzati + interni completi.</li>
+            </ul>
+        </div>
+    {% endif %}
+    <p class="text-muted small">
+        I prezzi mostrati sono <strong>orientativi</strong>: il prezzo finale puo'
+        variare in base alla grandezza dell'auto, allo stato di sporco e al tempo
+        effettivo di pulizia. Il prezzo definitivo viene confermato al ritiro.
+    </p>
+
+    {# ============ 4. PRIMA / DOPO ============ #}
+    <h4 class="mt-4 mb-3" style="font-weight:800">Prima e dopo</h4>
+    <div class="row g-2" id="gp-foto-row">
+        <div class="col-6"><img class="gp-foto" src="{% static 'img/garanzia-pioggia/prima-dopo-1.jpg' %}"
+             alt="Prima e dopo il lavaggio" onerror="this.closest('.col-6').remove()"></div>
+        <div class="col-6"><img class="gp-foto" src="{% static 'img/garanzia-pioggia/prima-dopo-2.jpg' %}"
+             alt="Prima e dopo il lavaggio" onerror="this.closest('.col-6').remove()"></div>
+    </div>
+
+    {# ============ 5. PERCHE' SCEGLIERCI ============ #}
+    <h4 class="mt-4 mb-3" style="font-weight:800">Mentre aspetti</h4>
+    <div class="pub-card">
+        <div class="row g-3">
+            <div class="col-12 col-md-4"><div class="gp-amenity">
+                <i class="bi bi-cup-hot"></i>
+                <div><strong>Area relax</strong><br><span class="text-muted small">Caff&egrave; e bevande</span></div>
+            </div></div>
+            <div class="col-12 col-md-4"><div class="gp-amenity">
+                <i class="bi bi-puzzle"></i>
+                <div><strong>Zona bimbi</strong><br><span class="text-muted small">Giochi inclusi</span></div>
+            </div></div>
+            <div class="col-12 col-md-4"><div class="gp-amenity">
+                <i class="bi bi-wifi"></i>
+                <div><strong>WiFi gratuito</strong><br><span class="text-muted small">Per tutti</span></div>
+            </div></div>
+        </div>
+    </div>
+
+    {# ============ 6. CONDIZIONI ============ #}
+    <h4 class="mt-4 mb-3" style="font-weight:800">Condizioni della garanzia</h4>
+    <div class="pub-card">
+        <ul class="gp-condizioni mb-0">
+            <li>Valida <strong>7 giorni</strong> dalla data del lavaggio completo
+                (a mano o con spazzole).</li>
+            <li>Il ri-lavaggio gratuito riguarda <strong>solo gli esterni</strong>.</li>
+            <li>Presenta lo <strong>scontrino o il tagliando</strong> consegnato al ritiro.</li>
+            <li>Valida per la <strong>stessa auto</strong>, una sola volta.</li>
+            <li>Prezzi orientativi: il prezzo definitivo viene confermato al ritiro.</li>
+        </ul>
+    </div>
+
+    {# ============ 7. DOVE SIAMO ============ #}
+    <h4 class="mt-4 mb-3" style="font-weight:800">Dove siamo</h4>
+    <div class="pub-card">
+        <p class="mb-1"><i class="bi bi-geo-alt-fill" style="color:#1b6fa3"></i>
+            <a href="https://www.google.com/maps/search/?api=1&query=Via+Palma+302+Licata+AG"
+               target="_blank" rel="noopener">Via Palma 302, Licata (AG)</a></p>
+        <p class="mb-1"><i class="bi bi-telephone-fill" style="color:#1b6fa3"></i>
+            <a href="tel:+393792337051">379 233 7051</a></p>
+        <p class="mb-3"><i class="bi bi-clock-fill" style="color:#1b6fa3"></i>
+            Self service tutti i giorni 7&ndash;22 &middot; servizio con operatori su prenotazione</p>
+        <iframe class="gp-map" loading="lazy" referrerpolicy="no-referrer-when-downgrade"
+                src="https://www.google.com/maps?q=Via+Palma+302,+Licata+AG&output=embed"
+                title="Mappa MasterWash"></iframe>
+    </div>
+
+    <div class="text-center my-4">
+        <a href="#" class="btn-cta gp-link-prenota" style="font-weight:800;">
+            <i class="bi bi-calendar-check"></i> Prenota il tuo lavaggio
+        </a>
+    </div>
+</div>
+
+{# Barra fissa mobile #}
+<div class="gp-bar">
+    <a href="#" class="prenota gp-link-prenota"><i class="bi bi-calendar-check"></i> Prenota</a>
+    <a href="tel:+393792337051" class="chiama"><i class="bi bi-telephone"></i> Chiama</a>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+// I link "Prenota" portano al wizard con la promo attiva e si portano
+// dietro gli UTM degli annunci (utm_source/medium/campaign).
+(function () {
+    const params = new URLSearchParams(location.search);
+    const dest = new URLSearchParams({ promo: 'garanzia_pioggia' });
+    ['utm_source', 'utm_medium', 'utm_campaign'].forEach(k => {
+        if (params.get(k)) dest.set(k, params.get(k));
+    });
+    const url = "{% url 'clients:booking' %}?" + dest.toString();
+    document.querySelectorAll('.gp-link-prenota').forEach(a => { a.href = url; });
+
+    // Evento ViewContent (solo se il pixel e' attivo = consenso dato)
+    window.addEventListener('load', function () {
+        if (window.mwTrack) mwTrack('ViewContent', { content_name: 'garanzia_pioggia' });
+    });
+})();
+</script>
+{% endblock %}

@@ -118,6 +118,7 @@ TEMPLATES = [
                 'django.contrib.messages.context_processors.messages',
                 'apps.cq.context_processors.oggi',
                 'apps.auth_system.context_processors.google_oauth',
+                'apps.clients.context_processors.meta_pixel',
             ],
         },
     },
@@ -309,6 +310,11 @@ PAYPAL_BASE_URL = os.environ.get(
 # === Recensioni Google sulla landing (Places API) ===
 # Vuoti = la landing mostra il link recensioni senza voto/numero.
 GOOGLE_PLACES_API_KEY = os.environ.get('GOOGLE_PLACES_API_KEY', '')
+
+# Meta Pixel (Facebook/Instagram ads). Vuoto = pixel spento: il tag
+# viene caricato solo se l'ID e' configurato E il visitatore ha dato
+# il consenso ai cookie di marketing (banner in base_public.html).
+META_PIXEL_ID = os.environ.get('META_PIXEL_ID', '')
 GOOGLE_PLACE_ID = os.environ.get('GOOGLE_PLACE_ID', '')
 
 # === Consulente AI marketing (Claude API) ===

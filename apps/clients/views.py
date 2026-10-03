@@ -224,6 +224,32 @@ def booking(request):
     })
 
 
+def garanzia_pioggia(request):
+    """Landing della promo 'Garanzia Pioggia' (campagne Meta).
+
+    Mostra i lavaggi completi presi dal catalogo (quelli pubblici il
+    cui titolo contiene 'completo'); se il catalogo non ne espone,
+    la pagina usa i testi statici di fallback.
+    """
+    servizi_completo = list(
+        ServizioProdotto.objects
+        .filter(attivo=True, tipo='servizio', is_supplemento=False,
+                mostra_pubblico=True, titolo__icontains='completo')
+        .order_by('ordine_visualizzazione', 'titolo')
+    )
+    return render(request, 'clients/garanzia_pioggia.html', {
+        'servizi_completo': servizi_completo,
+    })
+
+
+def privacy_policy(request):
+    return render(request, 'clients/privacy_policy.html')
+
+
+def cookie_policy(request):
+    return render(request, 'clients/cookie_policy.html')
+
+
 def slot_disponibili_pub(request):
     """API JSON: slot disponibili per data (riusa logica esistente)."""
     data_str = request.GET.get('data')

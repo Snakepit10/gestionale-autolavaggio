@@ -282,6 +282,13 @@
     {% endif %}
 
     {# Progress 4 step #}
+    {# Avviso promo (mostrato dal JS se arrivi da una landing promo) #}
+    <div class="alert alert-info py-2" id="bk-promo-banner" style="display:none;">
+        <i class="bi bi-cloud-rain"></i>
+        <strong>Promo Garanzia Pioggia attiva</strong> &mdash; se piove
+        entro 7 giorni dal lavaggio completo, ri-lavaggio esterni gratis.
+    </div>
+
     <div class="bk-progress" id="bk-progress">
         {% for cat in categorie_step %}
             <div class="pi {% if forloop.first %}done{% endif %}" data-key="cat-{{ cat.id }}" title="{{ cat.nome }}"></div>
@@ -463,6 +470,11 @@
             <textarea class="form-control" id="bk-nota" rows="2" placeholder="Eventuali richieste particolari"></textarea>
         </div>
 
+        <p class="text-muted small mt-2 mb-0">
+            I dati servono solo per gestire la prenotazione:
+            <a href="{% url 'clients:privacy' %}" target="_blank">privacy policy</a>.
+        </p>
+
         {% if not user.is_authenticated %}
         <div class="pub-card mb-3 mt-3">
             <h6 class="fw-bold"><i class="bi bi-shield-lock text-success"></i> Vuoi un account per gestire le prenotazioni?</h6>
@@ -610,6 +622,10 @@ let oraSelezionata = '';
 // landing via query string ?data=YYYY-MM-DD&ora=HH:MM). Consumato al
 // primo caricamento slot della data richiesta.
 let preselOra = '';
+// Promo attiva (?promo=...) e UTM degli annunci: finiscono come
+// marcatore nelle note della prenotazione e nell'evento Meta Schedule.
+let promoAttiva = '';
+let utmCampagna = '';
 
 // Lista ordinata delle chiavi degli step (cat-<id>, extra, profumazione,
 // data, conferma). Popolata al DOMContentLoaded leggendo i `.bk-step`
@@ -887,6 +903,25 @@ document.addEventListener('DOMContentLoaded', function() {
             preselOra = params.get('ora') || '';
         }
     }
+
+    // Promo da landing (?promo=...) + tracciamento campagne (utm_*):
+    // banner in testa al wizard, eventuale servizio preselezionato
+    // (?servizio=<id>) e marcatore salvato nelle note al submit.
+    promoAttiva = (params.get('promo') || '').replace(/[^a-z0-9_-]/gi, '');
+    utmCampagna = ['utm_source', 'utm_medium', 'utm_campaign']
+        .map(k => (params.get(k) || '').replace(/[|\[\]]/g, '').trim())
+        .filter(Boolean).join('/');
+    if (promoAttiva === 'garanzia_pioggia') {
+        document.getElementById('bk-promo-banner').style.display = '';
+    }
+    const servizioPresel = parseInt(params.get('servizio'));
+    if (servizioPresel) {
+        const card = document.querySelector(
+            `.servizio-pick[data-id="${servizioPresel}"]`);
+        if (card && !serviziSelezionati.some(s => s.id === servizioPresel)) {
+            toggleServizio(card);
+        }
+    }
 });
 
 // Step intermedio: prima di inviare la prenotazione, l'utente deve
@@ -931,12 +966,22 @@ function confermaPrenotazione() {
     btn.disabled = true;
     btn.innerHTML = '<i class="bi bi-arrow-clockwise"></i> Invio...';
 
+    // Promo e UTM finiscono come riga strutturata in coda alle note:
+    // l'operatore le vede nella card della prenotazione, nessun campo
+    // nuovo nel modello.
+    let nota = document.getElementById('bk-nota').value;
+    if (promoAttiva || utmCampagna) {
+        nota = (nota ? nota + '\n' : '')
+            + '[PROMO ' + (promoAttiva || '-')
+            + (utmCampagna ? ' | ' + utmCampagna : '') + ']';
+    }
+
     const payload = {
         data: dataSelezionata,
         ora: oraSelezionata,
         servizi: serviziSelezionati.map(s => s.id),
         tipo_auto: document.getElementById('bk-tipo-auto').value,
-        nota: document.getElementById('bk-nota').value,
+        nota: nota,
     };
 
     if (!IS_LOGGED) {
@@ -957,6 +1002,18 @@ function confermaPrenotazione() {
     .then(r => r.json())
     .then(d => {
         if (d.ok) {
+            // Meta Pixel: Schedule SOLO a salvataggio confermato dal
+            // server. event_id univoco per la deduplica con una futura
+            // Conversions API lato server.
+            if (window.mwTrack) {
+                const totale = serviziSelezionati
+                    .reduce((a, s) => a + (parseFloat(s.prezzo) || 0), 0);
+                const parametri = { value: totale, currency: 'EUR' };
+                if (promoAttiva) parametri.content_name = promoAttiva;
+                const eventId = (crypto.randomUUID && crypto.randomUUID())
+                    || ('sch-' + Date.now() + '-' + Math.random().toString(36).slice(2));
+                mwTrack('Schedule', parametri, eventId);
+            }
             alert(
                 `Richiesta inviata! 🎉\n\n` +
                 `Codice: ${d.codice}\n` +

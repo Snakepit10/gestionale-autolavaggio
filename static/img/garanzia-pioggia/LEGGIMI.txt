@@ -1,0 +1,8 @@
+Carica qui le foto prima/dopo della landing Garanzia Pioggia:
+
+  prima-dopo-1.jpg
+  prima-dopo-2.jpg
+
+Formato consigliato: orizzontale 4:3 (es. 1200x900), JPG < 300 KB.
+Se i file non ci sono la sezione "Prima e dopo" si nasconde da sola.
+Dopo averle caricate: commit + push (collectstatic gira al deploy).

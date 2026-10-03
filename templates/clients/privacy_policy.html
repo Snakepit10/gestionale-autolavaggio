@@ -1,0 +1,71 @@
+{% extends "clients/base_public.html" %}
+{% block title %}Privacy policy &mdash; MasterWash{% endblock %}
+{% block body_class %}mw-light{% endblock %}
+
+{% block content %}
+<div class="container py-4" style="max-width:760px">
+    <h2 style="font-weight:800">Privacy policy</h2>
+    <p class="text-muted">
+        BOZZA da far verificare a un professionista prima della
+        pubblicazione definitiva. I campi tra parentesi quadre vanno
+        completati con i dati aziendali.
+    </p>
+
+    <div class="pub-card">
+        <h5>Titolare del trattamento</h5>
+        <p>
+            [RAGIONE SOCIALE], P.IVA [PARTITA IVA], con sede in
+            Via Palma 302, 92027 Licata (AG) &mdash; email
+            [EMAIL AZIENDALE], tel. 379&nbsp;233&nbsp;7051
+            ("MasterWash" o il "Titolare").
+        </p>
+
+        <h5 class="mt-4">Dati trattati e finalit&agrave;</h5>
+        <ul>
+            <li><strong>Dati di prenotazione</strong> (nome, cognome,
+                email, telefono, veicolo, note): per gestire la
+                prenotazione, contattarti per conferma/esito e per gli
+                obblighi contrattuali. Base giuridica: esecuzione del
+                contratto (art. 6.1.b GDPR).</li>
+            <li><strong>Dati dell'account</strong> (se ti registri):
+                per l'area personale, lo storico e i servizi collegati.
+                Base giuridica: esecuzione del contratto.</li>
+            <li><strong>Comunicazioni promozionali</strong> (es.
+                WhatsApp): solo con il tuo consenso, revocabile in ogni
+                momento. Base giuridica: consenso (art. 6.1.a).</li>
+            <li><strong>Dati di navigazione e marketing</strong> (Meta
+                Pixel): solo previo consenso dal banner cookie, per
+                misurare le campagne pubblicitarie su Facebook e
+                Instagram. Base giuridica: consenso. Dettagli nella
+                <a href="{% url 'clients:cookie_policy' %}">cookie policy</a>.</li>
+        </ul>
+
+        <h5 class="mt-4">Destinatari</h5>
+        <p>
+            I dati possono essere trattati da fornitori tecnici che
+            ospitano o supportano il sito (hosting Railway, invio
+            email/WhatsApp tramite Meta Platforms) in qualit&agrave; di
+            responsabili o autonomi titolari. Con il consenso marketing,
+            Meta Platforms Ireland Ltd. riceve dati di navigazione
+            tramite il Pixel (possibile trasferimento extra&nbsp;UE sulla
+            base delle clausole contrattuali standard).
+        </p>
+
+        <h5 class="mt-4">Conservazione</h5>
+        <p>
+            Dati di prenotazione e account: per la durata del rapporto e
+            per i termini di legge. Consensi marketing: fino a revoca.
+        </p>
+
+        <h5 class="mt-4">I tuoi diritti</h5>
+        <p>
+            Puoi chiedere accesso, rettifica, cancellazione,
+            limitazione, portabilit&agrave; e opporti al trattamento
+            scrivendo a [EMAIL AZIENDALE]. Puoi inoltre proporre
+            reclamo al Garante per la protezione dei dati personali.
+        </p>
+
+        <p class="text-muted small mb-0">Ultimo aggiornamento: [DATA].</p>
+    </div>
+</div>
+{% endblock %}

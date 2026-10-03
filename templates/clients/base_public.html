@@ -546,6 +546,8 @@
             {% if not user.is_authenticated %}
             <p class="mb-2"><a href="{% url 'clients:register' %}"><i class="bi bi-person-plus"></i> Registrati</a></p>
             {% endif %}
+            <p class="mb-2"><a href="{% url 'clients:privacy' %}"><i class="bi bi-shield-lock"></i> Privacy policy</a></p>
+            <p class="mb-2"><a href="{% url 'clients:cookie_policy' %}"><i class="bi bi-cookie"></i> Cookie policy</a></p>
         </div>
     </div>
     <div class="copy">
@@ -563,6 +565,126 @@ if ('serviceWorker' in navigator) {
             .catch(function (err) { console.warn('SW client registration failed:', err); });
     });
 }
+</script>
+
+{% comment %}
+Banner cookie + Meta Pixel. Il pixel viene caricato SOLO se:
+1) META_PIXEL_ID e' configurato (env su Railway), e
+2) il visitatore ha accettato i cookie di marketing dal banner.
+La scelta vive in localStorage ('mw_consent'). window.mwTrack(evento,
+parametri, eventID) e' il punto unico per gli eventi: non fa nulla
+senza consenso. I click su tel:/wa.me generano l'evento Contact.
+{% endcomment %}
+<style>
+#mw-cookie-banner {
+    position: fixed; left: 12px; right: 12px; bottom: 12px; z-index: 2000;
+    max-width: 640px; margin: 0 auto;
+    background: #fff; color: #0e2233;
+    border: 1px solid #dbe5ee; border-radius: 14px;
+    box-shadow: 0 10px 34px rgba(10, 30, 50, .25);
+    padding: 16px; font-size: .9rem; display: none;
+}
+#mw-cookie-banner.visibile { display: block; }
+#mw-cookie-banner a { color: #1b6fa3; }
+#mw-cookie-pref { display: none; }
+#mw-cookie-banner.espanso #mw-cookie-pref { display: block; }
+</style>
+<div id="mw-cookie-banner" role="dialog" aria-label="Preferenze cookie">
+    <p class="mb-2">
+        Usiamo cookie tecnici e, solo col tuo consenso, cookie di
+        marketing (Meta Pixel) per misurare le nostre campagne.
+        <a href="{% url 'clients:cookie_policy' %}">Cookie policy</a> &middot;
+        <a href="{% url 'clients:privacy' %}">Privacy</a>
+    </p>
+    <div id="mw-cookie-pref" class="mb-2">
+        <div class="form-check">
+            <input class="form-check-input" type="checkbox" checked disabled id="mw-ck-tecnici">
+            <label class="form-check-label" for="mw-ck-tecnici">
+                Cookie tecnici (necessari, sempre attivi)</label>
+        </div>
+        <div class="form-check">
+            <input class="form-check-input" type="checkbox" id="mw-ck-marketing">
+            <label class="form-check-label" for="mw-ck-marketing">
+                Cookie di marketing (Meta Pixel)</label>
+        </div>
+    </div>
+    <div class="d-flex gap-2 flex-wrap">
+        <button type="button" class="btn btn-sm btn-primary" onclick="mwConsenso(true)">Accetta</button>
+        <button type="button" class="btn btn-sm btn-outline-secondary" onclick="mwConsenso(false)">Rifiuta</button>
+        <button type="button" class="btn btn-sm btn-link text-decoration-none" id="mw-ck-pref-btn">Preferenze</button>
+    </div>
+</div>
+<script>
+(function () {
+    var PIXEL_ID = '{{ META_PIXEL_ID|escapejs }}';
+    var banner = document.getElementById('mw-cookie-banner');
+
+    function leggiConsenso() {
+        try { return JSON.parse(localStorage.getItem('mw_consent')); }
+        catch (e) { return null; }
+    }
+    function salvaConsenso(marketing) {
+        try {
+            localStorage.setItem('mw_consent', JSON.stringify({
+                marketing: !!marketing, data: new Date().toISOString(),
+            }));
+        } catch (e) { /* storage bloccato: il banner ricomparira' */ }
+    }
+
+    function caricaPixel() {
+        if (!PIXEL_ID || window.fbq) return;
+        !function(f,b,e,v,n,t,s){if(f.fbq)return;n=f.fbq=function(){n.callMethod?
+        n.callMethod.apply(n,arguments):n.queue.push(arguments)};if(!f._fbq)f._fbq=n;
+        n.push=n;n.loaded=!0;n.version='2.0';n.queue=[];t=b.createElement(e);t.async=!0;
+        t.src=v;s=b.getElementsByTagName(e)[0];s.parentNode.insertBefore(t,s)}(window,
+        document,'script','https://connect.facebook.net/it_IT/fbevents.js');
+        fbq('init', PIXEL_ID);
+        fbq('track', 'PageView');
+    }
+
+    // Punto unico per gli eventi: no consenso/pixel = non fa nulla.
+    // eventID opzionale per la deduplica con la futura Conversions API.
+    window.mwTrack = function (evento, parametri, eventID) {
+        if (!window.fbq) return;
+        if (eventID) fbq('track', evento, parametri || {}, { eventID: eventID });
+        else fbq('track', evento, parametri || {});
+    };
+    window.mwConsensoMarketing = function () {
+        var c = leggiConsenso();
+        return !!(c && c.marketing);
+    };
+
+    window.mwConsenso = function (marketing) {
+        salvaConsenso(marketing);
+        banner.classList.remove('visibile');
+        if (marketing) caricaPixel();
+    };
+
+    if (banner) {
+        document.getElementById('mw-ck-pref-btn').addEventListener('click', function () {
+            banner.classList.add('espanso');
+            // In modalita' preferenze "Accetta" salva la scelta della checkbox
+            var btnAccetta = banner.querySelector('.btn-primary');
+            btnAccetta.textContent = 'Salva preferenze';
+            btnAccetta.onclick = function () {
+                mwConsenso(document.getElementById('mw-ck-marketing').checked);
+            };
+        });
+    }
+
+    var consenso = leggiConsenso();
+    if (consenso === null) {
+        if (banner) banner.classList.add('visibile');
+    } else if (consenso.marketing) {
+        caricaPixel();
+    }
+
+    // Evento Contact sui click tel: e WhatsApp, in tutto il sito
+    document.addEventListener('click', function (e) {
+        var link = e.target.closest('a[href^="tel:"], a[href*="wa.me"]');
+        if (link) window.mwTrack('Contact');
+    });
+})();
 </script>
 
 {% block extra_js %}{% endblock %}

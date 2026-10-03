@@ -1,0 +1,58 @@
+{% extends "clients/base_public.html" %}
+{% block title %}Cookie policy &mdash; MasterWash{% endblock %}
+{% block body_class %}mw-light{% endblock %}
+
+{% block content %}
+<div class="container py-4" style="max-width:760px">
+    <h2 style="font-weight:800">Cookie policy</h2>
+    <p class="text-muted">
+        BOZZA da far verificare a un professionista prima della
+        pubblicazione definitiva.
+    </p>
+
+    <div class="pub-card">
+        <h5>Cosa sono i cookie</h5>
+        <p>
+            Piccoli file o tecnologie simili (es. localStorage) salvati
+            sul tuo dispositivo quando visiti il sito.
+        </p>
+
+        <h5 class="mt-4">Cookie tecnici (sempre attivi)</h5>
+        <ul>
+            <li><strong>sessionid, csrftoken</strong> &mdash; gestione
+                della sessione e sicurezza dei moduli (Django).</li>
+            <li><strong>mw_consent</strong> (localStorage) &mdash;
+                memorizza la tua scelta sui cookie.</li>
+        </ul>
+        <p>Non richiedono consenso: servono al funzionamento del sito.</p>
+
+        <h5 class="mt-4">Cookie di marketing (solo con consenso)</h5>
+        <ul>
+            <li><strong>Meta Pixel</strong> (Meta Platforms Ireland
+                Ltd.) &mdash; misura l'efficacia delle nostre campagne
+                su Facebook e Instagram (es. visita della pagina,
+                richiesta di prenotazione). Cookie: _fbp e simili.
+                Informazioni: <a href="https://www.facebook.com/privacy/policy"
+                target="_blank" rel="noopener">privacy Meta</a>.</li>
+        </ul>
+        <p>
+            Si attivano solo se premi &laquo;Accetta&raquo; (o abiliti
+            il marketing nelle preferenze) nel banner.
+        </p>
+
+        <h5 class="mt-4">Come cambiare la scelta</h5>
+        <p>
+            Puoi modificare o revocare il consenso in qualsiasi momento
+            <a href="#" onclick="try{localStorage.removeItem('mw_consent');}catch(e){}; location.reload(); return false;">
+            riaprendo il banner cookie</a>, oppure cancellando i dati di
+            navigazione dal browser.
+        </p>
+
+        <p class="text-muted small mb-0">
+            Titolare: [RAGIONE SOCIALE] &mdash; vedi la
+            <a href="{% url 'clients:privacy' %}">privacy policy</a>.
+            Ultimo aggiornamento: [DATA].
+        </p>
+    </div>
+</div>
+{% endblock %}

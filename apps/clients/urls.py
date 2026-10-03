@@ -8,6 +8,9 @@ urlpatterns = [
     path('', views.landing, name='landing'),
     path('registrati/', views.register, name='register'),
     path('servizi/', views.booking, name='booking'),
+    path('garanzia-pioggia/', views.garanzia_pioggia, name='garanzia_pioggia'),
+    path('privacy/', views.privacy_policy, name='privacy'),
+    path('cookie-policy/', views.cookie_policy, name='cookie_policy'),
 
     # Cliente loggato
     path('area/', views.dashboard, name='dashboard'),

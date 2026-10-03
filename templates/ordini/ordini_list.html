@@ -252,6 +252,12 @@
                     {% endif %}
 
                     <div class="d-flex flex-wrap gap-1 my-1">
+                        {% if 'garanzia_pioggia' in p.nota_cliente %}
+                            <span class="badge" style="font-size:.68rem;padding:2px 6px;background:#dbeafe;color:#1d4ed8;border:1px solid #93c5fd;"
+                                  title="Prenotazione dalla promo Garanzia Pioggia: alla consegna ricordati il tagliando della garanzia">
+                                <i class="bi bi-cloud-rain"></i> Garanzia Pioggia
+                            </span>
+                        {% endif %}
                         {% for s in p.servizi.all %}
                             <span class="badge bg-light text-dark border" style="font-size:.68rem;padding:2px 6px;">{{ s.titolo }}</span>
                         {% endfor %}
