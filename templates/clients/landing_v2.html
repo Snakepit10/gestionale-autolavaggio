@@ -20,6 +20,24 @@
     position: relative;
     overflow: hidden;
 }
+/* Video di sfondo dell'hero: l'autolavaggio di notte coi LED. Sotto
+   il contenuto (z-index 2) e l'onda (z-index 1), con un velo navy
+   sopra per tenere leggibili testo e widget. Il gradiente resta come
+   fallback finche' il video non parte. */
+.hm-hero-video {
+    position: absolute; inset: 0; width: 100%; height: 100%;
+    object-fit: cover; z-index: 0;
+}
+.hm-hero-velo {
+    position: absolute; inset: 0; z-index: 0;
+    background: linear-gradient(160deg,
+        rgba(14, 51, 80, .86) 0%,
+        rgba(19, 75, 115, .78) 55%,
+        rgba(27, 111, 163, .70) 100%);
+}
+@media (prefers-reduced-motion: reduce) {
+    .hm-hero-video { display: none; }
+}
 .hm-hero-inner {
     padding: 56px 24px 80px; position: relative; z-index: 2;
     max-width: 1080px; margin: 0 auto;
@@ -336,6 +354,12 @@
 
 {# ========== HERO con onda: testo + widget prenota oggi ========== #}
 <section class="hm-hero" id="top">
+    <video class="hm-hero-video" autoplay muted loop playsinline
+           preload="metadata" poster="{% static 'video/hero-home-poster.jpg' %}"
+           aria-hidden="true">
+        <source src="{% static 'video/hero-home.mp4' %}" type="video/mp4">
+    </video>
+    <div class="hm-hero-velo" aria-hidden="true"></div>
     <div class="hm-hero-inner">
         <div>
             <div class="hm-badge" id="hm-badge-orario">
@@ -655,6 +679,19 @@
         badge.querySelector('.dot-verde').style.color = 'currentColor';
         testo.textContent = 'Self service tutti i giorni 7–22';
     }
+})();
+
+// === Video hero: alcuni browser rimandano l'autoplay (tab in
+// background, bfcache): riprova al load e quando la pagina torna
+// visibile. Muto, quindi il play non puo' essere rifiutato.
+(function () {
+    const video = document.querySelector('.hm-hero-video');
+    if (!video) return;
+    const avvia = () => { video.play().catch(() => {}); };
+    window.addEventListener('load', avvia);
+    document.addEventListener('visibilitychange', () => {
+        if (document.visibilityState === 'visible') avvia();
+    });
 })();
 
 // === Widget "Prenota": giorno navigabile con frecce, slot reali ===
