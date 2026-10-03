@@ -544,15 +544,18 @@
                         onclick="document.getElementById('iosTutorial').scrollIntoView({behavior:'smooth'});">
                     <i class="bi bi-apple"></i> Come installare su iPhone
                 </button>
-                <a class="hm-cta-ghost" id="btnPlayStore"
-                   href="https://play.google.com/store/apps/details?id=it.autolavaggiomasterwash.app"
-                   target="_blank" rel="noopener" style="display:none;">
-                    <i class="bi bi-google-play"></i> Google Play
-                </a>
             </div>
             <div id="installedAlert" class="alert alert-success mt-3" style="display:none;">
                 <i class="bi bi-check-circle-fill"></i>
                 Stai gi&agrave; usando l'app installata. Grazie!
+            </div>
+            {% comment %}Riserva Android: se il prompt nativo non e'
+            disponibile, istruzioni manuali{% endcomment %}
+            <div id="androidHint" class="alert alert-light mt-3" style="display:none;">
+                <i class="bi bi-android2"></i>
+                Apri il menu <strong>&#8942;</strong> di Chrome in alto a
+                destra e tocca <strong>&laquo;Installa app&raquo;</strong>
+                (o &laquo;Aggiungi a schermata Home&raquo;).
             </div>
         </div>
     </div>
@@ -808,9 +811,9 @@
     const heroBtn = null; // il ghost "Scarica l'app" nell'hero e' un'ancora, sempre visibile
     const btnPwa = document.getElementById('btnInstallPwa');
     const btnIos = document.getElementById('btnInstallIos');
-    const btnPlay = document.getElementById('btnPlayStore');
     const installedAlert = document.getElementById('installedAlert');
     const tutorialIos = document.getElementById('iosTutorial');
+    const androidHint = document.getElementById('androidHint');
 
     const isStandalone = window.matchMedia('(display-mode: standalone)').matches
         || window.navigator.standalone === true;
@@ -826,8 +829,11 @@
         tutorialIos.style.display = '';
         return;
     }
+    // Android (e desktop Chrome): "Installa l'app" installa la PWA.
+    // Su Android il bottone e' sempre visibile: se il prompt nativo
+    // non e' ancora disponibile mostriamo le istruzioni manuali.
     if (isAndroid) {
-        btnPlay.style.display = '';
+        btnPwa.style.display = '';
     }
     let deferredPrompt = null;
     window.addEventListener('beforeinstallprompt', function(e) {
@@ -836,12 +842,17 @@
         btnPwa.style.display = '';
     });
     btnPwa.addEventListener('click', async function() {
-        if (!deferredPrompt) return;
+        if (!deferredPrompt) {
+            androidHint.style.display = '';
+            androidHint.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+            return;
+        }
         deferredPrompt.prompt();
         try {
             const choice = await deferredPrompt.userChoice;
             if (choice.outcome === 'accepted') {
                 btnPwa.style.display = 'none';
+                androidHint.style.display = 'none';
                 installedAlert.style.display = '';
             }
         } catch (e) { /* ignore */ }
@@ -849,6 +860,7 @@
     });
     window.addEventListener('appinstalled', function() {
         btnPwa.style.display = 'none';
+        androidHint.style.display = 'none';
         installedAlert.style.display = '';
         deferredPrompt = null;
     });
