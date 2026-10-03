@@ -237,8 +237,21 @@ def garanzia_pioggia(request):
                 mostra_pubblico=True, titolo__icontains='completo')
         .order_by('ordine_visualizzazione', 'titolo')
     )
+
+    # Foto prima/dopo: la sezione compare solo per i file davvero
+    # presenti. Niente {% static %} su file mancanti: col manifest di
+    # WhiteNoise in produzione farebbe crashare la pagina (ValueError).
+    from django.contrib.staticfiles import finders
+    from django.templatetags.static import static as static_url
+    foto_prima_dopo = []
+    for nome in ('img/garanzia-pioggia/prima-dopo-1.jpg',
+                 'img/garanzia-pioggia/prima-dopo-2.jpg'):
+        if finders.find(nome):
+            foto_prima_dopo.append(static_url(nome))
+
     return render(request, 'clients/garanzia_pioggia.html', {
         'servizi_completo': servizi_completo,
+        'foto_prima_dopo': foto_prima_dopo,
     })
 
 

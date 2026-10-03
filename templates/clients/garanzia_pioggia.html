@@ -134,13 +134,15 @@ body.mw-light main { padding-bottom: 80px; }
     </p>
 
     {# ============ 4. PRIMA / DOPO ============ #}
+    {% if foto_prima_dopo %}
     <h4 class="mt-4 mb-3" style="font-weight:800">Prima e dopo</h4>
-    <div class="row g-2" id="gp-foto-row">
-        <div class="col-6"><img class="gp-foto" src="{% static 'img/garanzia-pioggia/prima-dopo-1.jpg' %}"
-             alt="Prima e dopo il lavaggio" onerror="this.closest('.col-6').remove()"></div>
-        <div class="col-6"><img class="gp-foto" src="{% static 'img/garanzia-pioggia/prima-dopo-2.jpg' %}"
-             alt="Prima e dopo il lavaggio" onerror="this.closest('.col-6').remove()"></div>
+    <div class="row g-2">
+        {% for foto in foto_prima_dopo %}
+        <div class="col-6"><img class="gp-foto" src="{{ foto }}"
+             alt="Prima e dopo il lavaggio"></div>
+        {% endfor %}
     </div>
+    {% endif %}
 
     {# ============ 5. PERCHE' SCEGLIERCI ============ #}
     <h4 class="mt-4 mb-3" style="font-weight:800">Mentre aspetti</h4>
