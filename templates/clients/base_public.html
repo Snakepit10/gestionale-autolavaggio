@@ -129,19 +129,6 @@
         transform: translateY(-1px);
         box-shadow: 0 4px 12px rgba(0,0,0,.25);
     }
-    /* Bottone WhatsApp nel nav: pill verde con pallino */
-    .pub-nav a.nav-wa {
-        background: rgba(37, 211, 102, .16);
-        border: 1px solid rgba(37, 211, 102, .45);
-        color: #7ce6a8 !important;
-        font-weight: 700;
-        border-radius: 99px;
-    }
-    .pub-nav a.nav-wa:hover {
-        background: rgba(37, 211, 102, .3);
-        color: #a5f0c4 !important;
-    }
-
     /* === Bottom nav mobile === */
     .pub-bottom-nav { display: none; }
     @media (max-width: 575.98px) {
@@ -440,7 +427,6 @@
     body.mw-light .pub-footer a:hover { color: var(--mw-cyan-light); }
     body.mw-light .pub-nav a { color: #ffffff !important; }
     body.mw-light .pub-nav a.nav-cta { color: var(--mw-on-cyan) !important; }
-    body.mw-light .pub-nav a.nav-wa { color: #7ce6a8 !important; }
     </style>
 
     {% block extra_css %}{% endblock %}
@@ -466,10 +452,6 @@
             {% else %}
                 <a href="{% url 'auth:client-login' %}" class="hide-mobile">Accedi</a>
             {% endif %}
-            <a href="https://wa.me/393792337051" target="_blank" rel="noopener"
-               class="nav-wa" title="Scrivici su WhatsApp">
-                <span style="color:#25d366;">&#9679;</span> WhatsApp
-            </a>
             <a href="{% url 'clients:booking' %}" class="nav-cta">Prenota ora</a>
         </nav>
     </div>
