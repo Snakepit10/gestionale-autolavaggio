@@ -19,12 +19,22 @@
     font-size: .85rem; font-weight: 700;
 }
 .gp-cta-row { display: flex; gap: 10px; flex-wrap: wrap; }
+/* !important: l'override globale dei link del tema chiaro ricolora le
+   <a> dentro main e rendeva i bottoni illeggibili sul navy */
 .gp-cta-row .btn-chiama, .gp-cta-row .btn-wa {
     display: inline-flex; align-items: center; gap: 8px;
     border-radius: 12px; padding: 13px 18px; font-weight: 700;
-    text-decoration: none; border: 1px solid rgba(255,255,255,.4); color: #fff;
+    text-decoration: none !important;
+    border: 1.5px solid rgba(255,255,255,.75);
+    background: rgba(255,255,255,.1);
+    color: #fff !important;
 }
+.gp-cta-row .btn-chiama:hover { background: rgba(255,255,255,.2); color: #fff !important; }
 .gp-cta-row .btn-wa { background: #1faa59; border-color: #1faa59; }
+.gp-cta-row .btn-wa:hover { background: #1c9850; color: #fff !important; }
+.gp-cta-row .btn-cta, .gp-hero .btn-cta {
+    color: var(--mw-on-cyan) !important;
+}
 .gp-step { display: flex; gap: 14px; align-items: flex-start; }
 .gp-step .num {
     width: 44px; height: 44px; border-radius: 50%; flex-shrink: 0;
