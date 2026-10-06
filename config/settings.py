@@ -13,6 +13,12 @@ SECRET_KEY = os.environ.get('SECRET_KEY', 'django-secret-key-for-development-cha
 # Debug - False in produzione
 DEBUG = os.environ.get('DEBUG', 'True').lower() in ('true', '1', 'yes')
 
+# URL pubblico del sito: usato dove serve un link assoluto raggiungibile
+# dall'esterno (es. immagine header dei template WhatsApp, che Meta
+# scarica dai propri server).
+SITE_PUBLIC_URL = os.environ.get('SITE_PUBLIC_URL',
+                                 'https://autolavaggiomasterwash.it')
+
 # Host consentiti (configurabili via env var, default '*' per dev)
 ALLOWED_HOSTS = (
     [h.strip() for h in os.environ.get('ALLOWED_HOSTS').split(',') if h.strip()]

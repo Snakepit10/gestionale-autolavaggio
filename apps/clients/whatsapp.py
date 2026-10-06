@@ -78,6 +78,12 @@ TEMPLATE_PREVIEWS = {
         "Ti chiediamo di rispettare questi orari: oltre l'orario "
         "indicato non siamo tenuti ad attendere il ritiro.",
     'hello_world': "Hello World!",
+    'garanzia_pioggia_wa':
+        "Lo sanno tutti: lavi l'auto e il giorno dopo piove. \U0001F327️\n\n"
+        "Noi di MasterWash l'abbiamo presa sul personale:\n\n"
+        "7 giorni di Garanzia Pioggia sul lavaggio completo. Se piove, "
+        "rilaviamo gli esterni gratis.\n\n"
+        "Prenota online in 2 minuti.",
 }
 
 
@@ -163,6 +169,94 @@ def _conta_variabili_template(template_name: str) -> int | None:
         return None
     indici = [int(m) for m in re.findall(r'\{(\d+)\}', base)]
     return (max(indici) + 1) if indici else 0
+
+
+def _fetch_template_header_format(template_name: str) -> str | None:
+    """Formato dell'HEADER di un template Meta ('IMAGE', 'TEXT', ...).
+
+    Ritorna '' se il template non ha header, None se non determinabile
+    (WABA non configurato, template non trovato, errore rete). Cache
+    24h come _fetch_template_body: i template con header multimediale
+    richiedono il media come parametro A OGNI invio (Meta 132012),
+    quindi prima di spedire bisogna sapere se l'header c'e'.
+    """
+    from django.core.cache import cache
+
+    waba_id = getattr(settings, 'META_WHATSAPP_BUSINESS_ACCOUNT_ID', '')
+    if not waba_id or not settings.META_WHATSAPP_ACCESS_TOKEN:
+        return None
+
+    cache_key = f'wa_tpl_header:{template_name}'
+    cached = cache.get(cache_key)
+    if cached is not None:
+        return cached
+
+    header = None
+    try:
+        url = (
+            f"{_GRAPH_URL}/{settings.META_WHATSAPP_API_VERSION}"
+            f"/{waba_id}/message_templates"
+        )
+        r = requests.get(
+            url,
+            params={'name': template_name, 'fields': 'name,components'},
+            headers={'Authorization': f'Bearer {settings.META_WHATSAPP_ACCESS_TOKEN}'},
+            timeout=_REQUEST_TIMEOUT,
+        )
+        if r.status_code < 400:
+            for tpl in r.json().get('data', []):
+                if tpl.get('name') != template_name:
+                    continue
+                header = ''
+                for comp in tpl.get('components', []):
+                    if comp.get('type') == 'HEADER':
+                        header = (comp.get('format') or '').upper()
+                        break
+                break
+        else:
+            logger.warning('fetch template header fallita (%s) name=%s: %s',
+                           r.status_code, template_name, r.text[:200])
+    except requests.RequestException as e:
+        logger.warning('fetch template header errore name=%s: %s', template_name, e)
+        return None
+
+    if header is not None:
+        cache.set(cache_key, header, 60 * 60 * 24)
+    return header
+
+
+def _componente_header(template_name: str) -> tuple[dict | None, str]:
+    """Component 'header' per l'invio, se il template lo richiede.
+
+    Convenzione: un template con header IMAGE usa l'immagine statica
+    `static/img/wa-header/<nome_template>.jpg` (JPG/PNG, Meta non
+    accetta webp), servita dal sito pubblico. Ritorna
+    (component_o_None, errore): errore valorizzato solo se l'invio
+    NON deve partire (immagine mancante o header non supportato).
+    """
+    fmt = _fetch_template_header_format(template_name)
+    if not fmt or fmt == 'TEXT':
+        # Nessun header, header solo testo senza variabili, o formato
+        # non determinabile: si tenta l'invio senza component (com'era
+        # prima); se Meta lo rifiuta l'errore resta leggibile in Note.
+        return None, ''
+    if fmt != 'IMAGE':
+        return None, (f'template con header {fmt} non supportato '
+                      f'dal gestionale')
+    from django.contrib.staticfiles.storage import staticfiles_storage
+    path = f'img/wa-header/{template_name}.jpg'
+    try:
+        static_url = staticfiles_storage.url(path)
+    except ValueError:
+        static_url = None
+    if not static_url:
+        return None, (f'il template ha un header immagine: carica '
+                      f'static/{path} e rideploya')
+    base = getattr(settings, 'SITE_PUBLIC_URL',
+                   'https://autolavaggiomasterwash.it').rstrip('/')
+    link = static_url if static_url.startswith('http') else base + static_url
+    return {'type': 'header',
+            'parameters': [{'type': 'image', 'image': {'link': link}}]}, ''
 
 
 def _format_preview(template_name: str, params: list[str]) -> str:
@@ -362,6 +456,16 @@ def _send_template_blocking_ex(to_e164: str, template_name: str, params: list[st
             {'type': 'text', 'text': (str(p) if p is not None else '')[:60]}
             for p in params_effettivi
         ]
+    # Header multimediale: i template con header IMAGE vogliono
+    # l'immagine come parametro a ogni invio (altrimenti Meta 132012).
+    header_comp, header_err = _componente_header(template_name)
+    if header_err:
+        return False, '', header_err
+    components = []
+    if header_comp:
+        components.append(header_comp)
+    if body_params:
+        components.append({'type': 'body', 'parameters': body_params})
     payload = {
         'messaging_product': 'whatsapp',
         'to': to_e164.lstrip('+'),  # Meta vuole solo cifre, no +
@@ -369,9 +473,7 @@ def _send_template_blocking_ex(to_e164: str, template_name: str, params: list[st
         'template': {
             'name': template_name,
             'language': {'code': settings.META_WHATSAPP_TEMPLATE_LANG},
-            'components': [
-                {'type': 'body', 'parameters': body_params}
-            ] if body_params else [],
+            'components': components,
         },
     }
     try:
@@ -385,9 +487,10 @@ def _send_template_blocking_ex(to_e164: str, template_name: str, params: list[st
             # cache (24h) e' di una versione vecchia del template (es.
             # appena modificato su Meta per aggiungere {{1}}). Butta la
             # cache cosi' il prossimo tentativo rilegge il template vero.
-            if '132000' in r.text:
+            if '132000' in r.text or '132012' in r.text:
                 from django.core.cache import cache as _cache
                 _cache.delete(f'wa_tpl_body:{template_name}')
+                _cache.delete(f'wa_tpl_header:{template_name}')
             return False, '', _errore_meta_leggibile(r.text)
         logger.info('WhatsApp inviato to=%s template=%s', to_e164, template_name)
         # Salva nel storico inbox: ricostruisce il corpo "umano" del
