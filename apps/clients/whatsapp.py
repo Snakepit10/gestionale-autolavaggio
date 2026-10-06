@@ -243,18 +243,23 @@ def _componente_header(template_name: str) -> tuple[dict | None, str]:
     if fmt != 'IMAGE':
         return None, (f'template con header {fmt} non supportato '
                       f'dal gestionale')
-    from django.contrib.staticfiles.storage import staticfiles_storage
+    # finders.find cerca nel sorgente static/ del repo: funziona in
+    # QUALSIASI processo (web, cron, comando), a differenza del
+    # manifest staticfiles che esiste solo dove e' girato
+    # collectstatic. L'URL e' quello non-hashed (servito comunque da
+    # WhiteNoise) con ?v=mtime per invalidare le cache al cambio file.
+    import os as _os
+
+    from django.contrib.staticfiles import finders
     path = f'img/wa-header/{template_name}.jpg'
-    try:
-        static_url = staticfiles_storage.url(path)
-    except ValueError:
-        static_url = None
-    if not static_url:
+    sorgente = finders.find(path)
+    if not sorgente:
         return None, (f'il template ha un header immagine: carica '
                       f'static/{path} e rideploya')
     base = getattr(settings, 'SITE_PUBLIC_URL',
                    'https://autolavaggiomasterwash.it').rstrip('/')
-    link = static_url if static_url.startswith('http') else base + static_url
+    versione = int(_os.path.getmtime(sorgente))
+    link = f'{base}{settings.STATIC_URL}{path}?v={versione}'
     return {'type': 'header',
             'parameters': [{'type': 'image', 'image': {'link': link}}]}, ''
 
