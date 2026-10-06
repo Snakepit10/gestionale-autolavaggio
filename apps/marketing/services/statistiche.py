@@ -54,6 +54,21 @@ def statistiche_campagna(campagna: Campagna) -> dict:
 
     tasso = (n_conversioni / n_inviati * 100) if n_inviati else 0.0
 
+    # Prenotazioni: clienti distinti che hanno CREATO una prenotazione
+    # (non annullata) nella finestra. Risposta piu' "precoce" della
+    # conversione: la prenotazione si vede subito, l'ordine completato
+    # solo quando il cliente e' poi passato davvero. Lo stato sta nello
+    # STESSO filter delle date: condizioni sulla medesima prenotazione
+    # (un exclude separato scarterebbe il cliente intero se ha anche
+    # un'altra prenotazione annullata).
+    n_prenotazioni = base.filter(
+        stato='inviato',
+        cliente__prenotazioni__creata_il__gt=F('inviato_il'),
+        cliente__prenotazioni__creata_il__lte=F('inviato_il') + finestra,
+        cliente__prenotazioni__stato__in=[
+            'confermata', 'in_attesa', 'completata', 'no_show'],
+    ).values('cliente').distinct().count()
+
     return {
         'n_destinatari': n_destinatari,
         'n_inviati': n_inviati,
@@ -65,6 +80,7 @@ def statistiche_campagna(campagna: Campagna) -> dict:
         'tasso_lettura': (n_letti / n_inviati * 100) if n_inviati else 0.0,
         'n_conversioni': n_conversioni,
         'tasso_conversione': tasso,
+        'n_prenotazioni': n_prenotazioni,
         'fatturato': float(fatturato),
     }
 

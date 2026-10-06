@@ -85,6 +85,7 @@
                     <th class="text-center" title="Spunte blu Meta: chi ha le conferme di lettura disattivate non viene contato">Letti</th>
                     <th class="text-center">Falliti</th>
                     <th class="text-center">In coda</th>
+                    <th class="text-center" title="Clienti che hanno creato una prenotazione (non annullata) entro la finestra dall'invio">Prenotazioni</th>
                     <th class="text-center">Conversioni</th>
                     <th class="text-end">Fatturato</th>
                     <th class="text-end">Azioni</th>
@@ -130,6 +131,7 @@
                     </td>
                     <td class="text-center {% if stats.n_falliti %}text-danger fw-bold{% endif %}">{{ stats.n_falliti }}</td>
                     <td class="text-center">{{ stats.n_in_coda }}</td>
+                    <td class="text-center">{{ stats.n_prenotazioni }}</td>
                     <td class="text-center">
                         {{ stats.n_conversioni }}
                         <span class="text-muted small">({{ stats.tasso_conversione|floatformat:1 }}%)</span>

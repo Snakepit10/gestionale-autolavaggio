@@ -581,6 +581,7 @@ def campagna_dettaglio(request, pk):
         'tasso_lettura': stats['tasso_lettura'],
         'n_conversioni': stats['n_conversioni'],
         'tasso_conversione': stats['tasso_conversione'],
+        'n_prenotazioni': stats['n_prenotazioni'],
         'fatturato': stats['fatturato'],
         'convertiti': clienti_convertiti(campagna),
     })

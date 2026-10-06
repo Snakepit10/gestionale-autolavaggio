@@ -84,6 +84,43 @@ class ReportConversioniWebTest(TestCase):
         self.assertEqual(gruppi, [])
         self.assertEqual(totale['n_richieste'], 0)
 
+    def test_statistiche_campagna_prenotazioni(self):
+        # Prenotazione creata in finestra dopo l'invio -> conta;
+        # annullata o fuori finestra -> no.
+        from apps.marketing.models import Campagna, InvioCampagna
+        from apps.marketing.services.statistiche import statistiche_campagna
+
+        campagna = Campagna.objects.create(
+            nome='Test GP', template_meta='garanzia_pioggia_wa',
+            segmento_origine='rallentamento', stato='in_corso',
+            finestra_conversione_giorni=7)
+        adesso = timezone.now()
+
+        c2 = Cliente.objects.create(tipo='privato', nome='Prenota',
+                                    cognome='Dopo', telefono='3390000002')
+        c3 = Cliente.objects.create(tipo='privato', nome='Annulla',
+                                    cognome='Solo', telefono='3390000003')
+        for cl in (self.cliente, c2, c3):
+            InvioCampagna.objects.create(
+                campagna=campagna, cliente=cl, stato='inviato',
+                inviato_il=adesso - timedelta(days=2))
+
+        # c2: prenotazione valida in finestra
+        p_ok = self._pren(nota='')
+        Prenotazione.objects.filter(pk=p_ok.pk).update(
+            cliente=c2, creata_il=adesso - timedelta(days=1))
+        # c3: solo una prenotazione ANNULLATA in finestra
+        p_ann = self._pren(stato='annullata', nota='')
+        Prenotazione.objects.filter(pk=p_ann.pk).update(
+            cliente=c3, creata_il=adesso - timedelta(days=1))
+        # self.cliente: prenotazione PRIMA dell'invio (fuori finestra)
+        p_prima = self._pren(nota='')
+        Prenotazione.objects.filter(pk=p_prima.pk).update(
+            creata_il=adesso - timedelta(days=5))
+
+        stats = statistiche_campagna(campagna)
+        self.assertEqual(stats['n_prenotazioni'], 1)
+
     def test_accesso_staff(self):
         # Non staff: rediretto; endpoint pagina non renderizzato qui
         # (test client + template rotti su Py3.14), basta il redirect.

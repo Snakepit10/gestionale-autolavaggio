@@ -126,6 +126,13 @@
         </div></div>
     </div>
     <div class="col-6 col-lg">
+        <div class="card border-0 shadow-sm h-100"><div class="card-body text-center"
+             title="Clienti che hanno creato una prenotazione (non annullata) entro la finestra dall'invio">
+            <div class="fs-3 fw-bold" style="color:#0aa2c0;">{{ n_prenotazioni }}</div>
+            <div class="text-muted small">prenotazioni</div>
+        </div></div>
+    </div>
+    <div class="col-6 col-lg">
         <div class="card border-0 shadow-sm h-100"><div class="card-body text-center">
             <div class="fs-3 fw-bold text-primary">{{ n_conversioni }}</div>
             <div class="text-muted small">conversioni ({{ tasso_conversione|floatformat:1 }}%)</div>
