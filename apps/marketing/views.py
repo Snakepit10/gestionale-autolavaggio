@@ -340,7 +340,8 @@ def campagna_nuova(request):
       consigli in dashboard).
     """
     from apps.clienti.models import Cliente
-    from .models import Campagna, SegmentoPersonalizzato
+    from .models import (Campagna, ImpostazioniMarketing,
+                         SegmentoPersonalizzato)
     from .services.campagne import PLACEHOLDER_SUPPORTATI
     from .services.segmentazione import (filtra_segmento_personalizzato,
                                          statistiche_clienti)
@@ -395,6 +396,7 @@ def campagna_nuova(request):
         'n_tutti': Cliente.objects.exclude(telefono='').count(),
         'placeholder': PLACEHOLDER_SUPPORTATI,
         'prefill': prefill,
+        'telefono_test': ImpostazioniMarketing.get_solo().telefono_test,
     })
 
 
@@ -624,6 +626,71 @@ def processa_coda_ora(request):
             f'Ricarica la pagina tra qualche minuto per vedere gli stati.'
         )
     return redirect(request.POST.get('next') or 'marketing:campagne')
+
+
+@_staff_required
+def campagna_test_invio(request):
+    """POST JSON dal composer: invia il template al numero di test.
+
+    Prova reale su WhatsApp PRIMA di confermare la campagna: un solo
+    messaggio, sincrono, fuori da coda/fascia/tetto (va al titolare,
+    non a un cliente). I placeholder sono risolti con dati fittizi.
+    Il numero usato viene salvato come default per le prossime prove.
+    """
+    import json
+
+    from django.http import JsonResponse
+
+    from .models import ImpostazioniMarketing
+
+    if request.method != 'POST':
+        return JsonResponse({'ok': False, 'errore': 'metodo non valido'},
+                            status=405)
+    try:
+        dati = json.loads(request.body or '{}')
+    except ValueError:
+        return JsonResponse({'ok': False, 'errore': 'payload non valido'},
+                            status=400)
+
+    template = (dati.get('template_meta') or '').strip()
+    telefono = (dati.get('telefono') or '').strip()
+    righe = [r.strip() for r in (dati.get('template_params') or '').splitlines()
+             if r.strip()]
+
+    cfg = ImpostazioniMarketing.get_solo()
+    telefono = telefono or cfg.telefono_test
+    if not template:
+        return JsonResponse({'ok': False,
+                             'errore': 'indica prima il nome del template Meta'})
+    if not telefono:
+        return JsonResponse({'ok': False,
+                             'errore': 'indica il numero su cui ricevere la prova'})
+
+    from apps.clients import whatsapp as wa
+    to_e164 = wa._to_e164(telefono)
+    if not to_e164:
+        return JsonResponse({'ok': False,
+                             'errore': f'numero non valido: {telefono}'})
+
+    # Placeholder con valori fittizi: nessun cliente reale coinvolto.
+    finti = {'{nome}': 'Test', '{giorni_ultimo_lavaggio}': '30',
+             '{totale_lavaggi}': '5'}
+    params = []
+    for r in righe:
+        for ph, val in finti.items():
+            r = r.replace(ph, val)
+        params.append(r)
+
+    ok, _wa_id, err = wa._send_template_blocking_ex(to_e164, template, params)
+
+    if telefono != cfg.telefono_test:
+        cfg.telefono_test = telefono
+        cfg.save()
+
+    if ok:
+        return JsonResponse({'ok': True,
+                             'messaggio': f'Messaggio di prova inviato a {to_e164}'})
+    return JsonResponse({'ok': False, 'errore': err or 'invio fallito'})
 
 
 @_staff_required

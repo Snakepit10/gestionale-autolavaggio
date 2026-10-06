@@ -96,6 +96,29 @@
                     </div>
                 </div>
                 <div class="col-12">
+                    <div class="border rounded p-3" style="background:#f0f7ff;">
+                        <label class="form-label fw-bold mb-1">
+                            <i class="bi bi-whatsapp"></i> Prova su WhatsApp
+                        </label>
+                        <div class="form-text mb-2">
+                            Invia il template qui sopra al tuo numero per vederlo
+                            come lo vedranno i clienti (i placeholder sono riempiti
+                            con dati di prova). Non tocca coda, tetto giornaliero
+                            n&eacute; destinatari.
+                        </div>
+                        <div class="d-flex gap-2 flex-wrap align-items-center">
+                            <input type="text" class="form-control" id="test-telefono"
+                                   value="{{ telefono_test }}" placeholder="es. 3791234567"
+                                   style="max-width:200px;">
+                            <button type="button" class="btn btn-outline-success"
+                                    id="btn-test-invio" onclick="inviaTest(this)">
+                                <i class="bi bi-send"></i> Invia messaggio di prova
+                            </button>
+                            <span id="test-esito" class="small"></span>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-12">
                     <div class="border rounded p-3" style="background:#f8fafc;">
                         <div class="form-check form-switch">
                             <input class="form-check-input" type="checkbox" name="flusso_continuo"
@@ -136,6 +159,43 @@
 </form>
 
 <script>
+// Invio di prova: POST sincrono del template al numero di test.
+// L'esito (anche l'errore Meta leggibile) compare accanto al bottone.
+async function inviaTest(btn) {
+    const esito = document.getElementById('test-esito');
+    const dati = {
+        template_meta: document.querySelector('input[name="template_meta"]').value,
+        template_params: document.querySelector('textarea[name="template_params"]').value,
+        telefono: document.getElementById('test-telefono').value,
+    };
+    btn.disabled = true;
+    esito.textContent = 'Invio in corso...';
+    esito.className = 'small text-muted';
+    try {
+        const r = await fetch("{% url 'marketing:campagna-test-invio' %}", {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]').value,
+            },
+            body: JSON.stringify(dati),
+        });
+        const dati_r = await r.json();
+        if (dati_r.ok) {
+            esito.textContent = dati_r.messaggio + ' — controlla il telefono.';
+            esito.className = 'small text-success fw-bold';
+        } else {
+            esito.textContent = 'Errore: ' + dati_r.errore;
+            esito.className = 'small text-danger fw-bold';
+        }
+    } catch (e) {
+        esito.textContent = 'Errore di rete: ' + e;
+        esito.className = 'small text-danger fw-bold';
+    } finally {
+        btn.disabled = false;
+    }
+}
+
 // "Tutti i clienti" ingloba qualsiasi segmento: quando e' spuntato,
 // i segmenti specifici vengono disabilitati (e viceversa restano
 // attivi se "tutti" e' deselezionato).

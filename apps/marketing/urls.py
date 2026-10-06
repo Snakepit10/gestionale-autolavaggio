@@ -37,5 +37,6 @@ urlpatterns = [
     path('campagne/<int:pk>/riprova-falliti/', views.campagna_riprova_falliti, name='campagna-riprova-falliti'),
     path('campagne/<int:pk>/export/', views.campagna_export_csv, name='campagna-export'),
     path('campagne/<int:pk>/invii/<int:invio_id>/invia/', views.invio_singolo, name='invio-singolo'),
+    path('campagne/test-invio/', views.campagna_test_invio, name='campagna-test-invio'),
     path('campagne/processa-coda/', views.processa_coda_ora, name='processa-coda'),
 ]

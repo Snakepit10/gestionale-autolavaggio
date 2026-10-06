@@ -106,6 +106,14 @@ class ImpostazioniMarketing(models.Model):
                   "dal messaggio.",
     )
 
+    # --- Test ---
+    telefono_test = models.CharField(
+        max_length=20, blank=True, default='',
+        help_text="Numero WhatsApp (es. 3791234567) a cui inviare i "
+                  "messaggi di prova dal composer campagne. Di solito il "
+                  "numero del titolare.",
+    )
+
     aggiornato_il = models.DateTimeField(auto_now=True)
 
     class Meta:
