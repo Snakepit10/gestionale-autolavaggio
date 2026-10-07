@@ -1,7 +1,7 @@
 from django.db import models
 from django.contrib.auth.models import User
 from django.utils import timezone
-from django.core.validators import MinValueValidator
+from django.core.validators import MaxValueValidator, MinValueValidator
 from decimal import Decimal
 
 
@@ -434,6 +434,83 @@ class ChiusuraCassaAutomatica(models.Model):
     def vendita_totale(self):
         """Vendita totale = contante + non contante."""
         return self.vendita_contante + self.vendita_non_contante
+
+
+# Prezzi dei programmi dei portali a spazzole (WashTec). I programmi
+# senza prezzo (P6-P9) valgono 0 e il report li segnala come "senza
+# importo": aggiornare qui quando il listino viene definito.
+PREZZI_PROGRAMMA_PORTALE = {
+    1: Decimal('15.00'), 2: Decimal('12.00'), 3: Decimal('10.00'),
+    4: Decimal('8.00'), 5: Decimal('3.00'),
+    6: Decimal('0.00'), 7: Decimal('0.00'), 8: Decimal('0.00'),
+    9: Decimal('0.00'),
+}
+
+
+class TransazionePortale(models.Model):
+    """Singola transazione dei portali a spazzole, estratta da WashTec
+    Plus (Report > Dati transazione): l'archivio grezzo da cui il
+    report giornata aggrega i lavaggi della finestra di chiusura.
+
+    I due portali hanno lo stesso nome postazione su WashTec e si
+    distinguono dalla serie del contatore transazioni: A = 132xx,
+    B = 139xx. La corrispondenza con Blu/Azzurro non e' nota.
+    L'import e' idempotente: (portale, numero) e' univoco.
+    """
+    PORTALE_CHOICES = [
+        ('A', 'Portale A (serie 132xx)'),
+        ('B', 'Portale B (serie 139xx)'),
+    ]
+    ORIGINE_CHOICES = [
+        ('contanti', 'Contanti'),
+        ('unita', 'Unita\' operativa'),
+    ]
+
+    portale = models.CharField(max_length=1, choices=PORTALE_CHOICES)
+    numero = models.PositiveIntegerField(
+        verbose_name='Numero transazione WashTec')
+    orario = models.DateTimeField(db_index=True)
+    programma = models.PositiveSmallIntegerField(
+        validators=[MinValueValidator(1), MaxValueValidator(9)])
+    origine = models.CharField(max_length=10, choices=ORIGINE_CHOICES)
+    importato_il = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        verbose_name = 'Transazione portale (WashTec)'
+        verbose_name_plural = 'Transazioni portali (WashTec)'
+        ordering = ['orario']
+        unique_together = [('portale', 'numero')]
+
+    def __str__(self):
+        return (f"{self.get_portale_display()} #{self.numero} "
+                f"P{self.programma} {self.orario:%d/%m/%Y %H:%M}")
+
+
+class ChiusuraPortali(models.Model):
+    """Finestra di chiusura dei portali per una giornata del report.
+
+    La "giornata" dei portali e' a cavallo di due date (es. report del
+    06/10 = dal 05/10 19:00 al 06/10 18:00) e gli orari variano:
+    li imposta l'operatore nel report giornata. I lavaggi mostrati
+    sono le TransazionePortale con orario nella finestra (estremo
+    iniziale escluso, finale incluso).
+    """
+    data = models.DateField(unique=True)
+    periodo_da = models.DateTimeField(verbose_name='Inizio chiusura')
+    periodo_a = models.DateTimeField(verbose_name='Fine chiusura')
+    operatore = models.ForeignKey(
+        User, on_delete=models.SET_NULL, null=True, blank=True,
+        related_name='chiusure_portali')
+    aggiornato_il = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        verbose_name = 'Chiusura portali'
+        verbose_name_plural = 'Chiusure portali'
+        ordering = ['-data']
+
+    def __str__(self):
+        return (f"Chiusura portali {self.data:%d/%m/%Y} "
+                f"({self.periodo_da:%d/%m %H:%M} - {self.periodo_a:%d/%m %H:%M})")
 
     @property
     def resto_erogato_teorico(self):

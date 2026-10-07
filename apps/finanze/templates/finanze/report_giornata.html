@@ -511,6 +511,95 @@
     </div>
   </div>
 
+  {# ====== Lavaggi portali a spazzole (dati WashTec Plus) ====== #}
+  <div class="chart-panel mb-3">
+    <div class="panel-title"><i class="bi bi-droplet-half text-primary"></i> Lavaggi portali (WashTec)</div>
+    <div class="panel-sub">
+      Aggregato dall'archivio transazioni WashTec ({{ portali_archivio_totale }} in archivio).
+      La giornata dei portali va dalla chiusura precedente a quella di oggi: imposta gli orari reali.
+    </div>
+    <div class="panel-body">
+
+      <form method="post" action="{% url 'finanze:imposta_chiusura_portali' %}"
+            class="d-flex gap-2 align-items-end flex-wrap mb-3">
+        {% csrf_token %}
+        <input type="hidden" name="data" value="{{ data|date:'Y-m-d' }}">
+        <div>
+          <label class="form-label small mb-0 fw-bold">Inizio chiusura</label>
+          <input type="datetime-local" name="periodo_da" class="form-control form-control-sm" required
+                 value="{% if portali_chiusura %}{{ portali_chiusura.periodo_da|date:'Y-m-d\TH:i' }}{% elif portali_suggerimento_da %}{{ portali_suggerimento_da|date:'Y-m-d\TH:i' }}{% endif %}">
+        </div>
+        <div>
+          <label class="form-label small mb-0 fw-bold">Fine chiusura</label>
+          <input type="datetime-local" name="periodo_a" class="form-control form-control-sm" required
+                 value="{% if portali_chiusura %}{{ portali_chiusura.periodo_a|date:'Y-m-d\TH:i' }}{% endif %}">
+        </div>
+        <button type="submit" class="btn btn-primary btn-sm">
+          <i class="bi bi-arrow-repeat"></i> {% if portali_chiusura %}Aggiorna{% else %}Imposta e calcola{% endif %}
+        </button>
+        {% if portali_chiusura %}
+        <span class="small text-muted">
+          {{ portali_n_transazioni }} lavaggi nella finestra
+          {{ portali_chiusura.periodo_da|date:'d/m H:i' }} &rarr; {{ portali_chiusura.periodo_a|date:'d/m H:i' }}
+        </span>
+        {% else %}
+        <span class="small text-warning"><i class="bi bi-exclamation-circle"></i> Finestra non ancora impostata per questa giornata</span>
+        {% endif %}
+      </form>
+
+      {% if portali_chiusura %}
+      <div class="row g-3">
+        {% for p in lavaggi_portali %}
+        <div class="col-12 col-xl-6">
+          <div class="border rounded p-3 h-100" style="background:#fafbfc;">
+            <div class="d-flex justify-content-between align-items-start mb-2">
+              <strong><i class="bi bi-droplet text-primary"></i> {{ p.label }}</strong>
+              <span class="badge bg-primary">{{ p.tot.richieste }} lavaggi</span>
+            </div>
+            {% if p.righe %}
+            <div class="table-responsive">
+              <table class="table table-sm data-table mb-1">
+                <thead class="table-light">
+                  <tr><th>Prog.</th><th class="text-end">Prezzo</th>
+                      <th class="text-center">Contanti</th><th class="text-center">Unit&agrave; op.</th>
+                      <th class="text-end">&euro;</th></tr>
+                </thead>
+                <tbody>
+                  {% for r in p.righe %}
+                  <tr>
+                    <td>P{{ r.programma }}{% if r.prezzo == 0 %} <i class="bi bi-exclamation-circle text-warning" title="Programma senza prezzo di listino: vale 0"></i>{% endif %}</td>
+                    <td class="text-end text-muted">{% if r.prezzo %}{{ r.prezzo|floatformat:2 }}{% else %}&mdash;{% endif %}</td>
+                    <td class="text-center">{{ r.n_contanti|default:"&mdash;" }}</td>
+                    <td class="text-center">{{ r.n_unita|default:"&mdash;" }}</td>
+                    <td class="text-end">&euro;{{ r.v_contanti|add:r.v_unita|floatformat:2 }}</td>
+                  </tr>
+                  {% endfor %}
+                </tbody>
+                <tfoot>
+                  <tr class="fw-bold">
+                    <td colspan="2">Totale</td>
+                    <td class="text-center">&euro;{{ p.tot.contanti|floatformat:2 }}</td>
+                    <td class="text-center">&euro;{{ p.tot.unita|floatformat:2 }}</td>
+                    <td class="text-end">&euro;{{ p.tot_valore|floatformat:2 }}</td>
+                  </tr>
+                </tfoot>
+              </table>
+            </div>
+            {% if p.tot.senza_prezzo %}
+            <div class="small text-warning mb-0"><i class="bi bi-exclamation-circle"></i>
+              {{ p.tot.senza_prezzo }} lavagg{{ p.tot.senza_prezzo|pluralize:"io,i" }} su programmi senza prezzo (contati a 0 &euro;)</div>
+            {% endif %}
+            {% else %}
+            <div class="text-muted small">Nessun lavaggio nella finestra per questo portale.</div>
+            {% endif %}
+          </div>
+        </div>
+        {% endfor %}
+      </div>
+      {% endif %}
+    </div>
+  </div>
+
   {# ====== Ordini non incassati ====== #}
   {% if ordini_non_pagati %}
   <div class="chart-panel mb-3">

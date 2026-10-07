@@ -1150,7 +1150,145 @@ def report_giornata(request):
         'orario_buckets_json': json.dumps(orario_buckets),
         'orario_counts_json': json.dumps(orario_counts),
     }
+    context.update(_contesto_lavaggi_portali(data))
     return render(request, 'finanze/report_giornata.html', context)
+
+
+def _contesto_lavaggi_portali(data):
+    """Sezione 'Lavaggi portali (WashTec)' del report giornata.
+
+    L'operatore imposta la finestra di chiusura (ChiusuraPortali);
+    le tabelle per portale sono aggregate dall'archivio
+    TransazionePortale: righe per programma con richieste/valore
+    divisi per origine (contanti / unita' operativa). I programmi
+    senza prezzo di listino vengono segnalati.
+    """
+    from .models import (PREZZI_PROGRAMMA_PORTALE, ChiusuraPortali,
+                         TransazionePortale)
+
+    chiusura = ChiusuraPortali.objects.filter(data=data).first()
+    transazioni = []
+    if chiusura:
+        transazioni = list(TransazionePortale.objects.filter(
+            orario__gt=chiusura.periodo_da,
+            orario__lte=chiusura.periodo_a,
+        ))
+
+    # Suggerimento inizio finestra: la fine della chiusura precedente
+    prec = (ChiusuraPortali.objects.filter(data__lt=data)
+            .order_by('-data').first())
+
+    portali = []
+    for codice, label in TransazionePortale.PORTALE_CHOICES:
+        righe = []
+        tot = {'richieste': 0, 'contanti': Decimal('0.00'),
+               'unita': Decimal('0.00'), 'senza_prezzo': 0}
+        for prog in range(1, 10):
+            cella = {'programma': prog,
+                     'prezzo': PREZZI_PROGRAMMA_PORTALE[prog]}
+            for origine in ('contanti', 'unita'):
+                n = sum(1 for t in transazioni
+                        if t.portale == codice and t.programma == prog
+                        and t.origine == origine)
+                cella[f'n_{origine}'] = n
+                cella[f'v_{origine}'] = PREZZI_PROGRAMMA_PORTALE[prog] * n
+                tot['richieste'] += n
+                tot[origine] += PREZZI_PROGRAMMA_PORTALE[prog] * n
+                if n and not PREZZI_PROGRAMMA_PORTALE[prog]:
+                    tot['senza_prezzo'] += n
+            if cella['n_contanti'] or cella['n_unita']:
+                righe.append(cella)
+        portali.append({
+            'codice': codice, 'label': label, 'righe': righe,
+            'tot': tot, 'tot_valore': tot['contanti'] + tot['unita'],
+        })
+
+    return {
+        'portali_chiusura': chiusura,
+        'portali_suggerimento_da': prec.periodo_a if prec else None,
+        'lavaggi_portali': portali,
+        'portali_n_transazioni': len(transazioni),
+        'portali_archivio_totale': TransazionePortale.objects.count(),
+    }
+
+
+@login_required
+@user_passes_test(is_staff_user)
+def imposta_chiusura_portali(request):
+    """POST form dal report giornata: salva la finestra di chiusura
+    dei portali per la data; il report si riaggrega dall'archivio."""
+    from django.urls import reverse
+
+    from .models import ChiusuraPortali
+
+    if request.method != 'POST':
+        return redirect('finanze:report_giornata')
+    data_str = request.POST.get('data', '')
+    try:
+        data = datetime.strptime(data_str, '%Y-%m-%d').date()
+        periodo_da = timezone.make_aware(datetime.strptime(
+            request.POST.get('periodo_da', ''), '%Y-%m-%dT%H:%M'))
+        periodo_a = timezone.make_aware(datetime.strptime(
+            request.POST.get('periodo_a', ''), '%Y-%m-%dT%H:%M'))
+    except ValueError:
+        messages.error(request, 'Date della chiusura portali non valide.')
+        return redirect(f"{reverse('finanze:report_giornata')}?data={data_str}")
+    if periodo_a <= periodo_da:
+        messages.error(request,
+                       "La fine della chiusura deve essere dopo l'inizio.")
+        return redirect(f"{reverse('finanze:report_giornata')}?data={data_str}")
+
+    ChiusuraPortali.objects.update_or_create(
+        data=data, defaults={'periodo_da': periodo_da,
+                             'periodo_a': periodo_a,
+                             'operatore': request.user})
+    messages.success(request, 'Chiusura portali aggiornata.')
+    return redirect(
+        f"{reverse('finanze:report_giornata')}?data={data.strftime('%Y-%m-%d')}")
+
+
+@login_required
+@user_passes_test(is_staff_user)
+def importa_transazioni_portali(request):
+    """POST JSON: importa transazioni WashTec nell'archivio.
+
+    Payload: {transazioni: [{portale, numero,
+    orario 'YYYY-MM-DD HH:MM:SS', programma, origine}, ...]}.
+    Idempotente: i duplicati (portale, numero) vengono ignorati.
+    """
+    from .models import TransazionePortale
+
+    if request.method != 'POST':
+        return JsonResponse({'ok': False, 'errore': 'metodo non valido'},
+                            status=405)
+    try:
+        payload = json.loads(request.body or '{}')
+        voci = payload['transazioni']
+        assert isinstance(voci, list)
+    except (KeyError, ValueError, AssertionError, TypeError):
+        return JsonResponse({'ok': False, 'errore': 'payload non valido'},
+                            status=400)
+
+    nuove = []
+    for v in voci:
+        try:
+            orario = timezone.make_aware(datetime.strptime(
+                v['orario'], '%Y-%m-%d %H:%M:%S'))
+            prog = int(v['programma'])
+            assert v['portale'] in ('A', 'B')
+            assert v['origine'] in ('contanti', 'unita')
+            assert 1 <= prog <= 9
+            nuove.append(TransazionePortale(
+                portale=v['portale'], numero=int(v['numero']),
+                orario=orario, programma=prog, origine=v['origine']))
+        except (KeyError, ValueError, AssertionError, TypeError):
+            return JsonResponse({'ok': False,
+                                 'errore': f'transazione non valida: {v}'},
+                                status=400)
+
+    TransazionePortale.objects.bulk_create(nuove, ignore_conflicts=True)
+    return JsonResponse({'ok': True, 'ricevute': len(nuove),
+                         'totale_archivio': TransazionePortale.objects.count()})
 
 
 @login_required
