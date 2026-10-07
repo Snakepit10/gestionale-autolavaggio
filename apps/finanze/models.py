@@ -435,6 +435,34 @@ class ChiusuraCassaAutomatica(models.Model):
         """Vendita totale = contante + non contante."""
         return self.vendita_contante + self.vendita_non_contante
 
+    @property
+    def resto_erogato_teorico(self):
+        """Resto erogato teorico = incasso vendita - vendita totale."""
+        return self.incasso_vendita - self.vendita_totale
+
+    @property
+    def differenza(self):
+        """Differenza tra resto erogato reale e teorico."""
+        return self.resto_erogato_reale - self.resto_erogato_teorico
+
+    @property
+    def stato_differenza(self):
+        """Stato della differenza (ok, mancante, eccedente)."""
+        diff = self.differenza
+        if abs(diff) < Decimal('0.50'):
+            return 'ok'
+        elif diff < 0:
+            return 'mancante'
+        else:
+            return 'eccedente'
+
+    @property
+    def contanti_teorici(self):
+        """Contanti teorici: vendita contante - resto erogato."""
+        if self.cassa.modalita_registratore:
+            return self.incasso_totale
+        return self.vendita_contante - self.resto_erogato_teorico
+
 
 # Prezzi dei programmi dei portali a spazzole (WashTec). I programmi
 # senza prezzo (P6-P9) valgono 0 e il report li segnala come "senza
@@ -461,6 +489,11 @@ class TransazionePortale(models.Model):
         ('A', 'Portale A (serie 132xx)'),
         ('B', 'Portale B (serie 139xx)'),
     ]
+    # ATTENZIONE alle etichette WashTec, che sono invertite rispetto
+    # alla realta' operativa: il "Metodo di pagamento" WashTec
+    # "Unita' operativa parallela" corrisponde ai CONTANTI, mentre
+    # "In contanti" corrisponde all'UNITA' OPERATIVA. L'import deve
+    # mappare di conseguenza.
     ORIGINE_CHOICES = [
         ('contanti', 'Contanti'),
         ('unita', 'Unita\' operativa'),
@@ -511,34 +544,6 @@ class ChiusuraPortali(models.Model):
     def __str__(self):
         return (f"Chiusura portali {self.data:%d/%m/%Y} "
                 f"({self.periodo_da:%d/%m %H:%M} - {self.periodo_a:%d/%m %H:%M})")
-
-    @property
-    def resto_erogato_teorico(self):
-        """Resto erogato teorico = incasso vendita - vendita totale."""
-        return self.incasso_vendita - self.vendita_totale
-
-    @property
-    def differenza(self):
-        """Differenza tra resto erogato reale e teorico."""
-        return self.resto_erogato_reale - self.resto_erogato_teorico
-
-    @property
-    def stato_differenza(self):
-        """Stato della differenza (ok, mancante, eccedente)."""
-        diff = self.differenza
-        if abs(diff) < Decimal('0.50'):
-            return 'ok'
-        elif diff < 0:
-            return 'mancante'
-        else:
-            return 'eccedente'
-
-    @property
-    def contanti_teorici(self):
-        """Contanti teorici: vendita contante - resto erogato."""
-        if self.cassa.modalita_registratore:
-            return self.incasso_totale
-        return self.vendita_contante - self.resto_erogato_teorico
 
 
 # ---------------------------------------------------------------------------
