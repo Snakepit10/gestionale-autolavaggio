@@ -146,7 +146,13 @@ function bookmarkletWashtec() {
 const CERCA_SRC = "[...document.querySelectorAll('button[title=Cerca]')].find(e => e.offsetParent)";
 
 (function () {
-  const sorgente = '(' + bookmarkletWashtec.toString()
+  // Chrome, salvando il preferito, puo' togliere gli a-capo: un commento
+  // // spegnerebbe tutto il codice che segue. Si generano quindi un'unica
+  // riga e nessun commento.
+  const codice = bookmarkletWashtec.toString()
+    .replace(/^\s*\/\/.*$/mg, '')
+    .replace(/\s*\n\s*/g, ' ');
+  const sorgente = '(' + codice
     .replace('__GESTIONALE__', '{{ origine_gestionale }}')
     .replace('__CERCA__', CERCA_SRC) + ')()';
   document.getElementById('bookmarklet').href = 'javascript:' + encodeURIComponent(sorgente);
