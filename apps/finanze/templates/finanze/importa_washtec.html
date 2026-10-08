@@ -25,17 +25,31 @@
         Trascina questo bottone nella <strong>barra dei preferiti</strong> di Chrome
         (se non la vedi: <kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>B</kbd>).
       </p>
-      <a id="bookmarklet" class="btn btn-success mb-3" href="#"
-         onclick="alert('Non cliccarlo qui: trascinalo nella barra dei preferiti.'); return false;">
-        <i class="bi bi-droplet-half"></i> WashTec &rarr; Gestionale
-      </a>
-      <ol class="small mb-0">
+      <div class="d-flex gap-2 flex-wrap align-items-center mb-3">
+        <a id="bookmarklet" class="btn btn-success" href="#"
+           onclick="alert('Non cliccarlo qui: trascinalo nella barra dei preferiti.'); return false;">
+          <i class="bi bi-droplet-half"></i> WashTec &rarr; Gestionale
+        </a>
+        <button type="button" class="btn btn-outline-secondary btn-sm" id="btn-copia-bm">
+          <i class="bi bi-clipboard"></i> Copia codice (installazione manuale)
+        </button>
+        <span class="small text-success" id="copia-esito"></span>
+      </div>
+      <ol class="small mb-2">
         <li>Accedi a <a href="https://plus.washtec.com" target="_blank" rel="noopener">WashTec Plus</a>.</li>
-        <li>Clicca il preferito <strong>WashTec &rarr; Gestionale</strong>: ti chiede da che giorno
-          estrarre (proposta: 3 giorni fa), poi legge da solo tutte le pagine di "Dati transazione".</li>
-        <li>Si apre questa pagina con l'anteprima: controlla i numeri e premi <strong>Importa</strong>.
-          Le transazioni gi&agrave; presenti vengono ignorate, quindi sovrapporre i periodi non crea doppioni.</li>
+        <li>Clicca il preferito <strong>WashTec &rarr; Gestionale</strong>: in alto a destra compare subito
+          un riquadro blu "Estrazione in corso", ti chiede da che giorno estrarre (proposta: 3 giorni fa)
+          e legge da solo tutte le pagine di "Dati transazione".</li>
+        <li>Alla fine la stessa scheda passa a questa pagina con l'anteprima: controlla i numeri e premi
+          <strong>Importa</strong>. Le transazioni gi&agrave; presenti vengono ignorate, quindi sovrapporre
+          i periodi non crea doppioni.</li>
       </ol>
+      <details class="small text-muted">
+        <summary>Se il trascinamento non funziona</summary>
+        Premi <strong>Copia codice</strong>, poi in Chrome: clic destro sulla barra dei preferiti &rarr;
+        <strong>Aggiungi pagina&hellip;</strong>; come nome scrivi <em>WashTec &rarr; Gestionale</em> e
+        nel campo <strong>URL</strong> incolla il codice copiato (<kbd>Ctrl</kbd>+<kbd>V</kbd>), poi Salva.
+      </details>
     </div>
   </div>
 </div>
@@ -50,9 +64,22 @@
 function bookmarkletWashtec() {
   (async () => {
     const GESTIONALE = '__GESTIONALE__';
-    const w = window.open('about:blank', 'mw_import_washtec');
-    const scrivi = t => { try { w.document.body.innerHTML = '<p style="font:16px sans-serif;padding:24px">' + t + '</p>'; } catch (e) {} };
-    scrivi('Estrazione da WashTec in corso&hellip;');
+    // Riquadro di avanzamento DENTRO la pagina WashTec: niente popup,
+    // che Chrome puo' bloccare in silenzio.
+    let box = document.getElementById('mw-import-box');
+    if (!box) {
+      box = document.createElement('div');
+      box.id = 'mw-import-box';
+      box.style.cssText = 'position:fixed;top:16px;right:16px;z-index:2147483647;' +
+        'background:#0e2233;color:#fff;font:15px/1.4 sans-serif;padding:14px 18px;' +
+        'border-radius:10px;box-shadow:0 6px 24px rgba(0,0,0,.35);max-width:360px;';
+      document.body.appendChild(box);
+    }
+    const scrivi = (t, errore) => {
+      box.style.background = errore ? '#b42318' : '#0e2233';
+      box.innerHTML = '<b>WashTec &rarr; Gestionale</b><br>' + t;
+    };
+    scrivi('Estrazione in corso&hellip;');
     const sleep = ms => new Promise(r => setTimeout(r, ms));
     const fire = el => ['mousedown', 'mouseup', 'click'].forEach(t =>
       el.dispatchEvent(new MouseEvent(t, { bubbles: true, view: window })));
@@ -88,7 +115,7 @@ function bookmarkletWashtec() {
       const oggi = new Date(), tre = new Date();
       tre.setDate(oggi.getDate() - 3);
       const dal = prompt('Importa le transazioni WashTec dal giorno (gg/mm/aa):', fmt(tre));
-      if (!dal) { w.close(); return; }
+      if (!dal) { box.remove(); return; }
       if (!/^\d\d\/\d\d\/\d\d$/.test(dal.trim())) throw 'data non valida: usa gg/mm/aa';
       imposta(date[0], dal.trim());
       imposta(date[1], fmt(oggi));
@@ -128,16 +155,17 @@ function bookmarkletWashtec() {
       if (!/^1-/.test(testoPag())) await vaiA(0);
       for (let giro = 0; giro < 500; giro++) {
         raccogli();
-        scrivi('Estrazione da WashTec: ' + Object.keys(righe).length + ' di ' + TOTALE + '&hellip;');
+        scrivi('Lette ' + Object.keys(righe).length + ' righe su ' + TOTALE + '&hellip;');
         if (Object.keys(righe).length >= TOTALE) break;
         if (!await vaiA(2)) throw 'la tabella non avanza di pagina';
       }
       const dati = Object.values(righe);
       if (dati.length !== TOTALE) throw 'lette ' + dati.length + ' righe su ' + TOTALE;
-      w.location = GESTIONALE + '/finanze/importa-washtec/#' + encodeURIComponent(JSON.stringify(dati));
+      scrivi('Lette tutte le ' + TOTALE + ' righe: apro il gestionale&hellip;');
+      location.href = GESTIONALE + '/finanze/importa-washtec/#' + encodeURIComponent(JSON.stringify(dati));
     } catch (e) {
+      scrivi('Errore: ' + e, true);
       alert('Import WashTec: ' + e);
-      try { w.close(); } catch (x) {}
     }
   })();
 }
@@ -155,7 +183,17 @@ const CERCA_SRC = "[...document.querySelectorAll('button[title=Cerca]')].find(e 
   const sorgente = '(' + codice
     .replace('__GESTIONALE__', '{{ origine_gestionale }}')
     .replace('__CERCA__', CERCA_SRC) + ')()';
-  document.getElementById('bookmarklet').href = 'javascript:' + encodeURIComponent(sorgente);
+  const href = 'javascript:' + encodeURIComponent(sorgente);
+  document.getElementById('bookmarklet').href = href;
+  const copia = document.getElementById('btn-copia-bm');
+  if (copia) copia.onclick = async () => {
+    try { await navigator.clipboard.writeText(href); }
+    catch (e) {
+      const t = document.createElement('textarea'); t.value = href;
+      document.body.appendChild(t); t.select(); document.execCommand('copy'); t.remove();
+    }
+    document.getElementById('copia-esito').textContent = 'Codice copiato: incollalo nell\'URL del nuovo preferito.';
+  };
 })();
 </script>
 <script>
