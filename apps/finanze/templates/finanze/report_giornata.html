@@ -642,10 +642,16 @@
                 <tr>
                   <td>
                     <a href="{% url 'ordini:ordine-detail' r.item.ordine.pk %}">#{{ r.item.ordine.numero_progressivo|slice:"-4:" }}</a>
-                    <div class="small text-muted">{{ r.item.ordine.cliente|default:"—" }}</div>
+                    <div class="small"><i class="bi bi-person text-muted"></i> {{ r.item.ordine.cliente|default:"—" }}</div>
+                    <div class="small text-muted"><i class="bi bi-car-front"></i> {{ r.item.ordine.tipo_auto|default:"—" }}</div>
                   </td>
                   <td>{{ r.rif|date:"d/m H:i" }}</td>
-                  <td>{{ r.item.servizio_prodotto.titolo }}{% if r.item.quantita > 1 %} &times;{{ r.item.quantita }}{% endif %}</td>
+                  <td>
+                    <div class="fw-semibold">{{ r.item.servizio_prodotto.titolo }}{% if r.item.quantita > 1 %} &times;{{ r.item.quantita }}{% endif %}</div>
+                    {% for altro in r.item.ordine.items.all %}{% if altro.pk != r.item.pk %}
+                    <div class="small text-muted">+ {{ altro.servizio_prodotto.titolo }}{% if altro.quantita > 1 %} &times;{{ altro.quantita }}{% endif %}</div>
+                    {% endif %}{% endfor %}
+                  </td>
                   <td class="text-muted small">{% for p in r.programmi %}P{{ p }}{% if not forloop.last %}/{% endif %}{% endfor %}</td>
                   <td>
                     {% for a in r.confermati %}

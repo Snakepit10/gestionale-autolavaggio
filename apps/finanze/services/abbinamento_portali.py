@@ -32,7 +32,8 @@ def lavaggi_servito(chiusura):
         .annotate(rif=Coalesce('inizio_lavorazione', 'ordine__data_ora'))
         .filter(rif__gt=chiusura.periodo_da, rif__lte=chiusura.periodo_a)
         .select_related('ordine__cliente', 'servizio_prodotto')
-        .prefetch_related('abbinamenti_portale__transazione')
+        .prefetch_related('abbinamenti_portale__transazione',
+                          'ordine__items__servizio_prodotto')
         .order_by('rif')
     )
 
