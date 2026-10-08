@@ -606,9 +606,14 @@
   <div class="chart-panel mb-3" id="abbinamento-portali">
     <div class="panel-title"><i class="bi bi-link-45deg text-primary"></i> Abbinamento servito &harr; portali (unit&agrave; operativa)</div>
     <div class="panel-sub">
-      Ogni lavaggio servito viene proposto con la transazione da unit&agrave; operativa di programma
-      compatibile pi&ugrave; vicina in orario (entro &plusmn;{{ abbinamento.tolleranza_ore|floatformat:0 }} h).
+      Abbinamento per priorit&agrave; di programma (ordine scritto nel catalogo, es. P8 &rarr; P9 &rarr; P7 &rarr; P4)
+      cercando all'indietro dal <strong>completamento</strong> del lavoro, a partire da ~{{ abbinamento.anticipo_min }} min prima
+      (fino a {{ abbinamento.tolleranza_ore|floatformat:0 }} h). Senza completamento registrato si usa l'ora di creazione dell'ordine.
       Quello che resta libero sono i lavaggi pagati direttamente agli operatori.
+      {% if abbinamento.n_senza_completamento %}
+      <span class="text-warning d-block mt-1"><i class="bi bi-exclamation-circle"></i>
+        {{ abbinamento.n_senza_completamento }} lavagg{{ abbinamento.n_senza_completamento|pluralize:"io,i" }} senza completamento registrato: abbinamento meno preciso.</span>
+      {% endif %}
     </div>
     <div class="panel-body">
       <div class="d-flex gap-3 flex-wrap align-items-center mb-3 small">
@@ -646,7 +651,11 @@
                     <div class="small"><i class="bi bi-person text-muted"></i> {{ r.item.ordine.cliente|default:"—" }}</div>
                     <div class="small text-muted"><i class="bi bi-car-front"></i> {{ r.item.ordine.tipo_auto|default:"—" }}</div>
                   </td>
-                  <td>{{ r.rif|date:"d/m H:i" }}</td>
+                  <td>
+                    {{ r.rif|date:"d/m H:i" }}
+                    {% if r.rif_tipo == 'completato' %}<div class="small text-success">completato</div>
+                    {% else %}<div class="small text-warning" title="Nessun completamento registrato: si usa l'ora di creazione dell'ordine">creato</div>{% endif %}
+                  </td>
                   <td>
                     <div class="fw-semibold">{{ r.item.servizio_prodotto.titolo }}{% if r.item.quantita > 1 %} &times;{{ r.item.quantita }}{% endif %}</div>
                     {% for altro in r.item.ordine.items.all %}{% if altro.pk != r.item.pk %}
@@ -669,7 +678,8 @@
                     {% for p in r.proposte %}
                     <div class="d-flex align-items-center gap-1 mb-1">
                       <span class="badge bg-primary-subtle text-primary-emphasis border border-primary-subtle"><i class="bi bi-lightbulb"></i> {{ p.transazione.portale }} #{{ p.transazione.numero }}</span>
-                      <span class="small">{{ p.transazione.orario|date:"H:i" }} · P{{ p.transazione.programma }} · &Delta; {{ p.delta_min }} min</span>
+                      <span class="small">{{ p.transazione.orario|date:"H:i" }} · P{{ p.transazione.programma }} ·
+                        {% if r.rif_tipo == 'completato' %}{{ p.delta_min }} min prima del completamento{% else %}&Delta; {{ p.delta_min }} min dalla creazione{% endif %}</span>
                     </div>
                     {% endfor %}
                     {% if r.scoperti %}

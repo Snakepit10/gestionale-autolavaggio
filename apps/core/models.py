@@ -132,9 +132,10 @@ class ServizioProdotto(models.Model):
         max_length=20, blank=True, default='',
         verbose_name='Programmi portale compatibili',
         help_text="Programmi WashTec (1-9) con cui il portale esegue questo "
-                  "lavaggio, separati da virgola (es. '5' per il completo a "
-                  "mano, '4,7,8,9' per gli altri completi). Vuoto = non "
-                  "passa dal portale.",
+                  "lavaggio, separati da virgola IN ORDINE DI PRIORITA' di "
+                  "abbinamento (es. '5' per il completo a mano, '8,9,7,4' per "
+                  "gli altri completi: prima i P8, poi P9, P7 e infine P4). "
+                  "Vuoto = non passa dal portale.",
     )
 
     attivo = models.BooleanField(default=True)
@@ -243,15 +244,21 @@ class ServizioProdotto(models.Model):
         return out
 
     @property
-    def lista_programmi_portale(self) -> set[int]:
-        """Programmi portale compatibili come insieme di interi 1-9
-        (valori non numerici o fuori range ignorati)."""
-        out = set()
+    def programmi_portale_ordinati(self) -> list[int]:
+        """Programmi portale compatibili (interi 1-9) nell'ordine di
+        priorita' scritto nel campo, senza duplicati; valori non numerici
+        o fuori range ignorati."""
+        out = []
         for parte in (self.programmi_portale or '').split(','):
             parte = parte.strip()
-            if parte.isdigit() and 1 <= int(parte) <= 9:
-                out.add(int(parte))
+            if parte.isdigit() and 1 <= int(parte) <= 9 and int(parte) not in out:
+                out.append(int(parte))
         return out
+
+    @property
+    def lista_programmi_portale(self) -> set[int]:
+        """Programmi portale compatibili come insieme."""
+        return set(self.programmi_portale_ordinati)
 
 
 class Sconto(models.Model):

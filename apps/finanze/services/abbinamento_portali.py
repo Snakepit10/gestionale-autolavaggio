@@ -1,10 +1,23 @@
 """Abbinamento lavaggi servito <-> transazioni portale da unita' operativa.
 
 Dentro la finestra di una ChiusuraPortali, ogni lavaggio del servito
-(ItemOrdine il cui servizio ha `programmi_portale`) viene abbinato alla
-transazione WashTec con origine 'unita' di programma compatibile piu'
-vicina in orario. Le transazioni 'unita' che restano libere sono i
-lavaggi pagati direttamente agli operatori.
+(ItemOrdine il cui servizio ha `programmi_portale`) viene abbinato a una
+transazione WashTec con origine 'unita' compatibile. Le transazioni
+'unita' che restano libere sono i lavaggi pagati direttamente agli
+operatori.
+
+Regole di proposta:
+- PRIORITA' DI PROGRAMMA: l'abbinamento procede a giri, uno per
+  posizione nell'elenco `programmi_portale` del servizio (es. '8,9,7,4':
+  prima tutti i P8, poi P9, P7 e infine P4). In ogni giro si assegna per
+  vicinanza d'orario, fino a esaurimento.
+- ORARIO: il passaggio al portale avviene prima della fine del lavoro,
+  quindi si parte dal COMPLETAMENTO (fine_lavorazione) e si cerca
+  all'indietro a partire da ANTICIPO_PORTALE (~30 min): obiettivo =
+  completamento - 30 min, transazioni non successive al completamento
+  e non oltre TOLLERANZA prima dell'obiettivo. Se l'item non ha
+  completamento registrato si ripiega sull'ora di creazione dell'ordine
+  (ricerca simmetrica, +-TOLLERANZA).
 
 Le proposte sono calcolate al volo (nessuna scrittura); diventano
 AbbinamentoPortale solo alla conferma dell'operatore.
@@ -13,29 +26,61 @@ from datetime import timedelta
 from decimal import Decimal
 
 from django.db import transaction
-from django.db.models.functions import Coalesce
 
 from apps.finanze.models import (PREZZI_PROGRAMMA_PORTALE, AbbinamentoPortale,
                                  TransazionePortale)
 from apps.ordini.models import ItemOrdine
 
+ANTICIPO_PORTALE = timedelta(minutes=30)
 TOLLERANZA_DEFAULT = timedelta(hours=2)
+# Margine per caricare gli ordini a cavallo dell'inizio finestra
+_MARGINE_CARICAMENTO = timedelta(hours=12)
+
+
+def _riferimento(item):
+    """(obiettivo, limite_max, tipo, orario_mostrato) dell'item.
+
+    tipo 'completato': obiettivo = fine - ANTICIPO, limite = fine
+    (la transazione non puo' essere successiva al completamento);
+    tipo 'creato': obiettivo = creazione ordine, nessun limite.
+    """
+    if item.fine_lavorazione:
+        fine = item.fine_lavorazione
+        return fine - ANTICIPO_PORTALE, fine, 'completato', fine
+    creato = item.ordine.data_ora
+    return creato, None, 'creato', creato
+
+
+def _compatibile_orario(item, t, tolleranza):
+    """Distanza (secondi) dall'obiettivo, o None se fuori dai limiti."""
+    obiettivo, limite, _, _ = item.riferimento
+    if limite is not None and t.orario > limite:
+        return None
+    delta = abs((t.orario - obiettivo).total_seconds())
+    return delta if delta <= tolleranza.total_seconds() else None
 
 
 def lavaggi_servito(chiusura):
-    """Item servito della finestra, con `rif` = orario di riferimento
-    (inizio lavorazione, altrimenti creazione ordine)."""
-    return list(
+    """Item servito il cui obiettivo cade nella finestra di chiusura.
+    Ogni item riceve l'attributo `riferimento` (vedi _riferimento)."""
+    candidati = (
         ItemOrdine.objects
         .exclude(servizio_prodotto__programmi_portale='')
         .exclude(ordine__stato='annullato')
-        .annotate(rif=Coalesce('inizio_lavorazione', 'ordine__data_ora'))
-        .filter(rif__gt=chiusura.periodo_da, rif__lte=chiusura.periodo_a)
+        .filter(ordine__data_ora__gt=chiusura.periodo_da - _MARGINE_CARICAMENTO,
+                ordine__data_ora__lte=chiusura.periodo_a)
         .select_related('ordine__cliente', 'servizio_prodotto')
         .prefetch_related('abbinamenti_portale__transazione',
                           'ordine__items__servizio_prodotto')
-        .order_by('rif')
     )
+    items = []
+    for it in candidati:
+        it.riferimento = _riferimento(it)
+        if chiusura.periodo_da < it.riferimento[0] <= chiusura.periodo_a:
+            it.rif = it.riferimento[3]
+            items.append(it)
+    items.sort(key=lambda i: i.riferimento[0])
+    return items
 
 
 def transazioni_libere(chiusura):
@@ -53,40 +98,50 @@ def _slot_liberi(item):
 
 
 def proponi(chiusura, tolleranza=TOLLERANZA_DEFAULT, items=None, libere=None):
-    """Proposte greedy per orario piu' vicino, fino a esaurimento.
+    """Proposte a giri di priorita' di programma, per vicinanza d'orario.
 
-    Ogni slot di item (quantita - abbinamenti gia' confermati) e ogni
-    transazione libera vengono usati al massimo una volta; si scartano
-    le coppie con programma incompatibile o |delta| oltre tolleranza.
-    Ritorna [{'item', 'transazione', 'delta_min'}].
+    Giro k: solo coppie in cui il programma della transazione e' il
+    k-esimo nell'elenco di priorita' del servizio. Ogni slot di item
+    (quantita - abbinamenti confermati) e ogni transazione si usano al
+    massimo una volta. Ritorna [{'item', 'transazione', 'delta_min'}]
+    con delta_min = minuti tra transazione e completamento (o creazione).
     """
     items = lavaggi_servito(chiusura) if items is None else items
     libere = transazioni_libere(chiusura) if libere is None else libere
-    tol = tolleranza.total_seconds()
 
     slots = []
     for it in items:
         slots.extend([it] * _slot_liberi(it))
-
-    coppie = []
-    for si, it in enumerate(slots):
-        programmi = it.servizio_prodotto.lista_programmi_portale
-        for t in libere:
-            if t.programma not in programmi:
-                continue
-            delta = abs((t.orario - it.rif).total_seconds())
-            if delta <= tol:
-                coppie.append((delta, si, t.pk, t))
-    coppie.sort(key=lambda c: (c[0], c[1], c[2]))
+    n_giri = max((len(it.servizio_prodotto.programmi_portale_ordinati)
+                  for it in items), default=0)
 
     slot_usati, tx_usate, proposte = set(), set(), []
-    for delta, si, tpk, t in coppie:
-        if si in slot_usati or tpk in tx_usate:
-            continue
-        slot_usati.add(si)
-        tx_usate.add(tpk)
-        proposte.append({'item': slots[si], 'transazione': t,
-                         'delta_min': round(delta / 60)})
+    for giro in range(n_giri):
+        coppie = []
+        for si, it in enumerate(slots):
+            if si in slot_usati:
+                continue
+            priorita = it.servizio_prodotto.programmi_portale_ordinati
+            if giro >= len(priorita):
+                continue
+            programma = priorita[giro]
+            for t in libere:
+                if t.pk in tx_usate or t.programma != programma:
+                    continue
+                delta = _compatibile_orario(it, t, tolleranza)
+                if delta is not None:
+                    coppie.append((delta, si, t.pk, t))
+        coppie.sort(key=lambda c: (c[0], c[1], c[2]))
+        for delta, si, tpk, t in coppie:
+            if si in slot_usati or tpk in tx_usate:
+                continue
+            slot_usati.add(si)
+            tx_usate.add(tpk)
+            it = slots[si]
+            proposte.append({
+                'item': it, 'transazione': t, 'giro': giro + 1,
+                'delta_min': round((it.riferimento[3] - t.orario).total_seconds() / 60),
+            })
     return proposte
 
 
@@ -94,8 +149,8 @@ def riepilogo(chiusura, tolleranza=TOLLERANZA_DEFAULT):
     """Dati per la sezione del report giornata.
 
     - righe: un dict per item servito con abbinamenti confermati,
-      proposte, slot ancora scoperti e transazioni libere compatibili
-      (per la scelta manuale, ordinate per vicinanza);
+      proposte, slot scoperti e transazioni libere compatibili (per la
+      scelta manuale: prima per priorita' di programma, poi vicinanza);
     - residuo: transazioni 'unita' che restano libere dopo le proposte
       (= lavaggi pagati agli operatori), con valore da listino.
     """
@@ -115,15 +170,18 @@ def riepilogo(chiusura, tolleranza=TOLLERANZA_DEFAULT):
         n_confermati += len(confermati)
         prop = proposte_per_item.get(it.pk, [])
         scoperti = max(0, it.quantita - len(confermati) - len(prop))
-        programmi = it.servizio_prodotto.lista_programmi_portale
+        priorita = it.servizio_prodotto.programmi_portale_ordinati
+        obiettivo = it.riferimento[0]
         compatibili = []
         if _slot_liberi(it):
             compatibili = sorted(
-                (t for t in libere if t.programma in programmi),
-                key=lambda t: abs((t.orario - it.rif).total_seconds()))
+                (t for t in libere if t.programma in priorita),
+                key=lambda t: (priorita.index(t.programma),
+                               abs((t.orario - obiettivo).total_seconds())))
         righe.append({
-            'item': it, 'rif': it.rif,
-            'programmi': sorted(programmi),
+            'item': it, 'rif': it.riferimento[3],
+            'rif_tipo': it.riferimento[2],
+            'programmi': priorita,
             'confermati': confermati,
             'proposte': prop,
             'scoperti': scoperti,
@@ -141,12 +199,14 @@ def riepilogo(chiusura, tolleranza=TOLLERANZA_DEFAULT):
         'n_confermati': n_confermati,
         'n_proposte': len(proposte),
         'n_scoperti': sum(r['scoperti'] for r in righe),
+        'n_senza_completamento': sum(1 for r in righe if r['rif_tipo'] == 'creato'),
         'residuo': [{'transazione': t,
                      'valore': PREZZI_PROGRAMMA_PORTALE[t.programma]}
                     for t in residuo],
         'valore_residuo': valore_residuo,
         'residuo_senza_prezzo': senza_prezzo,
         'tolleranza_ore': tolleranza.total_seconds() / 3600,
+        'anticipo_min': int(ANTICIPO_PORTALE.total_seconds() / 60),
     }
 
 
