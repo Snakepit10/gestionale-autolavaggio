@@ -62,8 +62,11 @@ function bookmarkletWashtec() {
       return null;
     };
     const foglia = re => [...document.querySelectorAll('div,td,span,a')]
-      .find(e => e.children.length === 0 && re.test(e.textContent.trim()));
+      .find(e => e.children.length === 0 && e.offsetParent && re.test(e.textContent.trim()));
     const pag = () => foglia(/^\d+-\d+ di \d+$/);
+    // Durante il cambio pagina WashTec ridisegna il paginatore: per un
+    // attimo non esiste, quindi si legge sempre in modo tollerante.
+    const testoPag = () => { const p = pag(); return p ? p.textContent.trim() : ''; };
     const fmt = d => String(d.getDate()).padStart(2, '0') + '/' +
       String(d.getMonth() + 1).padStart(2, '0') + '/' + String(d.getFullYear()).slice(2);
     const imposta = (el, v) => {
@@ -77,7 +80,7 @@ function bookmarkletWashtec() {
       if (!scheda) throw 'sezione Report non trovata: hai fatto il login?';
       fire(scheda);
       const date = await until(() => {
-        const a = [...document.querySelectorAll('input')].filter(i => /^\d\d\/\d\d\/\d\d$/.test(i.value));
+        const a = [...document.querySelectorAll('input')].filter(i => i.offsetParent && /^\d\d\/\d\d\/\d\d$/.test(i.value));
         return a.length >= 2 ? a : null;
       });
       if (!date) throw 'campi data non trovati';
@@ -90,36 +93,47 @@ function bookmarkletWashtec() {
       imposta(date[0], dal.trim());
       imposta(date[1], fmt(oggi));
 
-      const prima = pag() ? pag().textContent : '';
+      const prima = testoPag();
       const lente = __CERCA__;
       if (!lente) throw 'bottone di ricerca non trovato';
       fire(lente);
-      await until(() => pag() && pag().textContent !== prima, 30000);
-      if (!pag()) throw 'nessun risultato per il periodo';
+      await until(() => testoPag() && testoPag() !== prima, 30000);
+      await sleep(800);
+      if (!testoPag()) throw 'nessun risultato per il periodo';
 
       const righe = {};
-      const raccogli = () => document.querySelectorAll('tr').forEach(tr => {
+      const raccogli = () => [...document.querySelectorAll('tr')].filter(tr => tr.offsetParent).forEach(tr => {
         const c = [...tr.cells].map(x => x.innerText.trim());
         if (c.length >= 10 && /^\d+$/.test(c[1]) && /^\d\d\/\d\d\/\d\d \d\d:\d\d:\d\d$/.test(c[2]))
           righe[c[1] + '|' + c[2]] = [c[1], c[2], c[3], c[5], c[6], c[8], c[9]];
       });
-      const totale = () => parseInt(pag().textContent.split(' di ')[1], 10);
+      const TOTALE = parseInt(testoPag().split(' di ')[1], 10);
       const frecce = () => pag().closest('table').querySelectorAll('img');
+      // Cambio pagina: attende che il paginatore mostri un testo nuovo
+      // e stabile, poi lascia renderizzare le righe.
+      const primaRiga = () => {
+        const tr = [...document.querySelectorAll('tr')].find(tr => tr.offsetParent &&
+          tr.cells.length >= 10 && /^\d+$/.test(tr.cells[1].innerText.trim()));
+        return tr ? tr.cells[1].innerText.trim() + '|' + tr.cells[2].innerText.trim() : '';
+      };
+      const vaiA = async indiceFreccia => {
+        const t = testoPag(), r = primaRiga();
+        fire(frecce()[indiceFreccia]);
+        const ok = await until(() => testoPag() && testoPag() !== t &&
+                                     primaRiga() && primaRiga() !== r, 15000);
+        await sleep(400);
+        return ok;
+      };
       // dalla prima pagina, poi avanti finche' non le ho tutte
-      if (!/^1-/.test(pag().textContent.trim())) {
-        const t = pag().textContent; fire(frecce()[0]);
-        await until(() => pag().textContent !== t);
-      }
+      if (!/^1-/.test(testoPag())) await vaiA(0);
       for (let giro = 0; giro < 500; giro++) {
         raccogli();
-        scrivi('Estrazione da WashTec: ' + Object.keys(righe).length + ' di ' + totale() + '&hellip;');
-        if (Object.keys(righe).length >= totale()) break;
-        const t = pag().textContent;
-        fire(frecce()[2]);
-        if (!await until(() => pag().textContent !== t, 15000)) throw 'la tabella non avanza di pagina';
+        scrivi('Estrazione da WashTec: ' + Object.keys(righe).length + ' di ' + TOTALE + '&hellip;');
+        if (Object.keys(righe).length >= TOTALE) break;
+        if (!await vaiA(2)) throw 'la tabella non avanza di pagina';
       }
       const dati = Object.values(righe);
-      if (dati.length !== totale()) throw 'lette ' + dati.length + ' righe su ' + totale();
+      if (dati.length !== TOTALE) throw 'lette ' + dati.length + ' righe su ' + TOTALE;
       w.location = GESTIONALE + '/finanze/importa-washtec/#' + encodeURIComponent(JSON.stringify(dati));
     } catch (e) {
       alert('Import WashTec: ' + e);
@@ -129,8 +143,7 @@ function bookmarkletWashtec() {
 }
 
 // Espressione (valutata dentro WashTec) che trova il bottone lente
-const CERCA_SRC = "[...document.querySelectorAll('img,button,div[title],a[title]')]" +
-  ".find(e => /cerca|ricerca|search|filtr/i.test((e.title || '') + ' ' + (e.alt || '')) && e.offsetParent)";
+const CERCA_SRC = "[...document.querySelectorAll('button[title=Cerca]')].find(e => e.offsetParent)";
 
 (function () {
   const sorgente = '(' + bookmarkletWashtec.toString()
