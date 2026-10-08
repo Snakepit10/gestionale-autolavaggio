@@ -1,0 +1,215 @@
+{% extends "base.html" %}
+{% block title %}Importa da WashTec{% endblock %}
+
+{% block content %}
+<div class="container py-3" style="max-width: 960px;">
+  <h4 class="mb-3"><i class="bi bi-cloud-download me-2"></i>Importa transazioni WashTec</h4>
+
+  {# Esito import: popolato da JS quando la pagina arriva dal bookmarklet (#dati) #}
+  <div id="import-box" class="card border-0 shadow-sm mb-4" style="display:none;">
+    <div class="card-body">
+      <div id="import-stato" class="mb-2"></div>
+      <div id="import-dettaglio"></div>
+      <div class="d-flex gap-2 mt-3">
+        <button id="btn-importa" class="btn btn-primary" style="display:none;">
+          <i class="bi bi-check2"></i> Importa nel gestionale
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <div class="card border-0 shadow-sm">
+    <div class="card-body">
+      <h6 class="fw-bold"><i class="bi bi-bookmark-star me-1"></i> Il preferito di estrazione</h6>
+      <p class="small text-muted mb-2">
+        Trascina questo bottone nella <strong>barra dei preferiti</strong> di Chrome
+        (se non la vedi: <kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>B</kbd>).
+      </p>
+      <a id="bookmarklet" class="btn btn-success mb-3" href="#"
+         onclick="alert('Non cliccarlo qui: trascinalo nella barra dei preferiti.'); return false;">
+        <i class="bi bi-droplet-half"></i> WashTec &rarr; Gestionale
+      </a>
+      <ol class="small mb-0">
+        <li>Accedi a <a href="https://plus.washtec.com" target="_blank" rel="noopener">WashTec Plus</a>.</li>
+        <li>Clicca il preferito <strong>WashTec &rarr; Gestionale</strong>: ti chiede da che giorno
+          estrarre (proposta: 3 giorni fa), poi legge da solo tutte le pagine di "Dati transazione".</li>
+        <li>Si apre questa pagina con l'anteprima: controlla i numeri e premi <strong>Importa</strong>.
+          Le transazioni gi&agrave; presenti vengono ignorate, quindi sovrapporre i periodi non crea doppioni.</li>
+      </ol>
+    </div>
+  </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+// ===== Bookmarklet: gira dentro plus.washtec.com =====
+// Il codice viene serializzato nel link (toString), quindi deve essere
+// autosufficiente: nessun riferimento a variabili esterne tranne il
+// segnaposto __GESTIONALE__ sostituito qui sotto.
+function bookmarkletWashtec() {
+  (async () => {
+    const GESTIONALE = '__GESTIONALE__';
+    const w = window.open('about:blank', 'mw_import_washtec');
+    const scrivi = t => { try { w.document.body.innerHTML = '<p style="font:16px sans-serif;padding:24px">' + t + '</p>'; } catch (e) {} };
+    scrivi('Estrazione da WashTec in corso&hellip;');
+    const sleep = ms => new Promise(r => setTimeout(r, ms));
+    const fire = el => ['mousedown', 'mouseup', 'click'].forEach(t =>
+      el.dispatchEvent(new MouseEvent(t, { bubbles: true, view: window })));
+    const until = async (f, ms) => {
+      const t0 = Date.now();
+      while (Date.now() - t0 < (ms || 20000)) { const v = f(); if (v) return v; await sleep(250); }
+      return null;
+    };
+    const foglia = re => [...document.querySelectorAll('div,td,span,a')]
+      .find(e => e.children.length === 0 && re.test(e.textContent.trim()));
+    const pag = () => foglia(/^\d+-\d+ di \d+$/);
+    const fmt = d => String(d.getDate()).padStart(2, '0') + '/' +
+      String(d.getMonth() + 1).padStart(2, '0') + '/' + String(d.getFullYear()).slice(2);
+    const imposta = (el, v) => {
+      el.focus(); el.value = v;
+      ['input', 'change', 'keyup', 'blur'].forEach(t => el.dispatchEvent(new Event(t, { bubbles: true })));
+    };
+    try {
+      if (!/plus\.washtec\.com/.test(location.host)) throw 'apri prima plus.washtec.com e fai il login';
+      if (location.hash !== '#reporting') location.hash = '#reporting';
+      const scheda = await until(() => foglia(/^Dati transazione$/));
+      if (!scheda) throw 'sezione Report non trovata: hai fatto il login?';
+      fire(scheda);
+      const date = await until(() => {
+        const a = [...document.querySelectorAll('input')].filter(i => /^\d\d\/\d\d\/\d\d$/.test(i.value));
+        return a.length >= 2 ? a : null;
+      });
+      if (!date) throw 'campi data non trovati';
+
+      const oggi = new Date(), tre = new Date();
+      tre.setDate(oggi.getDate() - 3);
+      const dal = prompt('Importa le transazioni WashTec dal giorno (gg/mm/aa):', fmt(tre));
+      if (!dal) { w.close(); return; }
+      if (!/^\d\d\/\d\d\/\d\d$/.test(dal.trim())) throw 'data non valida: usa gg/mm/aa';
+      imposta(date[0], dal.trim());
+      imposta(date[1], fmt(oggi));
+
+      const prima = pag() ? pag().textContent : '';
+      const lente = __CERCA__;
+      if (!lente) throw 'bottone di ricerca non trovato';
+      fire(lente);
+      await until(() => pag() && pag().textContent !== prima, 30000);
+      if (!pag()) throw 'nessun risultato per il periodo';
+
+      const righe = {};
+      const raccogli = () => document.querySelectorAll('tr').forEach(tr => {
+        const c = [...tr.cells].map(x => x.innerText.trim());
+        if (c.length >= 10 && /^\d+$/.test(c[1]) && /^\d\d\/\d\d\/\d\d \d\d:\d\d:\d\d$/.test(c[2]))
+          righe[c[1] + '|' + c[2]] = [c[1], c[2], c[3], c[5], c[6], c[8], c[9]];
+      });
+      const totale = () => parseInt(pag().textContent.split(' di ')[1], 10);
+      const frecce = () => pag().closest('table').querySelectorAll('img');
+      // dalla prima pagina, poi avanti finche' non le ho tutte
+      if (!/^1-/.test(pag().textContent.trim())) {
+        const t = pag().textContent; fire(frecce()[0]);
+        await until(() => pag().textContent !== t);
+      }
+      for (let giro = 0; giro < 500; giro++) {
+        raccogli();
+        scrivi('Estrazione da WashTec: ' + Object.keys(righe).length + ' di ' + totale() + '&hellip;');
+        if (Object.keys(righe).length >= totale()) break;
+        const t = pag().textContent;
+        fire(frecce()[2]);
+        if (!await until(() => pag().textContent !== t, 15000)) throw 'la tabella non avanza di pagina';
+      }
+      const dati = Object.values(righe);
+      if (dati.length !== totale()) throw 'lette ' + dati.length + ' righe su ' + totale();
+      w.location = GESTIONALE + '/finanze/importa-washtec/#' + encodeURIComponent(JSON.stringify(dati));
+    } catch (e) {
+      alert('Import WashTec: ' + e);
+      try { w.close(); } catch (x) {}
+    }
+  })();
+}
+
+// Espressione (valutata dentro WashTec) che trova il bottone lente
+const CERCA_SRC = "[...document.querySelectorAll('img,button,div[title],a[title]')]" +
+  ".find(e => /cerca|ricerca|search|filtr/i.test((e.title || '') + ' ' + (e.alt || '')) && e.offsetParent)";
+
+(function () {
+  const sorgente = '(' + bookmarkletWashtec.toString()
+    .replace('__GESTIONALE__', '{{ origine_gestionale }}')
+    .replace('__CERCA__', CERCA_SRC) + ')()';
+  document.getElementById('bookmarklet').href = 'javascript:' + encodeURIComponent(sorgente);
+})();
+</script>
+<script>
+// ===== Arrivo dal bookmarklet: anteprima + import =====
+(async function () {
+  if (location.hash.length < 2) return;
+  let righe;
+  try { righe = JSON.parse(decodeURIComponent(location.hash.slice(1))); }
+  catch (e) { return; }
+  const box = document.getElementById('import-box');
+  const stato = document.getElementById('import-stato');
+  const det = document.getElementById('import-dettaglio');
+  const btn = document.getElementById('btn-importa');
+  box.style.display = '';
+  const csrf = '{{ csrf_token }}';
+
+  const chiama = async conferma => {
+    const r = await fetch("{% url 'finanze:importa_washtec_api' %}", {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'X-CSRFToken': csrf },
+      body: JSON.stringify({ righe: righe, conferma: conferma }),
+    });
+    return r.json();
+  };
+  const esc = s => String(s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+  const mostra = (d, fatto) => {
+    let h = '<div class="small mb-2">' + d.righe + ' righe lette da WashTec &middot; ' +
+      d.portali + ' dei portali &middot; ' + d.jetwash + ' JetWash esclusi</div>';
+    if (d.per_giorno.length) {
+      h += '<table class="table table-sm mb-2" style="max-width:420px"><thead><tr><th>Giorno</th>' +
+        '<th class="text-center">Portale A</th><th class="text-center">Portale B</th><th></th></tr></thead><tbody>';
+      d.per_giorno.forEach(g => {
+        const [a, m, gg] = g.data.split('-');
+        h += '<tr><td>' + gg + '/' + m + '/' + a + '</td><td class="text-center">' + g.A +
+          '</td><td class="text-center">' + g.B + '</td><td>' +
+          (fatto ? '<a href="{% url "finanze:report_giornata" %}?data=' + g.data + '">report</a>' : '') + '</td></tr>';
+      });
+      h += '</tbody></table>';
+    }
+    if (d.anomalie.length) {
+      h += '<div class="alert alert-warning small py-2"><strong>Da verificare (' + d.anomalie.length + '):</strong><br>' +
+        d.anomalie.map(esc).join('<br>') + '</div>';
+    }
+    if (d.escluse.length) {
+      h += '<details class="small text-muted"><summary>' + d.escluse.length +
+        ' escluse (manutenzione / non eseguite)</summary>' + d.escluse.map(esc).join('<br>') + '</details>';
+    }
+    det.innerHTML = h;
+  };
+
+  stato.innerHTML = '<span class="text-muted">Analisi delle transazioni&hellip;</span>';
+  const anteprima = await chiama(false);
+  if (!anteprima.ok) { stato.innerHTML = '<span class="text-danger">Errore: ' + esc(anteprima.errore) + '</span>'; return; }
+  mostra(anteprima, false);
+  if (!anteprima.nuove) {
+    stato.innerHTML = '<span class="text-success fw-bold"><i class="bi bi-check-circle"></i> Nessuna transazione nuova: ' +
+      anteprima.gia_presenti + ' gi&agrave; presenti in archivio.</span>';
+    history.replaceState(null, '', location.pathname);
+    return;
+  }
+  stato.innerHTML = '<span class="fw-bold">' + anteprima.nuove + ' transazioni nuove da importare</span>' +
+    (anteprima.gia_presenti ? ' <span class="text-muted">(' + anteprima.gia_presenti + ' gi&agrave; presenti)</span>' : '');
+  btn.style.display = '';
+  btn.onclick = async () => {
+    btn.disabled = true;
+    const esito = await chiama(true);
+    if (!esito.ok) { stato.innerHTML = '<span class="text-danger">Errore: ' + esc(esito.errore) + '</span>'; return; }
+    mostra(anteprima, true);
+    stato.innerHTML = '<span class="text-success fw-bold"><i class="bi bi-check-circle"></i> Importate ' +
+      anteprima.nuove + ' transazioni. Archivio: ' + esito.totale_archivio + '.</span>';
+    btn.style.display = 'none';
+    history.replaceState(null, '', location.pathname);
+  };
+})();
+</script>
+{% endblock %}

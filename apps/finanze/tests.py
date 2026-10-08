@@ -136,3 +136,56 @@ class AbbinamentoPortaliTest(TestCase):
     def test_lista_programmi_portale(self):
         s = ServizioProdotto(programmi_portale=' 4, 7,x,12,9 ')
         self.assertEqual(s.lista_programmi_portale, {4, 7, 9})
+
+
+class ImportWashtecTest(TestCase):
+    """Classificazione delle righe grezze del bookmarklet WashTec."""
+
+    def setUp(self):
+        # Archivio esistente: A ~13300, B ~13970
+        for portale, numero in (('A', 13300), ('B', 13970)):
+            TransazionePortale.objects.create(
+                portale=portale, numero=numero, orario=ora('08:00'),
+                programma=4, origine='unita')
+
+    def riga(self, numero, metodo, pagato='0,00 EUR', prog='4',
+             manut='No', eseguito='Sì', orario='07/10/26 10:00:00'):
+        return [str(numero), orario, prog, metodo, pagato, manut, eseguito]
+
+    def test_classificazione_completa(self):
+        from apps.finanze.services import import_washtec as iw
+        righe = [
+            self.riga(13301, 'In contanti'),                     # A, unita
+            self.riga(13971, 'Unità operativa parallela'),       # B, contanti
+            self.riga(15300, 'Gettone', '2,00 EUR', '1'),        # JetWash
+            self.riga(8550, '', '6,00 EUR', '1'),                # JetWash
+            self.riga(13302, 'In contanti', manut='Sì'),         # esclusa
+            self.riga(13303, 'Gettone', '0,00 EUR'),             # anomalia
+            self.riga(13650, 'In contanti'),                     # ambiguo
+        ]
+        esito = iw.classifica(righe)
+        trans = {t['numero']: (t['portale'], t['origine']) for t in esito['transazioni']}
+        self.assertEqual(trans, {13301: ('A', 'unita'), 13971: ('B', 'contanti')})
+        self.assertEqual(esito['jetwash'], 2)
+        self.assertEqual(len(esito['escluse']), 1)
+        self.assertEqual(len(esito['anomalie']), 2)
+
+    def test_import_idempotente(self):
+        from apps.finanze.services import import_washtec as iw
+        righe = [self.riga(13301, 'In contanti'), self.riga(13302, 'In contanti')]
+        ante = iw.importa(righe, conferma=False)
+        self.assertEqual((ante['nuove'], ante['importato']), (2, False))
+        self.assertEqual(TransazionePortale.objects.count(), 2)
+        iw.importa(righe, conferma=True)
+        self.assertEqual(TransazionePortale.objects.count(), 4)
+        ancora = iw.importa(righe, conferma=True)
+        self.assertEqual((ancora['nuove'], ancora['gia_presenti']), (0, 2))
+        self.assertEqual(TransazionePortale.objects.count(), 4)
+
+    def test_contatori_che_avanzano(self):
+        # Una serie lunga in crescita resta sullo stesso portale
+        from apps.finanze.services import import_washtec as iw
+        righe = [self.riga(n, 'In contanti') for n in range(13301, 13340)]
+        esito = iw.classifica(righe)
+        self.assertTrue(all(t['portale'] == 'A' for t in esito['transazioni']))
+        self.assertEqual(len(esito['transazioni']), 39)

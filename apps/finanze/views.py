@@ -1348,6 +1348,39 @@ def importa_transazioni_portali(request):
 
 @login_required
 @user_passes_test(is_staff_user)
+def importa_washtec(request):
+    """Pagina di arrivo del bookmarklet WashTec: legge le righe dal
+    fragment dell'URL (#...) lato browser, mostra l'anteprima e importa.
+    Contiene anche il bookmarklet da trascinare nei preferiti."""
+    return render(request, 'finanze/importa_washtec.html', {
+        'origine_gestionale': request.build_absolute_uri('/').rstrip('/'),
+    })
+
+
+@login_required
+@user_passes_test(is_staff_user)
+def importa_washtec_api(request):
+    """POST JSON {righe: [[numero, orario, programma, metodo, pagato,
+    manutenzione, eseguito], ...], conferma: bool}: classifica le righe
+    grezze WashTec e, con conferma, le salva in archivio."""
+    from .services import import_washtec
+
+    if request.method != 'POST':
+        return JsonResponse({'ok': False, 'errore': 'metodo non valido'},
+                            status=405)
+    try:
+        payload = json.loads(request.body or '{}')
+        righe = payload['righe']
+        assert isinstance(righe, list)
+    except (KeyError, ValueError, AssertionError, TypeError):
+        return JsonResponse({'ok': False, 'errore': 'payload non valido'},
+                            status=400)
+    esito = import_washtec.importa(righe, conferma=bool(payload.get('conferma')))
+    return JsonResponse({'ok': True, **esito})
+
+
+@login_required
+@user_passes_test(is_staff_user)
 def quadratura_form(request):
     """Form per inserire/modificare la quadratura giornaliera complessiva."""
     data = _parse_data(request)

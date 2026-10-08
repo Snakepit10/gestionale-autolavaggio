@@ -515,7 +515,8 @@
   <div class="chart-panel mb-3">
     <div class="panel-title"><i class="bi bi-droplet-half text-primary"></i> Lavaggi portali (WashTec)</div>
     <div class="panel-sub">
-      Aggregato dall'archivio transazioni WashTec ({{ portali_archivio_totale }} in archivio).
+      Aggregato dall'archivio transazioni WashTec ({{ portali_archivio_totale }} in archivio &middot;
+      <a href="{% url 'finanze:importa_washtec' %}"><i class="bi bi-cloud-download"></i> importa nuove transazioni</a>).
       La giornata dei portali va dalla chiusura precedente a quella di oggi: imposta gli orari reali.
     </div>
     <div class="panel-body">
