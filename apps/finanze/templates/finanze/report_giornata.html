@@ -249,9 +249,14 @@
         <div class="col-12">
           <div class="p-3 d-flex justify-content-between align-items-center" style="background:{% if quadratura.stato == 'ok' %}#f0fdf4{% else %}#fef2f2{% endif %}; border-radius:8px; border-left:4px solid {% if quadratura.stato == 'ok' %}#16a34a{% else %}#dc2626{% endif %};">
             <div>
-              <div class="text-muted small fw-bold text-uppercase">Differenza (reale &minus; teorico)</div>
+              <div class="text-muted small fw-bold text-uppercase">Differenza (reale &minus; teorico &minus; pagati agli operatori)</div>
               <div class="fs-3 fw-bold {% if quadratura.stato == 'ok' %}text-success{% else %}text-danger{% endif %}">
                 {% if quadratura.differenza >= 0 %}+{% endif %}&euro;{{ quadratura.differenza|floatformat:2 }}
+              </div>
+              <div class="small text-muted">
+                Reale &minus; teorico {% if quadratura.differenza_reale_teorico >= 0 %}+{% endif %}&euro;{{ quadratura.differenza_reale_teorico|floatformat:2 }}
+                &middot; &minus; residuo pagati agli operatori &euro;{{ quadratura.residuo_operatori|floatformat:2 }}
+                {% if abbinamento %}<a href="#abbinamento-portali">(dettaglio)</a>{% else %}<span title="Imposta la chiusura portali della giornata per calcolare il residuo">(chiusura portali non impostata)</span>{% endif %}
               </div>
             </div>
             <div>

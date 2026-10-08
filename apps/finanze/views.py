@@ -1152,6 +1152,21 @@ def report_giornata(request):
         'orario_counts_json': json.dumps(orario_counts),
     }
     context.update(_contesto_lavaggi_portali(data))
+
+    # La differenza di quadratura sconta anche i lavaggi portale pagati
+    # direttamente agli operatori (residuo dell'abbinamento servito).
+    abbinamento = context.get('abbinamento')
+    residuo_operatori = abbinamento['valore_residuo'] if abbinamento else Decimal('0.00')
+    quadratura['residuo_operatori'] = residuo_operatori
+    if quadratura['differenza'] is not None:
+        quadratura['differenza_reale_teorico'] = quadratura['differenza']
+        quadratura['differenza'] = quadratura['differenza'] - residuo_operatori
+        if abs(quadratura['differenza']) < Decimal('0.50'):
+            quadratura['stato'] = 'ok'
+        elif quadratura['differenza'] < 0:
+            quadratura['stato'] = 'mancante'
+        else:
+            quadratura['stato'] = 'eccedente'
     return render(request, 'finanze/report_giornata.html', context)
 
 
