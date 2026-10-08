@@ -234,10 +234,38 @@
               <span>Vendita self-service (automatiche)</span>
               <span class="fw-bold">&euro;{{ quadratura.vendita_self_service|floatformat:2 }}</span>
             </div>
-            <div class="d-flex justify-content-between small mb-2">
-              <span>Totale servito (ordini POS)</span>
-              <span class="fw-bold">&euro;{{ quadratura.totale_servito|floatformat:2 }}</span>
+            <div class="d-flex justify-content-between small mb-1">
+              <span>Servito: incassi ordini del giorno</span>
+              <span class="fw-bold">&euro;{{ quadratura.servito_ordini_giorno|floatformat:2 }}</span>
             </div>
+            <div class="d-flex justify-content-between small mb-1">
+              <span>Servito: crediti pregressi incassati oggi
+                {% if quadratura.crediti_pregressi %}({{ quadratura.crediti_pregressi|length }} ordin{{ quadratura.crediti_pregressi|length|pluralize:"e,i" }}){% endif %}</span>
+              <span class="fw-bold">&euro;{{ quadratura.totale_crediti_pregressi|floatformat:2 }}</span>
+            </div>
+            {% if quadratura.crediti_pregressi %}
+            <details class="small mb-2">
+              <summary class="text-muted">Dettaglio crediti pregressi</summary>
+              <table class="table table-sm data-table mb-0 mt-1">
+                <thead class="table-light">
+                  <tr><th>Ordine</th><th>Del</th><th>Cliente</th><th>Metodo</th><th class="text-end">Incassato</th></tr>
+                </thead>
+                <tbody>
+                  {% for c in quadratura.crediti_pregressi %}
+                  <tr>
+                    <td><a href="{% url 'ordini:ordine-detail' c.ordine.pk %}">#{{ c.ordine.numero_progressivo|slice:"-4:" }}</a></td>
+                    <td>{{ c.ordine.data_ora|date:"d/m/Y" }}</td>
+                    <td>{{ c.ordine.cliente|default:"—" }}</td>
+                    <td>{{ c.metodi|join:", " }}{% if c.riferimenti %}<div class="text-muted">{{ c.riferimenti|join:", " }}</div>{% endif %}</td>
+                    <td class="text-end">&euro;{{ c.importo|floatformat:2 }}</td>
+                  </tr>
+                  {% endfor %}
+                </tbody>
+              </table>
+            </details>
+            {% else %}
+            <div class="mb-2"></div>
+            {% endif %}
             <div class="d-flex justify-content-between border-top pt-2">
               <span class="fw-bold">Totale teorico</span>
               <span class="fs-5 fw-bold" style="color:#0f766e">&euro;{{ quadratura.totale_teorico|floatformat:2 }}</span>
@@ -289,6 +317,7 @@
           <strong>Teorico atteso per oggi:</strong>
           vendita self-service &euro;{{ quadratura.vendita_self_service|floatformat:2 }}
           + servito POS &euro;{{ quadratura.totale_servito|floatformat:2 }}
+          {% if quadratura.totale_crediti_pregressi %}(di cui crediti pregressi &euro;{{ quadratura.totale_crediti_pregressi|floatformat:2 }}){% endif %}
           = <strong>&euro;{{ quadratura.totale_teorico|floatformat:2 }}</strong>
         </div>
       </div>

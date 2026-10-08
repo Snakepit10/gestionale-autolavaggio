@@ -1074,6 +1074,28 @@ def report_giornata(request):
     vendita_self_service = agg['vendita_totale']
     totale_teorico = vendita_self_service + totale_servito
 
+    # Il servito incassato oggi comprende anche i crediti di giorni
+    # precedenti riscossi oggi: li separo, raggruppati per ordine.
+    crediti_per_ordine = {}
+    for p in (Pagamento.objects
+              .filter(data_pagamento__date=data, ordine__data_ora__date__lt=data)
+              .select_related('ordine__cliente')
+              .order_by('ordine__data_ora', 'data_pagamento')):
+        voce = crediti_per_ordine.setdefault(p.ordine_id, {
+            'ordine': p.ordine, 'importo': Decimal('0.00'),
+            'metodi': [], 'riferimenti': [], 'incassato_il': p.data_pagamento,
+        })
+        voce['importo'] += p.importo
+        if p.get_metodo_display() not in voce['metodi']:
+            voce['metodi'].append(p.get_metodo_display())
+        if p.riferimento and p.riferimento not in voce['riferimenti']:
+            voce['riferimenti'].append(p.riferimento)
+        voce['incassato_il'] = p.data_pagamento
+    crediti_pregressi = list(crediti_per_ordine.values())
+    totale_crediti_pregressi = sum((c['importo'] for c in crediti_pregressi),
+                                   Decimal('0.00'))
+    servito_ordini_giorno = totale_servito - totale_crediti_pregressi
+
     if quadratura_obj:
         fondo_cassa_iniziale = quadratura_obj.fondo_cassa_iniziale
         lordo_reale = quadratura_obj.contanti_totali + quadratura_obj.lettore_carte_servito
@@ -1096,6 +1118,9 @@ def report_giornata(request):
         'obj': quadratura_obj,
         'vendita_self_service': vendita_self_service,
         'totale_servito': totale_servito,
+        'servito_ordini_giorno': servito_ordini_giorno,
+        'crediti_pregressi': crediti_pregressi,
+        'totale_crediti_pregressi': totale_crediti_pregressi,
         'totale_teorico': totale_teorico,
         'fondo_cassa_iniziale': fondo_cassa_iniziale,
         'lordo_reale': lordo_reale,
