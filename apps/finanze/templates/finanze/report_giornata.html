@@ -612,7 +612,7 @@
       Quello che resta libero sono i lavaggi pagati direttamente agli operatori.
       {% if abbinamento.n_senza_completamento %}
       <span class="text-warning d-block mt-1"><i class="bi bi-exclamation-circle"></i>
-        {{ abbinamento.n_senza_completamento }} lavagg{{ abbinamento.n_senza_completamento|pluralize:"io,i" }} senza completamento registrato: abbinamento meno preciso.</span>
+        {{ abbinamento.n_senza_completamento }} lavagg{{ abbinamento.n_senza_completamento|pluralize:"io,i" }} senza completamento affidabile (non completat{{ abbinamento.n_senza_completamento|pluralize:"o,i" }} o chius{{ abbinamento.n_senza_completamento|pluralize:"o,i" }} in ritardo): abbinamento sull'ora di creazione, meno preciso.</span>
       {% endif %}
     </div>
     <div class="panel-body">
@@ -654,7 +654,8 @@
                   <td>
                     {{ r.rif|date:"d/m H:i" }}
                     {% if r.rif_tipo == 'completato' %}<div class="small text-success">completato</div>
-                    {% else %}<div class="small text-warning" title="Nessun completamento registrato: si usa l'ora di creazione dell'ordine">creato</div>{% endif %}
+                    {% elif r.rif_tipo == 'tardivo' %}<div class="small text-warning" title="Completato il {{ r.item.fine_lavorazione|date:'d/m H:i' }}, oltre 3 ore dopo la creazione: ordine chiuso in ritardo, si usa l'ora di creazione">creato &middot; chiuso in ritardo ({{ r.item.fine_lavorazione|date:'d/m H:i' }})</div>
+                    {% else %}<div class="small text-warning" title="Nessun completamento registrato: si usa l'ora di creazione dell'ordine">creato &middot; non completato</div>{% endif %}
                   </td>
                   <td>
                     <div class="fw-semibold">{{ r.item.servizio_prodotto.titolo }}{% if r.item.quantita > 1 %} &times;{{ r.item.quantita }}{% endif %}</div>

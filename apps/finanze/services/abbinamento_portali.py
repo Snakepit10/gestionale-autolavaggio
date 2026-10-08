@@ -16,8 +16,9 @@ Regole di proposta:
   all'indietro a partire da ANTICIPO_PORTALE (~30 min): obiettivo =
   completamento - 30 min, transazioni non successive al completamento
   e non oltre TOLLERANZA prima dell'obiettivo. Se l'item non ha
-  completamento registrato si ripiega sull'ora di creazione dell'ordine
-  (ricerca simmetrica, +-TOLLERANZA).
+  completamento registrato, o l'ordine e' stato chiuso in ritardo (oltre
+  DURATA_MAX_LAVORO dalla creazione), si ripiega sull'ora di creazione
+  dell'ordine (ricerca simmetrica, +-TOLLERANZA).
 
 Le proposte sono calcolate al volo (nessuna scrittura); diventano
 AbbinamentoPortale solo alla conferma dell'operatore.
@@ -33,6 +34,10 @@ from apps.ordini.models import ItemOrdine
 
 ANTICIPO_PORTALE = timedelta(minutes=30)
 TOLLERANZA_DEFAULT = timedelta(hours=2)
+# Oltre questa durata creazione -> completamento l'ordine e' stato
+# chiuso in ritardo (es. la mattina dopo): il completamento non dice
+# quando l'auto e' passata dal portale, quindi si usa la creazione.
+DURATA_MAX_LAVORO = timedelta(hours=3)
 # Margine per caricare gli ordini a cavallo dell'inizio finestra
 _MARGINE_CARICAMENTO = timedelta(hours=12)
 
@@ -42,13 +47,15 @@ def _riferimento(item):
 
     tipo 'completato': obiettivo = fine - ANTICIPO, limite = fine
     (la transazione non puo' essere successiva al completamento);
-    tipo 'creato': obiettivo = creazione ordine, nessun limite.
+    tipo 'creato' (nessun completamento) o 'tardivo' (completamento
+    oltre DURATA_MAX_LAVORO dalla creazione): obiettivo = creazione
+    ordine, nessun limite.
     """
-    if item.fine_lavorazione:
-        fine = item.fine_lavorazione
-        return fine - ANTICIPO_PORTALE, fine, 'completato', fine
     creato = item.ordine.data_ora
-    return creato, None, 'creato', creato
+    fine = item.fine_lavorazione
+    if fine and fine - creato <= DURATA_MAX_LAVORO:
+        return fine - ANTICIPO_PORTALE, fine, 'completato', fine
+    return creato, None, ('tardivo' if fine else 'creato'), creato
 
 
 def _compatibile_orario(item, t, tolleranza):
@@ -199,7 +206,7 @@ def riepilogo(chiusura, tolleranza=TOLLERANZA_DEFAULT):
         'n_confermati': n_confermati,
         'n_proposte': len(proposte),
         'n_scoperti': sum(r['scoperti'] for r in righe),
-        'n_senza_completamento': sum(1 for r in righe if r['rif_tipo'] == 'creato'),
+        'n_senza_completamento': sum(1 for r in righe if r['rif_tipo'] != 'completato'),
         'residuo': [{'transazione': t,
                      'valore': PREZZI_PROGRAMMA_PORTALE[t.programma]}
                     for t in residuo],

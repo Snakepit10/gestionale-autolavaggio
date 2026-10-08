@@ -95,6 +95,21 @@ class AbbinamentoPortaliTest(TestCase):
         self.assertEqual(r['righe'][0]['proposte'][0]['transazione'].pk, t.pk)
         self.assertEqual(r['righe'][0]['item'].pk, item.pk)
 
+    def test_completamento_tardivo_usa_creazione(self):
+        # Creato 15:00 (stesso giorno), chiuso il giorno dopo: si usa la creazione
+        ordine = Ordine.objects.create(totale=Decimal('22'),
+                                       totale_finale=Decimal('22'))
+        Ordine.objects.filter(pk=ordine.pk).update(data_ora=ora('15:00'))
+        ItemOrdine.objects.create(
+            ordine=ordine, servizio_prodotto=self.a_mano, quantita=1,
+            prezzo_unitario=self.a_mano.prezzo,
+            fine_lavorazione=ora('15:00') + timedelta(hours=18))
+        p5 = self._tx('15:25', 5)
+        r = ap.riepilogo(self.chiusura)
+        self.assertEqual(r['righe'][0]['rif_tipo'], 'tardivo')
+        self.assertEqual(r['righe'][0]['proposte'][0]['transazione'].pk, p5.pk)
+        self.assertEqual(r['n_senza_completamento'], 1)
+
     def test_programma_incompatibile_e_contanti_esclusi(self):
         self._item(self.a_mano, completato='10:30')       # solo P5
         self._tx('10:00', 4)                               # incompatibile
@@ -130,7 +145,7 @@ class AbbinamentoPortaliTest(TestCase):
         self._item(self.completo, completato='10:30')
         self._tx('10:05', 4)                    # abbinata al servito
         self._tx('15:00', 1)                    # residuo 15 euro
-        self._tx('16:00', 7)                    # residuo senza prezzo
+        self._tx('16:00', 9)                    # residuo senza prezzo
         r = ap.riepilogo(self.chiusura)
         self.assertEqual(r['n_proposte'], 1)
         self.assertEqual(len(r['residuo']), 2)

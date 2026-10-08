@@ -465,12 +465,12 @@ class ChiusuraCassaAutomatica(models.Model):
 
 
 # Prezzi dei programmi dei portali a spazzole (WashTec). I programmi
-# senza prezzo (P6-P9) valgono 0 e il report li segnala come "senza
+# senza prezzo (P6, P8, P9) valgono 0 e il report li segnala come "senza
 # importo": aggiornare qui quando il listino viene definito.
 PREZZI_PROGRAMMA_PORTALE = {
     1: Decimal('15.00'), 2: Decimal('12.00'), 3: Decimal('10.00'),
     4: Decimal('8.00'), 5: Decimal('3.00'),
-    6: Decimal('0.00'), 7: Decimal('0.00'), 8: Decimal('0.00'),
+    6: Decimal('0.00'), 7: Decimal('15.00'), 8: Decimal('0.00'),
     9: Decimal('0.00'),
 }
 
