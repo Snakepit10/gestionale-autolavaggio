@@ -168,6 +168,7 @@ Un gruppo cliente della pagina Ordini non pagati: riga intestazione
                     title="Imposta Scadenza">
                 <i class="bi bi-calendar"></i>
             </button>
+            {% if request.user.is_superuser %}
             {% if mostra_archiviati %}
                 <button class="btn btn-sm btn-outline-dark"
                         onclick="archiviaSingolo('{{ ordine.pk }}', false)"
@@ -180,6 +181,7 @@ Un gruppo cliente della pagina Ordini non pagati: riga intestazione
                         title="Archivia: nascondi da questo elenco">
                     <i class="bi bi-archive"></i>
                 </button>
+            {% endif %}
             {% endif %}
         </div>
     </td>

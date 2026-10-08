@@ -146,6 +146,7 @@ tr.gruppo-header .meta { font-size: .8rem; color: #64748b; }
                     <div class="col-md-8">
                         <div class="d-flex align-items-center flex-wrap gap-2">
                             <strong class="me-1">Azioni sui selezionati:</strong>
+                            {% if request.user.is_superuser %}
                             {% if mostra_archiviati %}
                             <button class="btn btn-sm btn-secondary" onclick="archiviaSelezionati(false)" disabled id="btn-archivia">
                                 <i class="bi bi-arrow-counterclockwise"></i> Ripristina
@@ -154,6 +155,7 @@ tr.gruppo-header .meta { font-size: .8rem; color: #64748b; }
                             <button class="btn btn-sm btn-dark" onclick="archiviaSelezionati(true)" disabled id="btn-archivia">
                                 <i class="bi bi-archive"></i> Archivia
                             </button>
+                            {% endif %}
                             {% endif %}
                             <button class="btn btn-sm btn-warning" onclick="inviaPromemoriaMassa()" disabled id="btn-promemoria-massa">
                                 <i class="bi bi-envelope"></i> Invia Promemoria

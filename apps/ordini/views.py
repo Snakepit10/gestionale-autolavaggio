@@ -1368,9 +1368,16 @@ def archivia_non_pagati(request):
     """Archivia (o ripristina) piu' ordini dalla pagina non pagati.
 
     L'ordine resta non pagato: viene solo nascosto dall'elenco.
+    Riservato all'amministratore (superuser): archiviare un credito
+    equivale a smettere di seguirlo.
     """
     if request.method != 'POST':
         return JsonResponse({'success': False, 'error': 'Metodo non consentito'})
+    if not request.user.is_superuser:
+        return JsonResponse({'success': False,
+                             'error': "Solo l'amministratore puo' archiviare "
+                                      "o ripristinare gli ordini non pagati."},
+                            status=403)
     try:
         data = json.loads(request.body)
         ordini_ids = [int(i) for i in data.get('ordini', [])]
