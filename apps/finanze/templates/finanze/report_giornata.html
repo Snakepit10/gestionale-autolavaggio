@@ -600,6 +600,140 @@
     </div>
   </div>
 
+  {# ====== Abbinamento lavaggi servito <-> portali unita' operativa ====== #}
+  {% if abbinamento %}
+  <div class="chart-panel mb-3" id="abbinamento-portali">
+    <div class="panel-title"><i class="bi bi-link-45deg text-primary"></i> Abbinamento servito &harr; portali (unit&agrave; operativa)</div>
+    <div class="panel-sub">
+      Ogni lavaggio servito viene proposto con la transazione da unit&agrave; operativa di programma
+      compatibile pi&ugrave; vicina in orario (entro &plusmn;{{ abbinamento.tolleranza_ore|floatformat:0 }} h).
+      Quello che resta libero sono i lavaggi pagati direttamente agli operatori.
+    </div>
+    <div class="panel-body">
+      <div class="d-flex gap-3 flex-wrap align-items-center mb-3 small">
+        <span><strong>{{ abbinamento.n_servito }}</strong> lavaggi servito</span>
+        <span class="text-success"><i class="bi bi-check-circle-fill"></i> {{ abbinamento.n_confermati }} confermati</span>
+        <span class="text-primary"><i class="bi bi-lightbulb"></i> {{ abbinamento.n_proposte }} proposti</span>
+        {% if abbinamento.n_scoperti %}<span class="text-warning"><i class="bi bi-question-circle"></i> {{ abbinamento.n_scoperti }} senza transazione</span>{% endif %}
+        <span class="text-danger"><i class="bi bi-person-badge"></i> {{ abbinamento.residuo|length }} residui = &euro;{{ abbinamento.valore_residuo|floatformat:2 }}</span>
+        {% if abbinamento.n_proposte %}
+        <form method="post" action="{% url 'finanze:azione_abbinamento_portali' %}" class="ms-auto">
+          {% csrf_token %}
+          <input type="hidden" name="data" value="{{ data|date:'Y-m-d' }}">
+          <input type="hidden" name="azione" value="conferma">
+          <button type="submit" class="btn btn-primary btn-sm">
+            <i class="bi bi-check2-all"></i> Conferma {{ abbinamento.n_proposte }} propost{{ abbinamento.n_proposte|pluralize:"a,e" }}
+          </button>
+        </form>
+        {% endif %}
+      </div>
+
+      <div class="row g-3">
+        <div class="col-12 col-xl-7">
+          <div class="fw-bold small text-uppercase text-muted mb-1">Lavaggi servito</div>
+          {% if abbinamento.righe %}
+          <div class="table-responsive">
+            <table class="table table-sm data-table mb-0">
+              <thead class="table-light">
+                <tr><th>Ordine</th><th>Ora</th><th>Servizio</th><th>Prog.</th><th>Transazione portale</th></tr>
+              </thead>
+              <tbody>
+                {% for r in abbinamento.righe %}
+                <tr>
+                  <td>
+                    <a href="{% url 'ordini:ordine-detail' r.item.ordine.pk %}">#{{ r.item.ordine.numero_progressivo|slice:"-4:" }}</a>
+                    <div class="small text-muted">{{ r.item.ordine.cliente|default:"—" }}</div>
+                  </td>
+                  <td>{{ r.rif|date:"d/m H:i" }}</td>
+                  <td>{{ r.item.servizio_prodotto.titolo }}{% if r.item.quantita > 1 %} &times;{{ r.item.quantita }}{% endif %}</td>
+                  <td class="text-muted small">{% for p in r.programmi %}P{{ p }}{% if not forloop.last %}/{% endif %}{% endfor %}</td>
+                  <td>
+                    {% for a in r.confermati %}
+                    <form method="post" action="{% url 'finanze:azione_abbinamento_portali' %}" class="d-flex align-items-center gap-1 mb-1">
+                      {% csrf_token %}
+                      <input type="hidden" name="data" value="{{ data|date:'Y-m-d' }}">
+                      <input type="hidden" name="azione" value="rimuovi">
+                      <input type="hidden" name="abbinamento_id" value="{{ a.pk }}">
+                      <span class="badge bg-success"><i class="bi bi-check"></i> {{ a.transazione.portale }} #{{ a.transazione.numero }}</span>
+                      <span class="small">{{ a.transazione.orario|date:"H:i" }} · P{{ a.transazione.programma }}</span>
+                      <button type="submit" class="btn btn-link btn-sm text-danger p-0 ms-1" title="Rimuovi abbinamento"><i class="bi bi-x-circle"></i></button>
+                    </form>
+                    {% endfor %}
+                    {% for p in r.proposte %}
+                    <div class="d-flex align-items-center gap-1 mb-1">
+                      <span class="badge bg-primary-subtle text-primary-emphasis border border-primary-subtle"><i class="bi bi-lightbulb"></i> {{ p.transazione.portale }} #{{ p.transazione.numero }}</span>
+                      <span class="small">{{ p.transazione.orario|date:"H:i" }} · P{{ p.transazione.programma }} · &Delta; {{ p.delta_min }} min</span>
+                    </div>
+                    {% endfor %}
+                    {% if r.scoperti %}
+                    <div class="small text-warning mb-1"><i class="bi bi-question-circle"></i> {{ r.scoperti }} senza transazione compatibile</div>
+                    {% endif %}
+                    {% if r.compatibili %}
+                    <form method="post" action="{% url 'finanze:azione_abbinamento_portali' %}" class="d-flex gap-1">
+                      {% csrf_token %}
+                      <input type="hidden" name="data" value="{{ data|date:'Y-m-d' }}">
+                      <input type="hidden" name="azione" value="abbina">
+                      <input type="hidden" name="item_id" value="{{ r.item.pk }}">
+                      <select name="transazione_id" class="form-select form-select-sm" style="max-width:230px;">
+                        <option value="">Abbina a mano&hellip;</option>
+                        {% for t in r.compatibili %}
+                        <option value="{{ t.pk }}">{{ t.portale }} #{{ t.numero }} · {{ t.orario|date:"d/m H:i" }} · P{{ t.programma }}</option>
+                        {% endfor %}
+                      </select>
+                      <button type="submit" class="btn btn-outline-primary btn-sm"><i class="bi bi-link"></i></button>
+                    </form>
+                    {% endif %}
+                  </td>
+                </tr>
+                {% endfor %}
+              </tbody>
+            </table>
+          </div>
+          {% else %}
+          <div class="text-muted small">Nessun lavaggio servito nella finestra di chiusura
+            (servizi con "Programmi portale compatibili" impostati nel catalogo).</div>
+          {% endif %}
+        </div>
+
+        <div class="col-12 col-xl-5">
+          <div class="fw-bold small text-uppercase text-muted mb-1">Residuo: pagati agli operatori</div>
+          {% if abbinamento.residuo %}
+          <div class="table-responsive">
+            <table class="table table-sm data-table mb-1">
+              <thead class="table-light">
+                <tr><th>Portale</th><th>#</th><th>Ora</th><th>Prog.</th><th class="text-end">&euro;</th></tr>
+              </thead>
+              <tbody>
+                {% for x in abbinamento.residuo %}
+                <tr>
+                  <td>{{ x.transazione.portale }}</td>
+                  <td>{{ x.transazione.numero }}</td>
+                  <td>{{ x.transazione.orario|date:"d/m H:i" }}</td>
+                  <td>P{{ x.transazione.programma }}</td>
+                  <td class="text-end">{% if x.valore %}&euro;{{ x.valore|floatformat:2 }}{% else %}<span class="text-warning" title="Programma senza prezzo">&mdash;</span>{% endif %}</td>
+                </tr>
+                {% endfor %}
+              </tbody>
+              <tfoot>
+                <tr class="fw-bold"><td colspan="4">Totale da verificare con gli operatori</td>
+                  <td class="text-end">&euro;{{ abbinamento.valore_residuo|floatformat:2 }}</td></tr>
+              </tfoot>
+            </table>
+          </div>
+          {% if abbinamento.residuo_senza_prezzo %}
+          <div class="small text-warning"><i class="bi bi-exclamation-circle"></i>
+            {{ abbinamento.residuo_senza_prezzo }} su programmi senza prezzo (contati a 0 &euro;)</div>
+          {% endif %}
+          <div class="small text-muted mt-1">Calcolato dopo le proposte: se ne rifiuti o cambi qualcuna il residuo si aggiorna.</div>
+          {% else %}
+          <div class="text-muted small">Nessuna transazione da unit&agrave; operativa rimasta libera.</div>
+          {% endif %}
+        </div>
+      </div>
+    </div>
+  </div>
+  {% endif %}
+
   {# ====== Ordini non incassati ====== #}
   {% if ordini_non_pagati %}
   <div class="chart-panel mb-3">

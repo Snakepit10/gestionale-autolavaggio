@@ -9,6 +9,7 @@ from decimal import Decimal
 import json
 
 from .models import ChiusuraCassa, MovimentoCassa, Cassa, ChiusuraCassaAutomatica, QuadraturaGiornaliera
+from .services import abbinamento_portali
 from apps.ordini.models import Pagamento, Ordine, ItemOrdine
 from apps.core.models import Categoria
 
@@ -1209,7 +1210,61 @@ def _contesto_lavaggi_portali(data):
         'lavaggi_portali': portali,
         'portali_n_transazioni': len(transazioni),
         'portali_archivio_totale': TransazionePortale.objects.count(),
+        'abbinamento': (abbinamento_portali.riepilogo(chiusura)
+                        if chiusura else None),
     }
+
+
+@login_required
+@user_passes_test(is_staff_user)
+def azione_abbinamento_portali(request):
+    """POST dal report giornata: conferma le proposte, abbina a mano o
+    rimuove un abbinamento servito <-> transazione portale."""
+    from django.urls import reverse
+
+    from .models import AbbinamentoPortale, ChiusuraPortali
+
+    data_str = request.POST.get('data', '')
+    torna = f"{reverse('finanze:report_giornata')}?data={data_str}#abbinamento-portali"
+    if request.method != 'POST':
+        return redirect('finanze:report_giornata')
+    try:
+        data = datetime.strptime(data_str, '%Y-%m-%d').date()
+    except ValueError:
+        messages.error(request, 'Data non valida.')
+        return redirect('finanze:report_giornata')
+    chiusura = ChiusuraPortali.objects.filter(data=data).first()
+    if chiusura is None:
+        messages.error(request, 'Imposta prima la chiusura portali della giornata.')
+        return redirect(torna)
+
+    azione = request.POST.get('azione')
+    if azione == 'conferma':
+        n = abbinamento_portali.conferma_proposte(chiusura, request.user)
+        messages.success(request, f'{n} abbinament{"o confermato" if n == 1 else "i confermati"}.')
+    elif azione == 'abbina':
+        try:
+            item_id = int(request.POST.get('item_id'))
+            tx_id = int(request.POST.get('transazione_id'))
+        except (TypeError, ValueError):
+            messages.error(request, 'Seleziona una transazione.')
+            return redirect(torna)
+        ok, msg = abbinamento_portali.abbina_manuale(
+            chiusura, item_id, tx_id, request.user)
+        (messages.success if ok else messages.error)(request, msg)
+    elif azione == 'rimuovi':
+        n, _ = AbbinamentoPortale.objects.filter(
+            pk=request.POST.get('abbinamento_id'),
+            transazione__orario__gt=chiusura.periodo_da,
+            transazione__orario__lte=chiusura.periodo_a,
+        ).delete()
+        if n:
+            messages.success(request, 'Abbinamento rimosso.')
+        else:
+            messages.error(request, 'Abbinamento non trovato.')
+    else:
+        messages.error(request, 'Azione non valida.')
+    return redirect(torna)
 
 
 @login_required

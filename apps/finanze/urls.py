@@ -36,6 +36,7 @@ urlpatterns = [
     # Report giornata
     path('report-giornata/', views.report_giornata, name='report_giornata'),
     path('report-giornata/chiusura-portali/', views.imposta_chiusura_portali, name='imposta_chiusura_portali'),
+    path('report-giornata/abbinamento-portali/', views.azione_abbinamento_portali, name='azione_abbinamento_portali'),
     path('report-giornata/importa-transazioni-portali/', views.importa_transazioni_portali, name='importa_transazioni_portali'),
     # Report periodo (aggregato multi-giorno)
     path('report-periodo/', views.report_periodo, name='report_periodo'),

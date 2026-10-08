@@ -26,7 +26,8 @@ class ServizioProdottoForm(forms.ModelForm):
             'titolo', 'tipo', 'categoria', 'categorie_aggiuntive',
             'prezzo', 'descrizione',
             'durata_minuti', 'postazioni', 'quantita_disponibile',
-            'quantita_minima_alert', 'codice_prodotto', 'attivo',
+            'quantita_minima_alert', 'codice_prodotto',
+            'programmi_portale', 'attivo',
             'is_supplemento', 'mostra_pubblico',
             'ordine_visualizzazione', 'gruppo', 'ordine_gruppo',
             # Upsell prenotazione online (vedi docs/UPSELL_PRENOTAZIONE.md)

@@ -124,7 +124,19 @@ class ServizioProdotto(models.Model):
     quantita_disponibile = models.IntegerField(default=-1, help_text="-1 = illimitata (per servizi)")
     quantita_minima_alert = models.IntegerField(default=5, help_text="Soglia per alert scorte basse")
     codice_prodotto = models.CharField(max_length=50, blank=True, help_text="SKU/codice interno")
-    
+
+    # Abbinamento con i lavaggi dei portali WashTec avviati da unita'
+    # operativa (finanze.AbbinamentoPortale): un servizio con programmi
+    # valorizzati e' un "lavaggio servito" da abbinare.
+    programmi_portale = models.CharField(
+        max_length=20, blank=True, default='',
+        verbose_name='Programmi portale compatibili',
+        help_text="Programmi WashTec (1-9) con cui il portale esegue questo "
+                  "lavaggio, separati da virgola (es. '5' per il completo a "
+                  "mano, '4,7,8,9' per gli altri completi). Vuoto = non "
+                  "passa dal portale.",
+    )
+
     attivo = models.BooleanField(default=True)
     is_supplemento = models.BooleanField(
         default=False,
@@ -228,6 +240,17 @@ class ServizioProdotto(models.Model):
         for c in self.categorie_aggiuntive.all():
             if c.pk != self.categoria_id:
                 out.append(c)
+        return out
+
+    @property
+    def lista_programmi_portale(self) -> set[int]:
+        """Programmi portale compatibili come insieme di interi 1-9
+        (valori non numerici o fuori range ignorati)."""
+        out = set()
+        for parte in (self.programmi_portale or '').split(','):
+            parte = parte.strip()
+            if parte.isdigit() and 1 <= int(parte) <= 9:
+                out.add(int(parte))
         return out
 
 

@@ -546,6 +546,35 @@ class ChiusuraPortali(models.Model):
                 f"({self.periodo_da:%d/%m %H:%M} - {self.periodo_a:%d/%m %H:%M})")
 
 
+class AbbinamentoPortale(models.Model):
+    """Collega un lavaggio del servito (ItemOrdine con programmi_portale)
+    alla transazione portale WashTec, avviata da unita' operativa, che
+    lo ha eseguito. Le transazioni 'unita' NON abbinate sono i lavaggi
+    pagati direttamente agli operatori.
+
+    Una transazione si abbina una sola volta (OneToOne); un item con
+    quantita N accetta fino a N abbinamenti (vincolo nel service).
+    """
+    transazione = models.OneToOneField(
+        TransazionePortale, on_delete=models.CASCADE,
+        related_name='abbinamento')
+    item = models.ForeignKey(
+        'ordini.ItemOrdine', on_delete=models.CASCADE,
+        related_name='abbinamenti_portale')
+    operatore = models.ForeignKey(
+        User, on_delete=models.SET_NULL, null=True, blank=True,
+        related_name='abbinamenti_portale')
+    creato_il = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        verbose_name = 'Abbinamento portale'
+        verbose_name_plural = 'Abbinamenti portale'
+        ordering = ['transazione__orario']
+
+    def __str__(self):
+        return f"{self.transazione} -> item {self.item_id}"
+
+
 # ---------------------------------------------------------------------------
 # Quadratura giornaliera complessiva (scassettamento)
 # ---------------------------------------------------------------------------
