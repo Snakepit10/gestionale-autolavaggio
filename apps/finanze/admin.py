@@ -1,6 +1,6 @@
 from django.contrib import admin
 from django.utils.html import format_html
-from .models import ChiusuraCassa, MovimentoCassa, Cassa, ChiusuraCassaAutomatica, QuadraturaGiornaliera, SpesaCassa
+from .models import ChiusuraCassa, MovimentoCassa, Cassa, ChiusuraCassaAutomatica, QuadraturaGiornaliera, SpesaCassa, TransazionePortale
 
 
 @admin.register(QuadraturaGiornaliera)
@@ -210,3 +210,25 @@ class SpesaCassaAdmin(admin.ModelAdmin):
     list_filter = ['categoria', 'data']
     search_fields = ['descrizione', 'riferimento']
     date_hierarchy = 'data'
+
+
+@admin.register(TransazionePortale)
+class TransazionePortaleAdmin(admin.ModelAdmin):
+    """Archivio WashTec in sola lettura: per controllare al secondo le
+    transazioni a cavallo delle chiusure."""
+    list_display = ['orario_secondi', 'portale', 'numero', 'programma', 'origine', 'importato_il']
+    list_filter = ['portale', 'origine', 'programma']
+    search_fields = ['numero']
+    date_hierarchy = 'orario'
+    list_per_page = 200
+
+    @admin.display(description='Orario', ordering='orario')
+    def orario_secondi(self, obj):
+        from django.utils import timezone
+        return timezone.localtime(obj.orario).strftime('%d/%m/%Y %H:%M:%S')
+
+    def has_add_permission(self, request):
+        return False
+
+    def has_change_permission(self, request, obj=None):
+        return False
