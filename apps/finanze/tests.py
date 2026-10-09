@@ -244,3 +244,63 @@ class ImportWashtecTest(TestCase):
         esito = iw.classifica(righe)
         self.assertTrue(all(t['portale'] == 'A' for t in esito['transazioni']))
         self.assertEqual(len(esito['transazioni']), 39)
+
+    def serie_settembre(self, giorni, a0=12421, b0=13121, per_giorno=20):
+        """Due contatori intrecciati come a settembre 2026: B usava i
+        numeri che a ottobre usa A."""
+        righe, a, b = [], a0, b0
+        for g in giorni:
+            for i in range(per_giorno):
+                orario = f'{g:02d}/09/26 {8 + i // 4:02d}:{(i % 4) * 15:02d}:00'
+                righe.append(self.riga(a, 'In contanti', orario=orario))
+                righe.append(self.riga(b, 'In contanti', orario=orario.replace(':00:00', ':05:00')
+                                       .replace(':15:00', ':20:00').replace(':30:00', ':35:00')
+                                       .replace(':45:00', ':50:00')))
+                a += 1
+                b += 1
+        return righe
+
+    def portali(self, esito):
+        return {t['numero']: t['portale'] for t in esito['transazioni']}
+
+    def test_mese_precedente_contiguo(self):
+        # Le due catene arrivano fino ai numeri gia' in archivio
+        from apps.finanze.services import import_washtec as iw
+        TransazionePortale.objects.all().delete()
+        for portale, numero in (('A', 13300), ('B', 14000)):
+            TransazionePortale.objects.create(
+                portale=portale, numero=numero, orario=ora('08:00'),
+                programma=4, origine='unita')
+        righe = self.serie_settembre(range(1, 31), a0=13300 - 600, b0=14000 - 600)
+        esito = iw.classifica(righe)
+        p = self.portali(esito)
+        self.assertEqual(esito['anomalie'], [])
+        self.assertEqual(p[12700], 'A')
+        self.assertEqual(p[13400], 'B')   # numero che A usera' dopo il 6/10
+        self.assertEqual((p[13299], p[13999]), ('A', 'B'))
+        self.assertEqual(len(p), 1200)
+
+    def test_pochi_giorni_lontani(self):
+        # 1-5/09 senza continuita' con l'archivio: B si riconosce perche'
+        # i suoi numeri superano quelli di A gia' noti a ottobre
+        from apps.finanze.services import import_washtec as iw
+        esito = iw.classifica(self.serie_settembre(range(1, 6), b0=13121, per_giorno=40))
+        p = self.portali(esito)
+        self.assertEqual(esito['anomalie'], [])
+        self.assertEqual((p[12421], p[13121], p[13320]), ('A', 'B', 'B'))
+
+    def test_un_giorno_lontano_spareggio(self):
+        # Entrambe le catene compatibili con entrambi i portali: vale
+        # l'ordine dei contatori in archivio (A piu' basso di B)
+        from apps.finanze.services import import_washtec as iw
+        esito = iw.classifica(self.serie_settembre([1], b0=13121))
+        p = self.portali(esito)
+        self.assertEqual(esito['anomalie'], [])
+        self.assertEqual((p[12421], p[13121]), ('A', 'B'))
+
+    def test_gia_presente_riconosciuto_da_numero_e_orario(self):
+        from apps.finanze.services import import_washtec as iw
+        righe = [self.riga(13300, 'In contanti', orario='06/10/26 08:00:00'),
+                 self.riga(13970, 'In contanti', orario='06/10/26 08:00:00')]
+        esito = iw.importa(righe)
+        self.assertEqual((esito['nuove'], esito['gia_presenti']), (0, 2))

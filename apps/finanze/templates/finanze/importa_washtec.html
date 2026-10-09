@@ -90,10 +90,16 @@ function bookmarkletWashtec() {
     };
     const foglia = re => [...document.querySelectorAll('div,td,span,a')]
       .find(e => e.children.length === 0 && e.offsetParent && re.test(e.textContent.trim()));
-    const pag = () => foglia(/^\d+-\d+ di \d+$/);
+    // Paginatore: "1-25 di 96" oppure, su periodi lunghi, "976-1.000 di oltre 1.000"
+    // (punto delle migliaia; totale non ancora noto: diventa esatto solo alla fine).
+    const pag = () => foglia(/^[\d.]+-[\d.]+ di (oltre )?[\d.]+$/);
     // Durante il cambio pagina WashTec ridisegna il paginatore: per un
     // attimo non esiste, quindi si legge sempre in modo tollerante.
     const testoPag = () => { const p = pag(); return p ? p.textContent.trim() : ''; };
+    const infoPag = () => {
+      const m = testoPag().replace(/\./g, '').match(/^(\d+)-(\d+) di (oltre )?(\d+)$/);
+      return m ? { a: +m[2], totale: +m[4], esatto: !m[3] } : null;
+    };
     const fmt = d => String(d.getDate()).padStart(2, '0') + '/' +
       String(d.getMonth() + 1).padStart(2, '0') + '/' + String(d.getFullYear()).slice(2);
     const imposta = (el, v) => {
@@ -114,17 +120,36 @@ function bookmarkletWashtec() {
 
       const oggi = new Date(), tre = new Date();
       tre.setDate(oggi.getDate() - 3);
-      const dal = prompt('Importa le transazioni WashTec dal giorno (gg/mm/aa):', fmt(tre));
-      if (!dal) { box.remove(); return; }
-      if (!/^\d\d\/\d\d\/\d\d$/.test(dal.trim())) throw 'data non valida: usa gg/mm/aa';
-      imposta(date[0], dal.trim());
-      imposta(date[1], fmt(oggi));
+      // Accetta gg/mm, gg/mm/aa, gg/mm/aaaa (anche con . o -); senza anno
+      // usa quello corrente, o il precedente se la data sarebbe futura.
+      // Ritorna [testo gg/mm/aa per WashTec, Date] oppure null.
+      const leggiData = s => {
+        const m = String(s || '').trim().match(/^(\d{1,2})[\/.\-](\d{1,2})(?:[\/.\-](\d{2}|\d{4}))?$/);
+        if (!m) return null;
+        let anno = m[3] ? (m[3].length === 4 ? +m[3] : 2000 + +m[3]) : oggi.getFullYear();
+        let d = new Date(anno, +m[2] - 1, +m[1]);
+        if (!m[3] && d > oggi) { anno -= 1; d = new Date(anno, +m[2] - 1, +m[1]); }
+        if (d.getMonth() !== +m[2] - 1 || d.getDate() !== +m[1]) return null;
+        return [fmt(d), d];
+      };
+      const testoDal = prompt('Importa le transazioni WashTec DAL giorno (es. 01/09 o 01/09/26):', fmt(tre));
+      if (testoDal === null) { box.remove(); return; }
+      const dal = leggiData(testoDal);
+      if (!dal) throw 'data di inizio non valida: "' + testoDal + '" (usa gg/mm o gg/mm/aa)';
+      const testoAl = prompt('AL giorno (compreso):', fmt(oggi));
+      if (testoAl === null) { box.remove(); return; }
+      const al = leggiData(testoAl);
+      if (!al) throw 'data di fine non valida: "' + testoAl + '" (usa gg/mm o gg/mm/aa)';
+      if (al[1] < dal[1]) throw 'la data di fine (' + al[0] + ') e\' prima di quella di inizio (' + dal[0] + ')';
+      scrivi('Estrazione dal ' + dal[0] + ' al ' + al[0] + '&hellip;');
+      imposta(date[0], dal[0]);
+      imposta(date[1], al[0]);
 
       const prima = testoPag();
       const lente = __CERCA__;
       if (!lente) throw 'bottone di ricerca non trovato';
       fire(lente);
-      await until(() => testoPag() && testoPag() !== prima, 30000);
+      await until(() => testoPag() && testoPag() !== prima, 60000);
       await sleep(800);
       if (!testoPag()) throw 'nessun risultato per il periodo';
 
@@ -134,7 +159,6 @@ function bookmarkletWashtec() {
         if (c.length >= 10 && /^\d+$/.test(c[1]) && /^\d\d\/\d\d\/\d\d \d\d:\d\d:\d\d$/.test(c[2]))
           righe[c[1] + '|' + c[2]] = [c[1], c[2], c[3], c[5], c[6], c[8], c[9]];
       });
-      const TOTALE = parseInt(testoPag().split(' di ')[1], 10);
       const frecce = () => pag().closest('table').querySelectorAll('img');
       // Cambio pagina: attende che il paginatore mostri un testo nuovo
       // e stabile, poi lascia renderizzare le righe.
@@ -153,15 +177,18 @@ function bookmarkletWashtec() {
       };
       // dalla prima pagina, poi avanti finche' non le ho tutte
       if (!/^1-/.test(testoPag())) await vaiA(0);
-      for (let giro = 0; giro < 500; giro++) {
+      let info = infoPag();
+      for (let giro = 0; giro < 1000; giro++) {
         raccogli();
-        scrivi('Lette ' + Object.keys(righe).length + ' righe su ' + TOTALE + '&hellip;');
-        if (Object.keys(righe).length >= TOTALE) break;
+        info = infoPag() || info;
+        scrivi('Lette ' + Object.keys(righe).length + ' righe su ' +
+               (info.esatto ? '' : 'oltre ') + info.totale + '&hellip;');
+        if (info.esatto && info.a >= info.totale) break;
         if (!await vaiA(2)) throw 'la tabella non avanza di pagina';
       }
       const dati = Object.values(righe);
-      if (dati.length !== TOTALE) throw 'lette ' + dati.length + ' righe su ' + TOTALE;
-      scrivi('Lette tutte le ' + TOTALE + ' righe: apro il gestionale&hellip;');
+      if (!info.esatto || dati.length !== info.totale) throw 'lette ' + dati.length + ' righe su ' + info.totale;
+      scrivi('Lette tutte le ' + dati.length + ' righe: apro il gestionale&hellip;');
       location.href = GESTIONALE + '/finanze/importa-washtec/#' + encodeURIComponent(JSON.stringify(dati));
     } catch (e) {
       scrivi('Errore: ' + e, true);

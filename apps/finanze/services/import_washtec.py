@@ -12,12 +12,16 @@ Regole (vedi anche le note su TransazionePortale):
   self-service (escluso);
 - etichette WashTec INVERTITE: "In contanti" = unita' operativa,
   "Unita' operativa parallela" = contanti;
-- il portale (A/B) si deduce dal contatore: ogni transazione va al
-  portale del numero gia' noto piu' vicino (archivio + righe gia'
-  classificate), perche' ogni portale ha un contatore progressivo suo;
+- il portale (A/B) si deduce dal contatore: ogni portale ha un contatore
+  progressivo suo, quindi in ordine di tempo le transazioni formano due
+  "catene" di numeri consecutivi. Il numero da solo non basta (a
+  settembre 2026 B usava i numeri 13121-13864 che a ottobre usa A): una
+  catena prende il portale delle transazioni gia' in archivio che
+  contiene, altrimenti quello compatibile nel tempo (il contatore non
+  torna mai indietro) o l'opposto della catena dell'altro portale che
+  corre negli stessi giorni;
 - si tengono solo manutenzione = No ed eseguito = Si'.
 """
-import bisect
 from datetime import datetime
 from decimal import Decimal, InvalidOperation
 
@@ -30,9 +34,16 @@ METODO_ORIGINE = {
     'unità operativa parallela': 'contanti',
     'unita operativa parallela': 'contanti',
 }
-# Oltre questa distanza dal numero noto piu' vicino il portale e'
-# ambiguo: la riga viene segnalata invece che indovinata.
-DISTANZA_MAX = 300
+# Salto massimo tra due numeri consecutivi della stessa catena (righe
+# escluse o mancanti in mezzo): oltre si apre una catena nuova.
+SALTO_CATENA = 50
+# Lavaggi al giorno oltre i quali un portale non puo' arrivare: limita
+# quanto il contatore puo' essere avanzato tra due transazioni note.
+LAVAGGI_GIORNO_MAX = 150
+
+
+def _salto_possibile(da, a):
+    return SALTO_CATENA + LAVAGGI_GIORNO_MAX * abs((a - da).total_seconds()) / 86400
 
 
 def _importo(testo):
@@ -93,32 +104,139 @@ def classifica(righe):
         candidati.append({'numero': numero, 'orario': orario,
                           'programma': programma, 'origine': origine})
 
-    noti = dict(TransazionePortale.objects.values_list('numero', 'portale'))
-    if not noti:
-        noti = _assegna_portali_senza_archivio(c['numero'] for c in candidati)
-    chiavi = sorted(noti)
+    noti = list(TransazionePortale.objects.values_list('numero', 'orario', 'portale'))
+    if noti:
+        portali = _assegna_portali(candidati, noti)
+    else:
+        primo = _assegna_portali_senza_archivio(c['numero'] for c in candidati)
+        portali = [primo[c['numero']] for c in candidati]
 
     transazioni = []
-    for c in sorted(candidati, key=lambda c: c['numero']):
-        n = c['numero']
-        i = bisect.bisect_left(chiavi, n)
-        vicini = [chiavi[j] for j in (i - 1, i) if 0 <= j < len(chiavi)]
-        if not vicini:
-            anomalie.append(f'#{n}: impossibile dedurre il portale')
+    for c, portale in zip(candidati, portali):
+        if portale is None:
+            anomalie.append(f'#{c["numero"]} {timezone.localtime(c["orario"]):%d/%m %H:%M}: '
+                            'portale ambiguo')
             continue
-        vicino = min(vicini, key=lambda k: abs(k - n))
-        if abs(vicino - n) > DISTANZA_MAX:
-            anomalie.append(f'#{n} {c["orario"]:%d/%m %H:%M}: portale ambiguo '
-                            f'(numero noto piu\' vicino {vicino})')
-            continue
-        portale = noti[vicino]
-        if n not in noti:
-            noti[n] = portale
-            bisect.insort(chiavi, n)
         transazioni.append({**c, 'portale': portale})
+    transazioni.sort(key=lambda t: t['numero'])
 
     return {'transazioni': transazioni, 'jetwash': jetwash,
             'escluse': escluse, 'anomalie': anomalie}
+
+
+def _catene(punti):
+    """Raggruppa i punti (ordinati per orario) in catene di numeri
+    crescenti: ogni punto si aggancia alla catena il cui ultimo numero lo
+    precede col salto piu' piccolo (al massimo SALTO_CATENA)."""
+    catene = []
+    for p in punti:
+        migliore = None
+        for c in catene:
+            salto = p['numero'] - c['punti'][-1]['numero']
+            if 0 < salto <= SALTO_CATENA and (
+                    migliore is None or salto < p['numero'] - migliore['punti'][-1]['numero']):
+                migliore = c
+        if migliore is None:
+            migliore = {'punti': []}
+            catene.append(migliore)
+        migliore['punti'].append(p)
+    for c in catene:
+        c['t0'], c['t1'] = c['punti'][0]['orario'], c['punti'][-1]['orario']
+        c['n0'], c['n1'] = c['punti'][0]['numero'], c['punti'][-1]['numero']
+        etichette = {p['portale'] for p in c['punti'] if p['portale']}
+        c['portale'] = etichette.pop() if len(etichette) == 1 else None
+        c['conflitto'] = len(etichette) > 0
+    return catene
+
+
+def _compatibile(catena, portale, catene):
+    """Il contatore non torna indietro e non corre troppo: le transazioni
+    note del portale prima della catena hanno numeri piu' bassi, quelle
+    dopo piu' alti, entrambe a una distanza raggiungibile nel tempo."""
+    for c in catene:
+        if c['portale'] != portale:
+            continue
+        for p in c['punti']:
+            if p['orario'] < catena['t0'] and not (
+                    0 < catena['n0'] - p['numero'] <= _salto_possibile(p['orario'], catena['t0'])):
+                return False
+            if p['orario'] > catena['t1'] and not (
+                    0 < p['numero'] - catena['n1'] <= _salto_possibile(catena['t1'], p['orario'])):
+                return False
+            if catena['t0'] <= p['orario'] <= catena['t1'] and not (
+                    catena['n0'] < p['numero'] < catena['n1']):
+                return False
+    return True
+
+
+def _spareggio(da_etichettare, catene):
+    """Due catene degli stessi giorni compatibili entrambe con A e B: i
+    due contatori avanzano a ritmi simili, quindi mantengono l'ordine
+    che hanno in archivio (la catena piu' bassa va al portale che in
+    archivio ha i numeri piu' bassi)."""
+    ultimo = {}
+    for c in catene:
+        if c['portale'] and (c['portale'] not in ultimo or c['t1'] > ultimo[c['portale']]['t1']):
+            ultimo[c['portale']] = c
+    if len(ultimo) < 2:
+        return False
+    basso = 'A' if ultimo['A']['n1'] < ultimo['B']['n1'] else 'B'
+    alto = 'B' if basso == 'A' else 'A'
+    for c in da_etichettare:
+        for d in da_etichettare:
+            if d is c or not (d['t0'] <= c['t1'] and c['t0'] <= d['t1']):
+                continue
+            if not all(_compatibile(x, p, catene) for x in (c, d) for p in ('A', 'B')):
+                continue
+            inferiore, superiore = (c, d) if c['n0'] < d['n0'] else (d, c)
+            for catena, portale in ((inferiore, basso), (superiore, alto)):
+                catena['portale'] = portale
+                for p in catena['punti']:
+                    p['portale'] = portale
+                da_etichettare.remove(catena)
+            return True
+    return False
+
+
+def _assegna_portali(candidati, noti):
+    """Portale ('A'/'B' o None se ambiguo) per ogni candidato, nello
+    stesso ordine, a partire dalle transazioni gia' in archivio."""
+    etichetta = {(n, o): portale for n, o, portale in noti}
+    punti = [{'numero': n, 'orario': o, 'portale': portale} for n, o, portale in noti]
+    for c in candidati:
+        if (c['numero'], c['orario']) not in etichetta:
+            punti.append({'numero': c['numero'], 'orario': c['orario'], 'portale': None})
+    punti.sort(key=lambda p: (p['orario'], p['numero']))
+    catene = _catene(punti)
+    da_etichettare = [c for c in catene if c['portale'] is None and not c['conflitto']]
+
+    cambiato = True
+    while cambiato and da_etichettare:
+        cambiato = False
+        for c in list(da_etichettare):
+            possibili = [p for p in ('A', 'B') if _compatibile(c, p, catene)]
+            if len(possibili) == 2:
+                # due portali, due contatori: una catena che corre negli
+                # stessi giorni di una gia' etichettata e' l'altro portale
+                vicine = {x['portale'] for x in catene if x is not c and x['portale']
+                          and x['t0'] <= c['t1'] and c['t0'] <= x['t1']}
+                if len(vicine) == 1:
+                    possibili = [p for p in possibili if p not in vicine]
+            if len(possibili) == 1:
+                c['portale'] = possibili[0]
+                for p in c['punti']:
+                    p['portale'] = c['portale']
+                da_etichettare.remove(c)
+                cambiato = True
+        if not cambiato:
+            cambiato = _spareggio(da_etichettare, catene)
+
+    for c in catene:
+        for p in c['punti']:
+            if p['portale'] is None:
+                p['portale'] = c['portale']
+            etichetta.setdefault((p['numero'], p['orario']), p['portale'])
+    return [etichetta.get((c['numero'], c['orario'])) for c in candidati]
 
 
 def importa(righe, conferma=False):
