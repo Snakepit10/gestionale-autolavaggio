@@ -210,6 +210,12 @@ def allinea_periodo(dal, al):
         # programmazione dinamica: migliore[k] = (costo, percorso)
         migliore = {0: (Decimal(0), [])}
         for i, g in enumerate(giorni):
+            # Giorno senza scontrino seguito da uno con scontrino: la cassa
+            # non e' stata chiusa, i suoi lavaggi finiscono nello scontrino
+            # successivo (giornata vuota, fine = None)
+            if casse[g][portale] is None and any(casse[x][portale] for x in giorni[i + 1:]):
+                migliore = {kp: (c, percorso + [(kp, None)]) for kp, (c, percorso) in migliore.items()}
+                continue
             nuovo = {}
             for k, fine, distanza in candidati[i]:
                 scelte = [(c + costo(g, kp, k, distanza), percorso)
@@ -245,7 +251,10 @@ def salva_periodo(dal, al, operatore=None):
         voce = esito[g]
         if 'A' not in voce or 'B' not in voce:
             continue
-        fine_a, fine_b = voce['A']['fine'], voce['B']['fine']
+        # giornata senza chiusura di cassa: finestra vuota, i lavaggi
+        # vanno al giorno dopo
+        fine_a = voce['A']['fine'] or da['A']
+        fine_b = voce['B']['fine'] or da['B']
         ChiusuraPortali.objects.update_or_create(data=g, defaults={
             'periodo_da': da['A'], 'periodo_a': fine_a,
             'periodo_da_blu': da['B'] if da['B'] != da['A'] else None,
