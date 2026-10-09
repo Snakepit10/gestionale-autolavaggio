@@ -1291,6 +1291,20 @@ def _contesto_lavaggi_portali(data):
             'tot': tot, 'tot_valore': tot['contanti'] + tot['unita'],
         })
 
+    # Lavaggi a cavallo di inizio e fine (+-20 min, al secondo): per
+    # far combaciare la finestra con gli scontrini senza andare a tentativi
+    margine = timedelta(minutes=20)
+    bordi = []
+    for etichetta, istante in (('Inizio', chiusura.periodo_da), ('Fine', chiusura.periodo_a)):
+        vicine = (TransazionePortale.objects
+                  .filter(orario__gte=istante - margine, orario__lte=istante + margine)
+                  .order_by('orario', 'numero'))
+        bordi.append({
+            'etichetta': etichetta, 'istante': istante,
+            'righe': [{'t': t, 'dentro': chiusura.periodo_da < t.orario <= chiusura.periodo_a}
+                      for t in vicine],
+        })
+
     abbinamento = abbinamento_portali.riepilogo(chiusura)
 
     # WashCycles self service: lavaggi pagati in contanti al portale +
@@ -1309,6 +1323,7 @@ def _contesto_lavaggi_portali(data):
         'portali_chiusura_salvata': salvata,
         'lavaggi_portali': portali,
         'portali_n_transazioni': len(transazioni),
+        'portali_bordi': bordi,
         'portali_archivio_totale': TransazionePortale.objects.count(),
         'abbinamento': abbinamento,
         'washcycles_self': washcycles_self,
@@ -1380,12 +1395,17 @@ def imposta_chiusura_portali(request):
     if request.method != 'POST':
         return redirect('finanze:report_giornata')
     data_str = request.POST.get('data', '')
+
+    def _orario(campo):
+        # datetime-local invia i secondi solo se diversi da :00
+        testo = request.POST.get(campo, '')
+        formato = '%Y-%m-%dT%H:%M:%S' if testo.count(':') == 2 else '%Y-%m-%dT%H:%M'
+        return timezone.make_aware(datetime.strptime(testo, formato))
+
     try:
         data = datetime.strptime(data_str, '%Y-%m-%d').date()
-        periodo_da = timezone.make_aware(datetime.strptime(
-            request.POST.get('periodo_da', ''), '%Y-%m-%dT%H:%M'))
-        periodo_a = timezone.make_aware(datetime.strptime(
-            request.POST.get('periodo_a', ''), '%Y-%m-%dT%H:%M'))
+        periodo_da = _orario('periodo_da')
+        periodo_a = _orario('periodo_a')
     except ValueError:
         messages.error(request, 'Date della chiusura portali non valide.')
         return redirect(f"{reverse('finanze:report_giornata')}?data={data_str}")

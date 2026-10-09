@@ -687,25 +687,59 @@
         <input type="hidden" name="data" value="{{ data|date:'Y-m-d' }}">
         <div>
           <label class="form-label small mb-0 fw-bold">Inizio chiusura</label>
-          <input type="datetime-local" name="periodo_da" class="form-control form-control-sm" required
-                 value="{{ portali_chiusura.periodo_da|date:'Y-m-d\TH:i' }}">
+          <input type="datetime-local" name="periodo_da" class="form-control form-control-sm" required step="1"
+                 value="{{ portali_chiusura.periodo_da|date:'Y-m-d\TH:i:s' }}">
         </div>
         <div>
           <label class="form-label small mb-0 fw-bold">Fine chiusura</label>
-          <input type="datetime-local" name="periodo_a" class="form-control form-control-sm" required
-                 value="{{ portali_chiusura.periodo_a|date:'Y-m-d\TH:i' }}">
+          <input type="datetime-local" name="periodo_a" class="form-control form-control-sm" required step="1"
+                 value="{{ portali_chiusura.periodo_a|date:'Y-m-d\TH:i:s' }}">
         </div>
         <button type="submit" class="btn btn-primary btn-sm">
           <i class="bi bi-arrow-repeat"></i> {% if portali_chiusura_salvata %}Aggiorna{% else %}Salva orari{% endif %}
         </button>
         <span class="small text-muted">
           {{ portali_n_transazioni }} lavaggi nella finestra
-          {{ portali_chiusura.periodo_da|date:'d/m H:i' }} &rarr; {{ portali_chiusura.periodo_a|date:'d/m H:i' }}
+          {{ portali_chiusura.periodo_da|date:'d/m H:i:s' }} &rarr; {{ portali_chiusura.periodo_a|date:'d/m H:i:s' }}
           {% if not portali_chiusura_salvata %}
           <span class="badge bg-light text-dark border" title="Calcolata con gli orari predefiniti: modificali e salva se la chiusura reale è diversa">orari predefiniti</span>
           {% endif %}
         </span>
       </form>
+
+      <details class="small mb-3">
+        <summary class="text-muted">Lavaggi a cavallo di inizio e fine chiusura (&plusmn;20 min, orari WashTec al secondo)</summary>
+        <div class="row g-3 mt-1">
+          {% for b in portali_bordi %}
+          <div class="col-12 col-lg-6">
+            <div class="fw-bold mb-1">{{ b.etichetta }} chiusura: {{ b.istante|date:'d/m H:i:s' }}</div>
+            {% if b.righe %}
+            <table class="table table-sm data-table mb-0">
+              <thead class="table-light"><tr><th>Orario</th><th>Portale</th><th>#</th><th>Prog.</th><th>Origine</th><th>Conta oggi</th></tr></thead>
+              <tbody>
+                {% for r in b.righe %}
+                <tr class="{% if r.dentro %}table-success{% else %}text-muted{% endif %}">
+                  <td>{{ r.t.orario|date:'d/m H:i:s' }}</td>
+                  <td>{{ r.t.get_portale_display }}</td>
+                  <td>{{ r.t.numero }}</td>
+                  <td>P{{ r.t.programma }}</td>
+                  <td>{{ r.t.get_origine_display }}</td>
+                  <td>{% if r.dentro %}<i class="bi bi-check-lg text-success"></i> s&igrave;{% else %}no{% endif %}</td>
+                </tr>
+                {% endfor %}
+              </tbody>
+            </table>
+            {% else %}
+            <div class="text-muted">Nessun lavaggio entro 20 minuti.</div>
+            {% endif %}
+          </div>
+          {% endfor %}
+        </div>
+        <div class="text-muted mt-2">
+          Gli orari degli scontrini delle casse possono differire di 1-2 minuti da quelli WashTec: se i WashCycles non tornano,
+          sposta inizio o fine tra due lavaggi di questa lista.
+        </div>
+      </details>
 
       {% if portali_chiusura %}
       <div class="row g-3">

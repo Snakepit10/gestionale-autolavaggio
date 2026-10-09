@@ -481,13 +481,14 @@ class TransazionePortale(models.Model):
     report giornata aggrega i lavaggi della finestra di chiusura.
 
     I due portali hanno lo stesso nome postazione su WashTec e si
-    distinguono dalla serie del contatore transazioni: A = 132xx,
-    B = 139xx. La corrispondenza con Blu/Azzurro non e' nota.
+    distinguono dalla serie del contatore transazioni (vedi
+    services/import_washtec). A = Azzurro e B = Blu: dedotto l'08/10/26
+    dalle vendite in contanti degli scontrini delle due casse.
     L'import e' idempotente: (portale, numero) e' univoco.
     """
     PORTALE_CHOICES = [
-        ('A', 'Portale A (serie 132xx)'),
-        ('B', 'Portale B (serie 139xx)'),
+        ('A', 'Portale Azzurro (A)'),
+        ('B', 'Portale Blu (B)'),
     ]
     # ATTENZIONE alle etichette WashTec, che sono invertite rispetto
     # alla realta' operativa: il "Metodo di pagamento" WashTec

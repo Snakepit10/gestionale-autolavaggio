@@ -215,6 +215,28 @@ class AbbinamentoPortaliTest(TestCase):
                          (user, '06/10 19:30'))
         self.assertEqual(AbbinamentoPortale.objects.count(), 1)
 
+    def test_chiusura_al_secondo(self):
+        user = User.objects.create_user('op', 'op@x.it', 'x', is_staff=True)
+        self.client.force_login(user)
+        url = reverse('finanze:imposta_chiusura_portali')
+        self.client.post(url, {'data': '2026-10-06', 'periodo_da': '2026-10-05T19:30',
+                               'periodo_a': '2026-10-06T17:48:05'})
+        c = ChiusuraPortali.objects.get(data=ora('10:00').date())
+        self.assertEqual(timezone.localtime(c.periodo_a).strftime('%H:%M:%S'), '17:48:05')
+        self.assertEqual(timezone.localtime(c.periodo_da).strftime('%H:%M:%S'), '19:30:00')
+
+    def test_lavaggi_ai_bordi(self):
+        from apps.finanze.views import _contesto_lavaggi_portali
+        # finestra 05/10 19:00 -> 06/10 18:00
+        self._tx('17:50', 4)
+        self._tx('18:05', 8)
+        self._tx('19:00', 4)        # oltre i 20 minuti: non elencato
+        ctx = _contesto_lavaggi_portali(self.chiusura.data)
+        fine = ctx['portali_bordi'][1]
+        self.assertEqual(fine['etichetta'], 'Fine')
+        self.assertEqual([(timezone.localtime(r['t'].orario).strftime('%H:%M'), r['dentro'])
+                          for r in fine['righe']], [('17:50', True), ('18:05', False)])
+
     def test_programmi_portale_ordinati(self):
         s = ServizioProdotto(programmi_portale=' 8, 9,x,12,7,8,4 ')
         self.assertEqual(s.programmi_portale_ordinati, [8, 9, 7, 4])
