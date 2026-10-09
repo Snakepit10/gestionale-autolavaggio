@@ -19,6 +19,9 @@ Regole di proposta:
   completamento registrato, o l'ordine e' stato chiuso in ritardo (oltre
   DURATA_MAX_LAVORO dalla creazione), si ripiega sull'ora di creazione
   dell'ordine (ricerca simmetrica, +-TOLLERANZA).
+- RIPIEGO: dopo i giri, i lavaggi ancora scoperti che ammettono il P4
+  (quindi non i completi a mano, solo P5) prendono i P4 liberi della
+  finestra senza vincoli d'orario, dal piu' vicino.
 
 Le proposte sono calcolate al volo (nessuna scrittura); diventano
 AbbinamentoPortale solo alla conferma dell'operatore.
@@ -38,6 +41,9 @@ TOLLERANZA_DEFAULT = timedelta(hours=2)
 # chiuso in ritardo (es. la mattina dopo): il completamento non dice
 # quando l'auto e' passata dal portale, quindi si usa la creazione.
 DURATA_MAX_LAVORO = timedelta(hours=3)
+# Programma con cui si coprono, senza vincoli d'orario, i lavaggi servito
+# rimasti scoperti dopo i giri di priorita'.
+PROGRAMMA_RIPIEGO = 4
 # Margine per caricare gli ordini a cavallo dell'inizio finestra
 _MARGINE_CARICAMENTO = timedelta(hours=12)
 
@@ -148,7 +154,31 @@ def proponi(chiusura, tolleranza=TOLLERANZA_DEFAULT, items=None, libere=None):
             proposte.append({
                 'item': it, 'transazione': t, 'giro': giro + 1,
                 'delta_min': round((it.riferimento[3] - t.orario).total_seconds() / 60),
+                'fuori_orario': False,
             })
+
+    # Ultimo giro: i lavaggi rimasti scoperti che ammettono il P4 (non i
+    # completi a mano) prendono i P4 liberi della finestra anche senza
+    # coincidenza d'orario, sempre partendo dal piu' vicino.
+    coppie = []
+    for si, it in enumerate(slots):
+        if si in slot_usati or PROGRAMMA_RIPIEGO not in it.servizio_prodotto.lista_programmi_portale:
+            continue
+        for t in libere:
+            if t.pk not in tx_usate and t.programma == PROGRAMMA_RIPIEGO:
+                coppie.append((abs((t.orario - it.riferimento[0]).total_seconds()), si, t.pk, t))
+    coppie.sort(key=lambda c: (c[0], c[1], c[2]))
+    for delta, si, tpk, t in coppie:
+        if si in slot_usati or tpk in tx_usate:
+            continue
+        slot_usati.add(si)
+        tx_usate.add(tpk)
+        it = slots[si]
+        proposte.append({
+            'item': it, 'transazione': t, 'giro': n_giri + 1,
+            'delta_min': round((it.riferimento[3] - t.orario).total_seconds() / 60),
+            'fuori_orario': True,
+        })
     return proposte
 
 

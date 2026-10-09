@@ -874,6 +874,7 @@
                       <span class="badge bg-primary-subtle text-primary-emphasis border border-primary-subtle"><i class="bi bi-lightbulb"></i> {{ p.transazione.portale }} #{{ p.transazione.numero }}</span>
                       <span class="small">{{ p.transazione.orario|date:"H:i" }} · P{{ p.transazione.programma }} ·
                         {% if r.rif_tipo == 'completato' %}{{ p.delta_min }} min prima del completamento{% else %}&Delta; {{ p.delta_min }} min dalla creazione{% endif %}</span>
+                      {% if p.fuori_orario %}<span class="badge bg-warning-subtle text-warning-emphasis border border-warning-subtle" title="Nessun P4 compatibile per orario: abbinato al P4 libero piu' vicino">senza coincidenza d'orario</span>{% endif %}
                     </div>
                     {% endfor %}
                     {% if r.scoperti %}

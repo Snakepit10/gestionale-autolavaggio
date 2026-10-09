@@ -64,7 +64,7 @@ class AbbinamentoPortaliTest(TestCase):
 
     def test_mai_dopo_il_completamento(self):
         self._item(self.completo, completato='10:30')
-        self._tx('10:40', 4)                    # successiva al completamento
+        self._tx('10:40', 8)                    # successiva al completamento
         self.assertEqual(ap.proponi(self.chiusura), [])
 
     def test_priorita_programma_prima_di_vicinanza(self):
@@ -121,11 +121,39 @@ class AbbinamentoPortaliTest(TestCase):
 
     def test_tolleranza_e_finestra(self):
         self._item(self.completo, completato='17:30')
-        self._tx('14:00', 4)                    # oltre 2h prima dell'obiettivo
+        self._tx('14:00', 7)                    # oltre 2h prima dell'obiettivo
         TransazionePortale.objects.create(      # fuori finestra
             portale='B', numero=13999, orario=ora('18:30'),
             programma=4, origine='unita')
         self.assertEqual(ap.proponi(self.chiusura), [])
+
+    def test_ripiego_p4_senza_coincidenza_orario(self):
+        # Scoperto dopo i giri: prende il P4 libero piu' vicino, anche
+        # dopo il completamento o a ore di distanza
+        item = self._item(self.completo, completato='17:30')
+        self._tx('08:00', 4)
+        vicino = self._tx('12:00', 4)
+        proposte = ap.proponi(self.chiusura)
+        self.assertEqual(len(proposte), 1)
+        self.assertEqual((proposte[0]['item'].pk, proposte[0]['transazione'].pk),
+                         (item.pk, vicino.pk))
+        self.assertTrue(proposte[0]['fuori_orario'])
+
+    def test_ripiego_solo_dopo_i_giri_e_mai_a_mano(self):
+        # Il P4 in orario va al primo item nel giro normale; il secondo
+        # prende l'altro P4 col ripiego; il completo a mano resta scoperto
+        primo = self._item(self.completo, completato='10:30')
+        secondo = self._item(self.completo, completato='16:30')
+        self._item(self.a_mano, completato='14:00')
+        in_orario = self._tx('10:05', 4)
+        lontano = self._tx('07:00', 4)
+        proposte = {p['item'].pk: p for p in ap.proponi(self.chiusura)}
+        self.assertEqual(proposte[primo.pk]['transazione'].pk, in_orario.pk)
+        self.assertFalse(proposte[primo.pk]['fuori_orario'])
+        self.assertEqual(proposte[secondo.pk]['transazione'].pk, lontano.pk)
+        self.assertTrue(proposte[secondo.pk]['fuori_orario'])
+        self.assertEqual(len(proposte), 2)
+        self.assertEqual(ap.riepilogo(self.chiusura)['n_scoperti'], 1)
 
     def test_quantita_due_prende_due_transazioni(self):
         self._item(self.completo, completato='10:30', quantita=2)
