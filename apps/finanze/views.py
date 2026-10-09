@@ -1466,6 +1466,41 @@ def imposta_chiusura_portali(request):
 
 @login_required
 @user_passes_test(is_staff_user)
+def allinea_periodo_portali(request):
+    """POST dal report giornata: allinea insieme le chiusure portali di
+    piu' giorni agli scontrini (prima i saldi, poi i WashCycles)."""
+    from django.urls import reverse
+
+    torna = f"{reverse('finanze:report_giornata')}?data={request.POST.get('data', '')}"
+    if request.method != 'POST':
+        return redirect('finanze:report_giornata')
+    try:
+        dal = datetime.strptime(request.POST.get('dal', ''), '%Y-%m-%d').date()
+        al = datetime.strptime(request.POST.get('al', ''), '%Y-%m-%d').date()
+    except ValueError:
+        messages.error(request, 'Date del periodo non valide.')
+        return redirect(torna)
+    if al < dal or (al - dal).days > 62:
+        messages.error(request, 'Periodo non valido (massimo due mesi).')
+        return redirect(torna)
+
+    esito = allinea_scontrini.salva_periodo(dal, al, request.user)
+    tornano = saldi = con_scontrini = 0
+    for voce in esito.values():
+        vv = [v for v in voce.values() if v['vendita'] is not None]
+        if not vv:
+            continue
+        con_scontrini += 1
+        saldi += all(v['contanti'] == v['vendita'] for v in vv)
+        tornano += all(v['conteggio'] == v['scontrino'] for v in vv)
+    messages.success(request, (
+        f"Chiusure portali dal {dal:%d/%m} al {al:%d/%m} allineate: su {con_scontrini} giorni "
+        f"con scontrini, contanti esatti in {saldi} e WashCycles esatti in {tornano}."))
+    return redirect(torna)
+
+
+@login_required
+@user_passes_test(is_staff_user)
 def azione_spese_cassa(request):
     """POST dal report giornata: aggiunge o elimina una spesa pagata coi
     contanti della cassa. Elimina solo chi l'ha inserita o l'admin."""

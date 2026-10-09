@@ -125,3 +125,132 @@ def allinea(chiusura, casse):
                      'scarto': (k - n) if n is not None else 0,
                      'contanti': contanti, 'scarto_contanti': contanti - vendita})
     return esito
+
+
+# Pesi dell'allineamento di un periodo: un euro di scarto conta piu' di
+# qualsiasi numero di cicli; la distanza dall'orario di riferimento
+# serve solo a scegliere tra soluzioni equivalenti.
+PESO_EURO = 1000
+PESO_SECONDO = Decimal('0.000001')
+
+
+def _riferimento_fine(data, portale):
+    """Fine attuale della giornata del portale (salvata o 19:30)."""
+    from apps.finanze.models import ChiusuraPortali
+
+    salvata = ChiusuraPortali.objects.filter(data=data).first()
+    if salvata:
+        return salvata.finestra(portale)[1]
+    return timezone.make_aware(datetime.combine(data, time(19, 30)))
+
+
+def _inizio_periodo(dal, portale):
+    from apps.finanze.models import ChiusuraPortali
+
+    prec = ChiusuraPortali.objects.filter(data=dal - timedelta(days=1)).first()
+    if prec:
+        return prec.finestra(portale)[1]
+    salvata = ChiusuraPortali.objects.filter(data=dal).first()
+    if salvata:
+        return salvata.finestra(portale)[0]
+    return timezone.make_aware(datetime.combine(dal - timedelta(days=1), time(19, 30)))
+
+
+def allinea_periodo(dal, al):
+    """Fine di ogni giornata dal..al, per portale, scelta insieme per
+    tutto il periodo (programmazione dinamica sui tagli tra lavaggi
+    consecutivi): minimizza la somma degli scarti dei saldi e, a parita',
+    quella dei WashCycles. Ritorna (inizi, {data: {portale: voce}}) con
+    voce = {'fine', 'conteggio', 'contanti', 'scontrino', 'vendita'}."""
+    giorni = [dal + timedelta(days=i) for i in range((al - dal).days + 1)]
+    casse = {g: chiusure_casse_portali(g) for g in giorni}
+    inizi, esito = {}, {g: {} for g in giorni}
+    for portale in ('A', 'B'):
+        da = _inizio_periodo(dal, portale)
+        inizi[portale] = da
+        _, fine_ultima = _sera(al)
+        righe = list(TransazionePortale.objects
+                     .filter(portale=portale, orario__gt=da, orario__lte=fine_ultima)
+                     .order_by('orario', 'numero')
+                     .values_list('orario', 'programma', 'origine'))
+        dopo = (TransazionePortale.objects
+                .filter(portale=portale, orario__gt=fine_ultima)
+                .order_by('orario').values_list('orario', flat=True).first())
+        orari = [r[0] for r in righe]
+        contanti = [Decimal('0.00')]
+        for _, programma, origine in righe:
+            contanti.append(contanti[-1] + (PREZZI_PROGRAMMA_PORTALE[programma]
+                                            if origine == 'contanti' else 0))
+
+        # candidati per giorno: (k lavaggi dall'inizio, orario di fine)
+        candidati = []
+        for g in giorni:
+            sera_da, sera_a = _sera(g)
+            rif = _riferimento_fine(g, portale)
+            lista = []
+            for k in range(len(orari) + 1):
+                minimo = max(orari[k - 1] if k else da, sera_da)
+                successivo = orari[k] if k < len(orari) else dopo
+                massimo = min(successivo - timedelta(seconds=1), sera_a) if successivo else sera_a
+                if massimo >= minimo:
+                    fine = min(max(rif, minimo), massimo).replace(microsecond=0)
+                    lista.append((k, fine, abs((fine - rif).total_seconds())))
+            candidati.append(lista)
+
+        def costo(g, k_prima, k, distanza):
+            cassa = casse[g][portale]
+            c = PESO_SECONDO * Decimal(distanza)
+            if cassa is None:
+                return c
+            c += PESO_EURO * abs(contanti[k] - contanti[k_prima] - cassa.vendita_totale)
+            if cassa.wash_cycles is not None:
+                c += abs(k - k_prima - cassa.wash_cycles)
+            return c
+
+        # programmazione dinamica: migliore[k] = (costo, percorso)
+        migliore = {0: (Decimal(0), [])}
+        for i, g in enumerate(giorni):
+            nuovo = {}
+            for k, fine, distanza in candidati[i]:
+                scelte = [(c + costo(g, kp, k, distanza), percorso)
+                          for kp, (c, percorso) in migliore.items() if kp <= k]
+                if scelte:
+                    c, percorso = min(scelte, key=lambda s: s[0])
+                    nuovo[k] = (c, percorso + [(k, fine)])
+            migliore = nuovo
+        if not migliore:
+            continue
+        _, percorso = min(migliore.values(), key=lambda s: s[0])
+        k_prima = 0
+        for g, (k, fine) in zip(giorni, percorso):
+            cassa = casse[g][portale]
+            esito[g][portale] = {
+                'fine': fine, 'conteggio': k - k_prima,
+                'contanti': contanti[k] - contanti[k_prima],
+                'scontrino': cassa.wash_cycles if cassa else None,
+                'vendita': cassa.vendita_totale if cassa else None,
+            }
+            k_prima = k
+    return inizi, esito
+
+
+def salva_periodo(dal, al, operatore=None):
+    """Applica allinea_periodo salvando le ChiusuraPortali dei giorni,
+    ognuna attaccata alla fine della precedente. Ritorna l'esito."""
+    from apps.finanze.models import ChiusuraPortali
+
+    inizi, esito = allinea_periodo(dal, al)
+    da = dict(inizi)
+    for g in sorted(esito):
+        voce = esito[g]
+        if 'A' not in voce or 'B' not in voce:
+            continue
+        fine_a, fine_b = voce['A']['fine'], voce['B']['fine']
+        ChiusuraPortali.objects.update_or_create(data=g, defaults={
+            'periodo_da': da['A'], 'periodo_a': fine_a,
+            'periodo_da_blu': da['B'] if da['B'] != da['A'] else None,
+            'periodo_a_blu': fine_b if fine_b != fine_a else None,
+            'operatore': operatore,
+        })
+        da = {'A': fine_a, 'B': fine_b}
+    return esito

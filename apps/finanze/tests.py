@@ -353,6 +353,32 @@ class AbbinamentoPortaliTest(TestCase):
         self.assertEqual((esito['conteggio'], esito['scarto'], esito['errore']), (2, -1, ''))
         self.assertEqual(esito['fine'], ora('18:00'))
 
+    def test_allinea_periodo_insieme(self):
+        # 06/10: 2 cicli e 10 euro; 07/10: 3 cicli e 16 euro. Il P4 in
+        # contanti delle 18:30 del 06 va sul 07: fine del 06 tra 17:00 e 18:30
+        from apps.finanze.models import Cassa, ChiusuraCassaAutomatica
+        from apps.finanze.services import allinea_scontrini as al
+        giorno, dopo = self.chiusura.data, self.chiusura.data + timedelta(days=1)
+        self._tx_portale('A', '10:00', programma=3, origine='contanti')
+        self._tx_portale('A', '17:00')
+        self._tx_portale('A', '18:30', programma=4, origine='contanti')
+        for numero, alle, prog, orig in ((21001, '09:00', 4, 'unita'), (21002, '17:00', 4, 'contanti')):
+            TransazionePortale.objects.create(portale='A', numero=numero, programma=prog,
+                                              origine=orig, orario=ora(alle) + timedelta(days=1))
+        azzurro, _ = Cassa.objects.get_or_create(nome='Portale Azzurro', defaults={'tipo': 'automatica'})
+        ChiusuraCassaAutomatica.objects.create(cassa=azzurro, data=giorno, wash_cycles=2,
+                                               vendita_contante=Decimal('10'))
+        ChiusuraCassaAutomatica.objects.create(cassa=azzurro, data=dopo, wash_cycles=3,
+                                               vendita_contante=Decimal('16'))
+        esito = al.salva_periodo(giorno, dopo)
+        self.assertEqual([(esito[g]['A']['conteggio'], esito[g]['A']['contanti']) for g in (giorno, dopo)],
+                         [(2, Decimal('10.00')), (3, Decimal('16.00'))])
+        c6 = ChiusuraPortali.objects.get(data=giorno)
+        c7 = ChiusuraPortali.objects.get(data=dopo)
+        self.assertEqual(c6.periodo_a, ora('18:00'))                 # resta l'orario attuale
+        self.assertEqual(c7.periodo_da, c6.periodo_a)                 # continuita'
+        self.assertTrue(ora('17:00') + timedelta(days=1) <= c7.periodo_a)
+
     def test_salva_orari_blu(self):
         user = User.objects.create_user('op', 'op@x.it', 'x', is_staff=True)
         self.client.force_login(user)

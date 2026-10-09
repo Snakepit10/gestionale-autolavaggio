@@ -793,6 +793,26 @@
       </div>
       {% endif %}
 
+      <form method="post" action="{% url 'finanze:allinea_periodo_portali' %}"
+            class="d-flex gap-2 align-items-end flex-wrap small mb-3"
+            onsubmit="return confirm('Riscrivere gli orari di chiusura portali di tutti i giorni del periodo?');">
+        {% csrf_token %}
+        <input type="hidden" name="data" value="{{ data|date:'Y-m-d' }}">
+        <div class="text-muted" style="max-width:22rem">
+          <i class="bi bi-calendar-range"></i> <strong>Allinea più giorni insieme</strong>: sceglie le chiusure di tutto
+          il periodo in modo che tornino prima i saldi e poi i WashCycles degli scontrini.
+        </div>
+        <div>
+          <label class="form-label small mb-0">Dal</label>
+          <input type="date" name="dal" class="form-control form-control-sm" required value="{{ data|date:'Y-m' }}-01">
+        </div>
+        <div>
+          <label class="form-label small mb-0">Al</label>
+          <input type="date" name="al" class="form-control form-control-sm" required value="{{ data|date:'Y-m-d' }}">
+        </div>
+        <button class="btn btn-sm btn-outline-warning"><i class="bi bi-magic"></i> Allinea periodo</button>
+      </form>
+
       <details class="small mb-3">
         <summary class="text-muted">Lavaggi a cavallo di inizio e fine chiusura (&plusmn;20 min, orari WashTec al secondo)</summary>
         <div class="row g-3 mt-1">
