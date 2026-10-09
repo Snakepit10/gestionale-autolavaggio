@@ -1,0 +1,142 @@
+{% extends "base.html" %}
+{% block title %}Saldi giornalieri {{ primo|date:"F Y" }}{% endblock %}
+
+{% block extra_css %}
+<style>
+.saldi-page { padding: 16px; max-width: 1400px; margin: 0 auto; }
+.saldi-kpi { background: #fff; border-radius: 10px; padding: 12px 16px; box-shadow: 0 1px 3px rgba(0,0,0,.06); height: 100%; }
+.saldi-kpi .label { font-size: .75rem; text-transform: uppercase; color: #64748b; font-weight: 600; }
+.saldi-kpi .value { font-size: 1.5rem; font-weight: 700; }
+.saldi-table td, .saldi-table th { white-space: nowrap; vertical-align: middle; }
+.saldi-table .num { text-align: right; font-variant-numeric: tabular-nums; }
+.saldi-table tr.vuoto td { color: #94a3b8; }
+.portale-check { font-size: .78rem; }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="saldi-page">
+
+  <div class="d-flex justify-content-between align-items-center flex-wrap gap-2 mb-3">
+    <h4 class="mb-0"><i class="bi bi-journal-check me-2"></i>Saldi giornalieri — {{ primo|date:"F Y" }}</h4>
+    <div class="d-flex gap-2 align-items-center">
+      <a href="?mese={{ precedente|date:'Y-m' }}" class="btn btn-sm btn-outline-secondary"><i class="bi bi-chevron-left"></i></a>
+      <input type="month" class="form-control form-control-sm" style="max-width:160px"
+             value="{{ primo|date:'Y-m' }}" onchange="location.href='?mese='+this.value">
+      {% if successivo %}<a href="?mese={{ successivo|date:'Y-m' }}" class="btn btn-sm btn-outline-secondary"><i class="bi bi-chevron-right"></i></a>{% endif %}
+      <a href="{% url 'finanze:report_giornata' %}" class="btn btn-sm btn-outline-primary"><i class="bi bi-file-earmark-bar-graph"></i> Report giornata</a>
+    </div>
+  </div>
+
+  <div class="row g-2 mb-3">
+    <div class="col-6 col-lg-3">
+      <div class="saldi-kpi">
+        <div class="label">Differenza del mese</div>
+        <div class="value {% if tot.differenza < -0.5 %}text-danger{% elif tot.differenza > 0.5 %}text-warning{% else %}text-success{% endif %}">
+          {% if tot.differenza > 0 %}+{% endif %}&euro;{{ tot.differenza|floatformat:2 }}
+        </div>
+        <div class="small text-muted">reale &minus; teorico &minus; pagati agli operatori</div>
+      </div>
+    </div>
+    <div class="col-6 col-lg-3">
+      <div class="saldi-kpi">
+        <div class="label">Giorni in quadra</div>
+        <div class="value">{{ tot.n_ok }} / {{ tot.n_quadrature }}</div>
+        <div class="small text-muted">con quadratura inserita (tolleranza &plusmn;&euro;0,50)</div>
+      </div>
+    </div>
+    <div class="col-6 col-lg-3">
+      <div class="saldi-kpi">
+        <div class="label">Pagati agli operatori</div>
+        <div class="value">&euro;{{ tot.operatori|floatformat:2 }}</div>
+        <div class="small text-muted">residuo portali (unità operativa non abbinata)</div>
+      </div>
+    </div>
+    <div class="col-6 col-lg-3">
+      <div class="saldi-kpi">
+        <div class="label">Portali: scontrini = WashTec</div>
+        <div class="value">{{ tot.n_portali_ok }} / {{ tot.n_portali }}</div>
+        <form method="post" action="{% url 'finanze:allinea_periodo_portali' %}" class="mt-1"
+              onsubmit="return confirm('Riallineare le chiusure portali di tutto il mese agli scontrini?');">
+          {% csrf_token %}
+          <input type="hidden" name="da_riepilogo" value="1">
+          <input type="hidden" name="dal" value="{{ primo|date:'Y-m-d' }}">
+          <input type="hidden" name="al" value="{{ ultimo|date:'Y-m-d' }}">
+          <button class="btn btn-sm btn-outline-warning py-0"><i class="bi bi-magic"></i> Allinea portali del mese</button>
+        </form>
+      </div>
+    </div>
+  </div>
+
+  <div class="card border-0 shadow-sm">
+    <div class="table-responsive">
+      <table class="table table-sm table-hover saldi-table mb-0">
+        <thead class="table-light">
+          <tr>
+            <th>Giorno</th>
+            <th class="num">Reale</th>
+            <th class="num">Teorico</th>
+            <th class="num">Pagati operatori</th>
+            <th class="num">Differenza</th>
+            <th class="num">Spese cassa</th>
+            <th>Portali (scontrino / WashTec)</th>
+            <th></th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for r in giorni %}
+          <tr class="{% if r.q.differenza is None %}vuoto{% endif %}">
+            <td>{{ r.data|date:"D d/m" }}</td>
+            {% if r.q.differenza is None %}
+            <td class="num">—</td>
+            <td class="num">&euro;{{ r.q.totale_teorico|floatformat:2 }}</td>
+            <td class="num">&euro;{{ r.q.residuo_operatori|floatformat:2 }}</td>
+            <td class="num"><span class="badge bg-light text-muted border">quadratura non inserita</span></td>
+            {% else %}
+            <td class="num">&euro;{{ r.q.totale_reale|floatformat:2 }}</td>
+            <td class="num">&euro;{{ r.q.totale_teorico|floatformat:2 }}</td>
+            <td class="num">&euro;{{ r.q.residuo_operatori|floatformat:2 }}</td>
+            <td class="num">
+              <span class="badge {% if r.q.stato == 'ok' %}bg-success{% elif r.q.stato == 'mancante' %}bg-danger{% else %}bg-warning text-dark{% endif %}">
+                {% if r.q.differenza > 0 %}+{% endif %}&euro;{{ r.q.differenza|floatformat:2 }}
+              </span>
+            </td>
+            {% endif %}
+            <td class="num">{% if r.q.spese_cassa %}&euro;{{ r.q.spese_cassa|floatformat:2 }}{% else %}<span class="text-muted">—</span>{% endif %}</td>
+            <td class="portale-check">
+              {% if not r.portali_con_scontrini %}
+                <span class="text-muted">scontrini non registrati</span>
+              {% else %}
+                {% for p in r.portali %}
+                <span class="me-2 {% if p.combacia and p.contanti_combaciano %}text-success{% else %}text-danger{% endif %}">
+                  {% if p.codice == 'A' %}Azz.{% else %}Blu{% endif %}
+                  {% if p.scontrino is None %}<span class="text-muted">—</span>
+                  {% else %}
+                    {{ p.scontrino }}/{{ p.tot.richieste }} cicli
+                    &middot; &euro;{{ p.vendita_scontrino|floatformat:0 }}/&euro;{{ p.tot.contanti|floatformat:0 }}
+                    {% if p.combacia and p.contanti_combaciano %}<i class="bi bi-check-circle"></i>{% else %}<i class="bi bi-x-circle"></i>{% endif %}
+                  {% endif %}
+                </span>
+                {% endfor %}
+              {% endif %}
+            </td>
+            <td><a href="{% url 'finanze:report_giornata' %}?data={{ r.data|date:'Y-m-d' }}" class="btn btn-sm btn-link py-0" title="Apri il report del giorno"><i class="bi bi-box-arrow-up-right"></i></a></td>
+          </tr>
+          {% endfor %}
+        </tbody>
+        <tfoot class="table-light">
+          <tr class="fw-bold">
+            <td>Totale ({{ tot.n_quadrature }} gg)</td>
+            <td class="num">&euro;{{ tot.reale|floatformat:2 }}</td>
+            <td class="num">&euro;{{ tot.teorico|floatformat:2 }}</td>
+            <td class="num">&euro;{{ tot.operatori|floatformat:2 }}</td>
+            <td class="num">{% if tot.differenza > 0 %}+{% endif %}&euro;{{ tot.differenza|floatformat:2 }}</td>
+            <td class="num">&euro;{{ tot.spese|floatformat:2 }}</td>
+            <td colspan="2" class="small text-muted fw-normal">I totali di reale, teorico e differenza contano solo i giorni con quadratura inserita.</td>
+          </tr>
+        </tfoot>
+      </table>
+    </div>
+  </div>
+</div>
+{% endblock %}

@@ -1070,12 +1070,79 @@ def report_giornata(request):
     }
 
     # ==================== QUADRATURA GIORNALIERA COMPLESSIVA ====================
-    # L'operatore scassetta TUTTE le casse automatiche + registratore,
-    # conta tutti i contanti insieme + lettore carte POS servito.
-    # Totale reale vs Totale teorico = vendita self-service + totale servito POS.
-    quadratura_obj = QuadraturaGiornaliera.objects.filter(data=data).first()
+    contesto_portali = _contesto_lavaggi_portali(data)
+    quadratura, spese_cassa, totale_spese_cassa = _quadratura_giornata(
+        data, cassa_servito, agg['vendita_totale'], totale_servito,
+        contesto_portali['abbinamento']['valore_residuo'])
 
-    vendita_self_service = agg['vendita_totale']
+    # ==================== PIE CHART TOTALE GIORNATA ====================
+    # Split: portali / cambia gettoni / servito (ordinato, include non pagati)
+    giornata_split = [
+        {'label': 'Servito', 'value': float(totale_servito_ordinato), 'color': '#10b981'},
+        {'label': 'Portali', 'value': float(totale_portali), 'color': '#3b82f6'},
+        {'label': 'Cambia gettoni', 'value': float(totale_cambia_gettoni), 'color': '#f59e0b'},
+    ]
+    giornata_split = [s for s in giornata_split if s['value'] > 0]
+
+    context = {
+        'data': data,
+        'data_prev': data - timedelta(days=1),
+        'data_next': data + timedelta(days=1),
+        'oggi': timezone.now().date(),
+        'cassa_servito': cassa_servito,
+        'chiusure_auto': chiusure_auto,
+        'casse_form_data': casse_form_data,
+        'agg': agg,
+        'totale_giornata': totale_giornata,
+        'totale_ordinato': totale_ordinato,
+        # Nuovi totali per categoria (richiesti)
+        'totale_portali': totale_portali,
+        'totale_cambia_gettoni': totale_cambia_gettoni,
+        'totale_self_service': totale_self_service,
+        'totale_servito': totale_servito,
+        'totale_servito_pagato': totale_servito_pagato,
+        'totale_servito_ordinato': totale_servito_ordinato,
+        'totale_non_pagato': totale_crediti,
+        'totale_corrispettivi': totale_corrispettivi,
+        'imponibile_corrispettivi': imponibile_corrispettivi,
+        'iva_corrispettivi': iva_corrispettivi,
+        'giornata_split_json': json.dumps(giornata_split),
+        'wash_cycles_portali': wash_cycles_portali,
+        'chiusura_registratore': chiusura_registratore,
+        # Quadratura contanti
+        'quadratura': quadratura,
+        # Resto
+        'kpis': kpis,
+        'ordini_non_pagati': ordini_non_pagati_list,
+        'top_servizi': top_servizi,
+        'top_categorie': top_categorie,
+        'metodi_chart_json': json.dumps(metodi_chart),
+        'servizi_chart_json': json.dumps(servizi_chart),
+        'categorie_chart_json': json.dumps(categorie_chart),
+        'orario_buckets_json': json.dumps(orario_buckets),
+        'orario_counts_json': json.dumps(orario_counts),
+    }
+    context.update(contesto_portali)
+    context.update({
+        'spese_cassa': spese_cassa,
+        'totale_spese_cassa': totale_spese_cassa,
+        'categorie_spesa': SpesaCassa.CATEGORIA_CHOICES,
+    })
+    return render(request, 'finanze/report_giornata.html', context)
+
+
+def _quadratura_giornata(data, cassa_servito, vendita_self_service, totale_servito,
+                         residuo_operatori):
+    """Quadratura giornaliera complessiva (scassettamento unificato).
+
+    L'operatore scassetta TUTTE le casse automatiche + registratore,
+    conta tutti i contanti insieme + lettore carte POS servito.
+    Totale reale vs Totale teorico = vendita self-service + servito POS;
+    la differenza sconta anche i lavaggi portale pagati direttamente agli
+    operatori (residuo dell'abbinamento servito).
+    Ritorna (quadratura, spese_cassa, totale_spese_cassa).
+    """
+    quadratura_obj = QuadraturaGiornaliera.objects.filter(data=data).first()
 
     def _per_ordine(pagamenti):
         """Pagamenti raggruppati per ordine: importo, metodi, riferimenti."""
@@ -1159,64 +1226,6 @@ def report_giornata(request):
         'stato': stato_quadratura,
     }
 
-    # ==================== PIE CHART TOTALE GIORNATA ====================
-    # Split: portali / cambia gettoni / servito (ordinato, include non pagati)
-    giornata_split = [
-        {'label': 'Servito', 'value': float(totale_servito_ordinato), 'color': '#10b981'},
-        {'label': 'Portali', 'value': float(totale_portali), 'color': '#3b82f6'},
-        {'label': 'Cambia gettoni', 'value': float(totale_cambia_gettoni), 'color': '#f59e0b'},
-    ]
-    giornata_split = [s for s in giornata_split if s['value'] > 0]
-
-    context = {
-        'data': data,
-        'data_prev': data - timedelta(days=1),
-        'data_next': data + timedelta(days=1),
-        'oggi': timezone.now().date(),
-        'cassa_servito': cassa_servito,
-        'chiusure_auto': chiusure_auto,
-        'casse_form_data': casse_form_data,
-        'agg': agg,
-        'totale_giornata': totale_giornata,
-        'totale_ordinato': totale_ordinato,
-        # Nuovi totali per categoria (richiesti)
-        'totale_portali': totale_portali,
-        'totale_cambia_gettoni': totale_cambia_gettoni,
-        'totale_self_service': totale_self_service,
-        'totale_servito': totale_servito,
-        'totale_servito_pagato': totale_servito_pagato,
-        'totale_servito_ordinato': totale_servito_ordinato,
-        'totale_non_pagato': totale_crediti,
-        'totale_corrispettivi': totale_corrispettivi,
-        'imponibile_corrispettivi': imponibile_corrispettivi,
-        'iva_corrispettivi': iva_corrispettivi,
-        'giornata_split_json': json.dumps(giornata_split),
-        'wash_cycles_portali': wash_cycles_portali,
-        'chiusura_registratore': chiusura_registratore,
-        # Quadratura contanti
-        'quadratura': quadratura,
-        # Resto
-        'kpis': kpis,
-        'ordini_non_pagati': ordini_non_pagati_list,
-        'top_servizi': top_servizi,
-        'top_categorie': top_categorie,
-        'metodi_chart_json': json.dumps(metodi_chart),
-        'servizi_chart_json': json.dumps(servizi_chart),
-        'categorie_chart_json': json.dumps(categorie_chart),
-        'orario_buckets_json': json.dumps(orario_buckets),
-        'orario_counts_json': json.dumps(orario_counts),
-    }
-    context.update(_contesto_lavaggi_portali(data))
-    context.update({
-        'spese_cassa': spese_cassa,
-        'totale_spese_cassa': totale_spese_cassa,
-        'categorie_spesa': SpesaCassa.CATEGORIA_CHOICES,
-    })
-
-    # La differenza di quadratura sconta anche i lavaggi portale pagati
-    # direttamente agli operatori (residuo dell'abbinamento servito).
-    abbinamento = context.get('abbinamento')
-    residuo_operatori = abbinamento['valore_residuo'] if abbinamento else Decimal('0.00')
     quadratura['residuo_operatori'] = residuo_operatori
     if quadratura['differenza'] is not None:
         quadratura['differenza_reale_teorico'] = quadratura['differenza']
@@ -1227,7 +1236,7 @@ def report_giornata(request):
             quadratura['stato'] = 'mancante'
         else:
             quadratura['stato'] = 'eccedente'
-    return render(request, 'finanze/report_giornata.html', context)
+    return quadratura, spese_cassa, totale_spese_cassa
 
 
 def _chiusura_portali(data):
@@ -1252,7 +1261,7 @@ def _chiusura_portali(data):
     ), False
 
 
-def _contesto_lavaggi_portali(data):
+def _contesto_lavaggi_portali(data, completo=True):
     """Sezione 'Lavaggi portali (WashTec)' del report giornata.
 
     L'operatore imposta la finestra di chiusura (ChiusuraPortali);
@@ -1306,7 +1315,7 @@ def _contesto_lavaggi_portali(data):
     # con l'inizio attaccato alla fine del giorno prima: proposti se
     # cambiano qualcosa o se qualche portale non torna
     allineamento, allineamento_cambia = None, False
-    if any(casse.values()):
+    if completo and any(casse.values()):
         allineamento = allinea_scontrini.allinea(chiusura, casse)
         allineamento_cambia = any(
             v['fine'] and (v['fine'] != v['fine_attuale'] or v['da'] != v['da_attuale'])
@@ -1325,7 +1334,7 @@ def _contesto_lavaggi_portali(data):
         istanti = [('Inizio Azzurro', chiusura.periodo_da), ('Fine Azzurro', chiusura.periodo_a)]
         istanti += [(e, i) for e, i in (('Inizio Blu', da_blu), ('Fine Blu', a_blu))
                     if i not in (chiusura.periodo_da, chiusura.periodo_a)]
-    for etichetta, istante in istanti:
+    for etichetta, istante in (istanti if completo else []):
         vicine = (TransazionePortale.objects
                   .filter(orario__gte=istante - margine, orario__lte=istante + margine)
                   .order_by('orario', 'numero'))
@@ -1466,12 +1475,91 @@ def imposta_chiusura_portali(request):
 
 @login_required
 @user_passes_test(is_staff_user)
+def riepilogo_saldi_portali(request):
+    """Riepilogo mensile dei saldi giornalieri: per ogni giorno la
+    differenza della quadratura (reale - teorico - pagati agli operatori)
+    e, come controllo, gli scontrini dei portali contro WashTec."""
+    import calendar
+
+    oggi = timezone.localdate()
+    try:
+        primo = datetime.strptime(request.GET.get('mese', ''), '%Y-%m').date()
+    except ValueError:
+        primo = oggi.replace(day=1)
+    ultimo = primo.replace(day=calendar.monthrange(primo.year, primo.month)[1])
+    precedente = (primo - timedelta(days=1)).replace(day=1)
+    successivo = ultimo + timedelta(days=1)
+
+    giorni = []
+    tot = {'reale': Decimal('0.00'), 'teorico': Decimal('0.00'),
+           'operatori': Decimal('0.00'), 'differenza': Decimal('0.00'),
+           'spese': Decimal('0.00'), 'n_quadrature': 0, 'n_ok': 0,
+           'n_portali_ok': 0, 'n_portali': 0}
+    g = primo
+    while g <= min(ultimo, oggi):
+        quadratura, portali = _saldo_giornata(g)
+        portali_scontrini = [p for p in portali['lavaggi_portali'] if p['scontrino'] is not None]
+        riga = {
+            'data': g, 'q': quadratura, 'portali': portali['lavaggi_portali'],
+            'portali_tornano': all(p['combacia'] and p['contanti_combaciano']
+                                   for p in portali['lavaggi_portali']),
+            'portali_con_scontrini': bool(portali_scontrini),
+            'washcycles_self': portali['washcycles_self'],
+        }
+        giorni.append(riga)
+        if quadratura['differenza'] is not None:
+            tot['n_quadrature'] += 1
+            tot['n_ok'] += quadratura['stato'] == 'ok'
+            tot['reale'] += quadratura['totale_reale']
+            tot['teorico'] += quadratura['totale_teorico']
+            tot['operatori'] += quadratura['residuo_operatori']
+            tot['differenza'] += quadratura['differenza']
+            tot['spese'] += quadratura['spese_cassa']
+        if riga['portali_con_scontrini']:
+            tot['n_portali'] += 1
+            tot['n_portali_ok'] += riga['portali_tornano']
+        g += timedelta(days=1)
+
+    return render(request, 'finanze/riepilogo_saldi_portali.html', {
+        'primo': primo, 'ultimo': min(ultimo, oggi),
+        'precedente': precedente,
+        'successivo': successivo if successivo <= oggi else None,
+        'giorni': giorni, 'tot': tot,
+    })
+
+
+def _saldo_giornata(data):
+    """(quadratura, contesto portali) di un giorno, con gli stessi calcoli
+    del report giornata (versione leggera dei portali)."""
+    cassa_servito = ChiusuraCassa.objects.filter(data=data).first()
+    if cassa_servito:
+        cassa_servito.ricalcola_totali()
+    vendita_self_service = sum(
+        (c.vendita_totale for c in ChiusuraCassaAutomatica.objects
+         .filter(data=data, cassa__modalita_registratore=False)),
+        Decimal('0.00'))
+    if cassa_servito:
+        totale_servito = cassa_servito.totale_incassi_giornalieri
+    else:
+        totale_servito = (Pagamento.objects.filter(data_pagamento__date=data)
+                          .aggregate(s=Sum('importo'))['s'] or Decimal('0.00'))
+    portali = _contesto_lavaggi_portali(data, completo=False)
+    quadratura, _, _ = _quadratura_giornata(
+        data, cassa_servito, vendita_self_service, totale_servito,
+        portali['abbinamento']['valore_residuo'])
+    return quadratura, portali
+
+
+@login_required
+@user_passes_test(is_staff_user)
 def allinea_periodo_portali(request):
     """POST dal report giornata: allinea insieme le chiusure portali di
     piu' giorni agli scontrini (prima i saldi, poi i WashCycles)."""
     from django.urls import reverse
 
     torna = f"{reverse('finanze:report_giornata')}?data={request.POST.get('data', '')}"
+    if request.POST.get('da_riepilogo'):
+        torna = f"{reverse('finanze:riepilogo_saldi_portali')}?mese={request.POST.get('dal', '')[:7]}"
     if request.method != 'POST':
         return redirect('finanze:report_giornata')
     try:
