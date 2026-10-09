@@ -187,6 +187,34 @@ class AbbinamentoPortaliTest(TestCase):
         self.assertEqual(r.status_code, 302)
         self.assertFalse(AbbinamentoPortale.objects.exists())
 
+    def test_finestra_predefinita_senza_chiusura(self):
+        # Senza chiusura salvata: 19:30 del giorno prima -> 19:30 del giorno
+        from apps.finanze.views import _contesto_lavaggi_portali
+        self.chiusura.delete()
+        self._tx('10:05', 4, origine='contanti')
+        TransazionePortale.objects.create(       # 06/10 20:00: giornata dopo
+            portale='A', numero=50000, orario=ora('20:00'), programma=4, origine='contanti')
+        ctx = _contesto_lavaggi_portali(ora('10:00').date())
+        self.assertFalse(ctx['portali_chiusura_salvata'])
+        self.assertEqual(ctx['portali_n_transazioni'], 1)
+        self.assertEqual(ctx['washcycles_self']['n_contanti'], 1)
+        self.assertEqual(timezone.localtime(ctx['portali_chiusura'].periodo_da).strftime('%d/%m %H:%M'),
+                         '05/10 19:30')
+        self.assertFalse(ChiusuraPortali.objects.exists())
+
+    def test_abbinare_salva_la_finestra_predefinita(self):
+        user = User.objects.create_user('op', 'op@x.it', 'x', is_staff=True)
+        self.client.force_login(user)
+        self.chiusura.delete()
+        self._item(self.completo, completato='10:30')
+        self._tx('10:05', 4)
+        self.client.post(reverse('finanze:azione_abbinamento_portali'),
+                         {'data': '2026-10-06', 'azione': 'conferma'})
+        c = ChiusuraPortali.objects.get()
+        self.assertEqual((c.operatore, timezone.localtime(c.periodo_a).strftime('%d/%m %H:%M')),
+                         (user, '06/10 19:30'))
+        self.assertEqual(AbbinamentoPortale.objects.count(), 1)
+
     def test_programmi_portale_ordinati(self):
         s = ServizioProdotto(programmi_portale=' 8, 9,x,12,7,8,4 ')
         self.assertEqual(s.programmi_portale_ordinati, [8, 9, 7, 4])

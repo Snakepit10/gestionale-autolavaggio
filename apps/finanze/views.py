@@ -1230,6 +1230,25 @@ def report_giornata(request):
     return render(request, 'finanze/report_giornata.html', context)
 
 
+def _chiusura_portali(data):
+    """(chiusura, salvata) della giornata portali. Senza una chiusura
+    salvata ritorna quella predefinita, non salvata: dalle 19:30 del
+    giorno prima alle 19:30 del giorno, oppure dalla fine della chiusura
+    del giorno prima se esiste (niente buchi ne' sovrapposizioni)."""
+    from .models import ChiusuraPortali
+
+    chiusura = ChiusuraPortali.objects.filter(data=data).first()
+    if chiusura:
+        return chiusura, True
+    prec = ChiusuraPortali.objects.filter(data=data - timedelta(days=1)).first()
+    alle_1930 = lambda g: timezone.make_aware(datetime.combine(g, time(19, 30)))
+    return ChiusuraPortali(
+        data=data,
+        periodo_da=prec.periodo_a if prec else alle_1930(data - timedelta(days=1)),
+        periodo_a=alle_1930(data),
+    ), False
+
+
 def _contesto_lavaggi_portali(data):
     """Sezione 'Lavaggi portali (WashTec)' del report giornata.
 
@@ -1239,24 +1258,13 @@ def _contesto_lavaggi_portali(data):
     divisi per origine (contanti / unita' operativa). I programmi
     senza prezzo di listino vengono segnalati.
     """
-    from .models import (PREZZI_PROGRAMMA_PORTALE, ChiusuraPortali,
-                         TransazionePortale)
+    from .models import PREZZI_PROGRAMMA_PORTALE, TransazionePortale
 
-    chiusura = ChiusuraPortali.objects.filter(data=data).first()
-    transazioni = []
-    if chiusura:
-        transazioni = list(TransazionePortale.objects.filter(
-            orario__gt=chiusura.periodo_da,
-            orario__lte=chiusura.periodo_a,
-        ))
-
-    # Finestra proposta: dalle 19:30 del giorno prima alle 19:30 del
-    # giorno; se il giorno prima ha gia' una chiusura si riparte dalla sua
-    # fine, cosi' non restano buchi ne' sovrapposizioni.
-    prec = ChiusuraPortali.objects.filter(data=data - timedelta(days=1)).first()
-    alle_1930 = lambda g: timezone.make_aware(datetime.combine(g, time(19, 30)))
-    default_da = prec.periodo_a if prec else alle_1930(data - timedelta(days=1))
-    default_a = alle_1930(data)
+    chiusura, salvata = _chiusura_portali(data)
+    transazioni = list(TransazionePortale.objects.filter(
+        orario__gt=chiusura.periodo_da,
+        orario__lte=chiusura.periodo_a,
+    ))
 
     portali = []
     for codice, label in TransazionePortale.PORTALE_CHOICES:
@@ -1283,25 +1291,22 @@ def _contesto_lavaggi_portali(data):
             'tot': tot, 'tot_valore': tot['contanti'] + tot['unita'],
         })
 
-    abbinamento = abbinamento_portali.riepilogo(chiusura) if chiusura else None
+    abbinamento = abbinamento_portali.riepilogo(chiusura)
 
     # WashCycles self service: lavaggi pagati in contanti al portale +
     # residuo unita' operativa (pagati direttamente agli operatori)
-    washcycles_self = None
-    if chiusura:
-        n_contanti = sum(1 for t in transazioni if t.origine == 'contanti')
-        v_contanti = sum((p['tot']['contanti'] for p in portali), Decimal('0.00'))
-        washcycles_self = {
-            'n': n_contanti + len(abbinamento['residuo']),
-            'valore': v_contanti + abbinamento['valore_residuo'],
-            'n_contanti': n_contanti,
-            'n_operatori': len(abbinamento['residuo']),
-        }
+    n_contanti = sum(1 for t in transazioni if t.origine == 'contanti')
+    v_contanti = sum((p['tot']['contanti'] for p in portali), Decimal('0.00'))
+    washcycles_self = {
+        'n': n_contanti + len(abbinamento['residuo']),
+        'valore': v_contanti + abbinamento['valore_residuo'],
+        'n_contanti': n_contanti,
+        'n_operatori': len(abbinamento['residuo']),
+    }
 
     return {
         'portali_chiusura': chiusura,
-        'portali_default_da': default_da,
-        'portali_default_a': default_a,
+        'portali_chiusura_salvata': salvata,
         'lavaggi_portali': portali,
         'portali_n_transazioni': len(transazioni),
         'portali_archivio_totale': TransazionePortale.objects.count(),
@@ -1317,7 +1322,7 @@ def azione_abbinamento_portali(request):
     rimuove un abbinamento servito <-> transazione portale."""
     from django.urls import reverse
 
-    from .models import AbbinamentoPortale, ChiusuraPortali
+    from .models import AbbinamentoPortale
 
     data_str = request.POST.get('data', '')
     torna = f"{reverse('finanze:report_giornata')}?data={data_str}#abbinamento-portali"
@@ -1328,10 +1333,11 @@ def azione_abbinamento_portali(request):
     except ValueError:
         messages.error(request, 'Data non valida.')
         return redirect('finanze:report_giornata')
-    chiusura = ChiusuraPortali.objects.filter(data=data).first()
-    if chiusura is None:
-        messages.error(request, 'Imposta prima la chiusura portali della giornata.')
-        return redirect(torna)
+    # Abbinare fissa la finestra: quella predefinita viene salvata
+    chiusura, salvata = _chiusura_portali(data)
+    if not salvata:
+        chiusura.operatore = request.user
+        chiusura.save()
 
     azione = request.POST.get('azione')
     if azione == 'conferma':

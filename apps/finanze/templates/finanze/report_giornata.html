@@ -688,24 +688,23 @@
         <div>
           <label class="form-label small mb-0 fw-bold">Inizio chiusura</label>
           <input type="datetime-local" name="periodo_da" class="form-control form-control-sm" required
-                 value="{{ portali_chiusura.periodo_da|default:portali_default_da|date:'Y-m-d\TH:i' }}">
+                 value="{{ portali_chiusura.periodo_da|date:'Y-m-d\TH:i' }}">
         </div>
         <div>
           <label class="form-label small mb-0 fw-bold">Fine chiusura</label>
           <input type="datetime-local" name="periodo_a" class="form-control form-control-sm" required
-                 value="{{ portali_chiusura.periodo_a|default:portali_default_a|date:'Y-m-d\TH:i' }}">
+                 value="{{ portali_chiusura.periodo_a|date:'Y-m-d\TH:i' }}">
         </div>
         <button type="submit" class="btn btn-primary btn-sm">
-          <i class="bi bi-arrow-repeat"></i> {% if portali_chiusura %}Aggiorna{% else %}Imposta e calcola{% endif %}
+          <i class="bi bi-arrow-repeat"></i> {% if portali_chiusura_salvata %}Aggiorna{% else %}Salva orari{% endif %}
         </button>
-        {% if portali_chiusura %}
         <span class="small text-muted">
           {{ portali_n_transazioni }} lavaggi nella finestra
           {{ portali_chiusura.periodo_da|date:'d/m H:i' }} &rarr; {{ portali_chiusura.periodo_a|date:'d/m H:i' }}
+          {% if not portali_chiusura_salvata %}
+          <span class="badge bg-light text-dark border" title="Calcolata con gli orari predefiniti: modificali e salva se la chiusura reale è diversa">orari predefiniti</span>
+          {% endif %}
         </span>
-        {% else %}
-        <span class="small text-warning"><i class="bi bi-exclamation-circle"></i> Finestra non ancora impostata per questa giornata</span>
-        {% endif %}
       </form>
 
       {% if portali_chiusura %}
