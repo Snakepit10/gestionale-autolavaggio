@@ -97,11 +97,11 @@ def lavaggi_servito(chiusura):
 
 
 def transazioni_libere(chiusura):
-    """Transazioni da unita' operativa della finestra non ancora abbinate."""
+    """Transazioni da unita' operativa della finestra (di ciascun
+    portale) non ancora abbinate."""
     return list(TransazionePortale.objects.filter(
+        chiusura.q_transazioni(),
         origine='unita',
-        orario__gt=chiusura.periodo_da,
-        orario__lte=chiusura.periodo_a,
         abbinamento__isnull=True,
     ).order_by('orario'))
 

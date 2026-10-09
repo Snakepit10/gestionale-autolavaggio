@@ -9,7 +9,7 @@ from decimal import Decimal
 import json
 
 from .models import ChiusuraCassa, MovimentoCassa, Cassa, ChiusuraCassaAutomatica, QuadraturaGiornaliera, SpesaCassa
-from .services import abbinamento_portali
+from .services import abbinamento_portali, allinea_scontrini
 
 # Metodi che non finiscono nel conteggio fisico della quadratura
 # (contanti scassettati + lettore carte): esclusi dal servito atteso.
@@ -1242,10 +1242,13 @@ def _chiusura_portali(data):
         return chiusura, True
     prec = ChiusuraPortali.objects.filter(data=data - timedelta(days=1)).first()
     alle_1930 = lambda g: timezone.make_aware(datetime.combine(g, time(19, 30)))
+    da = prec.periodo_a if prec else alle_1930(data - timedelta(days=1))
+    da_blu = prec.finestra('B')[1] if prec else da
     return ChiusuraPortali(
         data=data,
-        periodo_da=prec.periodo_a if prec else alle_1930(data - timedelta(days=1)),
+        periodo_da=da,
         periodo_a=alle_1930(data),
+        periodo_da_blu=da_blu if da_blu != da else None,
     ), False
 
 
@@ -1261,10 +1264,8 @@ def _contesto_lavaggi_portali(data):
     from .models import PREZZI_PROGRAMMA_PORTALE, TransazionePortale
 
     chiusura, salvata = _chiusura_portali(data)
-    transazioni = list(TransazionePortale.objects.filter(
-        orario__gt=chiusura.periodo_da,
-        orario__lte=chiusura.periodo_a,
-    ))
+    transazioni = list(TransazionePortale.objects.filter(chiusura.q_transazioni()))
+    scontrini = allinea_scontrini.washcycles_scontrini(data)
 
     portali = []
     for codice, label in TransazionePortale.PORTALE_CHOICES:
@@ -1289,20 +1290,34 @@ def _contesto_lavaggi_portali(data):
         portali.append({
             'codice': codice, 'label': label, 'righe': righe,
             'tot': tot, 'tot_valore': tot['contanti'] + tot['unita'],
+            'finestra': chiusura.finestra(codice),
+            'scontrino': scontrini[codice],
+            'combacia': scontrini[codice] is None or scontrini[codice] == tot['richieste'],
         })
+
+    # Orari che fanno combaciare i lavaggi WashTec con i WashCycles degli
+    # scontrini, proposti solo se qualche portale non torna
+    allineamento = None
+    if not all(p['combacia'] for p in portali):
+        allineamento = allinea_scontrini.allinea(chiusura, scontrini)
 
     # Lavaggi a cavallo di inizio e fine (+-20 min, al secondo): per
     # far combaciare la finestra con gli scontrini senza andare a tentativi
     margine = timedelta(minutes=20)
     bordi = []
-    for etichetta, istante in (('Inizio', chiusura.periodo_da), ('Fine', chiusura.periodo_a)):
+    istanti = [('Inizio', chiusura.periodo_da), ('Fine', chiusura.periodo_a)]
+    if chiusura.orari_blu_diversi:
+        da_blu, a_blu = chiusura.finestra('B')
+        istanti = [('Inizio Azzurro', chiusura.periodo_da), ('Fine Azzurro', chiusura.periodo_a)]
+        istanti += [(e, i) for e, i in (('Inizio Blu', da_blu), ('Fine Blu', a_blu))
+                    if i not in (chiusura.periodo_da, chiusura.periodo_a)]
+    for etichetta, istante in istanti:
         vicine = (TransazionePortale.objects
                   .filter(orario__gte=istante - margine, orario__lte=istante + margine)
                   .order_by('orario', 'numero'))
         bordi.append({
             'etichetta': etichetta, 'istante': istante,
-            'righe': [{'t': t, 'dentro': chiusura.periodo_da < t.orario <= chiusura.periodo_a}
-                      for t in vicine],
+            'righe': [{'t': t, 'dentro': chiusura.contiene(t)} for t in vicine],
         })
 
     abbinamento = abbinamento_portali.riepilogo(chiusura)
@@ -1324,6 +1339,7 @@ def _contesto_lavaggi_portali(data):
         'lavaggi_portali': portali,
         'portali_n_transazioni': len(transazioni),
         'portali_bordi': bordi,
+        'portali_allineamento': allineamento,
         'portali_archivio_totale': TransazionePortale.objects.count(),
         'abbinamento': abbinamento,
         'washcycles_self': washcycles_self,
@@ -1371,9 +1387,7 @@ def azione_abbinamento_portali(request):
     elif azione == 'rimuovi':
         n, _ = AbbinamentoPortale.objects.filter(
             pk=request.POST.get('abbinamento_id'),
-            transazione__orario__gt=chiusura.periodo_da,
-            transazione__orario__lte=chiusura.periodo_a,
-        ).delete()
+        ).filter(chiusura.q_transazioni('transazione__')).delete()
         if n:
             messages.success(request, 'Abbinamento rimosso.')
         else:
@@ -1396,9 +1410,11 @@ def imposta_chiusura_portali(request):
         return redirect('finanze:report_giornata')
     data_str = request.POST.get('data', '')
 
-    def _orario(campo):
+    def _orario(campo, facoltativo=False):
         # datetime-local invia i secondi solo se diversi da :00
-        testo = request.POST.get(campo, '')
+        testo = request.POST.get(campo, '').strip()
+        if facoltativo and not testo:
+            return None
         formato = '%Y-%m-%dT%H:%M:%S' if testo.count(':') == 2 else '%Y-%m-%dT%H:%M'
         return timezone.make_aware(datetime.strptime(testo, formato))
 
@@ -1406,10 +1422,17 @@ def imposta_chiusura_portali(request):
         data = datetime.strptime(data_str, '%Y-%m-%d').date()
         periodo_da = _orario('periodo_da')
         periodo_a = _orario('periodo_a')
+        # Orari del Blu: vuoti o uguali a quelli generali = nessuna differenza
+        periodo_da_blu = _orario('periodo_da_blu', facoltativo=True)
+        periodo_a_blu = _orario('periodo_a_blu', facoltativo=True)
     except ValueError:
         messages.error(request, 'Date della chiusura portali non valide.')
         return redirect(f"{reverse('finanze:report_giornata')}?data={data_str}")
-    if periodo_a <= periodo_da:
+    if periodo_da_blu == periodo_da:
+        periodo_da_blu = None
+    if periodo_a_blu == periodo_a:
+        periodo_a_blu = None
+    if periodo_a <= periodo_da or (periodo_a_blu or periodo_a) <= (periodo_da_blu or periodo_da):
         messages.error(request,
                        "La fine della chiusura deve essere dopo l'inizio.")
         return redirect(f"{reverse('finanze:report_giornata')}?data={data_str}")
@@ -1417,8 +1440,11 @@ def imposta_chiusura_portali(request):
     ChiusuraPortali.objects.update_or_create(
         data=data, defaults={'periodo_da': periodo_da,
                              'periodo_a': periodo_a,
+                             'periodo_da_blu': periodo_da_blu,
+                             'periodo_a_blu': periodo_a_blu,
                              'operatore': request.user})
-    messages.success(request, 'Chiusura portali aggiornata.')
+    messages.success(request, 'Orari allineati agli scontrini.' if request.POST.get('allinea')
+                     else 'Chiusura portali aggiornata.')
     return redirect(
         f"{reverse('finanze:report_giornata')}?data={data.strftime('%Y-%m-%d')}")
 

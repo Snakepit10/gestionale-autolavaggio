@@ -528,10 +528,21 @@ class ChiusuraPortali(models.Model):
     li imposta l'operatore nel report giornata. I lavaggi mostrati
     sono le TransazionePortale con orario nella finestra (estremo
     iniziale escluso, finale incluso).
+
+    periodo_da/periodo_a valgono per il portale Azzurro (A) e per i
+    lavaggi del servito; gli scontrini delle due casse pero' vengono
+    chiusi in momenti diversi (il Blu spesso 15-20 minuti dopo), quindi
+    il Blu (B) puo' avere orari suoi: se vuoti valgono quelli generali.
     """
     data = models.DateField(unique=True)
     periodo_da = models.DateTimeField(verbose_name='Inizio chiusura')
     periodo_a = models.DateTimeField(verbose_name='Fine chiusura')
+    periodo_da_blu = models.DateTimeField(
+        null=True, blank=True, verbose_name='Inizio chiusura Blu',
+        help_text='Solo se diverso dall\'inizio generale')
+    periodo_a_blu = models.DateTimeField(
+        null=True, blank=True, verbose_name='Fine chiusura Blu',
+        help_text='Solo se diversa dalla fine generale')
     operatore = models.ForeignKey(
         User, on_delete=models.SET_NULL, null=True, blank=True,
         related_name='chiusure_portali')
@@ -545,6 +556,32 @@ class ChiusuraPortali(models.Model):
     def __str__(self):
         return (f"Chiusura portali {self.data:%d/%m/%Y} "
                 f"({self.periodo_da:%d/%m %H:%M} - {self.periodo_a:%d/%m %H:%M})")
+
+    def finestra(self, portale):
+        """(inizio escluso, fine inclusa) della finestra del portale."""
+        if portale == 'B':
+            return (self.periodo_da_blu or self.periodo_da,
+                    self.periodo_a_blu or self.periodo_a)
+        return self.periodo_da, self.periodo_a
+
+    @property
+    def orari_blu_diversi(self):
+        return self.finestra('B') != self.finestra('A')
+
+    def contiene(self, transazione):
+        da, a = self.finestra(transazione.portale)
+        return da < transazione.orario <= a
+
+    def q_transazioni(self, prefisso=''):
+        """Q delle TransazionePortale nella finestra del loro portale
+        (prefisso per filtrare da un modello collegato, es. 'transazione__')."""
+        q = models.Q(pk__in=[])
+        for portale in ('A', 'B'):
+            da, a = self.finestra(portale)
+            q |= models.Q(**{f'{prefisso}portale': portale,
+                             f'{prefisso}orario__gt': da,
+                             f'{prefisso}orario__lte': a})
+        return q
 
 
 class AbbinamentoPortale(models.Model):

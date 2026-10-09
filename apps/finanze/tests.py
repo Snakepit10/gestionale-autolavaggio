@@ -265,6 +265,73 @@ class AbbinamentoPortaliTest(TestCase):
         self.assertEqual([(timezone.localtime(r['t'].orario).strftime('%H:%M'), r['dentro'])
                           for r in fine['righe']], [('17:50', True), ('18:05', False)])
 
+    def _scontrino(self, nome, wash_cycles):
+        from apps.finanze.models import Cassa, ChiusuraCassaAutomatica
+        cassa, _ = Cassa.objects.get_or_create(nome=nome, defaults={'tipo': 'automatica'})
+        ChiusuraCassaAutomatica.objects.create(cassa=cassa, data=self.chiusura.data,
+                                               wash_cycles=wash_cycles)
+
+    def _tx_portale(self, portale, alle, programma=4, origine='unita'):
+        self.n_tx += 1
+        return TransazionePortale.objects.create(
+            portale=portale, numero=20000 + self.n_tx, orario=ora(alle),
+            programma=programma, origine=origine)
+
+    def test_finestra_blu_separata(self):
+        # Blu chiuso alle 18:20: il suo lavaggio delle 18:10 conta, quello
+        # dell'Azzurro alla stessa ora no (fine generale 18:00)
+        self.chiusura.periodo_a_blu = ora('18:20')
+        self.chiusura.save()
+        a = self._tx_portale('A', '18:10')
+        b = self._tx_portale('B', '18:10')
+        self.assertFalse(self.chiusura.contiene(a))
+        self.assertTrue(self.chiusura.contiene(b))
+        self.assertEqual([t.pk for t in ap.transazioni_libere(self.chiusura)], [b.pk])
+
+    def test_allinea_agli_scontrini(self):
+        # Come il 17/09: Azzurro torna con la fine generale, il Blu solo
+        # spostando la sua fine dopo il lavaggio delle 18:15
+        from apps.finanze.services import allinea_scontrini as al
+        for alle in ('09:00', '12:00', '17:50'):
+            self._tx_portale('A', alle)
+        self._tx_portale('A', '18:05')                  # Azzurro: dopo la chiusura
+        for alle in ('10:00', '17:55', '18:15'):
+            self._tx_portale('B', alle)
+        self._tx_portale('B', '18:40')
+        self._scontrino('Portale Azzurro', 3)
+        self._scontrino('Portale Blu', 3)
+        scontrini = al.washcycles_scontrini(self.chiusura.data)
+        self.assertEqual(scontrini, {'A': 3, 'B': 3})
+        esito = al.allinea(self.chiusura, scontrini)
+        self.assertEqual(esito['A']['fine'], ora('18:00'))          # invariata
+        self.assertEqual(esito['B']['fine'], ora('18:15'))          # primo orario utile
+        self.assertEqual(esito['B']['tra'], (ora('18:15'), ora('18:40') - timedelta(seconds=1)))
+
+    def test_allinea_segnala_lavaggi_mancanti(self):
+        from apps.finanze.services import allinea_scontrini as al
+        self._tx_portale('B', '10:00')
+        esito = al.allinea(self.chiusura, {'A': None, 'B': 5})
+        self.assertIn('solo 1 lavaggi', esito['B']['errore'])
+        self.assertNotIn('A', esito)
+
+    def test_salva_orari_blu(self):
+        user = User.objects.create_user('op', 'op@x.it', 'x', is_staff=True)
+        self.client.force_login(user)
+        url = reverse('finanze:imposta_chiusura_portali')
+        self.client.post(url, {'data': '2026-10-06', 'periodo_da': '2026-10-05T19:00',
+                               'periodo_a': '2026-10-06T18:00',
+                               'periodo_da_blu': '2026-10-05T19:00',      # uguale: ignorato
+                               'periodo_a_blu': '2026-10-06T18:20:30'})
+        c = ChiusuraPortali.objects.get(data=ora('10:00').date())
+        self.assertIsNone(c.periodo_da_blu)
+        self.assertEqual(timezone.localtime(c.periodo_a_blu).strftime('%H:%M:%S'), '18:20:30')
+        # il giorno dopo il Blu riparte dalla sua fine
+        from apps.finanze.views import _chiusura_portali
+        dopo, salvata = _chiusura_portali(c.data + timedelta(days=1))
+        self.assertFalse(salvata)
+        self.assertEqual(dopo.finestra('B')[0], c.periodo_a_blu)
+        self.assertEqual(dopo.finestra('A')[0], c.periodo_a)
+
     def test_programmi_portale_ordinati(self):
         s = ServizioProdotto(programmi_portale=' 8, 9,x,12,7,8,4 ')
         self.assertEqual(s.programmi_portale_ordinati, [8, 9, 7, 4])

@@ -681,31 +681,95 @@
     </div>
     <div class="panel-body">
 
-      <form method="post" action="{% url 'finanze:imposta_chiusura_portali' %}"
-            class="d-flex gap-2 align-items-end flex-wrap mb-3">
+      {% with fa=lavaggi_portali.0.finestra fb=lavaggi_portali.1.finestra %}
+      <form method="post" action="{% url 'finanze:imposta_chiusura_portali' %}" class="mb-2">
         {% csrf_token %}
         <input type="hidden" name="data" value="{{ data|date:'Y-m-d' }}">
-        <div>
-          <label class="form-label small mb-0 fw-bold">Inizio chiusura</label>
-          <input type="datetime-local" name="periodo_da" class="form-control form-control-sm" required step="1"
-                 value="{{ portali_chiusura.periodo_da|date:'Y-m-d\TH:i:s' }}">
+        <div class="d-flex gap-2 align-items-end flex-wrap mb-2">
+          <div class="small fw-bold" style="width:7.5rem">Azzurro e servito</div>
+          <div>
+            <label class="form-label small mb-0">Inizio chiusura</label>
+            <input type="datetime-local" name="periodo_da" class="form-control form-control-sm" required step="1"
+                   value="{{ fa.0|date:'Y-m-d\TH:i:s' }}">
+          </div>
+          <div>
+            <label class="form-label small mb-0">Fine chiusura</label>
+            <input type="datetime-local" name="periodo_a" class="form-control form-control-sm" required step="1"
+                   value="{{ fa.1|date:'Y-m-d\TH:i:s' }}">
+          </div>
         </div>
-        <div>
-          <label class="form-label small mb-0 fw-bold">Fine chiusura</label>
-          <input type="datetime-local" name="periodo_a" class="form-control form-control-sm" required step="1"
-                 value="{{ portali_chiusura.periodo_a|date:'Y-m-d\TH:i:s' }}">
+        <div class="d-flex gap-2 align-items-end flex-wrap mb-2">
+          <div class="small fw-bold" style="width:7.5rem">Blu
+            <div class="fw-normal text-muted">se lo scontrino è chiuso a un altro orario</div></div>
+          <div>
+            <label class="form-label small mb-0">Inizio chiusura</label>
+            <input type="datetime-local" name="periodo_da_blu" class="form-control form-control-sm" step="1"
+                   value="{{ fb.0|date:'Y-m-d\TH:i:s' }}">
+          </div>
+          <div>
+            <label class="form-label small mb-0">Fine chiusura</label>
+            <input type="datetime-local" name="periodo_a_blu" class="form-control form-control-sm" step="1"
+                   value="{{ fb.1|date:'Y-m-d\TH:i:s' }}">
+          </div>
+          <button type="submit" class="btn btn-primary btn-sm">
+            <i class="bi bi-arrow-repeat"></i> {% if portali_chiusura_salvata %}Aggiorna{% else %}Salva orari{% endif %}
+          </button>
+          <span class="small text-muted">
+            {{ portali_n_transazioni }} lavaggi nella finestra
+            {% if not portali_chiusura_salvata %}
+            <span class="badge bg-light text-dark border" title="Calcolata con gli orari predefiniti: modificali e salva se la chiusura reale è diversa">orari predefiniti</span>
+            {% endif %}
+          </span>
         </div>
-        <button type="submit" class="btn btn-primary btn-sm">
-          <i class="bi bi-arrow-repeat"></i> {% if portali_chiusura_salvata %}Aggiorna{% else %}Salva orari{% endif %}
-        </button>
-        <span class="small text-muted">
-          {{ portali_n_transazioni }} lavaggi nella finestra
-          {{ portali_chiusura.periodo_da|date:'d/m H:i:s' }} &rarr; {{ portali_chiusura.periodo_a|date:'d/m H:i:s' }}
-          {% if not portali_chiusura_salvata %}
-          <span class="badge bg-light text-dark border" title="Calcolata con gli orari predefiniti: modificali e salva se la chiusura reale è diversa">orari predefiniti</span>
-          {% endif %}
-        </span>
       </form>
+      {% endwith %}
+
+      {# Confronto con i WashCycles degli scontrini delle casse #}
+      <div class="small mb-3 d-flex flex-wrap gap-3 align-items-center">
+        <span class="text-muted">Scontrini vs WashTec:</span>
+        {% for p in lavaggi_portali %}
+        <span>
+          {{ p.label }}:
+          {% if p.scontrino is None %}<span class="text-muted">scontrino non registrato &middot; WashTec {{ p.tot.richieste }}</span>
+          {% elif p.combacia %}<span class="text-success fw-bold"><i class="bi bi-check-circle"></i> {{ p.scontrino }} = {{ p.tot.richieste }}</span>
+          {% else %}<span class="text-danger fw-bold"><i class="bi bi-x-circle"></i> scontrino {{ p.scontrino }} &ne; WashTec {{ p.tot.richieste }}</span>{% endif %}
+        </span>
+        {% endfor %}
+      </div>
+
+      {% if portali_allineamento %}
+      <div class="alert alert-warning small">
+        <div class="fw-bold mb-1"><i class="bi bi-magic"></i> Orari che fanno combaciare i WashCycles degli scontrini</div>
+        <ul class="mb-2">
+          {% for codice, v in portali_allineamento.items %}
+          <li>
+            {% if codice == 'A' %}Azzurro{% else %}Blu{% endif %} (scontrino {{ v.scontrino }}):
+            {% if v.errore %}<span class="text-danger">{{ v.errore }}</span>
+            {% else %}
+              fine <strong>{{ v.fine|date:'d/m H:i:s' }}</strong>
+              {% if v.fine != v.fine_attuale %}(ora {{ v.fine_attuale|date:'d/m H:i:s' }}){% else %}(invariata){% endif %}
+              <span class="text-muted">&middot; va bene qualsiasi orario dal {{ v.tra.0|date:'d/m H:i:s' }}{% if v.tra.1 %} al {{ v.tra.1|date:'d/m H:i:s' }}{% else %} in poi{% endif %}</span>
+            {% endif %}
+          </li>
+          {% endfor %}
+        </ul>
+        {% with va=portali_allineamento.A vb=portali_allineamento.B fa=lavaggi_portali.0.finestra fb=lavaggi_portali.1.finestra %}
+        {% if va.fine or vb.fine %}
+        <form method="post" action="{% url 'finanze:imposta_chiusura_portali' %}" class="d-inline">
+          {% csrf_token %}
+          <input type="hidden" name="data" value="{{ data|date:'Y-m-d' }}">
+          <input type="hidden" name="allinea" value="1">
+          <input type="hidden" name="periodo_da" value="{{ fa.0|date:'Y-m-d\TH:i:s' }}">
+          <input type="hidden" name="periodo_a" value="{% if va.fine %}{{ va.fine|date:'Y-m-d\TH:i:s' }}{% else %}{{ fa.1|date:'Y-m-d\TH:i:s' }}{% endif %}">
+          <input type="hidden" name="periodo_da_blu" value="{{ fb.0|date:'Y-m-d\TH:i:s' }}">
+          <input type="hidden" name="periodo_a_blu" value="{% if vb.fine %}{{ vb.fine|date:'Y-m-d\TH:i:s' }}{% else %}{{ fb.1|date:'Y-m-d\TH:i:s' }}{% endif %}">
+          <button class="btn btn-sm btn-warning"><i class="bi bi-check2-all"></i> Applica questi orari</button>
+        </form>
+        {% endif %}
+        {% endwith %}
+        <div class="text-muted mt-2">L'inizio resta la fine del giorno prima: se il giorno prima non torna, allinea prima quello.</div>
+      </div>
+      {% endif %}
 
       <details class="small mb-3">
         <summary class="text-muted">Lavaggi a cavallo di inizio e fine chiusura (&plusmn;20 min, orari WashTec al secondo)</summary>
