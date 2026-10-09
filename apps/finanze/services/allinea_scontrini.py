@@ -1,21 +1,23 @@
-"""Allineamento della chiusura portali ai WashCycles degli scontrini.
+"""Allineamento della chiusura portali agli scontrini delle casse.
 
 Ogni cassa automatica dei portali stampa a fine giornata uno scontrino
-con i WashCycles erogati dall'ultima chiusura (registrati nella
+con WashCycles e vendite dall'ultima chiusura (registrati nella
 ChiusuraCassaAutomatica del giorno). Le due casse vengono chiuse in
 momenti diversi e il loro orologio non coincide con quello WashTec,
-quindi per ciascun portale si cerca la fine che da' esattamente i
-WashCycles dello scontrino: tenendo fisso l'inizio (la fine del giorno
-prima), la fine deve cadere tra l'N-esimo e l'(N+1)-esimo lavaggio; dentro
-quell'intervallo si sceglie l'orario piu' vicino a quello attuale. La fine resta
-sempre nella sera della giornata: se li' nessun orario combacia si propone
-quello che ci va piu' vicino, segnalando lo scarto.
+quindi per ciascun portale si cerca la fine della giornata: l'inizio e'
+la fine del giorno prima, la fine cade tra due lavaggi consecutivi e
+si sceglie prima per saldo (contanti WashTec a listino = vendita dello
+scontrino), poi per numero di lavaggi (= WashCycles), poi per vicinanza
+all'orario attuale. La fine resta sempre nella sera della giornata:
+quello che non si riesce a far tornare viene segnalato come scarto.
 """
 from datetime import datetime, time, timedelta
+from decimal import Decimal
 
 from django.utils import timezone
 
-from apps.finanze.models import ChiusuraCassaAutomatica, TransazionePortale
+from apps.finanze.models import (PREZZI_PROGRAMMA_PORTALE, ChiusuraCassaAutomatica,
+                                 TransazionePortale)
 
 # Portale WashTec -> parola nel nome della cassa automatica
 CASSA_PORTALE = {'A': 'azzurro', 'B': 'blu'}
@@ -48,52 +50,78 @@ def _sera(data):
             timezone.make_aware(datetime.combine(data, time(23, 59, 59))))
 
 
-def allinea(chiusura, scontrini):
-    """Per ogni portale con scontrino: {'scontrino', 'da', 'fine',
-    'fine_attuale', 'tra': (min, max), 'conteggio', 'scarto', 'errore'}.
+def inizio_continuo(chiusura, portale):
+    """Inizio della giornata del portale: la fine della chiusura del giorno
+    prima, se salvata (niente buchi ne' sovrapposizioni), altrimenti
+    quello della chiusura."""
+    from apps.finanze.models import ChiusuraPortali
 
-    'fine' e' l'orario, nella sera della giornata, che fa combaciare il
-    conteggio con lo scontrino; se nessun orario della sera ci riesce
-    (lo scontrino conta un lavaggio che WashTec non ha, o viceversa) e'
-    quello che ci va piu' vicino, con 'scarto' = conteggio - scontrino.
+    prec = ChiusuraPortali.objects.filter(data=chiusura.data - timedelta(days=1)).first()
+    return prec.finestra(portale)[1] if prec else chiusura.finestra(portale)[0]
+
+
+def allinea(chiusura, casse):
+    """Per ogni portale con scontrino (casse = chiusure_casse_portali):
+    {'scontrino', 'vendita', 'da', 'da_attuale', 'fine', 'fine_attuale',
+    'tra': (min, max), 'conteggio', 'scarto', 'contanti', 'scarto_contanti',
+    'errore'}.
+
+    L'inizio e' la fine del giorno prima. La fine, nella sera della
+    giornata, e' scelta per priorita':
+    1. contanti dei lavaggi WashTec (a listino) uguali alla vendita
+       contante + non contante dello scontrino (il saldo);
+    2. numero di lavaggi uguale ai WashCycles dello scontrino;
+    3. orario piu' vicino a quello attuale.
+    'scarto' e 'scarto_contanti' dicono quanto resta se non si azzera.
     """
     esito = {}
     sera_da, sera_a = _sera(chiusura.data)
-    for portale, n in scontrini.items():
-        if n is None:
+    for portale, cassa in casse.items():
+        if cassa is None:
             continue
-        da, fine_attuale = chiusura.finestra(portale)
+        n = cassa.wash_cycles
+        vendita = cassa.vendita_totale
+        da_attuale, fine_attuale = chiusura.finestra(portale)
+        da = inizio_continuo(chiusura, portale)
         lavaggi = list(TransazionePortale.objects
                        .filter(portale=portale, orario__gt=da, orario__lte=sera_a)
                        .order_by('orario', 'numero')
-                       .values_list('orario', flat=True))
+                       .values_list('orario', 'programma', 'origine'))
         dopo = (TransazionePortale.objects
                 .filter(portale=portale, orario__gt=sera_a)
                 .order_by('orario').values_list('orario', flat=True).first())
-        voce = {'scontrino': n, 'da': da, 'fine_attuale': fine_attuale,
-                'fine': None, 'tra': None, 'conteggio': None, 'scarto': 0, 'errore': ''}
+        voce = {'scontrino': n, 'vendita': vendita, 'da': da, 'da_attuale': da_attuale,
+                'fine_attuale': fine_attuale, 'fine': None, 'tra': None,
+                'conteggio': None, 'scarto': 0, 'contanti': None, 'scarto_contanti': 0,
+                'errore': ''}
         esito[portale] = voce
-        if dopo is None and len(lavaggi) < n:
+        if dopo is None and n is not None and len(lavaggi) < n:
             voce['errore'] = (f'in archivio ci sono solo {len(lavaggi)} lavaggi dopo '
-                              f'l\'inizio: importa le transazioni WashTec mancanti')
+                              "l'inizio: importa le transazioni WashTec mancanti")
             continue
         # Ogni k = lavaggi contati ha un intervallo di fine possibile:
         # dal k-esimo lavaggio a un secondo prima del successivo, tagliato
         # sulla sera della giornata
         candidati = []
+        contanti = Decimal('0.00')
         for k in range(len(lavaggi) + 1):
-            minimo = max(lavaggi[k - 1] if k else da, sera_da)
-            successivo = lavaggi[k] if k < len(lavaggi) else dopo
+            if k and lavaggi[k - 1][2] == 'contanti':
+                contanti += PREZZI_PROGRAMMA_PORTALE[lavaggi[k - 1][1]]
+            minimo = max(lavaggi[k - 1][0] if k else da, sera_da)
+            successivo = lavaggi[k][0] if k < len(lavaggi) else dopo
             massimo = min(successivo - timedelta(seconds=1), sera_a) if successivo else sera_a
             if massimo < minimo:
                 continue
             fine = min(max(fine_attuale, minimo), massimo).replace(microsecond=0)
-            candidati.append((abs(k - n), abs((fine - fine_attuale).total_seconds()),
-                              k, fine, minimo, massimo))
+            candidati.append((abs(contanti - vendita),
+                              abs(k - n) if n is not None else 0,
+                              abs((fine - fine_attuale).total_seconds()),
+                              k, contanti, fine, minimo, massimo))
         if not candidati:
             voce['errore'] = 'nessun orario possibile nella sera della giornata'
             continue
-        _, _, k, fine, minimo, massimo = min(candidati)
-        voce.update({'fine': fine, 'tra': (minimo, massimo),
-                     'conteggio': k, 'scarto': k - n})
+        _, _, _, k, contanti, fine, minimo, massimo = min(candidati)
+        voce.update({'fine': fine, 'tra': (minimo, massimo), 'conteggio': k,
+                     'scarto': (k - n) if n is not None else 0,
+                     'contanti': contanti, 'scarto_contanti': contanti - vendita})
     return esito

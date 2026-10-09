@@ -750,38 +750,46 @@
 
       {% if portali_allineamento %}
       <div class="alert alert-warning small">
-        <div class="fw-bold mb-1"><i class="bi bi-magic"></i> Orari che fanno combaciare i WashCycles degli scontrini</div>
+        <div class="fw-bold mb-1"><i class="bi bi-magic"></i> Orari che fanno tornare gli scontrini (prima i contanti, poi i WashCycles)</div>
         <ul class="mb-2">
           {% for codice, v in portali_allineamento.items %}
           <li>
-            {% if codice == 'A' %}Azzurro{% else %}Blu{% endif %} (scontrino {{ v.scontrino }}):
+            <strong>{% if codice == 'A' %}Azzurro{% else %}Blu{% endif %}</strong>
+            (scontrino {{ v.scontrino|default:"—" }} cicli, &euro;{{ v.vendita|floatformat:2 }}):
             {% if v.errore %}<span class="text-danger">{{ v.errore }}</span>
             {% else %}
+              {% if v.da != v.da_attuale %}inizio <strong>{{ v.da|date:'d/m H:i:s' }}</strong> (fine del giorno prima, ora {{ v.da_attuale|date:'d/m H:i:s' }}) &middot; {% endif %}
               fine <strong>{{ v.fine|date:'d/m H:i:s' }}</strong>
               {% if v.fine != v.fine_attuale %}(ora {{ v.fine_attuale|date:'d/m H:i:s' }}){% else %}(invariata){% endif %}
               <span class="text-muted">&middot; va bene qualsiasi orario dal {{ v.tra.0|date:'d/m H:i:s' }} al {{ v.tra.1|date:'d/m H:i:s' }}</span>
-              {% if v.scarto %}
-              <span class="text-danger">&middot; nessun orario della sera combacia: WashTec {{ v.conteggio }} su {{ v.scontrino }} (scarto {% if v.scarto > 0 %}+{% endif %}{{ v.scarto }})</span>
-              {% endif %}
+              <div>
+                {% if v.scarto_contanti %}<span class="text-danger">contanti WashTec &euro;{{ v.contanti|floatformat:2 }} (scarto {% if v.scarto_contanti > 0 %}+{% endif %}&euro;{{ v.scarto_contanti|floatformat:2 }})</span>
+                {% else %}<span class="text-success">contanti &euro;{{ v.contanti|floatformat:2 }} tornano</span>{% endif %}
+                &middot;
+                {% if v.scarto %}<span class="text-danger">WashTec {{ v.conteggio }} cicli (scarto {% if v.scarto > 0 %}+{% endif %}{{ v.scarto }})</span>
+                {% else %}<span class="text-success">{{ v.conteggio }} cicli tornano</span>{% endif %}
+              </div>
             {% endif %}
           </li>
           {% endfor %}
         </ul>
+        {% if portali_allineamento_cambia %}
         {% with va=portali_allineamento.A vb=portali_allineamento.B fa=lavaggi_portali.0.finestra fb=lavaggi_portali.1.finestra %}
-        {% if va.fine or vb.fine %}
         <form method="post" action="{% url 'finanze:imposta_chiusura_portali' %}" class="d-inline">
           {% csrf_token %}
           <input type="hidden" name="data" value="{{ data|date:'Y-m-d' }}">
           <input type="hidden" name="allinea" value="1">
-          <input type="hidden" name="periodo_da" value="{{ fa.0|date:'Y-m-d\TH:i:s' }}">
+          <input type="hidden" name="periodo_da" value="{% if va.fine %}{{ va.da|date:'Y-m-d\TH:i:s' }}{% else %}{{ fa.0|date:'Y-m-d\TH:i:s' }}{% endif %}">
           <input type="hidden" name="periodo_a" value="{% if va.fine %}{{ va.fine|date:'Y-m-d\TH:i:s' }}{% else %}{{ fa.1|date:'Y-m-d\TH:i:s' }}{% endif %}">
-          <input type="hidden" name="periodo_da_blu" value="{{ fb.0|date:'Y-m-d\TH:i:s' }}">
+          <input type="hidden" name="periodo_da_blu" value="{% if vb.fine %}{{ vb.da|date:'Y-m-d\TH:i:s' }}{% else %}{{ fb.0|date:'Y-m-d\TH:i:s' }}{% endif %}">
           <input type="hidden" name="periodo_a_blu" value="{% if vb.fine %}{{ vb.fine|date:'Y-m-d\TH:i:s' }}{% else %}{{ fb.1|date:'Y-m-d\TH:i:s' }}{% endif %}">
           <button class="btn btn-sm btn-warning"><i class="bi bi-check2-all"></i> Applica questi orari</button>
         </form>
-        {% endif %}
         {% endwith %}
-        <div class="text-muted mt-2">L'inizio resta la fine del giorno prima: se il giorno prima non torna, allinea prima quello.</div>
+        {% else %}
+        <div>Gli orari attuali sono già i migliori possibili.</div>
+        {% endif %}
+        <div class="text-muted mt-2">L'inizio è sempre la fine del giorno prima: se il giorno prima non torna, allinea prima quello.</div>
       </div>
       {% endif %}
 

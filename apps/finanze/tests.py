@@ -265,11 +265,12 @@ class AbbinamentoPortaliTest(TestCase):
         self.assertEqual([(timezone.localtime(r['t'].orario).strftime('%H:%M'), r['dentro'])
                           for r in fine['righe']], [('17:50', True), ('18:05', False)])
 
-    def _scontrino(self, nome, wash_cycles):
+    def _scontrino(self, nome, wash_cycles, vendita=0):
         from apps.finanze.models import Cassa, ChiusuraCassaAutomatica
         cassa, _ = Cassa.objects.get_or_create(nome=nome, defaults={'tipo': 'automatica'})
-        ChiusuraCassaAutomatica.objects.create(cassa=cassa, data=self.chiusura.data,
-                                               wash_cycles=wash_cycles)
+        return ChiusuraCassaAutomatica.objects.create(
+            cassa=cassa, data=self.chiusura.data, wash_cycles=wash_cycles,
+            vendita_contante=Decimal(vendita))
 
     def _tx_portale(self, portale, alle, programma=4, origine='unita'):
         self.n_tx += 1
@@ -300,17 +301,42 @@ class AbbinamentoPortaliTest(TestCase):
         self._tx_portale('B', '18:40')
         self._scontrino('Portale Azzurro', 3)
         self._scontrino('Portale Blu', 3)
-        scontrini = al.washcycles_scontrini(self.chiusura.data)
-        self.assertEqual(scontrini, {'A': 3, 'B': 3})
-        esito = al.allinea(self.chiusura, scontrini)
+        casse = al.chiusure_casse_portali(self.chiusura.data)
+        self.assertEqual(al.washcycles_scontrini(self.chiusura.data), {'A': 3, 'B': 3})
+        esito = al.allinea(self.chiusura, casse)
         self.assertEqual(esito['A']['fine'], ora('18:00'))          # invariata
         self.assertEqual(esito['B']['fine'], ora('18:15'))          # primo orario utile
         self.assertEqual(esito['B']['tra'], (ora('18:15'), ora('18:40') - timedelta(seconds=1)))
 
+    def test_allinea_priorita_ai_contanti(self):
+        # Scontrino: 3 cicli e 10 euro. Con 3 lavaggi i contanti sarebbero
+        # 18 (P4 + P3): vince la fine che fa tornare i 10 euro (2 lavaggi)
+        from apps.finanze.services import allinea_scontrini as al
+        self._tx_portale('A', '16:30', programma=3, origine='contanti')     # 10 euro
+        self._tx_portale('A', '17:00')                                     # unita'
+        self._tx_portale('A', '17:40', programma=4, origine='contanti')     # 8 euro
+        cassa = self._scontrino('Portale Azzurro', 3, vendita=10)
+        v = al.allinea(self.chiusura, {'A': cassa, 'B': None})['A']
+        self.assertEqual((v['conteggio'], v['contanti'], v['scarto'], v['scarto_contanti']),
+                         (2, Decimal('10.00'), -1, Decimal('0.00')))
+        self.assertEqual(v['tra'], (ora('17:00'), ora('17:40') - timedelta(seconds=1)))
+
+    def test_allinea_inizio_dalla_fine_del_giorno_prima(self):
+        from apps.finanze.services import allinea_scontrini as al
+        ChiusuraPortali.objects.create(
+            data=self.chiusura.data - timedelta(days=1),
+            periodo_da=timezone.make_aware(datetime(2026, 10, 4, 19, 0)),
+            periodo_a=timezone.make_aware(datetime(2026, 10, 5, 18, 30)))   # buco 18:30-19:00
+        cassa = self._scontrino('Portale Azzurro', 0)
+        v = al.allinea(self.chiusura, {'A': cassa, 'B': None})['A']
+        self.assertEqual(v['da'], timezone.make_aware(datetime(2026, 10, 5, 18, 30)))
+        self.assertNotEqual(v['da'], v['da_attuale'])
+
     def test_allinea_segnala_lavaggi_mancanti(self):
         from apps.finanze.services import allinea_scontrini as al
         self._tx_portale('B', '10:00')
-        esito = al.allinea(self.chiusura, {'A': None, 'B': 5})
+        cassa = self._scontrino('Portale Blu', 5)
+        esito = al.allinea(self.chiusura, {'A': None, 'B': cassa})
         self.assertIn('solo 1 lavaggi', esito['B']['errore'])
         self.assertNotIn('A', esito)
 
@@ -322,7 +348,8 @@ class AbbinamentoPortaliTest(TestCase):
         self._tx_portale('B', '17:30')
         TransazionePortale.objects.create(portale='B', numero=29999, programma=4, origine='unita',
                                           orario=ora('08:00') + timedelta(days=1))
-        esito = al.allinea(self.chiusura, {'A': None, 'B': 3})['B']
+        cassa = self._scontrino('Portale Blu', 3)
+        esito = al.allinea(self.chiusura, {'A': None, 'B': cassa})['B']
         self.assertEqual((esito['conteggio'], esito['scarto'], esito['errore']), (2, -1, ''))
         self.assertEqual(esito['fine'], ora('18:00'))
 

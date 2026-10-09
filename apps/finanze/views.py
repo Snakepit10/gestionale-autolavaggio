@@ -1302,11 +1302,18 @@ def _contesto_lavaggi_portali(data):
             portali[-1]['vendita_scontrino'] is None
             or portali[-1]['vendita_scontrino'] == tot['contanti'])
 
-    # Orari che fanno combaciare i lavaggi WashTec con i WashCycles degli
-    # scontrini, proposti solo se qualche portale non torna
-    allineamento = None
-    if not all(p['combacia'] for p in portali):
-        allineamento = allinea_scontrini.allinea(chiusura, scontrini)
+    # Orari che fanno tornare i saldi (e i WashCycles) degli scontrini,
+    # con l'inizio attaccato alla fine del giorno prima: proposti se
+    # cambiano qualcosa o se qualche portale non torna
+    allineamento, allineamento_cambia = None, False
+    if any(casse.values()):
+        allineamento = allinea_scontrini.allinea(chiusura, casse)
+        allineamento_cambia = any(
+            v['fine'] and (v['fine'] != v['fine_attuale'] or v['da'] != v['da_attuale'])
+            for v in allineamento.values())
+        tornano = all(p['combacia'] and p['contanti_combaciano'] for p in portali)
+        if tornano and not allineamento_cambia:
+            allineamento = None
 
     # Lavaggi a cavallo di inizio e fine (+-20 min, al secondo): per
     # far combaciare la finestra con gli scontrini senza andare a tentativi
@@ -1347,6 +1354,7 @@ def _contesto_lavaggi_portali(data):
         'portali_n_transazioni': len(transazioni),
         'portali_bordi': bordi,
         'portali_allineamento': allineamento,
+        'portali_allineamento_cambia': allineamento_cambia,
         'portali_archivio_totale': TransazionePortale.objects.count(),
         'abbinamento': abbinamento,
         'washcycles_self': washcycles_self,
