@@ -725,6 +725,16 @@
       </form>
       {% endwith %}
 
+      {% if portali_buchi %}
+      <div class="alert alert-danger small py-2">
+        <i class="bi bi-exclamation-triangle"></i> <strong>Mancano lavaggi nell'archivio WashTec</strong> per questa giornata:
+        {% for b in portali_buchi %}
+          {% if b.portale == 'A' %}Azzurro{% else %}Blu{% endif %} {{ b.quanti }} (#{{ b.da_numero }}{% if b.a_numero != b.da_numero %}&ndash;{{ b.a_numero }}{% endif %}, tra {{ b.dopo|date:"d/m H:i" }} e {{ b.prima|date:"d/m H:i" }}){% if not forloop.last %};{% endif %}
+        {% endfor %}
+        &rarr; <a href="{% url 'finanze:importa_washtec' %}">reimporta da WashTec</a> partendo dal {{ portali_buchi.0.dopo|date:"d/m" }}.
+      </div>
+      {% endif %}
+
       {# Confronto con i WashCycles degli scontrini delle casse #}
       <div class="small mb-1 d-flex flex-wrap gap-3 align-items-center">
         <span class="text-muted">Scontrini vs WashTec:</span>

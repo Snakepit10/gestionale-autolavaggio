@@ -5,6 +5,26 @@
 <div class="container py-3" style="max-width: 960px;">
   <h4 class="mb-3"><i class="bi bi-cloud-download me-2"></i>Importa transazioni WashTec</h4>
 
+  {% if ultima_transazione %}
+  <div class="small text-muted mb-2">
+    Ultima transazione in archivio: <strong>{{ ultima_transazione.orario|date:"d/m/Y H:i" }}</strong>
+    ({{ ultima_transazione.get_portale_display }}). Al prossimo import parti da quel giorno
+    (<strong>{{ ultima_transazione.orario|date:"d/m" }}</strong>), così non resta nessun buco: i doppioni vengono ignorati.
+  </div>
+  {% endif %}
+  {% if buchi %}
+  <div class="alert alert-danger small">
+    <strong><i class="bi bi-exclamation-triangle"></i> Lavaggi mancanti nell'archivio (ultimi 60 giorni)</strong>
+    <ul class="mb-1">
+      {% for b in buchi %}
+      <li>{% if b.portale == 'A' %}Azzurro{% else %}Blu{% endif %}: {{ b.quanti }} lavaggi (#{{ b.da_numero }}{% if b.a_numero != b.da_numero %}&ndash;{{ b.a_numero }}{% endif %})
+        tra {{ b.dopo|date:"d/m H:i" }} e {{ b.prima|date:"d/m H:i" }} &rarr; reimporta dal <strong>{{ b.dopo|date:"d/m" }}</strong></li>
+      {% endfor %}
+    </ul>
+    <div>Ogni portale numera i lavaggi senza salti: un numero che manca è un lavaggio non importato (o una riga scartata, es. manutenzione).</div>
+  </div>
+  {% endif %}
+
   {# Esito import: popolato da JS quando la pagina arriva dal bookmarklet (#dati) #}
   <div id="import-box" class="card border-0 shadow-sm mb-4" style="display:none;">
     <div class="card-body">

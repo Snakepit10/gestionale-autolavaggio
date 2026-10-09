@@ -22,7 +22,7 @@ Regole (vedi anche le note su TransazionePortale):
   corre negli stessi giorni;
 - si tengono solo manutenzione = No ed eseguito = Si'.
 """
-from datetime import datetime
+from datetime import datetime, timedelta
 from decimal import Decimal, InvalidOperation
 
 from django.utils import timezone
@@ -270,3 +270,21 @@ def importa(righe, conferma=False):
         'importato': bool(conferma),
         'totale_archivio': TransazionePortale.objects.count(),
     }
+
+
+def buchi_archivio(da, a, margine=timedelta(days=2)):
+    """Lavaggi mancanti nell'archivio tra da e a: ogni portale numera le
+    sue transazioni senza salti, quindi un numero che manca tra due
+    transazioni importate e' un lavaggio non importato (o una riga
+    scartata dall'import: manutenzione, non eseguita). Ritorna
+    [{'portale', 'da_numero', 'a_numero', 'quanti', 'dopo', 'prima'}]."""
+    buchi = []
+    for portale, _ in TransazionePortale.PORTALE_CHOICES:
+        righe = list(TransazionePortale.objects
+                     .filter(portale=portale, orario__gte=da - margine, orario__lte=a + margine)
+                     .order_by('numero').values_list('numero', 'orario'))
+        for (n1, t1), (n2, t2) in zip(righe, righe[1:]):
+            if 1 < n2 - n1 <= SALTO_CATENA and t2 > da and t1 < a:
+                buchi.append({'portale': portale, 'da_numero': n1 + 1, 'a_numero': n2 - 1,
+                              'quanti': n2 - n1 - 1, 'dopo': t1, 'prima': t2})
+    return buchi

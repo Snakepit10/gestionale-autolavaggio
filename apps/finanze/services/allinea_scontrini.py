@@ -8,7 +8,8 @@ quindi per ciascun portale si cerca la fine della giornata: l'inizio e'
 la fine del giorno prima, la fine cade tra due lavaggi consecutivi e
 si sceglie prima per saldo (contanti WashTec a listino = vendita dello
 scontrino), poi per numero di lavaggi (= WashCycles), poi per vicinanza
-all'orario attuale. La fine resta sempre nella sera della giornata:
+all'orario attuale. La fine resta sempre nella giornata (dalle 10 a
+mezzanotte, di solito la sera; a volte la cassa si chiude in mattinata):
 quello che non si riesce a far tornare viene segnalato come scarto.
 """
 from datetime import datetime, time, timedelta
@@ -21,9 +22,10 @@ from apps.finanze.models import (PREZZI_PROGRAMMA_PORTALE, ChiusuraCassaAutomati
 
 # Portale WashTec -> parola nel nome della cassa automatica
 CASSA_PORTALE = {'A': 'azzurro', 'B': 'blu'}
-# La chiusura degli scontrini cade la sera della giornata: la fine
+# La chiusura degli scontrini cade nella giornata (di solito la sera, a
+# volte in tarda mattinata): la fine
 # proposta resta tra quest'ora e mezzanotte
-SERA_DALLE = time(16, 0)
+SERA_DALLE = time(10, 0)
 
 
 def chiusure_casse_portali(data):
@@ -118,7 +120,7 @@ def allinea(chiusura, casse):
                               abs((fine - fine_attuale).total_seconds()),
                               k, contanti, fine, minimo, massimo))
         if not candidati:
-            voce['errore'] = 'nessun orario possibile nella sera della giornata'
+            voce['errore'] = 'nessun orario possibile nella giornata'
             continue
         _, _, _, k, contanti, fine, minimo, massimo = min(candidati)
         voce.update({'fine': fine, 'tra': (minimo, massimo), 'conteggio': k,

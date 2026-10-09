@@ -9,7 +9,7 @@ from decimal import Decimal
 import json
 
 from .models import ChiusuraCassa, MovimentoCassa, Cassa, ChiusuraCassaAutomatica, QuadraturaGiornaliera, SpesaCassa
-from .services import abbinamento_portali, allinea_scontrini
+from .services import abbinamento_portali, allinea_scontrini, import_washtec
 
 # Metodi che non finiscono nel conteggio fisico della quadratura
 # (contanti scassettati + lettore carte): esclusi dal servito atteso.
@@ -1362,6 +1362,9 @@ def _contesto_lavaggi_portali(data, completo=True):
         'lavaggi_portali': portali,
         'portali_n_transazioni': len(transazioni),
         'portali_bordi': bordi,
+        'portali_buchi': import_washtec.buchi_archivio(
+            min(chiusura.finestra('A')[0], chiusura.finestra('B')[0]),
+            max(chiusura.finestra('A')[1], chiusura.finestra('B')[1])),
         'portali_allineamento': allineamento,
         'portali_allineamento_cambia': allineamento_cambia,
         'portali_archivio_totale': TransazionePortale.objects.count(),
@@ -1680,8 +1683,14 @@ def importa_washtec(request):
     """Pagina di arrivo del bookmarklet WashTec: legge le righe dal
     fragment dell'URL (#...) lato browser, mostra l'anteprima e importa.
     Contiene anche il bookmarklet da trascinare nei preferiti."""
+    from .models import TransazionePortale
+
+    adesso = timezone.now()
+    ultima = TransazionePortale.objects.order_by('-orario').first()
     return render(request, 'finanze/importa_washtec.html', {
         'origine_gestionale': request.build_absolute_uri('/').rstrip('/'),
+        'ultima_transazione': ultima,
+        'buchi': import_washtec.buchi_archivio(adesso - timedelta(days=60), adesso),
     })
 
 

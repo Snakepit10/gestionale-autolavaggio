@@ -470,6 +470,16 @@ class ImportWashtecTest(TestCase):
         self.assertEqual(len(esito['escluse']), 1)
         self.assertEqual(len(esito['anomalie']), 2)
 
+    def test_buchi_archivio(self):
+        # A 13300 (setUp) e 13303: mancano 13301-13302
+        from apps.finanze.services import import_washtec as iw
+        TransazionePortale.objects.create(portale='A', numero=13303, orario=ora('12:00'),
+                                          programma=4, origine='unita')
+        buchi = iw.buchi_archivio(ora('07:00'), ora('20:00'))
+        self.assertEqual([(b['portale'], b['da_numero'], b['a_numero'], b['quanti']) for b in buchi],
+                         [('A', 13301, 13302, 2)])
+        self.assertEqual(iw.buchi_archivio(ora('13:00'), ora('20:00')), [])   # fuori finestra
+
     def test_import_idempotente(self):
         from apps.finanze.services import import_washtec as iw
         righe = [self.riga(13301, 'In contanti'), self.riga(13302, 'In contanti')]
