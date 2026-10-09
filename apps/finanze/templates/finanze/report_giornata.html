@@ -688,12 +688,12 @@
         <div>
           <label class="form-label small mb-0 fw-bold">Inizio chiusura</label>
           <input type="datetime-local" name="periodo_da" class="form-control form-control-sm" required
-                 value="{% if portali_chiusura %}{{ portali_chiusura.periodo_da|date:'Y-m-d\TH:i' }}{% elif portali_suggerimento_da %}{{ portali_suggerimento_da|date:'Y-m-d\TH:i' }}{% endif %}">
+                 value="{{ portali_chiusura.periodo_da|default:portali_default_da|date:'Y-m-d\TH:i' }}">
         </div>
         <div>
           <label class="form-label small mb-0 fw-bold">Fine chiusura</label>
           <input type="datetime-local" name="periodo_a" class="form-control form-control-sm" required
-                 value="{% if portali_chiusura %}{{ portali_chiusura.periodo_a|date:'Y-m-d\TH:i' }}{% endif %}">
+                 value="{{ portali_chiusura.periodo_a|default:portali_default_a|date:'Y-m-d\TH:i' }}">
         </div>
         <button type="submit" class="btn btn-primary btn-sm">
           <i class="bi bi-arrow-repeat"></i> {% if portali_chiusura %}Aggiorna{% else %}Imposta e calcola{% endif %}

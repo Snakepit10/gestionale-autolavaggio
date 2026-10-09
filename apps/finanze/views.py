@@ -4,7 +4,7 @@ from django.contrib import messages
 from django.utils import timezone
 from django.db.models import Sum, Q, Count
 from django.http import JsonResponse
-from datetime import datetime, timedelta
+from datetime import datetime, time, timedelta
 from decimal import Decimal
 import json
 
@@ -1250,9 +1250,13 @@ def _contesto_lavaggi_portali(data):
             orario__lte=chiusura.periodo_a,
         ))
 
-    # Suggerimento inizio finestra: la fine della chiusura precedente
-    prec = (ChiusuraPortali.objects.filter(data__lt=data)
-            .order_by('-data').first())
+    # Finestra proposta: dalle 19:30 del giorno prima alle 19:30 del
+    # giorno; se il giorno prima ha gia' una chiusura si riparte dalla sua
+    # fine, cosi' non restano buchi ne' sovrapposizioni.
+    prec = ChiusuraPortali.objects.filter(data=data - timedelta(days=1)).first()
+    alle_1930 = lambda g: timezone.make_aware(datetime.combine(g, time(19, 30)))
+    default_da = prec.periodo_a if prec else alle_1930(data - timedelta(days=1))
+    default_a = alle_1930(data)
 
     portali = []
     for codice, label in TransazionePortale.PORTALE_CHOICES:
@@ -1296,7 +1300,8 @@ def _contesto_lavaggi_portali(data):
 
     return {
         'portali_chiusura': chiusura,
-        'portali_suggerimento_da': prec.periodo_a if prec else None,
+        'portali_default_da': default_da,
+        'portali_default_a': default_a,
         'lavaggi_portali': portali,
         'portali_n_transazioni': len(transazioni),
         'portali_archivio_totale': TransazionePortale.objects.count(),
