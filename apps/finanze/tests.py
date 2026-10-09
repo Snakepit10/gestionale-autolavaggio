@@ -314,6 +314,18 @@ class AbbinamentoPortaliTest(TestCase):
         self.assertIn('solo 1 lavaggi', esito['B']['errore'])
         self.assertNotIn('A', esito)
 
+    def test_allinea_resta_nella_sera(self):
+        # Lo scontrino conta un lavaggio in piu': niente fine al mattino
+        # dopo, ma la sera con lo scarto segnalato
+        from apps.finanze.services import allinea_scontrini as al
+        self._tx_portale('B', '10:00')
+        self._tx_portale('B', '17:30')
+        TransazionePortale.objects.create(portale='B', numero=29999, programma=4, origine='unita',
+                                          orario=ora('08:00') + timedelta(days=1))
+        esito = al.allinea(self.chiusura, {'A': None, 'B': 3})['B']
+        self.assertEqual((esito['conteggio'], esito['scarto'], esito['errore']), (2, -1, ''))
+        self.assertEqual(esito['fine'], ora('18:00'))
+
     def test_salva_orari_blu(self):
         user = User.objects.create_user('op', 'op@x.it', 'x', is_staff=True)
         self.client.force_login(user)

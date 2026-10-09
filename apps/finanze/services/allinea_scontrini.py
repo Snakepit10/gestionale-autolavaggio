@@ -7,14 +7,21 @@ momenti diversi e il loro orologio non coincide con quello WashTec,
 quindi per ciascun portale si cerca la fine che da' esattamente i
 WashCycles dello scontrino: tenendo fisso l'inizio (la fine del giorno
 prima), la fine deve cadere tra l'N-esimo e l'(N+1)-esimo lavaggio; dentro
-quell'intervallo si sceglie l'orario piu' vicino a quello attuale.
+quell'intervallo si sceglie l'orario piu' vicino a quello attuale. La fine resta
+sempre nella sera della giornata: se li' nessun orario combacia si propone
+quello che ci va piu' vicino, segnalando lo scarto.
 """
-from datetime import timedelta
+from datetime import datetime, time, timedelta
+
+from django.utils import timezone
 
 from apps.finanze.models import ChiusuraCassaAutomatica, TransazionePortale
 
 # Portale WashTec -> parola nel nome della cassa automatica
 CASSA_PORTALE = {'A': 'azzurro', 'B': 'blu'}
+# La chiusura degli scontrini cade la sera della giornata: la fine
+# proposta resta tra quest'ora e mezzanotte
+SERA_DALLE = time(16, 0)
 
 
 def chiusure_casse_portali(data):
@@ -35,35 +42,58 @@ def washcycles_scontrini(data):
             for p, c in chiusure_casse_portali(data).items()}
 
 
+def _sera(data):
+    """Fascia in cui puo' cadere la chiusura della giornata."""
+    return (timezone.make_aware(datetime.combine(data, SERA_DALLE)),
+            timezone.make_aware(datetime.combine(data, time(23, 59, 59))))
+
+
 def allinea(chiusura, scontrini):
     """Per ogni portale con scontrino: {'scontrino', 'da', 'fine',
-    'fine_attuale', 'tra': (min, max), 'errore'}. 'fine' e' l'orario che
-    fa combaciare il conteggio (None con 'errore' se non si puo')."""
+    'fine_attuale', 'tra': (min, max), 'conteggio', 'scarto', 'errore'}.
+
+    'fine' e' l'orario, nella sera della giornata, che fa combaciare il
+    conteggio con lo scontrino; se nessun orario della sera ci riesce
+    (lo scontrino conta un lavaggio che WashTec non ha, o viceversa) e'
+    quello che ci va piu' vicino, con 'scarto' = conteggio - scontrino.
+    """
     esito = {}
+    sera_da, sera_a = _sera(chiusura.data)
     for portale, n in scontrini.items():
         if n is None:
             continue
         da, fine_attuale = chiusura.finestra(portale)
         lavaggi = list(TransazionePortale.objects
-                       .filter(portale=portale, orario__gt=da)
+                       .filter(portale=portale, orario__gt=da, orario__lte=sera_a)
                        .order_by('orario', 'numero')
-                       .values_list('orario', flat=True)[:n + 1])
+                       .values_list('orario', flat=True))
+        dopo = (TransazionePortale.objects
+                .filter(portale=portale, orario__gt=sera_a)
+                .order_by('orario').values_list('orario', flat=True).first())
         voce = {'scontrino': n, 'da': da, 'fine_attuale': fine_attuale,
-                'fine': None, 'tra': None, 'errore': ''}
+                'fine': None, 'tra': None, 'conteggio': None, 'scarto': 0, 'errore': ''}
         esito[portale] = voce
-        if len(lavaggi) < n:
+        if dopo is None and len(lavaggi) < n:
             voce['errore'] = (f'in archivio ci sono solo {len(lavaggi)} lavaggi dopo '
                               f'l\'inizio: importa le transazioni WashTec mancanti')
             continue
-        minimo = lavaggi[n - 1] if n else da
-        massimo = lavaggi[n] - timedelta(seconds=1) if len(lavaggi) > n else None
-        if massimo is not None and massimo < minimo:
-            voce['errore'] = ('due lavaggi nello stesso secondo a cavallo della '
-                              'chiusura: impossibile separarli')
+        # Ogni k = lavaggi contati ha un intervallo di fine possibile:
+        # dal k-esimo lavaggio a un secondo prima del successivo, tagliato
+        # sulla sera della giornata
+        candidati = []
+        for k in range(len(lavaggi) + 1):
+            minimo = max(lavaggi[k - 1] if k else da, sera_da)
+            successivo = lavaggi[k] if k < len(lavaggi) else dopo
+            massimo = min(successivo - timedelta(seconds=1), sera_a) if successivo else sera_a
+            if massimo < minimo:
+                continue
+            fine = min(max(fine_attuale, minimo), massimo).replace(microsecond=0)
+            candidati.append((abs(k - n), abs((fine - fine_attuale).total_seconds()),
+                              k, fine, minimo, massimo))
+        if not candidati:
+            voce['errore'] = 'nessun orario possibile nella sera della giornata'
             continue
-        fine = max(fine_attuale, minimo)
-        if massimo is not None:
-            fine = min(fine, massimo)
-        voce['fine'] = fine.replace(microsecond=0)
-        voce['tra'] = (minimo, massimo)
+        _, _, k, fine, minimo, massimo = min(candidati)
+        voce.update({'fine': fine, 'tra': (minimo, massimo),
+                     'conteggio': k, 'scarto': k - n})
     return esito

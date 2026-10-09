@@ -759,7 +759,10 @@
             {% else %}
               fine <strong>{{ v.fine|date:'d/m H:i:s' }}</strong>
               {% if v.fine != v.fine_attuale %}(ora {{ v.fine_attuale|date:'d/m H:i:s' }}){% else %}(invariata){% endif %}
-              <span class="text-muted">&middot; va bene qualsiasi orario dal {{ v.tra.0|date:'d/m H:i:s' }}{% if v.tra.1 %} al {{ v.tra.1|date:'d/m H:i:s' }}{% else %} in poi{% endif %}</span>
+              <span class="text-muted">&middot; va bene qualsiasi orario dal {{ v.tra.0|date:'d/m H:i:s' }} al {{ v.tra.1|date:'d/m H:i:s' }}</span>
+              {% if v.scarto %}
+              <span class="text-danger">&middot; nessun orario della sera combacia: WashTec {{ v.conteggio }} su {{ v.scontrino }} (scarto {% if v.scarto > 0 %}+{% endif %}{{ v.scarto }})</span>
+              {% endif %}
             {% endif %}
           </li>
           {% endfor %}
