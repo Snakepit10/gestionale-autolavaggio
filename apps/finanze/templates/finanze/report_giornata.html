@@ -725,7 +725,7 @@
       {% endwith %}
 
       {# Confronto con i WashCycles degli scontrini delle casse #}
-      <div class="small mb-3 d-flex flex-wrap gap-3 align-items-center">
+      <div class="small mb-1 d-flex flex-wrap gap-3 align-items-center">
         <span class="text-muted">Scontrini vs WashTec:</span>
         {% for p in lavaggi_portali %}
         <span>
@@ -733,6 +733,17 @@
           {% if p.scontrino is None %}<span class="text-muted">scontrino non registrato &middot; WashTec {{ p.tot.richieste }}</span>
           {% elif p.combacia %}<span class="text-success fw-bold"><i class="bi bi-check-circle"></i> {{ p.scontrino }} = {{ p.tot.richieste }}</span>
           {% else %}<span class="text-danger fw-bold"><i class="bi bi-x-circle"></i> scontrino {{ p.scontrino }} &ne; WashTec {{ p.tot.richieste }}</span>{% endif %}
+        </span>
+        {% endfor %}
+      </div>
+      <div class="small mb-3 d-flex flex-wrap gap-3 align-items-center">
+        <span class="text-muted" title="Lavaggi pagati in contanti su WashTec (a listino) contro vendita contante + non contante dello scontrino della cassa">Contanti WashTec vs vendita scontrino:</span>
+        {% for p in lavaggi_portali %}
+        <span>
+          {{ p.label }}:
+          {% if p.vendita_scontrino is None %}<span class="text-muted">scontrino non registrato &middot; WashTec &euro;{{ p.tot.contanti|floatformat:2 }}</span>
+          {% elif p.contanti_combaciano %}<span class="text-success fw-bold"><i class="bi bi-check-circle"></i> &euro;{{ p.tot.contanti|floatformat:2 }} = &euro;{{ p.vendita_scontrino|floatformat:2 }}</span>
+          {% else %}<span class="text-danger fw-bold"><i class="bi bi-x-circle"></i> WashTec &euro;{{ p.tot.contanti|floatformat:2 }} &ne; scontrino &euro;{{ p.vendita_scontrino|floatformat:2 }}</span>{% endif %}
         </span>
         {% endfor %}
       </div>

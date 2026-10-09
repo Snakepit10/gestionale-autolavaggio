@@ -1265,7 +1265,8 @@ def _contesto_lavaggi_portali(data):
 
     chiusura, salvata = _chiusura_portali(data)
     transazioni = list(TransazionePortale.objects.filter(chiusura.q_transazioni()))
-    scontrini = allinea_scontrini.washcycles_scontrini(data)
+    casse = allinea_scontrini.chiusure_casse_portali(data)
+    scontrini = {p: (c.wash_cycles if c else None) for p, c in casse.items()}
 
     portali = []
     for codice, label in TransazionePortale.PORTALE_CHOICES:
@@ -1293,7 +1294,13 @@ def _contesto_lavaggi_portali(data):
             'finestra': chiusura.finestra(codice),
             'scontrino': scontrini[codice],
             'combacia': scontrini[codice] is None or scontrini[codice] == tot['richieste'],
+            # i lavaggi pagati in contanti (a listino) devono fare la
+            # vendita contante + non contante dello scontrino della cassa
+            'vendita_scontrino': casse[codice].vendita_totale if casse[codice] else None,
         })
+        portali[-1]['contanti_combaciano'] = (
+            portali[-1]['vendita_scontrino'] is None
+            or portali[-1]['vendita_scontrino'] == tot['contanti'])
 
     # Orari che fanno combaciare i lavaggi WashTec con i WashCycles degli
     # scontrini, proposti solo se qualche portale non torna

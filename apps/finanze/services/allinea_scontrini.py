@@ -17,19 +17,22 @@ from apps.finanze.models import ChiusuraCassaAutomatica, TransazionePortale
 CASSA_PORTALE = {'A': 'azzurro', 'B': 'blu'}
 
 
-def washcycles_scontrini(data):
-    """{'A': n, 'B': n} dalle chiusure casse automatiche del giorno
-    (None se lo scontrino non e' registrato o senza WashCycles)."""
-    chiusure = (ChiusuraCassaAutomatica.objects
-                .filter(data=data, wash_cycles__isnull=False)
-                .select_related('cassa'))
+def chiusure_casse_portali(data):
+    """{'A': ChiusuraCassaAutomatica | None, 'B': ...} del giorno."""
     esito = {'A': None, 'B': None}
-    for c in chiusure:
+    for c in ChiusuraCassaAutomatica.objects.filter(data=data).select_related('cassa'):
         nome = c.cassa.nome.lower()
         for portale, parola in CASSA_PORTALE.items():
             if parola in nome:
-                esito[portale] = c.wash_cycles
+                esito[portale] = c
     return esito
+
+
+def washcycles_scontrini(data):
+    """{'A': n, 'B': n} dalle chiusure casse automatiche del giorno
+    (None se lo scontrino non e' registrato o senza WashCycles)."""
+    return {p: (c.wash_cycles if c else None)
+            for p, c in chiusure_casse_portali(data).items()}
 
 
 def allinea(chiusura, scontrini):
