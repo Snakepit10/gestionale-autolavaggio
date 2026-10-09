@@ -118,21 +118,21 @@
 
   {# ====== Seconda riga KPI: dettaglio self service + corrispettivi ====== #}
   <div class="row g-2 mb-3">
-    <div class="col-6 col-lg-3">
+    <div class="col-6 col-lg">
       <div class="kpi-tile primary">
         <div class="label">Totale portali</div>
         <div class="value">&euro;{{ totale_portali|floatformat:2 }}</div>
         <div class="sub">Blu + Azzurro</div>
       </div>
     </div>
-    <div class="col-6 col-lg-3">
+    <div class="col-6 col-lg">
       <div class="kpi-tile primary">
         <div class="label">Totale cambia gettoni</div>
         <div class="value">&euro;{{ totale_cambia_gettoni|floatformat:2 }}</div>
         <div class="sub">solo cambia gettoni</div>
       </div>
     </div>
-    <div class="col-6 col-lg-3">
+    <div class="col-6 col-lg">
       <div class="kpi-tile" style="background:#fef3c7; border-left:4px solid #d97706;">
         <div class="label" style="color:#92400e">Totale corrispettivi</div>
         <div class="value" style="color:#78350f">&euro;{{ totale_corrispettivi|floatformat:2 }}</div>
@@ -141,12 +141,29 @@
         </div>
       </div>
     </div>
-    <div class="col-6 col-lg-3">
+    <div class="col-6 col-lg">
       <div class="kpi-tile warning">
         <div class="label">WashCycles portali</div>
         <div class="value">{{ wash_cycles_portali }}</div>
         <div class="sub">cicli di lavaggio erogati</div>
       </div>
+    </div>
+    <div class="col-6 col-lg">
+      <a href="#abbinamento-portali" class="text-decoration-none">
+        <div class="kpi-tile warning">
+          <div class="label">WashCycles self service</div>
+          {% if washcycles_self %}
+            <div class="value">{{ washcycles_self.n }}</div>
+            <div class="sub">
+              &euro;{{ washcycles_self.valore|floatformat:2 }}
+              &middot; {{ washcycles_self.n_contanti }} contanti + {{ washcycles_self.n_operatori }} operatori
+            </div>
+          {% else %}
+            <div class="value">&mdash;</div>
+            <div class="sub">imposta la chiusura portali</div>
+          {% endif %}
+        </div>
+      </a>
     </div>
   </div>
 

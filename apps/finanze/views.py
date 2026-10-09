@@ -1268,14 +1268,29 @@ def _contesto_lavaggi_portali(data):
             'tot': tot, 'tot_valore': tot['contanti'] + tot['unita'],
         })
 
+    abbinamento = abbinamento_portali.riepilogo(chiusura) if chiusura else None
+
+    # WashCycles self service: lavaggi pagati in contanti al portale +
+    # residuo unita' operativa (pagati direttamente agli operatori)
+    washcycles_self = None
+    if chiusura:
+        n_contanti = sum(1 for t in transazioni if t.origine == 'contanti')
+        v_contanti = sum((p['tot']['contanti'] for p in portali), Decimal('0.00'))
+        washcycles_self = {
+            'n': n_contanti + len(abbinamento['residuo']),
+            'valore': v_contanti + abbinamento['valore_residuo'],
+            'n_contanti': n_contanti,
+            'n_operatori': len(abbinamento['residuo']),
+        }
+
     return {
         'portali_chiusura': chiusura,
         'portali_suggerimento_da': prec.periodo_a if prec else None,
         'lavaggi_portali': portali,
         'portali_n_transazioni': len(transazioni),
         'portali_archivio_totale': TransazionePortale.objects.count(),
-        'abbinamento': (abbinamento_portali.riepilogo(chiusura)
-                        if chiusura else None),
+        'abbinamento': abbinamento,
+        'washcycles_self': washcycles_self,
     }
 
 
