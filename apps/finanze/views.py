@@ -10,6 +10,10 @@ import json
 
 from .models import ChiusuraCassa, MovimentoCassa, Cassa, ChiusuraCassaAutomatica, QuadraturaGiornaliera
 from .services import abbinamento_portali
+
+# Metodi che non finiscono nel conteggio fisico della quadratura
+# (contanti scassettati + lettore carte): esclusi dal servito atteso.
+METODI_NON_IN_CASSA = ('bonifico', 'assegno')
 from apps.ordini.models import Pagamento, Ordine, ItemOrdine
 from apps.core.models import Categoria
 
@@ -1072,29 +1076,47 @@ def report_giornata(request):
     quadratura_obj = QuadraturaGiornaliera.objects.filter(data=data).first()
 
     vendita_self_service = agg['vendita_totale']
-    totale_teorico = vendita_self_service + totale_servito
 
-    # Il servito incassato oggi comprende anche i crediti di giorni
-    # precedenti riscossi oggi: li separo, raggruppati per ordine.
-    crediti_per_ordine = {}
-    for p in (Pagamento.objects
-              .filter(data_pagamento__date=data, ordine__data_ora__date__lt=data)
-              .select_related('ordine__cliente')
-              .order_by('ordine__data_ora', 'data_pagamento')):
-        voce = crediti_per_ordine.setdefault(p.ordine_id, {
-            'ordine': p.ordine, 'importo': Decimal('0.00'),
-            'metodi': [], 'riferimenti': [], 'incassato_il': p.data_pagamento,
-        })
-        voce['importo'] += p.importo
-        if p.get_metodo_display() not in voce['metodi']:
-            voce['metodi'].append(p.get_metodo_display())
-        if p.riferimento and p.riferimento not in voce['riferimenti']:
-            voce['riferimenti'].append(p.riferimento)
-        voce['incassato_il'] = p.data_pagamento
-    crediti_pregressi = list(crediti_per_ordine.values())
+    def _per_ordine(pagamenti):
+        """Pagamenti raggruppati per ordine: importo, metodi, riferimenti."""
+        out = {}
+        for p in pagamenti:
+            voce = out.setdefault(p.ordine_id, {
+                'ordine': p.ordine, 'importo': Decimal('0.00'),
+                'metodi': [], 'riferimenti': [],
+            })
+            voce['importo'] += p.importo
+            if p.get_metodo_display() not in voce['metodi']:
+                voce['metodi'].append(p.get_metodo_display())
+            if p.riferimento and p.riferimento not in voce['riferimenti']:
+                voce['riferimenti'].append(p.riferimento)
+        return list(out.values())
+
+    # Bonifici e assegni non passano ne' dal cassetto ne' dal POS: esclusi
+    # dal servito atteso e mostrati a parte. La chiusura cassa servito
+    # somma gia' i bonifici (non gli assegni); senza chiusura il servito e'
+    # la somma di tutti i pagamenti del giorno.
+    pagamenti_giorno_qs = (Pagamento.objects.filter(data_pagamento__date=data)
+                           .select_related('ordine__cliente')
+                           .order_by('ordine__data_ora', 'data_pagamento'))
+    non_in_cassa = _per_ordine(
+        pagamenti_giorno_qs.filter(metodo__in=METODI_NON_IN_CASSA))
+    totale_non_in_cassa = sum((v['importo'] for v in non_in_cassa), Decimal('0.00'))
+    if cassa_servito:
+        escluso_dal_servito = cassa_servito.totale_bonifici
+    else:
+        escluso_dal_servito = totale_non_in_cassa
+    servito_atteso = totale_servito - escluso_dal_servito
+    totale_teorico = vendita_self_service + servito_atteso
+
+    # Il servito atteso comprende anche i crediti di giorni precedenti
+    # riscossi oggi (in contanti/carta): li separo, per ordine.
+    crediti_pregressi = _per_ordine(
+        pagamenti_giorno_qs.filter(ordine__data_ora__date__lt=data)
+        .exclude(metodo__in=METODI_NON_IN_CASSA))
     totale_crediti_pregressi = sum((c['importo'] for c in crediti_pregressi),
                                    Decimal('0.00'))
-    servito_ordini_giorno = totale_servito - totale_crediti_pregressi
+    servito_ordini_giorno = servito_atteso - totale_crediti_pregressi
 
     if quadratura_obj:
         fondo_cassa_iniziale = quadratura_obj.fondo_cassa_iniziale
@@ -1117,10 +1139,12 @@ def report_giornata(request):
     quadratura = {
         'obj': quadratura_obj,
         'vendita_self_service': vendita_self_service,
-        'totale_servito': totale_servito,
+        'totale_servito': servito_atteso,
         'servito_ordini_giorno': servito_ordini_giorno,
         'crediti_pregressi': crediti_pregressi,
         'totale_crediti_pregressi': totale_crediti_pregressi,
+        'non_in_cassa': non_in_cassa,
+        'totale_non_in_cassa': totale_non_in_cassa,
         'totale_teorico': totale_teorico,
         'fondo_cassa_iniziale': fondo_cassa_iniziale,
         'lordo_reale': lordo_reale,

@@ -266,6 +266,31 @@
             {% else %}
             <div class="mb-2"></div>
             {% endif %}
+            {% if quadratura.non_in_cassa %}
+            <div class="d-flex justify-content-between small mb-1 text-muted">
+              <span><i class="bi bi-bank"></i> Bonifici e assegni del giorno (esclusi: non in cassa)</span>
+              <span>&euro;{{ quadratura.totale_non_in_cassa|floatformat:2 }}</span>
+            </div>
+            <details class="small mb-2">
+              <summary class="text-muted">Dettaglio bonifici e assegni</summary>
+              <table class="table table-sm data-table mb-0 mt-1">
+                <thead class="table-light">
+                  <tr><th>Ordine</th><th>Del</th><th>Cliente</th><th>Metodo</th><th class="text-end">Importo</th></tr>
+                </thead>
+                <tbody>
+                  {% for c in quadratura.non_in_cassa %}
+                  <tr>
+                    <td><a href="{% url 'ordini:ordine-detail' c.ordine.pk %}">#{{ c.ordine.numero_progressivo|slice:"-4:" }}</a></td>
+                    <td>{{ c.ordine.data_ora|date:"d/m/Y" }}</td>
+                    <td>{{ c.ordine.cliente|default:"—" }}</td>
+                    <td>{{ c.metodi|join:", " }}{% if c.riferimenti %}<div class="text-muted">{{ c.riferimenti|join:", " }}</div>{% endif %}</td>
+                    <td class="text-end">&euro;{{ c.importo|floatformat:2 }}</td>
+                  </tr>
+                  {% endfor %}
+                </tbody>
+              </table>
+            </details>
+            {% endif %}
             <div class="d-flex justify-content-between border-top pt-2">
               <span class="fw-bold">Totale teorico</span>
               <span class="fs-5 fw-bold" style="color:#0f766e">&euro;{{ quadratura.totale_teorico|floatformat:2 }}</span>
