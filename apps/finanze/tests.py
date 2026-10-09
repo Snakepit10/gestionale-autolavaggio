@@ -398,6 +398,22 @@ class AbbinamentoPortaliTest(TestCase):
         c6 = ChiusuraPortali.objects.get(data=giorno)
         self.assertEqual(c6.periodo_a, c6.periodo_da)
 
+    def test_allinea_periodo_inizio_libero(self):
+        # Il giorno prima non ha chiusura salvata: l'inizio si sposta prima
+        # del P4 in contanti delle 18:00 del 05/10 che lo scontrino conta
+        from apps.finanze.models import Cassa, ChiusuraCassaAutomatica
+        from apps.finanze.services import allinea_scontrini as al
+        TransazionePortale.objects.create(portale='A', numero=21001, programma=4, origine='contanti',
+                                          orario=ora('18:00') - timedelta(days=1))
+        self._tx_portale('A', '10:00')
+        azzurro, _ = Cassa.objects.get_or_create(nome='Portale Azzurro', defaults={'tipo': 'automatica'})
+        ChiusuraCassaAutomatica.objects.create(cassa=azzurro, data=self.chiusura.data, wash_cycles=2,
+                                               vendita_contante=Decimal('8'))
+        inizi, esito = al.allinea_periodo(self.chiusura.data, self.chiusura.data)
+        self.assertLess(inizi['A'], ora('18:00') - timedelta(days=1))
+        self.assertEqual((esito[self.chiusura.data]['A']['conteggio'],
+                          esito[self.chiusura.data]['A']['contanti']), (2, Decimal('8.00')))
+
     def test_salva_orari_blu(self):
         user = User.objects.create_user('op', 'op@x.it', 'x', is_staff=True)
         self.client.force_login(user)

@@ -166,11 +166,16 @@ def allinea_periodo(dal, al):
     casse = {g: chiusure_casse_portali(g) for g in giorni}
     inizi, esito = {}, {g: {} for g in giorni}
     for portale in ('A', 'B'):
-        da = _inizio_periodo(dal, portale)
-        inizi[portale] = da
+        # Inizio del periodo: la fine del giorno prima se salvata,
+        # altrimenti libero nella sera del giorno prima (si sceglie
+        # insieme al resto, vicino all'inizio attuale)
+        from apps.finanze.models import ChiusuraPortali
+        rif_inizio = _inizio_periodo(dal, portale)
+        inizio_fisso = ChiusuraPortali.objects.filter(data=dal - timedelta(days=1)).exists()
+        base = rif_inizio if inizio_fisso else _sera(dal - timedelta(days=1))[0]
         _, fine_ultima = _sera(al)
         righe = list(TransazionePortale.objects
-                     .filter(portale=portale, orario__gt=da, orario__lte=fine_ultima)
+                     .filter(portale=portale, orario__gt=base, orario__lte=fine_ultima)
                      .order_by('orario', 'numero')
                      .values_list('orario', 'programma', 'origine'))
         dopo = (TransazionePortale.objects
@@ -182,20 +187,21 @@ def allinea_periodo(dal, al):
             contanti.append(contanti[-1] + (PREZZI_PROGRAMMA_PORTALE[programma]
                                             if origine == 'contanti' else 0))
 
-        # candidati per giorno: (k lavaggi dall'inizio, orario di fine)
-        candidati = []
-        for g in giorni:
-            sera_da, sera_a = _sera(g)
-            rif = _riferimento_fine(g, portale)
+        def tagli(giorno, rif):
+            """(k lavaggi da base, orario, distanza da rif) possibili nella
+            sera del giorno."""
+            sera_da, sera_a = _sera(giorno)
             lista = []
             for k in range(len(orari) + 1):
-                minimo = max(orari[k - 1] if k else da, sera_da)
+                minimo = max(orari[k - 1] if k else base, sera_da)
                 successivo = orari[k] if k < len(orari) else dopo
                 massimo = min(successivo - timedelta(seconds=1), sera_a) if successivo else sera_a
                 if massimo >= minimo:
                     fine = min(max(rif, minimo), massimo).replace(microsecond=0)
                     lista.append((k, fine, abs((fine - rif).total_seconds())))
-            candidati.append(lista)
+            return lista
+
+        candidati = [tagli(g, _riferimento_fine(g, portale)) for g in giorni]
 
         def costo(g, k_prima, k, distanza):
             cassa = casse[g][portale]
@@ -207,8 +213,13 @@ def allinea_periodo(dal, al):
                 c += abs(k - k_prima - cassa.wash_cycles)
             return c
 
-        # programmazione dinamica: migliore[k] = (costo, percorso)
-        migliore = {0: (Decimal(0), [])}
+        # programmazione dinamica: migliore[k] = (costo, percorso); il
+        # primo elemento del percorso e' l'inizio
+        if inizio_fisso:
+            migliore = {0: (Decimal(0), [(0, base)])}
+        else:
+            migliore = {k: (PESO_SECONDO * Decimal(d), [(k, fine)])
+                        for k, fine, d in tagli(dal - timedelta(days=1), rif_inizio)}
         for i, g in enumerate(giorni):
             # Giorno senza scontrino seguito da uno con scontrino: la cassa
             # non e' stata chiusa, i suoi lavaggi finiscono nello scontrino
@@ -227,8 +238,8 @@ def allinea_periodo(dal, al):
         if not migliore:
             continue
         _, percorso = min(migliore.values(), key=lambda s: s[0])
-        k_prima = 0
-        for g, (k, fine) in zip(giorni, percorso):
+        k_prima, inizi[portale] = percorso[0]
+        for g, (k, fine) in zip(giorni, percorso[1:]):
             cassa = casse[g][portale]
             esito[g][portale] = {
                 'fine': fine, 'conteggio': k - k_prima,
