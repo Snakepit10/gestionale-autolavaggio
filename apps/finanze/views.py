@@ -8,7 +8,7 @@ from datetime import datetime, timedelta
 from decimal import Decimal
 import json
 
-from .models import ChiusuraCassa, MovimentoCassa, Cassa, ChiusuraCassaAutomatica, QuadraturaGiornaliera
+from .models import ChiusuraCassa, MovimentoCassa, Cassa, ChiusuraCassaAutomatica, QuadraturaGiornaliera, SpesaCassa
 from .services import abbinamento_portali
 
 # Metodi che non finiscono nel conteggio fisico della quadratura
@@ -1118,10 +1118,15 @@ def report_giornata(request):
                                    Decimal('0.00'))
     servito_ordini_giorno = servito_atteso - totale_crediti_pregressi
 
+    # Spese pagate coi contanti della cassa: mancano dal conteggio, quindi
+    # si sommano al reale.
+    spese_cassa = list(SpesaCassa.objects.filter(data=data).select_related('operatore'))
+    totale_spese_cassa = sum((s.importo for s in spese_cassa), Decimal('0.00'))
+
     if quadratura_obj:
         fondo_cassa_iniziale = quadratura_obj.fondo_cassa_iniziale
         lordo_reale = quadratura_obj.contanti_totali + quadratura_obj.lettore_carte_servito
-        totale_reale = quadratura_obj.totale_reale
+        totale_reale = quadratura_obj.totale_reale + totale_spese_cassa
         differenza_quadratura = totale_reale - totale_teorico
         if abs(differenza_quadratura) < Decimal('0.50'):
             stato_quadratura = 'ok'
@@ -1147,6 +1152,7 @@ def report_giornata(request):
         'totale_non_in_cassa': totale_non_in_cassa,
         'totale_teorico': totale_teorico,
         'fondo_cassa_iniziale': fondo_cassa_iniziale,
+        'spese_cassa': totale_spese_cassa,
         'lordo_reale': lordo_reale,
         'totale_reale': totale_reale,
         'differenza': differenza_quadratura,
@@ -1201,6 +1207,11 @@ def report_giornata(request):
         'orario_counts_json': json.dumps(orario_counts),
     }
     context.update(_contesto_lavaggi_portali(data))
+    context.update({
+        'spese_cassa': spese_cassa,
+        'totale_spese_cassa': totale_spese_cassa,
+        'categorie_spesa': SpesaCassa.CATEGORIA_CHOICES,
+    })
 
     # La differenza di quadratura sconta anche i lavaggi portale pagati
     # direttamente agli operatori (residuo dell'abbinamento servito).
@@ -1379,6 +1390,49 @@ def imposta_chiusura_portali(request):
     messages.success(request, 'Chiusura portali aggiornata.')
     return redirect(
         f"{reverse('finanze:report_giornata')}?data={data.strftime('%Y-%m-%d')}")
+
+
+@login_required
+@user_passes_test(is_staff_user)
+def azione_spese_cassa(request):
+    """POST dal report giornata: aggiunge o elimina una spesa pagata coi
+    contanti della cassa. Elimina solo chi l'ha inserita o l'admin."""
+    from django.urls import reverse
+
+    data_str = request.POST.get('data', '')
+    torna = f"{reverse('finanze:report_giornata')}?data={data_str}#spese-cassa"
+    if request.method != 'POST':
+        return redirect('finanze:report_giornata')
+
+    azione = request.POST.get('azione')
+    if azione == 'aggiungi':
+        try:
+            data = datetime.strptime(data_str, '%Y-%m-%d').date()
+            importo = Decimal((request.POST.get('importo') or '').replace(',', '.'))
+        except (ValueError, ArithmeticError):
+            messages.error(request, 'Data o importo della spesa non validi.')
+            return redirect(torna)
+        descrizione = request.POST.get('descrizione', '').strip()
+        categoria = request.POST.get('categoria', 'altro')
+        if importo <= 0 or not descrizione:
+            messages.error(request, 'Indica una descrizione e un importo maggiore di zero.')
+            return redirect(torna)
+        if categoria not in dict(SpesaCassa.CATEGORIA_CHOICES):
+            categoria = 'altro'
+        SpesaCassa.objects.create(
+            data=data, importo=importo.quantize(Decimal('0.01')),
+            descrizione=descrizione[:200], categoria=categoria,
+            riferimento=request.POST.get('riferimento', '').strip()[:100],
+            operatore=request.user)
+        messages.success(request, f'Spesa "{descrizione}" di €{importo:.2f} registrata.')
+    elif azione == 'elimina':
+        spesa = get_object_or_404(SpesaCassa, pk=request.POST.get('spesa_id'))
+        if not (request.user.is_superuser or spesa.operatore_id == request.user.id):
+            messages.error(request, "Solo chi l'ha inserita o l'amministratore può eliminare la spesa.")
+            return redirect(torna)
+        spesa.delete()
+        messages.success(request, 'Spesa eliminata.')
+    return redirect(torna)
 
 
 @login_required

@@ -304,3 +304,52 @@ class ImportWashtecTest(TestCase):
                  self.riga(13970, 'In contanti', orario='06/10/26 08:00:00')]
         esito = iw.importa(righe)
         self.assertEqual((esito['nuove'], esito['gia_presenti']), (0, 2))
+
+
+class SpeseCassaTest(TestCase):
+    """Spese pagate coi contanti della cassa dal report giornata."""
+
+    def setUp(self):
+        from apps.finanze.models import SpesaCassa
+        self.SpesaCassa = SpesaCassa
+        self.op = User.objects.create_user('op_spese', password='x', is_staff=True)
+        self.altro = User.objects.create_user('op_altro', password='x', is_staff=True)
+        self.url = reverse('finanze:azione_spese_cassa')
+
+    def aggiungi(self, **extra):
+        dati = {'data': '2026-10-06', 'azione': 'aggiungi', 'descrizione': 'Panni microfibra',
+                'categoria': 'prodotti', 'importo': '12,50', 'riferimento': 'sc. 45'}
+        dati.update(extra)
+        return self.client.post(self.url, dati)
+
+    def test_aggiungi_spesa(self):
+        self.client.force_login(self.op)
+        r = self.aggiungi()
+        self.assertEqual(r.status_code, 302)
+        self.assertIn('#spese-cassa', r['Location'])
+        s = self.SpesaCassa.objects.get()
+        self.assertEqual((s.importo, s.categoria, s.operatore, str(s.data)),
+                         (Decimal('12.50'), 'prodotti', self.op, '2026-10-06'))
+
+    def test_dati_non_validi(self):
+        self.client.force_login(self.op)
+        self.aggiungi(importo='0')
+        self.aggiungi(importo='abc')
+        self.aggiungi(descrizione='  ')
+        self.assertFalse(self.SpesaCassa.objects.exists())
+
+    def test_elimina_solo_autore_o_admin(self):
+        self.client.force_login(self.op)
+        self.aggiungi()
+        s = self.SpesaCassa.objects.get()
+        self.client.force_login(self.altro)
+        self.client.post(self.url, {'data': '2026-10-06', 'azione': 'elimina', 'spesa_id': s.pk})
+        self.assertTrue(self.SpesaCassa.objects.exists())
+        self.client.force_login(self.op)
+        self.client.post(self.url, {'data': '2026-10-06', 'azione': 'elimina', 'spesa_id': s.pk})
+        self.assertFalse(self.SpesaCassa.objects.exists())
+
+    def test_non_staff_respinto(self):
+        self.client.force_login(User.objects.create_user('cliente', password='x'))
+        self.aggiungi()
+        self.assertFalse(self.SpesaCassa.objects.exists())

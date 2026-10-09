@@ -627,3 +627,39 @@ class QuadraturaGiornaliera(models.Model):
     def totale_reale(self):
         """Totale netto rilevato: contanti + carte - fondo cassa iniziale."""
         return self.contanti_totali + self.lettore_carte_servito - self.fondo_cassa_iniziale
+
+
+class SpesaCassa(models.Model):
+    """Costo sostenuto in giornata pagando con i contanti presi dalla
+    cassa: nella quadratura si somma al reale, perche' quei soldi
+    mancano dal conteggio."""
+
+    CATEGORIA_CHOICES = [
+        ('prodotti', 'Prodotti e materiali'),
+        ('carburante', 'Carburante'),
+        ('manutenzione', 'Manutenzione e riparazioni'),
+        ('personale', 'Personale'),
+        ('alimentari', 'Bar e alimentari'),
+        ('altro', 'Altro'),
+    ]
+
+    data = models.DateField(default=timezone.localdate, db_index=True)
+    importo = models.DecimalField(
+        max_digits=10, decimal_places=2,
+        validators=[MinValueValidator(Decimal('0.01'))],
+    )
+    descrizione = models.CharField(max_length=200)
+    categoria = models.CharField(max_length=20, choices=CATEGORIA_CHOICES, default='altro')
+    riferimento = models.CharField(max_length=100, blank=True,
+                                   help_text='Numero scontrino, fattura, ricevuta...')
+    operatore = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, blank=True,
+                                  related_name='spese_cassa')
+    creato_il = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        verbose_name = 'Spesa pagata dalla cassa'
+        verbose_name_plural = 'Spese pagate dalla cassa'
+        ordering = ['data', 'creato_il']
+
+    def __str__(self):
+        return f"{self.data:%d/%m/%Y} {self.descrizione} €{self.importo}"

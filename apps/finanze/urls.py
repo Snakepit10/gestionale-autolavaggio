@@ -37,6 +37,7 @@ urlpatterns = [
     path('report-giornata/', views.report_giornata, name='report_giornata'),
     path('report-giornata/chiusura-portali/', views.imposta_chiusura_portali, name='imposta_chiusura_portali'),
     path('report-giornata/abbinamento-portali/', views.azione_abbinamento_portali, name='azione_abbinamento_portali'),
+    path('report-giornata/spese-cassa/', views.azione_spese_cassa, name='azione_spese_cassa'),
     path('importa-washtec/', views.importa_washtec, name='importa_washtec'),
     path('importa-washtec/api/', views.importa_washtec_api, name='importa_washtec_api'),
     path('report-giornata/importa-transazioni-portali/', views.importa_transazioni_portali, name='importa_transazioni_portali'),

@@ -1,6 +1,6 @@
 from django.contrib import admin
 from django.utils.html import format_html
-from .models import ChiusuraCassa, MovimentoCassa, Cassa, ChiusuraCassaAutomatica, QuadraturaGiornaliera
+from .models import ChiusuraCassa, MovimentoCassa, Cassa, ChiusuraCassaAutomatica, QuadraturaGiornaliera, SpesaCassa
 
 
 @admin.register(QuadraturaGiornaliera)
@@ -202,3 +202,11 @@ class MovimentoCassaAdmin(admin.ModelAdmin):
         if obj and obj.chiusura_cassa.confermata:
             return False
         return super().has_change_permission(request, obj)
+
+
+@admin.register(SpesaCassa)
+class SpesaCassaAdmin(admin.ModelAdmin):
+    list_display = ['data', 'descrizione', 'categoria', 'importo', 'riferimento', 'operatore']
+    list_filter = ['categoria', 'data']
+    search_fields = ['descrizione', 'riferimento']
+    date_hierarchy = 'data'

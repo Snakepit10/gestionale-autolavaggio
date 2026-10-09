@@ -236,6 +236,12 @@
               <span>&minus; Fondo cassa iniziale</span>
               <span class="fw-bold">&minus;&euro;{{ quadratura.fondo_cassa_iniziale|floatformat:2 }}</span>
             </div>
+            {% if quadratura.spese_cassa %}
+            <div class="d-flex justify-content-between small mb-2 text-success">
+              <span>+ Spese pagate dalla cassa <a href="#spese-cassa">(dettaglio)</a></span>
+              <span class="fw-bold">+&euro;{{ quadratura.spese_cassa|floatformat:2 }}</span>
+            </div>
+            {% endif %}
             <div class="d-flex justify-content-between border-top pt-2">
               <span class="fw-bold">Totale reale</span>
               <span class="fs-5 fw-bold text-primary">&euro;{{ quadratura.totale_reale|floatformat:2 }}</span>
@@ -364,6 +370,84 @@
         </div>
       </div>
       {% endif %}
+    </div>
+  </div>
+
+  {# ====== SPESE PAGATE DALLA CASSA ====== #}
+  <div class="chart-panel mb-3" id="spese-cassa">
+    <div class="panel-title">
+      <i class="bi bi-receipt text-danger"></i> Spese pagate dalla cassa
+      <span class="badge bg-light text-dark ms-2">&euro;{{ totale_spese_cassa|floatformat:2 }}</span>
+    </div>
+    <div class="panel-sub">Costi della giornata pagati con i contanti presi dalla cassa: nella quadratura si sommano al reale</div>
+    <div class="panel-body">
+      {% if spese_cassa %}
+      <div class="table-responsive">
+        <table class="table table-sm data-table mb-3">
+          <thead class="table-light">
+            <tr><th>Descrizione</th><th>Categoria</th><th>Riferimento</th><th>Inserita da</th><th class="text-end">Importo</th><th></th></tr>
+          </thead>
+          <tbody>
+            {% for s in spese_cassa %}
+            <tr>
+              <td>{{ s.descrizione }}</td>
+              <td>{{ s.get_categoria_display }}</td>
+              <td>{{ s.riferimento|default:"—" }}</td>
+              <td class="text-muted small">{{ s.operatore|default:"—" }} &middot; {{ s.creato_il|date:"H:i" }}</td>
+              <td class="text-end fw-bold">&euro;{{ s.importo|floatformat:2 }}</td>
+              <td class="text-end">
+                {% if request.user.is_superuser or s.operatore_id == request.user.id %}
+                <form method="post" action="{% url 'finanze:azione_spese_cassa' %}" class="d-inline"
+                      onsubmit="return confirm('Eliminare la spesa &quot;{{ s.descrizione|escapejs }}&quot;?');">
+                  {% csrf_token %}
+                  <input type="hidden" name="data" value="{{ data|date:'Y-m-d' }}">
+                  <input type="hidden" name="azione" value="elimina">
+                  <input type="hidden" name="spesa_id" value="{{ s.pk }}">
+                  <button class="btn btn-sm btn-link text-danger p-0" title="Elimina"><i class="bi bi-trash"></i></button>
+                </form>
+                {% endif %}
+              </td>
+            </tr>
+            {% endfor %}
+          </tbody>
+          <tfoot>
+            <tr><th colspan="4">Totale</th><th class="text-end">&euro;{{ totale_spese_cassa|floatformat:2 }}</th><th></th></tr>
+          </tfoot>
+        </table>
+      </div>
+      {% else %}
+      <p class="text-muted small">Nessuna spesa registrata per questa data.</p>
+      {% endif %}
+
+      <form method="post" action="{% url 'finanze:azione_spese_cassa' %}" class="row g-2 align-items-end">
+        {% csrf_token %}
+        <input type="hidden" name="data" value="{{ data|date:'Y-m-d' }}">
+        <input type="hidden" name="azione" value="aggiungi">
+        <div class="col-12 col-md-4">
+          <label class="form-label small mb-1">Descrizione</label>
+          <input type="text" name="descrizione" class="form-control form-control-sm" maxlength="200" required
+                 placeholder="es. Panni microfibra, gasolio generatore">
+        </div>
+        <div class="col-6 col-md-2">
+          <label class="form-label small mb-1">Categoria</label>
+          <select name="categoria" class="form-select form-select-sm">
+            {% for valore, etichetta in categorie_spesa %}
+            <option value="{{ valore }}"{% if valore == 'altro' %} selected{% endif %}>{{ etichetta }}</option>
+            {% endfor %}
+          </select>
+        </div>
+        <div class="col-6 col-md-2">
+          <label class="form-label small mb-1">Riferimento</label>
+          <input type="text" name="riferimento" class="form-control form-control-sm" maxlength="100" placeholder="n. scontrino">
+        </div>
+        <div class="col-6 col-md-2">
+          <label class="form-label small mb-1">Importo &euro;</label>
+          <input type="number" name="importo" class="form-control form-control-sm" step="0.01" min="0.01" required>
+        </div>
+        <div class="col-6 col-md-2">
+          <button class="btn btn-sm btn-danger w-100"><i class="bi bi-plus-circle"></i> Aggiungi spesa</button>
+        </div>
+      </form>
     </div>
   </div>
 
