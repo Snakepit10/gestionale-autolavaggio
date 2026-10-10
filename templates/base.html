@@ -204,6 +204,28 @@
                         </li>
                         {% endif %}
 
+                        {% if 'magazzino' in sezioni_visibili %}
+                        <li class="nav-item dropdown">
+                            <a class="nav-link dropdown-toggle" href="#" id="magazzinoDropdown" role="button" data-bs-toggle="dropdown">
+                                <i class="bi bi-box-seam"></i> Magazzino
+                                {% if n_segnalazioni_magazzino %}<span class="badge rounded-pill bg-danger">{{ n_segnalazioni_magazzino }}</span>{% endif %}
+                            </a>
+                            <ul class="dropdown-menu">
+                                <li><a class="dropdown-item" href="{% url 'magazzino:articoli' %}"><i class="bi bi-boxes"></i> Articoli</a></li>
+                                <li><a class="dropdown-item" href="{% url 'magazzino:movimenti' %}"><i class="bi bi-arrow-left-right"></i> Movimenti</a></li>
+                                <li><hr class="dropdown-divider"></li>
+                                <li><a class="dropdown-item" href="{% url 'magazzino:ordini' %}"><i class="bi bi-cart3"></i> Ordini fornitori</a></li>
+                                <li><a class="dropdown-item" href="{% url 'magazzino:consegne' %}"><i class="bi bi-truck"></i> Registro consegne</a></li>
+                                <li><a class="dropdown-item" href="{% url 'magazzino:fornitori' %}"><i class="bi bi-building"></i> Fornitori</a></li>
+                                <li><hr class="dropdown-divider"></li>
+                                <li><a class="dropdown-item" href="{% url 'magazzino:assegnazioni' %}"><i class="bi bi-person-badge"></i> Assegnazioni</a></li>
+                                <li><a class="dropdown-item" href="{% url 'magazzino:segnalazioni' %}"><i class="bi bi-exclamation-triangle"></i> Segnalazioni
+                                    {% if n_segnalazioni_magazzino %}<span class="badge rounded-pill bg-danger">{{ n_segnalazioni_magazzino }}</span>{% endif %}</a></li>
+                                <li><a class="dropdown-item" href="{% url 'magazzino:report' %}"><i class="bi bi-bar-chart"></i> Report</a></li>
+                            </ul>
+                        </li>
+                        {% endif %}
+
                         {% if 'finanze' in sezioni_visibili %}
                         <li class="nav-item dropdown">
                             <a class="nav-link dropdown-toggle" href="#" role="button" data-bs-toggle="dropdown">
@@ -242,7 +264,6 @@
                                 <li><hr class="dropdown-divider"></li>
                                 <li><h6 class="dropdown-header">Sistema</h6></li>
                                 <li><a class="dropdown-item" href="{% url 'core:stampanti-list' %}"><i class="bi bi-printer"></i> Stampanti</a></li>
-                                <li><a class="dropdown-item" href="{% url 'core:scorte-list' %}"><i class="bi bi-box-seam"></i> Gestione Scorte</a></li>
                                 <li><a class="dropdown-item" href="{% url 'cartellini:generatore' %}"><i class="bi bi-tag"></i> Cartellini Kanban</a></li>
                                 <li><a class="dropdown-item" href="{% url 'prenotazioni:config-slot-list' %}"><i class="bi bi-calendar-range"></i> Slot Prenotazioni</a></li>
                                 <li><a class="dropdown-item" href="{% url 'abbonamenti:config-abbonamenti-list' %}"><i class="bi bi-card-checklist"></i> Config Abbonamenti</a></li>

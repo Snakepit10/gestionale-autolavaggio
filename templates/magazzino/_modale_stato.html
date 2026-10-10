@@ -1,0 +1,32 @@
+<div class="modal fade" id="modaleStato" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header modal-clean"><h5 class="modal-title" id="st-titolo">Stato</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button></div>
+            <div class="modal-body">
+                <input type="hidden" id="st-id">
+                <label class="form-label">Stato</label>
+                <div class="d-flex flex-wrap gap-2 mb-3" id="st-stati">
+                    {% for k, v in stati %}{% if k != 'sostituito' %}
+                    <input type="radio" class="btn-check" name="st-stato" id="st-{{ k }}" value="{{ k }}">
+                    <label class="btn btn-outline-secondary btn-lg flex-fill" for="st-{{ k }}">{{ v }}</label>
+                    {% endif %}{% endfor %}
+                </div>
+                <div class="row g-2">
+                    <div class="col-4" id="st-q-box">
+                        <label class="form-label">Quanti</label>
+                        <input type="number" min="1" class="form-control form-control-lg" id="st-quantita">
+                        <small class="text-muted" id="st-di"></small>
+                    </div>
+                    <div class="col">
+                        <label class="form-label">Nota</label>
+                        <input type="text" class="form-control form-control-lg" id="st-nota" maxlength="200" placeholder="Cosa è successo?">
+                    </div>
+                </div>
+                <div class="alert alert-danger d-none mt-3 mb-0" id="st-errore"></div>
+            </div>
+            <div class="modal-footer"><button class="btn btn-secondary" data-bs-dismiss="modal">Annulla</button>
+                <button class="btn btn-primary btn-lg" onclick="salvaStato()"><i class="bi bi-check-circle"></i> Conferma</button></div>
+        </div>
+    </div>
+</div>

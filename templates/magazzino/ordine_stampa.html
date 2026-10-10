@@ -1,0 +1,51 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Ordine {{ ordine.numero }}</title>
+<style>
+body { font-family: Arial, Helvetica, sans-serif; color:#111; margin:24px; font-size:14px; }
+h1 { font-size:20px; margin:0 0 4px; }
+.intest { display:flex; justify-content:space-between; gap:24px; margin-bottom:20px; }
+.box { border:1px solid #ccc; border-radius:6px; padding:10px 14px; min-width:240px; }
+table { width:100%; border-collapse:collapse; margin-top:10px; }
+th, td { border-bottom:1px solid #ddd; padding:8px 6px; text-align:left; }
+th { background:#f3f4f6; font-size:12px; text-transform:uppercase; }
+.r { text-align:right; }
+tfoot td { font-weight:bold; border-top:2px solid #333; }
+.note { margin-top:18px; }
+@media print { .noprint { display:none; } body { margin:10mm; } }
+</style>
+</head>
+<body>
+<div class="noprint" style="margin-bottom:16px"><button onclick="window.print()">Stampa</button></div>
+<div class="intest">
+    <div>
+        <h1>Ordine {{ ordine.numero }}</h1>
+        <div>Data: {{ ordine.data|date:"d/m/Y" }}</div>
+        <div>Master Wash</div>
+    </div>
+    <div class="box">
+        <strong>{{ ordine.fornitore.ragione_sociale }}</strong><br>
+        {% if ordine.fornitore.partita_iva %}P.IVA {{ ordine.fornitore.partita_iva }}<br>{% endif %}
+        {% if ordine.fornitore.referente %}Alla c.a. {{ ordine.fornitore.referente }}<br>{% endif %}
+        {% if ordine.fornitore.telefono %}Tel. {{ ordine.fornitore.telefono }}<br>{% endif %}
+        {% if ordine.fornitore.email %}{{ ordine.fornitore.email }}{% endif %}
+    </div>
+</div>
+<table>
+    <thead><tr><th>Codice</th><th>Articolo</th><th class="r">Quantità</th><th class="r">Prezzo</th><th class="r">Importo</th></tr></thead>
+    <tbody>
+    {% for r in righe %}
+        <tr><td>{{ r.articolo.codice }}</td><td>{{ r.articolo.nome }}</td>
+            <td class="r">{{ r.quantita }} {{ r.articolo.unita }}</td>
+            <td class="r">{% if r.prezzo %}&euro; {{ r.prezzo|floatformat:2 }}{% endif %}</td>
+            <td class="r">{% if r.prezzo %}&euro; {{ r.importo|floatformat:2 }}{% endif %}</td></tr>
+    {% endfor %}
+    </tbody>
+    {% if ordine.totale %}<tfoot><tr><td colspan="4" class="r">Totale</td><td class="r">&euro; {{ ordine.totale|floatformat:2 }}</td></tr></tfoot>{% endif %}
+</table>
+{% if ordine.note %}<div class="note"><strong>Note:</strong> {{ ordine.note|linebreaksbr }}</div>{% endif %}
+</body>
+</html>

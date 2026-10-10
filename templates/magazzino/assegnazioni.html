@@ -1,0 +1,230 @@
+{% extends 'magazzino/_base.html' %}
+
+{% block title %}Magazzino - Assegnazioni{% endblock %}
+
+{% block pagina %}
+<div class="page-header">
+    <h1><i class="bi bi-person-badge"></i> Assegnazioni</h1>
+    <button class="btn btn-primary" onclick="apriAssegnazione()"><i class="bi bi-plus-circle"></i> Assegna merce</button>
+</div>
+
+<ul class="nav nav-pills mb-3">
+    <li class="nav-item"><a class="nav-link {% if vista == 'postazioni' %}active{% endif %}" href="?vista=postazioni"><i class="bi bi-geo-alt"></i> Dotazioni postazioni</a></li>
+    <li class="nav-item"><a class="nav-link {% if vista == 'operatori' %}active{% endif %}" href="?vista=operatori"><i class="bi bi-person"></i> Dotazioni operatori</a></li>
+</ul>
+
+{% if vista == 'postazioni' %}
+<p class="small text-muted"><i class="bi bi-clipboard-check"></i> La merce assegnata a una postazione compare nella checklist di inizio/fine turno di quella postazione: un esito "Usurato", "Rotto" o "Mancante" arriva nelle Segnalazioni.</p>
+{% endif %}
+
+{% for g in gruppi %}
+<div class="section-card {% if g.tipo == 'postazione' %}accent-blue{% else %}accent-green{% endif %}">
+    <div class="section-title">
+        <div class="label"><i class="bi {% if g.tipo == 'postazione' %}bi-geo-alt{% else %}bi-person{% endif %}"></i> {{ g.nome }}</div>
+        <span class="count">{{ g.righe|length }} articol{{ g.righe|length|pluralize:"o,i" }} &middot; &euro;{{ g.valore|floatformat:2 }}</span>
+    </div>
+    <div class="section-body">
+        <div class="table-responsive">
+            <table class="table table-hover">
+                <thead><tr><th>Articolo</th><th class="text-end">Qtà</th><th>Stato</th><th>Dal</th>{% if g.tipo == 'postazione' %}<th>Checklist</th>{% endif %}<th>Note</th><th class="text-end">Azioni</th></tr></thead>
+                <tbody>
+                {% for a in g.righe %}
+                    <tr>
+                        <td><a href="{% url 'magazzino:articolo' a.articolo_id %}" class="text-decoration-none fw-semibold">{{ a.articolo.nome }}</a>
+                            <br><small class="text-muted">{{ a.articolo.get_tipo_display }}</small></td>
+                        <td class="text-end fw-semibold">{{ a.quantita }} <small class="text-muted">{{ a.articolo.unita }}</small></td>
+                        <td><span class="badge bg-{{ a.colore_stato }}">{{ a.get_stato_display }}</span>
+                            {% if a.da_gestire %}<i class="bi bi-exclamation-circle-fill text-danger" title="Segnalazione da gestire"></i>{% endif %}</td>
+                        <td class="small text-nowrap">{{ a.data|date:"d/m/Y" }}<br><span class="text-muted">{% if a.assegnata_da %}{{ a.assegnata_da.get_full_name|default:a.assegnata_da.username }}{% endif %}</span></td>
+                        {% if g.tipo == 'postazione' %}
+                        <td class="small text-nowrap">
+                            <span class="cursor-pointer" onclick="apriChecklist({{ a.pk }}, {{ a.in_apertura|yesno:'true,false' }}, {{ a.in_chiusura|yesno:'true,false' }}, '{{ a.note|escapejs }}')" title="Modifica">
+                            {% if a.in_apertura %}<span class="badge bg-light text-dark border">inizio</span>{% endif %}
+                            {% if a.in_chiusura %}<span class="badge bg-light text-dark border">fine</span>{% endif %}
+                            {% if not a.in_apertura and not a.in_chiusura %}<span class="text-muted">no</span>{% endif %}
+                            <i class="bi bi-pencil text-muted"></i></span>
+                        </td>
+                        {% endif %}
+                        <td class="small">{{ a.note }}</td>
+                        <td class="text-end text-nowrap">
+                            <button class="btn btn-sm btn-outline-info" title="Restituito in magazzino" onclick="apriStato({{ a.pk }}, '{{ a.articolo.nome|escapejs }}', {{ a.quantita }}, 'restituito')"><i class="bi bi-arrow-return-left"></i></button>
+                            <button class="btn btn-sm btn-outline-warning" title="Cambia stato" onclick="apriStato({{ a.pk }}, '{{ a.articolo.nome|escapejs }}', {{ a.quantita }}, '{% if a.stato == 'usurato' %}in_uso{% else %}usurato{% endif %}')"><i class="bi bi-flag"></i></button>
+                            <button class="btn btn-sm btn-outline-success" title="Sostituisci con un pezzo nuovo" onclick="sostituisci({{ a.pk }}, '{{ a.articolo.nome|escapejs }}', {{ a.quantita }})"><i class="bi bi-arrow-repeat"></i></button>
+                        </td>
+                    </tr>
+                {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+{% empty %}
+<div class="section-card"><div class="empty-state"><i class="bi bi-person-badge"></i>
+    <h5>Nessuna merce assegnata {% if vista == 'postazioni' %}alle postazioni{% else %}agli operatori{% endif %}</h5>
+    <p>Usa "Assegna merce" per consegnare strumenti e consumabili.</p></div></div>
+{% endfor %}
+
+<div class="section-card">
+    <div class="section-title"><div class="label"><i class="bi bi-clock-history"></i> Ultimi cambi di stato</div></div>
+    <div class="section-body">
+        {% include 'magazzino/_storico_stati.html' with storico=recenti %}
+    </div>
+</div>
+
+{# ===== Modale nuova assegnazione ===== #}
+<div class="modal fade" id="modaleAssegnazione" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header modal-clean"><h5 class="modal-title"><i class="bi bi-person-badge"></i> Assegna merce</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button></div>
+            <div class="modal-body">
+                <div class="mb-3">
+                    <label class="form-label">Articolo *</label>
+                    <select class="form-select" id="ass-articolo" onchange="mostraDisponibile()"></select>
+                    <small class="text-muted" id="ass-disponibile"></small>
+                </div>
+                <div class="btn-group w-100 mb-3">
+                    <input type="radio" class="btn-check" name="ass-a" id="ass-a-post" value="postazione" onchange="tipoDestinatario()" checked>
+                    <label class="btn btn-outline-primary" for="ass-a-post"><i class="bi bi-geo-alt"></i> A una postazione</label>
+                    <input type="radio" class="btn-check" name="ass-a" id="ass-a-op" value="utente" onchange="tipoDestinatario()">
+                    <label class="btn btn-outline-primary" for="ass-a-op"><i class="bi bi-person"></i> A un operatore</label>
+                </div>
+                <div class="mb-3" id="ass-box-postazione">
+                    <label class="form-label">Postazione *</label>
+                    <select class="form-select" id="ass-postazione">
+                        <option value="">—</option>
+                        {% for p in postazioni %}<option value="{{ p.pk }}">{{ p.nome }}</option>{% endfor %}
+                    </select>
+                    <div class="mt-2 small">
+                        Controlla nella checklist:
+                        <div class="form-check form-check-inline ms-2"><input class="form-check-input" type="checkbox" id="ass-apertura" checked><label class="form-check-label" for="ass-apertura">inizio turno</label></div>
+                        <div class="form-check form-check-inline"><input class="form-check-input" type="checkbox" id="ass-chiusura" checked><label class="form-check-label" for="ass-chiusura">fine turno</label></div>
+                    </div>
+                </div>
+                <div class="mb-3 d-none" id="ass-box-utente">
+                    <label class="form-label">Operatore *</label>
+                    <select class="form-select" id="ass-utente">
+                        <option value="">—</option>
+                        {% for u in operatori %}<option value="{{ u.pk }}">{{ u.get_full_name|default:u.username }}</option>{% endfor %}
+                    </select>
+                </div>
+                <div class="row g-2">
+                    <div class="col-4"><label class="form-label">Quantità</label><input type="number" min="1" class="form-control" id="ass-quantita" value="1"></div>
+                    <div class="col-8"><label class="form-label">Note</label><input type="text" class="form-control" id="ass-note" maxlength="200"></div>
+                </div>
+                <div class="alert alert-danger d-none mt-3 mb-0" id="ass-errore"></div>
+            </div>
+            <div class="modal-footer"><button class="btn btn-secondary" data-bs-dismiss="modal">Annulla</button>
+                <button class="btn btn-primary" onclick="salvaAssegnazione()"><i class="bi bi-check-circle"></i> Assegna</button></div>
+        </div>
+    </div>
+</div>
+
+{# ===== Modale checklist / note ===== #}
+<div class="modal fade" id="modaleChecklist" tabindex="-1">
+    <div class="modal-dialog modal-sm">
+        <div class="modal-content">
+            <div class="modal-header modal-clean"><h5 class="modal-title">Checklist e note</h5><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div>
+            <div class="modal-body">
+                <input type="hidden" id="chk-id">
+                <div class="form-check"><input class="form-check-input" type="checkbox" id="chk-apertura"><label class="form-check-label" for="chk-apertura">Controlla a inizio turno</label></div>
+                <div class="form-check mb-3"><input class="form-check-input" type="checkbox" id="chk-chiusura"><label class="form-check-label" for="chk-chiusura">Controlla a fine turno</label></div>
+                <label class="form-label">Note</label><input type="text" class="form-control" id="chk-note" maxlength="200">
+            </div>
+            <div class="modal-footer"><button class="btn btn-primary" onclick="salvaChecklist()">Salva</button></div>
+        </div>
+    </div>
+</div>
+
+{% include 'magazzino/_modale_stato.html' with stati=stati magazzino=True %}
+{% endblock %}
+
+{% block extra_js_magazzino %}
+<script>
+const ARTICOLI = {{ articoli_json|safe }};
+
+function mostraDisponibile() {
+    const a = ARTICOLI.find(x => x.id == document.getElementById('ass-articolo').value);
+    document.getElementById('ass-disponibile').textContent = a ? (a.traccia ? 'In magazzino: ' + a.quantita + ' ' + a.unita : 'Quantità non tracciata') : '';
+}
+
+function tipoDestinatario() {
+    const post = document.getElementById('ass-a-post').checked;
+    document.getElementById('ass-box-postazione').classList.toggle('d-none', !post);
+    document.getElementById('ass-box-utente').classList.toggle('d-none', post);
+}
+
+function apriAssegnazione(articolo) {
+    const sel = document.getElementById('ass-articolo');
+    sel.innerHTML = '<option value="">— scegli —</option>' + ['strumento', 'consumabile', 'vendita'].map(t => {
+        const lista = ARTICOLI.filter(a => a.tipo === t);
+        if (!lista.length) return '';
+        const nome = {strumento: 'Strumenti', consumabile: 'Consumabili', vendita: 'Prodotti in vendita'}[t];
+        return `<optgroup label="${nome}">` + lista.map(a => `<option value="${a.id}">${esc(a.nome)}${a.traccia ? ' (' + a.quantita + ')' : ''}</option>`).join('') + '</optgroup>';
+    }).join('');
+    sel.value = articolo || '';
+    document.getElementById('ass-quantita').value = 1;
+    document.getElementById('ass-note').value = '';
+    document.getElementById('ass-errore').classList.add('d-none');
+    mostraDisponibile();
+    tipoDestinatario();
+    bootstrap.Modal.getOrCreateInstance(document.getElementById('modaleAssegnazione')).show();
+}
+
+async function salvaAssegnazione(forza) {
+    const post = document.getElementById('ass-a-post').checked;
+    const dati = {
+        articolo: document.getElementById('ass-articolo').value,
+        postazione: post ? document.getElementById('ass-postazione').value : null,
+        utente: post ? null : document.getElementById('ass-utente').value,
+        quantita: document.getElementById('ass-quantita').value,
+        note: document.getElementById('ass-note').value,
+        in_apertura: document.getElementById('ass-apertura').checked,
+        in_chiusura: document.getElementById('ass-chiusura').checked,
+        forza: !!forza,
+    };
+    if (!dati.postazione && !dati.utente) { mostraErrore('Scegli ' + (post ? 'la postazione' : "l'operatore")); return; }
+    const j = await postJSON("{% url 'magazzino:assegnazione-nuova' %}", dati);
+    if (!j.success) {
+        if (j.conferma && confirm(j.error)) return salvaAssegnazione(true);
+        mostraErrore(j.error);
+        return;
+    }
+    location.href = '?vista=' + (post ? 'postazioni' : 'operatori');
+}
+
+function mostraErrore(msg) { const e = document.getElementById('ass-errore'); e.textContent = msg; e.classList.remove('d-none'); }
+
+function apriChecklist(id, apertura, chiusura, note) {
+    document.getElementById('chk-id').value = id;
+    document.getElementById('chk-apertura').checked = apertura;
+    document.getElementById('chk-chiusura').checked = chiusura;
+    document.getElementById('chk-note').value = note;
+    bootstrap.Modal.getOrCreateInstance(document.getElementById('modaleChecklist')).show();
+}
+
+async function salvaChecklist() {
+    const id = document.getElementById('chk-id').value;
+    const j = await postJSON("{% url 'magazzino:assegnazione-modifica' 999999 %}".replace('999999', id), {
+        in_apertura: document.getElementById('chk-apertura').checked,
+        in_chiusura: document.getElementById('chk-chiusura').checked,
+        note: document.getElementById('chk-note').value,
+    });
+    if (!j.success) { alert(j.error); return; }
+    location.reload();
+}
+
+async function sostituisci(id, nome, quantita) {
+    if (!confirm(`Consegnare ${quantita} ${nome} nuov${quantita > 1 ? 'i' : 'o'}? Il vecchio passa a "Sostituito" e il nuovo esce dal magazzino.`)) return;
+    const j = await postJSON("{% url 'magazzino:assegnazione-sostituisci' 999999 %}".replace('999999', id));
+    if (!j.success) { alert(j.error); return; }
+    location.reload();
+}
+
+document.addEventListener('DOMContentLoaded', () => {
+    const art = new URLSearchParams(location.search).get('articolo');
+    if (art) apriAssegnazione(art);
+});
+</script>
+{% include 'magazzino/_js_stato.html' with url_stato="magazzino:assegnazione-stato" %}
+{% endblock %}

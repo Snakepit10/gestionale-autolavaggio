@@ -1,0 +1,257 @@
+{% extends 'magazzino/_base.html' %}
+
+{% block title %}{% if ordine %}Ordine {{ ordine.numero }}{% else %}Nuovo ordine{% endif %} - Magazzino{% endblock %}
+
+{% block pagina %}
+{% with bloccato=ordine.consegne.exists %}
+<div class="page-header">
+    <h1>
+        <a href="{% url 'magazzino:ordini' %}" class="text-decoration-none text-muted"><i class="bi bi-arrow-left"></i></a>
+        {% if ordine %}Ordine {{ ordine.numero }}
+            {% include 'magazzino/_stato_ordine.html' with stato=ordine.stato nome=ordine.get_stato_display %}
+        {% else %}Nuovo ordine{% endif %}
+    </h1>
+    {% if ordine %}
+    <div class="d-flex gap-2 flex-wrap">
+        <a class="btn btn-outline-secondary" href="{% url 'magazzino:ordine-stampa' ordine.pk %}" target="_blank"><i class="bi bi-printer"></i> Stampa</a>
+        {% if ordine.stato == 'bozza' %}
+            <button class="btn btn-info" onclick="statoOrdine('inviato')"><i class="bi bi-send"></i> Segna inviato</button>
+            <button class="btn btn-outline-danger" onclick="eliminaOrdine()"><i class="bi bi-trash"></i> Elimina</button>
+        {% endif %}
+        {% if ordine.stato == 'inviato' and not bloccato %}
+            <button class="btn btn-outline-secondary" onclick="statoOrdine('bozza')"><i class="bi bi-arrow-counterclockwise"></i> Torna in bozza</button>
+        {% endif %}
+        {% if ordine.stato == 'inviato' or ordine.stato == 'parziale' %}
+            <a class="btn btn-success" href="{% url 'magazzino:consegne' %}?ordine={{ ordine.pk }}"><i class="bi bi-truck"></i> Registra consegna</a>
+        {% endif %}
+        {% if ordine.stato == 'bozza' or ordine.stato == 'inviato' or ordine.stato == 'parziale' %}
+            <button class="btn btn-outline-danger" onclick="statoOrdine('annullato')"><i class="bi bi-x-circle"></i> Annulla ordine</button>
+        {% elif ordine.stato == 'annullato' %}
+            <button class="btn btn-outline-primary" onclick="statoOrdine('riapri')"><i class="bi bi-arrow-repeat"></i> Riapri</button>
+        {% endif %}
+    </div>
+    {% endif %}
+</div>
+
+{% if ordine and not ordine.modificabile or bloccato %}
+{# ===== Ordine in consultazione ===== #}
+<div class="section-card accent-blue">
+    <div class="section-title">
+        <div class="label"><i class="bi bi-building"></i> {{ ordine.fornitore }} &middot; {{ ordine.data|date:"d/m/Y" }}</div>
+        <span class="count">&euro;{{ ordine.totale|floatformat:2 }}</span>
+    </div>
+    <div class="section-body">
+        <table class="table">
+            <thead><tr><th>Articolo</th><th class="text-end">Ordinato</th><th class="text-end">Ricevuto</th><th class="text-end">Da ricevere</th><th class="text-end">Prezzo</th><th class="text-end">Importo</th></tr></thead>
+            <tbody>
+            {% for r in ordine.righe.all %}
+                <tr><td><a href="{% url 'magazzino:articolo' r.articolo_id %}">{{ r.articolo.nome }}</a></td>
+                    <td class="text-end">{{ r.quantita }} {{ r.articolo.unita }}</td>
+                    <td class="text-end">{{ r.ricevuto }}</td>
+                    <td class="text-end {% if r.residuo > 0 %}text-warning fw-bold{% else %}text-success{% endif %}">{% if r.residuo > 0 %}{{ r.residuo }}{% else %}<i class="bi bi-check-lg"></i>{% endif %}</td>
+                    <td class="text-end">&euro;{{ r.prezzo|floatformat:2 }}</td>
+                    <td class="text-end">&euro;{{ r.importo|floatformat:2 }}</td></tr>
+            {% endfor %}
+            </tbody>
+        </table>
+        {% if ordine.note %}<div class="p-3 border-top small"><strong>Note:</strong> {{ ordine.note|linebreaksbr }}</div>{% endif %}
+    </div>
+</div>
+{% else %}
+{# ===== Modifica ===== #}
+<div class="section-card accent-blue">
+    <div class="section-title"><div class="label"><i class="bi bi-pencil-square"></i> Dati ordine</div></div>
+    <div class="section-body pad">
+        <div class="row g-3">
+            <div class="col-md-5">
+                <label class="form-label">Fornitore *</label>
+                <select class="form-select" id="ord-fornitore" onchange="filtraArticoli()">
+                    <option value="">—</option>
+                    {% for f in fornitori %}<option value="{{ f.pk }}" {% if ordine.fornitore_id == f.pk %}selected{% endif %}>{{ f }}</option>{% endfor %}
+                </select>
+                {% if not fornitori %}<small class="text-danger">Prima crea un fornitore in <a href="{% url 'magazzino:fornitori' %}">Fornitori</a>.</small>{% endif %}
+            </div>
+            <div class="col-md-3">
+                <label class="form-label">Data</label>
+                <input type="date" class="form-control" id="ord-data" value="{% if ordine %}{{ ordine.data|date:'Y-m-d' }}{% else %}{{ oggi|date:'Y-m-d' }}{% endif %}">
+            </div>
+            <div class="col-md-4">
+                <label class="form-label">Note per il fornitore</label>
+                <input type="text" class="form-control" id="ord-note" value="{{ ordine.note|default:'' }}">
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="section-card accent-green">
+    <div class="section-title">
+        <div class="label"><i class="bi bi-list-check"></i> Articoli</div>
+        <div class="d-flex gap-2">
+            <button class="btn btn-sm btn-outline-primary" onclick="proponi()"><i class="bi bi-lightning"></i> Aggiungi i sotto scorta</button>
+            <button class="btn btn-sm btn-outline-success" onclick="aggiungiRiga()"><i class="bi bi-plus"></i> Riga</button>
+        </div>
+    </div>
+    <div class="section-body">
+        <div class="table-responsive">
+            <table class="table" id="tab-righe">
+                <thead><tr><th style="min-width:220px">Articolo</th><th class="text-end">In magazzino</th><th style="width:110px">Quantità</th><th style="width:130px">Prezzo &euro;</th><th class="text-end">Importo</th><th></th></tr></thead>
+                <tbody></tbody>
+                <tfoot><tr><td colspan="4" class="text-end">Totale</td><td class="text-end" id="ord-totale">&euro;0,00</td><td></td></tr></tfoot>
+            </table>
+        </div>
+        <div class="p-3 text-muted small d-none" id="nessuna-riga">Nessun articolo. Usa "Riga" o "Aggiungi i sotto scorta".</div>
+    </div>
+</div>
+<div class="alert alert-danger d-none" id="ord-errore"></div>
+<div class="d-flex gap-2 justify-content-end mb-4">
+    <a href="{% url 'magazzino:ordini' %}" class="btn btn-secondary">Annulla</a>
+    <button class="btn btn-primary" onclick="salvaOrdine(false)"><i class="bi bi-check-circle"></i> Salva</button>
+    {% if not ordine or ordine.stato == 'bozza' %}
+    <button class="btn btn-info" onclick="salvaOrdine(true)"><i class="bi bi-send"></i> Salva e segna inviato</button>
+    {% endif %}
+</div>
+{% endif %}
+
+{% if consegne %}
+<div class="section-card accent-green">
+    <div class="section-title"><div class="label"><i class="bi bi-truck"></i> Consegne ricevute</div><span class="count">{{ consegne|length }}</span></div>
+    <div class="section-body">
+        <table class="table table-sm">
+            <thead><tr><th>Data</th><th>DDT</th><th>Articoli</th><th class="text-end">Importo</th></tr></thead>
+            <tbody>
+            {% for c in consegne %}
+                <tr><td>{{ c.data|date:"d/m/Y" }}</td><td>{{ c.numero_ddt|default:"—" }}</td>
+                    <td class="small">{% for r in c.righe.all %}{{ r.articolo.nome }} ×{{ r.quantita }}{% if not forloop.last %}, {% endif %}{% endfor %}</td>
+                    <td class="text-end">&euro;{{ c.totale|floatformat:2 }}</td></tr>
+            {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+{% endif %}
+{% endwith %}
+{% endblock %}
+
+{% block extra_js_magazzino %}
+<script>
+const ARTICOLI = {{ articoli_json|safe }};
+const RIGHE_INIZIALI = {{ righe_json|safe }};
+const ORDINE_ID = {% if ordine %}{{ ordine.pk }}{% else %}null{% endif %};
+const URL_STATO = "{% if ordine %}{% url 'magazzino:ordine-stato' ordine.pk %}{% endif %}";
+const PER_ID = Object.fromEntries(ARTICOLI.map(a => [a.id, a]));
+const euro = v => '€' + (Number(v) || 0).toFixed(2).replace('.', ',');
+const num = v => Number(String(v).replace(',', '.')) || 0;
+
+function opzioniArticoli(sel) {
+    const forn = document.getElementById('ord-fornitore').value;
+    // Prima gli articoli del fornitore scelto, poi gli altri
+    const ordinati = [...ARTICOLI].sort((a, b) =>
+        ((b.fornitore == forn) - (a.fornitore == forn)) || a.nome.localeCompare(b.nome));
+    let html = '<option value="">— scegli —</option>';
+    let separato = false;
+    ordinati.forEach(a => {
+        if (forn && a.fornitore != forn && !separato) { html += '<option disabled>──────────</option>'; separato = true; }
+        html += `<option value="${a.id}" ${a.id == sel ? 'selected' : ''}>${esc(a.nome)}</option>`;
+    });
+    return html;
+}
+
+function aggiungiRiga(r) {
+    r = r || {};
+    const tr = document.createElement('tr');
+    tr.innerHTML = `
+        <td><select class="form-select form-select-sm r-art" onchange="cambiaArticolo(this)">${opzioniArticoli(r.articolo)}</select></td>
+        <td class="text-end small r-mag"></td>
+        <td><input type="number" min="1" class="form-control form-control-sm r-q" value="${r.quantita || 1}" oninput="ricalcola()"></td>
+        <td><input type="text" inputmode="decimal" class="form-control form-control-sm r-p" value="${r.prezzo != null ? r.prezzo : ''}" oninput="ricalcola()"></td>
+        <td class="text-end r-imp"></td>
+        <td class="text-end"><button class="btn btn-sm btn-outline-danger" onclick="this.closest('tr').remove(); ricalcola()"><i class="bi bi-x"></i></button></td>`;
+    document.querySelector('#tab-righe tbody').appendChild(tr);
+    aggiornaMagazzino(tr);
+    ricalcola();
+}
+
+function aggiornaMagazzino(tr) {
+    const a = PER_ID[tr.querySelector('.r-art').value];
+    tr.querySelector('.r-mag').textContent = a ? (a.traccia ? a.quantita + ' ' + a.unita : '—') : '';
+}
+
+function cambiaArticolo(sel) {
+    const tr = sel.closest('tr');
+    const a = PER_ID[sel.value];
+    if (a && !tr.querySelector('.r-p').value) tr.querySelector('.r-p').value = a.costo;
+    aggiornaMagazzino(tr);
+    ricalcola();
+}
+
+function filtraArticoli() {
+    document.querySelectorAll('#tab-righe .r-art').forEach(sel => { sel.innerHTML = opzioniArticoli(sel.value); });
+}
+
+function ricalcola() {
+    let tot = 0;
+    const righe = document.querySelectorAll('#tab-righe tbody tr');
+    righe.forEach(tr => {
+        const imp = num(tr.querySelector('.r-q').value) * num(tr.querySelector('.r-p').value);
+        tr.querySelector('.r-imp').textContent = euro(imp);
+        tot += imp;
+    });
+    document.getElementById('ord-totale').textContent = euro(tot);
+    document.getElementById('nessuna-riga').classList.toggle('d-none', righe.length > 0);
+}
+
+async function proponi() {
+    const forn = document.getElementById('ord-fornitore').value;
+    const r = await fetch("{% url 'magazzino:ordine-proponi' %}" + (forn ? '?fornitore=' + forn : ''));
+    const j = await r.json();
+    const presenti = new Set([...document.querySelectorAll('#tab-righe .r-art')].map(s => s.value));
+    let aggiunti = 0;
+    j.righe.forEach(riga => { if (!presenti.has(String(riga.articolo))) { aggiungiRiga(riga); aggiunti++; } });
+    if (!aggiunti) alert('Nessun articolo sotto scorta da aggiungere' + (forn ? ' per questo fornitore.' : '.'));
+}
+
+async function salvaOrdine(invia) {
+    const righe = [...document.querySelectorAll('#tab-righe tbody tr')].map(tr => ({
+        articolo: tr.querySelector('.r-art').value, quantita: tr.querySelector('.r-q').value,
+        prezzo: tr.querySelector('.r-p').value,
+    })).filter(r => r.articolo);
+    const j = await postJSON("{% url 'magazzino:ordine-salva' %}", {
+        id: ORDINE_ID, fornitore: document.getElementById('ord-fornitore').value,
+        data: document.getElementById('ord-data').value, note: document.getElementById('ord-note').value, righe,
+    });
+    if (!j.success) {
+        const e = document.getElementById('ord-errore'); e.textContent = j.error; e.classList.remove('d-none');
+        return;
+    }
+    if (invia) {
+        await postJSON("{% url 'magazzino:ordine-stato' 999999 %}".replace('999999', j.id), {stato: 'inviato'});
+    }
+    location.href = "{% url 'magazzino:ordine' 999999 %}".replace('999999', j.id);
+}
+
+async function statoOrdine(stato) {
+    const domande = {annullato: "Annullare l'ordine?", bozza: "Rimettere l'ordine in bozza?"};
+    if (domande[stato] && !confirm(domande[stato])) return;
+    const j = await postJSON(URL_STATO, {stato});
+    if (!j.success) { alert(j.error); return; }
+    location.reload();
+}
+
+async function eliminaOrdine() {
+    if (!confirm("Eliminare la bozza d'ordine?")) return;
+    const j = await postJSON("{% if ordine %}{% url 'magazzino:ordine-elimina' ordine.pk %}{% endif %}");
+    if (!j.success) { alert(j.error); return; }
+    location.href = "{% url 'magazzino:ordini' %}";
+}
+
+document.addEventListener('DOMContentLoaded', () => {
+    if (!document.getElementById('tab-righe')) return;
+    const qs = new URLSearchParams(location.search);
+    if (!ORDINE_ID && qs.get('fornitore')) document.getElementById('ord-fornitore').value = qs.get('fornitore');
+    RIGHE_INIZIALI.forEach(r => aggiungiRiga(r));
+    if (!ORDINE_ID && qs.get('proponi')) proponi();
+    else if (!RIGHE_INIZIALI.length) aggiungiRiga();
+    ricalcola();
+});
+</script>
+{% endblock %}

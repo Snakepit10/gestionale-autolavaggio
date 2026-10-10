@@ -1,0 +1,119 @@
+{% extends 'magazzino/_base.html' %}
+
+{% block title %}Magazzino - Articoli{% endblock %}
+
+{% block pagina %}
+<div class="page-header">
+    <h1><i class="bi bi-boxes"></i> Magazzino</h1>
+    <button type="button" class="btn btn-primary" onclick="apriArticolo()">
+        <i class="bi bi-plus-circle"></i> Nuovo articolo
+    </button>
+</div>
+
+<div class="row g-3 mb-3">
+    <div class="col-6 col-md-3"><div class="kpi"><div class="l">Articoli</div><div class="v">{{ articoli|length }}</div></div></div>
+    <div class="col-6 col-md-3"><div class="kpi"><div class="l">Valore in magazzino</div><div class="v">&euro;{{ valore_totale|floatformat:2 }}</div></div></div>
+    <div class="col-6 col-md-3">
+        <a href="?sotto=1" class="text-decoration-none"><div class="kpi"><div class="l">Sotto scorta</div>
+            <div class="v {% if n_sotto_scorta %}text-danger{% endif %}">{{ n_sotto_scorta }}</div></div></a>
+    </div>
+    <div class="col-6 col-md-3">
+        <a href="{% url 'magazzino:ordine-nuovo' %}?proponi=1" class="text-decoration-none"><div class="kpi"><div class="l">Riordina</div>
+            <div class="v"><i class="bi bi-cart-plus"></i></div></div></a>
+    </div>
+</div>
+
+<form class="filter-card" method="get">
+    <div class="row g-2 align-items-center">
+        <div class="col-12 col-md-3">
+            <input type="search" name="q" value="{{ filtro.q }}" class="form-control form-control-sm" placeholder="Cerca nome o codice">
+        </div>
+        <div class="col-6 col-md-2">
+            <select name="tipo" class="form-select form-select-sm" onchange="this.form.submit()">
+                <option value="">Tutti i tipi</option>
+                {% for k, v in tipi %}<option value="{{ k }}" {% if filtro.tipo == k %}selected{% endif %}>{{ v }}</option>{% endfor %}
+            </select>
+        </div>
+        <div class="col-6 col-md-2">
+            <select name="categoria" class="form-select form-select-sm" onchange="this.form.submit()">
+                <option value="">Tutte le categorie</option>
+                {% for c in categorie %}<option value="{{ c }}" {% if filtro.categoria == c %}selected{% endif %}>{{ c }}</option>{% endfor %}
+            </select>
+        </div>
+        <div class="col-auto form-check ms-2">
+            <input class="form-check-input" type="checkbox" name="sotto" value="1" id="f-sotto" {% if filtro.sotto %}checked{% endif %} onchange="this.form.submit()">
+            <label class="form-check-label small" for="f-sotto">Solo sotto scorta</label>
+        </div>
+        <div class="col-auto form-check ms-2">
+            <input class="form-check-input" type="checkbox" name="tutti" value="1" id="f-tutti" {% if filtro.tutti %}checked{% endif %} onchange="this.form.submit()">
+            <label class="form-check-label small" for="f-tutti">Anche non attivi</label>
+        </div>
+        <div class="col-auto"><button class="btn btn-sm btn-outline-secondary"><i class="bi bi-search"></i></button></div>
+    </div>
+</form>
+
+<div class="section-card accent-blue">
+    <div class="section-title">
+        <div class="label"><i class="bi bi-boxes"></i> Articoli</div>
+        <span class="count">{{ articoli|length }}</span>
+    </div>
+    <div class="section-body">
+        {% if articoli %}
+        <div class="table-responsive">
+            <table class="table table-hover">
+                <thead>
+                    <tr>
+                        <th>Articolo</th>
+                        <th>Tipo</th>
+                        <th class="text-end">In magazzino</th>
+                        <th class="text-end">Assegnati</th>
+                        <th class="text-end">Scorta min.</th>
+                        <th class="text-end">Costo</th>
+                        <th>Fornitore</th>
+                        <th class="text-center">Azioni</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for a in articoli %}
+                    <tr class="{% if not a.attivo %}text-muted{% endif %}">
+                        <td>
+                            <a href="{% url 'magazzino:articolo' a.pk %}" class="fw-semibold text-decoration-none">{{ a.nome }}</a>
+                            {% if a.prodotto %}<i class="bi bi-shop text-primary ms-1" title="In vendita in cassa: {{ a.prodotto.titolo }}"></i>{% endif %}
+                            <br><small class="text-muted">{% if a.codice %}{{ a.codice }} &middot; {% endif %}{{ a.categoria|default:"" }}</small>
+                        </td>
+                        <td><span class="badge {% if a.tipo == 'vendita' %}bg-primary{% elif a.tipo == 'strumento' %}bg-dark{% else %}bg-secondary{% endif %}">{{ a.get_tipo_display }}</span></td>
+                        <td class="text-end">
+                            {% if a.traccia_scorte %}
+                                <span class="{% if a.quantita < 0 %}qta-neg{% elif a.sotto_scorta %}text-danger fw-bold{% else %}fw-semibold{% endif %}">{{ a.quantita }}</span>
+                                <small class="text-muted">{{ a.unita }}</small>
+                                {% if a.sotto_scorta %}<br><span class="badge bg-danger-subtle text-danger">sotto scorta</span>{% endif %}
+                            {% else %}<span class="text-muted small">non tracciato</span>{% endif %}
+                        </td>
+                        <td class="text-end">{% if a.n_assegnati %}{{ a.n_assegnati }}{% else %}<span class="text-muted">—</span>{% endif %}</td>
+                        <td class="text-end">{% if a.traccia_scorte %}{{ a.scorta_minima }}{% else %}—{% endif %}</td>
+                        <td class="text-end">&euro;{{ a.costo|floatformat:2 }}</td>
+                        <td class="small">{{ a.fornitore|default:"" }}</td>
+                        <td class="text-center text-nowrap">
+                            <button class="btn btn-sm btn-outline-success" title="Carico" onclick="apriMovimento({{ a.pk }}, '{{ a.nome|escapejs }}', 'carico', {{ a.quantita }})"><i class="bi bi-box-arrow-in-down"></i></button>
+                            <button class="btn btn-sm btn-outline-secondary" title="Inventario" onclick="apriMovimento({{ a.pk }}, '{{ a.nome|escapejs }}', 'rettifica', {{ a.quantita }})"><i class="bi bi-clipboard-check"></i></button>
+                            <button class="btn btn-sm btn-outline-primary" title="Modifica" onclick='apriArticolo({{ a.pk }}, {"nome": "{{ a.nome|escapejs }}", "codice": "{{ a.codice|escapejs }}", "tipo": "{{ a.tipo }}", "categoria": "{{ a.categoria|escapejs }}", "unita": "{{ a.unita|escapejs }}", "scorta_minima": {{ a.scorta_minima }}, "traccia_scorte": {{ a.traccia_scorte|yesno:"true,false" }}, "costo": "{{ a.costo }}", "fornitore": "{{ a.fornitore_id|default_if_none:"" }}", "attivo": {{ a.attivo|yesno:"true,false" }}, "note": "{{ a.note|escapejs }}"})'><i class="bi bi-pencil"></i></button>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+        {% else %}
+        <div class="empty-state"><i class="bi bi-inbox"></i><h5>Nessun articolo</h5>
+            <p>Crea il primo articolo: consumabili (panni, detergenti), strumenti (aspiratori, pistole) o prodotti in vendita.</p></div>
+        {% endif %}
+    </div>
+</div>
+
+{% include 'magazzino/_modale_articolo.html' %}
+{% include 'magazzino/_modale_movimento.html' %}
+{% endblock %}
+
+{% block extra_js_magazzino %}
+{% include 'magazzino/_js_articolo.html' %}
+{% endblock %}

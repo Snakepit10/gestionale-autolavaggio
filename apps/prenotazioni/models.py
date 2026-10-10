@@ -333,8 +333,8 @@ class Prenotazione(models.Model):
         # ItemOrdine con quantita > 1 quando il cliente ha scelto piu'
         # unita'. Niente postazione (sono prodotti da scaffale, non
         # passano in lavaggio). Il signal aggiorna_scorte_prodotto
-        # decrementa le scorte solo se quantita_disponibile > 0; con il
-        # default -1 le scorte non vengono toccate.
+        # scarica l'articolo di magazzino collegato (se non tracciato
+        # registra solo il movimento).
         for p in prodotti_extra:
             ItemOrdine.objects.create(
                 ordine=ordine,

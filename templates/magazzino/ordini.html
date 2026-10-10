@@ -1,0 +1,67 @@
+{% extends 'magazzino/_base.html' %}
+
+{% block title %}Magazzino - Ordini fornitori{% endblock %}
+
+{% block pagina %}
+<div class="page-header">
+    <h1><i class="bi bi-cart3"></i> Ordini ai fornitori</h1>
+    <div class="d-flex gap-2">
+        <a href="{% url 'magazzino:ordine-nuovo' %}?proponi=1" class="btn btn-outline-primary"><i class="bi bi-lightning"></i> Riordina sotto scorta</a>
+        <a href="{% url 'magazzino:ordine-nuovo' %}" class="btn btn-primary"><i class="bi bi-plus-circle"></i> Nuovo ordine</a>
+    </div>
+</div>
+
+<form class="filter-card" method="get">
+    <div class="row g-2 align-items-center">
+        <div class="col-6 col-md-3">
+            <select name="stato" class="form-select form-select-sm" onchange="this.form.submit()">
+                <option value="">Tutti gli stati</option>
+                <option value="aperti" {% if filtro.stato == 'aperti' %}selected{% endif %}>Da completare (bozza, inviati, parziali)</option>
+                {% for k, v in stati %}<option value="{{ k }}" {% if filtro.stato == k %}selected{% endif %}>{{ v }}</option>{% endfor %}
+            </select>
+        </div>
+        <div class="col-6 col-md-3">
+            <select name="fornitore" class="form-select form-select-sm" onchange="this.form.submit()">
+                <option value="">Tutti i fornitori</option>
+                {% for f in fornitori %}<option value="{{ f.pk }}" {% if filtro.fornitore == f.pk|stringformat:"s" %}selected{% endif %}>{{ f }}</option>{% endfor %}
+            </select>
+        </div>
+    </div>
+</form>
+
+<div class="section-card accent-blue">
+    <div class="section-title"><div class="label"><i class="bi bi-receipt"></i> Riepilogo ordini</div><span class="count">{{ ordini|length }}</span></div>
+    <div class="section-body">
+        {% if ordini %}
+        <div class="table-responsive">
+            <table class="table table-hover">
+                <thead><tr><th>N°</th><th>Data</th><th>Fornitore</th><th>Articoli</th><th class="text-end">Importo</th><th>Stato</th><th></th></tr></thead>
+                <tbody>
+                {% for o in ordini %}
+                    <tr class="cursor-pointer" onclick="location.href='{% url 'magazzino:ordine' o.pk %}'">
+                        <td><span class="badge bg-primary" style="font-size:1rem">{{ o.numero }}</span></td>
+                        <td>{{ o.data|date:"d/m/Y" }}</td>
+                        <td><strong>{{ o.fornitore }}</strong></td>
+                        <td class="small">
+                            {% for r in o.righe.all|slice:":4" %}<div>{{ r.articolo.nome }} <span class="text-muted">×{{ r.quantita }}</span></div>{% endfor %}
+                            {% if o.righe.all|length > 4 %}<span class="text-muted">e altri {{ o.righe.all|length|add:"-4" }}</span>{% endif %}
+                        </td>
+                        <td class="text-end fw-semibold">&euro;{{ o.totale|floatformat:2 }}</td>
+                        <td>{% include 'magazzino/_stato_ordine.html' with stato=o.stato nome=o.get_stato_display %}</td>
+                        <td class="text-end" onclick="event.stopPropagation()">
+                            <a class="btn btn-sm btn-outline-secondary" href="{% url 'magazzino:ordine-stampa' o.pk %}" target="_blank" title="Stampa"><i class="bi bi-printer"></i></a>
+                            {% if o.stato == 'inviato' or o.stato == 'parziale' %}
+                            <a class="btn btn-sm btn-outline-success" href="{% url 'magazzino:consegne' %}?ordine={{ o.pk }}" title="Registra consegna"><i class="bi bi-truck"></i></a>
+                            {% endif %}
+                        </td>
+                    </tr>
+                {% endfor %}
+                </tbody>
+            </table>
+        </div>
+        {% else %}
+        <div class="empty-state"><i class="bi bi-cart"></i><h5>Nessun ordine</h5></div>
+        {% endif %}
+    </div>
+</div>
+{% endblock %}

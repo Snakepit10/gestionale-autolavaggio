@@ -62,8 +62,8 @@
         <div class="alert alert-warning">
             <i class="bi bi-exclamation-triangle"></i>
             <strong>Attenzione!</strong> 
-            {{ prodotti_scorta_bassa }} prodotto{{ prodotti_scorta_bassa|pluralize }} con scorte basse.
-            <a href="{% url 'core:alert-scorte' %}" class="alert-link">Visualizza dettagli</a>
+            {{ prodotti_scorta_bassa }} articol{{ prodotti_scorta_bassa|pluralize:"o,i" }} di magazzino sotto la scorta minima.
+            <a href="{% url 'magazzino:articoli' %}?sotto=1" class="alert-link">Visualizza dettagli</a>
         </div>
     </div>
 </div>

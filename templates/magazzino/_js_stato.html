@@ -1,0 +1,31 @@
+<script>
+const URL_STATO_ASSEGNAZIONE = "{% url url_stato 999999 %}";
+
+function apriStato(id, nome, quantita, stato) {
+    document.getElementById('st-id').value = id;
+    document.getElementById('st-titolo').textContent = nome;
+    const scelta = document.getElementById('st-' + stato);
+    document.querySelectorAll('[name=st-stato]').forEach(r => r.checked = false);
+    if (scelta) scelta.checked = true;
+    document.getElementById('st-quantita').value = quantita;
+    document.getElementById('st-quantita').max = quantita;
+    document.getElementById('st-di').textContent = 'su ' + quantita;
+    document.getElementById('st-q-box').classList.toggle('d-none', quantita <= 1);
+    document.getElementById('st-nota').value = '';
+    document.getElementById('st-errore').classList.add('d-none');
+    bootstrap.Modal.getOrCreateInstance(document.getElementById('modaleStato')).show();
+}
+
+async function salvaStato() {
+    const scelto = document.querySelector('[name=st-stato]:checked');
+    const errore = msg => { const e = document.getElementById('st-errore'); e.textContent = msg; e.classList.remove('d-none'); };
+    if (!scelto) { errore('Scegli lo stato'); return; }
+    const id = document.getElementById('st-id').value;
+    const j = await postJSON(URL_STATO_ASSEGNAZIONE.replace('999999', id), {
+        stato: scelto.value, quantita: document.getElementById('st-quantita').value,
+        nota: document.getElementById('st-nota').value,
+    });
+    if (!j.success) { errore(j.error); return; }
+    location.reload();
+}
+</script>

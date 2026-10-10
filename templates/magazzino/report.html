@@ -1,0 +1,87 @@
+{% extends 'magazzino/_base.html' %}
+
+{% block title %}Magazzino - Report{% endblock %}
+
+{% block pagina %}
+<div class="page-header">
+    <h1><i class="bi bi-bar-chart"></i> Report magazzino</h1>
+</div>
+
+<form class="filter-card" method="get">
+    <div class="row g-2 align-items-end">
+        <div class="col-6 col-md-2"><label class="form-label small mb-0">Dal</label><input type="date" name="dal" value="{{ dal|date:'Y-m-d' }}" class="form-control form-control-sm"></div>
+        <div class="col-6 col-md-2"><label class="form-label small mb-0">Al</label><input type="date" name="al" value="{{ al|date:'Y-m-d' }}" class="form-control form-control-sm"></div>
+        <div class="col-auto"><button class="btn btn-sm btn-primary"><i class="bi bi-arrow-repeat"></i> Aggiorna</button>
+            <a class="btn btn-sm btn-outline-secondary" href="?dal={{ mese_prec|date:'Y-m-d' }}&al={{ dal|date:'Y-m-d' }}">Mese precedente</a></div>
+    </div>
+</form>
+
+<div class="row g-3 mb-3">
+    <div class="col-6 col-md-3"><div class="kpi"><div class="l">Merce data a operatori/postazioni</div><div class="v">&euro;{{ totale_consumi|floatformat:2 }}</div></div></div>
+    <div class="col-6 col-md-3"><div class="kpi"><div class="l">Consumabili per lavaggio</div>
+        <div class="v">{% if costo_per_lavaggio is not None %}&euro;{{ costo_per_lavaggio }}{% else %}—{% endif %}</div>
+        <small class="text-muted">&euro;{{ costo_consumabili }} su {{ n_lavaggi }} ordini</small></div></div>
+    <div class="col-6 col-md-3"><div class="kpi"><div class="l">Usurati / rotti / smarriti</div><div class="v {% if totale_problemi %}text-danger{% endif %}">&euro;{{ totale_problemi|floatformat:2 }}</div></div></div>
+    <div class="col-6 col-md-3"><div class="kpi"><div class="l">Acquisti (consegne)</div><div class="v">&euro;{{ totale_acquisti|floatformat:2 }}</div></div></div>
+</div>
+
+<div class="row g-3">
+    <div class="col-lg-6">
+        <div class="section-card accent-blue">
+            <div class="section-title"><div class="label"><i class="bi bi-people"></i> Consumi per operatore / postazione</div></div>
+            <div class="section-body">
+                {% if consumi %}
+                <table class="table table-sm">
+                    <thead><tr><th>Articolo</th><th class="text-end">Qtà</th><th class="text-end">Costo</th></tr></thead>
+                    {% for g in consumi %}
+                    <tbody>
+                        <tr class="table-light"><td colspan="2"><i class="bi {% if g.tipo == 'postazione' %}bi-geo-alt{% else %}bi-person{% endif %}"></i> <strong>{{ g.nome }}</strong></td>
+                            <td class="text-end fw-bold">&euro;{{ g.costo|floatformat:2 }}</td></tr>
+                        {% for r in g.articoli %}
+                        <tr><td class="ps-4">{{ r.articolo.nome }}</td><td class="text-end">{{ r.quantita }} {{ r.articolo.unita }}</td><td class="text-end">&euro;{{ r.costo|floatformat:2 }}</td></tr>
+                        {% endfor %}
+                    </tbody>
+                    {% endfor %}
+                </table>
+                {% else %}<div class="p-3 text-muted small">Nessuna merce assegnata nel periodo.</div>{% endif %}
+            </div>
+        </div>
+    </div>
+    <div class="col-lg-6">
+        <div class="section-card accent-red">
+            <div class="section-title"><div class="label"><i class="bi bi-exclamation-triangle"></i> Usurati, rotti, smarriti, esauriti</div></div>
+            <div class="section-body">
+                {% if problemi %}
+                <table class="table table-sm">
+                    <thead><tr><th>Presso</th><th>Articolo</th><th>Stato</th><th class="text-end">Qtà</th><th class="text-end">Valore</th></tr></thead>
+                    <tbody>
+                    {% for r in problemi %}
+                        <tr><td class="small">{{ r.destinatario }}</td><td>{{ r.articolo.nome }}</td>
+                            <td><span class="badge {% if r.codice == 'rotto' or r.codice == 'smarrito' %}bg-danger{% elif r.codice == 'usurato' %}bg-warning text-dark{% else %}bg-secondary{% endif %}">{{ r.stato }}</span></td>
+                            <td class="text-end">{{ r.quantita }}</td><td class="text-end">&euro;{{ r.costo|floatformat:2 }}</td></tr>
+                    {% endfor %}
+                    </tbody>
+                </table>
+                {% else %}<div class="p-3 text-muted small">Nessuna segnalazione nel periodo.</div>{% endif %}
+            </div>
+        </div>
+
+        <div class="section-card accent-green">
+            <div class="section-title"><div class="label"><i class="bi bi-building"></i> Acquisti per fornitore</div></div>
+            <div class="section-body">
+                {% if acquisti %}
+                <table class="table table-sm">
+                    <thead><tr><th>Fornitore</th><th class="text-end">Consegne</th><th class="text-end">Importo</th></tr></thead>
+                    <tbody>
+                    {% for r in acquisti %}
+                        <tr><td><a href="{% url 'magazzino:consegne' %}?fornitore={{ r.fornitore.pk }}&dal={{ dal|date:'Y-m-d' }}&al={{ al|date:'Y-m-d' }}">{{ r.fornitore }}</a></td>
+                            <td class="text-end">{{ r.consegne }}</td><td class="text-end">&euro;{{ r.importo|floatformat:2 }}</td></tr>
+                    {% endfor %}
+                    </tbody>
+                </table>
+                {% else %}<div class="p-3 text-muted small">Nessuna consegna nel periodo.</div>{% endif %}
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

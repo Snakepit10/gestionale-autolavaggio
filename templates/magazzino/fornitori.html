@@ -1,0 +1,92 @@
+{% extends 'magazzino/_base.html' %}
+
+{% block title %}Magazzino - Fornitori{% endblock %}
+
+{% block pagina %}
+<div class="page-header">
+    <h1><i class="bi bi-building"></i> Fornitori</h1>
+    <button class="btn btn-primary" onclick="apriFornitore()"><i class="bi bi-plus-circle"></i> Nuovo fornitore</button>
+</div>
+
+<div class="section-card accent-blue">
+    <div class="section-title"><div class="label"><i class="bi bi-building"></i> Anagrafica</div><span class="count">{{ fornitori|length }}</span></div>
+    <div class="section-body">
+        {% if fornitori %}
+        <div class="table-responsive">
+            <table class="table table-hover">
+                <thead><tr><th>Fornitore</th><th>Referente</th><th>Contatti</th><th class="text-end">Articoli</th><th class="text-end">Ordini aperti</th><th></th></tr></thead>
+                <tbody>
+                {% for f in fornitori %}
+                    <tr class="{% if not f.attivo %}text-muted{% endif %}">
+                        <td><strong>{{ f.ragione_sociale }}</strong>{% if f.partita_iva %}<br><small class="text-muted">P.IVA {{ f.partita_iva }}</small>{% endif %}
+                            {% if not f.attivo %}<span class="badge bg-light text-muted">non attivo</span>{% endif %}</td>
+                        <td>{{ f.referente }}</td>
+                        <td class="small">
+                            {% if f.telefono %}<a href="tel:{{ f.telefono }}"><i class="bi bi-telephone"></i> {{ f.telefono }}</a><br>{% endif %}
+                            {% if f.email %}<a href="mailto:{{ f.email }}"><i class="bi bi-envelope"></i> {{ f.email }}</a>{% endif %}
+                        </td>
+                        <td class="text-end">{{ f.n_articoli }}</td>
+                        <td class="text-end">{% if f.n_ordini_aperti %}<a href="{% url 'magazzino:ordini' %}?fornitore={{ f.pk }}&stato=aperti">{{ f.n_ordini_aperti }}</a>{% else %}—{% endif %}</td>
+                        <td class="text-end text-nowrap">
+                            <a class="btn btn-sm btn-outline-success" href="{% url 'magazzino:ordine-nuovo' %}?fornitore={{ f.pk }}" title="Nuovo ordine"><i class="bi bi-cart-plus"></i></a>
+                            <button class="btn btn-sm btn-outline-primary" title="Modifica"
+                                onclick='apriFornitore({{ f.pk }}, {"ragione_sociale": "{{ f.ragione_sociale|escapejs }}", "partita_iva": "{{ f.partita_iva|escapejs }}", "referente": "{{ f.referente|escapejs }}", "telefono": "{{ f.telefono|escapejs }}", "email": "{{ f.email|escapejs }}", "note": "{{ f.note|escapejs }}", "attivo": {{ f.attivo|yesno:"true,false" }}})'>
+                                <i class="bi bi-pencil"></i></button>
+                        </td>
+                    </tr>
+                {% endfor %}
+                </tbody>
+            </table>
+        </div>
+        {% else %}
+        <div class="empty-state"><i class="bi bi-building"></i><h5>Nessun fornitore</h5></div>
+        {% endif %}
+    </div>
+</div>
+
+<div class="modal fade" id="modaleFornitore" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header modal-clean"><h5 class="modal-title" id="forn-titolo">Nuovo fornitore</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button></div>
+            <div class="modal-body">
+                <input type="hidden" id="forn-id">
+                <div class="row g-3">
+                    <div class="col-12"><label class="form-label">Ragione sociale *</label><input class="form-control" id="forn-ragione_sociale"></div>
+                    <div class="col-md-6"><label class="form-label">P.IVA</label><input class="form-control" id="forn-partita_iva"></div>
+                    <div class="col-md-6"><label class="form-label">Referente</label><input class="form-control" id="forn-referente"></div>
+                    <div class="col-md-6"><label class="form-label">Telefono</label><input class="form-control" id="forn-telefono"></div>
+                    <div class="col-md-6"><label class="form-label">Email</label><input type="email" class="form-control" id="forn-email"></div>
+                    <div class="col-12"><label class="form-label">Note</label><textarea class="form-control" id="forn-note" rows="2" placeholder="Giorni di consegna, minimo d'ordine, condizioni..."></textarea></div>
+                    <div class="col-12"><div class="form-check form-switch"><input class="form-check-input" type="checkbox" id="forn-attivo" checked><label class="form-check-label" for="forn-attivo">Attivo</label></div></div>
+                </div>
+                <div class="alert alert-danger d-none mt-3 mb-0" id="forn-errore"></div>
+            </div>
+            <div class="modal-footer"><button class="btn btn-secondary" data-bs-dismiss="modal">Annulla</button>
+                <button class="btn btn-primary" onclick="salvaFornitore()"><i class="bi bi-check-circle"></i> Salva</button></div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js_magazzino %}
+<script>
+const CAMPI_FORNITORE = ['ragione_sociale', 'partita_iva', 'referente', 'telefono', 'email', 'note'];
+function apriFornitore(id, f) {
+    f = f || {};
+    document.getElementById('forn-titolo').textContent = id ? 'Modifica fornitore' : 'Nuovo fornitore';
+    document.getElementById('forn-id').value = id || '';
+    CAMPI_FORNITORE.forEach(c => document.getElementById('forn-' + c).value = f[c] || '');
+    document.getElementById('forn-attivo').checked = f.attivo !== false;
+    document.getElementById('forn-errore').classList.add('d-none');
+    bootstrap.Modal.getOrCreateInstance(document.getElementById('modaleFornitore')).show();
+}
+async function salvaFornitore() {
+    const dati = {id: document.getElementById('forn-id').value || null, attivo: document.getElementById('forn-attivo').checked};
+    CAMPI_FORNITORE.forEach(c => dati[c] = document.getElementById('forn-' + c).value);
+    const j = await postJSON("{% url 'magazzino:fornitore-salva' %}", dati);
+    if (!j.success) { const e = document.getElementById('forn-errore'); e.textContent = j.error; e.classList.remove('d-none'); return; }
+    location.reload();
+}
+</script>
+{% endblock %}

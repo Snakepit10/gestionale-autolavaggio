@@ -208,6 +208,11 @@ def _checklist_view_inner(request, fase):
                     fase=fase,
                     defaults={'esito': esito_str, 'esito_obj': esito_obj, 'note': note},
                 )
+                # Merce del magazzino assegnata alla postazione: un esito
+                # non OK cambia lo stato dell'assegnazione
+                if item.assegnazione_id:
+                    from apps.magazzino.services import esito_checklist
+                    esito_checklist(item, esito_obj, request.user, note)
         if fase == 'inizio':
             messages.success(request, 'Checklist inizio turno compilata.')
             return redirect('turni:dashboard')
@@ -814,7 +819,9 @@ def config_checklist(request):
         messages.error(request, 'Accesso riservato al titolare.')
         return redirect('core:home')
 
-    all_items = list(ChecklistItem.objects.select_related(
+    # Le voci della merce assegnata alle postazioni si gestiscono dal magazzino
+    n_voci_magazzino = ChecklistItem.objects.filter(assegnazione__isnull=False, attivo=True).count()
+    all_items = list(ChecklistItem.objects.filter(assegnazione__isnull=True).select_related(
         'postazione_cq', 'blocco', 'categoria', 'parent'
     ).order_by('postazione_cq__ordine', 'blocco__ordine', 'categoria__ordine', 'ordine'))
 
@@ -843,6 +850,7 @@ def config_checklist(request):
         'parent_items': parent_items,
         'postazioni': postazioni,
         'categorie': categorie,
+        'n_voci_magazzino': n_voci_magazzino,
     })
 
 
@@ -879,6 +887,8 @@ def api_salva_checklist_item(request):
 
     if pk:
         obj = get_object_or_404(ChecklistItem, pk=pk)
+        if obj.assegnazione_id:
+            return _json_err('Voce del magazzino: si gestisce da Magazzino > Assegnazioni.')
         obj.postazione_cq = postazione
         obj.blocco_id = blocco_id if blocco_id else None
         obj.categoria_id = categoria_id if categoria_id else None
@@ -911,6 +921,8 @@ def api_elimina_checklist_item(request, pk):
     if not utente_nel_gruppo(request.user, 'titolare'):
         return _json_err('Non autorizzato', 403)
     obj = get_object_or_404(ChecklistItem, pk=pk)
+    if obj.assegnazione_id:
+        return _json_err('Voce del magazzino: si gestisce da Magazzino > Assegnazioni.')
     obj.delete()
     return _json_ok()
 

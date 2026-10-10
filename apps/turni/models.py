@@ -151,6 +151,12 @@ class ChecklistItem(models.Model):
         default=True, verbose_name='In chiusura turno',
         help_text='Mostra questa voce nella checklist di fine turno',
     )
+    # Voce generata dal magazzino per la merce assegnata alla postazione
+    # (si gestisce dal magazzino, non dalla configurazione checklist)
+    assegnazione = models.ForeignKey(
+        'magazzino.Assegnazione', null=True, blank=True,
+        on_delete=models.SET_NULL, related_name='voci_checklist',
+    )
 
     class Meta:
         verbose_name = 'Voce checklist'

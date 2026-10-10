@@ -25,8 +25,7 @@ class ServizioProdottoForm(forms.ModelForm):
         fields = [
             'titolo', 'tipo', 'categoria', 'categorie_aggiuntive',
             'prezzo', 'descrizione',
-            'durata_minuti', 'postazioni', 'quantita_disponibile',
-            'quantita_minima_alert', 'codice_prodotto',
+            'durata_minuti', 'postazioni',
             'programmi_portale', 'attivo',
             'is_supplemento', 'mostra_pubblico',
             'ordine_visualizzazione', 'gruppo', 'ordine_gruppo',
@@ -98,9 +97,7 @@ class ServizioProdottoForm(forms.ModelForm):
             ),
             Div(
                 HTML('<h5>Campi per Prodotti</h5>'),
-                Field('quantita_disponibile'),
-                Field('quantita_minima_alert'),
-                Field('codice_prodotto'),
+                HTML('<p class="text-muted small">Scorte, soglia e codice si gestiscono nel Magazzino.</p>'),
                 css_id='prodotto-fields'
             ),
             Div(
@@ -120,11 +117,7 @@ class ServizioProdottoForm(forms.ModelForm):
         cleaned_data = super().clean()
         tipo = cleaned_data.get('tipo')
         
-        if tipo == 'servizio':
-            cleaned_data['quantita_disponibile'] = -1
-            cleaned_data['quantita_minima_alert'] = 0
-            cleaned_data['codice_prodotto'] = ''
-        elif tipo == 'prodotto':
+        if tipo == 'prodotto':
             cleaned_data['durata_minuti'] = 0
             # Rimuovi le postazioni per i prodotti
             if 'postazioni' in cleaned_data:

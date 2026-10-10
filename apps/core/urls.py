@@ -1,5 +1,6 @@
 from django.urls import path
 from . import views
+from apps.magazzino.views import vecchie_scorte
 
 app_name = 'core'
 
@@ -34,10 +35,11 @@ urlpatterns = [
     path('stampanti/<int:pk>/test/', views.test_stampante, name='test-stampante'),
     
     # Gestione Scorte
-    path('scorte/', views.ScorteListView.as_view(), name='scorte-list'),
-    path('scorte/movimenti/', views.MovimentiScorteView.as_view(), name='movimenti-scorte'),
-    path('scorte/movimento/', views.movimento_scorte, name='movimento-scorte'),
-    path('scorte/alert/', views.ProdottiSottoScortaView.as_view(), name='alert-scorte'),
+    # Gestione Scorte -> app Magazzino (vecchi indirizzi rimandati la')
+    path('scorte/', vecchie_scorte, name='scorte-list'),
+    path('scorte/movimenti/', vecchie_scorte, name='movimenti-scorte'),
+    path('scorte/movimento/', vecchie_scorte, name='movimento-scorte'),
+    path('scorte/alert/', vecchie_scorte, name='alert-scorte'),
     
     # API
     path('api/servizi/', views.servizi_json, name='servizi-json'),

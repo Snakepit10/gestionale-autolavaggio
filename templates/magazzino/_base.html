@@ -1,0 +1,74 @@
+{% extends 'base.html' %}
+
+{% block extra_css %}
+<style>
+/* Stessa grafica della lista ordini */
+.page-header { display:flex; justify-content:space-between; align-items:center; margin-bottom:1.25rem; flex-wrap:wrap; gap:.75rem; }
+.page-header h1 { font-size:1.6rem; font-weight:700; color:#1a1a2e; margin:0; }
+.page-header .btn { border-radius:8px; font-weight:500; }
+.section-card { background:#fff; border:1px solid #e5e7eb; border-radius:12px; box-shadow:0 1px 2px rgba(0,0,0,.04); margin-bottom:1.25rem; overflow:hidden; }
+.section-card .section-title { padding:14px 20px; display:flex; align-items:center; justify-content:space-between; border-bottom:1px solid #f1f5f9; gap:.5rem; flex-wrap:wrap; }
+.section-card .section-title .label { display:flex; align-items:center; gap:10px; font-weight:600; color:#1e293b; font-size:.98rem; }
+.section-card .section-title .count { background:#f1f5f9; color:#475569; font-size:.78rem; font-weight:600; padding:2px 10px; border-radius:20px; }
+.section-card.accent-blue { border-left:4px solid #3b82f6; }
+.section-card.accent-blue .section-title .label i { color:#3b82f6; }
+.section-card.accent-amber { border-left:4px solid #f59e0b; }
+.section-card.accent-amber .section-title .label i { color:#f59e0b; }
+.section-card.accent-red { border-left:4px solid #ef4444; }
+.section-card.accent-red .section-title .label i { color:#ef4444; }
+.section-card.accent-green { border-left:4px solid #10b981; }
+.section-card.accent-green .section-title .label i { color:#10b981; }
+.section-card .section-body { padding:0; }
+.section-card .section-body.pad { padding:14px 20px; }
+.section-card table { margin-bottom:0; }
+.section-card table thead th { background:#eef2f7; color:#475569; font-size:.72rem; text-transform:uppercase; letter-spacing:.4px; font-weight:600; border-bottom:1px solid #dbe2ea; padding:10px 14px; white-space:nowrap; }
+.section-card table tbody td { padding:10px 14px; border-color:#f1f5f9; vertical-align:middle; }
+.section-card table tbody tr:hover { background:#fafbfc; }
+.section-card table tfoot td { padding:10px 14px; background:#f8fafc; font-weight:600; }
+.filter-card { background:#fff; border:1px solid #e5e7eb; border-radius:12px; padding:12px 16px; margin-bottom:1.25rem; box-shadow:0 1px 2px rgba(0,0,0,.04); }
+.empty-state { padding:2.5rem 1rem; text-align:center; color:#94a3b8; }
+.empty-state i { font-size:2.5rem; opacity:.5; }
+.empty-state h5 { color:#64748b; margin-top:.75rem; font-weight:600; }
+.modal .modal-header.modal-clean { background:#fff; color:#1e293b; border-bottom:1px solid #f1f5f9; }
+.modal .modal-header.modal-clean .modal-title { font-weight:600; }
+.cursor-pointer { cursor:pointer; }
+.schede-magazzino { margin-bottom:1.25rem; flex-wrap:nowrap; overflow-x:auto; overflow-y:hidden; }
+.schede-magazzino .nav-link { white-space:nowrap; }
+.qta-neg { color:#dc2626; font-weight:700; }
+.kpi { background:#fff; border:1px solid #e5e7eb; border-radius:12px; padding:12px 16px; }
+.kpi .v { font-size:1.35rem; font-weight:700; color:#1e293b; }
+.kpi .l { font-size:.78rem; color:#64748b; text-transform:uppercase; letter-spacing:.3px; }
+</style>
+{% block extra_css_magazzino %}{% endblock %}
+{% endblock %}
+
+{% block content %}
+{% csrf_token %}
+<ul class="nav nav-tabs schede-magazzino">
+    <li class="nav-item"><a class="nav-link {% if scheda == 'articoli' %}active{% endif %}" href="{% url 'magazzino:articoli' %}"><i class="bi bi-boxes"></i> Articoli</a></li>
+    <li class="nav-item"><a class="nav-link {% if scheda == 'movimenti' %}active{% endif %}" href="{% url 'magazzino:movimenti' %}"><i class="bi bi-arrow-left-right"></i> Movimenti</a></li>
+    <li class="nav-item"><a class="nav-link {% if scheda == 'ordini' %}active{% endif %}" href="{% url 'magazzino:ordini' %}"><i class="bi bi-cart3"></i> Ordini fornitori</a></li>
+    <li class="nav-item"><a class="nav-link {% if scheda == 'consegne' %}active{% endif %}" href="{% url 'magazzino:consegne' %}"><i class="bi bi-truck"></i> Consegne</a></li>
+    <li class="nav-item"><a class="nav-link {% if scheda == 'fornitori' %}active{% endif %}" href="{% url 'magazzino:fornitori' %}"><i class="bi bi-building"></i> Fornitori</a></li>
+    <li class="nav-item"><a class="nav-link {% if scheda == 'assegnazioni' %}active{% endif %}" href="{% url 'magazzino:assegnazioni' %}"><i class="bi bi-person-badge"></i> Assegnazioni</a></li>
+    <li class="nav-item"><a class="nav-link {% if scheda == 'segnalazioni' %}active{% endif %}" href="{% url 'magazzino:segnalazioni' %}"><i class="bi bi-exclamation-triangle"></i> Segnalazioni
+        {% if n_segnalazioni %}<span class="badge rounded-pill bg-danger">{{ n_segnalazioni }}</span>{% endif %}</a></li>
+    <li class="nav-item"><a class="nav-link {% if scheda == 'report' %}active{% endif %}" href="{% url 'magazzino:report' %}"><i class="bi bi-bar-chart"></i> Report</a></li>
+</ul>
+{% block pagina %}{% endblock %}
+{% endblock %}
+
+{% block extra_js %}
+<script>
+function csrf() { return document.querySelector('[name=csrfmiddlewaretoken]').value; }
+async function postJSON(url, dati) {
+    const r = await fetch(url, {method: 'POST', headers: {'Content-Type': 'application/json', 'X-CSRFToken': csrf()},
+                                body: JSON.stringify(dati || {})});
+    let j = {};
+    try { j = await r.json(); } catch (e) { j = {success: false, error: 'Errore del server (' + r.status + ')'}; }
+    return j;
+}
+function esc(s) { return String(s == null ? '' : s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
+</script>
+{% block extra_js_magazzino %}{% endblock %}
+{% endblock %}

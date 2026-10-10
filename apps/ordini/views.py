@@ -2723,19 +2723,10 @@ def _errore(msg, status=400):
 
 
 def _sposta_scorte(prodotto, delta, ordine, operatore, nota):
-    """delta < 0 scarica, > 0 ricarica. Prodotti a scorta illimitata (-1)
-    non vengono toccati."""
-    from apps.core.models import MovimentoScorte
+    """delta < 0 scarica, > 0 rimette in magazzino."""
+    from apps.magazzino.services import scarica_vendita
 
-    if not delta or prodotto.quantita_disponibile < 0:
-        return
-    prima = prodotto.quantita_disponibile
-    prodotto.quantita_disponibile = max(0, prima + delta)
-    prodotto.save(update_fields=['quantita_disponibile'])
-    MovimentoScorte.objects.create(
-        prodotto=prodotto, tipo='carico' if delta > 0 else 'scarico', quantita=delta,
-        quantita_prima=prima, quantita_dopo=prodotto.quantita_disponibile,
-        riferimento_ordine=ordine, nota=nota, operatore=operatore)
+    scarica_vendita(prodotto, delta, ordine=ordine, operatore=operatore, nota=nota)
 
 
 def _ricalcola_vendita(ordine):

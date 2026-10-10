@@ -1,0 +1,69 @@
+{% extends 'magazzino/_base.html' %}
+
+{% block title %}Magazzino - Segnalazioni{% endblock %}
+
+{% block pagina %}
+<div class="page-header">
+    <h1><i class="bi bi-exclamation-triangle"></i> Segnalazioni degli operatori</h1>
+</div>
+<p class="small text-muted">Merce segnalata come usurata, rotta, smarrita o esaurita dagli operatori (dalla pagina "La mia dotazione" o dalla checklist di turno).</p>
+
+<div class="section-card accent-red">
+    <div class="section-title"><div class="label"><i class="bi bi-bell"></i> Da gestire</div><span class="count">{{ segnalazioni|length }}</span></div>
+    <div class="section-body">
+        {% if segnalazioni %}
+        <div class="table-responsive">
+            <table class="table table-hover">
+                <thead><tr><th>Articolo</th><th>Presso</th><th>Stato</th><th>Segnalato</th><th class="text-end">Azioni</th></tr></thead>
+                <tbody>
+                {% for a in segnalazioni %}
+                    {% with s=a.storico.all.0 %}
+                    <tr>
+                        <td><a href="{% url 'magazzino:articolo' a.articolo_id %}" class="fw-semibold text-decoration-none">{{ a.articolo.nome }}</a> <span class="text-muted">×{{ a.quantita }}</span>
+                            <br><small class="text-muted">&euro;{{ a.articolo.costo|floatformat:2 }} cad.</small></td>
+                        <td><i class="bi {% if a.postazione_id %}bi-geo-alt{% else %}bi-person{% endif %}"></i> {{ a.destinatario }}</td>
+                        <td><span class="badge bg-{{ a.colore_stato }}">{{ a.get_stato_display }}</span></td>
+                        <td class="small">{% if s %}{{ s.data|date:"d/m H:i" }} &middot; {% if s.utente %}{{ s.utente.get_full_name|default:s.utente.username }}{% endif %}
+                            <span class="badge bg-light text-dark border">{{ s.get_origine_display }}</span>
+                            {% if s.nota %}<br><span class="text-muted fst-italic">"{{ s.nota }}"</span>{% endif %}{% endif %}</td>
+                        <td class="text-end text-nowrap">
+                            <button class="btn btn-sm btn-success" onclick="sostituisci({{ a.pk }}, '{{ a.articolo.nome|escapejs }}', {{ a.quantita }})"><i class="bi bi-arrow-repeat"></i> Sostituisci</button>
+                            {% if a.aperta %}<button class="btn btn-sm btn-outline-info" title="Rientrato in magazzino" onclick="apriStato({{ a.pk }}, '{{ a.articolo.nome|escapejs }}', {{ a.quantita }}, 'restituito')"><i class="bi bi-arrow-return-left"></i></button>{% endif %}
+                            <button class="btn btn-sm btn-outline-secondary" title="Presa visione, nessuna azione" onclick="gestita({{ a.pk }})"><i class="bi bi-check2"></i> Vista</button>
+                        </td>
+                    </tr>
+                    {% endwith %}
+                {% endfor %}
+                </tbody>
+            </table>
+        </div>
+        {% else %}
+        <div class="empty-state"><i class="bi bi-check-circle"></i><h5>Nessuna segnalazione da gestire</h5></div>
+        {% endif %}
+    </div>
+</div>
+
+<div class="section-card">
+    <div class="section-title"><div class="label"><i class="bi bi-clock-history"></i> Segnalazioni gestite</div></div>
+    <div class="section-body">{% include 'magazzino/_storico_stati.html' with storico=gestite %}</div>
+</div>
+
+{% include 'magazzino/_modale_stato.html' with stati=stati_restituzione %}
+{% endblock %}
+
+{% block extra_js_magazzino %}
+<script>
+async function sostituisci(id, nome, quantita) {
+    if (!confirm(`Consegnare ${quantita} ${nome} nuov${quantita > 1 ? 'i' : 'o'}? Esce dal magazzino.`)) return;
+    const j = await postJSON("{% url 'magazzino:assegnazione-sostituisci' 999999 %}".replace('999999', id));
+    if (!j.success) { alert(j.error); return; }
+    location.reload();
+}
+async function gestita(id) {
+    const j = await postJSON("{% url 'magazzino:assegnazione-gestita' 999999 %}".replace('999999', id));
+    if (!j.success) { alert(j.error); return; }
+    location.reload();
+}
+</script>
+{% include 'magazzino/_js_stato.html' with url_stato="magazzino:assegnazione-stato" %}
+{% endblock %}

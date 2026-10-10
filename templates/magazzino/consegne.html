@@ -1,0 +1,190 @@
+{% extends 'magazzino/_base.html' %}
+
+{% block title %}Magazzino - Registro consegne{% endblock %}
+
+{% block pagina %}
+<div class="page-header">
+    <h1><i class="bi bi-truck"></i> Registro consegne</h1>
+    <button class="btn btn-primary" onclick="apriConsegna()"><i class="bi bi-plus-circle"></i> Registra consegna</button>
+</div>
+
+<form class="filter-card" method="get">
+    <div class="row g-2 align-items-end">
+        <div class="col-12 col-md-3">
+            <label class="form-label small mb-0">Fornitore</label>
+            <select name="fornitore" class="form-select form-select-sm">
+                <option value="">Tutti</option>
+                {% for f in fornitori %}<option value="{{ f.pk }}" {% if filtro.fornitore == f.pk|stringformat:"s" %}selected{% endif %}>{{ f }}</option>{% endfor %}
+            </select>
+        </div>
+        <div class="col-6 col-md-2"><label class="form-label small mb-0">Dal</label><input type="date" name="dal" value="{{ filtro.dal|date:'Y-m-d' }}" class="form-control form-control-sm"></div>
+        <div class="col-6 col-md-2"><label class="form-label small mb-0">Al</label><input type="date" name="al" value="{{ filtro.al|date:'Y-m-d' }}" class="form-control form-control-sm"></div>
+        <div class="col-auto"><button class="btn btn-sm btn-primary"><i class="bi bi-funnel"></i> Filtra</button></div>
+    </div>
+</form>
+
+{% if ordini_aperti %}
+<div class="section-card accent-amber">
+    <div class="section-title"><div class="label"><i class="bi bi-hourglass-split"></i> In attesa di consegna</div><span class="count">{{ ordini_aperti|length }}</span></div>
+    <div class="section-body">
+        <table class="table table-sm">
+            <tbody>
+            {% for o in ordini_aperti %}
+                <tr><td><a href="{% url 'magazzino:ordine' o.pk %}">{{ o.numero }}</a></td><td>{{ o.fornitore }}</td><td>{{ o.data|date:"d/m/Y" }}</td>
+                    <td>{% include 'magazzino/_stato_ordine.html' with stato=o.stato nome=o.get_stato_display %}</td>
+                    <td class="text-end"><button class="btn btn-sm btn-success" onclick="apriConsegna({{ o.pk }})"><i class="bi bi-box-arrow-in-down"></i> Arrivato</button></td></tr>
+            {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+{% endif %}
+
+<div class="section-card accent-blue">
+    <div class="section-title"><div class="label"><i class="bi bi-journal-text"></i> Consegne ricevute</div><span class="count">{{ consegne|length }}</span></div>
+    <div class="section-body">
+        {% if consegne %}
+        <div class="table-responsive">
+            <table class="table table-hover">
+                <thead><tr><th>Data</th><th>Fornitore</th><th>DDT / bolla</th><th>Ordine</th><th>Articoli</th><th class="text-end">Importo</th><th>Registrata da</th><th></th></tr></thead>
+                <tbody>
+                {% for c in consegne %}
+                    <tr>
+                        <td class="text-nowrap">{{ c.data|date:"d/m/Y" }}</td>
+                        <td><strong>{{ c.fornitore }}</strong></td>
+                        <td>{{ c.numero_ddt|default:"—" }}</td>
+                        <td>{% if c.ordine %}<a href="{% url 'magazzino:ordine' c.ordine.pk %}">{{ c.ordine.numero }}</a>{% else %}<span class="text-muted">senza ordine</span>{% endif %}</td>
+                        <td class="small">{% for r in c.righe.all %}<div>{{ r.articolo.nome }} <span class="text-muted">×{{ r.quantita }}</span></div>{% endfor %}
+                            {% if c.note %}<div class="text-muted fst-italic">{{ c.note }}</div>{% endif %}</td>
+                        <td class="text-end">&euro;{{ c.totale|floatformat:2 }}</td>
+                        <td class="small">{% if c.registrata_da %}{{ c.registrata_da.get_full_name|default:c.registrata_da.username }}{% endif %}<br><span class="text-muted">{{ c.registrata_il|date:"d/m H:i" }}</span></td>
+                        <td class="text-end"><button class="btn btn-sm btn-outline-danger" title="Annulla consegna (registrata per errore)" onclick="annullaConsegna({{ c.pk }})"><i class="bi bi-x-circle"></i></button></td>
+                    </tr>
+                {% endfor %}
+                </tbody>
+            </table>
+        </div>
+        {% else %}
+        <div class="empty-state"><i class="bi bi-truck"></i><h5>Nessuna consegna</h5></div>
+        {% endif %}
+    </div>
+</div>
+
+<div class="modal fade" id="modaleConsegna" tabindex="-1">
+    <div class="modal-dialog modal-xl">
+        <div class="modal-content">
+            <div class="modal-header modal-clean"><h5 class="modal-title"><i class="bi bi-truck"></i> Registra consegna</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button></div>
+            <div class="modal-body">
+                <div class="row g-3 mb-3">
+                    <div class="col-md-4">
+                        <label class="form-label">Ordine</label>
+                        <select class="form-select" id="con-ordine" onchange="caricaOrdine(this.value)">
+                            <option value="">Nessun ordine (consegna libera)</option>
+                            {% for o in ordini_aperti %}<option value="{{ o.pk }}">{{ o.numero }} — {{ o.fornitore }}</option>{% endfor %}
+                        </select>
+                    </div>
+                    <div class="col-md-4">
+                        <label class="form-label">Fornitore *</label>
+                        <select class="form-select" id="con-fornitore">
+                            <option value="">—</option>
+                            {% for f in fornitori %}<option value="{{ f.pk }}">{{ f }}</option>{% endfor %}
+                        </select>
+                    </div>
+                    <div class="col-md-2"><label class="form-label">Data</label><input type="date" class="form-control" id="con-data" value="{{ oggi|date:'Y-m-d' }}"></div>
+                    <div class="col-md-2"><label class="form-label">N° DDT / bolla</label><input type="text" class="form-control" id="con-ddt"></div>
+                </div>
+                <table class="table table-sm" id="con-righe">
+                    <thead><tr><th>Articolo</th><th class="text-end">Ordinato / da ricevere</th><th style="width:120px">Ricevuto</th><th style="width:130px">Prezzo &euro;</th><th></th></tr></thead>
+                    <tbody></tbody>
+                </table>
+                <button class="btn btn-sm btn-outline-success" onclick="rigaConsegna()"><i class="bi bi-plus"></i> Articolo non in ordine</button>
+                <div class="mt-3"><label class="form-label">Note (merce danneggiata, mancanze...)</label><input type="text" class="form-control" id="con-note"></div>
+                <div class="alert alert-danger d-none mt-3 mb-0" id="con-errore"></div>
+            </div>
+            <div class="modal-footer">
+                <span class="me-auto small text-muted">Le quantità ricevute entrano in magazzino; l'ordine passa a "consegnato in parte" o "evaso".</span>
+                <button class="btn btn-secondary" data-bs-dismiss="modal">Annulla</button>
+                <button class="btn btn-success" onclick="registraConsegna()"><i class="bi bi-box-arrow-in-down"></i> Carica in magazzino</button>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js_magazzino %}
+<script>
+const ARTICOLI = {{ articoli_json|safe }};
+
+function opzioni(sel) {
+    return '<option value="">— scegli —</option>' + ARTICOLI.map(a =>
+        `<option value="${a.id}" ${a.id == sel ? 'selected' : ''}>${esc(a.nome)}</option>`).join('');
+}
+
+function rigaConsegna(r) {
+    r = r || {};
+    const tr = document.createElement('tr');
+    if (r.riga_ordine) tr.dataset.rigaOrdine = r.riga_ordine;
+    tr.innerHTML = `
+        <td>${r.riga_ordine ? `<strong>${esc(r.nome)}</strong><input type="hidden" class="c-art" value="${r.articolo}">`
+                            : `<select class="form-select form-select-sm c-art" onchange="prezzoDefault(this)">${opzioni(r.articolo)}</select>`}</td>
+        <td class="text-end small text-muted">${r.riga_ordine ? r.ordinato + ' / <strong>' + r.quantita + '</strong>' : 'fuori ordine'}</td>
+        <td><input type="number" min="0" class="form-control form-control-sm c-q" value="${r.quantita != null ? r.quantita : 1}"></td>
+        <td><input type="text" inputmode="decimal" class="form-control form-control-sm c-p" value="${r.prezzo != null ? r.prezzo : ''}"></td>
+        <td class="text-end"><button class="btn btn-sm btn-outline-danger" onclick="this.closest('tr').remove()"><i class="bi bi-x"></i></button></td>`;
+    document.querySelector('#con-righe tbody').appendChild(tr);
+}
+
+function prezzoDefault(sel) {
+    const a = ARTICOLI.find(x => x.id == sel.value);
+    const p = sel.closest('tr').querySelector('.c-p');
+    if (a && !p.value) p.value = a.costo;
+}
+
+async function caricaOrdine(id) {
+    document.querySelector('#con-righe tbody').innerHTML = '';
+    document.getElementById('con-fornitore').disabled = !!id;
+    if (!id) { rigaConsegna(); return; }
+    const r = await fetch("{% url 'magazzino:ordine-residuo' 999999 %}".replace('999999', id));
+    const j = await r.json();
+    document.getElementById('con-fornitore').value = j.fornitore;
+    j.righe.forEach(rigaConsegna);
+}
+
+function apriConsegna(ordine) {
+    document.getElementById('con-ordine').value = ordine || '';
+    document.getElementById('con-ddt').value = '';
+    document.getElementById('con-note').value = '';
+    document.getElementById('con-errore').classList.add('d-none');
+    caricaOrdine(ordine || '');
+    bootstrap.Modal.getOrCreateInstance(document.getElementById('modaleConsegna')).show();
+}
+
+async function registraConsegna() {
+    const righe = [...document.querySelectorAll('#con-righe tbody tr')].map(tr => ({
+        riga_ordine: tr.dataset.rigaOrdine || null, articolo: tr.querySelector('.c-art').value,
+        quantita: tr.querySelector('.c-q').value, prezzo: tr.querySelector('.c-p').value,
+    }));
+    const j = await postJSON("{% url 'magazzino:consegna-registra' %}", {
+        ordine: document.getElementById('con-ordine').value || null,
+        fornitore: document.getElementById('con-fornitore').value || null,
+        data: document.getElementById('con-data').value, numero_ddt: document.getElementById('con-ddt').value,
+        note: document.getElementById('con-note').value, righe,
+    });
+    if (!j.success) { const e = document.getElementById('con-errore'); e.textContent = j.error; e.classList.remove('d-none'); return; }
+    location.href = "{% url 'magazzino:consegne' %}";
+}
+
+async function annullaConsegna(id) {
+    if (!confirm('Annullare la consegna? La merce viene tolta dal magazzino e l\'ordine torna da completare.')) return;
+    const j = await postJSON("{% url 'magazzino:consegna-elimina' 999999 %}".replace('999999', id));
+    if (!j.success) { alert(j.error); return; }
+    location.reload();
+}
+
+document.addEventListener('DOMContentLoaded', () => {
+    const ordine = "{{ da_ordine|escapejs }}";
+    if (ordine) apriConsegna(ordine);
+});
+</script>
+{% endblock %}

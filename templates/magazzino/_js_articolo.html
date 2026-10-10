@@ -1,0 +1,90 @@
+<script>
+const URL_ARTICOLO_SALVA = "{% url 'magazzino:articolo-salva' %}";
+const URL_MOVIMENTO = "{% url 'magazzino:articolo-movimento' 999999 %}";
+
+function apriArticolo(id, a) {
+    a = a || {};
+    document.getElementById('art-titolo').textContent = id ? 'Modifica articolo' : 'Nuovo articolo';
+    document.getElementById('art-id').value = id || '';
+    document.getElementById('art-nome').value = a.nome || '';
+    document.getElementById('art-codice').value = a.codice || '';
+    document.getElementById('art-tipo').value = a.tipo || 'consumabile';
+    document.getElementById('art-categoria').value = a.categoria || '';
+    document.getElementById('art-unita').value = a.unita || 'pz';
+    document.getElementById('art-scorta').value = a.scorta_minima != null ? a.scorta_minima : 0;
+    document.getElementById('art-traccia').checked = a.traccia_scorte !== false;
+    document.getElementById('art-costo').value = a.costo || '0';
+    document.getElementById('art-fornitore').value = a.fornitore || '';
+    document.getElementById('art-note').value = a.note || '';
+    document.getElementById('art-attivo').checked = a.attivo !== false;
+    document.getElementById('art-iniziale').value = 0;
+    document.getElementById('art-iniziale-box').classList.toggle('d-none', !!id);
+    document.getElementById('art-errore').classList.add('d-none');
+    bootstrap.Modal.getOrCreateInstance(document.getElementById('modaleArticolo')).show();
+    setTimeout(() => document.getElementById('art-nome').focus(), 300);
+}
+
+async function salvaArticolo() {
+    const val = id => document.getElementById(id).value;
+    const j = await postJSON(URL_ARTICOLO_SALVA, {
+        id: val('art-id') || null, nome: val('art-nome'), codice: val('art-codice'), tipo: val('art-tipo'),
+        categoria: val('art-categoria'), unita: val('art-unita'), scorta_minima: val('art-scorta'),
+        traccia_scorte: document.getElementById('art-traccia').checked, costo: val('art-costo'),
+        fornitore: val('art-fornitore') || null, note: val('art-note'),
+        attivo: document.getElementById('art-attivo').checked, quantita_iniziale: val('art-iniziale'),
+    });
+    if (!j.success) {
+        const e = document.getElementById('art-errore');
+        e.textContent = j.error; e.classList.remove('d-none');
+        return;
+    }
+    location.reload();
+}
+
+const SPIEGA_MOVIMENTO = {
+    carico: 'Merce entrata in magazzino senza una consegna registrata (per le consegne dei fornitori usa il Registro consegne).',
+    scarto: 'Merce tolta dal magazzino: rotta, scaduta, usata in sede.',
+    rettifica: 'Inventario: scrivi la quantità che hai contato, la differenza viene registrata.',
+};
+let movQuantitaAttuale = 0;
+
+function apriMovimento(id, nome, tipo, attuale) {
+    movQuantitaAttuale = attuale;
+    document.getElementById('mov-articolo').value = id;
+    document.getElementById('mov-titolo').textContent = nome + ' (ora ' + attuale + ')';
+    document.getElementById('mov-' + tipo).checked = true;
+    document.getElementById('mov-quantita').value = '';
+    document.getElementById('mov-costo').value = '';
+    document.getElementById('mov-nota').value = '';
+    document.getElementById('mov-errore').classList.add('d-none');
+    tipoMovimento();
+    bootstrap.Modal.getOrCreateInstance(document.getElementById('modaleMovimento')).show();
+    setTimeout(() => document.getElementById('mov-quantita').focus(), 300);
+}
+
+function tipoMovimento() {
+    const tipo = document.querySelector('[name=mov-tipo]:checked').value;
+    document.getElementById('mov-spiega').textContent = SPIEGA_MOVIMENTO[tipo];
+    document.getElementById('mov-label-q').textContent = tipo === 'rettifica' ? 'Quantità contata' : 'Quantità';
+    document.getElementById('mov-costo-box').classList.toggle('d-none', tipo !== 'carico');
+    if (tipo === 'rettifica' && !document.getElementById('mov-quantita').value) {
+        document.getElementById('mov-quantita').value = Math.max(movQuantitaAttuale, 0);
+    }
+}
+
+async function salvaMovimento() {
+    const id = document.getElementById('mov-articolo').value;
+    const j = await postJSON(URL_MOVIMENTO.replace('999999', id), {
+        tipo: document.querySelector('[name=mov-tipo]:checked').value,
+        quantita: document.getElementById('mov-quantita').value,
+        costo: document.getElementById('mov-costo').value,
+        nota: document.getElementById('mov-nota').value,
+    });
+    if (!j.success) {
+        const e = document.getElementById('mov-errore');
+        e.textContent = j.error; e.classList.remove('d-none');
+        return;
+    }
+    location.reload();
+}
+</script>

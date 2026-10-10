@@ -1,0 +1,41 @@
+<div class="modal fade" id="modaleMovimento" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header modal-clean">
+                <h5 class="modal-title" id="mov-titolo">Movimento</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <input type="hidden" id="mov-articolo">
+                <div class="btn-group w-100 mb-3" role="group">
+                    <input type="radio" class="btn-check" name="mov-tipo" id="mov-carico" value="carico" onchange="tipoMovimento()">
+                    <label class="btn btn-outline-success" for="mov-carico"><i class="bi bi-box-arrow-in-down"></i> Carico</label>
+                    <input type="radio" class="btn-check" name="mov-tipo" id="mov-scarto" value="scarto" onchange="tipoMovimento()">
+                    <label class="btn btn-outline-danger" for="mov-scarto"><i class="bi bi-trash"></i> Scarto</label>
+                    <input type="radio" class="btn-check" name="mov-tipo" id="mov-rettifica" value="rettifica" onchange="tipoMovimento()">
+                    <label class="btn btn-outline-secondary" for="mov-rettifica"><i class="bi bi-clipboard-check"></i> Inventario</label>
+                </div>
+                <p class="small text-muted mb-2" id="mov-spiega"></p>
+                <div class="row g-2">
+                    <div class="col-6">
+                        <label class="form-label" id="mov-label-q">Quantità</label>
+                        <input type="number" min="0" class="form-control form-control-lg" id="mov-quantita">
+                    </div>
+                    <div class="col-6" id="mov-costo-box">
+                        <label class="form-label">Costo unitario (&euro;)</label>
+                        <input type="text" inputmode="decimal" class="form-control form-control-lg" id="mov-costo" placeholder="invariato">
+                    </div>
+                    <div class="col-12">
+                        <label class="form-label">Nota</label>
+                        <input type="text" class="form-control" id="mov-nota" maxlength="200">
+                    </div>
+                </div>
+                <div class="alert alert-danger d-none mt-3 mb-0" id="mov-errore"></div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Annulla</button>
+                <button type="button" class="btn btn-primary" onclick="salvaMovimento()"><i class="bi bi-check-circle"></i> Registra</button>
+            </div>
+        </div>
+    </div>
+</div>

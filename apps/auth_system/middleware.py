@@ -51,7 +51,7 @@ class AuthenticationMiddleware(MiddlewareMixin):
         '/cartellini/', '/messaggi/', '/marketing/',
         '/categorie/', '/catalogo/', '/sconti/', '/stampanti/', '/scorte/',
         '/clienti/', '/prenotazioni/', '/abbonamenti/', '/api/', '/monete/',
-        '/tasks/', '/garage/', '/fatture/', '/permessi/',
+        '/tasks/', '/garage/', '/fatture/', '/permessi/', '/magazzino/',
     )
 
     # Sotto-percorsi CLIENTE dentro prefissi staff: restano accessibili

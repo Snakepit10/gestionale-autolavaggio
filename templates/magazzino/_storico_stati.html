@@ -1,0 +1,22 @@
+{% if storico %}
+<div class="table-responsive">
+    <table class="table table-sm">
+        <thead><tr><th>Quando</th><th>Articolo</th><th>Presso</th><th>Cambio</th><th>Da</th><th>Nota</th></tr></thead>
+        <tbody>
+        {% for s in storico %}
+            <tr>
+                <td class="small text-nowrap">{{ s.data|date:"d/m H:i" }}</td>
+                <td>{{ s.assegnazione.articolo.nome }} <span class="text-muted">×{{ s.quantita }}</span></td>
+                <td class="small">{{ s.assegnazione.destinatario }}</td>
+                <td class="small">{% if s.da_stato %}{{ s.da_stato_display }} &rarr; {% endif %}<strong>{{ s.a_stato_display }}</strong></td>
+                <td class="small">{% if s.utente %}{{ s.utente.get_full_name|default:s.utente.username }}{% endif %}
+                    {% if s.origine != 'magazzino' %}<span class="badge bg-light text-dark border">{{ s.get_origine_display }}</span>{% endif %}</td>
+                <td class="small text-muted">{{ s.nota }}</td>
+            </tr>
+        {% endfor %}
+        </tbody>
+    </table>
+</div>
+{% else %}
+<div class="p-3 text-muted small">Nessun movimento.</div>
+{% endif %}

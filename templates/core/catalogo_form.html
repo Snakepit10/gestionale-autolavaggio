@@ -47,9 +47,6 @@
                                 Categoria principale (usata per ordinamento).
                             </small>
                         </div>
-                        <div class="col-md-6">
-                            {{ form.codice_prodotto|as_crispy_field }}
-                        </div>
                         <div class="col-12">
                             <label class="form-label fw-bold">Categorie aggiuntive</label>
                             {{ form.categorie_aggiuntive }}
@@ -79,18 +76,18 @@
                         <div class="col-12">
                             <h5 class="border-bottom pb-2 mb-3">Gestione Scorte</h5>
                         </div>
-                        <div class="col-md-4">
-                            {{ form.quantita_disponibile|as_crispy_field }}
-                        </div>
-                        <div class="col-md-4">
-                            {{ form.quantita_minima_alert|as_crispy_field }}
-                        </div>
-                        <div class="col-md-4">
-                            <div class="form-group">
-                                <label for="scorta-status" class="form-label">Stato Scorte</label>
-                                <div class="alert alert-info" id="scorta-status">
-                                    <i class="bi bi-info-circle"></i> Verrà calcolato automaticamente
-                                </div>
+                        <div class="col-12">
+                            <div class="alert alert-light border mb-0">
+                                <i class="bi bi-box-seam"></i>
+                                Quantità, scorta minima e codice si gestiscono nel <strong>Magazzino</strong>:
+                                la vendita in cassa scarica l'articolo collegato.
+                                {% if object.articolo %}
+                                    <br>In magazzino:
+                                    <strong>{% if object.articolo.traccia_scorte %}{{ object.articolo.quantita }} {{ object.articolo.unita }}{% else %}non tracciato{% endif %}</strong>
+                                    &middot; <a href="{% url 'magazzino:articolo' object.articolo.pk %}">apri l'articolo</a>
+                                {% else %}
+                                    <br><small class="text-muted">L'articolo viene creato al salvataggio (non tracciato: impostalo dal magazzino).</small>
+                                {% endif %}
                             </div>
                         </div>
                     </div>

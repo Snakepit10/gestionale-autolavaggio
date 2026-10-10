@@ -1,0 +1,68 @@
+{% extends 'base.html' %}
+
+{% block title %}La mia dotazione{% endblock %}
+
+{% block extra_css %}
+<style>
+.dot-header { display:flex; justify-content:space-between; align-items:center; gap:.5rem; margin-bottom:1rem; flex-wrap:wrap; }
+.dot-header h1 { font-size:1.4rem; font-weight:700; margin:0; }
+.dot-gruppo { font-weight:700; color:#1e293b; margin:1.25rem 0 .5rem; display:flex; align-items:center; gap:.5rem; }
+.dot-card { background:#fff; border:1px solid #e5e7eb; border-radius:12px; padding:12px 14px; margin-bottom:.6rem;
+            display:flex; align-items:center; gap:12px; box-shadow:0 1px 2px rgba(0,0,0,.04); }
+.dot-card .q { font-size:1.4rem; font-weight:700; min-width:48px; text-align:center; color:#1e293b; }
+.dot-card .n { flex:1; min-width:0; }
+.dot-card .n strong { display:block; }
+.dot-card .btn { min-height:44px; }
+.dot-vuoto { color:#94a3b8; padding:1rem; text-align:center; background:#fff; border:1px dashed #e5e7eb; border-radius:12px; }
+</style>
+{% endblock %}
+
+{% block content %}
+{% csrf_token %}
+<div class="dot-header">
+    <h1><i class="bi bi-box-seam"></i> La mia dotazione</h1>
+    <a href="{% url 'turni:dashboard' %}" class="btn btn-outline-secondary btn-sm"><i class="bi bi-arrow-left"></i> Il mio turno</a>
+</div>
+<p class="text-muted small mb-2">Se qualcosa è consumato, rovinato, rotto o non lo trovi più, segnalalo: il responsabile del magazzino lo vede subito.</p>
+
+<div class="dot-gruppo"><i class="bi bi-person"></i> Personale</div>
+{% for a in personali %}
+    {% include 'magazzino/_dotazione_riga.html' %}
+{% empty %}
+    <div class="dot-vuoto">Nessun articolo assegnato a te.</div>
+{% endfor %}
+
+{% if in_turno %}
+    {% for g in postazioni %}
+        <div class="dot-gruppo"><i class="bi bi-geo-alt"></i> {{ g.nome }}</div>
+        {% for a in g.righe %}{% include 'magazzino/_dotazione_riga.html' %}{% endfor %}
+    {% empty %}
+        <div class="dot-gruppo"><i class="bi bi-geo-alt"></i> Postazioni del turno</div>
+        <div class="dot-vuoto">Nessuna merce assegnata alle tue postazioni.</div>
+    {% endfor %}
+{% else %}
+    <div class="dot-gruppo"><i class="bi bi-geo-alt"></i> Postazioni</div>
+    <div class="dot-vuoto">Inizia il turno per vedere la dotazione delle tue postazioni.</div>
+{% endif %}
+
+{% if chiuse %}
+<div class="dot-gruppo text-muted"><i class="bi bi-clock-history"></i> Ultime chiuse</div>
+<div class="small text-muted">
+    {% for a in chiuse %}<div>{{ a.chiusa_il|date:"d/m" }} &middot; {{ a.articolo.nome }} ×{{ a.quantita }} ({{ a.destinatario }}) &mdash; {{ a.get_stato_display }}</div>{% endfor %}
+</div>
+{% endif %}
+
+{% include 'magazzino/_modale_stato.html' with stati=stati_segnalabili %}
+{% endblock %}
+
+{% block extra_js %}
+<script>
+function csrf() { return document.querySelector('[name=csrfmiddlewaretoken]').value; }
+async function postJSON(url, dati) {
+    const r = await fetch(url, {method: 'POST', headers: {'Content-Type': 'application/json', 'X-CSRFToken': csrf()},
+                                body: JSON.stringify(dati || {})});
+    try { return await r.json(); } catch (e) { return {success: false, error: 'Errore del server (' + r.status + ')'}; }
+}
+</script>
+{% include 'magazzino/_js_stato.html' with url_stato="magazzino:mia-dotazione-stato" %}
+{% endblock %}

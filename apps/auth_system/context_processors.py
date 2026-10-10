@@ -11,4 +11,13 @@ def google_oauth(request):
 def sezioni_visibili(request):
     """Sezioni del gestionale accessibili all'utente, per il menu."""
     from .sezioni import sezioni_permesse
-    return {'sezioni_visibili': sezioni_permesse(getattr(request, 'user', None))}
+    visibili = sezioni_permesse(getattr(request, 'user', None))
+    contesto = {'sezioni_visibili': visibili}
+    if 'magazzino' in visibili:
+        from django.utils.functional import SimpleLazyObject
+
+        def conta():
+            from apps.magazzino.models import Assegnazione
+            return Assegnazione.objects.filter(da_gestire=True).count()
+        contesto['n_segnalazioni_magazzino'] = SimpleLazyObject(conta)
+    return contesto

@@ -2,37 +2,18 @@ from django.db.models.signals import post_save, pre_save, post_delete
 from django.dispatch import receiver
 from django.db import transaction
 from .models import ItemOrdine, Ordine, Pagamento
-from apps.core.models import MovimentoScorte
 from apps.clienti.models import PuntiFedelta, MovimentoPunti
 
 
 @receiver(post_save, sender=ItemOrdine)
 def aggiorna_scorte_prodotto(sender, instance, created, **kwargs):
-    """Aggiorna automaticamente le scorte quando viene creato un ItemOrdine per un prodotto"""
+    """La vendita di un prodotto scarica il magazzino (app magazzino)."""
     if created and instance.servizio_prodotto.tipo == 'prodotto':
-        prodotto = instance.servizio_prodotto
-        
-        # Solo se il prodotto ha scorte gestite (non illimitate)
-        if prodotto.quantita_disponibile > 0:
-            with transaction.atomic():
-                quantita_prima = prodotto.quantita_disponibile
-                quantita_scarico = instance.quantita
-                
-                # Aggiorna la quantità disponibile
-                prodotto.quantita_disponibile = max(0, quantita_prima - quantita_scarico)
-                prodotto.save(update_fields=['quantita_disponibile'])
-                
-                # Registra il movimento di scorte
-                MovimentoScorte.objects.create(
-                    prodotto=prodotto,
-                    tipo='scarico',
-                    quantita=-quantita_scarico,
-                    quantita_prima=quantita_prima,
-                    quantita_dopo=prodotto.quantita_disponibile,
-                    riferimento_ordine=instance.ordine,
-                    nota=f'Vendita - Ordine {instance.ordine.numero_progressivo}',
-                    operatore=instance.ordine.operatore
-                )
+        from apps.magazzino.services import scarica_vendita
+
+        scarica_vendita(instance.servizio_prodotto, -instance.quantita, ordine=instance.ordine,
+                        operatore=instance.ordine.operatore,
+                        nota=f'Vendita - Ordine {instance.ordine.numero_progressivo}')
 
 
 @receiver(post_save, sender=Ordine)

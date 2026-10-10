@@ -1,0 +1,37 @@
+{% if movimenti %}
+<div class="table-responsive">
+    <table class="table table-sm table-hover">
+        <thead>
+            <tr>
+                <th>Data</th>
+                {% if not senza_articolo %}<th>Articolo</th>{% endif %}
+                <th>Tipo</th>
+                <th class="text-end">Qtà</th>
+                <th class="text-end">Dopo</th>
+                <th>Riferimento</th>
+                <th>Operatore</th>
+            </tr>
+        </thead>
+        <tbody>
+        {% for m in movimenti %}
+            <tr>
+                <td class="text-nowrap small">{{ m.data|date:"d/m/Y H:i" }}</td>
+                {% if not senza_articolo %}<td><a href="{% url 'magazzino:articolo' m.articolo_id %}" class="text-decoration-none">{{ m.articolo.nome }}</a></td>{% endif %}
+                <td><span class="badge {% if m.quantita > 0 %}bg-success-subtle text-success{% elif m.quantita < 0 %}bg-danger-subtle text-danger{% else %}bg-light text-muted{% endif %}">{{ m.get_tipo_display }}</span></td>
+                <td class="text-end fw-semibold {% if m.quantita > 0 %}text-success{% elif m.quantita < 0 %}text-danger{% endif %}">{% if m.quantita > 0 %}+{% endif %}{{ m.quantita }}</td>
+                <td class="text-end {% if m.quantita_dopo < 0 %}qta-neg{% endif %}">{{ m.quantita_dopo }}</td>
+                <td class="small">
+                    {% if m.ordine %}<a href="{% url 'ordini:ordine-detail' m.ordine.pk %}">{{ m.ordine.numero_display }}</a>{% endif %}
+                    {% if m.consegna %}<a href="{% url 'magazzino:consegne' %}?fornitore={{ m.consegna.fornitore_id }}">Consegna{% if m.consegna.numero_ddt %} DDT {{ m.consegna.numero_ddt }}{% endif %}</a>{% endif %}
+                    {% if m.assegnazione %}<i class="bi {% if m.assegnazione.postazione_id %}bi-geo-alt{% else %}bi-person{% endif %}"></i> {{ m.assegnazione.destinatario }}{% endif %}
+                    {% if m.nota %}<span class="text-muted">{% if m.ordine or m.consegna or m.assegnazione %} &middot; {% endif %}{{ m.nota }}</span>{% endif %}
+                </td>
+                <td class="small">{% if m.operatore %}{{ m.operatore.get_full_name|default:m.operatore.username }}{% endif %}</td>
+            </tr>
+        {% endfor %}
+        </tbody>
+    </table>
+</div>
+{% else %}
+<div class="empty-state"><i class="bi bi-inbox"></i><h5>Nessun movimento</h5></div>
+{% endif %}
