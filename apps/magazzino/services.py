@@ -1,8 +1,13 @@
 """Operazioni di magazzino: ogni variazione di quantita' passa da qui."""
+from io import BytesIO
+
 from django.db import transaction
 from django.utils import timezone
 
-from .models import Articolo, Assegnazione, Movimento, StatoAssegnazione
+from .models import Articolo, Assegnazione, FotoArticolo, Movimento, StatoAssegnazione
+
+FOTO_LATO_MAX = 1000          # px
+FOTO_PESO_MAX = 20 * 1024 * 1024
 
 # Esiti della categoria checklist "Dotazione" -> stato dell'assegnazione
 CATEGORIA_DOTAZIONE = 'Dotazione magazzino'
@@ -83,6 +88,45 @@ def scarica_vendita(prodotto, delta, ordine=None, operatore=None, nota=''):
     if articolo is None or not delta:
         return None
     return movimenta(articolo, delta, 'vendita', operatore=operatore, ordine=ordine, nota=nota)
+
+
+# ---------------------------------------------------------------------------
+# Foto
+# ---------------------------------------------------------------------------
+
+def salva_foto(articolo, file):
+    """Ridimensiona (lato massimo 1000 px, orientamento della fotocamera)
+    e salva come JPEG nel database. ValueError se non e' un'immagine."""
+    from PIL import Image, ImageOps, UnidentifiedImageError
+
+    if file.size > FOTO_PESO_MAX:
+        raise ValueError('Immagine troppo grande (massimo 20 MB)')
+    try:
+        img = Image.open(file)
+        img = ImageOps.exif_transpose(img)
+    except (UnidentifiedImageError, OSError):
+        raise ValueError("Il file non è un'immagine valida")
+    if img.mode in ('RGBA', 'LA', 'P'):
+        sfondo = Image.new('RGB', img.size, 'white')
+        img = img.convert('RGBA')
+        sfondo.paste(img, mask=img.split()[-1])
+        img = sfondo
+    else:
+        img = img.convert('RGB')
+    img.thumbnail((FOTO_LATO_MAX, FOTO_LATO_MAX))
+    buffer = BytesIO()
+    img.save(buffer, 'JPEG', quality=82, optimize=True)
+    with transaction.atomic():
+        FotoArticolo.objects.update_or_create(articolo=articolo,
+                                              defaults={'dati': buffer.getvalue(), 'tipo': 'image/jpeg'})
+        articolo.foto_aggiornata = timezone.now()
+        articolo.save(update_fields=['foto_aggiornata'])
+
+
+def elimina_foto(articolo):
+    FotoArticolo.objects.filter(articolo=articolo).delete()
+    articolo.foto_aggiornata = None
+    articolo.save(update_fields=['foto_aggiornata'])
 
 
 # ---------------------------------------------------------------------------

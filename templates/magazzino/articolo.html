@@ -35,6 +35,12 @@
     <div class="col-lg-4">
         <div class="section-card">
             <div class="section-title"><div class="label"><i class="bi bi-info-circle"></i> Dati</div></div>
+            {% if articolo.foto_aggiornata %}
+            <a href="{{ articolo.url_foto }}" target="_blank"><img src="{{ articolo.url_foto }}" alt="{{ articolo.nome }}" class="w-100" style="max-height:320px;object-fit:contain;background:#f8fafc"></a>
+            {% else %}
+            <div class="text-center py-3 bg-light text-muted small cursor-pointer" onclick="apriArticolo({{ articolo.pk }}, {{ articolo.dati_modifica }})">
+                <i class="bi bi-camera fs-3 d-block"></i> Aggiungi una foto</div>
+            {% endif %}
             <div class="section-body pad small">
                 <dl class="row mb-0">
                     <dt class="col-5">Codice</dt><dd class="col-7">{{ articolo.codice|default:"—" }}</dd>

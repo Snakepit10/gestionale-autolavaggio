@@ -56,7 +56,7 @@ ESCLUSI = (
 # clienti, il menu legge il contatore dei task): basta essere operatori
 CONDIVISI = (
     '/clienti/cerca/', '/clienti/api/', '/ordini/api/', '/prenotazioni/api/',
-    '/tasks/api/conteggio/',
+    '/tasks/api/conteggio/', '/magazzino/foto/',
 )
 
 _PREFISSI = sorted(((p, chiave) for chiave, _, _, prefissi in SEZIONI for p in prefissi),

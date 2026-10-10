@@ -70,6 +70,9 @@ class Articolo(models.Model):
         help_text='La vendita in cassa di questo prodotto scarica il magazzino')
     attivo = models.BooleanField(default=True)
     note = models.TextField(blank=True)
+    # Quando e' stata caricata la foto (None = nessuna foto); serve anche a
+    # cambiare l'indirizzo dell'immagine quando la foto cambia
+    foto_aggiornata = models.DateTimeField(null=True, blank=True, editable=False)
 
     class Meta:
         verbose_name = 'Articolo'
@@ -78,6 +81,13 @@ class Articolo(models.Model):
 
     def __str__(self):
         return self.nome
+
+    @property
+    def url_foto(self):
+        if not self.foto_aggiornata:
+            return ''
+        from django.urls import reverse
+        return f"{reverse('magazzino:articolo-foto', args=[self.pk])}?v={int(self.foto_aggiornata.timestamp())}"
 
     # --- contenuto e prezzi -------------------------------------------------
 
@@ -133,6 +143,19 @@ class Articolo(models.Model):
     def assegnati(self):
         return (self.assegnazioni.filter(stato__in=Assegnazione.APERTI)
                 .aggregate(t=Sum('quantita'))['t'] or 0)
+
+
+class FotoArticolo(models.Model):
+    """Foto dell'articolo salvata nel database (il disco del server si
+    azzera a ogni deploy). Tabella a parte, cosi' gli elenchi di articoli
+    non caricano le immagini."""
+    articolo = models.OneToOneField(Articolo, on_delete=models.CASCADE, related_name='foto')
+    dati = models.BinaryField()
+    tipo = models.CharField(max_length=30, default='image/jpeg')
+
+    class Meta:
+        verbose_name = 'Foto articolo'
+        verbose_name_plural = 'Foto articoli'
 
 
 class Movimento(models.Model):

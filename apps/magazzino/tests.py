@@ -376,3 +376,61 @@ class ContenutoPrezzoTest(TestCase):
         self.assertEqual(r.status_code, 400)
         r = _post(self.client, 'articolo-salva', {'nome': 'X', 'prezzo_per': 'contenuto'})
         self.assertEqual(r.status_code, 400)
+
+
+class FotoArticoloTest(TestCase):
+    def _immagine(self, lato=2400, formato='PNG'):
+        from io import BytesIO
+
+        from django.core.files.uploadedfile import SimpleUploadedFile
+        from PIL import Image
+        buffer = BytesIO()
+        Image.new('RGBA', (lato, lato // 2), (200, 30, 30, 255)).save(buffer, formato)
+        return SimpleUploadedFile('bidone.png', buffer.getvalue(), content_type='image/png')
+
+    def test_carica_mostra_e_togli(self):
+        from io import BytesIO
+
+        from django.core.files.uploadedfile import SimpleUploadedFile
+        from PIL import Image
+
+        from apps.auth_system.sezioni import sezione_per_percorso
+        titolare = utente_titolare('tit', password='x')
+        a = Articolo.objects.create(nome='Shampoo')
+        self.client.force_login(titolare)
+        url = reverse('magazzino:articolo-foto-carica', args=[a.pk])
+
+        r = self.client.post(url, {'foto': self._immagine()}).json()
+        a.refresh_from_db()
+        self.assertTrue(r['success'])
+        self.assertEqual(r['url'], a.url_foto)
+        img = Image.open(BytesIO(bytes(a.foto.dati)))
+        self.assertEqual((img.format, img.size), ('JPEG', (1000, 500)))   # ridimensionata
+
+        # la foto la vede anche l'operatore (dotazione), non solo il magazzino
+        self.assertIsNone(sezione_per_percorso(reverse('magazzino:articolo-foto', args=[a.pk])))
+        risposta = self.client.get(reverse('magazzino:articolo-foto', args=[a.pk]))
+        self.assertEqual((risposta.status_code, risposta['Content-Type']), (200, 'image/jpeg'))
+
+        falso = SimpleUploadedFile('x.jpg', b'non sono una foto', content_type='image/jpeg')
+        self.assertEqual(self.client.post(url, {'foto': falso}).status_code, 400)
+
+        self.assertTrue(self.client.post(url, {'elimina': '1'}).json()['success'])
+        a.refresh_from_db()
+        self.assertEqual((a.url_foto, Articolo.objects.filter(foto__isnull=False).count()), ('', 0))
+        from django.http import Http404
+
+        from .views import articolo_foto
+        req = RequestFactory().get('/')
+        req.user = titolare
+        with self.assertRaises(Http404):
+            articolo_foto(req, pk=a.pk)
+
+    def test_operatore_non_carica(self):
+        operatore = User.objects.create_user('op', password='x')
+        operatore.groups.add(Group.objects.get(name='operatore'))
+        a = Articolo.objects.create(nome='Shampoo')
+        self.client.force_login(operatore)
+        r = self.client.post(reverse('magazzino:articolo-foto-carica', args=[a.pk]), {'foto': self._immagine(100)},
+                             HTTP_X_REQUESTED_WITH='XMLHttpRequest')
+        self.assertEqual(r.status_code, 403)

@@ -77,6 +77,7 @@
                     {% for a in articoli %}
                     <tr class="{% if not a.attivo %}text-muted{% endif %}">
                         <td>
+                            {% if a.foto_aggiornata %}<img src="{{ a.url_foto }}" alt="" loading="lazy" class="rounded border me-2 float-start" style="width:40px;height:40px;object-fit:cover">{% endif %}
                             <a href="{% url 'magazzino:articolo' a.pk %}" class="fw-semibold text-decoration-none">{{ a.nome }}</a>
                             {% if a.prodotto %}<i class="bi bi-shop text-primary ms-1" title="In vendita in cassa: {{ a.prodotto.titolo }}"></i>{% endif %}
                             <br><small class="text-muted">{% if a.ha_contenuto %}{{ a.unita }} da {{ a.contenuto|floatformat:"-3" }} {{ a.unita_contenuto }} &middot; {% endif %}{% if a.codice %}{{ a.codice }} &middot; {% endif %}{{ a.categoria|default:"" }}</small>

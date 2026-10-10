@@ -1,6 +1,38 @@
 <script>
 const URL_ARTICOLO_SALVA = "{% url 'magazzino:articolo-salva' %}";
 const URL_MOVIMENTO = "{% url 'magazzino:articolo-movimento' 999999 %}";
+const URL_FOTO_CARICA = "{% url 'magazzino:articolo-foto-carica' 999999 %}";
+let fotoAttuale = '';
+
+function mostraAnteprima(src) {
+    const img = document.getElementById('art-foto-anteprima');
+    img.src = src || '';
+    img.classList.toggle('d-none', !src);
+}
+
+function anteprimaFoto(input) {
+    if (input.files && input.files[0]) {
+        mostraAnteprima(URL.createObjectURL(input.files[0]));
+        document.getElementById('art-foto-togli').checked = false;
+    } else {
+        mostraAnteprima(fotoAttuale);
+    }
+}
+
+function togliFoto(box) {
+    if (box.checked) { document.getElementById('art-foto').value = ''; mostraAnteprima(''); }
+    else mostraAnteprima(fotoAttuale);
+}
+
+async function caricaFoto(id) {
+    const file = document.getElementById('art-foto').files[0];
+    const togli = document.getElementById('art-foto-togli').checked;
+    if (!file && !togli) return {success: true};
+    const dati = new FormData();
+    if (file) dati.append('foto', file); else dati.append('elimina', '1');
+    const r = await fetch(URL_FOTO_CARICA.replace('999999', id), {method: 'POST', headers: {'X-CSRFToken': csrf(), 'X-Requested-With': 'XMLHttpRequest'}, body: dati});
+    try { return await r.json(); } catch (e) { return {success: false, error: 'Caricamento della foto non riuscito (' + r.status + ')'}; }
+}
 
 function apriArticolo(id, a) {
     a = a || {};
@@ -23,6 +55,11 @@ function apriArticolo(id, a) {
     document.getElementById('art-attivo').checked = a.attivo !== false;
     document.getElementById('art-iniziale').value = 0;
     document.getElementById('art-iniziale-box').classList.toggle('d-none', !!id);
+    fotoAttuale = a.url_foto || '';
+    document.getElementById('art-foto').value = '';
+    document.getElementById('art-foto-togli').checked = false;
+    document.getElementById('art-foto-togli-box').classList.toggle('d-none', !fotoAttuale);
+    mostraAnteprima(fotoAttuale);
     aggiornaPrezzo();
     document.getElementById('art-errore').classList.add('d-none');
     bootstrap.Modal.getOrCreateInstance(document.getElementById('modaleArticolo')).show();
@@ -40,9 +77,13 @@ async function salvaArticolo() {
         fornitore: val('art-fornitore') || null, note: val('art-note'),
         attivo: document.getElementById('art-attivo').checked, quantita_iniziale: val('art-iniziale'),
     });
-    if (!j.success) {
-        const e = document.getElementById('art-errore');
-        e.textContent = j.error; e.classList.remove('d-none');
+    const errore = msg => { const e = document.getElementById('art-errore'); e.textContent = msg; e.classList.remove('d-none'); };
+    if (!j.success) { errore(j.error); return; }
+    const foto = await caricaFoto(j.id);
+    if (!foto.success) {
+        // l'articolo e' salvato: si riprova solo la foto
+        document.getElementById('art-id').value = j.id;
+        errore('Articolo salvato, ma la foto no: ' + foto.error);
         return;
     }
     location.reload();

@@ -19,7 +19,7 @@
                 {% for a in segnalazioni %}
                     {% with s=a.storico.all.0 %}
                     <tr>
-                        <td><a href="{% url 'magazzino:articolo' a.articolo_id %}" class="fw-semibold text-decoration-none">{{ a.articolo.nome }}</a> <span class="text-muted">×{{ a.quantita }}</span>
+                        <td>{% with a=a.articolo %}{% if a.foto_aggiornata %}<img src="{{ a.url_foto }}" alt="" loading="lazy" class="rounded border me-2 float-start" style="width:40px;height:40px;object-fit:cover">{% endif %}{% endwith %}<a href="{% url 'magazzino:articolo' a.articolo_id %}" class="fw-semibold text-decoration-none">{{ a.articolo.nome }}</a> <span class="text-muted">×{{ a.quantita }}</span>
                             <br><small class="text-muted">&euro;{{ a.articolo.costo|floatformat:2 }} cad.</small></td>
                         <td><i class="bi {% if a.postazione_id %}bi-geo-alt{% else %}bi-person{% endif %}"></i> {{ a.destinatario }}</td>
                         <td><span class="badge bg-{{ a.colore_stato }}">{{ a.get_stato_display }}</span></td>

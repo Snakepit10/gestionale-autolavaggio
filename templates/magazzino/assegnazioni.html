@@ -30,7 +30,7 @@
                 <tbody>
                 {% for a in g.righe %}
                     <tr>
-                        <td><a href="{% url 'magazzino:articolo' a.articolo_id %}" class="text-decoration-none fw-semibold">{{ a.articolo.nome }}</a>
+                        <td>{% with a=a.articolo %}{% if a.foto_aggiornata %}<img src="{{ a.url_foto }}" alt="" loading="lazy" class="rounded border me-2 float-start" style="width:40px;height:40px;object-fit:cover">{% endif %}{% endwith %}<a href="{% url 'magazzino:articolo' a.articolo_id %}" class="text-decoration-none fw-semibold">{{ a.articolo.nome }}</a>
                             <br><small class="text-muted">{{ a.articolo.get_tipo_display }}{% if a.articolo.ha_contenuto %} &middot; {{ a.articolo.unita }} da {{ a.articolo.contenuto|floatformat:"-3" }} {{ a.articolo.unita_contenuto }}{% endif %}</small></td>
                         <td class="text-end fw-semibold">{{ a.quantita }} <small class="text-muted">{{ a.articolo.unita }}</small></td>
                         <td><span class="badge bg-{{ a.colore_stato }}">{{ a.get_stato_display }}</span>

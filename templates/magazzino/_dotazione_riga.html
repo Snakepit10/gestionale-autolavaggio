@@ -1,4 +1,5 @@
 <div class="dot-card">
+    {% if a.articolo.foto_aggiornata %}<img src="{{ a.articolo.url_foto }}" alt="" loading="lazy" class="rounded border" style="width:56px;height:56px;object-fit:cover">{% endif %}
     <div class="q">{{ a.quantita }}</div>
     <div class="n">
         <strong>{{ a.articolo.nome }}{% if a.articolo.ha_contenuto %} <small class="text-muted fw-normal">da {{ a.articolo.contenuto|floatformat:"-3" }} {{ a.articolo.unita_contenuto }}</small>{% endif %}</strong>

@@ -86,6 +86,19 @@
                         </select>
                     </div>
                     <div class="col-12">
+                        <label class="form-label">Foto</label>
+                        <div class="d-flex align-items-center gap-3">
+                            <img id="art-foto-anteprima" src="" alt="" class="rounded border d-none" style="width:84px;height:84px;object-fit:cover">
+                            <div class="flex-fill">
+                                <input type="file" class="form-control" id="art-foto" accept="image/*" onchange="anteprimaFoto(this)">
+                                <div class="form-check mt-1 d-none" id="art-foto-togli-box">
+                                    <input class="form-check-input" type="checkbox" id="art-foto-togli" onchange="togliFoto(this)">
+                                    <label class="form-check-label small" for="art-foto-togli">Togli la foto</label>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-12">
                         <label class="form-label">Note</label>
                         <textarea class="form-control" id="art-note" rows="2"></textarea>
                     </div>

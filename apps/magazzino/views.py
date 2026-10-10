@@ -17,7 +17,7 @@ from apps.auth_system.sezioni import ha_accesso
 from apps.cq.models import PostazioneCQ
 
 from . import services
-from .models import (UNITA_CONTENUTO_CHOICES, Articolo, Assegnazione, Consegna, Fornitore, Movimento, OrdineFornitore,
+from .models import (UNITA_CONTENUTO_CHOICES, Articolo, FotoArticolo, Assegnazione, Consegna, Fornitore, Movimento, OrdineFornitore,
                      RigaConsegna, RigaOrdineFornitore, StatoAssegnazione)
 
 
@@ -108,7 +108,7 @@ def _dati_modifica(a):
         'contenuto': _fmt(a.contenuto) if a.contenuto else '', 'unita_contenuto': a.unita_contenuto,
         'prezzo_per': a.prezzo_per, 'scorta_minima': a.scorta_minima, 'traccia_scorte': a.traccia_scorte,
         'costo': _fmt(a.costo_indicato), 'fornitore': a.fornitore_id or '', 'attivo': a.attivo,
-        'note': a.note, 'unita_prezzo': a.unita_prezzo,
+        'note': a.note, 'unita_prezzo': a.unita_prezzo, 'url_foto': a.url_foto,
     })
 
 
@@ -294,6 +294,37 @@ def movimenti(request):
         'query': '&'.join(f'{k}={v}' for k, v in request.GET.items() if k != 'page' and v),
     })
     return render(request, 'magazzino/movimenti.html', ctx)
+
+
+@login_required
+def articolo_foto(request, pk):
+    """L'immagine (la vede chiunque lavori nel gestionale: serve anche agli
+    operatori nella loro dotazione)."""
+    from django.http import HttpResponse
+
+    foto = get_object_or_404(FotoArticolo, articolo_id=pk)
+    risposta = HttpResponse(bytes(foto.dati), content_type=foto.tipo)
+    # l'indirizzo cambia con la foto (?v=...): si puo' tenere in cache a lungo
+    risposta['Cache-Control'] = 'private, max-age=31536000'
+    return risposta
+
+
+@magazzino_required
+def articolo_foto_carica(request, pk):
+    if request.method != 'POST':
+        return _errore('Metodo non consentito', 405)
+    articolo = get_object_or_404(Articolo, pk=pk)
+    if request.POST.get('elimina'):
+        services.elimina_foto(articolo)
+        return JsonResponse({'success': True, 'url': ''})
+    file = request.FILES.get('foto')
+    if not file:
+        return _errore('Scegli una foto')
+    try:
+        services.salva_foto(articolo, file)
+    except ValueError as e:
+        return _errore(str(e))
+    return JsonResponse({'success': True, 'url': articolo.url_foto})
 
 
 # ---------------------------------------------------------------------------
