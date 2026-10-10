@@ -116,6 +116,43 @@ class CategoriaListView(LoginRequiredMixin, ListView):
     template_name = 'core/categoria_list.html'
     context_object_name = 'categorie'
 
+    def get_context_data(self, **kwargs):
+        """Ogni categoria riceve `sottocategorie`: [(nome, n. item)] dal
+        campo `gruppo` degli item che la hanno come categoria principale."""
+        from django.db.models import Count
+
+        context = super().get_context_data(**kwargs)
+        righe = (ServizioProdotto.objects.exclude(gruppo='')
+                 .values('categoria_id', 'gruppo', 'ordine_gruppo')
+                 .annotate(n=Count('id')).order_by('ordine_gruppo', 'gruppo'))
+        per_categoria = {}
+        for r in righe:
+            per_categoria.setdefault(r['categoria_id'], []).append((r['gruppo'], r['n']))
+        for c in context['categorie']:
+            c.sottocategorie = per_categoria.get(c.pk, [])
+        return context
+
+
+@login_required
+def rinomina_sottocategoria(request, pk):
+    """POST {vecchio, nuovo}: rinomina una sottocategoria su tutti gli item
+    della categoria (nuovo vuoto = toglie la sottocategoria)."""
+    import json
+
+    if request.method != 'POST':
+        return JsonResponse({'success': False, 'error': 'Metodo non consentito'}, status=405)
+    categoria = get_object_or_404(Categoria, pk=pk)
+    try:
+        dati = json.loads(request.body or '{}')
+    except ValueError:
+        return JsonResponse({'success': False, 'error': 'Dati non validi'}, status=400)
+    vecchio = (dati.get('vecchio') or '').strip()
+    nuovo = (dati.get('nuovo') or '').strip()[:100]
+    if not vecchio:
+        return JsonResponse({'success': False, 'error': 'Sottocategoria non indicata'}, status=400)
+    n = ServizioProdotto.objects.filter(categoria=categoria, gruppo=vecchio).update(gruppo=nuovo)
+    return JsonResponse({'success': True, 'aggiornati': n})
+
 
 class CategoriaCreateView(LoginRequiredMixin, CreateView):
     model = Categoria

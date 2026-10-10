@@ -139,20 +139,24 @@
                         </div>
                         <div class="col-md-6 mt-3">
                             {{ form.gruppo|as_crispy_field }}
+                            <datalist id="sottocategorie-esistenti">
+                                {% for s in form.sottocategorie_esistenti %}<option value="{{ s }}">{% endfor %}
+                            </datalist>
                             <small class="form-text text-muted d-block mt-1">
-                                Sotto-sezione opzionale dentro lo step del wizard
-                                (es. <code>Pelle</code>, <code>Tessuto</code> dentro
-                                "Trattamento sedili"). Item con lo stesso gruppo
-                                vengono raccolti sotto un'intestazione comune.
-                                Lascia vuoto per item senza sotto-sezione.
+                                Sottocategoria dentro la categoria: in cassa gli item
+                                vengono divisi sotto questo titolo (es. <code>Profumi</code>,
+                                <code>Panni</code>, <code>Detergenti</code> dentro "Prodotti")
+                                e nella prenotazione online fa da sotto-sezione dello step.
+                                Scrivi un nome nuovo per crearla o scegli una esistente;
+                                lascia vuoto per nessuna sottocategoria.
                             </small>
                         </div>
                         <div class="col-md-2 mt-3">
                             {{ form.ordine_gruppo|as_crispy_field }}
                             <small class="form-text text-muted d-block mt-1">
-                                Posizione del <strong>gruppo</strong> nello step
-                                (0 = primo). Il valore viene propagato in
-                                automatico a tutti gli item dello stesso gruppo
+                                Posizione della <strong>sottocategoria</strong> nella
+                                categoria (0 = prima). Il valore viene propagato in
+                                automatico a tutti gli item della stessa sottocategoria
                                 quando salvi.
                             </small>
                         </div>

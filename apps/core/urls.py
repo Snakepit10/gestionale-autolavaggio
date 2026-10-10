@@ -11,6 +11,7 @@ urlpatterns = [
     path('categorie/nuova/', views.CategoriaCreateView.as_view(), name='categoria-create'),
     path('categorie/<int:pk>/modifica/', views.CategoriaUpdateView.as_view(), name='categoria-update'),
     path('categorie/<int:pk>/elimina/', views.CategoriaDeleteView.as_view(), name='categoria-delete'),
+    path('categorie/<int:pk>/sottocategoria/', views.rinomina_sottocategoria, name='categoria-sottocategoria'),
     
     # CRUD Servizi/Prodotti
     path('catalogo/', views.CatalogoListView.as_view(), name='catalogo-list'),

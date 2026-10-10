@@ -312,6 +312,11 @@
 .slot-pill.av-past { background: #e5e7eb; color: #9ca3af; border-color: #e5e7eb; cursor: not-allowed; opacity: .6; }
 .slot-pill.selected { border-color: #1e40af !important; box-shadow: 0 0 0 2px rgba(30, 64, 175, .2); background: #dbeafe !important; color: #1e3a8a !important; }
 .slot-grid-empty { padding: 16px; text-align: center; color: #94a3b8; font-size: .82rem; grid-column: 1 / -1; }
+/* Sottocategorie dentro una categoria (campo "Sottocategoria" del catalogo) */
+.sottocat-bar { display:flex; flex-wrap:wrap; gap:6px; }
+.sottocat-btn { border:1px solid #cbd5e1; background:#fff; color:#334155; border-radius:999px; font-weight:600; padding:2px 12px; }
+.sottocat-btn.active { background:#334155; border-color:#334155; color:#fff; }
+.sottocat-titolo { font-size:.74rem; font-weight:700; text-transform:uppercase; letter-spacing:.5px; color:#64748b; margin:6px 0 4px; }
 </style>
 {% endblock %}
 
@@ -378,9 +383,25 @@
                         <small class="text-muted">{{ items|length }} elementi</small>
                     </div>
 
+                    {% regroup items by gruppo as sottocategorie %}
+                    {% if sottocategorie|length > 1 or sottocategorie.0.grouper %}
+                    <!-- Sottocategorie: filtro dentro la categoria -->
+                    <div class="sottocat-bar mb-2">
+                        <button type="button" class="btn btn-sm sottocat-btn active" data-gruppo="*">Tutte</button>
+                        {% for sc in sottocategorie %}
+                        <button type="button" class="btn btn-sm sottocat-btn" data-gruppo="{{ sc.grouper }}">{{ sc.grouper|default:"Altri" }} <span class="opacity-75">{{ sc.list|length }}</span></button>
+                        {% endfor %}
+                    </div>
+                    {% endif %}
+
+                    {% for sc in sottocategorie %}
+                    <div class="sottocat-blocco" data-gruppo="{{ sc.grouper }}">
+                    {% if sottocategorie|length > 1 or sc.grouper %}
+                    <div class="sottocat-titolo">{{ sc.grouper|default:"Altri" }}</div>
+                    {% endif %}
                     <!-- Card della categoria -->
                     <div class="row g-1 mb-3">
-                        {% for item in items %}
+                        {% for item in sc.list %}
                         <div class="col-sm-6 col-md-4 col-lg-3 catalogo-item" data-categoria="{{ categoria.id }}" data-id="{{ item.id }}">
                             <div class="card item-card {{ item.tipo }}{% if item.id in preferiti_ids %} is-preferito{% endif %}" data-id="{{ item.id }}" data-categoria="{{ categoria.id }}" onclick="aggiungiAlCarrello({{ item.id }})">
                                 <button type="button" class="btn-fav{% if item.id in preferiti_ids %} active{% endif %}"
@@ -401,6 +422,8 @@
                         </div>
                         {% endfor %}
                     </div>
+                    </div>
+                    {% endfor %}
                 </div>
             {% endfor %}
         </div>
@@ -904,6 +927,17 @@ function configuraCategorieFilter() {
         });
     });
 }
+
+// Sottocategorie: filtro dentro la sezione della categoria
+document.addEventListener('click', function(e) {
+    const btn = e.target.closest('.sottocat-btn');
+    if (!btn) return;
+    const sezione = btn.closest('.categoria-sezione');
+    sezione.querySelectorAll('.sottocat-btn').forEach(b => b.classList.toggle('active', b === btn));
+    sezione.querySelectorAll('.sottocat-blocco').forEach(blocco => {
+        blocco.style.display = (btn.dataset.gruppo === '*' || blocco.dataset.gruppo === btn.dataset.gruppo) ? '' : 'none';
+    });
+});
 
 function filtraPerCategoria(categoriaId) {
     if (categoriaId === 'all') {

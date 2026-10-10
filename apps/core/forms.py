@@ -62,6 +62,17 @@ class ServizioProdottoForm(forms.ModelForm):
             "quei servizi nello step 1 della prenotazione."
         )
 
+        # Il campo `gruppo` fa da sottocategoria (cassa e prenotazione
+        # online): suggerisce quelle gia' usate per non creare doppioni
+        # scritti in modo diverso.
+        self.fields['gruppo'].label = 'Sottocategoria'
+        self.fields['gruppo'].widget.attrs['list'] = 'sottocategorie-esistenti'
+        self.fields['gruppo'].widget.attrs['autocomplete'] = 'off'
+        self.fields['ordine_gruppo'].label = 'Ordine sottocategoria'
+        self.sottocategorie_esistenti = sorted(
+            set(SP.objects.exclude(gruppo='').values_list('gruppo', flat=True)),
+            key=str.lower)
+
         self.helper = FormHelper()
         self.helper.form_method = 'post'
         self.helper.layout = Layout(

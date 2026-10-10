@@ -11,8 +11,17 @@
     </a>
 </div>
 
+<div class="alert alert-light border small">
+    <i class="bi bi-diagram-3"></i>
+    <strong>Sottocategorie</strong> (es. Profumi, Panni, Detergenti dentro "Prodotti"): si creano dal
+    <a href="{% url 'core:catalogo-list' %}">catalogo</a>, scrivendo il nome nel campo
+    <em>Sottocategoria</em> del prodotto. In cassa i prodotti vengono divisi sotto quei titoli,
+    con un filtro dentro la categoria. Qui puoi rinominarle o toglierle per tutti i prodotti insieme.
+</div>
+
 <div class="card">
     <div class="card-body">
+        {% csrf_token %}
         {% if categorie %}
             <div class="table-responsive">
                 <table class="table table-hover">
@@ -20,6 +29,7 @@
                         <tr>
                             <th>Nome</th>
                             <th>Descrizione</th>
+                            <th>Sottocategorie</th>
                             <th>Ordine</th>
                             <th>Stato</th>
                             <th class="text-center">Azioni</th>
@@ -33,6 +43,19 @@
                             </td>
                             <td>
                                 {{ categoria.descrizione|truncatewords:10 }}
+                            </td>
+                            <td>
+                                {% for nome, n in categoria.sottocategorie %}
+                                <span class="badge bg-light text-dark border me-1 mb-1">
+                                    {{ nome }} <span class="text-muted">{{ n }}</span>
+                                    <a href="#" class="text-primary ms-1" title="Rinomina"
+                                       onclick="rinominaSottocategoria({{ categoria.pk }}, '{{ nome|escapejs }}'); return false;"><i class="bi bi-pencil"></i></a>
+                                    <a href="#" class="text-danger" title="Togli la sottocategoria dagli item"
+                                       onclick="eliminaSottocategoria({{ categoria.pk }}, '{{ nome|escapejs }}', {{ n }}); return false;"><i class="bi bi-x-lg"></i></a>
+                                </span>
+                                {% empty %}
+                                <span class="text-muted small">&mdash;</span>
+                                {% endfor %}
                             </td>
                             <td>
                                 <span class="badge bg-secondary">{{ categoria.ordine_visualizzazione }}</span>
@@ -73,4 +96,30 @@
         {% endif %}
     </div>
 </div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+async function salvaSottocategoria(categoriaId, vecchio, nuovo) {
+    const r = await fetch(`{% url 'core:categoria-sottocategoria' 999999 %}`.replace('999999', categoriaId), {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json',
+                  'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]').value},
+        body: JSON.stringify({vecchio, nuovo}),
+    });
+    const esito = await r.json().catch(() => ({}));
+    if (!esito.success) { alert('Errore: ' + (esito.error || 'operazione non riuscita')); return; }
+    location.reload();
+}
+function rinominaSottocategoria(categoriaId, nome) {
+    const nuovo = prompt('Nuovo nome per la sottocategoria "' + nome + '":', nome);
+    if (nuovo === null || !nuovo.trim() || nuovo.trim() === nome) return;
+    salvaSottocategoria(categoriaId, nome, nuovo.trim());
+}
+function eliminaSottocategoria(categoriaId, nome, n) {
+    if (confirm('Togliere la sottocategoria "' + nome + '" da ' + n + ' item? Gli item restano nella categoria, senza sottocategoria.')) {
+        salvaSottocategoria(categoriaId, nome, '');
+    }
+}
+</script>
 {% endblock %}
