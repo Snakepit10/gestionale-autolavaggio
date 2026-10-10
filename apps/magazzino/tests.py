@@ -592,3 +592,15 @@ class PostoUsoSchedaTest(TestCase):
         services.assegna(a, 1, utente=operatore, da=self.user)
         self.assertContains(_pagina(operatore, 'mia-dotazione'), 'Spruzzare a freddo')
         self.assertContains(_pagina(self.user, 'articolo', pk=a.pk), 'Spruzzare a freddo')
+
+
+    def test_link_produttore(self):
+        r = self._salva(link_produttore='www.mafra.it/prodotti/killer')
+        a = Articolo.objects.get(pk=r.json()['id'])
+        self.assertEqual(a.link_produttore, 'https://www.mafra.it/prodotti/killer')
+        self.assertTrue(a.ha_scheda)
+        self.assertContains(_pagina(self.user, 'schede-prodotti'), 'https://www.mafra.it/prodotti/killer')
+        self.assertEqual(self._salva(id=a.pk, link_produttore='non un link').status_code, 400)
+        self._salva(id=a.pk, link_produttore='')
+        a.refresh_from_db()
+        self.assertEqual(a.link_produttore, '')

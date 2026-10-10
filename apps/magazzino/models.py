@@ -98,6 +98,8 @@ class Articolo(models.Model):
     diluizione = models.CharField(max_length=100, blank=True, help_text='es. 1:20, puro, 50 ml in 10 l')
     modo_uso = models.TextField("Modo d'uso", blank=True)
     avvertenze = models.TextField(blank=True, help_text='Sicurezza, protezioni, cosa non fare')
+    link_produttore = models.URLField('Link produttore', max_length=500, blank=True,
+                                      help_text='Pagina del prodotto sul sito del produttore')
     attivo = models.BooleanField(default=True)
     note = models.TextField(blank=True)
     # Quando e' stata caricata la foto (None = nessuna foto); serve anche a
@@ -119,7 +121,7 @@ class Articolo(models.Model):
 
     @property
     def ha_scheda(self):
-        return bool(self.diluizione or self.modo_uso or self.avvertenze)
+        return bool(self.diluizione or self.modo_uso or self.avvertenze or self.link_produttore)
 
     @property
     def in_cassa(self):

@@ -115,6 +115,7 @@ def _dati_modifica(a):
         'posto': a.posto_id or '',
         **{campo: getattr(a, campo) for campo, _, _ in USI},
         'diluizione': a.diluizione, 'modo_uso': a.modo_uso, 'avvertenze': a.avvertenze,
+        'link_produttore': a.link_produttore,
     })
 
 
@@ -274,6 +275,17 @@ def articolo_salva(request):
     articolo.diluizione = (d.get('diluizione') or '').strip()[:100]
     articolo.modo_uso = (d.get('modo_uso') or '').strip()
     articolo.avvertenze = (d.get('avvertenze') or '').strip()
+    link = (d.get('link_produttore') or '').strip()
+    if link and '://' not in link:
+        link = 'https://' + link
+    if link:
+        from django.core.exceptions import ValidationError
+        from django.core.validators import URLValidator
+        try:
+            URLValidator(schemes=['http', 'https'])(link)
+        except ValidationError:
+            return _errore('Il link del produttore non è un indirizzo web valido')
+    articolo.link_produttore = link[:500]
     posto_nuovo = (d.get('posto_nuovo') or '').strip()[:80]
     if posto_nuovo:
         articolo.posto = (Posto.objects.filter(nome__iexact=posto_nuovo).first()
@@ -887,7 +899,8 @@ def schede_prodotti(request):
     operatori, filtrabili per destinazione d'uso."""
     if not ha_accesso(request.user, 'mio_turno') and not ha_accesso(request.user, 'magazzino'):
         return render(request, 'auth_system/accesso_negato.html', {'sezione': 'Il Mio Turno'}, status=403)
-    qs = (Articolo.objects.filter(attivo=True).exclude(diluizione='', modo_uso='', avvertenze='')
+    qs = (Articolo.objects.filter(attivo=True)
+          .exclude(diluizione='', modo_uso='', avvertenze='', link_produttore='')
           .select_related('posto'))
     uso = request.GET.get('uso', '')
     if uso in {campo for campo, _, _ in USI}:

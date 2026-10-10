@@ -2,7 +2,8 @@
 <dl class="mb-0">
     {% if a.diluizione %}<dt>Diluizione</dt><dd class="fs-6 fw-semibold">{{ a.diluizione }}</dd>{% endif %}
     {% if a.modo_uso %}<dt>Modo d'uso</dt><dd>{{ a.modo_uso|linebreaksbr }}</dd>{% endif %}
-    {% if a.avvertenze %}<dt class="text-danger"><i class="bi bi-exclamation-triangle"></i> Avvertenze</dt><dd class="mb-0">{{ a.avvertenze|linebreaksbr }}</dd>{% endif %}
+    {% if a.avvertenze %}<dt class="text-danger"><i class="bi bi-exclamation-triangle"></i> Avvertenze</dt><dd{% if not a.link_produttore %} class="mb-0"{% endif %}>{{ a.avvertenze|linebreaksbr }}</dd>{% endif %}
+    {% if a.link_produttore %}<dt>Produttore</dt><dd class="mb-0"><a href="{{ a.link_produttore }}" target="_blank" rel="noopener noreferrer"><i class="bi bi-box-arrow-up-right"></i> Scheda sul sito del produttore</a></dd>{% endif %}
 </dl>
 {% else %}
 <span class="text-muted">Non compilata.</span>

@@ -82,6 +82,7 @@ function apriArticolo(id, a) {
     document.getElementById('art-diluizione').value = a.diluizione || '';
     document.getElementById('art-modo-uso').value = a.modo_uso || '';
     document.getElementById('art-avvertenze').value = a.avvertenze || '';
+    document.getElementById('art-link-produttore').value = a.link_produttore || '';
     document.getElementById('art-attivo').checked = a.attivo !== false;
     document.getElementById('art-iniziale').value = 0;
     document.getElementById('art-iniziale-box').classList.toggle('d-none', !!id);
@@ -111,6 +112,7 @@ async function salvaArticolo() {
         posto_nuovo: val('art-posto') === '__nuovo' ? val('art-posto-nuovo') : '',
         ...Object.fromEntries(USI_ARTICOLO.map(c => [c, document.getElementById('art-' + c).checked])),
         diluizione: val('art-diluizione'), modo_uso: val('art-modo-uso'), avvertenze: val('art-avvertenze'),
+        link_produttore: val('art-link-produttore'),
         attivo: document.getElementById('art-attivo').checked, quantita_iniziale: val('art-iniziale'),
     });
     const errore = msg => { const e = document.getElementById('art-errore'); e.textContent = msg; e.classList.remove('d-none'); };
