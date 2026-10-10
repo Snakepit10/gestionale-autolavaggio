@@ -181,6 +181,40 @@ class AbbinamentoPortaliTest(TestCase):
         self.assertEqual(r['valore_residuo'], Decimal('15.00'))
         self.assertEqual(r['residuo_senza_prezzo'], 1)
 
+    def test_rettifica_residuo_omaggio_e_promo(self):
+        from apps.finanze.models import RettificaResiduo
+        omaggio = self._tx('15:00', 1)          # listino 15
+        promo = self._tx('16:00', 1)            # listino 15
+        self._tx('17:00', 1)                    # pagato a listino
+        r = ap.riepilogo(self.chiusura)
+        self.assertEqual(r['valore_residuo'], Decimal('45.00'))
+
+        admin = User.objects.create_superuser('boss', 'b@x.it', 'x')
+        self.client.force_login(admin)
+        url = reverse('finanze:azione_abbinamento_portali')
+        base = {'data': '2026-10-06', 'azione': 'rettifica_residuo'}
+        self.client.post(url, {**base, 'transazione_id': omaggio.pk, 'motivo': 'omaggio', 'importo': '9'})
+        self.client.post(url, {**base, 'transazione_id': promo.pk, 'motivo': 'promo', 'importo': '10,50',
+                               'nota': 'promo pioggia'})
+        r = ap.riepilogo(self.chiusura)
+        self.assertEqual((r['valore_residuo'], r['valore_residuo_listino'], r['rettifica_residuo'],
+                          r['n_rettificati']), (Decimal('25.50'), Decimal('45.00'), Decimal('19.50'), 2))
+        self.assertEqual(RettificaResiduo.objects.get(transazione=omaggio).importo, Decimal('0.00'))
+        self.assertEqual(RettificaResiduo.objects.get(transazione=promo).nota, 'promo pioggia')
+
+        # di nuovo a listino
+        self.client.post(url, {**base, 'transazione_id': promo.pk, 'motivo': 'listino'})
+        self.assertEqual(ap.riepilogo(self.chiusura)['valore_residuo'], Decimal('15.00') + Decimal('15.00'))
+        # importo negativo rifiutato
+        self.client.post(url, {**base, 'transazione_id': promo.pk, 'motivo': 'promo', 'importo': '-3'})
+        self.assertFalse(RettificaResiduo.objects.filter(transazione=promo).exists())
+
+        # in quadratura conta l'incassato
+        from apps.finanze.views import _quadratura_giornata
+        q, _, _ = _quadratura_giornata(self.chiusura.data, None, Decimal('0'), Decimal('0'),
+                                       ap.riepilogo(self.chiusura)['valore_residuo'])
+        self.assertEqual(q['residuo_operatori'], Decimal('30.00'))
+
     def test_conferma_idempotente(self):
         self._item(self.completo, completato='10:30')
         self._tx('10:05', 4)

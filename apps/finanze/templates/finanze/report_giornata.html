@@ -332,7 +332,7 @@
               </div>
               <div class="small text-muted">
                 Reale &minus; teorico {% if quadratura.differenza_reale_teorico >= 0 %}+{% endif %}&euro;{{ quadratura.differenza_reale_teorico|floatformat:2 }}
-                &middot; &minus; residuo pagati agli operatori &euro;{{ quadratura.residuo_operatori|floatformat:2 }}
+                &middot; &minus; residuo pagati agli operatori &euro;{{ quadratura.residuo_operatori|floatformat:2 }}{% if abbinamento.n_rettificati %} <span class="text-muted">(dopo {{ abbinamento.n_rettificati }} omaggi/promo)</span>{% endif %}
                 {% if abbinamento %}<a href="#abbinamento-portali">(dettaglio)</a>{% else %}<span title="Imposta la chiusura portali della giornata per calcolare il residuo">(chiusura portali non impostata)</span>{% endif %}
               </div>
             </div>
@@ -1033,7 +1033,7 @@
           <div class="table-responsive">
             <table class="table table-sm data-table mb-1">
               <thead class="table-light">
-                <tr><th>Portale</th><th>#</th><th>Ora</th><th>Prog.</th><th class="text-end">&euro;</th></tr>
+                <tr><th>Portale</th><th>#</th><th>Ora</th><th>Prog.</th><th class="text-end">Listino</th><th class="text-end">Incassato</th><th></th></tr>
               </thead>
               <tbody>
                 {% for x in abbinamento.residuo %}
@@ -1042,13 +1042,34 @@
                   <td>{{ x.transazione.numero }}</td>
                   <td>{{ x.transazione.orario|date:"d/m H:i" }}</td>
                   <td>P{{ x.transazione.programma }}</td>
-                  <td class="text-end">{% if x.valore %}&euro;{{ x.valore|floatformat:2 }}{% else %}<span class="text-warning" title="Programma senza prezzo">&mdash;</span>{% endif %}</td>
+                  <td class="text-end {% if x.rettifica %}text-muted text-decoration-line-through{% endif %}">{% if x.listino %}&euro;{{ x.listino|floatformat:2 }}{% else %}<span class="text-warning" title="Programma senza prezzo">&mdash;</span>{% endif %}</td>
+                  <td class="text-end">
+                    {% if x.rettifica %}
+                      <span class="badge {% if x.rettifica.motivo == 'omaggio' %}bg-success{% elif x.rettifica.motivo == 'promo' %}bg-info text-dark{% else %}bg-secondary{% endif %}"
+                            title="{{ x.rettifica.nota }}{% if x.rettifica.operatore %} — {{ x.rettifica.operatore.get_full_name|default:x.rettifica.operatore.username }}{% endif %}">{{ x.rettifica.get_motivo_display }}</span>
+                      &euro;{{ x.valore|floatformat:2 }}
+                    {% else %}&euro;{{ x.valore|floatformat:2 }}{% endif %}
+                  </td>
+                  <td class="text-end">
+                    <button type="button" class="btn btn-link btn-sm p-0" title="Omaggio, promo..."
+                            data-bs-toggle="modal" data-bs-target="#modaleRettificaResiduo"
+                            data-tx="{{ x.transazione.pk }}" data-numero="{{ x.transazione.numero }}"
+                            data-listino="{{ x.listino|stringformat:'s' }}"
+                            data-motivo="{{ x.rettifica.motivo|default:'listino' }}"
+                            data-importo="{% if x.rettifica %}{{ x.rettifica.importo|stringformat:'s' }}{% endif %}"
+                            data-nota="{{ x.rettifica.nota|default:'' }}"><i class="bi bi-pencil"></i></button>
+                  </td>
                 </tr>
+                {% if x.rettifica.nota %}<tr class="small text-muted"><td colspan="7" class="pt-0 border-0 ps-3">&#8627; {{ x.rettifica.nota }}</td></tr>{% endif %}
                 {% endfor %}
               </tbody>
               <tfoot>
                 <tr class="fw-bold"><td colspan="4">Totale da verificare con gli operatori</td>
-                  <td class="text-end">&euro;{{ abbinamento.valore_residuo|floatformat:2 }}</td></tr>
+                  <td class="text-end {% if abbinamento.n_rettificati %}text-muted{% endif %}">&euro;{{ abbinamento.valore_residuo_listino|floatformat:2 }}</td>
+                  <td class="text-end">&euro;{{ abbinamento.valore_residuo|floatformat:2 }}</td><td></td></tr>
+                {% if abbinamento.n_rettificati %}
+                <tr class="small"><td colspan="7" class="text-muted">{{ abbinamento.n_rettificati }} lavagg{{ abbinamento.n_rettificati|pluralize:"io,i" }} rettificat{{ abbinamento.n_rettificati|pluralize:"o,i" }} (omaggi, promo): &minus;&euro;{{ abbinamento.rettifica_residuo|floatformat:2 }} rispetto al listino. In quadratura conta l'incassato.</td></tr>
+                {% endif %}
               </tfoot>
             </table>
           </div>
@@ -1056,7 +1077,67 @@
           <div class="small text-warning"><i class="bi bi-exclamation-circle"></i>
             {{ abbinamento.residuo_senza_prezzo }} su programmi senza prezzo (contati a 0 &euro;)</div>
           {% endif %}
-          <div class="small text-muted mt-1">Calcolato dopo le proposte: se ne rifiuti o cambi qualcuna il residuo si aggiorna.</div>
+          <div class="small text-muted mt-1">Calcolato dopo le proposte: se ne rifiuti o cambi qualcuna il residuo si aggiorna.
+            Con <i class="bi bi-pencil"></i> segni un lavaggio come omaggio o promo.</div>
+
+          <div class="modal fade" id="modaleRettificaResiduo" tabindex="-1">
+            <div class="modal-dialog">
+              <form method="post" action="{% url 'finanze:azione_abbinamento_portali' %}" class="modal-content">
+                {% csrf_token %}
+                <input type="hidden" name="data" value="{{ data|date:'Y-m-d' }}">
+                <input type="hidden" name="azione" value="rettifica_residuo">
+                <input type="hidden" name="transazione_id" id="rr-tx">
+                <div class="modal-header"><h5 class="modal-title">Lavaggio <span id="rr-numero"></span></h5>
+                  <button type="button" class="btn-close" data-bs-dismiss="modal"></button></div>
+                <div class="modal-body">
+                  <div class="small text-muted mb-2">Listino: &euro;<span id="rr-listino"></span></div>
+                  <div class="d-flex flex-wrap gap-2 mb-3">
+                    <input type="radio" class="btn-check" name="motivo" id="rr-m-listino" value="listino">
+                    <label class="btn btn-outline-secondary" for="rr-m-listino">Pagato a listino</label>
+                    <input type="radio" class="btn-check" name="motivo" id="rr-m-omaggio" value="omaggio">
+                    <label class="btn btn-outline-success" for="rr-m-omaggio">Omaggio</label>
+                    <input type="radio" class="btn-check" name="motivo" id="rr-m-promo" value="promo">
+                    <label class="btn btn-outline-info" for="rr-m-promo">Promo / sconto</label>
+                    <input type="radio" class="btn-check" name="motivo" id="rr-m-altro" value="altro">
+                    <label class="btn btn-outline-secondary" for="rr-m-altro">Altro</label>
+                  </div>
+                  <div class="row g-2" id="rr-dettagli">
+                    <div class="col-4" id="rr-importo-box">
+                      <label class="form-label small mb-0">Incassato &euro;</label>
+                      <input type="text" inputmode="decimal" class="form-control" name="importo" id="rr-importo">
+                    </div>
+                    <div class="col">
+                      <label class="form-label small mb-0">Nota</label>
+                      <input type="text" class="form-control" name="nota" id="rr-nota" maxlength="200" placeholder="es. cliente abbonato, promo pioggia">
+                    </div>
+                  </div>
+                </div>
+                <div class="modal-footer"><button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Annulla</button>
+                  <button type="submit" class="btn btn-primary"><i class="bi bi-check-circle"></i> Salva</button></div>
+              </form>
+            </div>
+          </div>
+          <script>
+          (function () {
+            const modale = document.getElementById('modaleRettificaResiduo');
+            const aggiorna = () => {
+              const m = (modale.querySelector('[name=motivo]:checked') || {}).value;
+              document.getElementById('rr-dettagli').classList.toggle('d-none', m === 'listino');
+              document.getElementById('rr-importo-box').classList.toggle('d-none', m === 'omaggio');
+            };
+            modale.querySelectorAll('[name=motivo]').forEach(r => r.addEventListener('change', aggiorna));
+            modale.addEventListener('show.bs.modal', ev => {
+              const b = ev.relatedTarget.dataset;
+              document.getElementById('rr-tx').value = b.tx;
+              document.getElementById('rr-numero').textContent = '#' + b.numero;
+              document.getElementById('rr-listino').textContent = Number(b.listino).toFixed(2).replace('.', ',');
+              document.getElementById('rr-m-' + b.motivo).checked = true;
+              document.getElementById('rr-importo').value = (b.importo || '').replace('.', ',');
+              document.getElementById('rr-nota').value = b.nota || '';
+              aggiorna();
+            });
+          })();
+          </script>
           {% else %}
           <div class="text-muted small">Nessuna transazione da unit&agrave; operativa rimasta libera.</div>
           {% endif %}

@@ -613,6 +613,35 @@ class AbbinamentoPortale(models.Model):
         return f"{self.transazione} -> item {self.item_id}"
 
 
+class RettificaResiduo(models.Model):
+    """Un lavaggio del residuo (unita' operativa non abbinata al servito)
+    che gli operatori NON hanno incassato a listino: omaggio, promo...
+    La quadratura conta l'importo indicato qui al posto del listino."""
+    MOTIVO_CHOICES = [
+        ('omaggio', 'Omaggio'),
+        ('promo', 'Promo / sconto'),
+        ('altro', 'Altro'),
+    ]
+    transazione = models.OneToOneField(
+        TransazionePortale, on_delete=models.CASCADE, related_name='rettifica_residuo')
+    motivo = models.CharField(max_length=10, choices=MOTIVO_CHOICES)
+    importo = models.DecimalField(
+        max_digits=8, decimal_places=2, default=Decimal('0.00'),
+        validators=[MinValueValidator(Decimal('0.00'))],
+        verbose_name='Incassato dagli operatori')
+    nota = models.CharField(max_length=200, blank=True)
+    operatore = models.ForeignKey(
+        User, on_delete=models.SET_NULL, null=True, blank=True, related_name='rettifiche_residuo')
+    modificato_il = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        verbose_name = 'Rettifica residuo portali'
+        verbose_name_plural = 'Rettifiche residuo portali'
+
+    def __str__(self):
+        return f'{self.transazione} {self.get_motivo_display()} {self.importo}'
+
+
 # ---------------------------------------------------------------------------
 # Quadratura giornaliera complessiva (scassettamento)
 # ---------------------------------------------------------------------------

@@ -189,7 +189,8 @@ def riepilogo(chiusura, tolleranza=TOLLERANZA_DEFAULT):
       proposte, slot scoperti e transazioni libere compatibili (per la
       scelta manuale: prima per priorita' di programma, poi vicinanza);
     - residuo: transazioni 'unita' che restano libere dopo le proposte
-      (= lavaggi pagati agli operatori), con valore da listino.
+      (= lavaggi pagati agli operatori), con valore da listino e valore
+      incassato (diverso dal listino se rettificato: omaggio, promo...).
     """
     items = lavaggi_servito(chiusura)
     libere = transazioni_libere(chiusura)
@@ -225,9 +226,19 @@ def riepilogo(chiusura, tolleranza=TOLLERANZA_DEFAULT):
             'compatibili': compatibili,
         })
 
+    from apps.finanze.models import RettificaResiduo
+
     residuo = [t for t in libere if t.pk not in proposte_tx]
-    valore_residuo = sum((PREZZI_PROGRAMMA_PORTALE[t.programma] for t in residuo),
-                         Decimal('0.00'))
+    rettifiche = {r.transazione_id: r for r in RettificaResiduo.objects.filter(
+        transazione__in=residuo).select_related('operatore')}
+    righe_residuo = []
+    for t in residuo:
+        listino = PREZZI_PROGRAMMA_PORTALE[t.programma]
+        rettifica = rettifiche.get(t.pk)
+        righe_residuo.append({'transazione': t, 'listino': listino, 'rettifica': rettifica,
+                              'valore': rettifica.importo if rettifica else listino})
+    valore_listino = sum((r['listino'] for r in righe_residuo), Decimal('0.00'))
+    valore_residuo = sum((r['valore'] for r in righe_residuo), Decimal('0.00'))
     senza_prezzo = sum(1 for t in residuo if not PREZZI_PROGRAMMA_PORTALE[t.programma])
 
     return {
@@ -237,10 +248,12 @@ def riepilogo(chiusura, tolleranza=TOLLERANZA_DEFAULT):
         'n_proposte': len(proposte),
         'n_scoperti': sum(r['scoperti'] for r in righe),
         'n_senza_completamento': sum(1 for r in righe if r['rif_tipo'] != 'completato'),
-        'residuo': [{'transazione': t,
-                     'valore': PREZZI_PROGRAMMA_PORTALE[t.programma]}
-                    for t in residuo],
+        'residuo': righe_residuo,
+        # incassato dagli operatori (usato in quadratura) e a listino
         'valore_residuo': valore_residuo,
+        'valore_residuo_listino': valore_listino,
+        'rettifica_residuo': valore_listino - valore_residuo,
+        'n_rettificati': len(rettifiche),
         'residuo_senza_prezzo': senza_prezzo,
         'tolleranza_ore': tolleranza.total_seconds() / 3600,
         'anticipo_min': int(ANTICIPO_PORTALE.total_seconds() / 60),

@@ -1358,7 +1358,7 @@ def _contesto_lavaggi_portali(data, completo=True):
     v_contanti = sum((p['tot']['contanti'] for p in portali), Decimal('0.00'))
     washcycles_self = {
         'n': n_contanti + len(abbinamento['residuo']),
-        'valore': v_contanti + abbinamento['valore_residuo'],
+        'valore': v_contanti + abbinamento['valore_residuo_listino'],
         'n_contanti': n_contanti,
         'n_operatori': len(abbinamento['residuo']),
     }
@@ -1378,6 +1378,41 @@ def _contesto_lavaggi_portali(data, completo=True):
         'abbinamento': abbinamento,
         'washcycles_self': washcycles_self,
     }
+
+
+def _rettifica_residuo(request, chiusura):
+    """Imposta (o toglie) la rettifica di un lavaggio del residuo:
+    omaggio, promo o altro, con l'importo davvero incassato."""
+    from .models import RettificaResiduo, TransazionePortale
+
+    transazione = (TransazionePortale.objects.filter(chiusura.q_transazioni(), origine='unita')
+                   .filter(pk=request.POST.get('transazione_id') or None).first())
+    if transazione is None:
+        messages.error(request, 'Lavaggio non trovato nella finestra di chiusura.')
+        return
+    motivo = request.POST.get('motivo', '')
+    if motivo == 'listino':
+        RettificaResiduo.objects.filter(transazione=transazione).delete()
+        messages.success(request, f'Lavaggio #{transazione.numero} riportato a listino.')
+        return
+    if motivo not in dict(RettificaResiduo.MOTIVO_CHOICES):
+        messages.error(request, 'Motivo non valido.')
+        return
+    try:
+        importo = Decimal((request.POST.get('importo') or '0').replace(',', '.'))
+    except Exception:
+        importo = Decimal('-1')
+    if motivo == 'omaggio':
+        importo = Decimal('0.00')
+    if importo < 0:
+        messages.error(request, 'Importo non valido.')
+        return
+    RettificaResiduo.objects.update_or_create(transazione=transazione, defaults={
+        'motivo': motivo, 'importo': importo.quantize(Decimal('0.01')),
+        'nota': (request.POST.get('nota') or '').strip()[:200], 'operatore': request.user,
+    })
+    messages.success(request, f'Lavaggio #{transazione.numero}: {dict(RettificaResiduo.MOTIVO_CHOICES)[motivo]} '
+                              f'(€{importo:.2f}).')
 
 
 @login_required
@@ -1418,6 +1453,8 @@ def azione_abbinamento_portali(request):
         ok, msg = abbinamento_portali.abbina_manuale(
             chiusura, item_id, tx_id, request.user)
         (messages.success if ok else messages.error)(request, msg)
+    elif azione == 'rettifica_residuo':
+        _rettifica_residuo(request, chiusura)
     elif azione == 'rimuovi':
         n, _ = AbbinamentoPortale.objects.filter(
             pk=request.POST.get('abbinamento_id'),
