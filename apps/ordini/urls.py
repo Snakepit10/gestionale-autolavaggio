@@ -27,6 +27,12 @@ urlpatterns = [
     # Gestione Ordini
     path('', views.OrdiniListView.as_view(), name='ordini-list'),
     path('prodotti/', views.VenditaProdottiView.as_view(), name='vendita-prodotti'),
+    path('prodotti/nuova/', views.vendita_nuova, name='vendita-nuova'),
+    path('prodotti/<int:pk>/aggiungi/', views.vendita_aggiungi_item, name='vendita-aggiungi-item'),
+    path('prodotti/<int:pk>/item/<int:item_id>/', views.vendita_modifica_item, name='vendita-modifica-item'),
+    path('prodotti/<int:pk>/item/<int:item_id>/elimina/', views.vendita_elimina_item, name='vendita-elimina-item'),
+    path('prodotti/<int:pk>/pagamento/', views.vendita_pagamento, name='vendita-pagamento'),
+    path('prodotti/<int:pk>/elimina/', views.vendita_elimina, name='vendita-elimina'),
     path('<int:pk>/', views.OrdineDetailView.as_view(), name='ordine-detail'),
     path('<int:pk>/dettaglio/', views.dettaglio_ordine_json, name='dettaglio-json'),
     path('<int:pk>/registra-pagamento/', views.registra_pagamento, name='registra-pagamento'),

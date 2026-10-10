@@ -1032,6 +1032,9 @@ class VenditaProdottiView(LoginRequiredMixin, TemplateView):
             'prodotti': prodotti,
             'pezzi': sum(p['quantita'] for p in prodotti),
             'totale_prodotti': sum((p['incasso'] for p in prodotti), Decimal('0.00')),
+            'catalogo_prodotti': ServizioProdotto.objects.filter(
+                tipo='prodotto', attivo=True).order_by('titolo'),
+            'metodi_pagamento': [m for m in Pagamento.METODO_CHOICES if m[0] != 'abbonamento'],
         })
         return context
 
@@ -2722,3 +2725,195 @@ def prenotazione_proponi_orario(request, pk):
         'data': nuova_data.strftime('%d/%m/%Y'),
         'ora': nuova_ora.strftime('%H:%M'),
     })
+
+
+# ---------------------------------------------------------------------------
+# Vendita prodotti: gestione (CRUD) dalla scheda "Vendita prodotti"
+# ---------------------------------------------------------------------------
+
+def _vendita_o_404(pk):
+    return get_object_or_404(Ordine, pk=pk, vendita_prodotti=True)
+
+
+def _errore(msg, status=400):
+    return JsonResponse({'success': False, 'error': msg}, status=status)
+
+
+def _sposta_scorte(prodotto, delta, ordine, operatore, nota):
+    """delta < 0 scarica, > 0 ricarica. Prodotti a scorta illimitata (-1)
+    non vengono toccati."""
+    from apps.core.models import MovimentoScorte
+
+    if not delta or prodotto.quantita_disponibile < 0:
+        return
+    prima = prodotto.quantita_disponibile
+    prodotto.quantita_disponibile = max(0, prima + delta)
+    prodotto.save(update_fields=['quantita_disponibile'])
+    MovimentoScorte.objects.create(
+        prodotto=prodotto, tipo='carico' if delta > 0 else 'scarico', quantita=delta,
+        quantita_prima=prima, quantita_dopo=prodotto.quantita_disponibile,
+        riferimento_ordine=ordine, nota=nota, operatore=operatore)
+
+
+def _ricalcola_vendita(ordine):
+    """Totali dagli item, sconto, importo pagato e stato pagamento."""
+    ordine.totale = sum((it.subtotale for it in ordine.items.all()), Decimal('0.00'))
+    ordine.importo_sconto = (ordine.sconto_applicato.calcola_sconto(ordine.totale)
+                             if ordine.sconto_applicato else Decimal('0.00'))
+    ordine.totale_finale = ordine.totale - ordine.importo_sconto
+    ordine.save()   # il pre_save ricalcola importo_pagato dai pagamenti
+    ordine.aggiorna_stato_pagamento()
+
+
+def _leggi_json(request):
+    try:
+        return json.loads(request.body or '{}')
+    except ValueError:
+        return None
+
+
+def _quantita(valore):
+    try:
+        q = int(valore)
+    except (TypeError, ValueError):
+        return None
+    return q if q > 0 else None
+
+
+def _prodotto(prodotto_id):
+    return ServizioProdotto.objects.filter(pk=prodotto_id, tipo='prodotto').first()
+
+
+@login_required
+@transaction.atomic
+def vendita_nuova(request):
+    """POST {righe: [{prodotto_id, quantita}], pagamento: 'non_pagato' o
+    un metodo di pagamento}: registra una vendita di soli prodotti (oggi)."""
+    if request.method != 'POST':
+        return _errore('Metodo non consentito', 405)
+    data = _leggi_json(request)
+    if data is None:
+        return _errore('Dati non validi')
+    metodo = data.get('pagamento', 'contanti')
+    if metodo != 'non_pagato' and metodo not in dict(Pagamento.METODO_CHOICES):
+        return _errore('Metodo di pagamento non valido')
+    righe = []
+    for r in data.get('righe') or []:
+        prodotto, quantita = _prodotto(r.get('prodotto_id')), _quantita(r.get('quantita'))
+        if not prodotto or not quantita:
+            return _errore('Prodotto o quantità non validi')
+        righe.append((prodotto, quantita))
+    if not righe:
+        return _errore('Aggiungi almeno un prodotto')
+
+    vendita = Ordine.objects.create(
+        vendita_prodotti=True, auto_ritirata=True, data_ritiro=timezone.now(),
+        origine='operatore', operatore=request.user,
+        totale=Decimal('0.00'), totale_finale=Decimal('0.00'))
+    for prodotto, quantita in righe:
+        # lo scarico scorte lo fa il signal sulla creazione dell'item
+        ItemOrdine.objects.create(ordine=vendita, servizio_prodotto=prodotto,
+                                  quantita=quantita, prezzo_unitario=prodotto.prezzo)
+    _ricalcola_vendita(vendita)
+    if metodo != 'non_pagato':
+        Pagamento.objects.create(ordine=vendita, importo=vendita.totale_finale,
+                                 metodo=metodo, operatore=request.user)
+    return JsonResponse({'success': True, 'numero_display': vendita.numero_display})
+
+
+@login_required
+@transaction.atomic
+def vendita_aggiungi_item(request, pk):
+    """POST {prodotto_id, quantita}: aggiunge un prodotto alla vendita."""
+    vendita = _vendita_o_404(pk)
+    data = _leggi_json(request) if request.method == 'POST' else None
+    if data is None:
+        return _errore('Richiesta non valida')
+    prodotto, quantita = _prodotto(data.get('prodotto_id')), _quantita(data.get('quantita', 1))
+    if not prodotto or not quantita:
+        return _errore('Prodotto o quantità non validi')
+    ItemOrdine.objects.create(ordine=vendita, servizio_prodotto=prodotto,
+                              quantita=quantita, prezzo_unitario=prodotto.prezzo)
+    _ricalcola_vendita(vendita)
+    return JsonResponse({'success': True})
+
+
+@login_required
+@transaction.atomic
+def vendita_modifica_item(request, pk, item_id):
+    """POST {quantita}: cambia la quantita' di un prodotto della vendita,
+    con rettifica del magazzino."""
+    vendita = _vendita_o_404(pk)
+    item = get_object_or_404(ItemOrdine, pk=item_id, ordine=vendita)
+    data = _leggi_json(request) if request.method == 'POST' else None
+    quantita = _quantita((data or {}).get('quantita'))
+    if not quantita:
+        return _errore('Quantità non valida')
+    delta = quantita - item.quantita
+    if delta:
+        _sposta_scorte(item.servizio_prodotto, -delta, vendita, request.user,
+                       f'Modifica vendita {vendita.numero_display}: '
+                       f'quantità {item.quantita} -> {quantita}')
+        item.quantita = quantita
+        item.save(update_fields=['quantita'])
+        _ricalcola_vendita(vendita)
+    return JsonResponse({'success': True})
+
+
+@login_required
+@transaction.atomic
+def vendita_elimina_item(request, pk, item_id):
+    """POST: toglie un prodotto dalla vendita e lo rimette in magazzino.
+    L'ultimo prodotto non si toglie: si elimina la vendita."""
+    vendita = _vendita_o_404(pk)
+    item = get_object_or_404(ItemOrdine, pk=item_id, ordine=vendita)
+    if request.method != 'POST':
+        return _errore('Metodo non consentito', 405)
+    if vendita.items.count() <= 1:
+        return _errore("È l'unico prodotto della vendita: elimina la vendita")
+    _sposta_scorte(item.servizio_prodotto, item.quantita, vendita, request.user,
+                   f'Tolto dalla vendita {vendita.numero_display}')
+    item.delete()
+    _ricalcola_vendita(vendita)
+    return JsonResponse({'success': True})
+
+
+@login_required
+@transaction.atomic
+def vendita_pagamento(request, pk):
+    """POST {stato: 'pagato' | 'non_pagato', metodo}: 'pagato' registra un
+    pagamento per il saldo; 'non_pagato' cancella i pagamenti della vendita."""
+    vendita = _vendita_o_404(pk)
+    data = _leggi_json(request) if request.method == 'POST' else None
+    stato = (data or {}).get('stato')
+    if stato == 'pagato':
+        metodo = data.get('metodo', 'contanti')
+        if metodo not in dict(Pagamento.METODO_CHOICES):
+            return _errore('Metodo di pagamento non valido')
+        if vendita.saldo_dovuto > 0:
+            Pagamento.objects.create(ordine=vendita, importo=vendita.saldo_dovuto,
+                                     metodo=metodo, operatore=request.user)
+    elif stato == 'non_pagato':
+        for pagamento in vendita.pagamenti.all():
+            pagamento.delete()
+    else:
+        return _errore('Stato di pagamento non valido')
+    vendita.refresh_from_db()
+    return JsonResponse({'success': True, 'stato_pagamento': vendita.stato_pagamento})
+
+
+@login_required
+@transaction.atomic
+def vendita_elimina(request, pk):
+    """POST: elimina la vendita (con i suoi pagamenti) e rimette i prodotti
+    in magazzino. Riservato all'amministratore."""
+    vendita = _vendita_o_404(pk)
+    if request.method != 'POST':
+        return _errore('Metodo non consentito', 405)
+    if not request.user.is_superuser:
+        return _errore("Solo l'amministratore può eliminare una vendita", 403)
+    for item in vendita.items.select_related('servizio_prodotto'):
+        _sposta_scorte(item.servizio_prodotto, item.quantita, None, request.user,
+                       f'Eliminata vendita {vendita.numero_display}')
+    vendita.delete()
+    return JsonResponse({'success': True})
