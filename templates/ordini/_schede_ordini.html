@@ -1,0 +1,20 @@
+{# Schede della sezione Ordini. Parametri: attiva ('ordini' | 'prodotti' | 'non_pagati'), data (facoltativa) #}
+<ul class="nav nav-pills mb-3 gap-1">
+  <li class="nav-item">
+    <a class="nav-link {% if attiva == 'ordini' %}active{% endif %}"
+       href="{% url 'ordini:ordini-list' %}{% if data %}?data={{ data|date:'Y-m-d' }}{% endif %}">
+      <i class="bi bi-receipt"></i> Ordini
+    </a>
+  </li>
+  <li class="nav-item">
+    <a class="nav-link {% if attiva == 'prodotti' %}active{% endif %}"
+       href="{% url 'ordini:vendita-prodotti' %}{% if data %}?data={{ data|date:'Y-m-d' }}{% endif %}">
+      <i class="bi bi-bag"></i> Vendita prodotti
+    </a>
+  </li>
+  <li class="nav-item">
+    <a class="nav-link {% if attiva == 'non_pagati' %}active{% endif %}" href="{% url 'ordini:ordini-non-pagati' %}">
+      <i class="bi bi-exclamation-triangle"></i> Non pagati
+    </a>
+  </li>
+</ul>

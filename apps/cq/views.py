@@ -1289,7 +1289,7 @@ def analytics_cq(request):
 
     # DPMO
     num_ordini_completati = Ordine.objects.filter(
-        stato='completato',
+        stato='completato', vendita_prodotti=False,
         data_ora__date__gte=data_da, data_ora__date__lte=data_a,
     ).count()
     num_zone = ZonaConfig.objects.filter(attiva=True).count() or 1

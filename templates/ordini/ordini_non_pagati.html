@@ -50,6 +50,8 @@ tr.gruppo-header .meta { font-size: .8rem; color: #64748b; }
     </div>
 </div>
 
+{% include 'ordini/_schede_ordini.html' with attiva='non_pagati' data=None %}
+
 {% if mostra_archiviati %}
 <div class="alert alert-secondary">
     <i class="bi bi-archive"></i>

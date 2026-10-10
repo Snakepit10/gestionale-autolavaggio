@@ -323,7 +323,7 @@ class MovimentoCassa(models.Model):
 
 def _num_ordini_giorno(self):
     from apps.ordini.models import Ordine
-    return Ordine.objects.filter(data_ora__date=self.data).count()
+    return Ordine.objects.filter(data_ora__date=self.data, vendita_prodotti=False).count()
 
 
 def _num_washcycles_giorno(self):

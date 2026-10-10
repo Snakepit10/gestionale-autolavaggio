@@ -1,0 +1,106 @@
+{% extends 'base.html' %}
+
+{% block title %}Vendita prodotti {{ data|date:"d/m/Y" }} - Gestionale Autolavaggio{% endblock %}
+
+{% block extra_css %}
+<style>
+.page-header { display:flex; justify-content:space-between; align-items:center; margin-bottom:1rem; flex-wrap:wrap; gap:.75rem; }
+.page-header h1 { font-size:1.6rem; font-weight:700; color:#1a1a2e; margin:0; }
+.vp-kpi { background:#fff; border-radius:10px; padding:12px 16px; box-shadow:0 1px 3px rgba(0,0,0,.06); height:100%; }
+.vp-kpi .label { font-size:.75rem; text-transform:uppercase; color:#64748b; font-weight:600; }
+.vp-kpi .value { font-size:1.5rem; font-weight:700; }
+.vp-table thead th { font-size:.72rem; text-transform:uppercase; letter-spacing:.04em; color:#64748b; background:#fff; white-space:nowrap; }
+.vp-table td { vertical-align:middle; }
+.vp-num { font-variant-numeric: tabular-nums; text-align:right; white-space:nowrap; }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="page-header">
+  <h1><i class="bi bi-bag"></i> Vendita prodotti</h1>
+  <a href="{% url 'ordini:cassa' %}" class="btn btn-primary"><i class="bi bi-plus-circle"></i> Nuova vendita</a>
+</div>
+
+{% include 'ordini/_schede_ordini.html' with attiva='prodotti' %}
+
+<div class="d-flex gap-2 align-items-center flex-wrap mb-3">
+  <i class="bi bi-calendar text-muted"></i>
+  <strong class="me-2">{{ data|date:"l d/m/Y" }}</strong>
+  <a href="?data={{ data_prev|date:'Y-m-d' }}" class="btn btn-outline-secondary btn-sm" title="Giorno precedente"><i class="bi bi-chevron-left"></i></a>
+  <input type="date" class="form-control form-control-sm" style="max-width:160px"
+         value="{{ data|date:'Y-m-d' }}" onchange="location.href='?data='+this.value">
+  <a href="?data={{ data_next|date:'Y-m-d' }}" class="btn btn-outline-secondary btn-sm" title="Giorno successivo"><i class="bi bi-chevron-right"></i></a>
+  <a href="?data={{ oggi|date:'Y-m-d' }}" class="btn btn-outline-primary btn-sm">Oggi</a>
+</div>
+
+<div class="row g-2 mb-3">
+  <div class="col-6 col-lg-3">
+    <div class="vp-kpi"><div class="label">Vendite prodotti</div><div class="value">{{ vendite|length }}</div>
+      <div class="small text-muted">&euro;{{ totale_vendite|floatformat:2 }} incassati</div></div>
+  </div>
+  <div class="col-6 col-lg-3">
+    <div class="vp-kpi"><div class="label">Pezzi venduti</div><div class="value">{{ pezzi }}</div>
+      <div class="small text-muted">anche dentro gli ordini di lavaggio</div></div>
+  </div>
+  <div class="col-12 col-lg-6">
+    <div class="vp-kpi"><div class="label">Totale prodotti della giornata</div><div class="value">&euro;{{ totale_prodotti|floatformat:2 }}</div>
+      <div class="small text-muted">vendite di soli prodotti + prodotti aggiunti agli ordini</div></div>
+  </div>
+</div>
+
+<div class="card border-0 shadow-sm mb-3">
+  <div class="card-header bg-white fw-bold"><i class="bi bi-receipt-cutoff"></i> Vendite</div>
+  {% if vendite %}
+  <div class="table-responsive">
+    <table class="table table-sm table-hover vp-table mb-0">
+      <thead><tr><th>N.</th><th>Ora</th><th>Cliente</th><th>Prodotti</th><th class="vp-num">Totale</th><th>Pagamento</th><th></th></tr></thead>
+      <tbody>
+        {% for v in vendite %}
+        <tr>
+          <td class="fw-bold">{{ v.numero_display }}</td>
+          <td>{{ v.data_ora|date:"H:i" }}</td>
+          <td>{{ v.cliente|default:"—" }}</td>
+          <td class="small">
+            {% for it in v.items.all %}{{ it.quantita }}&times; {{ it.servizio_prodotto.titolo }}{% if not forloop.last %}<br>{% endif %}{% endfor %}
+          </td>
+          <td class="vp-num fw-bold">&euro;{{ v.totale_finale|floatformat:2 }}</td>
+          <td>
+            {% if v.stato_pagamento == 'pagato' %}<span class="badge bg-success">Pagato</span>
+            {% elif v.stato_pagamento == 'parziale' %}<span class="badge bg-warning text-dark">Parziale</span>
+            {% else %}<span class="badge bg-danger">{{ v.get_stato_pagamento_display }}</span>{% endif %}
+          </td>
+          <td class="text-end"><a href="{% url 'ordini:ordine-detail' v.pk %}" class="btn btn-sm btn-link py-0" title="Dettaglio"><i class="bi bi-box-arrow-up-right"></i></a></td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {% else %}
+  <div class="card-body text-muted small">Nessuna vendita di soli prodotti in questa giornata.</div>
+  {% endif %}
+</div>
+
+<div class="card border-0 shadow-sm">
+  <div class="card-header bg-white fw-bold"><i class="bi bi-box-seam"></i> Prodotti venduti</div>
+  {% if prodotti %}
+  <div class="table-responsive">
+    <table class="table table-sm vp-table mb-0">
+      <thead><tr><th>Prodotto</th><th class="vp-num">Quantit&agrave;</th><th class="vp-num">di cui in ordini di lavaggio</th><th class="vp-num">Incasso</th></tr></thead>
+      <tbody>
+        {% for p in prodotti %}
+        <tr>
+          <td>{{ p.prodotto.titolo }}</td>
+          <td class="vp-num">{{ p.quantita }}</td>
+          <td class="vp-num text-muted">{% if p.in_ordini %}{{ p.in_ordini }}{% else %}—{% endif %}</td>
+          <td class="vp-num">&euro;{{ p.incasso|floatformat:2 }}</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+      <tfoot class="table-light"><tr class="fw-bold"><td>Totale</td><td class="vp-num">{{ pezzi }}</td><td></td><td class="vp-num">&euro;{{ totale_prodotti|floatformat:2 }}</td></tr></tfoot>
+    </table>
+  </div>
+  {% else %}
+  <div class="card-body text-muted small">Nessun prodotto venduto in questa giornata.</div>
+  {% endif %}
+</div>
+{% endblock %}

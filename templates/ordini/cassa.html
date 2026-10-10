@@ -1817,7 +1817,9 @@ function confermaOrdine() {
             document.getElementById('tempo-attesa').classList.add('d-none');
             
             // Determina messaggio in base al tipo di pagamento
-            let messaggio = `Ordine ${data.numero_progressivo} creato! Totale: €${data.totale_finale}`;
+            let messaggio = data.vendita_prodotti
+                ? `Vendita ${data.numero_display} registrata! Totale: €${data.totale_finale}`
+                : `Ordine ${data.numero_progressivo} creato! Totale: €${data.totale_finale}`;
             
             if (tipoPagamento === 'nessuno') {
                 messaggio += ' - Non pagato';

@@ -164,14 +164,13 @@
 <div class="page-header">
     <h1><i class="bi bi-receipt"></i> Gestione Ordini</h1>
     <div class="d-flex gap-2">
-        <a href="{% url 'ordini:ordini-non-pagati' %}" class="btn btn-outline-warning">
-            <i class="bi bi-exclamation-triangle"></i> Non Pagati
-        </a>
         <a href="{% url 'ordini:cassa' %}" class="btn btn-primary">
             <i class="bi bi-plus-circle"></i> Nuovo Ordine
         </a>
     </div>
 </div>
+
+{% include 'ordini/_schede_ordini.html' with attiva='ordini' %}
 
 <!-- Prenotazioni cliente DA CONFERMARE (in attesa) -->
 {% if prenotazioni_da_confermare %}

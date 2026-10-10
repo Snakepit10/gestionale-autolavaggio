@@ -552,7 +552,7 @@ def api_kpi_data(request):
     
     # Ordini oggi
     ordini_oggi = Ordine.objects.filter(
-        data_creazione__date=oggi
+        data_creazione__date=oggi, vendita_prodotti=False
     ).count()
     
     # Clienti attivi (con ordini negli ultimi 30 giorni)

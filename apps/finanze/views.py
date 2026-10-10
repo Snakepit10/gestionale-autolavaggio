@@ -964,7 +964,8 @@ def report_giornata(request):
     ordini_giorno = Ordine.objects.filter(
         data_ora__date=data,
     ).exclude(stato='annullato')
-    num_ordini = ordini_giorno.count()
+    # le vendite di soli prodotti non sono ordini (gli incassi restano)
+    num_ordini = ordini_giorno.filter(vendita_prodotti=False).count()
     totale_ordinato = ordini_giorno.aggregate(s=Sum('totale_finale'))['s'] or Decimal('0.00')
 
     pagamenti_giorno = Pagamento.objects.filter(
@@ -1809,8 +1810,12 @@ def report_periodo(request):
         data_ora__date__gte=data_inizio,
         data_ora__date__lte=data_fine,
     ).exclude(stato='annullato')
-    num_ordini = ordini_qs.count()
+    # le vendite di soli prodotti non sono ordini: fuori dal conteggio e
+    # dallo scontrino medio, ma dentro il fatturato servito
+    num_ordini = ordini_qs.filter(vendita_prodotti=False).count()
     totale_servito_ordinato = ordini_qs.aggregate(s=Sum('totale_finale'))['s'] or Decimal('0.00')
+    totale_ordini_lavaggio = (ordini_qs.filter(vendita_prodotti=False)
+                              .aggregate(s=Sum('totale_finale'))['s'] or Decimal('0.00'))
 
     # Non pagati
     non_pagati_qs = ordini_qs.filter(stato_pagamento__in=['non_pagato', 'parziale', 'differito'])
@@ -1874,7 +1879,7 @@ def report_periodo(request):
     # (era: (servito_pagato + self_service) / num_transazioni di Pagamento
     # che includeva nel numeratore vendite self-service ma divideva per
     # i soli Pagamento POS = valore inflato e fuorviante).
-    scontrino_medio = totale_servito_ordinato / num_ordini if num_ordini > 0 else Decimal('0.00')
+    scontrino_medio = totale_ordini_lavaggio / num_ordini if num_ordini > 0 else Decimal('0.00')
 
     # ==================== RILEVATO REALE (quadrature giornaliere) ====================
     # Somma delle Quadrature giornaliere nel periodo. Usa la stessa

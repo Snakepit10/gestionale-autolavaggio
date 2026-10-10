@@ -430,9 +430,16 @@ def completa_ordine(request):
             importo_sconto = sconto_obj.calcola_sconto(totale_prezzo)
         
         totale_finale = totale_prezzo - importo_sconto
-        
+
+        # Carrello di soli prodotti = vendita prodotti: numerazione propria
+        # (V-001...), nessuna auto da ritirare, fuori dalla lista ordini.
+        solo_prodotti = all(item.get('tipo') == 'prodotto' for item in carrello.values())
+
         # Crea ordine
         ordine = Ordine.objects.create(
+            vendita_prodotti=solo_prodotti,
+            auto_ritirata=solo_prodotti,
+            data_ritiro=timezone.now() if solo_prodotti else None,
             cliente=cliente,
             origine='operatore',
             tipo_consegna=data.get('tipo_consegna', 'immediata'),
@@ -556,12 +563,13 @@ def completa_ordine(request):
                         },
                     },
                 )
-        notify_group('ordini_list', {
-            'type': 'nuovo_ordine',
-            'ordine_id': ordine.id,
-            'numero_progressivo': ordine.numero_progressivo,
-            'timestamp': timezone.now().isoformat(),
-        })
+        if not ordine.vendita_prodotti:
+            notify_group('ordini_list', {
+                'type': 'nuovo_ordine',
+                'ordine_id': ordine.id,
+                'numero_progressivo': ordine.numero_progressivo,
+                'timestamp': timezone.now().isoformat(),
+            })
         
         # Calcola resto solo se c'è stato un pagamento
         resto = 0
@@ -595,6 +603,8 @@ def completa_ordine(request):
             'success': True,
             'ordine_id': ordine.id,
             'numero_progressivo': ordine.numero_progressivo,
+            'numero_display': ordine.numero_display,
+            'vendita_prodotti': ordine.vendita_prodotti,
             'totale_finale': float(ordine.totale_finale),
             'importo_pagamento': importo_pagamento_effettivo,
             'resto': resto
@@ -811,7 +821,7 @@ class OrdiniListView(LoginRequiredMixin, ListView):
             'cliente', 'operatore', 'prenotazione', 'fattura'
         ).prefetch_related(
             'items__servizio_prodotto', 'items__postazione_cq', 'items__aggiunto_da', 'pagamenti'
-        ).filter(data_ora__date=data)
+        ).filter(data_ora__date=data, vendita_prodotti=False)
 
         # Layout sempre in 3 sezioni (attivi / da ritirare / completati):
         # ordini con priorita manuale vengono prima, poi immediati per
@@ -969,6 +979,60 @@ class OrdiniListView(LoginRequiredMixin, ListView):
             .order_by('categoria__nome', 'titolo')
         )
 
+        return context
+
+
+def _data_da_get(request):
+    """Data ?data=YYYY-MM-DD della richiesta (oggi se assente o non valida)."""
+    try:
+        return datetime.strptime(request.GET.get('data', ''), '%Y-%m-%d').date()
+    except ValueError:
+        return timezone.localdate()
+
+
+class VenditaProdottiView(LoginRequiredMixin, TemplateView):
+    """Scheda "Vendita prodotti" della sezione Ordini: le vendite di soli
+    prodotti del giorno (serie V-001...) e il riepilogo di tutti i
+    prodotti venduti, compresi quelli dentro gli ordini di lavaggio."""
+    template_name = 'ordini/vendita_prodotti.html'
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        data = _data_da_get(self.request)
+
+        vendite = list(
+            Ordine.objects.filter(data_ora__date=data, vendita_prodotti=True)
+            .exclude(stato='annullato')
+            .select_related('cliente', 'operatore')
+            .prefetch_related('items__servizio_prodotto')
+            .order_by('-data_ora'))
+
+        righe = (ItemOrdine.objects
+                 .filter(ordine__data_ora__date=data, servizio_prodotto__tipo='prodotto')
+                 .exclude(ordine__stato='annullato')
+                 .select_related('servizio_prodotto', 'ordine'))
+        prodotti = {}
+        for it in righe:
+            voce = prodotti.setdefault(it.servizio_prodotto_id, {
+                'prodotto': it.servizio_prodotto, 'quantita': 0, 'incasso': Decimal('0.00'),
+                'in_ordini': 0,
+            })
+            voce['quantita'] += it.quantita
+            voce['incasso'] += it.subtotale
+            if not it.ordine.vendita_prodotti:
+                voce['in_ordini'] += it.quantita
+        prodotti = sorted(prodotti.values(), key=lambda v: (-v['incasso'], v['prodotto'].titolo))
+
+        oggi = timezone.localdate()
+        context.update({
+            'data': data, 'oggi': oggi,
+            'data_prev': data - timedelta(days=1), 'data_next': data + timedelta(days=1),
+            'vendite': vendite,
+            'totale_vendite': sum((v.totale_finale or Decimal('0.00') for v in vendite), Decimal('0.00')),
+            'prodotti': prodotti,
+            'pezzi': sum(p['quantita'] for p in prodotti),
+            'totale_prodotti': sum((p['incasso'] for p in prodotti), Decimal('0.00')),
+        })
         return context
 
 

@@ -54,7 +54,7 @@ class HomeView(TemplateView):
         ordini_oggi = Ordine.objects.filter(
             data_ora__range=[inizio_oggi, fine_oggi]
         )
-        context['ordini_oggi'] = ordini_oggi.count()
+        context['ordini_oggi'] = ordini_oggi.filter(vendita_prodotti=False).count()
         
         # Incasso di oggi
         incasso_oggi = ordini_oggi.filter(

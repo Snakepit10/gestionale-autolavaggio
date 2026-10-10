@@ -90,6 +90,12 @@ class Ordine(models.Model):
     # resta non pagato ma sparisce dall'elenco (recuperabile col
     # toggle "Mostra archiviati").
     non_pagato_archiviato = models.BooleanField(default=False)
+    # Vendita di soli prodotti dalla cassa: non e' un ordine di lavaggio,
+    # ha una numerazione sua (V-001, V-002...) che non consuma i numeri
+    # degli ordini, sta nella scheda "Vendita prodotti" e non conta nel
+    # numero di ordini dei report (gli incassi si'). Gli ordini misti
+    # (servizi + prodotti) restano ordini normali.
+    vendita_prodotti = models.BooleanField(default=False, db_index=True)
 
     richiede_fattura = models.BooleanField(default=False)
     fattura = models.ForeignKey(
@@ -161,8 +167,26 @@ class Ordine(models.Model):
     
     def save(self, *args, **kwargs):
         if not self.numero_progressivo:
-            self.numero_progressivo = self.genera_numero_progressivo()
+            self.numero_progressivo = (self.genera_numero_vendita() if self.vendita_prodotti
+                                       else self.genera_numero_progressivo())
         super().save(*args, **kwargs)
+
+    def genera_numero_vendita(self):
+        """Serie giornaliera delle vendite prodotti: 'V20261010-001'. Non
+        inizia con la data, quindi non entra nella serie degli ordini."""
+        prefisso = 'V' + timezone.localdate().strftime('%Y%m%d')
+        ultima = Ordine.objects.filter(
+            numero_progressivo__startswith=prefisso
+        ).order_by('-numero_progressivo').first()
+        nuovo = int(ultima.numero_progressivo.split('-')[1]) + 1 if ultima else 1
+        return f"{prefisso}-{nuovo:03d}"
+
+    @property
+    def numero_display(self):
+        """'V-003' per le vendite prodotti, '#7' per gli ordini."""
+        if self.vendita_prodotti:
+            return f"V-{self.numero_breve:03d}"
+        return f"#{self.numero_breve}"
     
     def genera_numero_progressivo(self):
         oggi = timezone.now().date()

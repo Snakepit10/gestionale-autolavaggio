@@ -181,7 +181,10 @@ class StampaService:
         contenuto.append("Via Roma 123, Milano")
         contenuto.append("Tel: 02-1234567")
         contenuto.append(separatore)
-        contenuto.append(f"SCONTRINO #{ordine.numero_progressivo}")
+        if ordine.vendita_prodotti:
+            contenuto.append(f"VENDITA {ordine.numero_display}")
+        else:
+            contenuto.append(f"SCONTRINO #{ordine.numero_progressivo}")
         contenuto.append(f"Data: {ordine.data_ora.strftime('%d/%m/%Y %H:%M')}")
         contenuto.append(f"Operatore: {ordine.operatore.username if ordine.operatore else 'N/A'}")
         
