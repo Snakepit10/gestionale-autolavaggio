@@ -8,6 +8,14 @@
 
 {% block extra_css %}
 <style>
+/* ============ Menu del turno ============ */
+.menu-turno-griglia { display:grid; grid-template-columns:repeat(auto-fill, minmax(130px, 1fr)); gap:10px; }
+.menu-turno-griglia a { display:flex; flex-direction:column; align-items:center; justify-content:center; gap:6px;
+  min-height:90px; padding:10px; border:1px solid #dee2e6; border-radius:12px; text-decoration:none;
+  color:#1e293b; font-weight:600; text-align:center; background:#f8fafc; }
+.menu-turno-griglia a:hover, .menu-turno-griglia a:active { background:#e7f1ff; border-color:#0d6efd; color:#0d6efd; }
+.menu-turno-griglia a i { font-size:1.6rem; }
+
 /* ============ Kiosk full-screen ============ */
 html, body { overflow: hidden !important; height: 100%; background: #fff; }
 .dashboard-main { padding: 0 !important; margin: 0; }
@@ -385,9 +393,14 @@ html, body { overflow: hidden !important; height: 100%; background: #fff; }
           <i class="bi bi-person-circle"></i>
           {{ user.get_full_name|default:user.username }}
         </span>
-        <a href="{% url 'turni:checklist_fine' %}" class="btn btn-outline-danger btn-sm" title="Fine turno">
-          <i class="bi bi-box-arrow-right"></i> Fine turno
-        </a>
+        <span class="d-flex gap-1">
+          <button type="button" class="btn btn-outline-secondary btn-sm" data-bs-toggle="modal" data-bs-target="#menuTurno" title="Menu">
+            <i class="bi bi-list"></i> Menu
+          </button>
+          <a href="{% url 'turni:checklist_fine' %}" class="btn btn-outline-danger btn-sm" title="Fine turno">
+            <i class="bi bi-box-arrow-right"></i> Fine turno
+          </a>
+        </span>
       </div>
       <div class="p-3">
       <div class="d-flex justify-content-between align-items-center mb-3">
@@ -559,6 +572,31 @@ html, body { overflow: hidden !important; height: 100%; background: #fff; }
         </div>
       </div>
 
+    </div>
+  </div>
+</div>
+
+{# ===== Menu (la dashboard e' a schermo intero, senza barra del menu) ===== #}
+<div class="modal fade" id="menuTurno" tabindex="-1">
+  <div class="modal-dialog modal-dialog-centered">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title"><i class="bi bi-list"></i> Menu</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+      </div>
+      <div class="modal-body">
+        <div class="menu-turno-griglia">
+          <a href="{% url 'magazzino:mia-dotazione' %}"><i class="bi bi-box-seam"></i>Dotazione</a>
+          <a href="{% url 'magazzino:schede-prodotti' %}"><i class="bi bi-file-earmark-text"></i>Schede prodotti</a>
+          {% if 'cassa' in sezioni_visibili %}<a href="{% url 'ordini:cassa' %}"><i class="bi bi-cash-register"></i>Cassa</a>{% endif %}
+          {% if 'ordini' in sezioni_visibili %}<a href="{% url 'ordini:ordini-list' %}"><i class="bi bi-list-check"></i>Ordini</a>{% endif %}
+          {% if 'prenotazioni' in sezioni_visibili %}<a href="{% url 'prenotazioni:checkin-prenotazioni' %}"><i class="bi bi-calendar-check"></i>Prenotazioni</a>{% endif %}
+          {% if 'clienti' in sezioni_visibili %}<a href="{% url 'clienti:clienti-list' %}"><i class="bi bi-people"></i>Clienti</a>{% endif %}
+          {% if 'task' in sezioni_visibili %}<a href="{% url 'tasks:lista' %}"><i class="bi bi-check2-square"></i>Task</a>{% endif %}
+          {% if 'qualita' in sezioni_visibili %}<a href="{% url 'cq:mio_punteggio' %}"><i class="bi bi-trophy"></i>Il mio punteggio</a>{% endif %}
+          <a href="{% url 'core:home' %}"><i class="bi bi-house"></i>Home</a>
+        </div>
+      </div>
     </div>
   </div>
 </div>
