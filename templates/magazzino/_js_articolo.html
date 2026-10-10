@@ -13,6 +13,15 @@ function tipoArticolo() {
     document.getElementById('art-categoria').placeholder = vendita ? 'es. Profumi, Panni e Accessori' : 'es. Panni, Detergenti';
 }
 
+const USI_ARTICOLO = [{% for campo, etichetta, sigla in usi %}'{{ campo }}'{% if not forloop.last %}, {% endif %}{% endfor %}];
+
+function sceltaPosto() {
+    const nuovo = document.getElementById('art-posto').value === '__nuovo';
+    const campo = document.getElementById('art-posto-nuovo');
+    campo.classList.toggle('d-none', !nuovo);
+    if (nuovo) campo.focus();
+}
+
 const URL_FOTO_CARICA = "{% url 'magazzino:articolo-foto-carica' 999999 %}";
 let fotoAttuale = '';
 
@@ -66,6 +75,13 @@ function apriArticolo(id, a) {
     document.getElementById('art-costo').value = a.costo || '0';
     document.getElementById('art-fornitore').value = a.fornitore || '';
     document.getElementById('art-note').value = a.note || '';
+    document.getElementById('art-posto').value = a.posto || '';
+    document.getElementById('art-posto-nuovo').value = '';
+    sceltaPosto();
+    USI_ARTICOLO.forEach(c => document.getElementById('art-' + c).checked = !!a[c]);
+    document.getElementById('art-diluizione').value = a.diluizione || '';
+    document.getElementById('art-modo-uso').value = a.modo_uso || '';
+    document.getElementById('art-avvertenze').value = a.avvertenze || '';
     document.getElementById('art-attivo').checked = a.attivo !== false;
     document.getElementById('art-iniziale').value = 0;
     document.getElementById('art-iniziale-box').classList.toggle('d-none', !!id);
@@ -91,6 +107,10 @@ async function salvaArticolo() {
         prezzo_vendita: val('art-prezzo-vendita'), categoria_catalogo: val('art-categoria-catalogo') || null,
         traccia_scorte: document.getElementById('art-traccia').checked, costo: val('art-costo'),
         fornitore: val('art-fornitore') || null, note: val('art-note'),
+        posto: val('art-posto') === '__nuovo' ? null : (val('art-posto') || null),
+        posto_nuovo: val('art-posto') === '__nuovo' ? val('art-posto-nuovo') : '',
+        ...Object.fromEntries(USI_ARTICOLO.map(c => [c, document.getElementById('art-' + c).checked])),
+        diluizione: val('art-diluizione'), modo_uso: val('art-modo-uso'), avvertenze: val('art-avvertenze'),
         attivo: document.getElementById('art-attivo').checked, quantita_iniziale: val('art-iniziale'),
     });
     const errore = msg => { const e = document.getElementById('art-errore'); e.textContent = msg; e.classList.remove('d-none'); };

@@ -40,6 +40,19 @@
                 {% for c in categorie %}<option value="{{ c }}" {% if filtro.categoria == c %}selected{% endif %}>{{ c }}</option>{% endfor %}
             </select>
         </div>
+        <div class="col-6 col-md-2">
+            <select name="posto" class="form-select form-select-sm" onchange="this.form.submit()">
+                <option value="">Tutti i posti</option>
+                {% for p in posti %}<option value="{{ p.pk }}" {% if filtro.posto == p.pk|stringformat:"s" %}selected{% endif %}>{{ p.nome }}</option>{% endfor %}
+                <option value="nessuno" {% if filtro.posto == 'nessuno' %}selected{% endif %}>Senza posto</option>
+            </select>
+        </div>
+        <div class="col-6 col-md-2">
+            <select name="uso" class="form-select form-select-sm" onchange="this.form.submit()">
+                <option value="">Ogni uso</option>
+                {% for campo, etichetta, sigla in usi %}<option value="{{ campo }}" {% if filtro.uso == campo %}selected{% endif %}>{{ etichetta }}</option>{% endfor %}
+            </select>
+        </div>
         <div class="col-auto form-check ms-2">
             <input class="form-check-input" type="checkbox" name="sotto" value="1" id="f-sotto" {% if filtro.sotto %}checked{% endif %} onchange="this.form.submit()">
             <label class="form-check-label small" for="f-sotto">Solo sotto scorta</label>
@@ -83,6 +96,9 @@
                             {% if a.in_cassa %}<i class="bi bi-shop text-primary ms-1" title="In vendita in cassa"></i>{% endif %}
                             {% if a.manca_in_cassa %}<span class="badge bg-warning text-dark ms-1 cursor-pointer" title="Manca il prezzo di vendita: aprilo e inseriscilo" onclick="apriArticolo({{ a.pk }}, {{ a.dati_modifica }})">non in cassa</span>{% endif %}
                             <br><small class="text-muted">{% if a.ha_contenuto %}{{ a.unita }} da {{ a.contenuto|floatformat:"-3" }} {{ a.unita_contenuto }} &middot; {% endif %}{% if a.codice %}{{ a.codice }} &middot; {% endif %}{{ a.categoria|default:"" }}</small>
+                            {% if a.posto or a.usi %}<br><small>{% if a.posto %}<span class="text-muted"><i class="bi bi-geo"></i> {{ a.posto }}</span>{% endif %}
+                                {% for etichetta, sigla in a.usi %}<span class="badge bg-light text-dark border" title="{{ etichetta }}">{{ etichetta }}</span>{% endfor %}
+                                {% if a.ha_scheda %}<i class="bi bi-file-earmark-text text-success" title="Scheda tecnica compilata"></i>{% endif %}</small>{% endif %}
                         </td>
                         <td><span class="badge {% if a.tipo == 'vendita' %}bg-primary{% elif a.tipo == 'strumento' %}bg-dark{% else %}bg-secondary{% endif %}">{{ a.get_tipo_display }}</span></td>
                         <td class="text-end">

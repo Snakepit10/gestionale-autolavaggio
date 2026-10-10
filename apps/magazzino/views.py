@@ -17,7 +17,7 @@ from apps.auth_system.sezioni import ha_accesso
 from apps.cq.models import PostazioneCQ
 
 from . import services
-from .models import (UNITA_CONTENUTO_CHOICES, Articolo, FotoArticolo, Assegnazione, Consegna, Fornitore, Movimento, OrdineFornitore,
+from .models import (UNITA_CONTENUTO_CHOICES, USI, Articolo, FotoArticolo, Posto, Assegnazione, Consegna, Fornitore, Movimento, OrdineFornitore,
                      RigaConsegna, RigaOrdineFornitore, StatoAssegnazione)
 
 
@@ -112,7 +112,23 @@ def _dati_modifica(a):
         # vendita in cassa: il prezzo sta nel prodotto del catalogo
         'prezzo_vendita': _fmt(a.prodotto.prezzo) if a.prodotto_id else '',
         'categoria_catalogo': a.prodotto.categoria_id if a.prodotto_id else '',
+        'posto': a.posto_id or '',
+        **{campo: getattr(a, campo) for campo, _, _ in USI},
+        'diluizione': a.diluizione, 'modo_uso': a.modo_uso, 'avvertenze': a.avvertenze,
     })
+
+
+def _contesto_modale():
+    """Tutto cio' che serve al modale dell'articolo."""
+    return {
+        'tipi': Articolo.TIPO_CHOICES,
+        'unita_contenuto': UNITA_CONTENUTO_CHOICES,
+        'categorie': _categorie_articoli(),
+        'fornitori': Fornitore.objects.filter(attivo=True),
+        'posti': Posto.objects.filter(attivo=True),
+        'usi': USI,
+        **_contesto_catalogo(),
+    }
 
 
 def _contesto_catalogo():
@@ -153,12 +169,20 @@ def _contesto_base(attiva):
 
 @magazzino_required
 def articoli(request):
-    qs = Articolo.objects.select_related('fornitore', 'prodotto')
+    qs = Articolo.objects.select_related('fornitore', 'prodotto', 'posto')
     tipo = request.GET.get('tipo', '')
     categoria = request.GET.get('categoria', '')
     cerca = request.GET.get('q', '').strip()
     sotto = request.GET.get('sotto') == '1'
     attivi = request.GET.get('tutti') != '1'
+    posto = request.GET.get('posto', '')
+    uso = request.GET.get('uso', '')
+    if posto == 'nessuno':
+        qs = qs.filter(posto__isnull=True)
+    elif posto:
+        qs = qs.filter(posto_id=posto)
+    if uso in {campo for campo, _, _ in USI}:
+        qs = qs.filter(**{uso: True})
     if tipo:
         qs = qs.filter(tipo=tipo)
     if categoria:
@@ -180,12 +204,9 @@ def articoli(request):
     ctx = _contesto_base('articoli')
     ctx.update({
         'articoli': lista,
-        'tipi': Articolo.TIPO_CHOICES,
-        'unita_contenuto': UNITA_CONTENUTO_CHOICES,
-        'categorie': _categorie_articoli(),
-        'fornitori': Fornitore.objects.filter(attivo=True),
-        **_contesto_catalogo(),
-        'filtro': {'tipo': tipo, 'categoria': categoria, 'q': cerca, 'sotto': sotto, 'tutti': not attivi},
+        **_contesto_modale(),
+        'filtro': {'tipo': tipo, 'categoria': categoria, 'q': cerca, 'sotto': sotto, 'tutti': not attivi,
+                   'posto': posto, 'uso': uso},
         'valore_totale': sum((a.valore for a in lista), Decimal('0')),
         'n_sotto_scorta': Articolo.objects.filter(attivo=True, traccia_scorte=True,
                                                   quantita__lte=F('scorta_minima')).count(),
@@ -195,7 +216,7 @@ def articoli(request):
 
 @magazzino_required
 def articolo_scheda(request, pk):
-    articolo = get_object_or_404(Articolo.objects.select_related('fornitore', 'prodotto'), pk=pk)
+    articolo = get_object_or_404(Articolo.objects.select_related('fornitore', 'prodotto', 'posto'), pk=pk)
     articolo.dati_modifica = _dati_modifica(articolo)
     ctx = _contesto_base('articoli')
     ctx.update({
@@ -208,10 +229,7 @@ def articolo_scheda(request, pk):
             articolo=articolo, ordine__stato__in=('inviato', 'parziale')).select_related('ordine')
             if r.residuo > 0],
         'tipi': Articolo.TIPO_CHOICES,
-        'unita_contenuto': UNITA_CONTENUTO_CHOICES,
-        'categorie': _categorie_articoli(),
-        'fornitori': Fornitore.objects.filter(attivo=True),
-        **_contesto_catalogo(),
+        **_contesto_modale(),
     })
     return render(request, 'magazzino/articolo.html', ctx)
 
@@ -251,6 +269,17 @@ def articolo_salva(request):
     articolo.fornitore_id = d.get('fornitore') or None
     articolo.attivo = bool(d.get('attivo', True))
     articolo.note = d.get('note') or ''
+    for campo, _, _ in USI:
+        setattr(articolo, campo, bool(d.get(campo)))
+    articolo.diluizione = (d.get('diluizione') or '').strip()[:100]
+    articolo.modo_uso = (d.get('modo_uso') or '').strip()
+    articolo.avvertenze = (d.get('avvertenze') or '').strip()
+    posto_nuovo = (d.get('posto_nuovo') or '').strip()[:80]
+    if posto_nuovo:
+        articolo.posto = (Posto.objects.filter(nome__iexact=posto_nuovo).first()
+                          or Posto.objects.create(nome=posto_nuovo))
+    else:
+        articolo.posto = Posto.objects.filter(pk=d.get('posto') or None).first()
 
     # Prodotto in vendita = prodotto del catalogo: prezzo e categoria in cassa
     prezzo_vendita = categoria_catalogo = None
@@ -362,6 +391,49 @@ def articolo_foto_carica(request, pk):
     except ValueError as e:
         return _errore(str(e))
     return JsonResponse({'success': True, 'url': articolo.url_foto})
+
+
+# ---------------------------------------------------------------------------
+# Posti
+# ---------------------------------------------------------------------------
+
+@magazzino_required
+def posti(request):
+    lista = list(Posto.objects.annotate(n_articoli=Count('articoli', filter=Q(articoli__attivo=True))))
+    ctx = _contesto_base('posti')
+    ctx.update({
+        'posti': lista,
+        'senza_posto': Articolo.objects.filter(attivo=True, posto__isnull=True).count(),
+    })
+    return render(request, 'magazzino/posti.html', ctx)
+
+
+@magazzino_required
+def posto_salva(request):
+    if request.method != 'POST':
+        return _errore('Metodo non consentito', 405)
+    d = _dati(request)
+    nome = (d.get('nome') or '').strip()[:80]
+    if not nome:
+        return _errore('Il nome è obbligatorio')
+    posto = get_object_or_404(Posto, pk=d['id']) if d.get('id') else Posto()
+    if Posto.objects.filter(nome__iexact=nome).exclude(pk=posto.pk).exists():
+        return _errore('Esiste già un posto con questo nome')
+    posto.nome = nome
+    posto.descrizione = (d.get('descrizione') or '').strip()[:200]
+    posto.ordine = max(_intero(d.get('ordine')), 0)
+    posto.attivo = bool(d.get('attivo', True))
+    posto.save()
+    return JsonResponse({'success': True, 'id': posto.pk})
+
+
+@magazzino_required
+def posto_elimina(request, pk):
+    """Elimina un posto: i suoi articoli restano senza posto."""
+    if request.method != 'POST':
+        return _errore('Metodo non consentito', 405)
+    get_object_or_404(Posto, pk=pk).delete()
+    return JsonResponse({'success': True})
 
 
 # ---------------------------------------------------------------------------
@@ -806,6 +878,25 @@ def mia_dotazione(request):
         'chiuse': chiuse,
         'stati_segnalabili': [(k, v) for k, v in Assegnazione.STATO_CHOICES if k in Assegnazione.SEGNALABILI],
         'in_turno': bool(postazioni_turno),
+    })
+
+
+@login_required
+def schede_prodotti(request):
+    """Schede tecniche (diluizione, modo d'uso, avvertenze) per gli
+    operatori, filtrabili per destinazione d'uso."""
+    if not ha_accesso(request.user, 'mio_turno') and not ha_accesso(request.user, 'magazzino'):
+        return render(request, 'auth_system/accesso_negato.html', {'sezione': 'Il Mio Turno'}, status=403)
+    qs = (Articolo.objects.filter(attivo=True).exclude(diluizione='', modo_uso='', avvertenze='')
+          .select_related('posto'))
+    uso = request.GET.get('uso', '')
+    if uso in {campo for campo, _, _ in USI}:
+        qs = qs.filter(**{uso: True})
+    cerca = request.GET.get('q', '').strip()
+    if cerca:
+        qs = qs.filter(nome__icontains=cerca)
+    return render(request, 'magazzino/schede_prodotti.html', {
+        'articoli': qs.order_by('nome'), 'usi': USI, 'uso': uso, 'cerca': cerca,
     })
 
 

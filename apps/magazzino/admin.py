@@ -1,7 +1,12 @@
 from django.contrib import admin
 
-from .models import (Articolo, Assegnazione, Consegna, Fornitore, Movimento, OrdineFornitore,
+from .models import (Posto, Articolo, Assegnazione, Consegna, Fornitore, Movimento, OrdineFornitore,
                      RigaConsegna, RigaOrdineFornitore, StatoAssegnazione)
+
+
+@admin.register(Posto)
+class PostoAdmin(admin.ModelAdmin):
+    list_display = ('nome', 'descrizione', 'ordine', 'attivo')
 
 
 @admin.register(Fornitore)

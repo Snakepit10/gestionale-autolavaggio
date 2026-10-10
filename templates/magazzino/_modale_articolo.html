@@ -105,6 +105,46 @@
                             {% for f in fornitori %}<option value="{{ f.pk }}">{{ f }}</option>{% endfor %}
                         </select>
                     </div>
+                    <div class="col-md-6">
+                        <label class="form-label">Posto</label>
+                        <select class="form-select" id="art-posto" onchange="sceltaPosto()">
+                            <option value="">— nessuno —</option>
+                            {% for p in posti %}<option value="{{ p.pk }}">{{ p.nome }}</option>{% endfor %}
+                            <option value="__nuovo">+ Nuovo posto…</option>
+                        </select>
+                        <input type="text" class="form-control mt-1 d-none" id="art-posto-nuovo" maxlength="80" placeholder="es. Scaffale A - ripiano 2">
+                    </div>
+                    <div class="col-md-6">
+                        <label class="form-label">Destinazione d'uso</label>
+                        <div class="d-flex flex-wrap gap-3 pt-1">
+                            {% for campo, etichetta, sigla in usi %}
+                            <div class="form-check">
+                                <input class="form-check-input" type="checkbox" id="art-{{ campo }}">
+                                <label class="form-check-label" for="art-{{ campo }}">{{ etichetta }}</label>
+                            </div>
+                            {% endfor %}
+                        </div>
+                    </div>
+                    <div class="col-12">
+                        <div class="border rounded p-2">
+                            <div class="fw-semibold mb-1"><i class="bi bi-file-earmark-text"></i> Scheda tecnica
+                                <small class="text-muted fw-normal">(la leggono gli operatori)</small></div>
+                            <div class="row g-2">
+                                <div class="col-md-4">
+                                    <label class="form-label small mb-0">Diluizione</label>
+                                    <input type="text" class="form-control" id="art-diluizione" maxlength="100" placeholder="es. 1:20, puro">
+                                </div>
+                                <div class="col-md-8">
+                                    <label class="form-label small mb-0">Modo d'uso</label>
+                                    <textarea class="form-control" id="art-modo-uso" rows="2" placeholder="Come e dove si usa"></textarea>
+                                </div>
+                                <div class="col-12">
+                                    <label class="form-label small mb-0">Avvertenze</label>
+                                    <textarea class="form-control" id="art-avvertenze" rows="2" placeholder="Protezioni, cosa non fare, superfici da evitare"></textarea>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
                     <div class="col-12">
                         <label class="form-label">Foto</label>
                         <div class="d-flex align-items-center gap-3">

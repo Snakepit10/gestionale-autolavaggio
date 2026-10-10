@@ -5,6 +5,10 @@
         <strong>{{ a.articolo.nome }}{% if a.articolo.ha_contenuto %} <small class="text-muted fw-normal">da {{ a.articolo.contenuto|floatformat:"-3" }} {{ a.articolo.unita_contenuto }}</small>{% endif %}</strong>
         <span class="badge bg-{{ a.colore_stato }}">{{ a.get_stato_display }}</span>
         <small class="text-muted">dal {{ a.data|date:"d/m/Y" }}{% if a.note %} &middot; {{ a.note }}{% endif %}</small>
+        {% if a.articolo.ha_scheda %}
+        <details class="mt-1 small"><summary class="text-primary">Scheda tecnica</summary>
+            {% include 'magazzino/_scheda_tecnica.html' with a=a.articolo %}</details>
+        {% endif %}
     </div>
     <button class="btn btn-outline-warning" onclick="apriStato({{ a.pk }}, '{{ a.articolo.nome|escapejs }}', {{ a.quantita }}, '{% if a.articolo.tipo == 'consumabile' %}esaurito{% else %}usurato{% endif %}')">
         <i class="bi bi-flag"></i> Segnala

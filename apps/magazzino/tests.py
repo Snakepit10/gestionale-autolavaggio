@@ -528,3 +528,67 @@ class VenditaCatalogoTest(TestCase):
         self.assertContains(pagina, 'non in cassa')
         self.assertContains(pagina, 'Vendita in cassa')
         self.assertEqual(_pagina(self.user, 'articolo', pk=a.pk).status_code, 200)
+
+
+
+class PostoUsoSchedaTest(TestCase):
+    """Posto, destinazione d'uso e scheda tecnica degli articoli."""
+
+    def setUp(self):
+        self.user = utente_titolare('tit', password='x')
+        self.client.force_login(self.user)
+
+    def _salva(self, **dati):
+        base = {'nome': 'Shampoo T25', 'tipo': 'consumabile'}
+        base.update(dati)
+        return _post(self.client, 'articolo-salva', base)
+
+    def test_posto_nuovo_o_esistente(self):
+        from .models import Posto
+        r = self._salva(posto_nuovo='Scaffale A')
+        a = Articolo.objects.get(pk=r.json()['id'])
+        self.assertEqual(a.posto.nome, 'Scaffale A')
+        # stesso nome scritto diverso: niente doppione
+        b = Articolo.objects.get(pk=self._salva(nome='Cera', posto_nuovo='scaffale a').json()['id'])
+        self.assertEqual((b.posto_id, Posto.objects.count()), (a.posto_id, 1))
+        self._salva(id=a.pk, posto=None)
+        a.refresh_from_db()
+        self.assertIsNone(a.posto)
+
+        # pagina posti, crea / rinomina / doppione / elimina
+        self.assertEqual(_pagina(self.user, 'posti').status_code, 200)
+        r = _post(self.client, 'posto-salva', {'nome': 'Container'})
+        self.assertTrue(r.json()['success'])
+        self.assertEqual(_post(self.client, 'posto-salva', {'nome': 'container'}).status_code, 400)
+        _post(self.client, 'posto-elimina', pk=b.posto_id)
+        b.refresh_from_db()
+        self.assertIsNone(b.posto)
+
+    def test_usi_e_filtri(self):
+        a = Articolo.objects.get(pk=self._salva(uso_servito=True, uso_self=True).json()['id'])
+        self.assertEqual([e for e, _ in a.usi], ['Servito', 'Self service'])
+        Articolo.objects.create(nome='Cera portale', uso_portale=True)
+        from django.urls import resolve
+        req = RequestFactory().get(reverse('magazzino:articoli'), {'uso': 'uso_portale'})
+        req.user = self.user
+        r = resolve(reverse('magazzino:articoli')).func(req)
+        self.assertContains(r, 'Cera portale')
+        self.assertNotContains(r, 'Shampoo T25')
+
+    def test_scheda_tecnica_per_gli_operatori(self):
+        a = Articolo.objects.get(pk=self._salva(diluizione='1:20', modo_uso='Spruzzare a freddo',
+                                                avvertenze='Usare i guanti', uso_servito=True).json()['id'])
+        self.assertTrue(a.ha_scheda)
+        Articolo.objects.create(nome='Senza scheda')
+        operatore = User.objects.create_user('op', password='x')
+        operatore.groups.add(Group.objects.get(name='operatore'))
+        from apps.auth_system.sezioni import sezione_per_percorso
+        self.assertEqual(sezione_per_percorso(reverse('magazzino:schede-prodotti')), 'mio_turno')
+        pagina = _pagina(operatore, 'schede-prodotti')
+        self.assertContains(pagina, '1:20')
+        self.assertContains(pagina, 'Usare i guanti')
+        self.assertNotContains(pagina, 'Senza scheda')
+        # nella dotazione, la scheda si apre dall'articolo assegnato
+        services.assegna(a, 1, utente=operatore, da=self.user)
+        self.assertContains(_pagina(operatore, 'mia-dotazione'), 'Spruzzare a freddo')
+        self.assertContains(_pagina(self.user, 'articolo', pk=a.pk), 'Spruzzare a freddo')

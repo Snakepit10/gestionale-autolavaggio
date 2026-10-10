@@ -36,6 +36,26 @@ PREZZO_PER_CHOICES = [('pezzo', 'Al pezzo'), ('contenuto', "All'unità di misura
 QUATTRO_DECIMALI = Decimal('0.0001')
 
 
+class Posto(models.Model):
+    """Dove sta la merce: scaffale, locale tecnico, container..."""
+    nome = models.CharField(max_length=80, unique=True)
+    descrizione = models.CharField(max_length=200, blank=True)
+    ordine = models.PositiveIntegerField(default=0)
+    attivo = models.BooleanField(default=True)
+
+    class Meta:
+        verbose_name = 'Posto'
+        verbose_name_plural = 'Posti'
+        ordering = ['ordine', 'nome']
+
+    def __str__(self):
+        return self.nome
+
+
+# Destinazioni d'uso: (campo, etichetta, sigla)
+USI = [('uso_servito', 'Servito', 'SV'), ('uso_portale', 'Portale', 'PT'), ('uso_self', 'Self service', 'SS')]
+
+
 class Articolo(models.Model):
     TIPO_CHOICES = [
         ('vendita', 'Prodotto in vendita'),
@@ -68,6 +88,16 @@ class Articolo(models.Model):
         'core.ServizioProdotto', null=True, blank=True, on_delete=models.SET_NULL,
         related_name='articolo', verbose_name='Prodotto del catalogo',
         help_text='La vendita in cassa di questo prodotto scarica il magazzino')
+    posto = models.ForeignKey(Posto, null=True, blank=True, on_delete=models.SET_NULL,
+                              related_name='articoli')
+    # Destinazione d'uso (una o piu')
+    uso_servito = models.BooleanField('Servito', default=False)
+    uso_portale = models.BooleanField('Portale', default=False)
+    uso_self = models.BooleanField('Self service', default=False)
+    # Scheda tecnica, visibile agli operatori
+    diluizione = models.CharField(max_length=100, blank=True, help_text='es. 1:20, puro, 50 ml in 10 l')
+    modo_uso = models.TextField("Modo d'uso", blank=True)
+    avvertenze = models.TextField(blank=True, help_text='Sicurezza, protezioni, cosa non fare')
     attivo = models.BooleanField(default=True)
     note = models.TextField(blank=True)
     # Quando e' stata caricata la foto (None = nessuna foto); serve anche a
@@ -81,6 +111,15 @@ class Articolo(models.Model):
 
     def __str__(self):
         return self.nome
+
+    @property
+    def usi(self):
+        """[(etichetta, sigla)] delle destinazioni d'uso spuntate."""
+        return [(etichetta, sigla) for campo, etichetta, sigla in USI if getattr(self, campo)]
+
+    @property
+    def ha_scheda(self):
+        return bool(self.diluizione or self.modo_uso or self.avvertenze)
 
     @property
     def in_cassa(self):

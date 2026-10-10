@@ -13,6 +13,10 @@ urlpatterns = [
     path('foto/<int:pk>/', views.articolo_foto, name='articolo-foto'),
     path('movimenti/', views.movimenti, name='movimenti'),
 
+    path('posti/', views.posti, name='posti'),
+    path('posti/salva/', views.posto_salva, name='posto-salva'),
+    path('posti/<int:pk>/elimina/', views.posto_elimina, name='posto-elimina'),
+
     path('fornitori/', views.fornitori, name='fornitori'),
     path('fornitori/salva/', views.fornitore_salva, name='fornitore-salva'),
 
@@ -40,6 +44,7 @@ urlpatterns = [
 
     path('mia-dotazione/', views.mia_dotazione, name='mia-dotazione'),
     path('mia-dotazione/<int:pk>/stato/', views.mia_dotazione_stato, name='mia-dotazione-stato'),
+    path('mia-dotazione/schede/', views.schede_prodotti, name='schede-prodotti'),
 
     path('report/', views.report, name='report'),
 ]

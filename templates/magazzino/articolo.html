@@ -43,6 +43,8 @@
             {% endif %}
             <div class="section-body pad small">
                 <dl class="row mb-0">
+                    <dt class="col-5">Posto</dt><dd class="col-7">{% if articolo.posto %}<a href="{% url 'magazzino:articoli' %}?posto={{ articolo.posto_id }}">{{ articolo.posto }}</a>{% else %}<span class="text-muted">non indicato</span>{% endif %}</dd>
+                    <dt class="col-5">Uso</dt><dd class="col-7">{% for etichetta, sigla in articolo.usi %}<span class="badge bg-light text-dark border">{{ etichetta }}</span> {% empty %}<span class="text-muted">—</span>{% endfor %}</dd>
                     <dt class="col-5">Codice</dt><dd class="col-7">{{ articolo.codice|default:"—" }}</dd>
                     <dt class="col-5">Pezzo</dt><dd class="col-7">{{ articolo.unita }}{% if articolo.ha_contenuto %} da {{ articolo.contenuto|floatformat:"-3" }} {{ articolo.unita_contenuto }}{% endif %}</dd>
                     <dt class="col-5">Categoria</dt><dd class="col-7">{{ articolo.categoria|default:"—" }}</dd>
@@ -56,6 +58,13 @@
                         {% else %}—{% endif %}</dd>
                     {% if articolo.note %}<dt class="col-5">Note</dt><dd class="col-7">{{ articolo.note|linebreaksbr }}</dd>{% endif %}
                 </dl>
+            </div>
+        </div>
+
+        <div class="section-card accent-green">
+            <div class="section-title"><div class="label"><i class="bi bi-file-earmark-text"></i> Scheda tecnica</div></div>
+            <div class="section-body pad small">
+                {% include 'magazzino/_scheda_tecnica.html' with a=articolo %}
             </div>
         </div>
 

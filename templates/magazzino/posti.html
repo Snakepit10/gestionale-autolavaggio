@@ -1,0 +1,96 @@
+{% extends 'magazzino/_base.html' %}
+
+{% block title %}Magazzino - Posti{% endblock %}
+
+{% block pagina %}
+<div class="page-header">
+    <h1><i class="bi bi-geo"></i> Posti</h1>
+    <button class="btn btn-primary" onclick="apriPosto()"><i class="bi bi-plus-circle"></i> Nuovo posto</button>
+</div>
+<p class="small text-muted">Dove sta la merce (scaffali, locale tecnico, container...). Si assegna dal modale di ogni articolo.</p>
+
+<div class="section-card accent-blue">
+    <div class="section-title"><div class="label"><i class="bi bi-geo"></i> Elenco</div><span class="count">{{ posti|length }}</span></div>
+    <div class="section-body">
+        {% if posti %}
+        <div class="table-responsive">
+            <table class="table table-hover">
+                <thead><tr><th>Posto</th><th>Descrizione</th><th class="text-end">Articoli</th><th></th></tr></thead>
+                <tbody>
+                {% for p in posti %}
+                    <tr class="{% if not p.attivo %}text-muted{% endif %}">
+                        <td><strong>{{ p.nome }}</strong>{% if not p.attivo %} <span class="badge bg-light text-muted">non attivo</span>{% endif %}</td>
+                        <td class="small">{{ p.descrizione }}</td>
+                        <td class="text-end">{% if p.n_articoli %}<a href="{% url 'magazzino:articoli' %}?posto={{ p.pk }}">{{ p.n_articoli }}</a>{% else %}0{% endif %}</td>
+                        <td class="text-end text-nowrap">
+                            <button class="btn btn-sm btn-outline-primary" title="Modifica"
+                                onclick="apriPosto({{ p.pk }}, '{{ p.nome|escapejs }}', '{{ p.descrizione|escapejs }}', {{ p.ordine }}, {{ p.attivo|yesno:'true,false' }})"><i class="bi bi-pencil"></i></button>
+                            <button class="btn btn-sm btn-outline-danger" title="Elimina" onclick="eliminaPosto({{ p.pk }}, '{{ p.nome|escapejs }}', {{ p.n_articoli }})"><i class="bi bi-trash"></i></button>
+                        </td>
+                    </tr>
+                {% endfor %}
+                </tbody>
+                {% if senza_posto %}
+                <tfoot><tr><td colspan="2"><a href="{% url 'magazzino:articoli' %}?posto=nessuno">Articoli senza posto</a></td><td class="text-end">{{ senza_posto }}</td><td></td></tr></tfoot>
+                {% endif %}
+            </table>
+        </div>
+        {% else %}
+        <div class="empty-state"><i class="bi bi-geo"></i><h5>Nessun posto</h5><p>Crea i posti del magazzino, poi assegnali agli articoli.</p></div>
+        {% endif %}
+    </div>
+</div>
+
+<div class="modal fade" id="modalePosto" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header modal-clean"><h5 class="modal-title" id="posto-titolo">Nuovo posto</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button></div>
+            <div class="modal-body">
+                <input type="hidden" id="posto-id">
+                <div class="row g-3">
+                    <div class="col-8"><label class="form-label">Nome *</label><input class="form-control" id="posto-nome" maxlength="80" placeholder="es. Scaffale A - ripiano 2"></div>
+                    <div class="col-4"><label class="form-label">Ordine</label><input type="number" min="0" class="form-control" id="posto-ordine" value="0"></div>
+                    <div class="col-12"><label class="form-label">Descrizione</label><input class="form-control" id="posto-descrizione" maxlength="200"></div>
+                    <div class="col-12"><div class="form-check form-switch"><input class="form-check-input" type="checkbox" id="posto-attivo" checked><label class="form-check-label" for="posto-attivo">Attivo</label></div></div>
+                </div>
+                <div class="alert alert-danger d-none mt-3 mb-0" id="posto-errore"></div>
+            </div>
+            <div class="modal-footer"><button class="btn btn-secondary" data-bs-dismiss="modal">Annulla</button>
+                <button class="btn btn-primary" onclick="salvaPosto()"><i class="bi bi-check-circle"></i> Salva</button></div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js_magazzino %}
+<script>
+function apriPosto(id, nome, descrizione, ordine, attivo) {
+    document.getElementById('posto-titolo').textContent = id ? 'Modifica posto' : 'Nuovo posto';
+    document.getElementById('posto-id').value = id || '';
+    document.getElementById('posto-nome').value = nome || '';
+    document.getElementById('posto-descrizione').value = descrizione || '';
+    document.getElementById('posto-ordine').value = ordine || 0;
+    document.getElementById('posto-attivo').checked = attivo !== false;
+    document.getElementById('posto-errore').classList.add('d-none');
+    bootstrap.Modal.getOrCreateInstance(document.getElementById('modalePosto')).show();
+}
+async function salvaPosto() {
+    const j = await postJSON("{% url 'magazzino:posto-salva' %}", {
+        id: document.getElementById('posto-id').value || null,
+        nome: document.getElementById('posto-nome').value,
+        descrizione: document.getElementById('posto-descrizione').value,
+        ordine: document.getElementById('posto-ordine').value,
+        attivo: document.getElementById('posto-attivo').checked,
+    });
+    if (!j.success) { const e = document.getElementById('posto-errore'); e.textContent = j.error; e.classList.remove('d-none'); return; }
+    location.reload();
+}
+async function eliminaPosto(id, nome, n) {
+    if (!confirm(`Eliminare il posto "${nome}"?` + (n ? ` I suoi ${n} articoli resteranno senza posto.` : ''))) return;
+    const j = await postJSON("{% url 'magazzino:posto-elimina' 999999 %}".replace('999999', id));
+    if (!j.success) { alert(j.error); return; }
+    location.reload();
+}
+</script>
+{% endblock %}

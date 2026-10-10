@@ -1,0 +1,48 @@
+{% extends 'base.html' %}
+
+{% block title %}Schede prodotti{% endblock %}
+
+{% block extra_css %}
+<style>
+.sch-header { display:flex; justify-content:space-between; align-items:center; gap:.5rem; margin-bottom:1rem; flex-wrap:wrap; }
+.sch-header h1 { font-size:1.4rem; font-weight:700; margin:0; }
+.sch-card { background:#fff; border:1px solid #e5e7eb; border-radius:12px; padding:12px 14px; margin-bottom:.75rem; box-shadow:0 1px 2px rgba(0,0,0,.04); }
+.sch-card .titolo { display:flex; align-items:center; gap:10px; margin-bottom:.4rem; }
+.sch-card .titolo strong { font-size:1.05rem; }
+.sch-card dt { font-size:.75rem; text-transform:uppercase; color:#64748b; letter-spacing:.3px; }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="sch-header">
+    <h1><i class="bi bi-file-earmark-text"></i> Schede prodotti</h1>
+    <a href="{% url 'magazzino:mia-dotazione' %}" class="btn btn-outline-secondary btn-sm"><i class="bi bi-arrow-left"></i> La mia dotazione</a>
+</div>
+
+<form method="get" class="d-flex flex-wrap gap-2 mb-3">
+    <div class="btn-group">
+        <a href="?q={{ cerca|urlencode }}" class="btn btn-sm {% if not uso %}btn-primary{% else %}btn-outline-primary{% endif %}">Tutti</a>
+        {% for campo, etichetta, sigla in usi %}
+        <a href="?uso={{ campo }}&q={{ cerca|urlencode }}" class="btn btn-sm {% if uso == campo %}btn-primary{% else %}btn-outline-primary{% endif %}">{{ etichetta }}</a>
+        {% endfor %}
+    </div>
+    <input type="hidden" name="uso" value="{{ uso }}">
+    <input type="search" name="q" value="{{ cerca }}" class="form-control form-control-sm" style="max-width:240px" placeholder="Cerca prodotto">
+</form>
+
+{% for a in articoli %}
+<div class="sch-card">
+    <div class="titolo">
+        {% if a.foto_aggiornata %}<img src="{{ a.url_foto }}" alt="" loading="lazy" class="rounded border" style="width:48px;height:48px;object-fit:cover">{% endif %}
+        <div>
+            <strong>{{ a.nome }}</strong>
+            {% for etichetta, sigla in a.usi %}<span class="badge bg-light text-dark border">{{ etichetta }}</span>{% endfor %}
+            {% if a.posto %}<br><small class="text-muted"><i class="bi bi-geo"></i> {{ a.posto }}</small>{% endif %}
+        </div>
+    </div>
+    {% include 'magazzino/_scheda_tecnica.html' %}
+</div>
+{% empty %}
+<div class="text-muted text-center py-4">Nessuna scheda{% if uso or cerca %} per questa ricerca{% endif %}.</div>
+{% endfor %}
+{% endblock %}
