@@ -28,9 +28,36 @@
                         <datalist id="art-categorie">{% for c in categorie %}<option value="{{ c }}">{% endfor %}</datalist>
                     </div>
                     <div class="col-md-4">
-                        <label class="form-label">Unità di misura</label>
-                        <input type="text" class="form-control" id="art-unita" value="pz" list="art-unita-l">
-                        <datalist id="art-unita-l"><option value="pz"><option value="flaconi"><option value="taniche"><option value="litri"><option value="confezioni"></datalist>
+                        <label class="form-label">Si conta a</label>
+                        <input type="text" class="form-control" id="art-unita" value="pz" list="art-unita-l" oninput="aggiornaPrezzo()">
+                        <datalist id="art-unita-l"><option value="pz"><option value="bidoni"><option value="taniche"><option value="flaconi"><option value="confezioni"><option value="rotoli"></datalist>
+                    </div>
+                    <div class="col-12">
+                        <div class="border rounded p-2 bg-light">
+                            <div class="row g-2 align-items-end">
+                                <div class="col-6 col-md-3">
+                                    <label class="form-label small mb-0">Ogni pezzo contiene</label>
+                                    <input type="text" inputmode="decimal" class="form-control" id="art-contenuto" placeholder="es. 25" oninput="aggiornaPrezzo()">
+                                </div>
+                                <div class="col-6 col-md-3">
+                                    <label class="form-label small mb-0">Unità</label>
+                                    <select class="form-select" id="art-unita-contenuto" onchange="aggiornaPrezzo()">
+                                        <option value="">—</option>
+                                        {% for k, v in unita_contenuto %}<option value="{{ k }}">{{ v }}</option>{% endfor %}
+                                    </select>
+                                </div>
+                                <div class="col-12 col-md-6">
+                                    <label class="form-label small mb-0">Il prezzo lo indico</label>
+                                    <div class="btn-group w-100">
+                                        <input type="radio" class="btn-check" name="art-prezzo-per" id="art-pp-pezzo" value="pezzo" onchange="cambiaBasePrezzo()" checked>
+                                        <label class="btn btn-outline-secondary" for="art-pp-pezzo" id="art-pp-pezzo-l">al pezzo</label>
+                                        <input type="radio" class="btn-check" name="art-prezzo-per" id="art-pp-contenuto" value="contenuto" onchange="cambiaBasePrezzo()">
+                                        <label class="btn btn-outline-secondary" for="art-pp-contenuto" id="art-pp-contenuto-l">al kg / litro</label>
+                                    </div>
+                                </div>
+                            </div>
+                            <small class="text-muted">Per un bidone da 25 kg: si conta a "bidoni", contiene 25 kg. Lascia vuoto se non serve.</small>
+                        </div>
                     </div>
                     <div class="col-md-4">
                         <div class="form-check form-switch mt-md-4">
@@ -47,8 +74,9 @@
                         <input type="number" min="0" class="form-control" id="art-iniziale" value="0">
                     </div>
                     <div class="col-md-4">
-                        <label class="form-label">Costo unitario (&euro;)</label>
-                        <input type="text" inputmode="decimal" class="form-control" id="art-costo" value="0">
+                        <label class="form-label" id="art-costo-l">Costo al pezzo (&euro;)</label>
+                        <input type="text" inputmode="decimal" class="form-control" id="art-costo" value="0" oninput="aggiornaPrezzo()">
+                        <small class="text-muted" id="art-costo-altro"></small>
                     </div>
                     <div class="col-md-8">
                         <label class="form-label">Fornitore abituale</label>

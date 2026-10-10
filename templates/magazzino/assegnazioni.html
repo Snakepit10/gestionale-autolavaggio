@@ -31,7 +31,7 @@
                 {% for a in g.righe %}
                     <tr>
                         <td><a href="{% url 'magazzino:articolo' a.articolo_id %}" class="text-decoration-none fw-semibold">{{ a.articolo.nome }}</a>
-                            <br><small class="text-muted">{{ a.articolo.get_tipo_display }}</small></td>
+                            <br><small class="text-muted">{{ a.articolo.get_tipo_display }}{% if a.articolo.ha_contenuto %} &middot; {{ a.articolo.unita }} da {{ a.articolo.contenuto|floatformat:"-3" }} {{ a.articolo.unita_contenuto }}{% endif %}</small></td>
                         <td class="text-end fw-semibold">{{ a.quantita }} <small class="text-muted">{{ a.articolo.unita }}</small></td>
                         <td><span class="badge bg-{{ a.colore_stato }}">{{ a.get_stato_display }}</span>
                             {% if a.da_gestire %}<i class="bi bi-exclamation-circle-fill text-danger" title="Segnalazione da gestire"></i>{% endif %}</td>

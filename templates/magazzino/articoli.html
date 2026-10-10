@@ -79,24 +79,26 @@
                         <td>
                             <a href="{% url 'magazzino:articolo' a.pk %}" class="fw-semibold text-decoration-none">{{ a.nome }}</a>
                             {% if a.prodotto %}<i class="bi bi-shop text-primary ms-1" title="In vendita in cassa: {{ a.prodotto.titolo }}"></i>{% endif %}
-                            <br><small class="text-muted">{% if a.codice %}{{ a.codice }} &middot; {% endif %}{{ a.categoria|default:"" }}</small>
+                            <br><small class="text-muted">{% if a.ha_contenuto %}{{ a.unita }} da {{ a.contenuto|floatformat:"-3" }} {{ a.unita_contenuto }} &middot; {% endif %}{% if a.codice %}{{ a.codice }} &middot; {% endif %}{{ a.categoria|default:"" }}</small>
                         </td>
                         <td><span class="badge {% if a.tipo == 'vendita' %}bg-primary{% elif a.tipo == 'strumento' %}bg-dark{% else %}bg-secondary{% endif %}">{{ a.get_tipo_display }}</span></td>
                         <td class="text-end">
                             {% if a.traccia_scorte %}
                                 <span class="{% if a.quantita < 0 %}qta-neg{% elif a.sotto_scorta %}text-danger fw-bold{% else %}fw-semibold{% endif %}">{{ a.quantita }}</span>
                                 <small class="text-muted">{{ a.unita }}</small>
+                                {% if a.ha_contenuto and a.quantita > 0 %}<br><small class="text-muted">{{ a.quantita_contenuto|floatformat:"-2" }} {{ a.unita_contenuto }}</small>{% endif %}
                                 {% if a.sotto_scorta %}<br><span class="badge bg-danger-subtle text-danger">sotto scorta</span>{% endif %}
                             {% else %}<span class="text-muted small">non tracciato</span>{% endif %}
                         </td>
                         <td class="text-end">{% if a.n_assegnati %}{{ a.n_assegnati }}{% else %}<span class="text-muted">—</span>{% endif %}</td>
                         <td class="text-end">{% if a.traccia_scorte %}{{ a.scorta_minima }}{% else %}—{% endif %}</td>
-                        <td class="text-end">&euro;{{ a.costo|floatformat:2 }}</td>
+                        <td class="text-end text-nowrap">&euro;{{ a.costo|floatformat:2 }}<small class="text-muted">/{{ a.unita }}</small>
+                            {% if a.ha_contenuto %}<br><small class="{% if a.prezzo_al_contenuto %}fw-semibold{% else %}text-muted{% endif %}">&euro;{{ a.costo_al_contenuto|floatformat:"-4" }}/{{ a.unita_contenuto }}</small>{% endif %}</td>
                         <td class="small">{{ a.fornitore|default:"" }}</td>
                         <td class="text-center text-nowrap">
-                            <button class="btn btn-sm btn-outline-success" title="Carico" onclick="apriMovimento({{ a.pk }}, '{{ a.nome|escapejs }}', 'carico', {{ a.quantita }})"><i class="bi bi-box-arrow-in-down"></i></button>
+                            <button class="btn btn-sm btn-outline-success" title="Carico" onclick="apriMovimento({{ a.pk }}, '{{ a.nome|escapejs }}', 'carico', {{ a.quantita }}, '{{ a.unita_prezzo|escapejs }}')"><i class="bi bi-box-arrow-in-down"></i></button>
                             <button class="btn btn-sm btn-outline-secondary" title="Inventario" onclick="apriMovimento({{ a.pk }}, '{{ a.nome|escapejs }}', 'rettifica', {{ a.quantita }})"><i class="bi bi-clipboard-check"></i></button>
-                            <button class="btn btn-sm btn-outline-primary" title="Modifica" onclick='apriArticolo({{ a.pk }}, {"nome": "{{ a.nome|escapejs }}", "codice": "{{ a.codice|escapejs }}", "tipo": "{{ a.tipo }}", "categoria": "{{ a.categoria|escapejs }}", "unita": "{{ a.unita|escapejs }}", "scorta_minima": {{ a.scorta_minima }}, "traccia_scorte": {{ a.traccia_scorte|yesno:"true,false" }}, "costo": "{{ a.costo }}", "fornitore": "{{ a.fornitore_id|default_if_none:"" }}", "attivo": {{ a.attivo|yesno:"true,false" }}, "note": "{{ a.note|escapejs }}"})'><i class="bi bi-pencil"></i></button>
+                            <button class="btn btn-sm btn-outline-primary" title="Modifica" onclick="apriArticolo({{ a.pk }}, {{ a.dati_modifica }})"><i class="bi bi-pencil"></i></button>
                         </td>
                     </tr>
                     {% endfor %}

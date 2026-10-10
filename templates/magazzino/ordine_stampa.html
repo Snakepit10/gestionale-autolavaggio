@@ -38,9 +38,9 @@ tfoot td { font-weight:bold; border-top:2px solid #333; }
     <thead><tr><th>Codice</th><th>Articolo</th><th class="r">Quantità</th><th class="r">Prezzo</th><th class="r">Importo</th></tr></thead>
     <tbody>
     {% for r in righe %}
-        <tr><td>{{ r.articolo.codice }}</td><td>{{ r.articolo.nome }}</td>
-            <td class="r">{{ r.quantita }} {{ r.articolo.unita }}</td>
-            <td class="r">{% if r.prezzo %}&euro; {{ r.prezzo|floatformat:2 }}{% endif %}</td>
+        <tr><td>{{ r.articolo.codice }}</td><td>{{ r.articolo.nome }}{% if r.articolo.ha_contenuto %} &ndash; {{ r.articolo.unita }} da {{ r.articolo.contenuto|floatformat:"-3" }} {{ r.articolo.unita_contenuto }}{% endif %}</td>
+            <td class="r">{{ r.quantita }} {{ r.articolo.unita }}{% if r.articolo.ha_contenuto %}<br><small>({{ r.quantita_contenuto|floatformat:"-3" }} {{ r.articolo.unita_contenuto }})</small>{% endif %}</td>
+            <td class="r">{% if r.prezzo %}&euro; {{ r.prezzo_indicato|floatformat:"-4" }}/{{ r.articolo.unita_prezzo }}{% endif %}</td>
             <td class="r">{% if r.prezzo %}&euro; {{ r.importo|floatformat:2 }}{% endif %}</td></tr>
     {% endfor %}
     </tbody>

@@ -46,10 +46,10 @@
             <tbody>
             {% for r in ordine.righe.all %}
                 <tr><td><a href="{% url 'magazzino:articolo' r.articolo_id %}">{{ r.articolo.nome }}</a></td>
-                    <td class="text-end">{{ r.quantita }} {{ r.articolo.unita }}</td>
+                    <td class="text-end">{{ r.quantita }} {{ r.articolo.unita }}{% if r.articolo.ha_contenuto %}<br><small class="text-muted">da {{ r.articolo.contenuto|floatformat:"-3" }} {{ r.articolo.unita_contenuto }}</small>{% endif %}</td>
                     <td class="text-end">{{ r.ricevuto }}</td>
                     <td class="text-end {% if r.residuo > 0 %}text-warning fw-bold{% else %}text-success{% endif %}">{% if r.residuo > 0 %}{{ r.residuo }}{% else %}<i class="bi bi-check-lg"></i>{% endif %}</td>
-                    <td class="text-end">&euro;{{ r.prezzo|floatformat:2 }}</td>
+                    <td class="text-end">&euro;{{ r.prezzo_indicato|floatformat:"-4" }}<small class="text-muted">/{{ r.articolo.unita_prezzo }}</small></td>
                     <td class="text-end">&euro;{{ r.importo|floatformat:2 }}</td></tr>
             {% endfor %}
             </tbody>
@@ -94,7 +94,7 @@
     <div class="section-body">
         <div class="table-responsive">
             <table class="table" id="tab-righe">
-                <thead><tr><th style="min-width:220px">Articolo</th><th class="text-end">In magazzino</th><th style="width:110px">Quantità</th><th style="width:130px">Prezzo &euro;</th><th class="text-end">Importo</th><th></th></tr></thead>
+                <thead><tr><th style="min-width:220px">Articolo</th><th class="text-end">In magazzino</th><th style="width:110px">Quantità</th><th style="width:170px">Prezzo &euro;</th><th class="text-end">Importo</th><th></th></tr></thead>
                 <tbody></tbody>
                 <tfoot><tr><td colspan="4" class="text-end">Totale</td><td class="text-end" id="ord-totale">&euro;0,00</td><td></td></tr></tfoot>
             </table>
@@ -163,7 +163,7 @@ function aggiungiRiga(r) {
         <td><select class="form-select form-select-sm r-art" onchange="cambiaArticolo(this)">${opzioniArticoli(r.articolo)}</select></td>
         <td class="text-end small r-mag"></td>
         <td><input type="number" min="1" class="form-control form-control-sm r-q" value="${r.quantita || 1}" oninput="ricalcola()"></td>
-        <td><input type="text" inputmode="decimal" class="form-control form-control-sm r-p" value="${r.prezzo != null ? r.prezzo : ''}" oninput="ricalcola()"></td>
+        <td><div class="input-group input-group-sm"><input type="text" inputmode="decimal" class="form-control r-p" value="${r.prezzo != null ? r.prezzo : ''}" oninput="ricalcola()"><span class="input-group-text r-up">/pz</span></div></td>
         <td class="text-end r-imp"></td>
         <td class="text-end"><button class="btn btn-sm btn-outline-danger" onclick="this.closest('tr').remove(); ricalcola()"><i class="bi bi-x"></i></button></td>`;
     document.querySelector('#tab-righe tbody').appendChild(tr);
@@ -173,13 +173,18 @@ function aggiungiRiga(r) {
 
 function aggiornaMagazzino(tr) {
     const a = PER_ID[tr.querySelector('.r-art').value];
-    tr.querySelector('.r-mag').textContent = a ? (a.traccia ? a.quantita + ' ' + a.unita : '—') : '';
+    tr.querySelector('.r-mag').innerHTML = a ? ((a.traccia ? a.quantita + ' ' + esc(a.unita) : '—')
+        + (a.pezzo ? '<br><span class="text-muted">da ' + esc(a.pezzo) + '</span>' : '')) : '';
+    tr.querySelector('.r-up').textContent = '/' + (a ? a.unita_prezzo : 'pz');
 }
+
+// importo = pezzi x prezzo indicato x (kg per pezzo se il prezzo e' al kg)
+const fattore = tr => { const a = PER_ID[tr.querySelector('.r-art').value]; return a ? num(a.fattore) || 1 : 1; };
 
 function cambiaArticolo(sel) {
     const tr = sel.closest('tr');
     const a = PER_ID[sel.value];
-    if (a && !tr.querySelector('.r-p').value) tr.querySelector('.r-p').value = a.costo;
+    if (a) tr.querySelector('.r-p').value = a.costo;
     aggiornaMagazzino(tr);
     ricalcola();
 }
@@ -192,7 +197,7 @@ function ricalcola() {
     let tot = 0;
     const righe = document.querySelectorAll('#tab-righe tbody tr');
     righe.forEach(tr => {
-        const imp = num(tr.querySelector('.r-q').value) * num(tr.querySelector('.r-p').value);
+        const imp = num(tr.querySelector('.r-q').value) * num(tr.querySelector('.r-p').value) * fattore(tr);
         tr.querySelector('.r-imp').textContent = euro(imp);
         tot += imp;
     });

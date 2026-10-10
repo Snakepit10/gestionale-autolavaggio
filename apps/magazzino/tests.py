@@ -330,3 +330,49 @@ class MigrazioneScorteTest(TestCase):
         self.assertFalse(Articolo.objects.get(prodotto=libero).traccia_scorte)
         self.assertEqual(list(a.movimenti.order_by('data').values_list('tipo', 'quantita', 'quantita_dopo')),
                          [('carico', 10, 10), ('scarto', -3, 7)])
+
+
+class ContenutoPrezzoTest(TestCase):
+    """Bidone da 25 kg: prezzo al kg o al pezzo, costo salvato sempre al pezzo."""
+
+    def setUp(self):
+        self.user = utente_titolare('tit', password='x')
+        self.client.force_login(self.user)
+
+    def test_prezzo_al_kg(self):
+        r = _post(self.client, 'articolo-salva', {
+            'nome': 'Shampoo', 'tipo': 'consumabile', 'unita': 'bidoni', 'contenuto': '25',
+            'unita_contenuto': 'kg', 'prezzo_per': 'contenuto', 'costo': '1,37', 'quantita_iniziale': 4})
+        a = Articolo.objects.get(pk=r.json()['id'])
+        self.assertEqual((a.costo, a.costo_indicato, a.unita_prezzo), (Decimal('34.25'), Decimal('1.37'), 'kg'))
+        self.assertEqual((a.quantita_contenuto, a.valore), (Decimal('100'), Decimal('137.00')))
+
+        # ordine con prezzo al kg: importo = 2 bidoni x 25 kg x 1,40
+        fornitore = Fornitore.objects.create(ragione_sociale='Chimica')
+        r = _post(self.client, 'ordine-salva', {'fornitore': fornitore.pk, 'righe': [
+            {'articolo': a.pk, 'quantita': 2, 'prezzo': '1.40'}]})
+        ordine = OrdineFornitore.objects.get(pk=r.json()['id'])
+        riga = ordine.righe.get()
+        self.assertEqual((riga.prezzo, riga.prezzo_indicato, riga.importo, riga.quantita_contenuto),
+                         (Decimal('35.0000'), Decimal('1.4000'), Decimal('70.00'), Decimal('50')))
+        self.assertEqual(_pagina(self.user, 'ordine-stampa', pk=ordine.pk).status_code, 200)
+
+        # consegna: prezzo indicato al kg, aggiorna il costo al pezzo
+        _post(self.client, 'ordine-stato', {'stato': 'inviato'}, pk=ordine.pk)
+        residuo = self.client.get(reverse('magazzino:ordine-residuo', args=[ordine.pk])).json()['righe']
+        self.assertEqual((residuo[0]['prezzo'], residuo[0]['unita_prezzo'], residuo[0]['pezzo']), ('1.4', 'kg', '25 kg'))
+        _post(self.client, 'consegna-registra', {'ordine': ordine.pk, 'righe': [
+            {'riga_ordine': residuo[0]['riga_ordine'], 'quantita': 2, 'prezzo': '1.5'}]})
+        a.refresh_from_db()
+        self.assertEqual((a.quantita, a.costo), (6, Decimal('37.5000')))
+
+    def test_prezzo_al_pezzo_mostra_anche_al_litro(self):
+        a = Articolo.objects.create(nome='Lucidante', unita='flaconi', contenuto=Decimal('0.75'),
+                                    unita_contenuto='l', costo=Decimal('6'))
+        self.assertEqual((a.costo_indicato, a.unita_prezzo, a.costo_al_contenuto), (Decimal('6'), 'flaconi', Decimal('8')))
+
+    def test_validazioni(self):
+        r = _post(self.client, 'articolo-salva', {'nome': 'X', 'contenuto': '25'})
+        self.assertEqual(r.status_code, 400)
+        r = _post(self.client, 'articolo-salva', {'nome': 'X', 'prezzo_per': 'contenuto'})
+        self.assertEqual(r.status_code, 400)

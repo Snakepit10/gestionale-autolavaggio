@@ -31,6 +31,11 @@ class Fornitore(models.Model):
         return self.ragione_sociale
 
 
+UNITA_CONTENUTO_CHOICES = [('kg', 'kg'), ('g', 'g'), ('l', 'litri'), ('ml', 'ml')]
+PREZZO_PER_CHOICES = [('pezzo', 'Al pezzo'), ('contenuto', "All'unità di misura (kg, litro...)")]
+QUATTRO_DECIMALI = Decimal('0.0001')
+
+
 class Articolo(models.Model):
     TIPO_CHOICES = [
         ('vendita', 'Prodotto in vendita'),
@@ -41,12 +46,22 @@ class Articolo(models.Model):
     codice = models.CharField(max_length=50, blank=True)
     tipo = models.CharField(max_length=15, choices=TIPO_CHOICES, default='consumabile')
     categoria = models.CharField(max_length=60, blank=True)
-    unita = models.CharField('Unità di misura', max_length=20, default='pz')
+    unita = models.CharField('Unità di conteggio', max_length=20, default='pz',
+                             help_text='Come si contano: pz, bidoni, flaconi, confezioni...')
+    # Contenuto di un pezzo (es. bidone da 25 kg, flacone da 750 ml)
+    contenuto = models.DecimalField('Contenuto di un pezzo', max_digits=10, decimal_places=3,
+                                    null=True, blank=True)
+    unita_contenuto = models.CharField('Unità del contenuto', max_length=5, blank=True,
+                                       choices=UNITA_CONTENUTO_CHOICES)
+    prezzo_per = models.CharField('Prezzo indicato', max_length=10, choices=PREZZO_PER_CHOICES,
+                                  default='pezzo')
     quantita = models.IntegerField('Quantità in magazzino', default=0)
     scorta_minima = models.IntegerField(default=0)
     traccia_scorte = models.BooleanField(
         default=True, help_text='Se spento la quantità non viene controllata (illimitata)')
-    costo = models.DecimalField('Costo unitario', max_digits=10, decimal_places=2, default=Decimal('0'))
+    # Sempre al pezzo (con 4 decimali, cosi' un prezzo al kg/litro non
+    # perde precisione); le maschere lo mostrano al pezzo o al contenuto
+    costo = models.DecimalField('Costo al pezzo', max_digits=12, decimal_places=4, default=Decimal('0'))
     fornitore = models.ForeignKey(Fornitore, null=True, blank=True, on_delete=models.SET_NULL,
                                   related_name='articoli', verbose_name='Fornitore abituale')
     prodotto = models.OneToOneField(
@@ -64,13 +79,55 @@ class Articolo(models.Model):
     def __str__(self):
         return self.nome
 
+    # --- contenuto e prezzi -------------------------------------------------
+
+    @property
+    def ha_contenuto(self):
+        return bool(self.contenuto and self.unita_contenuto)
+
+    @property
+    def prezzo_al_contenuto(self):
+        """Il prezzo si indica per kg/litro (serve il contenuto del pezzo)."""
+        return self.prezzo_per == 'contenuto' and self.ha_contenuto
+
+    @property
+    def unita_prezzo(self):
+        """Unita' a cui si riferisce il prezzo mostrato: 'kg' o 'pz'."""
+        return self.unita_contenuto if self.prezzo_al_contenuto else self.unita
+
+    @property
+    def fattore_prezzo(self):
+        """Quante unita' di prezzo ci sono in un pezzo."""
+        return self.contenuto if self.prezzo_al_contenuto else Decimal('1')
+
+    def a_pezzo(self, prezzo):
+        """Prezzo indicato (al pezzo o al kg/litro) -> prezzo al pezzo."""
+        return (Decimal(prezzo) * self.fattore_prezzo).quantize(QUATTRO_DECIMALI)
+
+    def da_pezzo(self, prezzo_pezzo):
+        """Prezzo al pezzo -> prezzo da mostrare (al pezzo o al kg/litro)."""
+        return (Decimal(prezzo_pezzo) / self.fattore_prezzo).quantize(QUATTRO_DECIMALI)
+
+    @property
+    def costo_indicato(self):
+        return self.da_pezzo(self.costo)
+
+    @property
+    def costo_al_contenuto(self):
+        return (self.costo / self.contenuto).quantize(QUATTRO_DECIMALI) if self.ha_contenuto else None
+
+    @property
+    def quantita_contenuto(self):
+        """Totale in magazzino in kg/litri (es. 4 bidoni da 25 kg = 100)."""
+        return self.quantita * self.contenuto if self.ha_contenuto else None
+
     @property
     def sotto_scorta(self):
         return self.traccia_scorte and self.quantita <= self.scorta_minima
 
     @property
     def valore(self):
-        return self.costo * max(self.quantita, 0) if self.traccia_scorte else Decimal('0')
+        return (self.costo * max(self.quantita, 0)).quantize(Decimal('0.01')) if self.traccia_scorte             else Decimal('0')
 
     @property
     def assegnati(self):
@@ -177,14 +234,23 @@ class RigaOrdineFornitore(models.Model):
     ordine = models.ForeignKey(OrdineFornitore, on_delete=models.CASCADE, related_name='righe')
     articolo = models.ForeignKey(Articolo, on_delete=models.PROTECT, related_name='righe_ordine')
     quantita = models.PositiveIntegerField()
-    prezzo = models.DecimalField(max_digits=10, decimal_places=2, default=Decimal('0'))
+    prezzo = models.DecimalField('Prezzo al pezzo', max_digits=12, decimal_places=4, default=Decimal('0'))
 
     class Meta:
         ordering = ['pk']
 
     @property
     def importo(self):
-        return self.prezzo * self.quantita
+        return (self.prezzo * self.quantita).quantize(Decimal('0.01'))
+
+    @property
+    def prezzo_indicato(self):
+        return self.articolo.da_pezzo(self.prezzo)
+
+    @property
+    def quantita_contenuto(self):
+        """Totale ordinato in kg/litri."""
+        return self.quantita * self.articolo.contenuto if self.articolo.ha_contenuto else None
 
     @property
     def ricevuto(self):
@@ -216,7 +282,7 @@ class Consegna(models.Model):
 
     @property
     def totale(self):
-        return sum((r.prezzo * r.quantita for r in self.righe.all()), Decimal('0'))
+        return sum((r.importo for r in self.righe.all()), Decimal('0'))
 
 
 class RigaConsegna(models.Model):
@@ -225,10 +291,14 @@ class RigaConsegna(models.Model):
     riga_ordine = models.ForeignKey(RigaOrdineFornitore, null=True, blank=True,
                                     on_delete=models.SET_NULL, related_name='righe_consegna')
     quantita = models.PositiveIntegerField()
-    prezzo = models.DecimalField(max_digits=10, decimal_places=2, default=Decimal('0'))
+    prezzo = models.DecimalField('Prezzo al pezzo', max_digits=12, decimal_places=4, default=Decimal('0'))
 
     class Meta:
         ordering = ['pk']
+
+    @property
+    def importo(self):
+        return (self.prezzo * self.quantita).quantize(Decimal('0.01'))
 
 
 class Assegnazione(models.Model):

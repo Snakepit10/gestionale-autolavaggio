@@ -11,21 +11,24 @@
         {% if not articolo.attivo %}<span class="badge bg-light text-muted fs-6 align-middle">non attivo</span>{% endif %}
     </h1>
     <div class="d-flex gap-2 flex-wrap">
-        <button class="btn btn-outline-success" onclick="apriMovimento({{ articolo.pk }}, '{{ articolo.nome|escapejs }}', 'carico', {{ articolo.quantita }})"><i class="bi bi-box-arrow-in-down"></i> Carico</button>
+        <button class="btn btn-outline-success" onclick="apriMovimento({{ articolo.pk }}, '{{ articolo.nome|escapejs }}', 'carico', {{ articolo.quantita }}, '{{ articolo.unita_prezzo|escapejs }}')"><i class="bi bi-box-arrow-in-down"></i> Carico</button>
         <button class="btn btn-outline-danger" onclick="apriMovimento({{ articolo.pk }}, '{{ articolo.nome|escapejs }}', 'scarto', {{ articolo.quantita }})"><i class="bi bi-trash"></i> Scarto</button>
         <button class="btn btn-outline-secondary" onclick="apriMovimento({{ articolo.pk }}, '{{ articolo.nome|escapejs }}', 'rettifica', {{ articolo.quantita }})"><i class="bi bi-clipboard-check"></i> Inventario</button>
         <a class="btn btn-outline-primary" href="{% url 'magazzino:assegnazioni' %}?articolo={{ articolo.pk }}"><i class="bi bi-person-badge"></i> Assegna</a>
-        <button class="btn btn-primary" onclick='apriArticolo({{ articolo.pk }}, {"nome": "{{ articolo.nome|escapejs }}", "codice": "{{ articolo.codice|escapejs }}", "tipo": "{{ articolo.tipo }}", "categoria": "{{ articolo.categoria|escapejs }}", "unita": "{{ articolo.unita|escapejs }}", "scorta_minima": {{ articolo.scorta_minima }}, "traccia_scorte": {{ articolo.traccia_scorte|yesno:"true,false" }}, "costo": "{{ articolo.costo }}", "fornitore": "{{ articolo.fornitore_id|default_if_none:"" }}", "attivo": {{ articolo.attivo|yesno:"true,false" }}, "note": "{{ articolo.note|escapejs }}"})'><i class="bi bi-pencil"></i> Modifica</button>
+        <button class="btn btn-primary" onclick="apriArticolo({{ articolo.pk }}, {{ articolo.dati_modifica }})"><i class="bi bi-pencil"></i> Modifica</button>
     </div>
 </div>
 
 <div class="row g-3 mb-3">
     <div class="col-6 col-md-3"><div class="kpi"><div class="l">In magazzino</div>
         <div class="v {% if articolo.quantita < 0 or articolo.sotto_scorta %}text-danger{% endif %}">
-            {% if articolo.traccia_scorte %}{{ articolo.quantita }} <small class="fs-6 text-muted">{{ articolo.unita }}</small>{% else %}<small class="fs-6">non tracciato</small>{% endif %}</div></div></div>
+            {% if articolo.traccia_scorte %}{{ articolo.quantita }} <small class="fs-6 text-muted">{{ articolo.unita }}</small>{% else %}<small class="fs-6">non tracciato</small>{% endif %}</div>
+            {% if articolo.ha_contenuto and articolo.traccia_scorte %}<small class="text-muted">= {{ articolo.quantita_contenuto|floatformat:"-2" }} {{ articolo.unita_contenuto }}</small>{% endif %}</div></div>
     <div class="col-6 col-md-3"><div class="kpi"><div class="l">Assegnati</div><div class="v">{{ articolo.assegnati }}</div></div></div>
     <div class="col-6 col-md-3"><div class="kpi"><div class="l">Scorta minima</div><div class="v">{{ articolo.scorta_minima }}</div></div></div>
-    <div class="col-6 col-md-3"><div class="kpi"><div class="l">Costo / valore</div><div class="v">&euro;{{ articolo.costo|floatformat:2 }} <small class="fs-6 text-muted">/ &euro;{{ articolo.valore|floatformat:2 }}</small></div></div></div>
+    <div class="col-6 col-md-3"><div class="kpi"><div class="l">Costo</div>
+        <div class="v">&euro;{{ articolo.costo_indicato|floatformat:"-4" }}<small class="fs-6 text-muted">/{{ articolo.unita_prezzo }}</small></div>
+        <small class="text-muted">{% if articolo.prezzo_al_contenuto %}&euro;{{ articolo.costo|floatformat:2 }}/{{ articolo.unita }} &middot; {% elif articolo.ha_contenuto %}&euro;{{ articolo.costo_al_contenuto|floatformat:"-4" }}/{{ articolo.unita_contenuto }} &middot; {% endif %}valore &euro;{{ articolo.valore|floatformat:2 }}</small></div></div>
 </div>
 
 <div class="row g-3">
@@ -35,6 +38,7 @@
             <div class="section-body pad small">
                 <dl class="row mb-0">
                     <dt class="col-5">Codice</dt><dd class="col-7">{{ articolo.codice|default:"—" }}</dd>
+                    <dt class="col-5">Pezzo</dt><dd class="col-7">{{ articolo.unita }}{% if articolo.ha_contenuto %} da {{ articolo.contenuto|floatformat:"-3" }} {{ articolo.unita_contenuto }}{% endif %}</dd>
                     <dt class="col-5">Categoria</dt><dd class="col-7">{{ articolo.categoria|default:"—" }}</dd>
                     <dt class="col-5">Fornitore</dt><dd class="col-7">{{ articolo.fornitore|default:"—" }}</dd>
                     <dt class="col-5">In cassa</dt><dd class="col-7">{% if articolo.prodotto %}<a href="{% url 'core:catalogo-update' articolo.prodotto.pk %}">{{ articolo.prodotto.titolo }}</a> (&euro;{{ articolo.prodotto.prezzo }}){% else %}—{% endif %}</dd>

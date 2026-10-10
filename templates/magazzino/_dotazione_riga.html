@@ -1,7 +1,7 @@
 <div class="dot-card">
     <div class="q">{{ a.quantita }}</div>
     <div class="n">
-        <strong>{{ a.articolo.nome }}</strong>
+        <strong>{{ a.articolo.nome }}{% if a.articolo.ha_contenuto %} <small class="text-muted fw-normal">da {{ a.articolo.contenuto|floatformat:"-3" }} {{ a.articolo.unita_contenuto }}</small>{% endif %}</strong>
         <span class="badge bg-{{ a.colore_stato }}">{{ a.get_stato_display }}</span>
         <small class="text-muted">dal {{ a.data|date:"d/m/Y" }}{% if a.note %} &middot; {{ a.note }}{% endif %}</small>
     </div>

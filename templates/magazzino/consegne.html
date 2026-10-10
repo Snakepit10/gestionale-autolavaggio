@@ -95,7 +95,7 @@
                     <div class="col-md-2"><label class="form-label">N° DDT / bolla</label><input type="text" class="form-control" id="con-ddt"></div>
                 </div>
                 <table class="table table-sm" id="con-righe">
-                    <thead><tr><th>Articolo</th><th class="text-end">Ordinato / da ricevere</th><th style="width:120px">Ricevuto</th><th style="width:130px">Prezzo &euro;</th><th></th></tr></thead>
+                    <thead><tr><th>Articolo</th><th class="text-end">Ordinato / da ricevere</th><th style="width:120px">Ricevuto</th><th style="width:170px">Prezzo &euro;</th><th></th></tr></thead>
                     <tbody></tbody>
                 </table>
                 <button class="btn btn-sm btn-outline-success" onclick="rigaConsegna()"><i class="bi bi-plus"></i> Articolo non in ordine</button>
@@ -126,11 +126,11 @@ function rigaConsegna(r) {
     const tr = document.createElement('tr');
     if (r.riga_ordine) tr.dataset.rigaOrdine = r.riga_ordine;
     tr.innerHTML = `
-        <td>${r.riga_ordine ? `<strong>${esc(r.nome)}</strong><input type="hidden" class="c-art" value="${r.articolo}">`
+        <td>${r.riga_ordine ? `<strong>${esc(r.nome)}</strong>${r.pezzo ? ' <small class="text-muted">da ' + esc(r.pezzo) + '</small>' : ''}<input type="hidden" class="c-art" value="${r.articolo}">`
                             : `<select class="form-select form-select-sm c-art" onchange="prezzoDefault(this)">${opzioni(r.articolo)}</select>`}</td>
         <td class="text-end small text-muted">${r.riga_ordine ? r.ordinato + ' / <strong>' + r.quantita + '</strong>' : 'fuori ordine'}</td>
         <td><input type="number" min="0" class="form-control form-control-sm c-q" value="${r.quantita != null ? r.quantita : 1}"></td>
-        <td><input type="text" inputmode="decimal" class="form-control form-control-sm c-p" value="${r.prezzo != null ? r.prezzo : ''}"></td>
+        <td><div class="input-group input-group-sm"><input type="text" inputmode="decimal" class="form-control c-p" value="${r.prezzo != null ? r.prezzo : ''}"><span class="input-group-text c-up">/${esc(r.unita_prezzo || 'pz')}</span></div></td>
         <td class="text-end"><button class="btn btn-sm btn-outline-danger" onclick="this.closest('tr').remove()"><i class="bi bi-x"></i></button></td>`;
     document.querySelector('#con-righe tbody').appendChild(tr);
 }
@@ -138,7 +138,8 @@ function rigaConsegna(r) {
 function prezzoDefault(sel) {
     const a = ARTICOLI.find(x => x.id == sel.value);
     const p = sel.closest('tr').querySelector('.c-p');
-    if (a && !p.value) p.value = a.costo;
+    if (a) p.value = a.costo;
+    sel.closest('tr').querySelector('.c-up').textContent = '/' + (a ? a.unita_prezzo : 'pz');
 }
 
 async function caricaOrdine(id) {

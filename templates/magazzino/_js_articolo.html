@@ -11,6 +11,10 @@ function apriArticolo(id, a) {
     document.getElementById('art-tipo').value = a.tipo || 'consumabile';
     document.getElementById('art-categoria').value = a.categoria || '';
     document.getElementById('art-unita').value = a.unita || 'pz';
+    document.getElementById('art-contenuto').value = a.contenuto || '';
+    document.getElementById('art-unita-contenuto').value = a.unita_contenuto || '';
+    document.getElementById(a.prezzo_per === 'contenuto' ? 'art-pp-contenuto' : 'art-pp-pezzo').checked = true;
+    basePrezzoAttuale = a.prezzo_per === 'contenuto' ? 'contenuto' : 'pezzo';
     document.getElementById('art-scorta').value = a.scorta_minima != null ? a.scorta_minima : 0;
     document.getElementById('art-traccia').checked = a.traccia_scorte !== false;
     document.getElementById('art-costo').value = a.costo || '0';
@@ -19,6 +23,7 @@ function apriArticolo(id, a) {
     document.getElementById('art-attivo').checked = a.attivo !== false;
     document.getElementById('art-iniziale').value = 0;
     document.getElementById('art-iniziale-box').classList.toggle('d-none', !!id);
+    aggiornaPrezzo();
     document.getElementById('art-errore').classList.add('d-none');
     bootstrap.Modal.getOrCreateInstance(document.getElementById('modaleArticolo')).show();
     setTimeout(() => document.getElementById('art-nome').focus(), 300);
@@ -29,6 +34,8 @@ async function salvaArticolo() {
     const j = await postJSON(URL_ARTICOLO_SALVA, {
         id: val('art-id') || null, nome: val('art-nome'), codice: val('art-codice'), tipo: val('art-tipo'),
         categoria: val('art-categoria'), unita: val('art-unita'), scorta_minima: val('art-scorta'),
+        contenuto: val('art-contenuto'), unita_contenuto: val('art-unita-contenuto'),
+        prezzo_per: document.querySelector('[name=art-prezzo-per]:checked').value,
         traccia_scorte: document.getElementById('art-traccia').checked, costo: val('art-costo'),
         fornitore: val('art-fornitore') || null, note: val('art-note'),
         attivo: document.getElementById('art-attivo').checked, quantita_iniziale: val('art-iniziale'),
@@ -41,6 +48,54 @@ async function salvaArticolo() {
     location.reload();
 }
 
+// --- contenuto del pezzo e prezzo al pezzo / al kg ---
+const numero = v => Number(String(v || '').replace(',', '.')) || 0;
+const cifre = v => String(Math.round(v * 10000) / 10000).replace('.', ',');
+let basePrezzoAttuale = 'pezzo';
+
+function datiPezzo() {
+    return {
+        contenuto: numero(document.getElementById('art-contenuto').value),
+        unita: document.getElementById('art-unita-contenuto').value,
+        conta: document.getElementById('art-unita').value || 'pz',
+    };
+}
+
+function cambiaBasePrezzo() {
+    // converte il prezzo scritto nella nuova base
+    const p = datiPezzo();
+    const nuova = document.querySelector('[name=art-prezzo-per]:checked').value;
+    const costo = document.getElementById('art-costo');
+    if (p.contenuto && p.unita && numero(costo.value) && nuova !== basePrezzoAttuale) {
+        costo.value = cifre(nuova === 'contenuto' ? numero(costo.value) / p.contenuto : numero(costo.value) * p.contenuto);
+    }
+    basePrezzoAttuale = nuova;
+    aggiornaPrezzo();
+}
+
+function aggiornaPrezzo() {
+    const p = datiPezzo();
+    const conContenuto = !!(p.contenuto && p.unita);
+    const perContenuto = document.getElementById('art-pp-contenuto');
+    perContenuto.disabled = !conContenuto;
+    if (!conContenuto && perContenuto.checked) {
+        document.getElementById('art-pp-pezzo').checked = true;
+        basePrezzoAttuale = 'pezzo';
+    }
+    document.getElementById('art-pp-pezzo-l').textContent = 'al pezzo (' + p.conta + ')';
+    document.getElementById('art-pp-contenuto-l').textContent = conContenuto ? 'al ' + p.unita : 'al kg / litro';
+    const base = document.querySelector('[name=art-prezzo-per]:checked').value;
+    document.getElementById('art-costo-l').textContent = 'Costo ' + (base === 'contenuto' ? 'al ' + p.unita : 'al pezzo') + ' (€)';
+    const costo = numero(document.getElementById('art-costo').value);
+    let altro = '';
+    if (conContenuto && costo) {
+        altro = base === 'contenuto'
+            ? '= €' + cifre(costo * p.contenuto) + ' al pezzo (' + cifre(p.contenuto) + ' ' + p.unita + ')'
+            : '= €' + cifre(costo / p.contenuto) + ' al ' + p.unita;
+    }
+    document.getElementById('art-costo-altro').textContent = altro;
+}
+
 const SPIEGA_MOVIMENTO = {
     carico: 'Merce entrata in magazzino senza una consegna registrata (per le consegne dei fornitori usa il Registro consegne).',
     scarto: 'Merce tolta dal magazzino: rotta, scaduta, usata in sede.',
@@ -48,8 +103,9 @@ const SPIEGA_MOVIMENTO = {
 };
 let movQuantitaAttuale = 0;
 
-function apriMovimento(id, nome, tipo, attuale) {
+function apriMovimento(id, nome, tipo, attuale, unitaPrezzo) {
     movQuantitaAttuale = attuale;
+    document.getElementById('mov-costo-l').textContent = 'Costo ' + (unitaPrezzo ? 'al ' + unitaPrezzo : 'unitario') + ' (€)';
     document.getElementById('mov-articolo').value = id;
     document.getElementById('mov-titolo').textContent = nome + ' (ora ' + attuale + ')';
     document.getElementById('mov-' + tipo).checked = true;

@@ -17,7 +17,7 @@ from apps.auth_system.sezioni import ha_accesso
 from apps.cq.models import PostazioneCQ
 
 from . import services
-from .models import (Articolo, Assegnazione, Consegna, Fornitore, Movimento, OrdineFornitore,
+from .models import (UNITA_CONTENUTO_CHOICES, Articolo, Assegnazione, Consegna, Fornitore, Movimento, OrdineFornitore,
                      RigaConsegna, RigaOrdineFornitore, StatoAssegnazione)
 
 
@@ -88,8 +88,35 @@ def _articoli_json(solo_attivi=True):
     if solo_attivi:
         qs = qs.filter(attivo=True)
     return [{'id': a.pk, 'nome': a.nome, 'tipo': a.tipo, 'unita': a.unita, 'quantita': a.quantita,
-             'traccia': a.traccia_scorte, 'costo': str(a.costo), 'fornitore': a.fornitore_id}
+             'traccia': a.traccia_scorte, 'fornitore': a.fornitore_id,
+             # prezzo come lo si indica: al pezzo o al kg/litro
+             'costo': _fmt(a.costo_indicato), 'unita_prezzo': a.unita_prezzo,
+             'fattore': str(a.fattore_prezzo), 'pezzo': _descrizione_pezzo(a)}
             for a in qs.order_by('nome')]
+
+
+def _fmt(valore):
+    """Decimale senza zeri inutili (8.2000 -> '8.2')."""
+    testo = format(Decimal(valore).normalize(), 'f')
+    return testo
+
+
+def _dati_modifica(a):
+    """Valori del modale di modifica articolo (numeri non localizzati)."""
+    return json.dumps({
+        'nome': a.nome, 'codice': a.codice, 'tipo': a.tipo, 'categoria': a.categoria, 'unita': a.unita,
+        'contenuto': _fmt(a.contenuto) if a.contenuto else '', 'unita_contenuto': a.unita_contenuto,
+        'prezzo_per': a.prezzo_per, 'scorta_minima': a.scorta_minima, 'traccia_scorte': a.traccia_scorte,
+        'costo': _fmt(a.costo_indicato), 'fornitore': a.fornitore_id or '', 'attivo': a.attivo,
+        'note': a.note, 'unita_prezzo': a.unita_prezzo,
+    })
+
+
+def _descrizione_pezzo(a):
+    if not a.ha_contenuto:
+        return ''
+    return f'{_fmt(a.contenuto)} {a.unita_contenuto}'
+
 
 
 def _contesto_base(attiva):
@@ -127,11 +154,13 @@ def articoli(request):
                      .values('articolo').annotate(t=Sum('quantita')).values_list('articolo', 't'))
     for a in lista:
         a.n_assegnati = assegnati.get(a.pk, 0)
+        a.dati_modifica = _dati_modifica(a)
 
     ctx = _contesto_base('articoli')
     ctx.update({
         'articoli': lista,
         'tipi': Articolo.TIPO_CHOICES,
+        'unita_contenuto': UNITA_CONTENUTO_CHOICES,
         'categorie': _categorie_articoli(),
         'fornitori': Fornitore.objects.filter(attivo=True),
         'filtro': {'tipo': tipo, 'categoria': categoria, 'q': cerca, 'sotto': sotto, 'tutti': not attivi},
@@ -145,6 +174,7 @@ def articoli(request):
 @magazzino_required
 def articolo_scheda(request, pk):
     articolo = get_object_or_404(Articolo.objects.select_related('fornitore', 'prodotto'), pk=pk)
+    articolo.dati_modifica = _dati_modifica(articolo)
     ctx = _contesto_base('articoli')
     ctx.update({
         'articolo': articolo,
@@ -156,6 +186,7 @@ def articolo_scheda(request, pk):
             articolo=articolo, ordine__stato__in=('inviato', 'parziale')).select_related('ordine')
             if r.residuo > 0],
         'tipi': Articolo.TIPO_CHOICES,
+        'unita_contenuto': UNITA_CONTENUTO_CHOICES,
         'categorie': _categorie_articoli(),
         'fornitori': Fornitore.objects.filter(attivo=True),
     })
@@ -181,9 +212,19 @@ def articolo_salva(request):
     articolo.tipo = tipo
     articolo.categoria = (d.get('categoria') or '').strip()
     articolo.unita = (d.get('unita') or 'pz').strip() or 'pz'
+    contenuto = _decimale(d.get('contenuto'))
+    articolo.contenuto = contenuto if contenuto > 0 else None
+    articolo.unita_contenuto = d.get('unita_contenuto') or ''
+    if articolo.unita_contenuto not in dict(UNITA_CONTENUTO_CHOICES):
+        articolo.unita_contenuto = ''
+    if bool(articolo.contenuto) != bool(articolo.unita_contenuto):
+        return _errore('Indica sia il contenuto del pezzo sia la sua unità (es. 25 kg)')
+    articolo.prezzo_per = 'contenuto' if d.get('prezzo_per') == 'contenuto' else 'pezzo'
+    if articolo.prezzo_per == 'contenuto' and not articolo.ha_contenuto:
+        return _errore('Per indicare il prezzo al kg/litro serve il contenuto del pezzo')
     articolo.scorta_minima = max(_intero(d.get('scorta_minima')), 0)
     articolo.traccia_scorte = bool(d.get('traccia_scorte', True))
-    articolo.costo = _decimale(d.get('costo'))
+    articolo.costo = articolo.a_pezzo(_decimale(d.get('costo')))
     articolo.fornitore_id = d.get('fornitore') or None
     articolo.attivo = bool(d.get('attivo', True))
     articolo.note = d.get('note') or ''
@@ -218,7 +259,7 @@ def articolo_movimento(request, pk):
         if quantita <= 0:
             return _errore('Quantità non valida')
         if tipo == 'carico' and _decimale(d.get('costo')) > 0:
-            articolo.costo = _decimale(d.get('costo'))
+            articolo.costo = articolo.a_pezzo(_decimale(d.get('costo')))
             articolo.save(update_fields=['costo'])
         mov = services.movimenta(articolo, quantita if tipo == 'carico' else -quantita, tipo,
                                  operatore=request.user, nota=nota)
@@ -320,7 +361,7 @@ def ordine_scheda(request, pk=None):
     ordine = get_object_or_404(OrdineFornitore.objects.select_related('fornitore'), pk=pk) if pk else None
     righe = []
     if ordine:
-        righe = [{'articolo': r.articolo_id, 'quantita': r.quantita, 'prezzo': str(r.prezzo),
+        righe = [{'articolo': r.articolo_id, 'quantita': r.quantita, 'prezzo': _fmt(r.prezzo_indicato),
                   'ricevuto': r.ricevuto} for r in ordine.righe.select_related('articolo')]
     ctx = _contesto_base('ordini')
     ctx.update({
@@ -347,7 +388,7 @@ def ordine_salva(request):
         articolo = Articolo.objects.filter(pk=r.get('articolo')).first()
         quantita = _intero(r.get('quantita'))
         if articolo and quantita > 0:
-            righe.append((articolo, quantita, _decimale(r.get('prezzo'))))
+            righe.append((articolo, quantita, articolo.a_pezzo(_decimale(r.get('prezzo')))))
     if not righe:
         return _errore("Aggiungi almeno un articolo con quantità")
     with transaction.atomic():
@@ -427,7 +468,7 @@ def proponi_sotto_scorta(request):
             articolo=a, ordine__stato__in=('inviato', 'parziale')))
         quantita = max(a.scorta_minima * 2, 1) - a.quantita - in_arrivo
         if quantita > 0:
-            righe.append({'articolo': a.pk, 'quantita': quantita, 'prezzo': str(a.costo)})
+            righe.append({'articolo': a.pk, 'quantita': quantita, 'prezzo': _fmt(a.costo_indicato)})
     return JsonResponse({'success': True, 'righe': righe})
 
 
@@ -466,7 +507,8 @@ def ordine_residuo(request, pk):
     """Righe ancora da ricevere di un ordine (per precompilare la consegna)."""
     ordine = get_object_or_404(OrdineFornitore, pk=pk)
     righe = [{'riga_ordine': r.pk, 'articolo': r.articolo_id, 'nome': r.articolo.nome,
-              'ordinato': r.quantita, 'quantita': r.residuo, 'prezzo': str(r.prezzo)}
+              'ordinato': r.quantita, 'quantita': r.residuo, 'prezzo': _fmt(r.prezzo_indicato),
+              'unita_prezzo': r.articolo.unita_prezzo, 'pezzo': _descrizione_pezzo(r.articolo)}
              for r in ordine.righe.select_related('articolo') if r.residuo > 0]
     return JsonResponse({'success': True, 'fornitore': ordine.fornitore_id, 'righe': righe})
 
@@ -494,7 +536,7 @@ def consegna_registra(request):
         articolo = riga_ordine.articolo if riga_ordine else Articolo.objects.filter(pk=r.get('articolo')).first()
         if articolo is None:
             continue
-        righe.append((articolo, riga_ordine, quantita, _decimale(r.get('prezzo'))))
+        righe.append((articolo, riga_ordine, quantita, articolo.a_pezzo(_decimale(r.get('prezzo')))))
     if not righe:
         return _errore('Nessun articolo con quantità ricevuta')
     with transaction.atomic():
@@ -547,7 +589,7 @@ def _per_destinatario(assegnazioni):
             gruppi[chiave] = {'tipo': chiave[0], 'nome': a.destinatario, 'righe': [],
                               'valore': Decimal('0')}
         gruppi[chiave]['righe'].append(a)
-        gruppi[chiave]['valore'] += a.articolo.costo * a.quantita
+        gruppi[chiave]['valore'] += (a.articolo.costo * a.quantita).quantize(Decimal('0.01'))
     return list(gruppi.values())
 
 
