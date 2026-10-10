@@ -174,7 +174,7 @@
       <div class="kpi-tile info h-100">
         <div class="label">Ordini giornata</div>
         <div class="value">{{ kpis.num_ordini }}</div>
-        <div class="sub">{{ kpis.num_transazioni }} transazioni &middot; &euro;{{ kpis.scontrino_medio|floatformat:2 }} avg</div>
+        <div class="sub">{{ kpis.num_transazioni }} transazioni &middot; &euro;{{ kpis.scontrino_medio|floatformat:2 }} avg{% if rp.n_vendite %} &middot; + {{ rp.n_vendite }} vendit{{ rp.n_vendite|pluralize:"a,e" }} prodotti{% endif %}</div>
       </div>
     </div>
     <div class="col-12 col-lg-4">
@@ -522,6 +522,9 @@
       </div>
     </div>
   </div>
+
+  {# ====== Vendita prodotti ====== #}
+  {% include 'finanze/_vendita_prodotti_report.html' with link_scheda=link_scheda_prodotti %}
 
   {# ====== Dettagli cassa servito + automatiche ====== #}
   <div class="row g-2 mb-3">

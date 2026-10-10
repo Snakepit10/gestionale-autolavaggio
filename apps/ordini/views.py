@@ -1007,31 +1007,12 @@ class VenditaProdottiView(LoginRequiredMixin, TemplateView):
             .prefetch_related('items__servizio_prodotto')
             .order_by('-data_ora'))
 
-        righe = (ItemOrdine.objects
-                 .filter(ordine__data_ora__date=data, servizio_prodotto__tipo='prodotto')
-                 .exclude(ordine__stato='annullato')
-                 .select_related('servizio_prodotto', 'ordine'))
-        prodotti = {}
-        for it in righe:
-            voce = prodotti.setdefault(it.servizio_prodotto_id, {
-                'prodotto': it.servizio_prodotto, 'quantita': 0, 'incasso': Decimal('0.00'),
-                'in_ordini': 0,
-            })
-            voce['quantita'] += it.quantita
-            voce['incasso'] += it.subtotale
-            if not it.ordine.vendita_prodotti:
-                voce['in_ordini'] += it.quantita
-        prodotti = sorted(prodotti.values(), key=lambda v: (-v['incasso'], v['prodotto'].titolo))
-
         oggi = timezone.localdate()
         context.update({
             'data': data, 'oggi': oggi,
             'data_prev': data - timedelta(days=1), 'data_next': data + timedelta(days=1),
             'vendite': vendite,
             'totale_vendite': sum((v.totale_finale or Decimal('0.00') for v in vendite), Decimal('0.00')),
-            'prodotti': prodotti,
-            'pezzi': sum(p['quantita'] for p in prodotti),
-            'totale_prodotti': sum((p['incasso'] for p in prodotti), Decimal('0.00')),
             'catalogo_prodotti': [
                 {'id': p.pk, 'titolo': p.titolo, 'prezzo': float(p.prezzo),
                  'disponibili': p.quantita_disponibile}

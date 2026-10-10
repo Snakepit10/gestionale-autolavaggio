@@ -1124,6 +1124,10 @@ def report_giornata(request):
         'orario_counts_json': json.dumps(orario_counts),
     }
     context.update(contesto_portali)
+    from django.urls import reverse
+    from apps.ordini.vendite import riepilogo_prodotti
+    context['rp'] = riepilogo_prodotti(data, data)
+    context['link_scheda_prodotti'] = f"{reverse('ordini:vendita-prodotti')}?data={data:%Y-%m-%d}"
     context.update({
         'spese_cassa': spese_cassa,
         'totale_spese_cassa': totale_spese_cassa,
@@ -1806,6 +1810,7 @@ def report_periodo(request):
     giorni_periodo = (data_fine - data_inizio).days + 1
 
     # ==================== AGGREGATI ORDINI ====================
+    from apps.ordini.vendite import riepilogo_prodotti
     ordini_qs = Ordine.objects.filter(
         data_ora__date__gte=data_inizio,
         data_ora__date__lte=data_fine,
@@ -2179,6 +2184,7 @@ def report_periodo(request):
         'fatturato_medio_giornaliero': fatturato_medio_giornaliero,
         'num_ordini': num_ordini,
         'scontrino_medio': scontrino_medio,
+        'rp': riepilogo_prodotti(data_inizio, data_fine),
         'variazione_pct': variazione_pct,
         'fatturato_prev': fatturato_prev,
         # Canali

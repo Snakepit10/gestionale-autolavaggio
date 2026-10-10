@@ -1,0 +1,55 @@
+{# Sezione "Vendita prodotti" dei report. Parametri: rp (riepilogo_prodotti), link_scheda, periodo (True nel report di periodo) #}
+<div class="chart-panel mb-3" style="height:auto">
+  <div class="panel-title">
+    <i class="bi bi-bag text-primary"></i> Vendita prodotti
+    <a href="{{ link_scheda }}" class="ms-auto small text-decoration-none" style="text-transform:none; letter-spacing:0; font-weight:600;">
+      Apri la scheda <i class="bi bi-box-arrow-up-right"></i>
+    </a>
+  </div>
+  <div class="panel-sub">Vendite di soli prodotti alla cassa (numerazione V-…) e prodotti aggiunti dentro gli ordini di lavaggio</div>
+  <div class="panel-body">
+    <div class="row g-2 mb-2">
+      <div class="col-6 col-lg-3">
+        <div class="text-muted small text-uppercase fw-bold">Vendite prodotti</div>
+        <div class="fs-4 fw-bold">{{ rp.n_vendite }}</div>
+        <div class="small text-muted">&euro;{{ rp.totale_vendite|floatformat:2 }}</div>
+      </div>
+      <div class="col-6 col-lg-3">
+        <div class="text-muted small text-uppercase fw-bold">Pezzi venduti</div>
+        <div class="fs-4 fw-bold">{{ rp.pezzi }}</div>
+        <div class="small text-muted">{% if periodo %}nel periodo{% else %}nella giornata{% endif %}</div>
+      </div>
+      <div class="col-6 col-lg-3">
+        <div class="text-muted small text-uppercase fw-bold">Totale prodotti</div>
+        <div class="fs-4 fw-bold text-primary">&euro;{{ rp.totale_prodotti|floatformat:2 }}</div>
+        <div class="small text-muted">vendite + dentro gli ordini</div>
+      </div>
+      <div class="col-6 col-lg-3">
+        <div class="text-muted small text-uppercase fw-bold">Dentro gli ordini</div>
+        <div class="fs-4 fw-bold">&euro;{{ rp.totale_in_ordini|floatformat:2 }}</div>
+        <div class="small text-muted">prodotti aggiunti a un lavaggio</div>
+      </div>
+    </div>
+    {% if rp.prodotti %}
+    <div class="table-responsive">
+      <table class="table table-sm mb-0">
+        <thead class="table-light">
+          <tr><th>Prodotto</th><th class="text-end">Pezzi</th><th class="text-end">Di cui in ordini</th><th class="text-end">Incasso</th></tr>
+        </thead>
+        <tbody>
+          {% for p in rp.prodotti %}
+          <tr>
+            <td>{{ p.prodotto.titolo }}</td>
+            <td class="text-end">{{ p.quantita }}</td>
+            <td class="text-end text-muted">{% if p.in_ordini %}{{ p.in_ordini }}{% else %}—{% endif %}</td>
+            <td class="text-end fw-bold">&euro;{{ p.incasso|floatformat:2 }}</td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+    {% else %}
+    <div class="text-muted text-center py-3">Nessun prodotto venduto {% if periodo %}nel periodo{% else %}in questa giornata{% endif %}</div>
+    {% endif %}
+  </div>
+</div>

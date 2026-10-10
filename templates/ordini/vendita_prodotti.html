@@ -14,14 +14,11 @@
 .section-card .section-title .label i { font-size:1.05rem; }
 .section-card .section-title .count { background:#f1f5f9; color:#475569; font-size:.78rem; font-weight:600; padding:2px 10px; border-radius:20px; }
 .section-card.accent-blue { border-left:4px solid #3b82f6; }
-.section-card.accent-green { border-left:4px solid #10b981; }
 .section-card.accent-blue .section-title .label i { color:#3b82f6; }
-.section-card.accent-green .section-title .label i { color:#10b981; }
 .section-card .section-body { padding: 0; }
 .section-card table { margin-bottom:0; }
 .section-card table thead th { background:#eef2f7; color:#475569; font-size:.72rem; text-transform:uppercase; letter-spacing:.4px; font-weight:600; border-bottom:1px solid #dbe2ea; padding: 12px 14px; }
 .section-card.accent-blue table thead th { background:#eff6ff; color:#1e40af; border-bottom-color:#dbeafe; }
-.section-card.accent-green table thead th { background:#f0fdf4; color:#14532d; border-bottom-color:#dcfce7; }
 .section-card table tbody td { padding: 12px 14px; border-color:#f1f5f9; vertical-align:middle; }
 .section-card table tbody tr { transition: background .12s; }
 .section-card table tbody tr:hover { background:#fafbfc; }
@@ -168,41 +165,6 @@
             <i class="bi bi-bag"></i>
             <h5>Nessuna Vendita</h5>
             <p class="mb-0">Non ci sono vendite di soli prodotti in questa giornata.</p>
-        </div>
-        {% endif %}
-    </div>
-</div>
-
-<!-- Prodotti venduti (riepilogo, anche dentro gli ordini di lavaggio) -->
-<div class="section-card accent-green">
-    <div class="section-title">
-        <div class="label"><i class="bi bi-box-seam"></i> Prodotti venduti</div>
-        <span class="count">{{ pezzi }} pz &middot; &euro;{{ totale_prodotti|floatformat:2 }}</span>
-    </div>
-    <div class="section-body">
-        {% if prodotti %}
-        <div class="table-responsive">
-            <table class="table table-hover">
-                <thead>
-                    <tr><th>Prodotto</th><th class="text-end">Quantità</th><th class="text-end">Di cui in ordini di lavaggio</th><th class="text-end">Incasso</th></tr>
-                </thead>
-                <tbody>
-                    {% for p in prodotti %}
-                    <tr>
-                        <td><strong>{{ p.prodotto.titolo }}</strong></td>
-                        <td class="text-end">{{ p.quantita }}</td>
-                        <td class="text-end text-muted">{% if p.in_ordini %}{{ p.in_ordini }}{% else %}—{% endif %}</td>
-                        <td class="text-end"><strong>€{{ p.incasso|floatformat:2 }}</strong></td>
-                    </tr>
-                    {% endfor %}
-                </tbody>
-            </table>
-        </div>
-        {% else %}
-        <div class="empty-state">
-            <i class="bi bi-box-seam"></i>
-            <h5>Nessun Prodotto Venduto</h5>
-            <p class="mb-0">Né nelle vendite né dentro gli ordini di questa giornata.</p>
         </div>
         {% endif %}
     </div>

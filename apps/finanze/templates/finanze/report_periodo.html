@@ -316,6 +316,10 @@
     </div>
   </div>
 
+  {# ====== Vendita prodotti ====== #}
+  {% url 'ordini:vendita-prodotti' as url_scheda %}
+  {% include 'finanze/_vendita_prodotti_report.html' with link_scheda=url_scheda periodo=True %}
+
   {# ====== Washcycles: aggregato / servito / self ====== #}
   <div class="row g-2 mb-3 mt-1">
     <div class="col-12">

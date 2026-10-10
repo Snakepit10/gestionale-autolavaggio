@@ -105,8 +105,12 @@ class VenditaProdottiTest(TestCase):
         vista = VenditaProdottiView(); vista.setup(req)
         ctx = vista.get_context_data()
         self.assertEqual([x.pk for x in ctx['vendite']], [v.pk])
-        self.assertEqual((ctx['pezzi'], ctx['totale_prodotti']), (3, Decimal('15.00')))
-        self.assertEqual(ctx['prodotti'][0]['in_ordini'], 1)
+
+        from apps.ordini.vendite import riepilogo_prodotti
+        rp = riepilogo_prodotti(oggi, oggi)
+        self.assertEqual((rp['n_vendite'], rp['pezzi'], rp['totale_prodotti'], rp['totale_in_ordini']),
+                         (1, 3, Decimal('15.00'), Decimal('5.00')))
+        self.assertEqual(rp['prodotti'][0]['in_ordini'], 1)
 
         lista = OrdiniListView(); lista.setup(req); lista.object_list = []
         ctx = lista.get_context_data()
