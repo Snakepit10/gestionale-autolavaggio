@@ -434,3 +434,97 @@ class FotoArticoloTest(TestCase):
         r = self.client.post(reverse('magazzino:articolo-foto-carica', args=[a.pk]), {'foto': self._immagine(100)},
                              HTTP_X_REQUESTED_WITH='XMLHttpRequest')
         self.assertEqual(r.status_code, 403)
+
+
+class VenditaCatalogoTest(TestCase):
+    """Articoli in vendita e prodotti del catalogo coincidono."""
+
+    def setUp(self):
+        self.user = utente_titolare('tit', password='x')
+        self.client.force_login(self.user)
+        self.prodotti = Categoria.objects.create(nome='Prodotti')
+        self.ricariche = Categoria.objects.create(nome='Credito Carte fedeltà', senza_magazzino=True)
+
+    def _salva(self, **dati):
+        base = {'nome': 'Trattamento plastiche 500 ml', 'tipo': 'vendita', 'categoria': 'Detergenti per interno',
+                'prezzo_vendita': '12,50', 'categoria_catalogo': self.prodotti.pk, 'quantita_iniziale': 6,
+                'scorta_minima': 2}
+        base.update(dati)
+        return _post(self.client, 'articolo-salva', base)
+
+    def test_articolo_in_vendita_diventa_prodotto_in_cassa(self):
+        a = Articolo.objects.get(pk=self._salva().json()['id'])
+        p = a.prodotto
+        self.assertEqual((p.titolo, p.tipo, p.prezzo, p.categoria, p.gruppo, p.attivo, p.quantita_disponibile,
+                          p.quantita_minima_alert),
+                         ('Trattamento plastiche 500 ml', 'prodotto', Decimal('12.50'), self.prodotti,
+                          'Detergenti per interno', True, 6, 2))
+        self.assertEqual(Articolo.objects.count(), 1)          # nessun doppione dal signal
+        self.assertTrue(a.in_cassa)
+
+        # modifiche dall'articolo -> catalogo
+        self._salva(id=a.pk, nome='Rinnova plastiche', prezzo_vendita='13', categoria='Superfici')
+        p.refresh_from_db()
+        self.assertEqual((p.titolo, p.prezzo, p.gruppo), ('Rinnova plastiche', Decimal('13.00'), 'Superfici'))
+
+        # non piu' in vendita -> disattivato in cassa; di nuovo in vendita -> riattivato
+        self._salva(id=a.pk, tipo='consumabile', prezzo_vendita='')
+        p.refresh_from_db()
+        self.assertFalse(p.attivo)
+        self._salva(id=a.pk)
+        p.refresh_from_db()
+        self.assertTrue(p.attivo)
+        self._salva(id=a.pk, attivo=False)
+        p.refresh_from_db()
+        self.assertFalse(p.attivo)
+        self.assertEqual(ServizioProdotto.objects.count(), 1)
+        self.assertEqual(Articolo.objects.count(), 1)
+
+    def test_modifiche_dal_catalogo(self):
+        a = Articolo.objects.get(pk=self._salva().json()['id'])
+        p = a.prodotto
+        p.titolo, p.gruppo, p.attivo = 'Plastiche new', 'Superfici', False
+        p.save()
+        a.refresh_from_db()
+        self.assertEqual((a.nome, a.categoria, a.attivo), ('Plastiche new', 'Superfici', False))
+        # riattivato in cassa: torna un articolo in vendita
+        Articolo.objects.filter(pk=a.pk).update(tipo='consumabile')
+        p.attivo = True
+        p.save()
+        a.refresh_from_db()
+        self.assertEqual((a.tipo, a.attivo), ('vendita', True))
+
+    def test_validazioni(self):
+        self.assertEqual(self._salva(prezzo_vendita='').status_code, 400)
+        self.assertEqual(self._salva(categoria_catalogo=None).status_code, 400)
+        self.assertEqual(self._salva(categoria_catalogo=self.ricariche.pk).status_code, 400)
+        self.assertFalse(Articolo.objects.exists())
+
+    def test_ricariche_non_sono_merce(self):
+        ricarica = ServizioProdotto.objects.create(titolo='Ricarica credito', categoria=self.ricariche,
+                                                   prezzo=Decimal('50'), descrizione='', tipo='prodotto')
+        self.assertFalse(Articolo.objects.filter(prodotto=ricarica).exists())
+        from apps.ordini.models import ItemOrdine, Ordine
+        ordine = Ordine.objects.create(totale=Decimal('50'), totale_finale=Decimal('50'))
+        ItemOrdine.objects.create(ordine=ordine, servizio_prodotto=ricarica, quantita=1, prezzo_unitario=Decimal('50'))
+        self.assertFalse(Movimento.objects.exists())
+
+    def test_migrazione_toglie_gli_articoli_delle_ricariche(self):
+        import importlib
+
+        from django.apps import apps as global_apps
+        ricarica = ServizioProdotto.objects.create(titolo='Ricarica', categoria=self.prodotti,
+                                                   prezzo=Decimal('50'), descrizione='', tipo='prodotto')
+        self.assertTrue(Articolo.objects.filter(prodotto=ricarica).exists())
+        ricarica.categoria = self.ricariche
+        ServizioProdotto.objects.filter(pk=ricarica.pk).update(categoria=self.ricariche)
+        importlib.import_module('apps.magazzino.migrations.0005_togli_prodotti_senza_magazzino').avanti(global_apps, None)
+        self.assertFalse(Articolo.objects.filter(prodotto=ricarica).exists())
+
+    def test_badge_non_in_cassa_e_pagine(self):
+        a = Articolo.objects.create(nome='Senza prezzo', tipo='vendita')
+        self.assertTrue(a.manca_in_cassa)
+        pagina = _pagina(self.user, 'articoli')
+        self.assertContains(pagina, 'non in cassa')
+        self.assertContains(pagina, 'Vendita in cassa')
+        self.assertEqual(_pagina(self.user, 'articolo', pk=a.pk).status_code, 200)

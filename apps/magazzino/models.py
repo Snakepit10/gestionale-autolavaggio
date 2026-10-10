@@ -83,6 +83,15 @@ class Articolo(models.Model):
         return self.nome
 
     @property
+    def in_cassa(self):
+        return bool(self.prodotto_id and self.prodotto.attivo)
+
+    @property
+    def manca_in_cassa(self):
+        """In vendita ma senza prodotto attivo in cassa (manca il prezzo)."""
+        return self.tipo == 'vendita' and self.attivo and not self.in_cassa
+
+    @property
     def url_foto(self):
         if not self.foto_aggiornata:
             return ''

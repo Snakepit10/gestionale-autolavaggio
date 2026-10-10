@@ -28,6 +28,13 @@ class Categoria(models.Model):
                   "default). Usa singola per scelte alternative tipo "
                   "'Esterno base / Esterno completo / Esterno premium'.",
     )
+    senza_magazzino = models.BooleanField(
+        default=False,
+        verbose_name='Prodotti non di magazzino',
+        help_text="Se attivo, i prodotti di questa categoria (es. ricariche "
+                  "credito, buoni) non sono merce: non hanno un articolo nel "
+                  "Magazzino e non scaricano scorte.",
+    )
 
     class Meta:
         ordering = ['ordine_visualizzazione', 'nome']

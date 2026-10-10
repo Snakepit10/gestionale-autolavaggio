@@ -31,6 +31,9 @@ def sincronizza_prodotto(articolo):
         return
     from apps.core.models import ServizioProdotto
 
+    # la quantita' puo' essere cambiata da un movimento su un'altra copia
+    articolo.refresh_from_db(fields=['quantita'])
+
     ServizioProdotto.objects.filter(pk=articolo.prodotto_id).update(
         quantita_disponibile=max(articolo.quantita, 0) if articolo.traccia_scorte else -1,
         quantita_minima_alert=articolo.scorta_minima,
@@ -67,10 +70,14 @@ def rettifica(articolo, quantita_contata, operatore=None, nota=''):
 
 
 def articolo_del_prodotto(prodotto):
-    """Articolo collegato a un prodotto del catalogo; lo crea se manca."""
+    """Articolo collegato a un prodotto del catalogo; lo crea se manca.
+    Niente articolo per i prodotti che non sono merce (categorie "senza
+    magazzino", es. ricariche credito)."""
     if prodotto.tipo != 'prodotto':
         return None
     articolo = Articolo.objects.filter(prodotto=prodotto).first()
+    if articolo is None and prodotto.categoria.senza_magazzino:
+        return None
     if articolo is None:
         q = prodotto.quantita_disponibile
         articolo = Articolo.objects.create(
@@ -79,6 +86,44 @@ def articolo_del_prodotto(prodotto):
             scorta_minima=prodotto.quantita_minima_alert if q >= 0 else 0,
             prodotto=prodotto)
     return articolo
+
+
+def sincronizza_catalogo(articolo, prezzo=None, categoria=None):
+    """Gli articoli in vendita e i prodotti del catalogo coincidono.
+
+    Articolo 'vendita' attivo: crea il prodotto se manca (servono prezzo e
+    categoria del catalogo) e ne allinea titolo, sottocategoria in cassa
+    (gruppo), codice, prezzo e quantita'. Altrimenti il prodotto collegato
+    viene disattivato in cassa (resta nel catalogo con lo storico)."""
+    from apps.core.models import ServizioProdotto
+
+    prodotto = articolo.prodotto
+    in_vendita = articolo.tipo == 'vendita' and articolo.attivo
+    if not in_vendita:
+        if prodotto and prodotto.attivo:
+            prodotto.attivo = False
+            prodotto._da_magazzino = True
+            prodotto.save()
+        return prodotto
+    if prodotto is None:
+        if prezzo is None or categoria is None:
+            raise ValueError('Per mettere in vendita servono prezzo e categoria in cassa')
+        prodotto = ServizioProdotto(tipo='prodotto', descrizione='')
+    prodotto.titolo = articolo.nome
+    prodotto.gruppo = articolo.categoria
+    prodotto.codice_prodotto = articolo.codice
+    prodotto.attivo = True
+    if prezzo is not None:
+        prodotto.prezzo = prezzo
+    if categoria is not None:
+        prodotto.categoria = categoria
+    prodotto._da_magazzino = True   # il signal non deve creare un altro articolo
+    prodotto.save()
+    if articolo.prodotto_id != prodotto.pk:
+        articolo.prodotto = prodotto
+        articolo.save(update_fields=['prodotto'])
+    sincronizza_prodotto(articolo)
+    return prodotto
 
 
 def scarica_vendita(prodotto, delta, ordine=None, operatore=None, nota=''):

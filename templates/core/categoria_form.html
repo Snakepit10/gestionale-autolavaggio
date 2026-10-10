@@ -71,6 +71,17 @@
                         </div>
                     </div>
 
+                    <div class="form-check form-switch mb-3">
+                        {{ form.senza_magazzino }}
+                        <label class="form-check-label" for="{{ form.senza_magazzino.id_for_label }}">
+                            Prodotti non di magazzino
+                        </label>
+                        <div class="form-text small text-muted">
+                            Per ricariche credito, buoni e simili: i prodotti di questa categoria
+                            non sono merce e non compaiono nel <strong>Magazzino</strong>.
+                        </div>
+                    </div>
+
                     <div class="d-flex justify-content-between">
                         <a href="{% url 'core:categoria-list' %}" class="btn btn-secondary">
                             <i class="bi bi-x-circle"></i> Annulla

@@ -47,7 +47,13 @@
                     <dt class="col-5">Pezzo</dt><dd class="col-7">{{ articolo.unita }}{% if articolo.ha_contenuto %} da {{ articolo.contenuto|floatformat:"-3" }} {{ articolo.unita_contenuto }}{% endif %}</dd>
                     <dt class="col-5">Categoria</dt><dd class="col-7">{{ articolo.categoria|default:"—" }}</dd>
                     <dt class="col-5">Fornitore</dt><dd class="col-7">{{ articolo.fornitore|default:"—" }}</dd>
-                    <dt class="col-5">In cassa</dt><dd class="col-7">{% if articolo.prodotto %}<a href="{% url 'core:catalogo-update' articolo.prodotto.pk %}">{{ articolo.prodotto.titolo }}</a> (&euro;{{ articolo.prodotto.prezzo }}){% else %}—{% endif %}</dd>
+                    <dt class="col-5">In cassa</dt><dd class="col-7">
+                        {% if articolo.in_cassa %}<strong>&euro;{{ articolo.prodotto.prezzo|floatformat:2 }}</strong>
+                            &middot; {{ articolo.prodotto.categoria }}{% if articolo.prodotto.gruppo %} &rsaquo; {{ articolo.prodotto.gruppo }}{% endif %}
+                            <br><a href="{% url 'core:catalogo-update' articolo.prodotto.pk %}" class="small">apri nel catalogo</a>
+                        {% elif articolo.manca_in_cassa %}<span class="badge bg-warning text-dark">non in cassa</span> <small>manca il prezzo di vendita</small>
+                        {% elif articolo.prodotto %}<span class="text-muted">disattivato in cassa</span>
+                        {% else %}—{% endif %}</dd>
                     {% if articolo.note %}<dt class="col-5">Note</dt><dd class="col-7">{{ articolo.note|linebreaksbr }}</dd>{% endif %}
                 </dl>
             </div>

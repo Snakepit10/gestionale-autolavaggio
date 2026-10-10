@@ -109,7 +109,28 @@ def _dati_modifica(a):
         'prezzo_per': a.prezzo_per, 'scorta_minima': a.scorta_minima, 'traccia_scorte': a.traccia_scorte,
         'costo': _fmt(a.costo_indicato), 'fornitore': a.fornitore_id or '', 'attivo': a.attivo,
         'note': a.note, 'unita_prezzo': a.unita_prezzo, 'url_foto': a.url_foto,
+        # vendita in cassa: il prezzo sta nel prodotto del catalogo
+        'prezzo_vendita': _fmt(a.prodotto.prezzo) if a.prodotto_id else '',
+        'categoria_catalogo': a.prodotto.categoria_id if a.prodotto_id else '',
     })
+
+
+def _contesto_catalogo():
+    """Categorie e sottocategorie del catalogo per il modale articolo."""
+    from django.db.models import Count
+
+    from apps.core.models import Categoria, ServizioProdotto
+
+    categorie = list(Categoria.objects.filter(senza_magazzino=False)
+                     .annotate(n_prodotti=Count('servizi_primari', filter=Q(servizi_primari__tipo='prodotto')))
+                     .order_by('ordine_visualizzazione', 'nome'))
+    principale = max(categorie, key=lambda c: c.n_prodotti, default=None)
+    return {
+        'categorie_catalogo': categorie,
+        'categoria_catalogo_default': principale.pk if principale and principale.n_prodotti else '',
+        'sottocategorie_cassa': sorted(set(ServizioProdotto.objects.filter(tipo='prodotto').exclude(gruppo='')
+                                           .values_list('gruppo', flat=True)), key=str.lower),
+    }
 
 
 def _descrizione_pezzo(a):
@@ -163,6 +184,7 @@ def articoli(request):
         'unita_contenuto': UNITA_CONTENUTO_CHOICES,
         'categorie': _categorie_articoli(),
         'fornitori': Fornitore.objects.filter(attivo=True),
+        **_contesto_catalogo(),
         'filtro': {'tipo': tipo, 'categoria': categoria, 'q': cerca, 'sotto': sotto, 'tutti': not attivi},
         'valore_totale': sum((a.valore for a in lista), Decimal('0')),
         'n_sotto_scorta': Articolo.objects.filter(attivo=True, traccia_scorte=True,
@@ -189,6 +211,7 @@ def articolo_scheda(request, pk):
         'unita_contenuto': UNITA_CONTENUTO_CHOICES,
         'categorie': _categorie_articoli(),
         'fornitori': Fornitore.objects.filter(attivo=True),
+        **_contesto_catalogo(),
     })
     return render(request, 'magazzino/articolo.html', ctx)
 
@@ -228,6 +251,19 @@ def articolo_salva(request):
     articolo.fornitore_id = d.get('fornitore') or None
     articolo.attivo = bool(d.get('attivo', True))
     articolo.note = d.get('note') or ''
+
+    # Prodotto in vendita = prodotto del catalogo: prezzo e categoria in cassa
+    prezzo_vendita = categoria_catalogo = None
+    if articolo.tipo == 'vendita' and articolo.attivo:
+        from apps.core.models import Categoria
+
+        prezzo_vendita = _decimale(d.get('prezzo_vendita'))
+        if prezzo_vendita <= 0:
+            return _errore('Indica il prezzo di vendita in cassa')
+        categoria_catalogo = Categoria.objects.filter(pk=d.get('categoria_catalogo') or None,
+                                                      senza_magazzino=False).first()
+        if categoria_catalogo is None:
+            return _errore('Scegli la categoria in cassa')
     with transaction.atomic():
         nuovo = articolo.pk is None
         articolo.save()
@@ -235,6 +271,7 @@ def articolo_salva(request):
         if nuovo and iniziale > 0:
             services.movimenta(articolo, iniziale, 'carico', operatore=request.user,
                                nota='Quantità iniziale')
+        services.sincronizza_catalogo(articolo, prezzo=prezzo_vendita, categoria=categoria_catalogo)
         services.sincronizza_prodotto(articolo)
     return JsonResponse({'success': True, 'id': articolo.pk})
 

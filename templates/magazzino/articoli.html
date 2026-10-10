@@ -69,6 +69,7 @@
                         <th class="text-end">Assegnati</th>
                         <th class="text-end">Scorta min.</th>
                         <th class="text-end">Costo</th>
+                        <th class="text-end">Vendita</th>
                         <th>Fornitore</th>
                         <th class="text-center">Azioni</th>
                     </tr>
@@ -79,7 +80,8 @@
                         <td>
                             {% if a.foto_aggiornata %}<img src="{{ a.url_foto }}" alt="" loading="lazy" class="rounded border me-2 float-start" style="width:40px;height:40px;object-fit:cover">{% endif %}
                             <a href="{% url 'magazzino:articolo' a.pk %}" class="fw-semibold text-decoration-none">{{ a.nome }}</a>
-                            {% if a.prodotto %}<i class="bi bi-shop text-primary ms-1" title="In vendita in cassa: {{ a.prodotto.titolo }}"></i>{% endif %}
+                            {% if a.in_cassa %}<i class="bi bi-shop text-primary ms-1" title="In vendita in cassa"></i>{% endif %}
+                            {% if a.manca_in_cassa %}<span class="badge bg-warning text-dark ms-1 cursor-pointer" title="Manca il prezzo di vendita: aprilo e inseriscilo" onclick="apriArticolo({{ a.pk }}, {{ a.dati_modifica }})">non in cassa</span>{% endif %}
                             <br><small class="text-muted">{% if a.ha_contenuto %}{{ a.unita }} da {{ a.contenuto|floatformat:"-3" }} {{ a.unita_contenuto }} &middot; {% endif %}{% if a.codice %}{{ a.codice }} &middot; {% endif %}{{ a.categoria|default:"" }}</small>
                         </td>
                         <td><span class="badge {% if a.tipo == 'vendita' %}bg-primary{% elif a.tipo == 'strumento' %}bg-dark{% else %}bg-secondary{% endif %}">{{ a.get_tipo_display }}</span></td>
@@ -95,6 +97,7 @@
                         <td class="text-end">{% if a.traccia_scorte %}{{ a.scorta_minima }}{% else %}—{% endif %}</td>
                         <td class="text-end text-nowrap">&euro;{{ a.costo|floatformat:2 }}<small class="text-muted">/{{ a.unita }}</small>
                             {% if a.ha_contenuto %}<br><small class="{% if a.prezzo_al_contenuto %}fw-semibold{% else %}text-muted{% endif %}">&euro;{{ a.costo_al_contenuto|floatformat:"-4" }}/{{ a.unita_contenuto }}</small>{% endif %}</td>
+                        <td class="text-end text-nowrap">{% if a.in_cassa %}<strong>&euro;{{ a.prodotto.prezzo|floatformat:2 }}</strong>{% elif a.tipo == 'vendita' %}<span class="text-muted">—</span>{% endif %}</td>
                         <td class="small">{{ a.fornitore|default:"" }}</td>
                         <td class="text-center text-nowrap">
                             <button class="btn btn-sm btn-outline-success" title="Carico" onclick="apriMovimento({{ a.pk }}, '{{ a.nome|escapejs }}', 'carico', {{ a.quantita }}, '{{ a.unita_prezzo|escapejs }}')"><i class="bi bi-box-arrow-in-down"></i></button>

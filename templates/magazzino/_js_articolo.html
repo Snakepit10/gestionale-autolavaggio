@@ -1,6 +1,18 @@
 <script>
 const URL_ARTICOLO_SALVA = "{% url 'magazzino:articolo-salva' %}";
 const URL_MOVIMENTO = "{% url 'magazzino:articolo-movimento' 999999 %}";
+const CATEGORIA_CATALOGO_DEFAULT = "{{ categoria_catalogo_default }}";
+
+// Prodotto in vendita: prezzo e categoria in cassa; la categoria
+// dell'articolo diventa la sottocategoria della cassa
+function tipoArticolo() {
+    const vendita = document.getElementById('art-tipo').value === 'vendita';
+    document.getElementById('art-vendita-box').classList.toggle('d-none', !vendita);
+    document.getElementById('art-categoria-l').textContent = vendita ? 'Sottocategoria in cassa' : 'Categoria';
+    document.getElementById('art-categoria').setAttribute('list', vendita ? 'art-sottocategorie' : 'art-categorie');
+    document.getElementById('art-categoria').placeholder = vendita ? 'es. Profumi, Panni e Accessori' : 'es. Panni, Detergenti';
+}
+
 const URL_FOTO_CARICA = "{% url 'magazzino:articolo-foto-carica' 999999 %}";
 let fotoAttuale = '';
 
@@ -41,6 +53,8 @@ function apriArticolo(id, a) {
     document.getElementById('art-nome').value = a.nome || '';
     document.getElementById('art-codice').value = a.codice || '';
     document.getElementById('art-tipo').value = a.tipo || 'consumabile';
+    document.getElementById('art-prezzo-vendita').value = a.prezzo_vendita || '';
+    document.getElementById('art-categoria-catalogo').value = a.categoria_catalogo || CATEGORIA_CATALOGO_DEFAULT;
     document.getElementById('art-categoria').value = a.categoria || '';
     document.getElementById('art-unita').value = a.unita || 'pz';
     document.getElementById('art-contenuto').value = a.contenuto || '';
@@ -61,6 +75,7 @@ function apriArticolo(id, a) {
     document.getElementById('art-foto-togli-box').classList.toggle('d-none', !fotoAttuale);
     mostraAnteprima(fotoAttuale);
     aggiornaPrezzo();
+    tipoArticolo();
     document.getElementById('art-errore').classList.add('d-none');
     bootstrap.Modal.getOrCreateInstance(document.getElementById('modaleArticolo')).show();
     setTimeout(() => document.getElementById('art-nome').focus(), 300);
@@ -73,6 +88,7 @@ async function salvaArticolo() {
         categoria: val('art-categoria'), unita: val('art-unita'), scorta_minima: val('art-scorta'),
         contenuto: val('art-contenuto'), unita_contenuto: val('art-unita-contenuto'),
         prezzo_per: document.querySelector('[name=art-prezzo-per]:checked').value,
+        prezzo_vendita: val('art-prezzo-vendita'), categoria_catalogo: val('art-categoria-catalogo') || null,
         traccia_scorte: document.getElementById('art-traccia').checked, costo: val('art-costo'),
         fornitore: val('art-fornitore') || null, note: val('art-note'),
         attivo: document.getElementById('art-attivo').checked, quantita_iniziale: val('art-iniziale'),
