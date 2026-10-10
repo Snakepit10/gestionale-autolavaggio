@@ -1032,8 +1032,10 @@ class VenditaProdottiView(LoginRequiredMixin, TemplateView):
             'prodotti': prodotti,
             'pezzi': sum(p['quantita'] for p in prodotti),
             'totale_prodotti': sum((p['incasso'] for p in prodotti), Decimal('0.00')),
-            'catalogo_prodotti': ServizioProdotto.objects.filter(
-                tipo='prodotto', attivo=True).order_by('titolo'),
+            'catalogo_prodotti': [
+                {'id': p.pk, 'titolo': p.titolo, 'prezzo': float(p.prezzo),
+                 'disponibili': p.quantita_disponibile}
+                for p in ServizioProdotto.objects.filter(tipo='prodotto', attivo=True).order_by('titolo')],
             'metodi_pagamento': [m for m in Pagamento.METODO_CHOICES if m[0] != 'abbonamento'],
         })
         return context

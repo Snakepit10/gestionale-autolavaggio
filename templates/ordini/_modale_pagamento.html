@@ -1,0 +1,61 @@
+{# Modale registra pagamento (lista ordini, vendita prodotti) #}
+<!-- Modal Pagamento Veloce -->
+<div class="modal fade" id="modalPagamento" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">
+                    <i class="bi bi-credit-card"></i>
+                    Registra Pagamento
+                </h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <form id="form-pagamento">
+                <div class="modal-body">
+                    {% csrf_token %}
+                    <input type="hidden" id="ordine-id">
+
+                    <div class="alert alert-info">
+                        Ordine: <strong id="ordine-numero"></strong><br>
+                        Totale: <strong id="ordine-totale"></strong><br>
+                        Già pagato: <strong id="ordine-pagato"></strong><br>
+                        <hr class="my-2">
+                        <strong>Da pagare: <span id="ordine-residuo"></span></strong>
+                    </div>
+
+                    <div class="mb-3">
+                        <label class="form-label">Importo Pagamento:</label>
+                        <input type="number" class="form-control" id="importo-pagamento"
+                               step="0.01" min="0" required>
+                    </div>
+
+                    <div class="mb-3">
+                        <label class="form-label">Metodo Pagamento:</label>
+                        <select class="form-select" id="metodo-pagamento-modal" required>
+                            <option value="">Seleziona metodo</option>
+                            <option value="contanti">Contanti</option>
+                            <option value="carta">Carta di Credito/Debito</option>
+                            <option value="bancomat">Bancomat</option>
+                            <option value="bonifico">Bonifico</option>
+                            <option value="assegno">Assegno</option>
+                            <option value="abbonamento">Abbonamento</option>
+                        </select>
+                    </div>
+
+                    <div class="mb-3">
+                        <label class="form-label">Note:</label>
+                        <textarea class="form-control" id="note-pagamento" rows="2"></textarea>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">
+                        <i class="bi bi-x-circle"></i> Annulla
+                    </button>
+                    <button type="submit" class="btn btn-success">
+                        <i class="bi bi-check-circle"></i> Registra Pagamento
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>

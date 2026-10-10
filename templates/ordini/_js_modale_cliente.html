@@ -1,0 +1,194 @@
+{# JS del modale cliente: incluso dentro un <script> #}
+let clienteSelezionatoList = null;
+
+function modificaClienteOrdine(ordineId, clienteId, clienteNome) {
+    document.getElementById('cliente-ordine-id').value = ordineId;
+    clienteSelezionatoList = clienteId ? { id: clienteId, nome: clienteNome } : null;
+
+    // Resetta i form
+    document.getElementById('cerca-cliente-list').value = '';
+    document.getElementById('filtro-tipo-cliente-list').value = '';
+    document.getElementById('risultati-ricerca-list').innerHTML = '';
+    document.getElementById('form-nuovo-cliente-list').reset();
+    document.getElementById('campi-privato-list').style.display = 'none';
+    document.getElementById('campi-azienda-list').style.display = 'none';
+
+    // Mostra il tab appropriato
+    if (clienteId) {
+        document.getElementById('cerca-tab-list').click();
+    } else {
+        document.getElementById('anonimo-tab-list').click();
+    }
+
+    const modal = new bootstrap.Modal(document.getElementById('modalCliente'));
+    modal.show();
+}
+
+function configuraCercaClienteList() {
+    const input = document.getElementById('cerca-cliente-list');
+    const filtroTipo = document.getElementById('filtro-tipo-cliente-list');
+    let timeout;
+
+    function eseguiRicerca() {
+        clearTimeout(timeout);
+        const term = input.value.trim();
+        const tipo = filtroTipo.value;
+
+        if (term.length < 2 && !tipo) {
+            document.getElementById('risultati-ricerca-list').innerHTML = '';
+            return;
+        }
+
+        timeout = setTimeout(() => {
+            let url = `/clienti/cerca/?term=${encodeURIComponent(term)}`;
+            if (tipo) {
+                url += `&tipo=${tipo}`;
+            }
+
+            fetch(url)
+            .then(response => response.json())
+            .then(data => {
+                mostraRisultatiRicercaList(data.results);
+            })
+            .catch(error => console.error('Errore ricerca:', error));
+        }, 300);
+    }
+
+    input.addEventListener('input', eseguiRicerca);
+    filtroTipo.addEventListener('change', eseguiRicerca);
+}
+
+function mostraRisultatiRicercaList(risultati) {
+    const container = document.getElementById('risultati-ricerca-list');
+
+    if (risultati.length === 0) {
+        container.innerHTML = '<p class="text-muted">Nessun cliente trovato</p>';
+        return;
+    }
+
+    let html = '<div class="list-group">';
+    risultati.forEach(cliente => {
+        html += `
+            <button type="button" class="list-group-item list-group-item-action"
+                    onclick="selezionaClienteTrovatoList(${cliente.id}, '${cliente.text.replace(/'/g, "\\'")}')">
+                <div class="d-flex w-100 justify-content-between">
+                    <h6 class="mb-1">${cliente.text}</h6>
+                    <small class="text-muted">${cliente.tipo}</small>
+                </div>
+                <p class="mb-1">${cliente.email || ''}</p>
+                <small>${cliente.telefono}</small>
+            </button>
+        `;
+    });
+    html += '</div>';
+
+    container.innerHTML = html;
+}
+
+function selezionaClienteTrovatoList(id, nome) {
+    clienteSelezionatoList = { id: id, nome: nome };
+}
+
+function toggleNuovoClienteFieldsList() {
+    const tipo = document.getElementById('tipo-nuovo-cliente-list').value;
+    const campiPrivato = document.getElementById('campi-privato-list');
+    const campiAzienda = document.getElementById('campi-azienda-list');
+
+    campiPrivato.style.display = 'none';
+    campiAzienda.style.display = 'none';
+
+    document.getElementById('nome-privato-list').required = false;
+    document.getElementById('cognome-privato-list').required = false;
+    document.getElementById('telefono-privato-list').required = false;
+    document.getElementById('ragione-sociale-list').required = false;
+    document.getElementById('partita-iva-list').required = false;
+    document.getElementById('telefono-azienda-list').required = false;
+
+    if (tipo === 'privato') {
+        campiPrivato.style.display = 'block';
+        document.getElementById('nome-privato-list').required = true;
+        document.getElementById('cognome-privato-list').required = true;
+        document.getElementById('telefono-privato-list').required = true;
+    } else if (tipo === 'azienda') {
+        campiAzienda.style.display = 'block';
+        document.getElementById('ragione-sociale-list').required = true;
+        document.getElementById('partita-iva-list').required = true;
+        document.getElementById('telefono-azienda-list').required = true;
+    }
+}
+
+function confermaSelezioneCliente() {
+    const ordineId = document.getElementById('cliente-ordine-id').value;
+    const tabAttivo = document.querySelector('#clienteTabs .nav-link.active').id;
+
+    let clienteData = null;
+
+    if (tabAttivo === 'cerca-tab-list') {
+        // Cliente esistente selezionato
+        if (!clienteSelezionatoList || !clienteSelezionatoList.id) {
+            alert('Seleziona un cliente dalla lista');
+            return;
+        }
+        clienteData = { cliente_id: clienteSelezionatoList.id };
+    } else if (tabAttivo === 'nuovo-tab-list') {
+        // Crea nuovo cliente
+        const form = document.getElementById('form-nuovo-cliente-list');
+        if (!form.checkValidity()) {
+            form.reportValidity();
+            return;
+        }
+
+        const formData = new FormData(form);
+        const tipo = formData.get('tipo');
+
+        clienteData = {
+            nuovo_cliente: true,
+            tipo: tipo
+        };
+
+        if (tipo === 'privato') {
+            clienteData.nome = formData.get('nome');
+            clienteData.cognome = formData.get('cognome');
+            clienteData.telefono = formData.get('telefono');
+            clienteData.email = formData.get('email');
+        } else if (tipo === 'azienda') {
+            clienteData.ragione_sociale = formData.get('ragione_sociale');
+            clienteData.partita_iva = formData.get('partita_iva');
+            clienteData.codice_sdi = formData.get('codice_sdi');
+            clienteData.indirizzo = formData.get('indirizzo');
+            clienteData.telefono = formData.get('telefono');
+            clienteData.email = formData.get('email');
+        }
+    } else if (tabAttivo === 'anonimo-tab-list') {
+        // Nessun cliente (anonimo)
+        clienteData = { cliente_id: null };
+    }
+
+    // Invia la richiesta
+    fetch(`{% url 'ordini:modifica-ordine' 0 %}`.replace('0', ordineId), {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+            'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]').value
+        },
+        body: JSON.stringify(clienteData)
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            bootstrap.Modal.getInstance(document.getElementById('modalCliente')).hide();
+            location.reload();
+        } else {
+            alert('Errore: ' + data.error);
+        }
+    })
+    .catch(error => {
+        console.error('Errore:', error);
+        alert('Errore durante la modifica');
+    });
+}
+
+// Inizializza la ricerca cliente quando il documento è pronto
+document.addEventListener('DOMContentLoaded', function() {
+    configuraCercaClienteList();
+});

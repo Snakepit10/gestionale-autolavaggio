@@ -1,0 +1,155 @@
+{# Modale cambio cliente di un ordine (lista ordini, vendita prodotti) #}
+<!-- Modal Modifica Cliente -->
+<div class="modal fade" id="modalCliente" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">
+                    <i class="bi bi-person"></i>
+                    Seleziona o Crea Cliente
+                </h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <input type="hidden" id="cliente-ordine-id">
+
+                <ul class="nav nav-tabs mb-3" id="clienteTabs" role="tablist">
+                    <li class="nav-item" role="presentation">
+                        <button class="nav-link active" id="cerca-tab-list" data-bs-toggle="tab" data-bs-target="#cerca-list" type="button">
+                            Cerca Esistente
+                        </button>
+                    </li>
+                    <li class="nav-item" role="presentation">
+                        <button class="nav-link" id="nuovo-tab-list" data-bs-toggle="tab" data-bs-target="#nuovo-list" type="button">
+                            Nuovo Cliente
+                        </button>
+                    </li>
+                    <li class="nav-item" role="presentation">
+                        <button class="nav-link" id="anonimo-tab-list" data-bs-toggle="tab" data-bs-target="#anonimo-list" type="button">
+                            Anonimo
+                        </button>
+                    </li>
+                </ul>
+
+                <div class="tab-content" id="clienteTabContent">
+                    <!-- Tab Cerca Cliente -->
+                    <div class="tab-pane fade show active" id="cerca-list" role="tabpanel">
+                        <div class="row mb-3">
+                            <div class="col-md-8">
+                                <input type="text" class="form-control" id="cerca-cliente-list"
+                                       placeholder="Cerca per nome, email, telefono...">
+                            </div>
+                            <div class="col-md-4">
+                                <select class="form-select" id="filtro-tipo-cliente-list">
+                                    <option value="">Tutti i tipi</option>
+                                    <option value="privato">Privati</option>
+                                    <option value="azienda">Aziende</option>
+                                </select>
+                            </div>
+                        </div>
+                        <div id="risultati-ricerca-list" style="max-height: 400px; overflow-y: auto;"></div>
+                    </div>
+
+                    <!-- Tab Nuovo Cliente -->
+                    <div class="tab-pane fade" id="nuovo-list" role="tabpanel">
+                        <form id="form-nuovo-cliente-list">
+                            {% csrf_token %}
+                            <!-- Tipo Cliente -->
+                            <div class="mb-3">
+                                <label class="form-label">Tipo Cliente *</label>
+                                <select class="form-select" name="tipo" id="tipo-nuovo-cliente-list" onchange="toggleNuovoClienteFieldsList()" required>
+                                    <option value="">Seleziona tipo...</option>
+                                    <option value="privato">Privato</option>
+                                    <option value="azienda">Azienda</option>
+                                </select>
+                            </div>
+
+                            <!-- Campi Privato -->
+                            <div id="campi-privato-list" style="display: none;">
+                                <div class="row">
+                                    <div class="col-md-6">
+                                        <div class="mb-3">
+                                            <label class="form-label">Nome *</label>
+                                            <input type="text" class="form-control" name="nome" id="nome-privato-list">
+                                        </div>
+                                    </div>
+                                    <div class="col-md-6">
+                                        <div class="mb-3">
+                                            <label class="form-label">Cognome *</label>
+                                            <input type="text" class="form-control" name="cognome" id="cognome-privato-list">
+                                        </div>
+                                    </div>
+                                </div>
+                                <div class="row">
+                                    <div class="col-md-6">
+                                        <div class="mb-3">
+                                            <label class="form-label">Telefono *</label>
+                                            <input type="tel" class="form-control" name="telefono" id="telefono-privato-list">
+                                        </div>
+                                    </div>
+                                    <div class="col-md-6">
+                                        <div class="mb-3">
+                                            <label class="form-label">Email (facoltativo)</label>
+                                            <input type="email" class="form-control" name="email" id="email-privato-list" placeholder="indirizzo@email.com">
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <!-- Campi Azienda -->
+                            <div id="campi-azienda-list" style="display: none;">
+                                <div class="mb-3">
+                                    <label class="form-label">Ragione Sociale *</label>
+                                    <input type="text" class="form-control" name="ragione_sociale" id="ragione-sociale-list">
+                                </div>
+                                <div class="row">
+                                    <div class="col-md-6">
+                                        <div class="mb-3">
+                                            <label class="form-label">Partita IVA *</label>
+                                            <input type="text" class="form-control" name="partita_iva" id="partita-iva-list" maxlength="11">
+                                        </div>
+                                    </div>
+                                    <div class="col-md-6">
+                                        <div class="mb-3">
+                                            <label class="form-label">Codice SDI</label>
+                                            <input type="text" class="form-control" name="codice_sdi" id="codice-sdi-list" maxlength="7">
+                                        </div>
+                                    </div>
+                                </div>
+                                <div class="mb-3">
+                                    <label class="form-label">Indirizzo</label>
+                                    <input type="text" class="form-control" name="indirizzo" id="indirizzo-list">
+                                </div>
+                                <div class="row">
+                                    <div class="col-md-6">
+                                        <div class="mb-3">
+                                            <label class="form-label">Telefono *</label>
+                                            <input type="tel" class="form-control" name="telefono" id="telefono-azienda-list">
+                                        </div>
+                                    </div>
+                                    <div class="col-md-6">
+                                        <div class="mb-3">
+                                            <label class="form-label">Email (facoltativo)</label>
+                                            <input type="email" class="form-control" name="email" id="email-azienda-list" placeholder="indirizzo@email.com">
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </form>
+                    </div>
+
+                    <!-- Tab Anonimo -->
+                    <div class="tab-pane fade" id="anonimo-list" role="tabpanel">
+                        <div class="alert alert-info">
+                            <i class="bi bi-info-circle"></i> L'ordine non sarà associato ad alcun cliente.
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Annulla</button>
+                <button type="button" class="btn btn-primary" onclick="confermaSelezioneCliente()">Conferma</button>
+            </div>
+        </div>
+    </div>
+</div>

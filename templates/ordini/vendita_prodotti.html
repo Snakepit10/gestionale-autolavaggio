@@ -4,200 +4,524 @@
 
 {% block extra_css %}
 <style>
-.page-header { display:flex; justify-content:space-between; align-items:center; margin-bottom:1rem; flex-wrap:wrap; gap:.75rem; }
+/* Stessa grafica della lista ordini */
+.page-header { display:flex; justify-content:space-between; align-items:center; margin-bottom:1.5rem; flex-wrap:wrap; gap:.75rem; }
 .page-header h1 { font-size:1.6rem; font-weight:700; color:#1a1a2e; margin:0; }
-.vp-kpi { background:#fff; border-radius:10px; padding:12px 16px; box-shadow:0 1px 3px rgba(0,0,0,.06); height:100%; }
-.vp-kpi .label { font-size:.75rem; text-transform:uppercase; color:#64748b; font-weight:600; }
-.vp-kpi .value { font-size:1.5rem; font-weight:700; }
-.vp-table thead th { font-size:.72rem; text-transform:uppercase; letter-spacing:.04em; color:#64748b; background:#fff; white-space:nowrap; }
-.vp-table td { vertical-align:middle; }
-.vp-num { font-variant-numeric: tabular-nums; text-align:right; white-space:nowrap; }
+.page-header .btn { border-radius:8px; font-weight:500; }
+.section-card { background:#fff; border:1px solid #e5e7eb; border-radius:12px; box-shadow:0 1px 2px rgba(0,0,0,.04); margin-bottom:1.25rem; overflow:hidden; }
+.section-card .section-title { padding:14px 20px; display:flex; align-items:center; justify-content:space-between; border-bottom:1px solid #f1f5f9; }
+.section-card .section-title .label { display:flex; align-items:center; gap:10px; font-weight:600; color:#1e293b; font-size:.98rem; }
+.section-card .section-title .label i { font-size:1.05rem; }
+.section-card .section-title .count { background:#f1f5f9; color:#475569; font-size:.78rem; font-weight:600; padding:2px 10px; border-radius:20px; }
+.section-card.accent-blue { border-left:4px solid #3b82f6; }
+.section-card.accent-green { border-left:4px solid #10b981; }
+.section-card.accent-blue .section-title .label i { color:#3b82f6; }
+.section-card.accent-green .section-title .label i { color:#10b981; }
+.section-card .section-body { padding: 0; }
+.section-card table { margin-bottom:0; }
+.section-card table thead th { background:#eef2f7; color:#475569; font-size:.72rem; text-transform:uppercase; letter-spacing:.4px; font-weight:600; border-bottom:1px solid #dbe2ea; padding: 12px 14px; }
+.section-card.accent-blue table thead th { background:#eff6ff; color:#1e40af; border-bottom-color:#dbeafe; }
+.section-card.accent-green table thead th { background:#f0fdf4; color:#14532d; border-bottom-color:#dcfce7; }
+.section-card table tbody td { padding: 12px 14px; border-color:#f1f5f9; vertical-align:middle; }
+.section-card table tbody tr { transition: background .12s; }
+.section-card table tbody tr:hover { background:#fafbfc; }
+.filter-card { background:#fff; border:1px solid #e5e7eb; border-radius:12px; padding:14px 18px; margin-bottom:1.25rem; box-shadow:0 1px 2px rgba(0,0,0,.04); }
+.empty-state { padding: 2.5rem 1rem; text-align:center; color:#94a3b8; }
+.empty-state i { font-size:2.5rem; opacity:.5; }
+.empty-state h5 { color:#64748b; margin-top:.75rem; font-weight:600; }
+.modal .modal-header.modal-clean { background:#fff; color:#1e293b; border-bottom:1px solid #f1f5f9; }
+.modal .modal-header.modal-clean .modal-title { font-weight:600; }
+.cursor-pointer { cursor: pointer; }
 </style>
 {% endblock %}
 
 {% block content %}
+{% csrf_token %}
 <div class="page-header">
-  <h1><i class="bi bi-bag"></i> Vendita prodotti</h1>
-  <a href="{% url 'ordini:cassa' %}" class="btn btn-primary"><i class="bi bi-plus-circle"></i> Nuova vendita</a>
+    <h1><i class="bi bi-bag"></i> Vendita prodotti</h1>
+    <div class="d-flex gap-2">
+        <button type="button" class="btn btn-primary" onclick="apriNuovaVendita()">
+            <i class="bi bi-plus-circle"></i> Nuova Vendita
+        </button>
+    </div>
 </div>
 
 {% include 'ordini/_schede_ordini.html' with attiva='prodotti' %}
 
-<div class="d-flex gap-2 align-items-center flex-wrap mb-3">
-  <i class="bi bi-calendar text-muted"></i>
-  <strong class="me-2">{{ data|date:"l d/m/Y" }}</strong>
-  <a href="?data={{ data_prev|date:'Y-m-d' }}" class="btn btn-outline-secondary btn-sm" title="Giorno precedente"><i class="bi bi-chevron-left"></i></a>
-  <input type="date" class="form-control form-control-sm" style="max-width:160px"
-         value="{{ data|date:'Y-m-d' }}" onchange="location.href='?data='+this.value">
-  <a href="?data={{ data_next|date:'Y-m-d' }}" class="btn btn-outline-secondary btn-sm" title="Giorno successivo"><i class="bi bi-chevron-right"></i></a>
-  <a href="?data={{ oggi|date:'Y-m-d' }}" class="btn btn-outline-primary btn-sm">Oggi</a>
-</div>
-
-<div class="row g-2 mb-3">
-  <div class="col-6 col-lg-3">
-    <div class="vp-kpi"><div class="label">Vendite prodotti</div><div class="value">{{ vendite|length }}</div>
-      <div class="small text-muted">&euro;{{ totale_vendite|floatformat:2 }} incassati</div></div>
-  </div>
-  <div class="col-6 col-lg-3">
-    <div class="vp-kpi"><div class="label">Pezzi venduti</div><div class="value">{{ pezzi }}</div>
-      <div class="small text-muted">anche dentro gli ordini di lavaggio</div></div>
-  </div>
-  <div class="col-12 col-lg-6">
-    <div class="vp-kpi"><div class="label">Totale prodotti della giornata</div><div class="value">&euro;{{ totale_prodotti|floatformat:2 }}</div>
-      <div class="small text-muted">vendite di soli prodotti + prodotti aggiunti agli ordini</div></div>
-  </div>
-</div>
-
-{# Opzioni prodotto riusate dalle select #}
-<template id="opzioni-prodotti">
-  {% for p in catalogo_prodotti %}<option value="{{ p.pk }}">{{ p.titolo }} — &euro;{{ p.prezzo|floatformat:2 }}{% if p.quantita_disponibile >= 0 %} ({{ p.quantita_disponibile }} disp.){% endif %}</option>{% endfor %}
-</template>
-
-{% if data == oggi %}
-<div class="card border-0 shadow-sm mb-3" id="nuova-vendita">
-  <div class="card-header bg-white fw-bold"><i class="bi bi-plus-circle"></i> Nuova vendita</div>
-  <div class="card-body">
-    <div id="nv-righe"></div>
-    <div class="d-flex gap-2 flex-wrap align-items-center mt-2">
-      <button type="button" class="btn btn-sm btn-outline-secondary" onclick="nvRiga()"><i class="bi bi-plus"></i> Altro prodotto</button>
-      <select id="nv-pagamento" class="form-select form-select-sm" style="max-width:220px">
-        {% for codice, nome in metodi_pagamento %}<option value="{{ codice }}">Pagato: {{ nome }}</option>{% endfor %}
-        <option value="non_pagato">Non pagato</option>
-      </select>
-      <button type="button" class="btn btn-sm btn-primary" onclick="nvSalva()"><i class="bi bi-check2"></i> Registra vendita</button>
+<!-- Navigazione giorni (come la lista ordini) -->
+<div class="filter-card">
+    <div class="d-flex gap-2 align-items-center flex-wrap">
+        <i class="bi bi-calendar text-muted"></i>
+        <strong class="me-2">{{ data|date:"l d/m/Y" }}</strong>
+        <a href="?data={{ data_prev|date:'Y-m-d' }}" class="btn btn-outline-secondary btn-sm" title="Giorno precedente">
+            <i class="bi bi-chevron-left"></i>
+        </a>
+        <input type="date" class="form-control form-control-sm border-0 bg-light"
+               value="{{ data|date:'Y-m-d' }}" style="max-width:160px"
+               onchange="location.href='?data='+this.value">
+        <a href="?data={{ data_next|date:'Y-m-d' }}" class="btn btn-outline-secondary btn-sm" title="Giorno successivo">
+            <i class="bi bi-chevron-right"></i>
+        </a>
+        {% if data != oggi %}
+        <a href="?data={{ oggi|date:'Y-m-d' }}" class="btn btn-outline-primary btn-sm">
+            <i class="bi bi-calendar-check"></i> Oggi
+        </a>
+        {% endif %}
     </div>
-  </div>
-</div>
-{% endif %}
-
-<div class="card border-0 shadow-sm mb-3">
-  <div class="card-header bg-white fw-bold"><i class="bi bi-receipt-cutoff"></i> Vendite</div>
-  {% if vendite %}
-  <div class="table-responsive">
-    <table class="table table-sm vp-table mb-0">
-      <thead><tr><th>N.</th><th>Ora</th><th>Cliente</th><th>Prodotti e quantit&agrave;</th><th class="vp-num">Totale</th><th>Pagamento</th><th></th></tr></thead>
-      <tbody>
-        {% for v in vendite %}
-        <tr>
-          <td class="fw-bold">{{ v.numero_display }}</td>
-          <td>{{ v.data_ora|date:"H:i" }}</td>
-          <td>{{ v.cliente|default:"—" }}</td>
-          <td class="small">
-            {% for it in v.items.all %}
-            <div class="d-flex align-items-center gap-1 mb-1">
-              <input type="number" min="1" value="{{ it.quantita }}" class="form-control form-control-sm" style="width:64px"
-                     title="Quantità" onchange="vpPost('{% url 'ordini:vendita-modifica-item' v.pk it.pk %}', {quantita: this.value})">
-              <span>&times; {{ it.servizio_prodotto.titolo }} <span class="text-muted">(&euro;{{ it.prezzo_unitario|floatformat:2 }})</span></span>
-              <button type="button" class="btn btn-sm btn-link text-danger py-0" title="Togli dalla vendita"
-                      onclick="if(confirm('Togliere {{ it.servizio_prodotto.titolo|escapejs }} dalla vendita?')) vpPost('{% url 'ordini:vendita-elimina-item' v.pk it.pk %}', {})">
-                <i class="bi bi-x-lg"></i></button>
-            </div>
-            {% endfor %}
-            <div class="d-flex align-items-center gap-1">
-              <input type="number" min="1" value="1" class="form-control form-control-sm" style="width:64px" id="agg-q-{{ v.pk }}">
-              <select class="form-select form-select-sm vp-sel-prodotti" style="max-width:260px" id="agg-p-{{ v.pk }}"></select>
-              <button type="button" class="btn btn-sm btn-outline-primary py-0" title="Aggiungi prodotto"
-                      onclick="vpPost('{% url 'ordini:vendita-aggiungi-item' v.pk %}', {prodotto_id: document.getElementById('agg-p-{{ v.pk }}').value, quantita: document.getElementById('agg-q-{{ v.pk }}').value})">
-                <i class="bi bi-plus-lg"></i></button>
-            </div>
-          </td>
-          <td class="vp-num fw-bold">&euro;{{ v.totale_finale|floatformat:2 }}</td>
-          <td>
-            <select class="form-select form-select-sm" style="min-width:170px"
-                    onchange="vpPagamento('{% url 'ordini:vendita-pagamento' v.pk %}', this)">
-              {% if v.stato_pagamento == 'pagato' %}<option value="" selected>Pagato</option>
-              {% elif v.stato_pagamento == 'parziale' %}<option value="" selected>Parziale (&euro;{{ v.importo_pagato|floatformat:2 }})</option>
-              {% else %}<option value="" selected>Non pagato</option>{% endif %}
-              {% if v.stato_pagamento != 'pagato' %}{% for codice, nome in metodi_pagamento %}<option value="pagato:{{ codice }}">&rarr; Pagato: {{ nome }}</option>{% endfor %}{% endif %}
-              {% if v.stato_pagamento != 'non_pagato' %}<option value="non_pagato">&rarr; Non pagato (annulla pagamenti)</option>{% endif %}
-            </select>
-          </td>
-          <td class="text-end text-nowrap">
-            <a href="{% url 'ordini:ordine-detail' v.pk %}" class="btn btn-sm btn-link py-0" title="Dettaglio"><i class="bi bi-box-arrow-up-right"></i></a>
-            {% if request.user.is_superuser %}
-            <button type="button" class="btn btn-sm btn-link text-danger py-0" title="Elimina vendita"
-                    onclick="if(confirm('Eliminare la vendita {{ v.numero_display }}? I prodotti tornano in magazzino e i pagamenti vengono cancellati.')) vpPost('{% url 'ordini:vendita-elimina' v.pk %}', {})">
-              <i class="bi bi-trash"></i></button>
-            {% endif %}
-          </td>
-        </tr>
-        {% endfor %}
-      </tbody>
-    </table>
-  </div>
-  {% else %}
-  <div class="card-body text-muted small">Nessuna vendita di soli prodotti in questa giornata.</div>
-  {% endif %}
 </div>
 
-<div class="card border-0 shadow-sm">
-  <div class="card-header bg-white fw-bold"><i class="bi bi-box-seam"></i> Prodotti venduti</div>
-  {% if prodotti %}
-  <div class="table-responsive">
-    <table class="table table-sm vp-table mb-0">
-      <thead><tr><th>Prodotto</th><th class="vp-num">Quantit&agrave;</th><th class="vp-num">di cui in ordini di lavaggio</th><th class="vp-num">Incasso</th></tr></thead>
-      <tbody>
-        {% for p in prodotti %}
-        <tr>
-          <td>{{ p.prodotto.titolo }}</td>
-          <td class="vp-num">{{ p.quantita }}</td>
-          <td class="vp-num text-muted">{% if p.in_ordini %}{{ p.in_ordini }}{% else %}—{% endif %}</td>
-          <td class="vp-num">&euro;{{ p.incasso|floatformat:2 }}</td>
-        </tr>
-        {% endfor %}
-      </tbody>
-      <tfoot class="table-light"><tr class="fw-bold"><td>Totale</td><td class="vp-num">{{ pezzi }}</td><td></td><td class="vp-num">&euro;{{ totale_prodotti|floatformat:2 }}</td></tr></tfoot>
-    </table>
-  </div>
-  {% else %}
-  <div class="card-body text-muted small">Nessun prodotto venduto in questa giornata.</div>
-  {% endif %}
+<!-- Vendite -->
+<div class="section-card accent-blue">
+    <div class="section-title">
+        <div class="label"><i class="bi bi-receipt-cutoff"></i> Vendite</div>
+        <span class="count">{{ vendite|length }} &middot; &euro;{{ totale_vendite|floatformat:2 }}</span>
+    </div>
+    <div class="section-body">
+        {% if vendite %}
+        <div class="table-responsive">
+            <table class="table table-hover">
+                <thead>
+                    <tr>
+                        <th>N° Vendita</th>
+                        <th>Data/Ora</th>
+                        <th>Cliente</th>
+                        <th>Prodotti</th>
+                        <th>Totale</th>
+                        <th>Pagamento</th>
+                        <th class="text-center">Azioni</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for v in vendite %}
+                    <tr data-ordine-id="{{ v.id }}">
+                        <td>
+                            <span class="badge bg-primary cursor-pointer" style="font-size: 1.2rem; padding: 0.5rem 0.8rem;"
+                                  onclick="apriModificaVendita({{ v.pk }})" title="Modifica vendita">
+                                {{ v.numero_display }}
+                            </span>
+                        </td>
+                        <td>
+                            <strong>{{ v.data_ora|date:"d/m/Y" }}</strong>
+                            <br><small class="text-muted">{{ v.data_ora|date:"H:i" }}</small>
+                        </td>
+                        <td>
+                            <div class="cursor-pointer"
+                                 onclick="modificaClienteOrdine('{{ v.pk }}', '{% if v.cliente %}{{ v.cliente.id }}{% endif %}', '{% if v.cliente %}{{ v.cliente.nome_completo|escapejs }}{% endif %}')"
+                                 title="Clicca per modificare">
+                                {% if v.cliente %}
+                                    <div class="d-flex align-items-center">
+                                        <i class="bi bi-person me-1"></i>
+                                        <div>
+                                            <strong>{{ v.cliente.nome_completo }}</strong>
+                                            <br><small class="text-muted">{{ v.cliente.telefono }}</small>
+                                        </div>
+                                    </div>
+                                {% else %}
+                                    <span class="text-muted"><i class="bi bi-person-x"></i> Cliente anonimo</span>
+                                {% endif %}
+                            </div>
+                        </td>
+                        <td>
+                            <div class="small cursor-pointer" onclick="apriModificaVendita({{ v.pk }})"
+                                 title="Clicca per modificare prodotti e quantità">
+                                {% for item in v.items.all %}
+                                    <div class="d-flex justify-content-between gap-3">
+                                        <span>{{ item.servizio_prodotto.titolo }}</span>
+                                        <span class="text-muted">x{{ item.quantita }}</span>
+                                    </div>
+                                {% endfor %}
+                            </div>
+                        </td>
+                        <td><strong class="h4 text-primary">€{{ v.totale_finale }}</strong></td>
+                        <td>
+                            {% if v.stato_pagamento == 'pagato' %}
+                                <span class="badge bg-success cursor-pointer" onclick="apriModificaVendita({{ v.pk }})" title="Clicca per gestire il pagamento">
+                                    <i class="bi bi-check-circle"></i> Pagato
+                                </span>
+                                {% if v.pagamenti.all %}<br><small class="text-muted">{% if v.pagamenti.count == 1 %}{{ v.pagamenti.first.get_metodo_display }}{% else %}{{ v.pagamenti.count }} pagamenti{% endif %}</small>{% endif %}
+                            {% elif v.stato_pagamento == 'parziale' %}
+                                <span class="badge bg-warning cursor-pointer" onclick="aggiungiPagamento('{{ v.pk }}')" title="Clicca per aggiungere pagamento">
+                                    <i class="bi bi-clock"></i> Parziale
+                                </span>
+                                <br><small class="text-muted">€{{ v.importo_pagato }}</small>
+                            {% else %}
+                                <span class="badge bg-danger cursor-pointer" onclick="aggiungiPagamento('{{ v.pk }}')" title="Clicca per aggiungere pagamento">
+                                    <i class="bi bi-x-circle"></i> Non Pagato
+                                </span>
+                            {% endif %}
+                        </td>
+                        <td class="text-center text-nowrap">
+                            <button type="button" class="btn btn-sm btn-outline-primary" onclick="apriModificaVendita({{ v.pk }})" title="Modifica">
+                                <i class="bi bi-pencil"></i>
+                            </button>
+                            <a href="{% url 'ordini:ordine-detail' v.pk %}" class="btn btn-sm btn-outline-secondary" title="Dettaglio">
+                                <i class="bi bi-eye"></i>
+                            </a>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+        {% else %}
+        <div class="empty-state">
+            <i class="bi bi-bag"></i>
+            <h5>Nessuna Vendita</h5>
+            <p class="mb-0">Non ci sono vendite di soli prodotti in questa giornata.</p>
+        </div>
+        {% endif %}
+    </div>
 </div>
+
+<!-- Prodotti venduti (riepilogo, anche dentro gli ordini di lavaggio) -->
+<div class="section-card accent-green">
+    <div class="section-title">
+        <div class="label"><i class="bi bi-box-seam"></i> Prodotti venduti</div>
+        <span class="count">{{ pezzi }} pz &middot; &euro;{{ totale_prodotti|floatformat:2 }}</span>
+    </div>
+    <div class="section-body">
+        {% if prodotti %}
+        <div class="table-responsive">
+            <table class="table table-hover">
+                <thead>
+                    <tr><th>Prodotto</th><th class="text-end">Quantità</th><th class="text-end">Di cui in ordini di lavaggio</th><th class="text-end">Incasso</th></tr>
+                </thead>
+                <tbody>
+                    {% for p in prodotti %}
+                    <tr>
+                        <td><strong>{{ p.prodotto.titolo }}</strong></td>
+                        <td class="text-end">{{ p.quantita }}</td>
+                        <td class="text-end text-muted">{% if p.in_ordini %}{{ p.in_ordini }}{% else %}—{% endif %}</td>
+                        <td class="text-end"><strong>€{{ p.incasso|floatformat:2 }}</strong></td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+        {% else %}
+        <div class="empty-state">
+            <i class="bi bi-box-seam"></i>
+            <h5>Nessun Prodotto Venduto</h5>
+            <p class="mb-0">Né nelle vendite né dentro gli ordini di questa giornata.</p>
+        </div>
+        {% endif %}
+    </div>
+</div>
+
+{% include 'ordini/_modale_cliente.html' %}
+{% include 'ordini/_modale_pagamento.html' %}
+
+<!-- Modal Nuova Vendita -->
+<div class="modal fade" id="modalNuovaVendita" tabindex="-1">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header bg-primary text-white">
+                <h5 class="modal-title"><i class="bi bi-bag-plus"></i> Nuova Vendita</h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <div class="card mb-3 border-success">
+                    <div class="card-header bg-success bg-opacity-10">
+                        <h6 class="mb-0"><i class="bi bi-box-seam"></i> Prodotti</h6>
+                    </div>
+                    <div class="card-body">
+                        <div id="nv-righe"></div>
+                        <button type="button" class="btn btn-outline-success btn-sm" onclick="nvAggiungiRiga()">
+                            <i class="bi bi-plus-circle"></i> Altro prodotto
+                        </button>
+                    </div>
+                </div>
+                <div class="row align-items-end">
+                    <div class="col-md-6 mb-3">
+                        <label class="form-label fw-bold">Pagamento</label>
+                        <select class="form-select" id="nv-pagamento">
+                            {% for codice, nome in metodi_pagamento %}<option value="{{ codice }}">Pagato: {{ nome }}</option>{% endfor %}
+                            <option value="non_pagato">Non pagato</option>
+                        </select>
+                    </div>
+                    <div class="col-md-6 mb-3 text-end">
+                        <div class="text-muted small">Totale</div>
+                        <div class="fs-3 fw-bold text-primary" id="nv-totale">€0.00</div>
+                    </div>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal"><i class="bi bi-x-circle"></i> Annulla</button>
+                <button type="button" class="btn btn-primary" onclick="nvRegistra(this)"><i class="bi bi-check-circle"></i> Registra Vendita</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Modal Modifica Vendita (stessa struttura del Modifica Ordine) -->
+<div class="modal fade" id="modalModificaVendita" tabindex="-1">
+    <div class="modal-dialog modal-xl">
+        <div class="modal-content">
+            <div class="modal-header bg-primary text-white">
+                <h5 class="modal-title"><i class="bi bi-pencil-square"></i> Modifica Vendita <span id="mv-numero"></span></h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body" style="max-height: 70vh; overflow-y: auto;">
+                <input type="hidden" id="mv-id">
+
+                <!-- Prodotti correnti -->
+                <div class="card mb-3 border-warning">
+                    <div class="card-header bg-warning bg-opacity-10">
+                        <h6 class="mb-0"><i class="bi bi-list-check"></i> Prodotti Correnti</h6>
+                    </div>
+                    <div class="card-body">
+                        <div id="mv-correnti" class="border rounded p-2 bg-light" style="max-height: 250px; overflow-y: auto;">
+                            <div class="text-muted text-center py-2">Caricamento...</div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Modifica prodotto esistente -->
+                <div class="card mb-3 border-primary">
+                    <div class="card-header bg-primary bg-opacity-10">
+                        <h6 class="mb-0"><i class="bi bi-pencil"></i> Modifica Prodotto Esistente</h6>
+                    </div>
+                    <div class="card-body">
+                        <div class="mb-3">
+                            <label class="form-label fw-bold">Seleziona prodotto da modificare</label>
+                            <select class="form-select" id="mv-item-select" onchange="mvSelezionaItem()">
+                                <option value="">Seleziona un prodotto...</option>
+                            </select>
+                        </div>
+                        <div id="mv-form-item" style="display: none;">
+                            <div class="row">
+                                <div class="col-md-4 mb-3">
+                                    <label class="form-label fw-bold">Quantità</label>
+                                    <input type="number" class="form-control" id="mv-item-quantita" min="1" value="1" oninput="mvSubtotaleItem()">
+                                </div>
+                                <div class="col-md-4 mb-3">
+                                    <label class="form-label fw-bold">Prezzo €</label>
+                                    <div class="form-control-plaintext" id="mv-item-prezzo">€0.00</div>
+                                </div>
+                                <div class="col-md-4 mb-3">
+                                    <label class="form-label fw-bold">Subtotale</label>
+                                    <div class="fs-5 text-primary fw-bold" id="mv-item-subtotale">€0.00</div>
+                                </div>
+                            </div>
+                            <button type="button" class="btn btn-primary" onclick="mvSalvaItem()"><i class="bi bi-check-circle"></i> Salva Modifica</button>
+                            <button type="button" class="btn btn-danger" onclick="mvEliminaItem()"><i class="bi bi-trash"></i> Elimina Prodotto</button>
+                            <button type="button" class="btn btn-secondary" onclick="mvChiudiItem()">Annulla</button>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Aggiungi prodotto -->
+                <div class="card mb-3 border-success">
+                    <div class="card-header bg-success bg-opacity-10">
+                        <h6 class="mb-0"><i class="bi bi-plus-circle"></i> Aggiungi Nuovo Prodotto</h6>
+                    </div>
+                    <div class="card-body">
+                        <div class="row align-items-end">
+                            <div class="col-md-6 mb-3">
+                                <label class="form-label fw-bold">Prodotto</label>
+                                <select class="form-select" id="mv-agg-prodotto" onchange="mvSubtotaleAggiunta()"></select>
+                            </div>
+                            <div class="col-md-3 mb-3">
+                                <label class="form-label fw-bold">Quantità</label>
+                                <input type="number" class="form-control" id="mv-agg-quantita" min="1" value="1" oninput="mvSubtotaleAggiunta()">
+                            </div>
+                            <div class="col-md-3 mb-3">
+                                <label class="form-label fw-bold">Subtotale</label>
+                                <div class="fs-5 text-success fw-bold" id="mv-agg-subtotale">€0.00</div>
+                            </div>
+                        </div>
+                        <button type="button" class="btn btn-success" onclick="mvAggiungi()"><i class="bi bi-plus-circle"></i> Conferma Aggiunta</button>
+                    </div>
+                </div>
+
+                <!-- Pagamento -->
+                <div class="card mb-3 border-info">
+                    <div class="card-header bg-info bg-opacity-10">
+                        <h6 class="mb-0"><i class="bi bi-credit-card"></i> Pagamento</h6>
+                    </div>
+                    <div class="card-body d-flex flex-wrap gap-2 align-items-center">
+                        <div class="me-auto">
+                            Stato: <strong id="mv-stato-pagamento"></strong>
+                            &middot; Totale <strong id="mv-totale"></strong>
+                            &middot; Pagato <strong id="mv-pagato"></strong>
+                        </div>
+                        <button type="button" class="btn btn-success" id="mv-btn-paga" onclick="mvRegistraPagamento()">
+                            <i class="bi bi-cash-coin"></i> Registra Pagamento
+                        </button>
+                        <button type="button" class="btn btn-outline-danger" id="mv-btn-non-pagato" onclick="mvSegnaNonPagato()">
+                            <i class="bi bi-x-circle"></i> Segna come non pagato
+                        </button>
+                    </div>
+                </div>
+            </div>
+            <div class="modal-footer justify-content-between">
+                {% if request.user.is_superuser %}
+                <button type="button" class="btn btn-outline-danger" onclick="mvEliminaVendita()"><i class="bi bi-trash"></i> Elimina Vendita</button>
+                {% else %}<span></span>{% endif %}
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal"><i class="bi bi-x-circle"></i> Chiudi</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+{{ catalogo_prodotti|json_script:"catalogo-prodotti" }}
 {% endblock %}
 
 {% block extra_js %}
 <script>
-const VP_CSRF = '{{ csrf_token }}';
-const VP_OPZIONI = document.getElementById('opzioni-prodotti').innerHTML;
-document.querySelectorAll('.vp-sel-prodotti').forEach(s => s.innerHTML = VP_OPZIONI);
+{% include 'ordini/_js_modale_pagamento.html' %}
 
-async function vpPost(url, dati) {
-  const r = await fetch(url, {method: 'POST', headers: {'Content-Type': 'application/json', 'X-CSRFToken': VP_CSRF},
-                              body: JSON.stringify(dati)});
-  let esito = {};
-  try { esito = await r.json(); } catch (e) {}
-  if (!r.ok || !esito.success) { alert(esito.error || 'Operazione non riuscita'); }
-  location.reload();
+{% include 'ordini/_js_modale_cliente.html' %}
+
+// ===== Vendita prodotti =====
+const CATALOGO = JSON.parse(document.getElementById('catalogo-prodotti').textContent);
+const URL_VENDITA = {
+    nuova: "{% url 'ordini:vendita-nuova' %}",
+    aggiungi: "{% url 'ordini:vendita-aggiungi-item' 999999 %}",
+    modifica: "{% url 'ordini:vendita-modifica-item' 999999 888888 %}",
+    eliminaItem: "{% url 'ordini:vendita-elimina-item' 999999 888888 %}",
+    pagamento: "{% url 'ordini:vendita-pagamento' 999999 %}",
+    elimina: "{% url 'ordini:vendita-elimina' 999999 %}",
+    dettaglio: "{% url 'ordini:dettaglio-json' 999999 %}",
+};
+// segnaposto 999999 = id vendita, 888888 = id riga
+const urlVendita = (chiave, id, itemId) => URL_VENDITA[chiave]
+    .replace('999999', id).replace('888888', itemId);
+const euro = n => '€' + Number(n).toFixed(2);
+const opzioniProdotti = () => CATALOGO.map(p =>
+    `<option value="${p.id}">${p.titolo} — ${euro(p.prezzo)}${p.disponibili >= 0 ? ` (${p.disponibili} disp.)` : ''}</option>`).join('');
+const prezzoProdotto = id => (CATALOGO.find(p => String(p.id) === String(id)) || {prezzo: 0}).prezzo;
+
+async function postVendita(url, dati) {
+    const r = await fetch(url, {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json',
+                  'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]').value},
+        body: JSON.stringify(dati || {}),
+    });
+    let esito = {};
+    try { esito = await r.json(); } catch (e) {}
+    if (!r.ok || !esito.success) {
+        alert('Errore: ' + (esito.error || 'operazione non riuscita'));
+        return null;
+    }
+    return esito;
 }
 
-function vpPagamento(url, sel) {
-  const v = sel.value;
-  if (!v) return;
-  if (v === 'non_pagato') {
-    if (!confirm('Segnare la vendita come non pagata? I pagamenti registrati vengono cancellati.')) { sel.value = ''; return; }
-    vpPost(url, {stato: 'non_pagato'});
-  } else {
-    vpPost(url, {stato: 'pagato', metodo: v.split(':')[1]});
-  }
+// --- Nuova vendita ---
+function nvAggiungiRiga() {
+    const riga = document.createElement('div');
+    riga.className = 'row g-2 align-items-center mb-2 nv-riga';
+    riga.innerHTML = `
+        <div class="col-md-7"><select class="form-select nv-prodotto">${opzioniProdotti()}</select></div>
+        <div class="col-md-2"><input type="number" class="form-control nv-quantita" min="1" value="1"></div>
+        <div class="col-md-2 text-end fw-bold text-success nv-subtotale">€0.00</div>
+        <div class="col-md-1 text-end"><button type="button" class="btn btn-sm btn-outline-danger" title="Togli"><i class="bi bi-x-lg"></i></button></div>`;
+    riga.querySelector('button').onclick = () => { riga.remove(); nvTotale(); };
+    riga.querySelectorAll('select, input').forEach(el => el.addEventListener('input', nvTotale));
+    document.getElementById('nv-righe').appendChild(riga);
+    nvTotale();
+}
+function nvTotale() {
+    let totale = 0;
+    document.querySelectorAll('.nv-riga').forEach(r => {
+        const sub = prezzoProdotto(r.querySelector('.nv-prodotto').value) * (parseInt(r.querySelector('.nv-quantita').value) || 0);
+        r.querySelector('.nv-subtotale').textContent = euro(sub);
+        totale += sub;
+    });
+    document.getElementById('nv-totale').textContent = euro(totale);
+}
+function apriNuovaVendita() {
+    document.getElementById('nv-righe').innerHTML = '';
+    nvAggiungiRiga();
+    new bootstrap.Modal(document.getElementById('modalNuovaVendita')).show();
+}
+async function nvRegistra(btn) {
+    const righe = [...document.querySelectorAll('.nv-riga')].map(r => ({
+        prodotto_id: r.querySelector('.nv-prodotto').value,
+        quantita: r.querySelector('.nv-quantita').value}));
+    btn.disabled = true;
+    const esito = await postVendita(URL_VENDITA.nuova, {righe, pagamento: document.getElementById('nv-pagamento').value});
+    btn.disabled = false;
+    if (esito) location.reload();
 }
 
-function nvRiga() {
-  const box = document.getElementById('nv-righe');
-  if (!box) return;
-  const riga = document.createElement('div');
-  riga.className = 'd-flex gap-2 align-items-center mb-2 nv-riga';
-  riga.innerHTML = '<input type="number" min="1" value="1" class="form-control form-control-sm nv-q" style="width:70px">'
-    + '<select class="form-select form-select-sm nv-p" style="max-width:360px">' + VP_OPZIONI + '</select>'
-    + '<button type="button" class="btn btn-sm btn-link text-danger py-0" title="Togli"><i class="bi bi-x-lg"></i></button>';
-  riga.querySelector('button').onclick = () => riga.remove();
-  box.appendChild(riga);
+// --- Modifica vendita ---
+let mvDati = null;
+async function apriModificaVendita(id) {
+    const r = await fetch(urlVendita('dettaglio', id));
+    mvDati = await r.json();
+    document.getElementById('mv-id').value = id;
+    document.getElementById('mv-numero').textContent = document.querySelector(`tr[data-ordine-id="${id}"] .badge`).textContent.trim();
+    document.getElementById('mv-correnti').innerHTML = mvDati.items.map(it => `
+        <div class="d-flex justify-content-between border-bottom py-1">
+            <span><strong>${it.quantita}×</strong> ${it.servizio_nome}</span>
+            <span class="text-muted">${euro(it.prezzo_unitario)} cad. · <strong>${euro(it.subtotale)}</strong></span>
+        </div>`).join('');
+    document.getElementById('mv-item-select').innerHTML = '<option value="">Seleziona un prodotto...</option>'
+        + mvDati.items.map(it => `<option value="${it.id}">${it.servizio_nome} (x${it.quantita})</option>`).join('');
+    mvChiudiItem();
+    document.getElementById('mv-agg-prodotto').innerHTML = opzioniProdotti();
+    document.getElementById('mv-agg-quantita').value = 1;
+    mvSubtotaleAggiunta();
+    document.getElementById('mv-stato-pagamento').textContent = mvDati.stato_pagamento_display;
+    document.getElementById('mv-totale').textContent = euro(mvDati.totale_finale);
+    document.getElementById('mv-pagato').textContent = euro(mvDati.importo_pagato);
+    document.getElementById('mv-btn-paga').style.display = mvDati.saldo_dovuto > 0 ? '' : 'none';
+    document.getElementById('mv-btn-non-pagato').style.display = mvDati.importo_pagato > 0 ? '' : 'none';
+    bootstrap.Modal.getOrCreateInstance(document.getElementById('modalModificaVendita')).show();
 }
-
-function nvSalva() {
-  const righe = [...document.querySelectorAll('.nv-riga')].map(r => ({
-    prodotto_id: r.querySelector('.nv-p').value, quantita: r.querySelector('.nv-q').value}));
-  vpPost('{% url 'ordini:vendita-nuova' %}', {righe, pagamento: document.getElementById('nv-pagamento').value});
+const mvItem = () => mvDati.items.find(it => String(it.id) === document.getElementById('mv-item-select').value);
+function mvSelezionaItem() {
+    const it = mvItem();
+    document.getElementById('mv-form-item').style.display = it ? 'block' : 'none';
+    if (!it) return;
+    document.getElementById('mv-item-quantita').value = it.quantita;
+    document.getElementById('mv-item-prezzo').textContent = euro(it.prezzo_unitario);
+    mvSubtotaleItem();
 }
-nvRiga();
+function mvSubtotaleItem() {
+    const it = mvItem();
+    if (it) document.getElementById('mv-item-subtotale').textContent =
+        euro(it.prezzo_unitario * (parseInt(document.getElementById('mv-item-quantita').value) || 0));
+}
+function mvChiudiItem() {
+    document.getElementById('mv-item-select').value = '';
+    document.getElementById('mv-form-item').style.display = 'none';
+}
+function mvSubtotaleAggiunta() {
+    document.getElementById('mv-agg-subtotale').textContent = euro(
+        prezzoProdotto(document.getElementById('mv-agg-prodotto').value)
+        * (parseInt(document.getElementById('mv-agg-quantita').value) || 0));
+}
+const mvId = () => document.getElementById('mv-id').value;
+async function mvSalvaItem() {
+    const it = mvItem();
+    if (it && await postVendita(urlVendita('modifica', mvId(), it.id),
+                                {quantita: document.getElementById('mv-item-quantita').value})) location.reload();
+}
+async function mvEliminaItem() {
+    const it = mvItem();
+    if (it && confirm(`Togliere ${it.servizio_nome} dalla vendita? Torna in magazzino.`)
+           && await postVendita(urlVendita('eliminaItem', mvId(), it.id))) location.reload();
+}
+async function mvAggiungi() {
+    if (await postVendita(urlVendita('aggiungi', mvId()), {
+            prodotto_id: document.getElementById('mv-agg-prodotto').value,
+            quantita: document.getElementById('mv-agg-quantita').value})) location.reload();
+}
+function mvRegistraPagamento() {
+    const id = mvId();
+    bootstrap.Modal.getInstance(document.getElementById('modalModificaVendita')).hide();
+    aggiungiPagamento(id);
+}
+async function mvSegnaNonPagato() {
+    if (confirm('Segnare la vendita come non pagata? I pagamenti registrati vengono cancellati.')
+            && await postVendita(urlVendita('pagamento', mvId()), {stato: 'non_pagato'})) location.reload();
+}
+async function mvEliminaVendita() {
+    if (confirm('Eliminare la vendita? I prodotti tornano in magazzino e i pagamenti vengono cancellati.')
+            && await postVendita(urlVendita('elimina', mvId()))) location.reload();
+}
 </script>
 {% endblock %}

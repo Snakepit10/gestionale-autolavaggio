@@ -1,0 +1,80 @@
+{# JS del modale pagamento: incluso dentro un <script> #}
+function aggiungiPagamento(ordineId) {
+    // Recupera dati ordine
+    fetch(`{% url 'ordini:dettaglio-json' 0 %}`.replace('0', ordineId))
+        .then(response => response.json())
+        .then(data => {
+            document.getElementById('ordine-id').value = ordineId;
+            document.getElementById('ordine-numero').textContent = `#${data.numero_progressivo}`;
+            document.getElementById('ordine-totale').textContent = `€${data.totale_finale.toFixed(2)}`;
+            document.getElementById('ordine-pagato').textContent = `€${data.importo_pagato.toFixed(2)}`;
+            document.getElementById('ordine-residuo').textContent = `€${data.saldo_dovuto.toFixed(2)}`;
+            document.getElementById('importo-pagamento').value = data.saldo_dovuto.toFixed(2);
+            
+            const modal = new bootstrap.Modal(document.getElementById('modalPagamento'));
+            modal.show();
+        })
+        .catch(error => {
+            console.error('Errore nel caricamento dati ordine:', error);
+            alert('Errore nel caricamento dati ordine');
+        });
+}
+
+// Gestione form pagamento (anti double-submit)
+let _pagamentoInFlight = false;
+document.getElementById('form-pagamento').addEventListener('submit', function(e) {
+    e.preventDefault();
+    if (_pagamentoInFlight) return;  // ignora click ripetuti mentre la richiesta e' in corso
+    _pagamentoInFlight = true;
+
+    const submitBtn = this.querySelector('button[type="submit"]');
+    const originalLabel = submitBtn ? submitBtn.innerHTML : '';
+    if (submitBtn) {
+        submitBtn.disabled = true;
+        submitBtn.innerHTML = '<span class="spinner-border spinner-border-sm me-1"></span> Registrazione...';
+    }
+
+    const ordineId = document.getElementById('ordine-id').value;
+    const importo = document.getElementById('importo-pagamento').value;
+    const metodo = document.getElementById('metodo-pagamento-modal').value;
+    const note = document.getElementById('note-pagamento').value;
+
+    fetch(`{% url 'ordini:registra-pagamento' 0 %}`.replace('0', ordineId), {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+            'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]').value
+        },
+        body: JSON.stringify({
+            importo: importo,
+            metodo_pagamento: metodo,
+            note: note
+        })
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            bootstrap.Modal.getInstance(document.getElementById('modalPagamento')).hide();
+            document.getElementById('form-pagamento').reset();
+            const alertDiv = document.createElement('div');
+            alertDiv.className = 'alert alert-success alert-dismissible fade show';
+            alertDiv.innerHTML = `
+                <i class="bi bi-check-circle"></i> ${data.message}
+                ${data.ordine_completamente_pagato ? '<br><strong>Ordine completamente saldato!</strong>' : ''}
+                <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+            `;
+            (document.querySelector('.d-flex.justify-content-between') || document.querySelector('main')).insertAdjacentElement('afterbegin', alertDiv);
+            setTimeout(() => { location.reload(); }, 1200);
+        } else {
+            alert('Errore: ' + data.error);
+            _pagamentoInFlight = false;
+            if (submitBtn) { submitBtn.disabled = false; submitBtn.innerHTML = originalLabel; }
+        }
+    })
+    .catch(error => {
+        console.error('Errore:', error);
+        alert('Errore durante la registrazione del pagamento');
+        _pagamentoInFlight = false;
+        if (submitBtn) { submitBtn.disabled = false; submitBtn.innerHTML = originalLabel; }
+    });
+});
