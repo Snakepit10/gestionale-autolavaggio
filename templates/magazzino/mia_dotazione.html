@@ -21,10 +21,6 @@
 {% csrf_token %}
 <div class="dot-header">
     <h1><i class="bi bi-box-seam"></i> La mia dotazione</h1>
-    <span class="d-flex gap-1">
-        <a href="{% url 'magazzino:schede-prodotti' %}" class="btn btn-outline-primary btn-sm"><i class="bi bi-file-earmark-text"></i> Schede prodotti</a>
-        <a href="{% url 'turni:dashboard' %}" class="btn btn-outline-secondary btn-sm"><i class="bi bi-arrow-left"></i> Il mio turno</a>
-    </span>
 </div>
 <p class="text-muted small mb-2">Se qualcosa è consumato, rovinato, rotto o non lo trovi più, segnalalo: il responsabile del magazzino lo vede subito.</p>
 

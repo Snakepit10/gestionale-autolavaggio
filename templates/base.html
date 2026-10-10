@@ -187,6 +187,19 @@
                         </li>
                         {% endif %}
 
+                        {% if 'mio_turno' in sezioni_visibili or 'magazzino' in sezioni_visibili %}
+                        <li class="nav-item">
+                            <a class="nav-link" href="{% url 'magazzino:mia-dotazione' %}">
+                                <i class="bi bi-box-seam"></i> Dotazione
+                            </a>
+                        </li>
+                        <li class="nav-item">
+                            <a class="nav-link" href="{% url 'magazzino:schede-prodotti' %}">
+                                <i class="bi bi-file-earmark-text"></i> Schede prodotti
+                            </a>
+                        </li>
+                        {% endif %}
+
                         {# === Menu per responsabile/titolare === #}
                         {% if 'report_turni' in sezioni_visibili %}
                         <li class="nav-item dropdown">
