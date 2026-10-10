@@ -46,6 +46,7 @@
                 <ul class="navbar-nav me-auto">
                     {% if user.is_authenticated %}
                         {# === Menu per TUTTI gli utenti autenticati === #}
+                        {% if 'clienti' in sezioni_visibili %}
                         <li class="nav-item dropdown">
                             <a class="nav-link dropdown-toggle" href="#" id="clientiDropdown" role="button" data-bs-toggle="dropdown">
                                 <i class="bi bi-people"></i> Clienti
@@ -58,7 +59,9 @@
                                     <i class="bi bi-car-front"></i> Garage veicoli</a></li>
                             </ul>
                         </li>
+                        {% endif %}
 
+                        {% if 'messaggi' in sezioni_visibili %}
                         <li class="nav-item">
                             <a class="nav-link" href="{% url 'messaggi:inbox' %}" id="navWaLink"
                                title="Messaggi WhatsApp">
@@ -71,13 +74,17 @@
                                              box-shadow:0 1px 4px rgba(0,0,0,.25);"></span>
                             </a>
                         </li>
+                        {% endif %}
 
+                        {% if 'cassa' in sezioni_visibili %}
                         <li class="nav-item">
                             <a class="nav-link" href="{% url 'ordini:cassa' %}">
                                 <i class="bi bi-cash-register"></i> Cassa
                             </a>
                         </li>
+                        {% endif %}
 
+                        {% if 'task' in sezioni_visibili %}
                         <li class="nav-item">
                             <a class="nav-link" href="{% url 'tasks:lista' %}" id="navTaskLink"
                                title="Task interni">
@@ -90,8 +97,9 @@
                                              box-shadow:0 1px 4px rgba(0,0,0,.25);"></span>
                             </a>
                         </li>
+                        {% endif %}
 
-                        {% if user.is_staff %}
+                        {% if 'marketing' in sezioni_visibili %}
                         <li class="nav-item">
                             <a class="nav-link" href="{% url 'marketing:dashboard' %}">
                                 <i class="bi bi-megaphone"></i> Marketing
@@ -99,18 +107,23 @@
                         </li>
                         {% endif %}
 
+                        {% if 'ordini' in sezioni_visibili %}
                         <li class="nav-item">
                             <a class="nav-link" href="{% url 'ordini:ordini-list' %}">
                                 <i class="bi bi-receipt"></i> Ordini
                             </a>
                         </li>
+                        {% endif %}
 
+                        {% if 'fatture' in sezioni_visibili %}
                         <li class="nav-item">
                             <a class="nav-link" href="{% url 'fatture:fatture-list' %}">
                                 <i class="bi bi-receipt-cutoff"></i> Fatture
                             </a>
                         </li>
+                        {% endif %}
 
+                        {% if 'abbonamenti' in sezioni_visibili %}
                         <li class="nav-item dropdown">
                             <a class="nav-link dropdown-toggle" href="#" id="abbonamentiDropdown" role="button" data-bs-toggle="dropdown">
                                 <i class="bi bi-card-checklist"></i> Abbonamenti
@@ -122,7 +135,9 @@
                                 <li><a class="dropdown-item" href="{% url 'abbonamenti:verifica-accesso' %}">Verifica Accesso</a></li>
                             </ul>
                         </li>
+                        {% endif %}
 
+                        {% if 'prenotazioni' in sezioni_visibili %}
                         <li class="nav-item dropdown">
                             <a class="nav-link dropdown-toggle" href="#" id="prenotazioniDropdown" role="button" data-bs-toggle="dropdown">
                                 <i class="bi bi-calendar-check"></i> Prenotazioni
@@ -138,7 +153,9 @@
                                 <li><a class="dropdown-item" href="{% url 'prenotazioni:calendario-prenotazioni' %}">Calendario</a></li>
                             </ul>
                         </li>
+                        {% endif %}
 
+                        {% if 'qualita' in sezioni_visibili %}
                         <li class="nav-item dropdown">
                             <a class="nav-link dropdown-toggle" href="#" id="cqDropdown" role="button" data-bs-toggle="dropdown">
                                 <i class="bi bi-clipboard2-check"></i> Qualità
@@ -159,9 +176,10 @@
                                 </a></li>
                             </ul>
                         </li>
+                        {% endif %}
 
                         {# Turni: link diretto per operatore #}
-                        {% if user|in_group:"operatore" %}
+                        {% if 'mio_turno' in sezioni_visibili %}
                         <li class="nav-item">
                             <a class="nav-link" href="{% url 'turni:dashboard' %}">
                                 <i class="bi bi-person-workspace"></i> Il Mio Turno
@@ -170,7 +188,7 @@
                         {% endif %}
 
                         {# === Menu per responsabile/titolare === #}
-                        {% if user|in_group:"titolare" or user|in_group:"responsabile" or user.is_superuser %}
+                        {% if 'report_turni' in sezioni_visibili %}
                         <li class="nav-item dropdown">
                             <a class="nav-link dropdown-toggle" href="#" role="button" data-bs-toggle="dropdown">
                                 <i class="bi bi-clock-history"></i> Turni
@@ -186,9 +204,7 @@
                         </li>
                         {% endif %}
 
-                        {# === Menu SOLO per titolare/admin === #}
-                        {% if user|in_group:"titolare" or user.is_superuser %}
-
+                        {% if 'finanze' in sezioni_visibili %}
                         <li class="nav-item dropdown">
                             <a class="nav-link dropdown-toggle" href="#" role="button" data-bs-toggle="dropdown">
                                 <i class="bi bi-cash-coin"></i> Finanze
@@ -205,12 +221,15 @@
                                 </a></li>
                             </ul>
                         </li>
+                        {% endif %}
 
+                        {% if 'configurazione' in sezioni_visibili or 'permessi' in sezioni_visibili %}
                         <li class="nav-item dropdown">
                             <a class="nav-link dropdown-toggle" href="#" id="configDropdown" role="button" data-bs-toggle="dropdown">
                                 <i class="bi bi-gear"></i> Configurazione
                             </a>
                             <ul class="dropdown-menu">
+                                {% if 'configurazione' in sezioni_visibili %}
                                 <li><h6 class="dropdown-header">Catalogo</h6></li>
                                 <li><a class="dropdown-item" href="{% url 'core:categoria-list' %}"><i class="bi bi-folder"></i> Categorie</a></li>
                                 <li><a class="dropdown-item" href="{% url 'core:catalogo-list' %}"><i class="bi bi-grid"></i> Servizi & Prodotti</a></li>
@@ -227,6 +246,12 @@
                                 <li><a class="dropdown-item" href="{% url 'cartellini:generatore' %}"><i class="bi bi-tag"></i> Cartellini Kanban</a></li>
                                 <li><a class="dropdown-item" href="{% url 'prenotazioni:config-slot-list' %}"><i class="bi bi-calendar-range"></i> Slot Prenotazioni</a></li>
                                 <li><a class="dropdown-item" href="{% url 'abbonamenti:config-abbonamenti-list' %}"><i class="bi bi-card-checklist"></i> Config Abbonamenti</a></li>
+                                {% endif %}
+                                {% if 'permessi' in sezioni_visibili %}
+                                <li><hr class="dropdown-divider"></li>
+                                <li><h6 class="dropdown-header">Utenti</h6></li>
+                                <li><a class="dropdown-item" href="{% url 'permessi:matrice' %}"><i class="bi bi-shield-lock"></i> Permessi</a></li>
+                                {% endif %}
                             </ul>
                         </li>
                         {% endif %}
@@ -333,7 +358,7 @@
     
     {% block extra_js %}{% endblock %}
 
-    {% if user.is_authenticated and user.is_staff %}
+    {% if user.is_authenticated and 'messaggi' in sezioni_visibili %}
     {# Badge "Messaggi WhatsApp" non letti nella navbar, aggiornato live via WS #}
     <style>
         @keyframes wa-badge-pulse {

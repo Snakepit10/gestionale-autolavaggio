@@ -24,8 +24,9 @@ def _staff_required(view_func):
     """Solo staff (stesso pattern di apps/marketing/views.py)."""
     @wraps(view_func)
     def _wrapped(request, *args, **kwargs):
-        if not (request.user.is_staff or request.user.is_superuser):
-            messages.error(request, 'Non hai i permessi per questa sezione.')
+        from apps.auth_system.sezioni import ha_accesso
+        if not ha_accesso(request.user, 'monete'):
+            messages.error(request, 'Non hai accesso alla sezione Monete.')
             return redirect('core:home')
         return view_func(request, *args, **kwargs)
     return login_required(_wrapped)

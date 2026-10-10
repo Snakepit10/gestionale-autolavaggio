@@ -1,0 +1,155 @@
+{% extends 'base.html' %}
+
+{% block title %}Permessi - Gestionale Autolavaggio{% endblock %}
+
+{% block extra_css %}
+<style>
+.perm-card { background:#fff; border:1px solid #e5e7eb; border-radius:12px; box-shadow:0 1px 2px rgba(0,0,0,.04); margin-bottom:1.25rem; overflow:hidden; }
+.perm-card .perm-title { padding:14px 20px; font-weight:600; color:#1e293b; border-bottom:1px solid #f1f5f9; display:flex; align-items:center; gap:10px; }
+.perm-card table { margin-bottom:0; }
+.perm-card thead th { background:#eff6ff; color:#1e40af; font-size:.72rem; text-transform:uppercase; letter-spacing:.4px; font-weight:600; padding:12px 14px; }
+.perm-card tbody td { padding:10px 14px; vertical-align:middle; }
+.perm-check { width:1.4rem; height:1.4rem; cursor:pointer; }
+.chip { display:inline-block; background:#f1f5f9; color:#334155; border-radius:999px; padding:2px 10px; font-size:.75rem; margin:2px; }
+</style>
+{% endblock %}
+
+{% block content %}
+{% csrf_token %}
+<div class="d-flex justify-content-between align-items-center mb-3 flex-wrap gap-2">
+    <h1 class="h3 mb-0"><i class="bi bi-shield-lock"></i> Permessi</h1>
+</div>
+<p class="text-muted">
+    Scegli quali sezioni vede ogni gruppo. Vale sia per il menu sia per l'accesso diretto agli indirizzi.
+    L'amministratore vede sempre tutto; la pagina Permessi resta al titolare.
+    Le modifiche valgono subito (l'utente le vede al prossimo caricamento di pagina).
+</p>
+
+<div class="perm-card">
+    <div class="perm-title"><i class="bi bi-grid-3x3-gap text-primary"></i> Sezioni per gruppo</div>
+    <div class="table-responsive">
+        <table class="table table-hover">
+            <thead>
+                <tr>
+                    <th>Sezione</th>
+                    {% for g in gruppi %}<th class="text-center">{{ g.name|capfirst }}</th>{% endfor %}
+                </tr>
+            </thead>
+            <tbody>
+                {% for r in righe %}
+                <tr>
+                    <td><strong>{{ r.nome }}</strong><br><small class="text-muted">{{ r.descrizione }}</small></td>
+                    {% for c in r.celle %}
+                    <td class="text-center">
+                        <input type="checkbox" class="form-check-input perm-check" {% if c.attivo %}checked{% endif %}
+                               {% if r.fissa %}disabled title="Fissa: non modificabile"{% endif %}
+                               onchange="salvaGruppo('{{ r.chiave }}', {{ c.gruppo.pk }}, this)">
+                    </td>
+                    {% endfor %}
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+
+<div class="perm-card">
+    <div class="perm-title"><i class="bi bi-person-gear text-primary"></i> Eccezioni per utente</div>
+    <div class="p-3">
+        <p class="small text-muted mb-2">Valgono sopra al gruppo: <em>consenti</em> dà la sezione anche se il gruppo non ce l'ha, <em>nega</em> la toglie anche se il gruppo ce l'ha.</p>
+        <div class="row g-2 align-items-end mb-3">
+            <div class="col-md-4">
+                <label class="form-label fw-bold small">Utente</label>
+                <select class="form-select" id="ecc-utente">
+                    {% for u in utenti %}<option value="{{ u.pk }}">{{ u.get_full_name|default:u.username }}{% if u.nomi_gruppi %} ({{ u.nomi_gruppi|join:", " }}){% endif %}</option>{% endfor %}
+                </select>
+            </div>
+            <div class="col-md-4">
+                <label class="form-label fw-bold small">Sezione</label>
+                <select class="form-select" id="ecc-sezione">
+                    {% for chiave, nome in sezioni_modificabili %}<option value="{{ chiave }}">{{ nome }}</option>{% endfor %}
+                </select>
+            </div>
+            <div class="col-md-2">
+                <label class="form-label fw-bold small">Regola</label>
+                <select class="form-select" id="ecc-consenti">
+                    <option value="1">Consenti</option>
+                    <option value="0">Nega</option>
+                </select>
+            </div>
+            <div class="col-md-2">
+                <button type="button" class="btn btn-primary w-100" onclick="salvaEccezione()"><i class="bi bi-plus-circle"></i> Aggiungi</button>
+            </div>
+        </div>
+        {% if eccezioni %}
+        <table class="table table-sm mb-0">
+            <thead><tr><th>Utente</th><th>Sezione</th><th>Regola</th><th></th></tr></thead>
+            <tbody>
+                {% for e in eccezioni %}
+                <tr>
+                    <td>{{ e.user.get_full_name|default:e.user.username }}</td>
+                    <td>{{ e.get_sezione_display }}</td>
+                    <td>{% if e.consenti %}<span class="badge bg-success">Consenti</span>{% else %}<span class="badge bg-danger">Nega</span>{% endif %}</td>
+                    <td class="text-end">
+                        <button type="button" class="btn btn-sm btn-link text-danger py-0" title="Elimina eccezione"
+                                onclick="eliminaEccezione('{% url 'permessi:api-eccezione-elimina' e.pk %}')"><i class="bi bi-trash"></i></button>
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+        {% else %}
+        <div class="text-muted small">Nessuna eccezione.</div>
+        {% endif %}
+    </div>
+</div>
+
+<div class="perm-card">
+    <div class="perm-title"><i class="bi bi-people text-primary"></i> Cosa vede ogni utente</div>
+    <div class="table-responsive">
+        <table class="table table-hover">
+            <thead><tr><th>Utente</th><th>Gruppi</th><th>Sezioni</th></tr></thead>
+            <tbody>
+                {% for u in utenti %}
+                <tr>
+                    <td><strong>{{ u.get_full_name|default:u.username }}</strong>{% if u.is_superuser %} <span class="badge bg-dark">admin</span>{% endif %}</td>
+                    <td>{% for g in u.nomi_gruppi %}<span class="chip">{{ g }}</span>{% empty %}<span class="text-muted small">—</span>{% endfor %}</td>
+                    <td>{% for s in u.sezioni_effettive %}<span class="chip">{{ s }}</span>{% empty %}<span class="text-muted small">nessuna</span>{% endfor %}</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+async function postPermessi(url, dati) {
+    const r = await fetch(url, {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json',
+                  'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]').value},
+        body: JSON.stringify(dati || {}),
+    });
+    const esito = await r.json().catch(() => ({}));
+    if (!r.ok || !esito.success) { alert('Errore: ' + (esito.error || 'operazione non riuscita')); return false; }
+    return true;
+}
+async function salvaGruppo(sezione, gruppoId, box) {
+    box.disabled = true;
+    const ok = await postPermessi("{% url 'permessi:api-gruppo' %}", {sezione, gruppo_id: gruppoId, attivo: box.checked});
+    if (!ok) box.checked = !box.checked;
+    box.disabled = false;
+}
+async function salvaEccezione() {
+    if (await postPermessi("{% url 'permessi:api-eccezione' %}", {
+            user_id: document.getElementById('ecc-utente').value,
+            sezione: document.getElementById('ecc-sezione').value,
+            consenti: document.getElementById('ecc-consenti').value === '1'})) location.reload();
+}
+async function eliminaEccezione(url) {
+    if (confirm("Eliminare l'eccezione?") && await postPermessi(url)) location.reload();
+}
+</script>
+{% endblock %}

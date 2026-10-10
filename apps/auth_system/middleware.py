@@ -51,7 +51,7 @@ class AuthenticationMiddleware(MiddlewareMixin):
         '/cartellini/', '/messaggi/', '/marketing/',
         '/categorie/', '/catalogo/', '/sconti/', '/stampanti/', '/scorte/',
         '/clienti/', '/prenotazioni/', '/abbonamenti/', '/api/', '/monete/',
-        '/tasks/', '/garage/', '/fatture/',
+        '/tasks/', '/garage/', '/fatture/', '/permessi/',
     )
 
     # Sotto-percorsi CLIENTE dentro prefissi staff: restano accessibili
@@ -68,7 +68,7 @@ class AuthenticationMiddleware(MiddlewareMixin):
         if not user.is_authenticated:
             return None
         if user.is_staff or user.groups.exists():
-            return None
+            return self._controlla_sezione(request)
 
         path = request.path
         if any(path.startswith(p) for p in self.CLIENT_ALLOWED_PREFIXES):
@@ -78,3 +78,25 @@ class AuthenticationMiddleware(MiddlewareMixin):
             messages.error(request, 'Area riservata agli operatori.')
             return redirect('clients:dashboard')
         return None
+
+    @staticmethod
+    def _controlla_sezione(request):
+        """Operatori: la sezione dell'indirizzo deve essere tra le loro
+        (pagina Configurazione > Permessi). 403 JSON per le chiamate API."""
+        from django.http import JsonResponse
+        from django.shortcuts import render
+
+        from .sezioni import NOMI, ha_accesso, sezione_per_percorso
+
+        sezione = sezione_per_percorso(request.path)
+        if sezione is None or ha_accesso(request.user, sezione):
+            return None
+        messaggio = f'Non hai accesso alla sezione {NOMI[sezione]}.'
+        vuole_json = ('/api/' in request.path
+                      or 'application/json' in request.headers.get('Accept', '')
+                      or request.content_type == 'application/json'
+                      or request.headers.get('X-Requested-With') == 'XMLHttpRequest')
+        if vuole_json:
+            return JsonResponse({'success': False, 'error': messaggio}, status=403)
+        return render(request, 'auth_system/accesso_negato.html',
+                      {'sezione': NOMI[sezione]}, status=403)

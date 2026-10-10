@@ -124,6 +124,7 @@ TEMPLATES = [
                 'django.contrib.messages.context_processors.messages',
                 'apps.cq.context_processors.oggi',
                 'apps.auth_system.context_processors.google_oauth',
+                'apps.auth_system.context_processors.sezioni_visibili',
                 'apps.clients.context_processors.meta_pixel',
             ],
         },

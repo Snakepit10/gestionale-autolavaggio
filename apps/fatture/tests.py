@@ -4,6 +4,7 @@ from datetime import date
 from decimal import Decimal
 
 from django.contrib.auth.models import User
+from apps.auth_system.testutils import utente_titolare
 from django.test import TestCase
 from django.urls import reverse
 
@@ -24,7 +25,7 @@ def _crea_ordine(cliente=None, totale='10.00', **extra):
 
 class BaseFattureTest(TestCase):
     def setUp(self):
-        self.operatore = User.objects.create_user(
+        self.operatore = utente_titolare(
             'op_fatture', 'op@test.it', 'pw', is_staff=True)
         self.client.force_login(self.operatore)
         self.cliente_a = Cliente.objects.create(
@@ -478,7 +479,7 @@ class AccessoTest(TestCase):
         # non riesce a copiare il context dei template su Python 3.14
         # (AttributeError in Context.__copy__). Il render della pagina
         # viene collaudato a mano nel browser.
-        op = User.objects.create_user('op2_fatture', 'o2@test.it', 'pw',
+        op = utente_titolare('op2_fatture', 'o2@test.it', 'pw',
                                       is_staff=True)
         self.client.force_login(op)
         r = self.client.get(reverse('fatture:suggerisci-numero'))

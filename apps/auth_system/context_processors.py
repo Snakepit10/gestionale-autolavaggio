@@ -6,3 +6,9 @@ def google_oauth(request):
     cosi' i bottoni 'Continua con Google' compaiono solo quando
     possono funzionare."""
     return {'google_oauth_enabled': settings.GOOGLE_OAUTH_ENABLED}
+
+
+def sezioni_visibili(request):
+    """Sezioni del gestionale accessibili all'utente, per il menu."""
+    from .sezioni import sezioni_permesse
+    return {'sezioni_visibili': sezioni_permesse(getattr(request, 'user', None))}

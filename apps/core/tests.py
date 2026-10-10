@@ -3,6 +3,7 @@ import json
 from decimal import Decimal
 
 from django.contrib.auth.models import User
+from apps.auth_system.testutils import utente_titolare
 from django.test import RequestFactory, TestCase
 from django.urls import reverse
 
@@ -21,7 +22,7 @@ class SottocategorieTest(TestCase):
         crea('Panno microfibra', 'Panni')
         crea('Spugna', '')
         crea('Profumo in altra categoria', 'Profumi', self.altra)
-        self.user = User.objects.create_user('op', 'op@x.it', 'x', is_staff=True)
+        self.user = utente_titolare('op', 'op@x.it', 'x', is_staff=True)
 
     def test_elenco_sottocategorie_per_categoria(self):
         from apps.core.views import CategoriaListView

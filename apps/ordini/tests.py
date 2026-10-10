@@ -3,6 +3,7 @@ import json
 from decimal import Decimal
 
 from django.contrib.auth.models import User
+from apps.auth_system.testutils import utente_titolare
 from django.test import TestCase
 from django.urls import reverse
 
@@ -23,7 +24,7 @@ class ArchiviaNonPagatiTest(TestCase):
             content_type='application/json')
 
     def test_operatore_staff_non_puo_archiviare(self):
-        staff = User.objects.create_user('op', 'op@x.it', 'x', is_staff=True)
+        staff = utente_titolare('op', 'op@x.it', 'x', is_staff=True)
         r = self._post(staff)
         self.assertEqual(r.status_code, 403)
         self.assertFalse(r.json()['success'])
@@ -52,7 +53,7 @@ class VenditaProdottiTest(TestCase):
         self.lavaggio = ServizioProdotto.objects.create(
             titolo='Lavaggio esterno', categoria=cat, prezzo=Decimal('10'), descrizione='',
             tipo='servizio')
-        self.user = User.objects.create_user('op', 'op@x.it', 'x', is_staff=True)
+        self.user = utente_titolare('op', 'op@x.it', 'x', is_staff=True)
 
     def _ordine(self, **kw):
         return Ordine.objects.create(totale=Decimal('5'), totale_finale=Decimal('5'), **kw)
@@ -133,7 +134,7 @@ class VenditaProdottiCrudTest(TestCase):
         self.panno = ServizioProdotto.objects.create(
             titolo='Panno', categoria=cat, prezzo=Decimal('3'), descrizione='',
             tipo='prodotto', quantita_disponibile=-1)
-        self.user = User.objects.create_user('op', 'op@x.it', 'x', is_staff=True)
+        self.user = utente_titolare('op', 'op@x.it', 'x', is_staff=True)
         self.admin = User.objects.create_superuser('boss', 'b@x.it', 'x')
         self.client.force_login(self.user)
 

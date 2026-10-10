@@ -19,7 +19,9 @@ from apps.core.models import Categoria
 
 
 def is_staff_user(user):
-    return user.is_staff
+    """Chi ha la sezione Finanze (Configurazione > Permessi)."""
+    from apps.auth_system.sezioni import ha_accesso
+    return ha_accesso(user, 'finanze')
 
 
 @login_required

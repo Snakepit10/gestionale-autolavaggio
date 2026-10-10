@@ -120,6 +120,7 @@ urlpatterns = [
     path('app/', include('apps.clients.urls')),
 
     # Core URLs essenziali (dashboard staff su /, gestisce dispatch interno)
+    path('permessi/', include('apps.auth_system.urls_permessi', namespace='permessi')),
     path('', include('apps.core.urls')),
     path('clienti/', include('apps.clienti.urls')),
     path('ordini/', include('apps.ordini.urls')),

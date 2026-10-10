@@ -3,6 +3,13 @@ from channels.generic.websocket import AsyncWebsocketConsumer
 from channels.db import database_sync_to_async
 
 
+@database_sync_to_async
+def _ha_accesso(user, sezione):
+    """Permessi per sezione (Configurazione > Permessi) per i WebSocket."""
+    from apps.auth_system.sezioni import ha_accesso
+    return ha_accesso(user, sezione)
+
+
 async def _safe_group_discard(consumer):
     """Wrapper difensivo per disconnect: se connect() ha rifiutato
     l'handshake (utente anonimo, sessione scaduta) ritornando prima di
@@ -221,7 +228,7 @@ class MessaggiConsumer(AsyncWebsocketConsumer):
     """
     async def connect(self):
         from django.contrib.auth.models import AnonymousUser
-        if isinstance(self.scope['user'], AnonymousUser):
+        if isinstance(self.scope['user'], AnonymousUser) or not await _ha_accesso(self.scope['user'], 'messaggi'):
             await self.close()
             return
         self.room_group_name = 'messaggi_wa'

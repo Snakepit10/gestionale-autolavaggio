@@ -45,13 +45,16 @@ def _label_chiavi(chiavi):
 
 
 def _staff_required(view):
-    """Il modulo marketing e' riservato allo staff."""
+    """Il modulo marketing e' riservato a chi ha la sezione Marketing
+    (Configurazione > Permessi)."""
     from functools import wraps
+
+    from apps.auth_system.sezioni import ha_accesso
 
     @wraps(view)
     def wrapper(request, *args, **kwargs):
-        if not (request.user.is_staff or request.user.is_superuser):
-            messages.error(request, 'Sezione riservata allo staff.')
+        if not ha_accesso(request.user, 'marketing'):
+            messages.error(request, 'Non hai accesso alla sezione Marketing.')
             return redirect('core:home')
         return view(request, *args, **kwargs)
     return login_required(wrapper)

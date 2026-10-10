@@ -3,6 +3,7 @@ from datetime import datetime, timedelta
 from decimal import Decimal
 
 from django.contrib.auth.models import User
+from apps.auth_system.testutils import utente_titolare
 from django.test import TestCase
 from django.urls import reverse
 from django.utils import timezone
@@ -202,7 +203,7 @@ class AbbinamentoPortaliTest(TestCase):
         self.assertFalse(ok)                    # transazione gia' usata
 
     def test_endpoint_conferma_e_rimuovi(self):
-        user = User.objects.create_user('op', 'op@x.it', 'x', is_staff=True)
+        user = utente_titolare('op', 'op@x.it', 'x', is_staff=True)
         self.client.force_login(user)
         self._item(self.completo, completato='10:30')
         self._tx('10:05', 4)
@@ -231,7 +232,7 @@ class AbbinamentoPortaliTest(TestCase):
         self.assertFalse(ChiusuraPortali.objects.exists())
 
     def test_abbinare_salva_la_finestra_predefinita(self):
-        user = User.objects.create_user('op', 'op@x.it', 'x', is_staff=True)
+        user = utente_titolare('op', 'op@x.it', 'x', is_staff=True)
         self.client.force_login(user)
         self.chiusura.delete()
         self._item(self.completo, completato='10:30')
@@ -244,7 +245,7 @@ class AbbinamentoPortaliTest(TestCase):
         self.assertEqual(AbbinamentoPortale.objects.count(), 1)
 
     def test_chiusura_al_secondo(self):
-        user = User.objects.create_user('op', 'op@x.it', 'x', is_staff=True)
+        user = utente_titolare('op', 'op@x.it', 'x', is_staff=True)
         self.client.force_login(user)
         url = reverse('finanze:imposta_chiusura_portali')
         self.client.post(url, {'data': '2026-10-06', 'periodo_da': '2026-10-05T19:30',
@@ -415,7 +416,7 @@ class AbbinamentoPortaliTest(TestCase):
                           esito[self.chiusura.data]['A']['contanti']), (2, Decimal('8.00')))
 
     def test_salva_orari_blu(self):
-        user = User.objects.create_user('op', 'op@x.it', 'x', is_staff=True)
+        user = utente_titolare('op', 'op@x.it', 'x', is_staff=True)
         self.client.force_login(user)
         url = reverse('finanze:imposta_chiusura_portali')
         self.client.post(url, {'data': '2026-10-06', 'periodo_da': '2026-10-05T19:00',
@@ -567,8 +568,8 @@ class SpeseCassaTest(TestCase):
     def setUp(self):
         from apps.finanze.models import SpesaCassa
         self.SpesaCassa = SpesaCassa
-        self.op = User.objects.create_user('op_spese', password='x', is_staff=True)
-        self.altro = User.objects.create_user('op_altro', password='x', is_staff=True)
+        self.op = utente_titolare('op_spese', password='x', is_staff=True)
+        self.altro = utente_titolare('op_altro', password='x', is_staff=True)
         self.url = reverse('finanze:azione_spese_cassa')
 
     def aggiungi(self, **extra):

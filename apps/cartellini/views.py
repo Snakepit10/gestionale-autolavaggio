@@ -20,7 +20,8 @@ def _staff_required(view_func):
     """Decorator: login + is_staff. 302 -> login se anonimo, 403 se non staff."""
     @login_required
     def _wrap(request, *args, **kwargs):
-        if not request.user.is_staff:
+        from apps.auth_system.sezioni import ha_accesso
+        if not ha_accesso(request.user, 'configurazione'):
             return JsonResponse({'error': 'forbidden'}, status=403)
         return view_func(request, *args, **kwargs)
     return _wrap

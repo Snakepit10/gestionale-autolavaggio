@@ -9,8 +9,10 @@ from django.views.generic import TemplateView
 
 
 class StaffRequiredMixin(LoginRequiredMixin, UserPassesTestMixin):
+    """Chi ha la sezione Messaggi (Configurazione > Permessi)."""
     def test_func(self):
-        return self.request.user.is_staff
+        from apps.auth_system.sezioni import ha_accesso
+        return ha_accesso(self.request.user, 'messaggi')
 
 
 class MessaggiInboxView(StaffRequiredMixin, TemplateView):

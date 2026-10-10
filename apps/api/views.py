@@ -509,7 +509,9 @@ def whatsapp_webhook(request):
 # ===========================================================================
 
 def _is_staff(user):
-    return user.is_authenticated and user.is_staff
+    """API dell'inbox WhatsApp: chi ha la sezione Messaggi."""
+    from apps.auth_system.sezioni import ha_accesso
+    return user.is_authenticated and ha_accesso(user, 'messaggi')
 
 
 def _serialize_conv(c: ConversazioneWhatsApp, ultimo: MessaggioWhatsApp | None = None) -> dict:
