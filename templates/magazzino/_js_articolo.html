@@ -191,6 +191,7 @@ function apriMovimento(id, nome, tipo, attuale, unitaPrezzo) {
     document.getElementById('mov-quantita').value = '';
     document.getElementById('mov-costo').value = '';
     document.getElementById('mov-nota').value = '';
+    document.getElementById('mov-motivo').value = '';
     document.getElementById('mov-errore').classList.add('d-none');
     tipoMovimento();
     bootstrap.Modal.getOrCreateInstance(document.getElementById('modaleMovimento')).show();
@@ -205,6 +206,24 @@ function tipoMovimento() {
     if (tipo === 'rettifica' && !document.getElementById('mov-quantita').value) {
         document.getElementById('mov-quantita').value = Math.max(movQuantitaAttuale, 0);
     }
+    aggiornaMotivo();
+}
+
+// Scarto, o inventario che trova meno merce del registrato: motivo obbligatorio
+function serveMotivo() {
+    const tipo = document.querySelector('[name=mov-tipo]:checked').value;
+    const q = document.getElementById('mov-quantita').value;
+    return tipo === 'scarto' || (tipo === 'rettifica' && q !== '' && Number(q) < movQuantitaAttuale);
+}
+
+function aggiornaMotivo() {
+    const serve = serveMotivo();
+    const tipo = document.querySelector('[name=mov-tipo]:checked').value;
+    document.getElementById('mov-motivo-box').classList.toggle('d-none', !serve);
+    document.getElementById('mov-motivo-spiega').textContent = serve && tipo === 'rettifica'
+        ? 'Hai contato ' + (movQuantitaAttuale - Number(document.getElementById('mov-quantita').value)) + ' in meno del registrato: perché?' : '';
+    const altro = serve && document.getElementById('mov-motivo').value === 'altro';
+    document.getElementById('mov-nota-l').textContent = altro ? 'Nota * (spiega il motivo)' : 'Nota';
 }
 
 async function salvaMovimento() {
@@ -212,6 +231,7 @@ async function salvaMovimento() {
     const j = await postJSON(URL_MOVIMENTO.replace('999999', id), {
         tipo: document.querySelector('[name=mov-tipo]:checked').value,
         quantita: document.getElementById('mov-quantita').value,
+        motivo: serveMotivo() ? document.getElementById('mov-motivo').value : '',
         costo: document.getElementById('mov-costo').value,
         nota: document.getElementById('mov-nota').value,
     });

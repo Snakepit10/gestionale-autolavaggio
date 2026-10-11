@@ -19,14 +19,22 @@
                 <div class="row g-2">
                     <div class="col-6">
                         <label class="form-label" id="mov-label-q">Quantità</label>
-                        <input type="number" min="0" class="form-control form-control-lg" id="mov-quantita">
+                        <input type="number" min="0" class="form-control form-control-lg" id="mov-quantita" oninput="aggiornaMotivo()">
                     </div>
                     <div class="col-6" id="mov-costo-box">
                         <label class="form-label" id="mov-costo-l">Costo unitario (&euro;)</label>
                         <input type="text" inputmode="decimal" class="form-control form-control-lg" id="mov-costo" placeholder="invariato">
                     </div>
+                    <div class="col-12 d-none" id="mov-motivo-box">
+                        <label class="form-label">Motivo *</label>
+                        <select class="form-select" id="mov-motivo" onchange="aggiornaMotivo()">
+                            <option value="">— scegli —</option>
+                            {% for k, v in motivi_uscita %}<option value="{{ k }}">{{ v }}</option>{% endfor %}
+                        </select>
+                        <small class="text-muted" id="mov-motivo-spiega"></small>
+                    </div>
                     <div class="col-12">
-                        <label class="form-label">Nota</label>
+                        <label class="form-label" id="mov-nota-l">Nota</label>
                         <input type="text" class="form-control" id="mov-nota" maxlength="200">
                     </div>
                 </div>

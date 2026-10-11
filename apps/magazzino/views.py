@@ -128,6 +128,7 @@ def _contesto_modale():
         'fornitori': Fornitore.objects.filter(attivo=True),
         'posti': Posto.objects.filter(attivo=True),
         'usi': USI,
+        'motivi_uscita': Movimento.MOTIVO_CHOICES,
         **_contesto_catalogo(),
     }
 
@@ -329,10 +330,23 @@ def articolo_movimento(request, pk):
     nota = (d.get('nota') or '').strip()
     if quantita is None:
         return _errore('Quantità non valida')
+    # Merce che esce (scarto o inventario sotto la quantita' registrata):
+    # il motivo e' obbligatorio, e con "Altro" anche la nota
+    motivo = d.get('motivo') or ''
+    articolo.refresh_from_db(fields=['quantita'])
+    esce = tipo == 'scarto' or (tipo == 'rettifica' and articolo.traccia_scorte
+                                and quantita < articolo.quantita)
+    if esce:
+        if motivo not in dict(Movimento.MOTIVO_CHOICES):
+            return _errore('Indica il motivo')
+        if motivo == 'altro' and not nota:
+            return _errore('Con "Altro" scrivi il motivo nella nota')
+    else:
+        motivo = ''
     if tipo == 'rettifica':
         if quantita < 0:
             return _errore('La quantità contata non può essere negativa')
-        mov = services.rettifica(articolo, quantita, operatore=request.user, nota=nota)
+        mov = services.rettifica(articolo, quantita, operatore=request.user, nota=nota, motivo=motivo)
     elif tipo in ('carico', 'scarto'):
         if quantita <= 0:
             return _errore('Quantità non valida')
@@ -340,7 +354,7 @@ def articolo_movimento(request, pk):
             articolo.costo = articolo.a_pezzo(_decimale(d.get('costo')))
             articolo.save(update_fields=['costo'])
         mov = services.movimenta(articolo, quantita if tipo == 'carico' else -quantita, tipo,
-                                 operatore=request.user, nota=nota)
+                                 operatore=request.user, nota=nota, motivo=motivo)
     else:
         return _errore('Tipo di movimento non valido')
     return JsonResponse({'success': True, 'quantita': mov.quantita_dopo})
@@ -352,6 +366,9 @@ def movimenti(request):
                                           'assegnazione__utente', 'assegnazione__postazione')
     tipo = request.GET.get('tipo', '')
     articolo = request.GET.get('articolo', '')
+    motivo = request.GET.get('motivo', '')
+    if motivo:
+        qs = qs.filter(motivo=motivo)
     dal = _data(request.GET.get('dal'))
     al = _data(request.GET.get('al'))
     if tipo:
@@ -367,8 +384,9 @@ def movimenti(request):
     ctx.update({
         'pagina': pagina,
         'tipi': Movimento.TIPO_CHOICES,
+        'motivi': Movimento.MOTIVO_CHOICES,
         'articoli': Articolo.objects.order_by('nome'),
-        'filtro': {'tipo': tipo, 'articolo': articolo, 'dal': dal, 'al': al},
+        'filtro': {'tipo': tipo, 'articolo': articolo, 'dal': dal, 'al': al, 'motivo': motivo},
         'query': '&'.join(f'{k}={v}' for k, v in request.GET.items() if k != 'page' and v),
     })
     return render(request, 'magazzino/movimenti.html', ctx)

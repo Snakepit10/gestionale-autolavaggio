@@ -43,7 +43,7 @@ def sincronizza_prodotto(articolo):
 
 @transaction.atomic
 def movimenta(articolo, delta, tipo, operatore=None, nota='', ordine=None,
-              consegna=None, assegnazione=None):
+              consegna=None, assegnazione=None, motivo=''):
     """Registra il movimento e aggiorna la quantita' (che puo' andare
     sotto zero: segnala un inventario da rettificare). Per gli articoli
     non tracciati il movimento resta nel registro ma la quantita' non
@@ -55,17 +55,17 @@ def movimenta(articolo, delta, tipo, operatore=None, nota='', ordine=None,
         articolo.save(update_fields=['quantita'])
     mov = Movimento.objects.create(
         articolo=articolo, tipo=tipo, quantita=delta, quantita_prima=prima,
-        quantita_dopo=articolo.quantita, operatore=operatore, nota=nota[:255],
+        quantita_dopo=articolo.quantita, operatore=operatore, nota=nota[:255], motivo=motivo,
         ordine=ordine, consegna=consegna, assegnazione=assegnazione)
     sincronizza_prodotto(articolo)
     return mov
 
 
-def rettifica(articolo, quantita_contata, operatore=None, nota=''):
+def rettifica(articolo, quantita_contata, operatore=None, nota='', motivo=''):
     """Inventario: porta la quantita' al valore contato."""
     articolo.refresh_from_db(fields=['quantita'])
     delta = quantita_contata - articolo.quantita
-    return movimenta(articolo, delta, 'rettifica', operatore=operatore,
+    return movimenta(articolo, delta, 'rettifica', operatore=operatore, motivo=motivo if delta < 0 else '',
                      nota=nota or f'Inventario: contati {quantita_contata}')
 
 

@@ -16,6 +16,13 @@
                 {% for k, v in tipi %}<option value="{{ k }}" {% if filtro.tipo == k %}selected{% endif %}>{{ v }}</option>{% endfor %}
             </select>
         </div>
+        <div class="col-6 col-md-2">
+            <label class="form-label small mb-0">Motivo uscita</label>
+            <select name="motivo" class="form-select form-select-sm">
+                <option value="">Tutti</option>
+                {% for k, v in motivi %}<option value="{{ k }}" {% if filtro.motivo == k %}selected{% endif %}>{{ v }}</option>{% endfor %}
+            </select>
+        </div>
         <div class="col-6 col-md-3">
             <label class="form-label small mb-0">Articolo</label>
             <select name="articolo" class="form-select form-select-sm">

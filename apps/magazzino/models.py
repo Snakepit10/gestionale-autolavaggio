@@ -218,8 +218,18 @@ class Movimento(models.Model):
         ('scarto', 'Scarto'),
         ('rettifica', 'Rettifica inventario'),
     ]
+    # Perche' la merce esce (obbligatorio per scarti e ammanchi d'inventario)
+    MOTIVO_CHOICES = [
+        ('rotto', 'Rotto / danneggiato'),
+        ('scaduto', 'Scaduto / deteriorato'),
+        ('uso_interno', 'Usato in sede'),
+        ('ammanco', 'Ammanco / smarrito'),
+        ('errore', 'Errore di registrazione'),
+        ('altro', 'Altro'),
+    ]
     articolo = models.ForeignKey(Articolo, on_delete=models.CASCADE, related_name='movimenti')
     tipo = models.CharField(max_length=15, choices=TIPO_CHOICES)
+    motivo = models.CharField(max_length=15, choices=MOTIVO_CHOICES, blank=True)
     quantita = models.IntegerField(help_text='Positivo = entra in magazzino, negativo = esce')
     quantita_prima = models.IntegerField()
     quantita_dopo = models.IntegerField()

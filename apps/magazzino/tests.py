@@ -97,7 +97,7 @@ class QuantitaTest(TestCase):
                                                    'quantita_iniziale': 3, 'costo': '120,50'})
         a = Articolo.objects.get(pk=r.json()['id'])
         self.assertEqual((a.quantita, a.costo), (3, Decimal('120.50')))
-        r = _post(self.client, 'articolo-movimento', {'tipo': 'scarto', 'quantita': 1}, pk=a.pk)
+        r = _post(self.client, 'articolo-movimento', {'tipo': 'scarto', 'quantita': 1, 'motivo': 'rotto'}, pk=a.pk)
         self.assertEqual(r.json()['quantita'], 2)
         r = _post(self.client, 'articolo-movimento', {'tipo': 'rettifica', 'quantita': 5}, pk=a.pk)
         self.assertEqual(r.json()['quantita'], 5)
@@ -604,3 +604,38 @@ class PostoUsoSchedaTest(TestCase):
         self._salva(id=a.pk, link_produttore='')
         a.refresh_from_db()
         self.assertEqual(a.link_produttore, '')
+
+
+
+class MotivoUscitaTest(TestCase):
+    """Scarti e ammanchi d'inventario richiedono il motivo."""
+
+    def setUp(self):
+        self.user = utente_titolare('tit', password='x')
+        self.client.force_login(self.user)
+        self.a = Articolo.objects.create(nome='Shampoo', quantita=10)
+
+    def _mov(self, **dati):
+        return _post(self.client, 'articolo-movimento', dati, pk=self.a.pk)
+
+    def test_scarto_vuole_il_motivo(self):
+        self.assertEqual(self._mov(tipo='scarto', quantita=2).status_code, 400)
+        self.assertEqual(self._mov(tipo='scarto', quantita=2, motivo='altro').status_code, 400)
+        self.assertTrue(self._mov(tipo='scarto', quantita=2, motivo='rotto').json()['success'])
+        self.assertTrue(self._mov(tipo='scarto', quantita=1, motivo='altro', nota='caduto').json()['success'])
+        self.assertEqual(list(self.a.movimenti.order_by('pk').values_list('motivo', flat=True)), ['rotto', 'altro'])
+
+    def test_inventario_in_meno_vuole_il_motivo(self):
+        self.assertEqual(self._mov(tipo='rettifica', quantita=7).status_code, 400)
+        r = self._mov(tipo='rettifica', quantita=7, motivo='ammanco')
+        self.assertEqual(r.json()['quantita'], 7)
+        mov = self.a.movimenti.get()
+        self.assertEqual((mov.quantita, mov.motivo), (-3, 'ammanco'))
+        # in piu' o uguale: nessun motivo richiesto (e non salvato)
+        self.assertTrue(self._mov(tipo='rettifica', quantita=9, motivo='rotto').json()['success'])
+        self.assertEqual(self.a.movimenti.order_by('-pk').first().motivo, '')
+        # carico: niente motivo
+        self.assertTrue(self._mov(tipo='carico', quantita=5).json()['success'])
+        # filtro nel registro
+        pagina = _pagina(self.user, 'movimenti')
+        self.assertContains(pagina, 'Ammanco / smarrito')
