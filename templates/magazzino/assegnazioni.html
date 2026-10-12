@@ -9,24 +9,25 @@
 </div>
 
 <ul class="nav nav-pills mb-3">
-    <li class="nav-item"><a class="nav-link {% if vista == 'postazioni' %}active{% endif %}" href="?vista=postazioni"><i class="bi bi-geo-alt"></i> Dotazioni postazioni</a></li>
+    <li class="nav-item"><a class="nav-link {% if vista == 'posti' %}active{% endif %}" href="?vista=posti"><i class="bi bi-geo-alt"></i> Dotazioni posti</a></li>
     <li class="nav-item"><a class="nav-link {% if vista == 'operatori' %}active{% endif %}" href="?vista=operatori"><i class="bi bi-person"></i> Dotazioni operatori</a></li>
 </ul>
 
-{% if vista == 'postazioni' %}
-<p class="small text-muted"><i class="bi bi-clipboard-check"></i> La merce assegnata a una postazione compare nella checklist di inizio/fine turno di quella postazione: un esito "Usurato", "Rotto" o "Mancante" arriva nelle Segnalazioni.</p>
+{% if vista == 'posti' %}
+<p class="small text-muted"><i class="bi bi-clipboard-check"></i> Se il posto è collegato a una postazione del turno (pagina <a href="{% url 'magazzino:posti' %}">Posti</a>), la merce compare nella checklist di inizio/fine turno di quella postazione: un esito "Usurato", "Rotto" o "Mancante" arriva nelle Segnalazioni.</p>
 {% endif %}
 
 {% for g in gruppi %}
-<div class="section-card {% if g.tipo == 'postazione' %}accent-blue{% else %}accent-green{% endif %}">
+<div class="section-card {% if g.tipo == 'posto' %}accent-blue{% else %}accent-green{% endif %}">
     <div class="section-title">
-        <div class="label"><i class="bi {% if g.tipo == 'postazione' %}bi-geo-alt{% else %}bi-person{% endif %}"></i> {{ g.nome }}</div>
+        <div class="label"><i class="bi {% if g.tipo == 'posto' %}bi-geo-alt{% else %}bi-person{% endif %}"></i> {{ g.nome }}
+            {% if g.tipo == 'posto' %}{% if g.postazione %}<span class="badge bg-light text-dark border fw-normal" title="Checklist di turno di questa postazione"><i class="bi bi-clipboard-check"></i> {{ g.postazione }}</span>{% else %}<span class="badge bg-light text-muted border fw-normal">senza checklist</span>{% endif %}{% endif %}</div>
         <span class="count">{{ g.righe|length }} articol{{ g.righe|length|pluralize:"o,i" }} &middot; &euro;{{ g.valore|floatformat:2 }}</span>
     </div>
     <div class="section-body">
         <div class="table-responsive">
             <table class="table table-hover">
-                <thead><tr><th>Articolo</th><th class="text-end">Qtà</th><th>Stato</th><th>Dal</th>{% if g.tipo == 'postazione' %}<th>Checklist</th>{% endif %}<th>Note</th><th class="text-end">Azioni</th></tr></thead>
+                <thead><tr><th>Articolo</th><th class="text-end">Qtà</th><th>Stato</th><th>Dal</th>{% if g.postazione %}<th>Checklist</th>{% endif %}<th>Note</th><th class="text-end">Azioni</th></tr></thead>
                 <tbody>
                 {% for a in g.righe %}
                     <tr>
@@ -36,7 +37,7 @@
                         <td><span class="badge bg-{{ a.colore_stato }}">{{ a.get_stato_display }}</span>
                             {% if a.da_gestire %}<i class="bi bi-exclamation-circle-fill text-danger" title="Segnalazione da gestire"></i>{% endif %}</td>
                         <td class="small text-nowrap">{{ a.data|date:"d/m/Y" }}<br><span class="text-muted">{% if a.assegnata_da %}{{ a.assegnata_da.get_full_name|default:a.assegnata_da.username }}{% endif %}</span></td>
-                        {% if g.tipo == 'postazione' %}
+                        {% if g.postazione %}
                         <td class="small text-nowrap">
                             <span class="cursor-pointer" onclick="apriChecklist({{ a.pk }}, {{ a.in_apertura|yesno:'true,false' }}, {{ a.in_chiusura|yesno:'true,false' }}, '{{ a.note|escapejs }}')" title="Modifica">
                             {% if a.in_apertura %}<span class="badge bg-light text-dark border">inizio</span>{% endif %}
@@ -84,18 +85,19 @@
                     <small class="text-muted" id="ass-disponibile"></small>
                 </div>
                 <div class="btn-group w-100 mb-3">
-                    <input type="radio" class="btn-check" name="ass-a" id="ass-a-post" value="postazione" onchange="tipoDestinatario()" checked>
-                    <label class="btn btn-outline-primary" for="ass-a-post"><i class="bi bi-geo-alt"></i> A una postazione</label>
+                    <input type="radio" class="btn-check" name="ass-a" id="ass-a-post" value="posto" onchange="tipoDestinatario()" checked>
+                    <label class="btn btn-outline-primary" for="ass-a-post"><i class="bi bi-geo-alt"></i> A un posto</label>
                     <input type="radio" class="btn-check" name="ass-a" id="ass-a-op" value="utente" onchange="tipoDestinatario()">
                     <label class="btn btn-outline-primary" for="ass-a-op"><i class="bi bi-person"></i> A un operatore</label>
                 </div>
                 <div class="mb-3" id="ass-box-postazione">
-                    <label class="form-label">Postazione *</label>
-                    <select class="form-select" id="ass-postazione">
+                    <label class="form-label">Posto *</label>
+                    <select class="form-select" id="ass-postazione" onchange="postoScelto()">
                         <option value="">—</option>
-                        {% for p in postazioni %}<option value="{{ p.pk }}">{{ p.nome }}</option>{% endfor %}
+                        {% for p in posti %}<option value="{{ p.pk }}" data-postazione="{{ p.postazione|default:'' }}">{{ p.nome }}{% if p.postazione %} (checklist {{ p.postazione }}){% endif %}</option>{% endfor %}
                     </select>
-                    <div class="mt-2 small">
+                    {% if not posti %}<small class="text-danger">Prima crea i posti in <a href="{% url 'magazzino:posti' %}">Posti</a>.</small>{% endif %}
+                    <div class="mt-2 small" id="ass-checklist-box">
                         Controlla nella checklist:
                         <div class="form-check form-check-inline ms-2"><input class="form-check-input" type="checkbox" id="ass-apertura" checked><label class="form-check-label" for="ass-apertura">inizio turno</label></div>
                         <div class="form-check form-check-inline"><input class="form-check-input" type="checkbox" id="ass-chiusura" checked><label class="form-check-label" for="ass-chiusura">fine turno</label></div>
@@ -148,6 +150,13 @@ function mostraDisponibile() {
     document.getElementById('ass-disponibile').textContent = a ? (a.traccia ? 'In magazzino: ' + a.quantita + ' ' + a.unita : 'Quantità non tracciata') : '';
 }
 
+// la checklist conta solo per i posti collegati a una postazione del turno
+function postoScelto() {
+    const sel = document.getElementById('ass-postazione');
+    const opt = sel.options[sel.selectedIndex];
+    document.getElementById('ass-checklist-box').classList.toggle('d-none', !(opt && opt.dataset.postazione));
+}
+
 function tipoDestinatario() {
     const post = document.getElementById('ass-a-post').checked;
     document.getElementById('ass-box-postazione').classList.toggle('d-none', !post);
@@ -168,6 +177,7 @@ function apriAssegnazione(articolo) {
     document.getElementById('ass-errore').classList.add('d-none');
     mostraDisponibile();
     tipoDestinatario();
+    postoScelto();
     bootstrap.Modal.getOrCreateInstance(document.getElementById('modaleAssegnazione')).show();
 }
 
@@ -175,7 +185,7 @@ async function salvaAssegnazione(forza) {
     const post = document.getElementById('ass-a-post').checked;
     const dati = {
         articolo: document.getElementById('ass-articolo').value,
-        postazione: post ? document.getElementById('ass-postazione').value : null,
+        posto: post ? document.getElementById('ass-postazione').value : null,
         utente: post ? null : document.getElementById('ass-utente').value,
         quantita: document.getElementById('ass-quantita').value,
         note: document.getElementById('ass-note').value,
@@ -183,14 +193,14 @@ async function salvaAssegnazione(forza) {
         in_chiusura: document.getElementById('ass-chiusura').checked,
         forza: !!forza,
     };
-    if (!dati.postazione && !dati.utente) { mostraErrore('Scegli ' + (post ? 'la postazione' : "l'operatore")); return; }
+    if (!dati.posto && !dati.utente) { mostraErrore('Scegli ' + (post ? 'il posto' : "l'operatore")); return; }
     const j = await postJSON("{% url 'magazzino:assegnazione-nuova' %}", dati);
     if (!j.success) {
         if (j.conferma && confirm(j.error)) return salvaAssegnazione(true);
         mostraErrore(j.error);
         return;
     }
-    location.href = '?vista=' + (post ? 'postazioni' : 'operatori');
+    location.href = '?vista=' + (post ? 'posti' : 'operatori');
 }
 
 function mostraErrore(msg) { const e = document.getElementById('ass-errore'); e.textContent = msg; e.classList.remove('d-none'); }

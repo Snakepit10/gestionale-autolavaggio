@@ -40,6 +40,10 @@ class Posto(models.Model):
     """Dove sta la merce: scaffale, locale tecnico, container..."""
     nome = models.CharField(max_length=80, unique=True)
     descrizione = models.CharField(max_length=200, blank=True)
+    # La merce assegnata a questo posto va nella checklist di turno (e nella
+    # dotazione degli operatori) di questa postazione
+    postazione = models.ForeignKey('cq.PostazioneCQ', null=True, blank=True, on_delete=models.SET_NULL,
+                                   related_name='posti_magazzino', verbose_name='Postazione del turno')
     ordine = models.PositiveIntegerField(default=0)
     attivo = models.BooleanField(default=True)
 
@@ -433,8 +437,8 @@ class Assegnazione(models.Model):
     quantita = models.PositiveIntegerField(default=1)
     utente = models.ForeignKey(User, null=True, blank=True, on_delete=models.PROTECT,
                                related_name='assegnazioni_magazzino')
-    postazione = models.ForeignKey('cq.PostazioneCQ', null=True, blank=True, on_delete=models.PROTECT,
-                                   related_name='assegnazioni_magazzino')
+    posto = models.ForeignKey(Posto, null=True, blank=True, on_delete=models.PROTECT,
+                              related_name='assegnazioni')
     stato = models.CharField(max_length=12, choices=STATO_CHOICES, default='in_uso')
     in_apertura = models.BooleanField('Controlla a inizio turno', default=True)
     in_chiusura = models.BooleanField('Controlla a fine turno', default=True)
@@ -459,8 +463,8 @@ class Assegnazione(models.Model):
 
     @property
     def destinatario(self):
-        if self.postazione_id:
-            return self.postazione.nome
+        if self.posto_id:
+            return self.posto.nome
         if self.utente_id:
             return self.utente.get_full_name() or self.utente.username
         return '—'

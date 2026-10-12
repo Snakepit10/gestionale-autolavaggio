@@ -96,7 +96,7 @@
                 <table class="table table-sm">
                     <tbody>
                     {% for a in assegnazioni %}
-                        <tr><td>{% if a.postazione %}<i class="bi bi-geo-alt"></i>{% else %}<i class="bi bi-person"></i>{% endif %} {{ a.destinatario }}</td>
+                        <tr><td>{% if a.posto_id %}<i class="bi bi-geo-alt"></i>{% else %}<i class="bi bi-person"></i>{% endif %} {{ a.destinatario }}</td>
                             <td class="text-end">×{{ a.quantita }}</td>
                             <td class="text-end"><span class="badge bg-{{ a.colore_stato }}">{{ a.get_stato_display }}</span></td></tr>
                     {% endfor %}

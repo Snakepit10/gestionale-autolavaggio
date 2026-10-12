@@ -4,7 +4,7 @@ import json
 from decimal import Decimal
 
 from django.contrib.auth.models import Group, User
-from django.test import RequestFactory, TestCase
+from django.test import RequestFactory, TestCase, TransactionTestCase
 from django.urls import reverse
 
 from apps.auth_system.testutils import utente_titolare
@@ -184,6 +184,9 @@ class AssegnazioniTest(TestCase):
         self.altro = User.objects.create_user('luigi', password='x')
         self.altro.groups.add(Group.objects.get(name='operatore'))
         self.post = PostazioneCQ.objects.create(codice='aspirazione-t', nome='Aspirazione T')
+        from .models import Posto
+        # posto collegato alla postazione: checklist e dotazione del turno
+        self.posto = Posto.objects.create(nome='Box aspirazione', postazione=self.post)
         self.aspiratore = Articolo.objects.create(nome='Aspiratore', tipo='strumento', quantita=3,
                                                   costo=Decimal('150'))
         self.panni = Articolo.objects.create(nome='Panno', quantita=30, costo=Decimal('1'))
@@ -209,7 +212,7 @@ class AssegnazioniTest(TestCase):
 
     def test_assegnazione_a_postazione_crea_la_voce_di_checklist(self):
         from apps.turni.models import ChecklistItem
-        a = services.assegna(self.aspiratore, 1, postazione=self.post, da=self.titolare, in_chiusura=False)
+        a = services.assegna(self.aspiratore, 1, posto=self.posto, da=self.titolare, in_chiusura=False)
         voce = ChecklistItem.objects.get(assegnazione=a)
         self.assertEqual((voce.postazione_cq, voce.nome, voce.in_apertura, voce.in_chiusura, voce.attivo),
                          (self.post, 'Aspiratore ×1', True, False, True))
@@ -223,7 +226,7 @@ class AssegnazioniTest(TestCase):
     def test_esito_rotto_in_checklist_cambia_lo_stato(self):
         from apps.turni.models import ChecklistItem, SessioneTurno
         from apps.turni.views import checklist_view
-        a = services.assegna(self.aspiratore, 1, postazione=self.post, da=self.titolare)
+        a = services.assegna(self.aspiratore, 1, posto=self.posto, da=self.titolare)
         voce = ChecklistItem.objects.get(assegnazione=a)
         rotto = voce.categoria.esiti.get(codice='rotto')
         self._in_turno(self.operatore)
@@ -256,7 +259,7 @@ class AssegnazioniTest(TestCase):
     def test_operatore_segnala_solo_il_suo(self):
         mia = services.assegna(self.panni, 5, utente=self.operatore, da=self.titolare)
         sua = services.assegna(self.panni, 5, utente=self.altro, da=self.titolare)
-        di_postazione = services.assegna(self.aspiratore, 1, postazione=self.post, da=self.titolare)
+        di_postazione = services.assegna(self.aspiratore, 1, posto=self.posto, da=self.titolare)
         self.client.force_login(self.operatore)
 
         r = _post(self.client, 'mia-dotazione-stato', {'stato': 'esaurito', 'quantita': 2}, pk=mia.pk)
@@ -289,7 +292,7 @@ class AssegnazioniTest(TestCase):
 
     def test_report(self):
         services.assegna(self.panni, 10, utente=self.operatore, da=self.titolare)
-        a = services.assegna(self.aspiratore, 1, postazione=self.post, da=self.titolare)
+        a = services.assegna(self.aspiratore, 1, posto=self.posto, da=self.titolare)
         services.cambia_stato(a, 'rotto', utente=self.operatore, origine='operatore')
         from django.utils import timezone
 
@@ -735,3 +738,94 @@ class GiacenzePerPostoTest(TestCase):
         _post(self.client, 'posto-elimina', pk=self.cassa.pk)
         self.a.refresh_from_db()
         self.assertEqual((self.a.quantita, self._q(None), self._q(self.magazzino)), (6, 2, 4))
+
+
+
+class AssegnazioniAiPostiTest(TestCase):
+    """Le assegnazioni vanno ai posti; la checklist segue la postazione collegata."""
+
+    def setUp(self):
+        from .models import Posto
+        self.titolare = utente_titolare('tit', password='x')
+        self.client.force_login(self.titolare)
+        self.lavaggio = PostazioneCQ.objects.create(codice='lav-t', nome='Lavaggio T')
+        self.asciugatura = PostazioneCQ.objects.create(codice='asc-t', nome='Asciugatura T')
+        self.scaffale = Posto.objects.create(nome='Scaffale attrezzi')            # senza postazione
+        self.box = Posto.objects.create(nome='Box lavaggio', postazione=self.lavaggio)
+        self.pistola = Articolo.objects.create(nome='Pistola', tipo='strumento', quantita=5)
+
+    def test_posto_senza_postazione_non_va_in_checklist(self):
+        from apps.turni.models import ChecklistItem
+        r = _post(self.client, 'assegnazione-nuova', {'articolo': self.pistola.pk, 'posto': self.scaffale.pk,
+                                                      'quantita': 1})
+        self.assertTrue(r.json()['success'])
+        self.assertFalse(ChecklistItem.objects.exists())
+        a = Assegnazione.objects.get()
+        self.assertEqual(a.destinatario, 'Scaffale attrezzi')
+
+    def test_checklist_segue_la_postazione_del_posto(self):
+        from apps.turni.models import ChecklistItem
+        a = services.assegna(self.pistola, 2, posto=self.box, da=self.titolare)
+        voce = ChecklistItem.objects.get(assegnazione=a)
+        self.assertEqual(voce.postazione_cq, self.lavaggio)
+        # il posto passa a un'altra postazione: la voce la segue
+        _post(self.client, 'posto-salva', {'id': self.box.pk, 'nome': 'Box lavaggio',
+                                            'postazione': self.asciugatura.pk})
+        voce.refresh_from_db()
+        self.assertEqual((voce.postazione_cq, voce.attivo), (self.asciugatura, True))
+        # scollegato: niente piu' checklist
+        _post(self.client, 'posto-salva', {'id': self.box.pk, 'nome': 'Box lavaggio', 'postazione': None})
+        voce.refresh_from_db()
+        self.assertFalse(voce.attivo)
+
+    def test_posto_con_merce_assegnata_non_si_elimina(self):
+        services.assegna(self.pistola, 1, posto=self.box, da=self.titolare)
+        self.assertEqual(_post(self.client, 'posto-elimina', pk=self.box.pk).status_code, 400)
+        a = Assegnazione.objects.get()
+        services.cambia_stato(a, 'restituito', utente=self.titolare)
+        r = _post(self.client, 'posto-elimina', pk=self.box.pk).json()
+        self.assertTrue(r['disattivato'])                                  # ha uno storico
+        self.box.refresh_from_db()
+        self.assertFalse(self.box.attivo)
+
+    def test_pagine(self):
+        services.assegna(self.pistola, 1, posto=self.box, da=self.titolare)
+        pagina = _pagina(self.titolare, 'assegnazioni')
+        self.assertContains(pagina, 'Box lavaggio')
+        self.assertContains(pagina, 'A un posto')
+        self.assertContains(_pagina(self.titolare, 'posti'), 'Checklist della postazione')
+
+
+class MigrazioneAssegnazioniAiPostiTest(TransactionTestCase):
+    """0010: le assegnazioni alle postazioni passano a posti collegati."""
+
+    def test_conversione(self):
+        from django.db import connection
+        from django.db.migrations.executor import MigrationExecutor
+        prima = [('magazzino', '0009_giacenze_per_posto')]
+        dopo = [('magazzino', '0010_assegnazioni_ai_posti')]
+        executor = MigrationExecutor(connection)
+        executor.migrate(prima)
+        vecchie = executor.loader.project_state(prima).apps
+        Postazione = vecchie.get_model('cq', 'PostazioneCQ')
+        Posto = vecchie.get_model('magazzino', 'Posto')
+        Articolo = vecchie.get_model('magazzino', 'Articolo')
+        Assegnazione = vecchie.get_model('magazzino', 'Assegnazione')
+        lav = Postazione.objects.create(codice='lav-m', nome='Lavaggio M')
+        asc = Postazione.objects.create(codice='asc-m', nome='Asciugatura M')
+        Posto.objects.create(nome='Asciugatura M')                  # stesso nome: viene collegato
+        art = Articolo.objects.create(nome='Pistola M')
+        for postazione in (lav, lav, asc):
+            Assegnazione.objects.create(articolo=art, postazione=postazione)
+
+        executor = MigrationExecutor(connection)
+        executor.loader.build_graph()
+        executor.migrate(dopo)
+        nuove = executor.loader.project_state(dopo).apps
+        Posto = nuove.get_model('magazzino', 'Posto')
+        Assegnazione = nuove.get_model('magazzino', 'Assegnazione')
+        posti = {p.nome: p.postazione_id for p in Posto.objects.all()}
+        self.assertEqual(posti, {'Lavaggio M': lav.pk, 'Asciugatura M': asc.pk})
+        self.assertEqual(sorted(Assegnazione.objects.values_list('posto__nome', flat=True)),
+                         ['Asciugatura M', 'Lavaggio M', 'Lavaggio M'])
+        MigrationExecutor(connection).migrate(MigrationExecutor(connection).loader.graph.leaf_nodes())

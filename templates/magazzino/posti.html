@@ -15,24 +15,25 @@
         {% if posti %}
         <div class="table-responsive">
             <table class="table table-hover">
-                <thead><tr><th>Posto</th><th>Descrizione</th><th class="text-end">Articoli</th><th class="text-end">Pezzi</th><th></th></tr></thead>
+                <thead><tr><th>Posto</th><th>Descrizione</th><th>Checklist postazione</th><th class="text-end">Articoli</th><th class="text-end">Pezzi</th><th></th></tr></thead>
                 <tbody>
                 {% for p in posti %}
                     <tr class="{% if not p.attivo %}text-muted{% endif %}">
                         <td><strong>{{ p.nome }}</strong>{% if not p.attivo %} <span class="badge bg-light text-muted">non attivo</span>{% endif %}</td>
                         <td class="small">{{ p.descrizione }}</td>
+                        <td class="small">{% if p.postazione %}<i class="bi bi-clipboard-check"></i> {{ p.postazione }}{% else %}<span class="text-muted">—</span>{% endif %}</td>
                         <td class="text-end">{% if p.n_articoli %}<a href="{% url 'magazzino:articoli' %}?posto={{ p.pk }}">{{ p.n_articoli }}</a>{% else %}0{% endif %}</td>
                         <td class="text-end">{{ p.n_pezzi|default:0 }}</td>
                         <td class="text-end text-nowrap">
                             <button class="btn btn-sm btn-outline-primary" title="Modifica"
-                                onclick="apriPosto({{ p.pk }}, '{{ p.nome|escapejs }}', '{{ p.descrizione|escapejs }}', {{ p.ordine }}, {{ p.attivo|yesno:'true,false' }})"><i class="bi bi-pencil"></i></button>
+                                onclick="apriPosto({{ p.pk }}, '{{ p.nome|escapejs }}', '{{ p.descrizione|escapejs }}', {{ p.ordine }}, {{ p.attivo|yesno:'true,false' }}, '{{ p.postazione_id|default_if_none:'' }}')"><i class="bi bi-pencil"></i></button>
                             <button class="btn btn-sm btn-outline-danger" title="Elimina" onclick="eliminaPosto({{ p.pk }}, '{{ p.nome|escapejs }}', {{ p.n_pezzi|default:0 }})"><i class="bi bi-trash"></i></button>
                         </td>
                     </tr>
                 {% endfor %}
                 </tbody>
                 {% if senza_posto %}
-                <tfoot><tr><td colspan="2"><a href="{% url 'magazzino:articoli' %}?posto=nessuno">Articoli senza posto</a></td><td class="text-end">{{ senza_posto }}</td><td></td><td></td></tr></tfoot>
+                <tfoot><tr><td colspan="3"><a href="{% url 'magazzino:articoli' %}?posto=nessuno">Articoli senza posto</a></td><td class="text-end">{{ senza_posto }}</td><td></td><td></td></tr></tfoot>
                 {% endif %}
             </table>
         </div>
@@ -53,6 +54,12 @@
                     <div class="col-8"><label class="form-label">Nome *</label><input class="form-control" id="posto-nome" maxlength="80" placeholder="es. Scaffale A - ripiano 2"></div>
                     <div class="col-4"><label class="form-label">Ordine</label><input type="number" min="0" class="form-control" id="posto-ordine" value="0"></div>
                     <div class="col-12"><label class="form-label">Descrizione</label><input class="form-control" id="posto-descrizione" maxlength="200"></div>
+                    <div class="col-12"><label class="form-label">Checklist della postazione</label>
+                        <select class="form-select" id="posto-postazione">
+                            <option value="">— nessuna —</option>
+                            {% for s in postazioni %}<option value="{{ s.pk }}">{{ s.nome }}</option>{% endfor %}
+                        </select>
+                        <small class="text-muted">La merce assegnata a questo posto va nella checklist di inizio/fine turno di questa postazione e nella dotazione di chi ci lavora.</small></div>
                     <div class="col-12"><div class="form-check form-switch"><input class="form-check-input" type="checkbox" id="posto-attivo" checked><label class="form-check-label" for="posto-attivo">Attivo</label></div></div>
                 </div>
                 <div class="alert alert-danger d-none mt-3 mb-0" id="posto-errore"></div>
@@ -66,7 +73,8 @@
 
 {% block extra_js_magazzino %}
 <script>
-function apriPosto(id, nome, descrizione, ordine, attivo) {
+function apriPosto(id, nome, descrizione, ordine, attivo, postazione) {
+    document.getElementById('posto-postazione').value = postazione || '';
     document.getElementById('posto-titolo').textContent = id ? 'Modifica posto' : 'Nuovo posto';
     document.getElementById('posto-id').value = id || '';
     document.getElementById('posto-nome').value = nome || '';
@@ -83,6 +91,7 @@ async function salvaPosto() {
         descrizione: document.getElementById('posto-descrizione').value,
         ordine: document.getElementById('posto-ordine').value,
         attivo: document.getElementById('posto-attivo').checked,
+        postazione: document.getElementById('posto-postazione').value || null,
     });
     if (!j.success) { const e = document.getElementById('posto-errore'); e.textContent = j.error; e.classList.remove('d-none'); return; }
     location.reload();

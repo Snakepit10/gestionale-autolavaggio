@@ -266,14 +266,14 @@ def elimina_foto(articolo):
 # ---------------------------------------------------------------------------
 
 @transaction.atomic
-def assegna(articolo, quantita, utente=None, postazione=None, da=None, note='',
+def assegna(articolo, quantita, utente=None, posto=None, da=None, note='',
             in_apertura=True, in_chiusura=True, origine=None):
     if quantita <= 0:
         raise ValueError('Quantità non valida')
-    if bool(utente) == bool(postazione):
-        raise ValueError('Scegli un operatore oppure una postazione')
+    if bool(utente) == bool(posto):
+        raise ValueError('Scegli un operatore oppure un posto')
     a = Assegnazione.objects.create(
-        articolo=articolo, quantita=quantita, utente=utente, postazione=postazione,
+        articolo=articolo, quantita=quantita, utente=utente, posto=posto,
         assegnata_da=da, note=note[:255], in_apertura=in_apertura, in_chiusura=in_chiusura,
         origine=origine)
     StatoAssegnazione.objects.create(assegnazione=a, a_stato='in_uso', quantita=quantita,
@@ -304,7 +304,7 @@ def cambia_stato(assegnazione, stato, quantita=None, utente=None, origine='magaz
         a.save(update_fields=['quantita'])
         sincronizza_checklist(a)
         a = Assegnazione.objects.create(
-            articolo=a.articolo, quantita=quantita, utente=a.utente, postazione=a.postazione,
+            articolo=a.articolo, quantita=quantita, utente=a.utente, posto=a.posto,
             stato=a.stato, in_apertura=a.in_apertura, in_chiusura=a.in_chiusura,
             assegnata_da=a.assegnata_da, data=a.data, note=a.note, origine=a)
 
@@ -333,7 +333,7 @@ def sostituisci(assegnazione, da=None, nota=''):
     if a.da_gestire:
         a.da_gestire = False
         a.save(update_fields=['da_gestire'])
-    return assegna(a.articolo, a.quantita, utente=a.utente, postazione=a.postazione, da=da,
+    return assegna(a.articolo, a.quantita, utente=a.utente, posto=a.posto, da=da,
                    note=nota or 'Sostituzione', in_apertura=a.in_apertura,
                    in_chiusura=a.in_chiusura, origine=a)
 
@@ -347,7 +347,8 @@ def puo_segnalare(user, assegnazione):
         return True
     if assegnazione.utente_id == user.pk:
         return True
-    return assegnazione.postazione_id in postazioni_del_turno(user)
+    postazione = assegnazione.posto.postazione_id if assegnazione.posto_id else None
+    return postazione is not None and postazione in postazioni_del_turno(user)
 
 
 def postazioni_del_turno(user):
@@ -375,20 +376,22 @@ def categoria_dotazione():
 
 
 def sincronizza_checklist(assegnazione):
-    """La merce assegnata a una postazione e' una voce della checklist di
-    inizio/fine turno di quella postazione, finche' l'assegnazione e'
+    """La merce assegnata a un posto collegato a una postazione e' una
+    voce della checklist di inizio/fine turno di quella postazione, finche'
+    l'assegnazione e'
     aperta."""
     from apps.turni.models import ChecklistItem
 
     a = assegnazione
     voce = ChecklistItem.objects.filter(assegnazione=a).first()
-    if not a.postazione_id or not a.aperta:
+    postazione = a.posto.postazione_id if a.posto_id else None
+    if not postazione or not a.aperta:
         if voce and voce.attivo:
             voce.attivo = False
             voce.save(update_fields=['attivo'])
         return voce
     valori = {
-        'postazione_cq_id': a.postazione_id,
+        'postazione_cq_id': postazione,
         'categoria': categoria_dotazione(),
         'nome': f'{a.articolo.nome} ×{a.quantita}',
         'in_apertura': a.in_apertura,

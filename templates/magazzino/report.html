@@ -29,14 +29,14 @@
 <div class="row g-3">
     <div class="col-lg-6">
         <div class="section-card accent-blue">
-            <div class="section-title"><div class="label"><i class="bi bi-people"></i> Consumi per operatore / postazione</div></div>
+            <div class="section-title"><div class="label"><i class="bi bi-people"></i> Consumi per operatore / posto</div></div>
             <div class="section-body">
                 {% if consumi %}
                 <table class="table table-sm">
                     <thead><tr><th>Articolo</th><th class="text-end">Qtà</th><th class="text-end">Costo</th></tr></thead>
                     {% for g in consumi %}
                     <tbody>
-                        <tr class="table-light"><td colspan="2"><i class="bi {% if g.tipo == 'postazione' %}bi-geo-alt{% else %}bi-person{% endif %}"></i> <strong>{{ g.nome }}</strong></td>
+                        <tr class="table-light"><td colspan="2"><i class="bi {% if g.tipo == 'posto' %}bi-geo-alt{% else %}bi-person{% endif %}"></i> <strong>{{ g.nome }}</strong></td>
                             <td class="text-end fw-bold">&euro;{{ g.costo|floatformat:2 }}</td></tr>
                         {% for r in g.articoli %}
                         <tr><td class="ps-4">{{ r.articolo.nome }}</td><td class="text-end">{{ r.quantita }} {{ r.articolo.unita }}</td><td class="text-end">&euro;{{ r.costo|floatformat:2 }}</td></tr>

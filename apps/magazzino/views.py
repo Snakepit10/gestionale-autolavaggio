@@ -233,7 +233,7 @@ def articolo_scheda(request, pk):
         'movimenti': articolo.movimenti.select_related('operatore', 'ordine', 'consegna',
                                                        'assegnazione')[:200],
         'assegnazioni': articolo.assegnazioni.filter(stato__in=Assegnazione.APERTI)
-                                             .select_related('utente', 'postazione'),
+                                             .select_related('utente', 'posto'),
         'in_arrivo': [r for r in RigaOrdineFornitore.objects.filter(
             articolo=articolo, ordine__stato__in=('inviato', 'parziale')).select_related('ordine')
             if r.residuo > 0],
@@ -398,7 +398,7 @@ def articolo_sposta(request, pk):
 @magazzino_required
 def movimenti(request):
     qs = Movimento.objects.select_related('articolo', 'operatore', 'ordine', 'consegna', 'posto',
-                                          'assegnazione__utente', 'assegnazione__postazione')
+                                          'assegnazione__utente', 'assegnazione__posto')
     tipo = request.GET.get('tipo', '')
     articolo = request.GET.get('articolo', '')
     motivo = request.GET.get('motivo', '')
@@ -464,7 +464,7 @@ def articolo_foto_carica(request, pk):
 
 @magazzino_required
 def posti(request):
-    lista = list(Posto.objects.annotate(
+    lista = list(Posto.objects.select_related('postazione').annotate(
         n_articoli=Count('giacenze__articolo', filter=Q(giacenze__quantita__gt=0, giacenze__articolo__attivo=True),
                          distinct=True),
         n_pezzi=Sum('giacenze__quantita', filter=Q(giacenze__quantita__gt=0))))
@@ -472,6 +472,7 @@ def posti(request):
     ctx.update({
         'posti': lista,
         'senza_posto': Articolo.objects.filter(attivo=True, posto__isnull=True).count(),
+        'postazioni': PostazioneCQ.objects.filter(attiva=True),
     })
     return render(request, 'magazzino/posti.html', ctx)
 
@@ -491,7 +492,13 @@ def posto_salva(request):
     posto.descrizione = (d.get('descrizione') or '').strip()[:200]
     posto.ordine = max(_intero(d.get('ordine')), 0)
     posto.attivo = bool(d.get('attivo', True))
+    postazione_prima = posto.postazione_id
+    posto.postazione = PostazioneCQ.objects.filter(pk=d.get('postazione') or None).first()
     posto.save()
+    if posto.pk and postazione_prima != posto.postazione_id:
+        # la merce assegnata al posto segue la nuova postazione in checklist
+        for a in posto.assegnazioni.filter(stato__in=Assegnazione.APERTI):
+            services.sincronizza_checklist(a)
     return JsonResponse({'success': True, 'id': posto.pk})
 
 
@@ -502,12 +509,19 @@ def posto_elimina(request, pk):
     if request.method != 'POST':
         return _errore('Metodo non consentito', 405)
     posto = get_object_or_404(Posto, pk=pk)
+    if posto.assegnazioni.filter(stato__in=Assegnazione.APERTI).exists():
+        return _errore('Al posto è assegnata della merce: prima restituiscila o assegnala altrove')
     with transaction.atomic():
         for g in list(posto.giacenze.all()):
             senza = services.giacenza(g.articolo, None)
             senza.quantita += g.quantita
             senza.save(update_fields=['quantita'])
             g.delete()
+        if posto.assegnazioni.exists():
+            # ha uno storico di assegnazioni: si disattiva invece di eliminarlo
+            posto.attivo = False
+            posto.save(update_fields=['attivo'])
+            return JsonResponse({'success': True, 'disattivato': True})
         posto.delete()
     return JsonResponse({'success': True})
 
@@ -797,13 +811,14 @@ def consegna_elimina(request, pk):
 # ---------------------------------------------------------------------------
 
 def _per_destinatario(assegnazioni):
-    """{('utente'|'postazione', id): {'nome', 'tipo', 'righe'}} in ordine."""
+    """{('utente'|'posto', id): {'nome', 'tipo', 'righe'}} in ordine."""
     gruppi = OrderedDict()
     for a in assegnazioni:
-        chiave = ('postazione', a.postazione_id) if a.postazione_id else ('utente', a.utente_id)
+        chiave = ('posto', a.posto_id) if a.posto_id else ('utente', a.utente_id)
         if chiave not in gruppi:
             gruppi[chiave] = {'tipo': chiave[0], 'nome': a.destinatario, 'righe': [],
-                              'valore': Decimal('0')}
+                              'valore': Decimal('0'),
+                              'postazione': a.posto.postazione if a.posto_id else None}
         gruppi[chiave]['righe'].append(a)
         gruppi[chiave]['valore'] += (a.articolo.costo * a.quantita).quantize(Decimal('0.01'))
     return list(gruppi.values())
@@ -811,25 +826,25 @@ def _per_destinatario(assegnazioni):
 
 @magazzino_required
 def assegnazioni(request):
-    vista = request.GET.get('vista', 'postazioni')
+    vista = request.GET.get('vista', 'posti')
     aperte = (Assegnazione.objects.filter(stato__in=Assegnazione.APERTI)
-              .select_related('articolo', 'utente', 'postazione', 'assegnata_da'))
+              .select_related('articolo', 'utente', 'posto__postazione', 'assegnata_da'))
     if vista == 'operatori':
         aperte = aperte.filter(utente__isnull=False).order_by('utente__first_name', 'utente__username',
                                                                'articolo__nome')
     else:
-        vista = 'postazioni'
-        aperte = aperte.filter(postazione__isnull=False).order_by('postazione__ordine', 'articolo__nome')
+        vista = 'posti'
+        aperte = aperte.filter(posto__isnull=False).order_by('posto__ordine', 'posto__nome', 'articolo__nome')
     ctx = _contesto_base('assegnazioni')
     ctx.update({
         'vista': vista,
         'gruppi': _per_destinatario(aperte),
         'operatori': _operatori(),
-        'postazioni': PostazioneCQ.objects.filter(attiva=True),
+        'posti': Posto.objects.filter(attivo=True).select_related('postazione'),
         'articoli_json': json.dumps(_articoli_json()),
         'stati': Assegnazione.STATO_CHOICES,
         'recenti': StatoAssegnazione.objects.select_related(
-            'assegnazione__articolo', 'assegnazione__utente', 'assegnazione__postazione', 'utente')[:30],
+            'assegnazione__articolo', 'assegnazione__utente', 'assegnazione__posto', 'utente')[:30],
     })
     return render(request, 'magazzino/assegnazioni.html', ctx)
 
@@ -843,14 +858,14 @@ def assegnazione_nuova(request):
     if articolo is None:
         return _errore("Scegli l'articolo")
     utente = User.objects.filter(pk=d.get('utente')).first() if d.get('utente') else None
-    postazione = PostazioneCQ.objects.filter(pk=d.get('postazione')).first() if d.get('postazione') else None
+    posto = Posto.objects.filter(pk=d.get('posto')).first() if d.get('posto') else None
     quantita = _intero(d.get('quantita'), 1)
     if articolo.traccia_scorte and quantita > articolo.quantita and not d.get('forza'):
         return JsonResponse({'success': False, 'conferma': True,
                              'error': f'In magazzino ci sono solo {articolo.quantita} {articolo.unita}. '
                                       'Assegnare comunque?'}, status=400)
     try:
-        a = services.assegna(articolo, quantita, utente=utente, postazione=postazione, da=request.user,
+        a = services.assegna(articolo, quantita, utente=utente, posto=posto, da=request.user,
                              note=d.get('note') or '', in_apertura=bool(d.get('in_apertura', True)),
                              in_chiusura=bool(d.get('in_chiusura', True)))
     except ValueError as e:
@@ -904,12 +919,12 @@ def segnalazioni(request):
     ctx = _contesto_base('segnalazioni')
     ctx.update({
         'segnalazioni': (Assegnazione.objects.filter(da_gestire=True)
-                         .select_related('articolo', 'utente', 'postazione')
+                         .select_related('articolo', 'utente', 'posto')
                          .prefetch_related('storico__utente')),
         'gestite': (StatoAssegnazione.objects.filter(origine__in=('operatore', 'checklist'),
                                                      assegnazione__da_gestire=False)
                     .select_related('assegnazione__articolo', 'assegnazione__utente',
-                                    'assegnazione__postazione', 'utente')[:30]),
+                                    'assegnazione__posto', 'utente')[:30]),
         'stati_restituzione': [('restituito', 'Rientrato in magazzino')],
     })
     return render(request, 'magazzino/segnalazioni.html', ctx)
@@ -942,11 +957,11 @@ def mia_dotazione(request):
     if not ha_accesso(request.user, 'mio_turno') and not ha_accesso(request.user, 'magazzino'):
         return render(request, 'auth_system/accesso_negato.html', {'sezione': 'Il Mio Turno'}, status=403)
     postazioni_turno = services.postazioni_del_turno(request.user)
-    base = Assegnazione.objects.select_related('articolo', 'postazione', 'utente')
+    base = Assegnazione.objects.select_related('articolo', 'posto__postazione', 'utente')
     personali = base.filter(utente=request.user, stato__in=Assegnazione.APERTI).order_by('articolo__nome')
-    di_postazione = (base.filter(postazione_id__in=postazioni_turno, stato__in=Assegnazione.APERTI)
-                     .order_by('postazione__ordine', 'articolo__nome'))
-    chiuse = (base.filter(Q(utente=request.user) | Q(postazione_id__in=postazioni_turno))
+    di_postazione = (base.filter(posto__postazione_id__in=postazioni_turno, stato__in=Assegnazione.APERTI)
+                     .order_by('posto__ordine', 'posto__nome', 'articolo__nome'))
+    chiuse = (base.filter(Q(utente=request.user) | Q(posto__postazione_id__in=postazioni_turno))
               .exclude(stato__in=Assegnazione.APERTI).order_by('-chiusa_il')[:15])
     return render(request, 'magazzino/mia_dotazione.html', {
         'personali': personali,
@@ -983,7 +998,7 @@ def mia_dotazione_stato(request, pk):
         return _errore('Metodo non consentito', 405)
     a = get_object_or_404(Assegnazione, pk=pk)
     if not services.puo_segnalare(request.user, a):
-        return _errore('Non è una tua assegnazione né di una postazione del tuo turno', 403)
+        return _errore('Non è una tua assegnazione né di un posto della tua postazione', 403)
     return _cambia_stato_json(request, a, 'operatore')
 
 
@@ -998,11 +1013,11 @@ def dati_report(dal, al):
     # Consumi: merce uscita verso operatori/postazioni meno quella rientrata
     consumi = OrderedDict()
     movs = (Movimento.objects.filter(periodo, tipo__in=('assegnazione', 'rientro'), assegnazione__isnull=False)
-            .select_related('articolo', 'assegnazione__utente', 'assegnazione__postazione')
-            .order_by('assegnazione__postazione__ordine', 'assegnazione__utente__username', 'articolo__nome'))
+            .select_related('articolo', 'assegnazione__utente', 'assegnazione__posto')
+            .order_by('assegnazione__posto__ordine', 'assegnazione__utente__username', 'articolo__nome'))
     for m in movs:
         dest = m.assegnazione.destinatario
-        gruppo = consumi.setdefault(dest, {'nome': dest, 'tipo': 'postazione' if m.assegnazione.postazione_id
+        gruppo = consumi.setdefault(dest, {'nome': dest, 'tipo': 'posto' if m.assegnazione.posto_id
                                            else 'utente', 'articoli': OrderedDict(), 'costo': Decimal('0')})
         riga = gruppo['articoli'].setdefault(m.articolo_id, {'articolo': m.articolo, 'quantita': 0,
                                                             'costo': Decimal('0')})
@@ -1016,7 +1031,7 @@ def dati_report(dal, al):
     # Segnalazioni nel periodo (usurati, rotti, smarriti, esauriti)
     problemi = OrderedDict()
     for s in (StatoAssegnazione.objects.filter(periodo, a_stato__in=Assegnazione.SEGNALABILI)
-              .select_related('assegnazione__articolo', 'assegnazione__utente', 'assegnazione__postazione')):
+              .select_related('assegnazione__articolo', 'assegnazione__utente', 'assegnazione__posto')):
         a = s.assegnazione
         chiave = (a.destinatario, a.articolo_id, s.a_stato)
         riga = problemi.setdefault(chiave, {'destinatario': a.destinatario, 'articolo': a.articolo,

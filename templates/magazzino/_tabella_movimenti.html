@@ -25,7 +25,7 @@
                 <td class="small">
                     {% if m.ordine %}<a href="{% url 'ordini:ordine-detail' m.ordine.pk %}">{{ m.ordine.numero_display }}</a>{% endif %}
                     {% if m.consegna %}<a href="{% url 'magazzino:consegne' %}?fornitore={{ m.consegna.fornitore_id }}">Consegna{% if m.consegna.numero_ddt %} DDT {{ m.consegna.numero_ddt }}{% endif %}</a>{% endif %}
-                    {% if m.assegnazione %}<i class="bi {% if m.assegnazione.postazione_id %}bi-geo-alt{% else %}bi-person{% endif %}"></i> {{ m.assegnazione.destinatario }}{% endif %}
+                    {% if m.assegnazione %}<i class="bi {% if m.assegnazione.posto_id %}bi-geo-alt{% else %}bi-person{% endif %}"></i> {{ m.assegnazione.destinatario }}{% endif %}
                     {% if m.nota %}<span class="text-muted">{% if m.ordine or m.consegna or m.assegnazione %} &middot; {% endif %}{{ m.nota }}</span>{% endif %}
                 </td>
                 <td class="small">{% if m.operatore %}{{ m.operatore.get_full_name|default:m.operatore.username }}{% endif %}</td>

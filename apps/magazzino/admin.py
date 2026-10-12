@@ -6,7 +6,7 @@ from .models import (Posto, Articolo, Assegnazione, Consegna, Fornitore, Movimen
 
 @admin.register(Posto)
 class PostoAdmin(admin.ModelAdmin):
-    list_display = ('nome', 'descrizione', 'ordine', 'attivo')
+    list_display = ('nome', 'descrizione', 'postazione', 'ordine', 'attivo')
 
 
 @admin.register(Fornitore)
@@ -66,6 +66,6 @@ class StatoInline(admin.TabularInline):
 
 @admin.register(Assegnazione)
 class AssegnazioneAdmin(admin.ModelAdmin):
-    list_display = ('articolo', 'quantita', 'utente', 'postazione', 'stato', 'data', 'da_gestire')
+    list_display = ('articolo', 'quantita', 'utente', 'posto', 'stato', 'data', 'da_gestire')
     list_filter = ('stato', 'da_gestire')
     inlines = [StatoInline]
