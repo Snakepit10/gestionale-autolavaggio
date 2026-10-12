@@ -17,10 +17,12 @@ from django.utils import timezone
 
 from apps.auth_system.sezioni import ha_accesso
 
-from .models import LavaggioExtra, PromoGiornata, QuadraturaGiornaliera, SpesaCassa, TicketResto
+from .models import (Cassa, LavaggioExtra, PromoGiornata, QuadraturaGiornaliera, RicaricaCassa, SpesaCassa,
+                     TicketResto)
 
 # azione -> modello delle voci che si aggiungono/eliminano
 VOCI = {
+    'ricarica': RicaricaCassa,
     'ticket': TicketResto,
     'spesa': SpesaCassa,
     'extra': LavaggioExtra,
@@ -45,6 +47,11 @@ def _importo(valore):
     return importo.quantize(Decimal('0.01')) if importo > 0 else None
 
 
+def casse_ricaricabili():
+    """Casse automatiche self service (non il registratore)."""
+    return Cassa.objects.filter(tipo='automatica', attiva=True, modalita_registratore=False).order_by('ordine')
+
+
 def giornata_confermata(giorno):
     return QuadraturaGiornaliera.objects.filter(data=giorno, confermata_il__isnull=False).exists()
 
@@ -66,7 +73,8 @@ def chiusura_giornata(request):
         return redirect(torna + (request.POST.get('ancora') or ''))
 
     quadratura = QuadraturaGiornaliera.objects.filter(data=giorno).select_related('confermata_da').first()
-    voci = {nome: list(modello.objects.filter(data=giorno).select_related('operatore'))
+    voci = {nome: list(modello.objects.filter(data=giorno).select_related(
+                *(['operatore', 'cassa'] if nome == 'ricarica' else ['operatore'])))
             for nome, modello in VOCI.items()}
     totali = {nome: sum((v.importo for v in lista), Decimal('0.00')) for nome, lista in voci.items()}
     oggi = timezone.localdate()
@@ -83,6 +91,7 @@ def chiusura_giornata(request):
         'promo_macchine': sum((p.importo for p in voci['promo'] if p.tipo == 'macchine'), Decimal('0.00')),
         'promo_operatori': sum((p.importo for p in voci['promo'] if p.tipo == 'operatori'), Decimal('0.00')),
         'categorie_spesa': SpesaCassa.CATEGORIA_CHOICES,
+        'casse_ricarica': casse_ricaricabili(),
         'tipi_promo': PromoGiornata.TIPO_CHOICES,
         'metodi_extra': LavaggioExtra.METODO_CHOICES,
         'vede_report': ha_accesso(request.user, 'finanze'),
@@ -126,7 +135,15 @@ def _azione(request, giorno):
         messages.error(request, "Indica un importo maggiore di zero.")
         return
     descrizione = (p.get('descrizione') or '').strip()
-    if azione == 'aggiungi_ticket':
+    if azione == 'aggiungi_ricarica':
+        cassa = casse_ricaricabili().filter(pk=p.get('cassa') or None).first()
+        if cassa is None:
+            messages.error(request, 'Scegli la cassa ricaricata.')
+            return
+        RicaricaCassa.objects.create(data=giorno, cassa=cassa, importo=importo,
+                                     nota=(p.get('nota') or '').strip()[:100], operatore=request.user)
+        messages.success(request, f'Ricarica di €{importo} su {cassa} registrata.')
+    elif azione == 'aggiungi_ticket':
         TicketResto.objects.create(data=giorno, importo=importo, nota=(p.get('nota') or '').strip()[:100],
                                    operatore=request.user)
         messages.success(request, f'Ticket di resto di €{importo} registrato.')

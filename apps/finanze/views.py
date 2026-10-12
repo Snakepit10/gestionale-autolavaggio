@@ -9,7 +9,7 @@ from decimal import Decimal
 import json
 
 from .models import (ChiusuraCassa, MovimentoCassa, Cassa, ChiusuraCassaAutomatica, QuadraturaGiornaliera,
-                     SpesaCassa, TicketResto, LavaggioExtra, PromoGiornata)
+                     SpesaCassa, TicketResto, LavaggioExtra, PromoGiornata, RicaricaCassa)
 from .services import abbinamento_portali, allinea_scontrini, import_washtec
 
 # Metodi che non finiscono nel conteggio fisico della quadratura
@@ -1073,6 +1073,20 @@ def report_giornata(request):
         'variazione_pct': variazione_pct,
     }
 
+    # ==================== RICARICHE: dichiarate dagli operatori vs scontrini ====================
+    ricariche_dichiarate = list(RicaricaCassa.objects.filter(data=data).select_related('cassa', 'operatore'))
+    confronto_ricariche = []
+    for ca in casse_attive.filter(modalita_registratore=False):
+        dichiarate = [r for r in ricariche_dichiarate if r.cassa_id == ca.pk]
+        dichiarato = sum((r.importo for r in dichiarate), Decimal('0.00'))
+        chiusura_ca = _chiusure_by_cassa.get(ca.pk)
+        scontrino = chiusura_ca.incasso_ricarica if chiusura_ca else None
+        if dichiarate or scontrino:
+            confronto_ricariche.append({
+                'cassa': ca, 'righe': dichiarate, 'dichiarato': dichiarato, 'scontrino': scontrino,
+                'differenza': (dichiarato - scontrino) if scontrino is not None else None,
+            })
+
     # ==================== QUADRATURA GIORNALIERA COMPLESSIVA ====================
     contesto_portali = _contesto_lavaggi_portali(data)
     # Self service atteso in cassa = incasso totale - ricarica di ogni cassa:
@@ -1100,6 +1114,7 @@ def report_giornata(request):
         'chiusure_auto': chiusure_auto,
         'casse_form_data': casse_form_data,
         'agg': agg,
+        'confronto_ricariche': confronto_ricariche,
         'totale_giornata': totale_giornata,
         'totale_ordinato': totale_ordinato,
         # Nuovi totali per categoria (richiesti)

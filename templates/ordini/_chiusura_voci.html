@@ -5,7 +5,8 @@
         {% for v in lista %}
             <tr>
                 <td>
-                    {% if tipo == 'ticket' %}Ticket di resto{% if v.nota %} &middot; <span class="text-muted">{{ v.nota }}</span>{% endif %}
+                    {% if tipo == 'ricarica' %}Ricarica <strong>{{ v.cassa.nome }}</strong>{% if v.nota %} &middot; <span class="text-muted">{{ v.nota }}</span>{% endif %}
+                    {% elif tipo == 'ticket' %}Ticket di resto{% if v.nota %} &middot; <span class="text-muted">{{ v.nota }}</span>{% endif %}
                     {% elif tipo == 'promo' %}<span class="badge {% if v.tipo == 'macchine' %}bg-info text-dark{% else %}bg-secondary{% endif %}">{% if v.tipo == 'macchine' %}Macchine{% else %}Operatori{% endif %}</span> {{ v.descrizione }}
                     {% elif tipo == 'spesa' %}{{ v.descrizione }} <span class="text-muted small">({{ v.get_categoria_display }}{% if v.riferimento %} &middot; {{ v.riferimento }}{% endif %})</span>
                     {% else %}{{ v.descrizione }} <span class="text-muted small">({{ v.get_metodo_display }})</span>{% endif %}

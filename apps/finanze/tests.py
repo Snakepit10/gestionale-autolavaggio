@@ -754,6 +754,29 @@ class ChiusuraGiornataOperatoriTest(TestCase):
         self.assertEqual((q['residuo_operatori_lordo'], q['residuo_operatori']), (Decimal('15'), Decimal('7.00')))
         self.assertEqual(q['differenza'], Decimal('263.00') - Decimal('216.00') - Decimal('7.00'))
 
+    def test_ricariche_operatori_e_confronto(self):
+        from apps.finanze.models import Cassa, ChiusuraCassaAutomatica, RicaricaCassa
+        cassa = Cassa.objects.create(nome='Cambia gettoni', tipo='automatica')
+        registratore = Cassa.objects.create(nome='Registratore', tipo='automatica', modalita_registratore=True)
+        self._post(self.operatore, azione='aggiungi_ricarica', cassa=cassa.pk, importo='40', nota='monete')
+        self._post(self.operatore, azione='aggiungi_ricarica', cassa=cassa.pk, importo='10')
+        self._post(self.operatore, azione='aggiungi_ricarica', cassa=registratore.pk, importo='5')   # non ricaricabile
+        self._post(self.operatore, azione='aggiungi_ricarica', importo='5')                          # senza cassa
+        self.assertEqual(RicaricaCassa.objects.count(), 2)
+        ChiusuraCassaAutomatica.objects.create(cassa=cassa, data=self.oggi, incasso_totale=Decimal('300'),
+                                               incasso_ricarica=Decimal('40'))
+        from django.contrib.messages.storage.fallback import FallbackStorage
+        from django.test import RequestFactory
+
+        from apps.finanze.views import report_giornata
+        req = RequestFactory().get('/', {'data': self.oggi.isoformat()})
+        req.user = self.titolare
+        req.session = {}
+        req._messages = FallbackStorage(req)
+        pagina = report_giornata(req).content.decode()
+        self.assertIn('Ricariche delle casse', pagina)
+        self.assertIn('+&euro;10,00', pagina)                 # dichiarato 50, scontrino 40
+
     def test_validazioni(self):
         from apps.finanze.models import LavaggioExtra, PromoGiornata
         self._post(self.operatore, azione='aggiungi_extra', importo='0', descrizione='x')

@@ -701,6 +701,28 @@ class QuadraturaGiornaliera(models.Model):
         return self.contanti_totali + self.lettore_carte_servito - self.fondo_cassa_iniziale
 
 
+class RicaricaCassa(models.Model):
+    """Ricarica di una cassa automatica (resti/gettoni) fatta dagli
+    operatori con i soldi del fondo cassa, dichiarata nella chiusura
+    giornata: il report la confronta con la ricarica dello scontrino."""
+    data = models.DateField(default=timezone.localdate, db_index=True)
+    cassa = models.ForeignKey(Cassa, on_delete=models.PROTECT, related_name='ricariche_operatori')
+    importo = models.DecimalField(max_digits=8, decimal_places=2,
+                                  validators=[MinValueValidator(Decimal('0.01'))])
+    nota = models.CharField(max_length=100, blank=True)
+    operatore = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, blank=True,
+                                  related_name='ricariche_cassa')
+    creato_il = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        verbose_name = 'Ricarica cassa (operatori)'
+        verbose_name_plural = 'Ricariche casse (operatori)'
+        ordering = ['data', 'creato_il']
+
+    def __str__(self):
+        return f"{self.data:%d/%m/%Y} ricarica {self.cassa} €{self.importo}"
+
+
 class LavaggioExtra(models.Model):
     """Lavaggio o servizio fatto e incassato senza ordine nel gestionale:
     nella quadratura si aggiunge all'atteso."""
