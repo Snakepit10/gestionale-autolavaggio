@@ -693,3 +693,95 @@ class TicketRestoTest(TestCase):
         t = TicketResto.objects.get(importo=Decimal('2'))
         self.client.post(url, {'data': '2026-10-06', 'azione': 'elimina', 'ticket_id': t.pk})
         self.assertEqual(TicketResto.objects.count(), 1)
+
+
+
+class ChiusuraGiornataOperatoriTest(TestCase):
+    """Conteggio e dichiarazioni degli operatori; conferma del titolare."""
+
+    def setUp(self):
+        from django.contrib.auth.models import Group
+        self.oggi = timezone.localdate()
+        self.operatore = User.objects.create_user('op', password='x')
+        self.operatore.groups.add(Group.objects.get(name='operatore'))
+        self.titolare = utente_titolare('tit', password='x')
+        self.url = reverse('ordini:chiusura-giornata')
+
+    def _post(self, user, **dati):
+        self.client.force_login(user)
+        return self.client.post(self.url, {'data': self.oggi.isoformat(), **dati})
+
+    def test_operatore_dichiara_e_il_report_incrocia(self):
+        from apps.finanze.models import (LavaggioExtra, PromoGiornata, QuadraturaGiornaliera, SpesaCassa,
+                                         TicketResto)
+        from apps.finanze.views import _quadratura_giornata
+        self._post(self.operatore, azione='conteggio', contanti_totali='300', lettore_carte_servito='50',
+                   fondo_cassa_iniziale='100')
+        self._post(self.operatore, azione='aggiungi_ticket', importo='3')
+        self._post(self.operatore, azione='aggiungi_spesa', importo='10', descrizione='Gasolio')
+        self._post(self.operatore, azione='aggiungi_extra', importo='20', descrizione='Lavaggio Panda',
+                   metodo='contanti')
+        self._post(self.operatore, azione='aggiungi_promo', tipo='macchine', importo='4', descrizione='2 gettoni')
+        self._post(self.operatore, azione='aggiungi_promo', tipo='operatori', importo='8', descrizione='omaggio')
+        self.assertEqual(QuadraturaGiornaliera.objects.get(data=self.oggi).totale_reale, Decimal('250.00'))
+        self.assertEqual((TicketResto.objects.count(), SpesaCassa.objects.count(), LavaggioExtra.objects.count(),
+                          PromoGiornata.objects.count()), (1, 1, 1, 2))
+
+        q, _, _ = _quadratura_giornata(self.oggi, None, Decimal('200'), Decimal('0'), Decimal('15'))
+        # reale = 250 + spese 10 + ticket 3; atteso = 200 - 4 + 0 + 20; residuo = 15 - 8
+        self.assertEqual(q['totale_reale'], Decimal('263.00'))
+        self.assertEqual(q['totale_teorico'], Decimal('216.00'))
+        self.assertEqual((q['residuo_operatori_lordo'], q['residuo_operatori']), (Decimal('15'), Decimal('7.00')))
+        self.assertEqual(q['differenza'], Decimal('263.00') - Decimal('216.00') - Decimal('7.00'))
+
+    def test_validazioni(self):
+        from apps.finanze.models import LavaggioExtra, PromoGiornata
+        self._post(self.operatore, azione='aggiungi_extra', importo='0', descrizione='x')
+        self._post(self.operatore, azione='aggiungi_extra', importo='5', descrizione='')
+        self._post(self.operatore, azione='aggiungi_promo', tipo='boh', importo='5', descrizione='x')
+        self.assertFalse(LavaggioExtra.objects.exists() or PromoGiornata.objects.exists())
+
+    def test_conferma_blocca_gli_operatori(self):
+        from apps.finanze.models import LavaggioExtra, QuadraturaGiornaliera
+        self._post(self.operatore, azione='conteggio', contanti_totali='100')
+        self._post(self.operatore, azione='aggiungi_extra', importo='5', descrizione='Moto')
+        extra = LavaggioExtra.objects.get()
+        # un altro operatore non elimina le voci altrui
+        altro = User.objects.create_user('op2', password='x')
+        from django.contrib.auth.models import Group
+        altro.groups.add(Group.objects.get(name='operatore'))
+        self._post(altro, azione='elimina_extra', id=extra.pk)
+        self.assertTrue(LavaggioExtra.objects.exists())
+
+        self.client.force_login(self.titolare)
+        self.client.post(reverse('finanze:azione_conferma_giornata'), {'data': self.oggi.isoformat(),
+                                                                        'azione': 'conferma'})
+        self.assertIsNotNone(QuadraturaGiornaliera.objects.get().confermata_il)
+        self._post(self.operatore, azione='aggiungi_extra', importo='9', descrizione='Altro')
+        self._post(self.operatore, azione='conteggio', contanti_totali='999')
+        self.assertEqual((LavaggioExtra.objects.count(), QuadraturaGiornaliera.objects.get().contanti_totali),
+                         (1, Decimal('100.00')))
+        # il titolare modifica anche dopo la conferma, e puo' sbloccare
+        self._post(self.titolare, azione='aggiungi_extra', importo='9', descrizione='Altro')
+        self.assertEqual(LavaggioExtra.objects.count(), 2)
+        self.client.post(reverse('finanze:azione_conferma_giornata'), {'data': self.oggi.isoformat(),
+                                                                        'azione': 'sblocca'})
+        self._post(self.operatore, azione='conteggio', contanti_totali='120')
+        self.assertEqual(QuadraturaGiornaliera.objects.get().contanti_totali, Decimal('120.00'))
+
+    def test_pagina_e_permessi(self):
+        from django.contrib.messages.storage.fallback import FallbackStorage
+        from django.test import RequestFactory
+
+        from apps.auth_system.sezioni import ha_accesso, sezione_per_percorso
+        from apps.finanze.views_chiusura import chiusura_giornata
+        self.assertEqual(sezione_per_percorso(self.url), 'ordini')
+        self.assertTrue(ha_accesso(self.operatore, 'ordini'))
+        req = RequestFactory().get(self.url)
+        req.user = User.objects.get(pk=self.operatore.pk)
+        req.session = {}
+        req._messages = FallbackStorage(req)
+        pagina = chiusura_giornata(req).content.decode()
+        for testo in ('Conteggio', 'Ticket di resto', 'Promo e omaggi', 'Spese pagate', 'Lavaggi extra'):
+            self.assertIn(testo, pagina)
+        self.assertNotIn('Report giornata</a>', pagina)       # l'operatore non vede il report

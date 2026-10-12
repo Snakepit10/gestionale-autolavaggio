@@ -211,10 +211,29 @@
       {% else %}
         <span class="badge bg-warning text-dark ms-2">Eccedente</span>
       {% endif %}
-      <a href="{% url 'finanze:quadratura_form' %}?data={{ data|date:'Y-m-d' }}" class="btn btn-sm btn-outline-primary ms-auto">
+      {% if quadratura.obj.confermata_il %}
+        <span class="badge bg-dark ms-2" title="Confermata da {{ quadratura.obj.confermata_da|default:'—' }} il {{ quadratura.obj.confermata_il|date:'d/m H:i' }}"><i class="bi bi-lock-fill"></i> Confermata</span>
+      {% endif %}
+      <a href="{% url 'ordini:chiusura-giornata' %}?data={{ data|date:'Y-m-d' }}" class="btn btn-sm btn-outline-secondary ms-auto">
+        <i class="bi bi-calculator"></i> Chiusura operatori
+      </a>
+      <a href="{% url 'finanze:quadratura_form' %}?data={{ data|date:'Y-m-d' }}" class="btn btn-sm btn-outline-primary">
         <i class="bi bi-pencil"></i>
         {% if quadratura.obj %}Modifica{% else %}Inserisci{% endif %} quadratura
       </a>
+      {% if quadratura.obj %}
+      <form method="post" action="{% url 'finanze:azione_conferma_giornata' %}" class="d-inline">
+        {% csrf_token %}
+        <input type="hidden" name="data" value="{{ data|date:'Y-m-d' }}">
+        {% if quadratura.obj.confermata_il %}
+        <input type="hidden" name="azione" value="sblocca">
+        <button class="btn btn-sm btn-outline-dark"><i class="bi bi-unlock"></i> Sblocca</button>
+        {% else %}
+        <input type="hidden" name="azione" value="conferma">
+        <button class="btn btn-sm btn-dark" onclick="return confirm('Confermare la giornata? Gli operatori non potranno più modificarla.');"><i class="bi bi-lock"></i> Conferma giornata</button>
+        {% endif %}
+      </form>
+      {% endif %}
     </div>
     <div class="panel-sub">Conta tutti i contanti scassettati + totale lettore carte servito, confronta con self service (incasso &minus; ricarica) + ordini POS</div>
     <div class="panel-body">
@@ -265,6 +284,18 @@
                 <div class="text-muted" style="font-size:.75rem">&euro;{{ agg.incasso_totale|floatformat:2 }} &minus; &euro;{{ agg.incasso_ricarica|floatformat:2 }} (la ricarica viene dal fondo cassa)</div></span>
               <span class="fw-bold">&euro;{{ quadratura.vendita_self_service|floatformat:2 }}</span>
             </div>
+            {% if quadratura.promo_macchine %}
+            <div class="d-flex justify-content-between small mb-1 text-danger">
+              <span>&minus; Gettoni/crediti regalati (promo macchine) <a href="#chiusura-operatori">(dettaglio)</a></span>
+              <span class="fw-bold">&minus;&euro;{{ quadratura.promo_macchine|floatformat:2 }}</span>
+            </div>
+            {% endif %}
+            {% if quadratura.totale_extra %}
+            <div class="d-flex justify-content-between small mb-1 text-success">
+              <span>+ Lavaggi extra senza ordine <a href="#chiusura-operatori">(dettaglio)</a></span>
+              <span class="fw-bold">+&euro;{{ quadratura.totale_extra|floatformat:2 }}</span>
+            </div>
+            {% endif %}
             <div class="d-flex justify-content-between small mb-1">
               <span>Servito: incassi ordini del giorno</span>
               <span class="fw-bold">&euro;{{ quadratura.servito_ordini_giorno|floatformat:2 }}</span>
@@ -339,7 +370,7 @@
               </div>
               <div class="small text-muted">
                 Reale &minus; teorico {% if quadratura.differenza_reale_teorico >= 0 %}+{% endif %}&euro;{{ quadratura.differenza_reale_teorico|floatformat:2 }}
-                &middot; &minus; residuo pagati agli operatori &euro;{{ quadratura.residuo_operatori|floatformat:2 }}{% if abbinamento.n_rettificati %} <span class="text-muted">(dopo {{ abbinamento.n_rettificati }} omaggi/promo)</span>{% endif %}
+                &middot; &minus; residuo pagati agli operatori &euro;{{ quadratura.residuo_operatori|floatformat:2 }}{% if quadratura.promo_operatori %} <span class="text-muted">(&euro;{{ quadratura.residuo_operatori_lordo|floatformat:2 }} &minus; promo operatori &euro;{{ quadratura.promo_operatori|floatformat:2 }})</span>{% endif %}{% if abbinamento.n_rettificati %} <span class="text-muted">(dopo {{ abbinamento.n_rettificati }} omaggi/promo)</span>{% endif %}
                 {% if abbinamento %}<a href="#abbinamento-portali">(dettaglio)</a>{% else %}<span title="Imposta la chiusura portali della giornata per calcolare il residuo">(chiusura portali non impostata)</span>{% endif %}
               </div>
             </div>
@@ -456,6 +487,38 @@
           <button class="btn btn-sm btn-danger w-100"><i class="bi bi-plus-circle"></i> Aggiungi spesa</button>
         </div>
       </form>
+    </div>
+  </div>
+
+  {# ====== CHIUSURA OPERATORI: lavaggi extra e promo ====== #}
+  <div class="chart-panel mb-3" id="chiusura-operatori">
+    <div class="panel-title">
+      <i class="bi bi-calculator text-primary"></i> Lavaggi extra e promo (chiusura operatori)
+      <span class="badge bg-light text-dark ms-2">extra &euro;{{ quadratura.totale_extra|floatformat:2 }} &middot; promo &euro;{{ quadratura.promo_macchine|add:quadratura.promo_operatori|floatformat:2 }}</span>
+      <a href="{% url 'ordini:chiusura-giornata' %}?data={{ data|date:'Y-m-d' }}" class="btn btn-sm btn-outline-secondary ms-auto"><i class="bi bi-pencil"></i> Apri chiusura operatori</a>
+    </div>
+    <div class="panel-sub">Gli extra si aggiungono all'atteso; le promo macchine lo riducono; le promo operatori riducono il residuo "pagati agli operatori" (non segnare lo stesso omaggio anche con la matita del residuo)</div>
+    <div class="panel-body">
+      {% if quadratura.lavaggi_extra or quadratura.promo_lista %}
+      <table class="table table-sm data-table mb-0">
+        <thead class="table-light"><tr><th>Tipo</th><th>Descrizione</th><th>Inserito da</th><th class="text-end">Importo</th></tr></thead>
+        <tbody>
+          {% for x in quadratura.lavaggi_extra %}
+          <tr><td><span class="badge bg-success">Extra</span> {{ x.get_metodo_display }}</td><td>{{ x.descrizione }}</td>
+              <td class="text-muted small">{{ x.operatore|default:"—" }} &middot; {{ x.creato_il|date:"H:i" }}</td>
+              <td class="text-end fw-bold">+&euro;{{ x.importo|floatformat:2 }}</td></tr>
+          {% endfor %}
+          {% for p in quadratura.promo_lista %}
+          <tr><td><span class="badge {% if p.tipo == 'macchine' %}bg-info text-dark{% else %}bg-secondary{% endif %}">Promo {% if p.tipo == 'macchine' %}macchine{% else %}operatori{% endif %}</span></td>
+              <td>{{ p.descrizione }}</td>
+              <td class="text-muted small">{{ p.operatore|default:"—" }} &middot; {{ p.creato_il|date:"H:i" }}</td>
+              <td class="text-end fw-bold">&minus;&euro;{{ p.importo|floatformat:2 }}</td></tr>
+          {% endfor %}
+        </tbody>
+      </table>
+      {% else %}
+      <p class="text-muted small mb-0">Nessun lavaggio extra o promo dichiarati per questa data.</p>
+      {% endif %}
     </div>
   </div>
 

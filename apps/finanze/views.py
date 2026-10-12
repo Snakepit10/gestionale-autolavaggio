@@ -8,7 +8,8 @@ from datetime import datetime, time, timedelta
 from decimal import Decimal
 import json
 
-from .models import ChiusuraCassa, MovimentoCassa, Cassa, ChiusuraCassaAutomatica, QuadraturaGiornaliera, SpesaCassa, TicketResto
+from .models import (ChiusuraCassa, MovimentoCassa, Cassa, ChiusuraCassaAutomatica, QuadraturaGiornaliera,
+                     SpesaCassa, TicketResto, LavaggioExtra, PromoGiornata)
 from .services import abbinamento_portali, allinea_scontrini, import_washtec
 
 # Metodi che non finiscono nel conteggio fisico della quadratura
@@ -1184,7 +1185,14 @@ def _quadratura_giornata(data, cassa_servito, vendita_self_service, totale_servi
     else:
         escluso_dal_servito = totale_non_in_cassa
     servito_atteso = totale_servito - escluso_dal_servito
-    totale_teorico = vendita_self_service + servito_atteso
+    # Dichiarati dagli operatori nella chiusura giornata: lavaggi extra
+    # incassati senza ordine (si aggiungono all'atteso) e promo
+    lavaggi_extra = list(LavaggioExtra.objects.filter(data=data).select_related('operatore'))
+    totale_extra = sum((x.importo for x in lavaggi_extra), Decimal('0.00'))
+    promo = list(PromoGiornata.objects.filter(data=data).select_related('operatore'))
+    promo_macchine = sum((p.importo for p in promo if p.tipo == 'macchine'), Decimal('0.00'))
+    promo_operatori = sum((p.importo for p in promo if p.tipo == 'operatori'), Decimal('0.00'))
+    totale_teorico = vendita_self_service - promo_macchine + servito_atteso + totale_extra
 
     # Il servito atteso comprende anche i crediti di giorni precedenti
     # riscossi oggi (in contanti/carta): li separo, per ordine.
@@ -1224,6 +1232,11 @@ def _quadratura_giornata(data, cassa_servito, vendita_self_service, totale_servi
     quadratura = {
         'obj': quadratura_obj,
         'vendita_self_service': vendita_self_service,
+        'lavaggi_extra': lavaggi_extra,
+        'totale_extra': totale_extra,
+        'promo_lista': promo,
+        'promo_macchine': promo_macchine,
+        'promo_operatori': promo_operatori,
         'totale_servito': servito_atteso,
         'servito_ordini_giorno': servito_ordini_giorno,
         'crediti_pregressi': crediti_pregressi,
@@ -1241,6 +1254,9 @@ def _quadratura_giornata(data, cassa_servito, vendita_self_service, totale_servi
         'stato': stato_quadratura,
     }
 
+    # promo dichiarate sui lavaggi degli operatori: il residuo scende
+    quadratura['residuo_operatori_lordo'] = residuo_operatori
+    residuo_operatori = max(residuo_operatori - promo_operatori, Decimal('0.00'))
     quadratura['residuo_operatori'] = residuo_operatori
     if quadratura['differenza'] is not None:
         quadratura['differenza_reale_teorico'] = quadratura['differenza']
@@ -1684,6 +1700,31 @@ def azione_spese_cassa(request):
             return redirect(torna)
         spesa.delete()
         messages.success(request, 'Spesa eliminata.')
+    return redirect(torna)
+
+
+@login_required
+@user_passes_test(is_staff_user)
+def azione_conferma_giornata(request):
+    """POST dal report giornata: conferma la chiusura degli operatori
+    (da quel momento non la modificano piu') oppure la sblocca."""
+    from django.urls import reverse
+
+    data_str = request.POST.get('data', '')
+    torna = f"{reverse('finanze:report_giornata')}?data={data_str}#quadratura"
+    if request.method != 'POST':
+        return redirect('finanze:report_giornata')
+    quadratura = QuadraturaGiornaliera.objects.filter(data=data_str or None).first()
+    if quadratura is None:
+        messages.error(request, 'Manca il conteggio della giornata: non si può confermare.')
+        return redirect(torna)
+    if request.POST.get('azione') == 'sblocca':
+        quadratura.confermata_da, quadratura.confermata_il = None, None
+        messages.success(request, 'Giornata sbloccata: gli operatori possono di nuovo modificarla.')
+    else:
+        quadratura.confermata_da, quadratura.confermata_il = request.user, timezone.now()
+        messages.success(request, 'Giornata confermata.')
+    quadratura.save(update_fields=['confermata_da', 'confermata_il'])
     return redirect(torna)
 
 

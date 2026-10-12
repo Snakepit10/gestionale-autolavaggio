@@ -674,6 +674,11 @@ class QuadraturaGiornaliera(models.Model):
         help_text='Contanti gia presenti in cassa all\'inizio della giornata (verra sottratto dal totale reale)',
     )
     note = models.TextField(blank=True)
+    # Chiusura giornata degli operatori confermata dal titolare: da qui in
+    # poi conteggio, resti, spese, promo ed extra non li modificano piu'
+    confermata_da = models.ForeignKey(
+        User, on_delete=models.SET_NULL, null=True, blank=True, related_name='quadrature_confermate')
+    confermata_il = models.DateTimeField(null=True, blank=True)
     operatore = models.ForeignKey(
         User, on_delete=models.SET_NULL, null=True, blank=True,
         related_name='quadrature_giornaliere',
@@ -694,6 +699,59 @@ class QuadraturaGiornaliera(models.Model):
     def totale_reale(self):
         """Totale netto rilevato: contanti + carte - fondo cassa iniziale."""
         return self.contanti_totali + self.lettore_carte_servito - self.fondo_cassa_iniziale
+
+
+class LavaggioExtra(models.Model):
+    """Lavaggio o servizio fatto e incassato senza ordine nel gestionale:
+    nella quadratura si aggiunge all'atteso."""
+    METODO_CHOICES = [('contanti', 'Contanti'), ('carta', 'Carta (POS servito)')]
+    data = models.DateField(default=timezone.localdate, db_index=True)
+    descrizione = models.CharField(max_length=150)
+    importo = models.DecimalField(max_digits=8, decimal_places=2,
+                                  validators=[MinValueValidator(Decimal('0.01'))])
+    metodo = models.CharField(max_length=10, choices=METODO_CHOICES, default='contanti')
+    operatore = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, blank=True,
+                                  related_name='lavaggi_extra')
+    creato_il = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        verbose_name = 'Lavaggio extra (senza ordine)'
+        verbose_name_plural = 'Lavaggi extra (senza ordine)'
+        ordering = ['data', 'creato_il']
+
+    def __str__(self):
+        return f"{self.data:%d/%m/%Y} {self.descrizione} €{self.importo}"
+
+
+class PromoGiornata(models.Model):
+    """Promozioni e omaggi della giornata dichiarati dagli operatori.
+
+    - macchine: gettoni/crediti regalati ai clienti self service: l'atteso
+      delle casse automatiche scende dell'importo;
+    - operatori: sconto concesso sui lavaggi fatti dagli operatori
+      (unita' operativa): il residuo "pagati agli operatori" scende
+      dell'importo."""
+    TIPO_CHOICES = [
+        ('macchine', 'Gettoni / crediti regalati alle macchine'),
+        ('operatori', 'Omaggio / sconto sui lavaggi degli operatori'),
+    ]
+    data = models.DateField(default=timezone.localdate, db_index=True)
+    tipo = models.CharField(max_length=10, choices=TIPO_CHOICES)
+    descrizione = models.CharField(max_length=150)
+    importo = models.DecimalField(max_digits=8, decimal_places=2,
+                                  validators=[MinValueValidator(Decimal('0.01'))],
+                                  help_text='Valore regalato o sconto concesso')
+    operatore = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, blank=True,
+                                  related_name='promo_giornata')
+    creato_il = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        verbose_name = 'Promo / omaggio della giornata'
+        verbose_name_plural = 'Promo / omaggi della giornata'
+        ordering = ['data', 'creato_il']
+
+    def __str__(self):
+        return f"{self.data:%d/%m/%Y} {self.get_tipo_display()} €{self.importo}"
 
 
 class TicketResto(models.Model):

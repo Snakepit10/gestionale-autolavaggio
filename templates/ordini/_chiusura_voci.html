@@ -1,0 +1,33 @@
+{% if lista %}
+<div class="table-responsive">
+    <table class="table table-sm align-middle">
+        <tbody>
+        {% for v in lista %}
+            <tr>
+                <td>
+                    {% if tipo == 'ticket' %}Ticket di resto{% if v.nota %} &middot; <span class="text-muted">{{ v.nota }}</span>{% endif %}
+                    {% elif tipo == 'promo' %}<span class="badge {% if v.tipo == 'macchine' %}bg-info text-dark{% else %}bg-secondary{% endif %}">{% if v.tipo == 'macchine' %}Macchine{% else %}Operatori{% endif %}</span> {{ v.descrizione }}
+                    {% elif tipo == 'spesa' %}{{ v.descrizione }} <span class="text-muted small">({{ v.get_categoria_display }}{% if v.riferimento %} &middot; {{ v.riferimento }}{% endif %})</span>
+                    {% else %}{{ v.descrizione }} <span class="text-muted small">({{ v.get_metodo_display }})</span>{% endif %}
+                    <div class="text-muted small">{% if v.operatore %}{{ v.operatore.get_full_name|default:v.operatore.username }}{% else %}—{% endif %} &middot; {{ v.creato_il|date:"H:i" }}</div>
+                </td>
+                <td class="text-end fw-bold text-nowrap">&euro;{{ v.importo|floatformat:2 }}</td>
+                <td class="text-end" style="width:1%">
+                    {% if modificabile and v.operatore_id == request.user.id or modificabile and vede_report %}
+                    <form method="post" class="d-inline" onsubmit="return confirm('Eliminare questa voce?');">
+                        {% csrf_token %}
+                        <input type="hidden" name="data" value="{{ data|date:'Y-m-d' }}">
+                        <input type="hidden" name="azione" value="elimina_{{ tipo }}">
+                        <input type="hidden" name="id" value="{{ v.pk }}">
+                        <button class="btn btn-sm btn-link text-danger p-0" title="Elimina"><i class="bi bi-trash"></i></button>
+                    </form>
+                    {% endif %}
+                </td>
+            </tr>
+        {% endfor %}
+        </tbody>
+    </table>
+</div>
+{% else %}
+<p class="text-muted small mb-2">Nessuna voce.</p>
+{% endif %}
