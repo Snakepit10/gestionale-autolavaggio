@@ -1,5 +1,5 @@
 from django.urls import path
-from apps.finanze.views_chiusura import chiusura_giornata
+from apps.finanze.views_chiusura import chiusura_giornata, distinta_chiusura
 
 from . import views
 
@@ -7,6 +7,7 @@ app_name = 'ordini'
 
 urlpatterns = [
     path('chiusura-giornata/', chiusura_giornata, name='chiusura-giornata'),
+    path('chiusura-giornata/distinta/', distinta_chiusura, name='chiusura-distinta'),
     # Punto Cassa
     path('cassa/', views.CassaView.as_view(), name='cassa'),
     path('cassa/mobile/', views.CassaMobileView.as_view(), name='cassa-mobile'),

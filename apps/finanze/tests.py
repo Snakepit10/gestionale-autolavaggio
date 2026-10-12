@@ -777,6 +777,25 @@ class ChiusuraGiornataOperatoriTest(TestCase):
         self.assertIn('Ricariche delle casse', pagina)
         self.assertIn('+&euro;10,00', pagina)                 # dichiarato 50, scontrino 40
 
+    def test_distinta_cartacea(self):
+        from apps.finanze.models import SpesaCassa
+        SpesaCassa.objects.create(data=self.oggi, descrizione='Gasolio', importo=Decimal('20'), riferimento='45')
+        self._post(self.operatore, azione='conteggio', contanti_totali='0', fondo_cassa_iniziale='150')
+        from django.test import RequestFactory
+
+        from apps.finanze.views_chiusura import distinta_chiusura
+        req = RequestFactory().get('/', {'data': self.oggi.isoformat()})
+        req.user = self.operatore
+        html = distinta_chiusura(req).content.decode()
+        self.assertIn('Gasolio (n. 45)', html)
+        self.assertIn('150,00', html)
+        self.assertIn('CONTEGGIO CASSA', html)
+        req = RequestFactory().get('/', {'vuota': '1'})
+        req.user = self.operatore
+        vuota = distinta_chiusura(req).content.decode()
+        self.assertNotIn('Gasolio', vuota)
+        self.assertEqual(vuota.count('class="tipi"'), 22)
+
     def test_validazioni(self):
         from apps.finanze.models import LavaggioExtra, PromoGiornata
         self._post(self.operatore, azione='aggiungi_extra', importo='0', descrizione='x')

@@ -30,6 +30,10 @@
         <strong>{{ data|date:"l d/m/Y" }}</strong>
         {% if data_next %}<a href="?data={{ data_next|date:'Y-m-d' }}" class="btn btn-outline-secondary btn-sm"><i class="bi bi-chevron-right"></i></a>{% endif %}
         {% if data != oggi %}<a href="?" class="btn btn-outline-primary btn-sm">Oggi</a>{% endif %}
+        <div class="btn-group btn-group-sm">
+            <a href="{% url 'ordini:chiusura-distinta' %}?data={{ data|date:'Y-m-d' }}" target="_blank" class="btn btn-outline-dark"><i class="bi bi-printer"></i> Stampa distinta</a>
+            <a href="{% url 'ordini:chiusura-distinta' %}?vuota=1" target="_blank" class="btn btn-outline-dark" title="Modulo in bianco">in bianco</a>
+        </div>
         <a href="{% url 'ordini:ordini-list' %}" class="btn btn-outline-secondary btn-sm"><i class="bi bi-arrow-left"></i> Ordini</a>
         {% if vede_report %}<a href="{% url 'finanze:report_giornata' %}?data={{ data|date:'Y-m-d' }}#quadratura" class="btn btn-outline-primary btn-sm"><i class="bi bi-graph-up"></i> Report giornata</a>{% endif %}
     </div>
