@@ -1,10 +1,13 @@
 """Abbinamento lavaggi servito <-> transazioni portale da unita' operativa.
 
-Dentro la finestra di una ChiusuraPortali, ogni lavaggio del servito
-(ItemOrdine il cui servizio ha `programmi_portale`) viene abbinato a una
-transazione WashTec con origine 'unita' compatibile. Le transazioni
-'unita' che restano libere sono i lavaggi pagati direttamente agli
-operatori.
+I lavaggi del servito (ItemOrdine il cui servizio ha `programmi_portale`)
+appartengono al GIORNO DELL'ORDINE e si abbinano alle transazioni WashTec
+con origine 'unita' dello stesso giorno di calendario. Il residuo (le
+transazioni 'unita' rimaste libere = lavaggi pagati direttamente agli
+operatori) segue invece la FINESTRA della ChiusuraPortali, cioe' il
+conteggio della cassa: ne escono le transazioni abbinate ai lavaggi del
+servito di tutti i giorni che la finestra tocca (es. 10/10 19:30 ->
+11/10 19:30: quelli del 10 e dell'11).
 
 Regole di proposta:
 - PRIORITA' DI PROGRAMMA: l'abbinamento procede a giri, uno per
@@ -26,10 +29,11 @@ Regole di proposta:
 Le proposte sono calcolate al volo (nessuna scrittura); diventano
 AbbinamentoPortale solo alla conferma dell'operatore.
 """
-from datetime import timedelta
+from datetime import datetime, time, timedelta
 from decimal import Decimal
 
 from django.db import transaction
+from django.utils import timezone
 
 from apps.finanze.models import (PREZZI_PROGRAMMA_PORTALE, AbbinamentoPortale,
                                  TransazionePortale)
@@ -44,8 +48,19 @@ DURATA_MAX_LAVORO = timedelta(hours=3)
 # Programma con cui si coprono, senza vincoli d'orario, i lavaggi servito
 # rimasti scoperti dopo i giri di priorita'.
 PROGRAMMA_RIPIEGO = 4
-# Margine per caricare gli ordini a cavallo dell'inizio finestra
-_MARGINE_CARICAMENTO = timedelta(hours=12)
+
+
+def _limiti_giorno(giorno):
+    """[inizio, fine) del giorno di calendario, nell'ora locale."""
+    inizio = timezone.make_aware(datetime.combine(giorno, time.min))
+    return inizio, inizio + timedelta(days=1)
+
+
+def _giorni_finestra(chiusura):
+    """Giorni di calendario toccati dalla finestra di chiusura."""
+    da = timezone.localtime(min(chiusura.periodo_da, chiusura.finestra('B')[0])).date()
+    a = timezone.localtime(max(chiusura.periodo_a, chiusura.finestra('B')[1])).date()
+    return [da + timedelta(days=n) for n in range((a - da).days + 1)]
 
 
 def _riferimento(item):
@@ -73,15 +88,15 @@ def _compatibile_orario(item, t, tolleranza):
     return delta if delta <= tolleranza.total_seconds() else None
 
 
-def lavaggi_servito(chiusura):
-    """Item servito il cui obiettivo cade nella finestra di chiusura.
+def lavaggi_servito_giorno(giorno):
+    """Item servito degli ordini del giorno (di calendario).
     Ogni item riceve l'attributo `riferimento` (vedi _riferimento)."""
+    inizio, fine = _limiti_giorno(giorno)
     candidati = (
         ItemOrdine.objects
         .exclude(servizio_prodotto__programmi_portale='')
         .exclude(ordine__stato='annullato')
-        .filter(ordine__data_ora__gt=chiusura.periodo_da - _MARGINE_CARICAMENTO,
-                ordine__data_ora__lte=chiusura.periodo_a)
+        .filter(ordine__data_ora__gte=inizio, ordine__data_ora__lt=fine)
         .select_related('ordine__cliente', 'servizio_prodotto')
         .prefetch_related('abbinamenti_portale__transazione',
                           'ordine__items__servizio_prodotto')
@@ -89,11 +104,26 @@ def lavaggi_servito(chiusura):
     items = []
     for it in candidati:
         it.riferimento = _riferimento(it)
-        if chiusura.periodo_da < it.riferimento[0] <= chiusura.periodo_a:
-            it.rif = it.riferimento[3]
-            items.append(it)
+        it.rif = it.riferimento[3]
+        items.append(it)
     items.sort(key=lambda i: i.riferimento[0])
     return items
+
+
+def lavaggi_servito(chiusura):
+    """Lavaggi servito della giornata della chiusura (giorno dell'ordine)."""
+    return lavaggi_servito_giorno(chiusura.data)
+
+
+def transazioni_abbinabili(giorno):
+    """Transazioni da unita' operativa del giorno di calendario non
+    ancora abbinate: i candidati per i lavaggi servito di quel giorno."""
+    inizio, fine = _limiti_giorno(giorno)
+    return list(TransazionePortale.objects.filter(
+        orario__gte=inizio, orario__lt=fine,
+        origine='unita',
+        abbinamento__isnull=True,
+    ).order_by('orario'))
 
 
 def transazioni_libere(chiusura):
@@ -111,6 +141,11 @@ def _slot_liberi(item):
 
 
 def proponi(chiusura, tolleranza=TOLLERANZA_DEFAULT, items=None, libere=None):
+    """Proposte per i lavaggi servito della giornata della chiusura."""
+    return proponi_giorno(chiusura.data, tolleranza, items=items, libere=libere)
+
+
+def proponi_giorno(giorno, tolleranza=TOLLERANZA_DEFAULT, items=None, libere=None):
     """Proposte a giri di priorita' di programma, per vicinanza d'orario.
 
     Giro k: solo coppie in cui il programma della transazione e' il
@@ -119,8 +154,8 @@ def proponi(chiusura, tolleranza=TOLLERANZA_DEFAULT, items=None, libere=None):
     massimo una volta. Ritorna [{'item', 'transazione', 'delta_min'}]
     con delta_min = minuti tra transazione e completamento (o creazione).
     """
-    items = lavaggi_servito(chiusura) if items is None else items
-    libere = transazioni_libere(chiusura) if libere is None else libere
+    items = lavaggi_servito_giorno(giorno) if items is None else items
+    libere = transazioni_abbinabili(giorno) if libere is None else libere
 
     slots = []
     for it in items:
@@ -193,7 +228,7 @@ def riepilogo(chiusura, tolleranza=TOLLERANZA_DEFAULT):
       incassato (diverso dal listino se rettificato: omaggio, promo...).
     """
     items = lavaggi_servito(chiusura)
-    libere = transazioni_libere(chiusura)
+    libere = transazioni_abbinabili(chiusura.data)
     proposte = proponi(chiusura, tolleranza, items=items, libere=libere)
 
     proposte_per_item = {}
@@ -228,7 +263,14 @@ def riepilogo(chiusura, tolleranza=TOLLERANZA_DEFAULT):
 
     from apps.finanze.models import RettificaResiduo
 
-    residuo = [t for t in libere if t.pk not in proposte_tx]
+    # Residuo della finestra: escono anche le transazioni proposte per i
+    # lavaggi servito degli altri giorni che la finestra tocca (es. un
+    # ordine delle 19:45 del giorno prima, passato al portale dopo la
+    # chiusura cassa)
+    for giorno in _giorni_finestra(chiusura):
+        if giorno != chiusura.data:
+            proposte_tx |= {p['transazione'].pk for p in proponi_giorno(giorno, tolleranza)}
+    residuo = [t for t in transazioni_libere(chiusura) if t.pk not in proposte_tx]
     rettifiche = {r.transazione_id: r for r in RettificaResiduo.objects.filter(
         transazione__in=residuo).select_related('operatore')}
     righe_residuo = []
@@ -280,9 +322,9 @@ def abbina_manuale(chiusura, item_id, transazione_id, operatore=None):
         return False, 'Lavaggio servito non presente in questa chiusura.'
     if not _slot_liberi(item):
         return False, 'Il lavaggio ha gia\' tutti i suoi abbinamenti.'
-    t = next((t for t in transazioni_libere(chiusura) if t.pk == transazione_id), None)
+    t = next((t for t in transazioni_abbinabili(chiusura.data) if t.pk == transazione_id), None)
     if t is None:
-        return False, 'Transazione non disponibile (gia\' abbinata o fuori finestra).'
+        return False, 'Transazione non disponibile (gia\' abbinata o di un altro giorno).'
     if t.programma not in item.servizio_prodotto.lista_programmi_portale:
         return False, f'Programma P{t.programma} non compatibile con il servizio.'
     AbbinamentoPortale.objects.create(item=item, transazione=t, operatore=operatore)

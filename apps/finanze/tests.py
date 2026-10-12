@@ -120,13 +120,33 @@ class AbbinamentoPortaliTest(TestCase):
         proposte = ap.proponi(self.chiusura)
         self.assertEqual([p['transazione'].pk for p in proposte], [giusta.pk])
 
-    def test_tolleranza_e_finestra(self):
+    def test_tolleranza_e_giorno(self):
         self._item(self.completo, completato='17:30')
         self._tx('14:00', 7)                    # oltre 2h prima dell'obiettivo
-        TransazionePortale.objects.create(      # fuori finestra
-            portale='B', numero=13999, orario=ora('18:30'),
+        TransazionePortale.objects.create(      # giorno dopo: non abbinabile
+            portale='B', numero=13999, orario=ora('18:30') + timedelta(days=1),
             programma=4, origine='unita')
         self.assertEqual(ap.proponi(self.chiusura), [])
+
+    def test_servito_resta_nel_giorno_dell_ordine(self):
+        # Chiusura del 06 finisce alle 18:00. Ordine delle 19:31 del 06,
+        # passato al portale alle 19:40 (finestra del 07): resta nel 06.
+        tardo = self._item(self.completo, creato='19:31')
+        tx = self._tx('19:40', 8)
+        self.assertIn(tardo.pk, [i.pk for i in ap.lavaggi_servito(self.chiusura)])
+        self.assertEqual([(p['item'].pk, p['transazione'].pk) for p in ap.proponi(self.chiusura)],
+                         [(tardo.pk, tx.pk)])
+        # Nel report del 07 il lavaggio non c'e' e la transazione non e' residuo
+        domani = ChiusuraPortali.objects.create(
+            data=datetime(2026, 10, 7).date(), periodo_da=ora('18:00'),
+            periodo_a=ora('18:00') + timedelta(days=1))
+        r = ap.riepilogo(domani)
+        self.assertEqual(r['n_servito'], 0)
+        self.assertNotIn(tx.pk, [x['transazione'].pk for x in r['residuo']])
+        # una transazione libera dopo la chiusura resta residuo del 07
+        libera = self._tx('20:30', 1)
+        self.assertIn(libera.pk, [x['transazione'].pk for x in ap.riepilogo(domani)['residuo']])
+        self.assertNotIn(libera.pk, [x['transazione'].pk for x in ap.riepilogo(self.chiusura)['residuo']])
 
     def test_ripiego_p4_senza_coincidenza_orario(self):
         # Scoperto dopo i giri: prende il P4 libero piu' vicino, anche

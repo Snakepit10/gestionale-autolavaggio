@@ -1061,7 +1061,8 @@
       Abbinamento per priorit&agrave; di programma (ordine scritto nel catalogo, es. P8 &rarr; P9 &rarr; P7 &rarr; P4)
       cercando all'indietro dal <strong>completamento</strong> del lavoro, a partire da ~{{ abbinamento.anticipo_min }} min prima
       (fino a {{ abbinamento.tolleranza_ore|floatformat:0 }} h). Senza completamento registrato si usa l'ora di creazione dell'ordine.
-      Quello che resta libero sono i lavaggi pagati direttamente agli operatori.
+      I lavaggi del servito sono quelli degli <strong>ordini del giorno</strong> (anche dopo la chiusura cassa) e si abbinano alle transazioni dello stesso giorno;
+      il residuo segue la finestra di chiusura: quello che resta libero sono i lavaggi pagati direttamente agli operatori.
       {% if abbinamento.n_senza_completamento %}
       <span class="text-warning d-block mt-1"><i class="bi bi-exclamation-circle"></i>
         {{ abbinamento.n_senza_completamento }} lavagg{{ abbinamento.n_senza_completamento|pluralize:"io,i" }} senza completamento affidabile (non completat{{ abbinamento.n_senza_completamento|pluralize:"o,i" }} o chius{{ abbinamento.n_senza_completamento|pluralize:"o,i" }} in ritardo): abbinamento sull'ora di creazione, meno preciso.</span>
@@ -1161,7 +1162,7 @@
             </table>
           </div>
           {% else %}
-          <div class="text-muted small">Nessun lavaggio servito nella finestra di chiusura
+          <div class="text-muted small">Nessun lavaggio servito negli ordini del giorno
             (servizi con "Programmi portale compatibili" impostati nel catalogo).</div>
           {% endif %}
         </div>
