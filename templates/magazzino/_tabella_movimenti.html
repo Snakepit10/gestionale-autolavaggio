@@ -18,7 +18,8 @@
                 <td class="text-nowrap small">{{ m.data|date:"d/m/Y H:i" }}</td>
                 {% if not senza_articolo %}<td><a href="{% url 'magazzino:articolo' m.articolo_id %}" class="text-decoration-none">{{ m.articolo.nome }}</a></td>{% endif %}
                 <td><span class="badge {% if m.quantita > 0 %}bg-success-subtle text-success{% elif m.quantita < 0 %}bg-danger-subtle text-danger{% else %}bg-light text-muted{% endif %}">{{ m.get_tipo_display }}</span>
-                    {% if m.motivo %}<br><small class="text-danger">{{ m.get_motivo_display }}</small>{% endif %}</td>
+                    {% if m.motivo %}<br><small class="text-danger">{{ m.get_motivo_display }}</small>{% endif %}
+                    {% if m.posto %}<br><small class="text-muted"><i class="bi bi-geo"></i> {{ m.posto }}</small>{% endif %}</td>
                 <td class="text-end fw-semibold {% if m.quantita > 0 %}text-success{% elif m.quantita < 0 %}text-danger{% endif %}">{% if m.quantita > 0 %}+{% endif %}{{ m.quantita }}</td>
                 <td class="text-end {% if m.quantita_dopo < 0 %}qta-neg{% endif %}">{{ m.quantita_dopo }}</td>
                 <td class="small">

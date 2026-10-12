@@ -76,6 +76,7 @@ function apriArticolo(id, a) {
     document.getElementById('art-fornitore').value = a.fornitore || '';
     document.getElementById('art-note').value = a.note || '';
     document.getElementById('art-posto').value = a.posto || '';
+    document.getElementById('art-posto-vendita').value = a.posto_vendita || '';
     document.getElementById('art-posto-nuovo').value = '';
     sceltaPosto();
     USI_ARTICOLO.forEach(c => document.getElementById('art-' + c).checked = !!a[c]);
@@ -109,6 +110,7 @@ async function salvaArticolo() {
         traccia_scorte: document.getElementById('art-traccia').checked, costo: val('art-costo'),
         fornitore: val('art-fornitore') || null, note: val('art-note'),
         posto: val('art-posto') === '__nuovo' ? null : (val('art-posto') || null),
+        posto_vendita: val('art-posto-vendita') || null,
         posto_nuovo: val('art-posto') === '__nuovo' ? val('art-posto-nuovo') : '',
         ...Object.fromEntries(USI_ARTICOLO.map(c => [c, document.getElementById('art-' + c).checked])),
         diluizione: val('art-diluizione'), modo_uso: val('art-modo-uso'), avvertenze: val('art-avvertenze'),
@@ -182,11 +184,22 @@ const SPIEGA_MOVIMENTO = {
 };
 let movQuantitaAttuale = 0;
 
-function apriMovimento(id, nome, tipo, attuale, unitaPrezzo) {
-    movQuantitaAttuale = attuale;
-    document.getElementById('mov-costo-l').textContent = 'Costo ' + (unitaPrezzo ? 'al ' + unitaPrezzo : 'unitario') + ' (€)';
+// Giacenze per posto dell'articolo aperto ('' = senza posto)
+let movDati = {giacenze: {}};
+
+function apriMovimento(id, tipo, a) {
+    movDati = a;
+    document.getElementById('mov-costo-l').textContent = 'Costo al ' + (a.unita_prezzo || 'pezzo') + ' (€)';
     document.getElementById('mov-articolo').value = id;
-    document.getElementById('mov-titolo').textContent = nome + ' (ora ' + attuale + ')';
+    document.getElementById('mov-titolo').textContent = a.nome + ' (ora ' + a.quantita + ')';
+    // posto proposto: il principale, o quello con piu' merce per scarti e inventari
+    const conMerce = Object.entries(a.giacenze || {}).filter(([p, q]) => q > 0).sort((x, y) => y[1] - x[1]);
+    let posto = a.posto === '' || a.posto == null ? '' : String(a.posto);
+    if (tipo !== 'carico' && conMerce.length && !(posto in (a.giacenze || {}))) posto = conMerce[0][0];
+    const sel = document.getElementById('mov-posto');
+    sel.value = posto;
+    if (sel.value !== posto) sel.value = '';
+    cambiaPostoMovimento(true);
     document.getElementById('mov-' + tipo).checked = true;
     document.getElementById('mov-quantita').value = '';
     document.getElementById('mov-costo').value = '';
@@ -198,8 +211,23 @@ function apriMovimento(id, nome, tipo, attuale, unitaPrezzo) {
     setTimeout(() => document.getElementById('mov-quantita').focus(), 300);
 }
 
+function cambiaPostoMovimento(senzaTipo) {
+    const posto = document.getElementById('mov-posto').value;
+    movQuantitaAttuale = movDati.traccia === false ? 0 : ((movDati.giacenze || {})[posto] || 0);
+    const piuPosti = Object.values(movDati.giacenze || {}).filter(q => q).length > 1;
+    document.getElementById('mov-posto-l').textContent = 'Posto' + (piuPosti ? ' (qui: ' + movQuantitaAttuale + ')' : '');
+    if (!senzaTipo) {
+        if (document.querySelector('[name=mov-tipo]:checked').value === 'rettifica') {
+            document.getElementById('mov-quantita').value = Math.max(movQuantitaAttuale, 0);
+        }
+        aggiornaMotivo();
+    }
+}
+
 function tipoMovimento() {
     const tipo = document.querySelector('[name=mov-tipo]:checked').value;
+    document.getElementById('mov-posto-l').textContent = (tipo === 'carico' ? 'Entra in' : tipo === 'scarto' ? 'Esce da' : 'Posto contato')
+        + (Object.values(movDati.giacenze || {}).filter(q => q).length > 1 ? ' (qui: ' + movQuantitaAttuale + ')' : '');
     document.getElementById('mov-spiega').textContent = SPIEGA_MOVIMENTO[tipo];
     document.getElementById('mov-label-q').textContent = tipo === 'rettifica' ? 'Quantità contata' : 'Quantità';
     document.getElementById('mov-costo-box').classList.toggle('d-none', tipo !== 'carico');
@@ -231,6 +259,7 @@ async function salvaMovimento() {
     const j = await postJSON(URL_MOVIMENTO.replace('999999', id), {
         tipo: document.querySelector('[name=mov-tipo]:checked').value,
         quantita: document.getElementById('mov-quantita').value,
+        posto: document.getElementById('mov-posto').value,
         motivo: serveMotivo() ? document.getElementById('mov-motivo').value : '',
         costo: document.getElementById('mov-costo').value,
         nota: document.getElementById('mov-nota').value,

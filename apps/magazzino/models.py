@@ -88,8 +88,13 @@ class Articolo(models.Model):
         'core.ServizioProdotto', null=True, blank=True, on_delete=models.SET_NULL,
         related_name='articolo', verbose_name='Prodotto del catalogo',
         help_text='La vendita in cassa di questo prodotto scarica il magazzino')
+    # Dove entra la merce (carichi, consegne, rientri) e da dove esce per
+    # prima; la quantita' per posto sta nelle Giacenze
     posto = models.ForeignKey(Posto, null=True, blank=True, on_delete=models.SET_NULL,
-                              related_name='articoli')
+                              related_name='articoli', verbose_name='Posto principale')
+    # Prodotti in vendita: la vendita in cassa scarica prima da qui
+    posto_vendita = models.ForeignKey(Posto, null=True, blank=True, on_delete=models.SET_NULL,
+                                      related_name='articoli_vendita', verbose_name='Posto di vendita')
     # Destinazione d'uso (una o piu')
     uso_servito = models.BooleanField('Servito', default=False)
     uso_portale = models.BooleanField('Portale', default=False)
@@ -113,6 +118,11 @@ class Articolo(models.Model):
 
     def __str__(self):
         return self.nome
+
+    @property
+    def giacenze_elenco(self):
+        """Giacenze non a zero, in ordine di posto (usa il prefetch)."""
+        return [g for g in self.giacenze.all() if g.quantita]
 
     @property
     def usi(self):
@@ -208,6 +218,23 @@ class FotoArticolo(models.Model):
         verbose_name_plural = 'Foto articoli'
 
 
+class Giacenza(models.Model):
+    """Quanti pezzi di un articolo stanno in un posto (posto vuoto =
+    non indicato). La somma delle giacenze e' Articolo.quantita."""
+    articolo = models.ForeignKey(Articolo, on_delete=models.CASCADE, related_name='giacenze')
+    posto = models.ForeignKey(Posto, null=True, blank=True, on_delete=models.PROTECT, related_name='giacenze')
+    quantita = models.IntegerField(default=0)
+
+    class Meta:
+        verbose_name = 'Giacenza per posto'
+        verbose_name_plural = 'Giacenze per posto'
+        unique_together = [('articolo', 'posto')]
+        ordering = ['posto__ordine', 'posto__nome']
+
+    def __str__(self):
+        return f'{self.articolo} @ {self.posto or "senza posto"}: {self.quantita}'
+
+
 class Movimento(models.Model):
     TIPO_CHOICES = [
         ('carico', 'Carico'),
@@ -217,6 +244,7 @@ class Movimento(models.Model):
         ('rientro', 'Rientro'),
         ('scarto', 'Scarto'),
         ('rettifica', 'Rettifica inventario'),
+        ('spostamento', 'Spostamento tra posti'),
     ]
     # Perche' la merce esce (obbligatorio per scarti e ammanchi d'inventario)
     MOTIVO_CHOICES = [
@@ -230,6 +258,8 @@ class Movimento(models.Model):
     articolo = models.ForeignKey(Articolo, on_delete=models.CASCADE, related_name='movimenti')
     tipo = models.CharField(max_length=15, choices=TIPO_CHOICES)
     motivo = models.CharField(max_length=15, choices=MOTIVO_CHOICES, blank=True)
+    posto = models.ForeignKey(Posto, null=True, blank=True, on_delete=models.SET_NULL,
+                              related_name='movimenti')
     quantita = models.IntegerField(help_text='Positivo = entra in magazzino, negativo = esce')
     quantita_prima = models.IntegerField()
     quantita_dopo = models.IntegerField()

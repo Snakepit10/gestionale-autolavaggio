@@ -11,9 +11,9 @@
         {% if not articolo.attivo %}<span class="badge bg-light text-muted fs-6 align-middle">non attivo</span>{% endif %}
     </h1>
     <div class="d-flex gap-2 flex-wrap">
-        <button class="btn btn-outline-success" onclick="apriMovimento({{ articolo.pk }}, '{{ articolo.nome|escapejs }}', 'carico', {{ articolo.quantita }}, '{{ articolo.unita_prezzo|escapejs }}')"><i class="bi bi-box-arrow-in-down"></i> Carico</button>
-        <button class="btn btn-outline-danger" onclick="apriMovimento({{ articolo.pk }}, '{{ articolo.nome|escapejs }}', 'scarto', {{ articolo.quantita }})"><i class="bi bi-trash"></i> Scarto</button>
-        <button class="btn btn-outline-secondary" onclick="apriMovimento({{ articolo.pk }}, '{{ articolo.nome|escapejs }}', 'rettifica', {{ articolo.quantita }})"><i class="bi bi-clipboard-check"></i> Inventario</button>
+        <button class="btn btn-outline-success" onclick="apriMovimento({{ articolo.pk }}, 'carico', {{ articolo.dati_modifica }})"><i class="bi bi-box-arrow-in-down"></i> Carico</button>
+        <button class="btn btn-outline-danger" onclick="apriMovimento({{ articolo.pk }}, 'scarto', {{ articolo.dati_modifica }})"><i class="bi bi-trash"></i> Scarto</button>
+        <button class="btn btn-outline-secondary" onclick="apriMovimento({{ articolo.pk }}, 'rettifica', {{ articolo.dati_modifica }})"><i class="bi bi-clipboard-check"></i> Inventario</button>
         <a class="btn btn-outline-primary" href="{% url 'magazzino:assegnazioni' %}?articolo={{ articolo.pk }}"><i class="bi bi-person-badge"></i> Assegna</a>
         <button class="btn btn-primary" onclick="apriArticolo({{ articolo.pk }}, {{ articolo.dati_modifica }})"><i class="bi bi-pencil"></i> Modifica</button>
     </div>
@@ -60,6 +60,27 @@
                 </dl>
             </div>
         </div>
+
+        {% if articolo.traccia_scorte %}
+        <div class="section-card accent-blue">
+            <div class="section-title"><div class="label"><i class="bi bi-geo"></i> Dove si trova</div>
+                <button class="btn btn-sm btn-outline-primary" onclick="apriSposta()"><i class="bi bi-arrow-left-right"></i> Sposta</button></div>
+            <div class="section-body">
+                {% if articolo.giacenze_elenco %}
+                <table class="table table-sm mb-0">
+                    <tbody>
+                    {% for g in articolo.giacenze_elenco %}
+                        <tr><td>{{ g.posto|default:"Senza posto" }}
+                                {% if g.posto and g.posto == articolo.posto %}<span class="badge bg-light text-dark border">principale</span>{% endif %}
+                                {% if g.posto and g.posto == articolo.posto_vendita %}<span class="badge bg-primary-subtle text-primary">vendita</span>{% endif %}</td>
+                            <td class="text-end fw-semibold {% if g.quantita < 0 %}qta-neg{% endif %}">{{ g.quantita }} {{ articolo.unita }}</td></tr>
+                    {% endfor %}
+                    </tbody>
+                </table>
+                {% else %}<div class="p-3 text-muted small">Nessun pezzo in magazzino.</div>{% endif %}
+            </div>
+        </div>
+        {% endif %}
 
         <div class="section-card accent-green">
             <div class="section-title"><div class="label"><i class="bi bi-file-earmark-text"></i> Scheda tecnica</div></div>
@@ -113,8 +134,49 @@
 
 {% include 'magazzino/_modale_articolo.html' %}
 {% include 'magazzino/_modale_movimento.html' %}
+
+<div class="modal fade" id="modaleSposta" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header modal-clean"><h5 class="modal-title"><i class="bi bi-arrow-left-right"></i> Sposta {{ articolo.nome }}</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button></div>
+            <div class="modal-body">
+                <div class="row g-2">
+                    <div class="col-6"><label class="form-label">Da</label>
+                        <select class="form-select" id="sp-da">
+                            {% for g in articolo.giacenze_elenco %}{% if g.quantita > 0 %}<option value="{{ g.posto_id|default_if_none:'' }}">{{ g.posto|default:"Senza posto" }} ({{ g.quantita }})</option>{% endif %}{% endfor %}
+                        </select></div>
+                    <div class="col-6"><label class="form-label">A</label>
+                        <select class="form-select" id="sp-a">
+                            {% for p in posti %}<option value="{{ p.pk }}" {% if p == articolo.posto_vendita %}selected{% endif %}>{{ p.nome }}</option>{% endfor %}
+                            <option value="">Senza posto</option>
+                        </select></div>
+                    <div class="col-4"><label class="form-label">Quantità</label><input type="number" min="1" class="form-control" id="sp-q" value="1"></div>
+                    <div class="col-8"><label class="form-label">Nota</label><input type="text" class="form-control" id="sp-nota" maxlength="200"></div>
+                </div>
+                <div class="alert alert-danger d-none mt-3 mb-0" id="sp-errore"></div>
+            </div>
+            <div class="modal-footer"><button class="btn btn-secondary" data-bs-dismiss="modal">Annulla</button>
+                <button class="btn btn-primary" onclick="salvaSposta()"><i class="bi bi-check-circle"></i> Sposta</button></div>
+        </div>
+    </div>
+</div>
 {% endblock %}
 
 {% block extra_js_magazzino %}
 {% include 'magazzino/_js_articolo.html' %}
+<script>
+function apriSposta() {
+    document.getElementById('sp-errore').classList.add('d-none');
+    bootstrap.Modal.getOrCreateInstance(document.getElementById('modaleSposta')).show();
+}
+async function salvaSposta() {
+    const j = await postJSON("{% url 'magazzino:articolo-sposta' articolo.pk %}", {
+        da: document.getElementById('sp-da').value, a: document.getElementById('sp-a').value,
+        quantita: document.getElementById('sp-q').value, nota: document.getElementById('sp-nota').value,
+    });
+    if (!j.success) { const e = document.getElementById('sp-errore'); e.textContent = j.error; e.classList.remove('d-none'); return; }
+    location.reload();
+}
+</script>
 {% endblock %}

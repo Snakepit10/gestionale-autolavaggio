@@ -16,6 +16,13 @@
                     <label class="btn btn-outline-secondary" for="mov-rettifica"><i class="bi bi-clipboard-check"></i> Inventario</label>
                 </div>
                 <p class="small text-muted mb-2" id="mov-spiega"></p>
+                <div class="mb-2" id="mov-posto-box">
+                    <label class="form-label mb-0" id="mov-posto-l">Posto</label>
+                    <select class="form-select" id="mov-posto" onchange="cambiaPostoMovimento()">
+                        {% for p in posti %}<option value="{{ p.pk }}">{{ p.nome }}</option>{% endfor %}
+                        <option value="">Senza posto</option>
+                    </select>
+                </div>
                 <div class="row g-2">
                     <div class="col-6">
                         <label class="form-label" id="mov-label-q">Quantità</label>

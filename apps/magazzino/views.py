@@ -113,6 +113,11 @@ def _dati_modifica(a):
         'prezzo_vendita': _fmt(a.prodotto.prezzo) if a.prodotto_id else '',
         'categoria_catalogo': a.prodotto.categoria_id if a.prodotto_id else '',
         'posto': a.posto_id or '',
+        'posto_vendita': a.posto_vendita_id or '',
+        'quantita': a.quantita,
+        'traccia': a.traccia_scorte,
+        # pezzi per posto ('' = senza posto)
+        'giacenze': {str(g.posto_id or ''): g.quantita for g in a.giacenze.all()},
         **{campo: getattr(a, campo) for campo, _, _ in USI},
         'diluizione': a.diluizione, 'modo_uso': a.modo_uso, 'avvertenze': a.avvertenze,
         'link_produttore': a.link_produttore,
@@ -171,7 +176,8 @@ def _contesto_base(attiva):
 
 @magazzino_required
 def articoli(request):
-    qs = Articolo.objects.select_related('fornitore', 'prodotto', 'posto')
+    qs = (Articolo.objects.select_related('fornitore', 'prodotto', 'posto', 'posto_vendita')
+          .prefetch_related('giacenze__posto'))
     tipo = request.GET.get('tipo', '')
     categoria = request.GET.get('categoria', '')
     cerca = request.GET.get('q', '').strip()
@@ -180,9 +186,9 @@ def articoli(request):
     posto = request.GET.get('posto', '')
     uso = request.GET.get('uso', '')
     if posto == 'nessuno':
-        qs = qs.filter(posto__isnull=True)
+        qs = qs.filter(Q(posto__isnull=True) | Q(giacenze__posto__isnull=True, giacenze__quantita__gt=0)).distinct()
     elif posto:
-        qs = qs.filter(posto_id=posto)
+        qs = qs.filter(Q(posto_id=posto) | Q(giacenze__posto_id=posto, giacenze__quantita__gt=0)).distinct()
     if uso in {campo for campo, _, _ in USI}:
         qs = qs.filter(**{uso: True})
     if tipo:
@@ -218,7 +224,8 @@ def articoli(request):
 
 @magazzino_required
 def articolo_scheda(request, pk):
-    articolo = get_object_or_404(Articolo.objects.select_related('fornitore', 'prodotto', 'posto'), pk=pk)
+    articolo = get_object_or_404(Articolo.objects.select_related('fornitore', 'prodotto', 'posto', 'posto_vendita')
+                                 .prefetch_related('giacenze__posto'), pk=pk)
     articolo.dati_modifica = _dati_modifica(articolo)
     ctx = _contesto_base('articoli')
     ctx.update({
@@ -293,6 +300,8 @@ def articolo_salva(request):
                           or Posto.objects.create(nome=posto_nuovo))
     else:
         articolo.posto = Posto.objects.filter(pk=d.get('posto') or None).first()
+    articolo.posto_vendita = (Posto.objects.filter(pk=d.get('posto_vendita') or None).first()
+                              if articolo.tipo == 'vendita' else None)
 
     # Prodotto in vendita = prodotto del catalogo: prezzo e categoria in cassa
     prezzo_vendita = categoria_catalogo = None
@@ -330,12 +339,17 @@ def articolo_movimento(request, pk):
     nota = (d.get('nota') or '').strip()
     if quantita is None:
         return _errore('Quantità non valida')
+    # Posto del movimento: indicato dal modale ('' = senza posto); se manca
+    # decide il magazzino (posto principale)
+    posto = services.AUTO
+    if 'posto' in d:
+        posto = Posto.objects.filter(pk=d.get('posto') or None).first() if d.get('posto') else None
     # Merce che esce (scarto o inventario sotto la quantita' registrata):
     # il motivo e' obbligatorio, e con "Altro" anche la nota
     motivo = d.get('motivo') or ''
     articolo.refresh_from_db(fields=['quantita'])
-    esce = tipo == 'scarto' or (tipo == 'rettifica' and articolo.traccia_scorte
-                                and quantita < articolo.quantita)
+    attuale = articolo.quantita if posto is services.AUTO else services.giacenza(articolo, posto).quantita
+    esce = tipo == 'scarto' or (tipo == 'rettifica' and articolo.traccia_scorte and quantita < attuale)
     if esce:
         if motivo not in dict(Movimento.MOTIVO_CHOICES):
             return _errore('Indica il motivo')
@@ -346,7 +360,11 @@ def articolo_movimento(request, pk):
     if tipo == 'rettifica':
         if quantita < 0:
             return _errore('La quantità contata non può essere negativa')
-        mov = services.rettifica(articolo, quantita, operatore=request.user, nota=nota, motivo=motivo)
+        try:
+            mov = services.rettifica(articolo, quantita, operatore=request.user, nota=nota, motivo=motivo,
+                                     posto=posto)
+        except ValueError as e:
+            return _errore(str(e))
     elif tipo in ('carico', 'scarto'):
         if quantita <= 0:
             return _errore('Quantità non valida')
@@ -354,15 +372,32 @@ def articolo_movimento(request, pk):
             articolo.costo = articolo.a_pezzo(_decimale(d.get('costo')))
             articolo.save(update_fields=['costo'])
         mov = services.movimenta(articolo, quantita if tipo == 'carico' else -quantita, tipo,
-                                 operatore=request.user, nota=nota, motivo=motivo)
+                                 operatore=request.user, nota=nota, motivo=motivo, posto=posto)
     else:
         return _errore('Tipo di movimento non valido')
     return JsonResponse({'success': True, 'quantita': mov.quantita_dopo})
 
 
 @magazzino_required
+def articolo_sposta(request, pk):
+    """Sposta pezzi da un posto a un altro (JSON)."""
+    if request.method != 'POST':
+        return _errore('Metodo non consentito', 405)
+    articolo = get_object_or_404(Articolo, pk=pk)
+    d = _dati(request)
+    da = Posto.objects.filter(pk=d.get('da')).first() if d.get('da') else None
+    a = Posto.objects.filter(pk=d.get('a')).first() if d.get('a') else None
+    try:
+        services.sposta(articolo, da, a, _intero(d.get('quantita')), operatore=request.user,
+                        nota=(d.get('nota') or '').strip())
+    except ValueError as e:
+        return _errore(str(e))
+    return JsonResponse({'success': True})
+
+
+@magazzino_required
 def movimenti(request):
-    qs = Movimento.objects.select_related('articolo', 'operatore', 'ordine', 'consegna',
+    qs = Movimento.objects.select_related('articolo', 'operatore', 'ordine', 'consegna', 'posto',
                                           'assegnazione__utente', 'assegnazione__postazione')
     tipo = request.GET.get('tipo', '')
     articolo = request.GET.get('articolo', '')
@@ -429,7 +464,10 @@ def articolo_foto_carica(request, pk):
 
 @magazzino_required
 def posti(request):
-    lista = list(Posto.objects.annotate(n_articoli=Count('articoli', filter=Q(articoli__attivo=True))))
+    lista = list(Posto.objects.annotate(
+        n_articoli=Count('giacenze__articolo', filter=Q(giacenze__quantita__gt=0, giacenze__articolo__attivo=True),
+                         distinct=True),
+        n_pezzi=Sum('giacenze__quantita', filter=Q(giacenze__quantita__gt=0))))
     ctx = _contesto_base('posti')
     ctx.update({
         'posti': lista,
@@ -459,10 +497,18 @@ def posto_salva(request):
 
 @magazzino_required
 def posto_elimina(request, pk):
-    """Elimina un posto: i suoi articoli restano senza posto."""
+    """Elimina un posto: la sua merce passa a "senza posto" e gli
+    articoli che lo avevano come principale restano senza."""
     if request.method != 'POST':
         return _errore('Metodo non consentito', 405)
-    get_object_or_404(Posto, pk=pk).delete()
+    posto = get_object_or_404(Posto, pk=pk)
+    with transaction.atomic():
+        for g in list(posto.giacenze.all()):
+            senza = services.giacenza(g.articolo, None)
+            senza.quantita += g.quantita
+            senza.save(update_fields=['quantita'])
+            g.delete()
+        posto.delete()
     return JsonResponse({'success': True})
 
 

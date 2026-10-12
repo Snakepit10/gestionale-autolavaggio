@@ -660,3 +660,78 @@ class MotivoUscitaTest(TestCase):
         rotto = next(g for g in r['scarti'] if g['codice'] == 'rotto')
         self.assertEqual(rotto['articoli'][0]['note'], ['caduto dallo scaffale'])
         self.assertContains(_pagina(self.user, 'report'), 'Scarti e ammanchi per motivo')
+
+
+
+class GiacenzePerPostoTest(TestCase):
+    """Scorta divisa in piu' posti."""
+
+    def setUp(self):
+        from .models import Posto
+        self.user = utente_titolare('tit', password='x')
+        self.client.force_login(self.user)
+        self.magazzino = Posto.objects.create(nome='Magazzino')
+        self.cassa = Posto.objects.create(nome='Cassa')
+        self.a = Articolo.objects.create(nome='Profumo', posto=self.magazzino, posto_vendita=self.cassa)
+
+    def _q(self, posto):
+        return services.giacenza(self.a, posto).quantita
+
+    def test_carico_sposta_vendita(self):
+        services.movimenta(self.a, 10, 'carico')                       # entra nel principale
+        self.assertEqual((self._q(self.magazzino), self._q(self.cassa)), (10, 0))
+        services.sposta(self.a, self.magazzino, self.cassa, 5)
+        self.a.refresh_from_db()
+        self.assertEqual((self.a.quantita, self._q(self.magazzino), self._q(self.cassa)), (10, 5, 5))
+        with self.assertRaises(ValueError):
+            services.sposta(self.a, self.cassa, self.magazzino, 9)
+        # vendita: prima dalla cassa, poi dal magazzino
+        services.movimenta(self.a, -7, 'vendita', primo=self.cassa)
+        self.a.refresh_from_db()
+        self.assertEqual((self.a.quantita, self._q(self.cassa), self._q(self.magazzino)), (3, 0, 3))
+        ultimi = list(self.a.movimenti.filter(tipo='vendita').order_by('pk').values_list('posto__nome', 'quantita'))
+        self.assertEqual(ultimi, [('Cassa', -5), ('Magazzino', -2)])
+        # se finisce dappertutto va in negativo sul primo
+        services.movimenta(self.a, -5, 'vendita', primo=self.cassa)
+        self.assertEqual((self._q(self.magazzino), self._q(self.cassa)), (0, -2))
+
+    def test_vendita_in_cassa_usa_il_posto_di_vendita(self):
+        from apps.core.models import Categoria, ServizioProdotto
+        from apps.ordini.models import ItemOrdine, Ordine
+        prodotto = ServizioProdotto.objects.create(titolo='Profumo', categoria=Categoria.objects.create(nome='P'),
+                                                   prezzo=Decimal('5'), descrizione='', tipo='prodotto',
+                                                   quantita_disponibile=0)
+        a = prodotto.articolo
+        a.posto, a.posto_vendita = self.magazzino, self.cassa
+        a.save()
+        services.movimenta(a, 4, 'carico')
+        services.sposta(a, self.magazzino, self.cassa, 1)
+        ordine = Ordine.objects.create(totale=Decimal('5'), totale_finale=Decimal('5'))
+        ItemOrdine.objects.create(ordine=ordine, servizio_prodotto=prodotto, quantita=1, prezzo_unitario=Decimal('5'))
+        self.assertEqual((services.giacenza(a, self.cassa).quantita, services.giacenza(a, self.magazzino).quantita),
+                         (0, 3))
+
+    def test_inventario_e_scarto_per_posto(self):
+        services.movimenta(self.a, 10, 'carico')
+        services.sposta(self.a, self.magazzino, self.cassa, 4)
+        r = _post(self.client, 'articolo-movimento', {'tipo': 'rettifica', 'quantita': 3}, pk=self.a.pk)
+        self.assertEqual(r.status_code, 400)                            # in piu' posti: quale?
+        r = _post(self.client, 'articolo-movimento', {'tipo': 'rettifica', 'quantita': 3, 'posto': self.cassa.pk,
+                                                       'motivo': 'ammanco'}, pk=self.a.pk)
+        self.assertEqual(r.json()['quantita'], 9)
+        self.assertEqual(self._q(self.cassa), 3)
+        r = _post(self.client, 'articolo-movimento', {'tipo': 'scarto', 'quantita': 2, 'posto': self.magazzino.pk,
+                                                       'motivo': 'rotto'}, pk=self.a.pk)
+        self.assertEqual((r.json()['quantita'], self._q(self.magazzino)), (7, 4))
+        r = _post(self.client, 'articolo-sposta', {'da': self.magazzino.pk, 'a': self.cassa.pk, 'quantita': 1},
+                  pk=self.a.pk)
+        self.assertTrue(r.json()['success'])
+        self.assertEqual((self._q(self.magazzino), self._q(self.cassa)), (3, 4))
+        self.assertContains(_pagina(self.user, 'articolo', pk=self.a.pk), 'Dove si trova')
+
+    def test_elimina_posto_sposta_la_merce_su_senza_posto(self):
+        services.movimenta(self.a, 6, 'carico')
+        services.sposta(self.a, self.magazzino, self.cassa, 2)
+        _post(self.client, 'posto-elimina', pk=self.cassa.pk)
+        self.a.refresh_from_db()
+        self.assertEqual((self.a.quantita, self._q(None), self._q(self.magazzino)), (6, 2, 4))

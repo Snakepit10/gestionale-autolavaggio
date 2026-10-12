@@ -36,15 +36,22 @@
                                     <label class="form-label small mb-0">Prezzo di vendita (&euro;) *</label>
                                     <input type="text" inputmode="decimal" class="form-control" id="art-prezzo-vendita">
                                 </div>
-                                <div class="col-6 col-md-5">
+                                <div class="col-6 col-md-4">
                                     <label class="form-label small mb-0">Categoria in cassa *</label>
                                     <select class="form-select" id="art-categoria-catalogo">
                                         <option value="">—</option>
                                         {% for c in categorie_catalogo %}<option value="{{ c.pk }}">{{ c.nome }}</option>{% endfor %}
                                     </select>
                                 </div>
+                                <div class="col-12 col-md-4">
+                                    <label class="form-label small mb-0">Posto di vendita</label>
+                                    <select class="form-select" id="art-posto-vendita">
+                                        <option value="">come il principale</option>
+                                        {% for p in posti %}<option value="{{ p.pk }}">{{ p.nome }}</option>{% endfor %}
+                                    </select>
+                                </div>
                             </div>
-                            <small class="text-muted">Il prodotto in cassa è questo articolo: nome, prezzo e sottocategoria si aggiornano anche nel catalogo, la vendita scarica il magazzino.</small>
+                            <small class="text-muted">Il prodotto in cassa è questo articolo: nome, prezzo e sottocategoria si aggiornano anche nel catalogo. La vendita scarica prima dal posto di vendita, poi dagli altri.</small>
                         </div>
                     </div>
                     <div class="col-md-4">
@@ -106,7 +113,7 @@
                         </select>
                     </div>
                     <div class="col-md-6">
-                        <label class="form-label">Posto</label>
+                        <label class="form-label">Posto principale</label>
                         <select class="form-select" id="art-posto" onchange="sceltaPosto()">
                             <option value="">— nessuno —</option>
                             {% for p in posti %}<option value="{{ p.pk }}">{{ p.nome }}</option>{% endfor %}

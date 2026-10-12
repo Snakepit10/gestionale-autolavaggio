@@ -96,7 +96,7 @@
                             {% if a.in_cassa %}<i class="bi bi-shop text-primary ms-1" title="In vendita in cassa"></i>{% endif %}
                             {% if a.manca_in_cassa %}<span class="badge bg-warning text-dark ms-1 cursor-pointer" title="Manca il prezzo di vendita: aprilo e inseriscilo" onclick="apriArticolo({{ a.pk }}, {{ a.dati_modifica }})">non in cassa</span>{% endif %}
                             <br><small class="text-muted">{% if a.ha_contenuto %}{{ a.unita }} da {{ a.contenuto|floatformat:"-3" }} {{ a.unita_contenuto }} &middot; {% endif %}{% if a.codice %}{{ a.codice }} &middot; {% endif %}{{ a.categoria|default:"" }}</small>
-                            {% if a.posto or a.usi %}<br><small>{% if a.posto %}<span class="text-muted"><i class="bi bi-geo"></i> {{ a.posto }}</span>{% endif %}
+                            {% if a.posto or a.usi %}<br><small>{% if a.posto and a.giacenze_elenco|length < 2 %}<span class="text-muted"><i class="bi bi-geo"></i> {{ a.posto }}</span>{% endif %}
                                 {% for etichetta, sigla in a.usi %}<span class="badge bg-light text-dark border" title="{{ etichetta }}">{{ etichetta }}</span>{% endfor %}
                                 {% if a.ha_scheda %}<i class="bi bi-file-earmark-text text-success" title="Scheda tecnica compilata"></i>{% endif %}</small>{% endif %}
                         </td>
@@ -106,6 +106,7 @@
                                 <span class="{% if a.quantita < 0 %}qta-neg{% elif a.sotto_scorta %}text-danger fw-bold{% else %}fw-semibold{% endif %}">{{ a.quantita }}</span>
                                 <small class="text-muted">{{ a.unita }}</small>
                                 {% if a.ha_contenuto and a.quantita > 0 %}<br><small class="text-muted">{{ a.quantita_contenuto|floatformat:"-2" }} {{ a.unita_contenuto }}</small>{% endif %}
+                                {% if a.giacenze_elenco|length > 1 %}<br><small class="text-muted text-nowrap">{% for g in a.giacenze_elenco %}{{ g.quantita }} {{ g.posto|default:"senza posto" }}{% if not forloop.last %} &middot; {% endif %}{% endfor %}</small>{% endif %}
                                 {% if a.sotto_scorta %}<br><span class="badge bg-danger-subtle text-danger">sotto scorta</span>{% endif %}
                             {% else %}<span class="text-muted small">non tracciato</span>{% endif %}
                         </td>
@@ -116,8 +117,8 @@
                         <td class="text-end text-nowrap">{% if a.in_cassa %}<strong>&euro;{{ a.prodotto.prezzo|floatformat:2 }}</strong>{% elif a.tipo == 'vendita' %}<span class="text-muted">—</span>{% endif %}</td>
                         <td class="small">{{ a.fornitore|default:"" }}</td>
                         <td class="text-center text-nowrap">
-                            <button class="btn btn-sm btn-outline-success" title="Carico" onclick="apriMovimento({{ a.pk }}, '{{ a.nome|escapejs }}', 'carico', {{ a.quantita }}, '{{ a.unita_prezzo|escapejs }}')"><i class="bi bi-box-arrow-in-down"></i></button>
-                            <button class="btn btn-sm btn-outline-secondary" title="Inventario" onclick="apriMovimento({{ a.pk }}, '{{ a.nome|escapejs }}', 'rettifica', {{ a.quantita }})"><i class="bi bi-clipboard-check"></i></button>
+                            <button class="btn btn-sm btn-outline-success" title="Carico" onclick="apriMovimento({{ a.pk }}, 'carico', {{ a.dati_modifica }})"><i class="bi bi-box-arrow-in-down"></i></button>
+                            <button class="btn btn-sm btn-outline-secondary" title="Inventario" onclick="apriMovimento({{ a.pk }}, 'rettifica', {{ a.dati_modifica }})"><i class="bi bi-clipboard-check"></i></button>
                             <button class="btn btn-sm btn-outline-primary" title="Modifica" onclick="apriArticolo({{ a.pk }}, {{ a.dati_modifica }})"><i class="bi bi-pencil"></i></button>
                         </td>
                     </tr>

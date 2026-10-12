@@ -4,7 +4,10 @@ from io import BytesIO
 from django.db import transaction
 from django.utils import timezone
 
-from .models import Articolo, Assegnazione, FotoArticolo, Movimento, StatoAssegnazione
+from .models import Articolo, Assegnazione, FotoArticolo, Giacenza, Movimento, StatoAssegnazione
+
+# posto non indicato dal chiamante: lo sceglie movimenta
+AUTO = object()
 
 FOTO_LATO_MAX = 1000          # px
 FOTO_PESO_MAX = 20 * 1024 * 1024
@@ -41,32 +44,115 @@ def sincronizza_prodotto(articolo):
     )
 
 
+def giacenza(articolo, posto):
+    """Giacenza dell'articolo nel posto (None = senza posto), creata se manca."""
+    return Giacenza.objects.get_or_create(articolo=articolo, posto=posto)[0]
+
+
+def _ripartisci_uscita(articolo, quantita, primo):
+    """[(posto, pezzi)] da cui far uscire `quantita`: prima dal posto
+    `primo`, poi dagli altri posti con piu' merce; quello che manca va
+    in negativo sul primo (inventario da rettificare)."""
+    giacenze = list(Giacenza.objects.select_for_update().filter(articolo=articolo).select_related('posto'))
+    ordine = sorted(giacenze, key=lambda g: (g.posto_id != getattr(primo, 'pk', primo), -g.quantita))
+    parti, resta = [], quantita
+    for g in ordine:
+        if resta <= 0:
+            break
+        presi = min(max(g.quantita, 0), resta)
+        if presi:
+            parti.append((g.posto, presi))
+            resta -= presi
+    if resta:
+        for i, (posto, presi) in enumerate(parti):
+            if posto == primo:
+                parti[i] = (posto, presi + resta)
+                break
+        else:
+            parti.insert(0, (primo, resta))
+    return parti
+
+
 @transaction.atomic
 def movimenta(articolo, delta, tipo, operatore=None, nota='', ordine=None,
-              consegna=None, assegnazione=None, motivo=''):
+              consegna=None, assegnazione=None, motivo='', posto=AUTO, primo=AUTO):
     """Registra il movimento e aggiorna la quantita' (che puo' andare
-    sotto zero: segnala un inventario da rettificare). Per gli articoli
-    non tracciati il movimento resta nel registro ma la quantita' non
-    cambia."""
+    sotto zero: segnala un inventario da rettificare) e le giacenze per
+    posto. Per gli articoli non tracciati il movimento resta nel registro
+    ma la quantita' non cambia.
+
+    posto: il posto preciso (es. scarto o inventario di quel posto).
+    Altrimenti la merce entra nel `primo` (default: posto principale) ed
+    esce prima da li', poi dagli altri posti: in questo caso un'uscita
+    divisa su piu' posti scrive un movimento per posto. Ritorna l'ultimo.
+    """
     articolo = Articolo.objects.select_for_update().get(pk=articolo.pk)
-    prima = articolo.quantita
+    primo = articolo.posto if primo is AUTO else primo
+    if not articolo.traccia_scorte:
+        parti = [(None if posto is AUTO else posto, delta)]
+    elif posto is not AUTO:
+        parti = [(posto, delta)]
+    elif delta >= 0:
+        parti = [(primo, delta)]
+    else:
+        parti = [(p, -q) for p, q in _ripartisci_uscita(articolo, -delta, primo)]
+
+    mov = None
+    for posto_parte, quantita in parti:
+        prima = articolo.quantita
+        if articolo.traccia_scorte:
+            articolo.quantita = prima + quantita
+            g = giacenza(articolo, posto_parte)
+            g.quantita += quantita
+            g.save(update_fields=['quantita'])
+        mov = Movimento.objects.create(
+            articolo=articolo, tipo=tipo, quantita=quantita, quantita_prima=prima,
+            quantita_dopo=articolo.quantita, operatore=operatore, nota=nota[:255], motivo=motivo,
+            ordine=ordine, consegna=consegna, assegnazione=assegnazione, posto=posto_parte)
     if articolo.traccia_scorte:
-        articolo.quantita = prima + delta
         articolo.save(update_fields=['quantita'])
-    mov = Movimento.objects.create(
-        articolo=articolo, tipo=tipo, quantita=delta, quantita_prima=prima,
-        quantita_dopo=articolo.quantita, operatore=operatore, nota=nota[:255], motivo=motivo,
-        ordine=ordine, consegna=consegna, assegnazione=assegnazione)
     sincronizza_prodotto(articolo)
     return mov
 
 
-def rettifica(articolo, quantita_contata, operatore=None, nota='', motivo=''):
-    """Inventario: porta la quantita' al valore contato."""
-    articolo.refresh_from_db(fields=['quantita'])
-    delta = quantita_contata - articolo.quantita
+def rettifica(articolo, quantita_contata, operatore=None, nota='', motivo='', posto=AUTO):
+    """Inventario: porta al valore contato la quantita' di un posto
+    (o il totale, se l'articolo non e' diviso in posti)."""
+    articolo.refresh_from_db(fields=['quantita', 'posto'])
+    if posto is AUTO:
+        posto = articolo.posto
+        if articolo.giacenze.exclude(posto=posto).exclude(quantita=0).exists():
+            raise ValueError("L'articolo è in più posti: indica quale posto hai contato")
+        attuale = articolo.quantita
+    else:
+        attuale = giacenza(articolo, posto).quantita
+    delta = quantita_contata - attuale
+    dove = f' ({posto})' if posto else ''
     return movimenta(articolo, delta, 'rettifica', operatore=operatore, motivo=motivo if delta < 0 else '',
-                     nota=nota or f'Inventario: contati {quantita_contata}')
+                     posto=posto, nota=nota or f'Inventario{dove}: contati {quantita_contata}')
+
+
+@transaction.atomic
+def sposta(articolo, da, a, quantita, operatore=None, nota=''):
+    """Sposta pezzi da un posto a un altro: il totale non cambia."""
+    if quantita <= 0:
+        raise ValueError('Quantità non valida')
+    if da == a:
+        raise ValueError('Scegli due posti diversi')
+    articolo = Articolo.objects.select_for_update().get(pk=articolo.pk)
+    origine = giacenza(articolo, da)
+    if quantita > origine.quantita:
+        raise ValueError(f'In {da or "senza posto"} ci sono solo {origine.quantita} {articolo.unita}')
+    destinazione = giacenza(articolo, a)
+    origine.quantita -= quantita
+    destinazione.quantita += quantita
+    origine.save(update_fields=['quantita'])
+    destinazione.save(update_fields=['quantita'])
+    testo = f'{da or "senza posto"} → {a or "senza posto"}' + (f' · {nota}' if nota else '')
+    for posto, q in ((da, -quantita), (a, quantita)):
+        Movimento.objects.create(articolo=articolo, tipo='spostamento', quantita=q,
+                                 quantita_prima=articolo.quantita, quantita_dopo=articolo.quantita,
+                                 operatore=operatore, nota=testo[:255], posto=posto)
 
 
 def articolo_del_prodotto(prodotto):
@@ -132,7 +218,8 @@ def scarica_vendita(prodotto, delta, ordine=None, operatore=None, nota=''):
     articolo = articolo_del_prodotto(prodotto)
     if articolo is None or not delta:
         return None
-    return movimenta(articolo, delta, 'vendita', operatore=operatore, ordine=ordine, nota=nota)
+    return movimenta(articolo, delta, 'vendita', operatore=operatore, ordine=ordine, nota=nota,
+                     primo=articolo.posto_vendita or articolo.posto)
 
 
 # ---------------------------------------------------------------------------

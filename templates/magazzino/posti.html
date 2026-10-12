@@ -15,23 +15,24 @@
         {% if posti %}
         <div class="table-responsive">
             <table class="table table-hover">
-                <thead><tr><th>Posto</th><th>Descrizione</th><th class="text-end">Articoli</th><th></th></tr></thead>
+                <thead><tr><th>Posto</th><th>Descrizione</th><th class="text-end">Articoli</th><th class="text-end">Pezzi</th><th></th></tr></thead>
                 <tbody>
                 {% for p in posti %}
                     <tr class="{% if not p.attivo %}text-muted{% endif %}">
                         <td><strong>{{ p.nome }}</strong>{% if not p.attivo %} <span class="badge bg-light text-muted">non attivo</span>{% endif %}</td>
                         <td class="small">{{ p.descrizione }}</td>
                         <td class="text-end">{% if p.n_articoli %}<a href="{% url 'magazzino:articoli' %}?posto={{ p.pk }}">{{ p.n_articoli }}</a>{% else %}0{% endif %}</td>
+                        <td class="text-end">{{ p.n_pezzi|default:0 }}</td>
                         <td class="text-end text-nowrap">
                             <button class="btn btn-sm btn-outline-primary" title="Modifica"
                                 onclick="apriPosto({{ p.pk }}, '{{ p.nome|escapejs }}', '{{ p.descrizione|escapejs }}', {{ p.ordine }}, {{ p.attivo|yesno:'true,false' }})"><i class="bi bi-pencil"></i></button>
-                            <button class="btn btn-sm btn-outline-danger" title="Elimina" onclick="eliminaPosto({{ p.pk }}, '{{ p.nome|escapejs }}', {{ p.n_articoli }})"><i class="bi bi-trash"></i></button>
+                            <button class="btn btn-sm btn-outline-danger" title="Elimina" onclick="eliminaPosto({{ p.pk }}, '{{ p.nome|escapejs }}', {{ p.n_pezzi|default:0 }})"><i class="bi bi-trash"></i></button>
                         </td>
                     </tr>
                 {% endfor %}
                 </tbody>
                 {% if senza_posto %}
-                <tfoot><tr><td colspan="2"><a href="{% url 'magazzino:articoli' %}?posto=nessuno">Articoli senza posto</a></td><td class="text-end">{{ senza_posto }}</td><td></td></tr></tfoot>
+                <tfoot><tr><td colspan="2"><a href="{% url 'magazzino:articoli' %}?posto=nessuno">Articoli senza posto</a></td><td class="text-end">{{ senza_posto }}</td><td></td><td></td></tr></tfoot>
                 {% endif %}
             </table>
         </div>
@@ -87,7 +88,7 @@ async function salvaPosto() {
     location.reload();
 }
 async function eliminaPosto(id, nome, n) {
-    if (!confirm(`Eliminare il posto "${nome}"?` + (n ? ` I suoi ${n} articoli resteranno senza posto.` : ''))) return;
+    if (!confirm(`Eliminare il posto "${nome}"?` + (n ? ` I ${n} pezzi che contiene passano a "senza posto".` : ''))) return;
     const j = await postJSON("{% url 'magazzino:posto-elimina' 999999 %}".replace('999999', id));
     if (!j.success) { alert(j.error); return; }
     location.reload();
