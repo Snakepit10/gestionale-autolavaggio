@@ -643,3 +643,21 @@ class SpeseCassaTest(TestCase):
         self.client.force_login(User.objects.create_user('cliente', password='x'))
         self.aggiungi()
         self.assertFalse(self.SpesaCassa.objects.exists())
+
+
+class SelfServiceQuadraturaTest(TestCase):
+    """Nella quadratura il self service atteso e' incasso totale - ricarica."""
+
+    def test_incasso_meno_ricarica(self):
+        from datetime import date
+
+        from apps.finanze.models import Cassa, ChiusuraCassaAutomatica
+        from apps.finanze.views import _saldo_giornata
+        giorno = date(2026, 10, 6)
+        cassa = Cassa.objects.create(nome='Cambia gettoni', tipo='automatica')
+        ChiusuraCassaAutomatica.objects.create(
+            cassa=cassa, data=giorno, incasso_totale=Decimal('500'), incasso_ricarica=Decimal('100'),
+            vendita_contante=Decimal('350'), vendita_non_contante=Decimal('20'))
+        quadratura, _ = _saldo_giornata(giorno)
+        self.assertEqual(quadratura['vendita_self_service'], Decimal('400'))
+        self.assertEqual(quadratura['totale_teorico'], Decimal('400'))

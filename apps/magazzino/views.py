@@ -980,6 +980,24 @@ def dati_report(dal, al):
         riga['costo'] += s.quantita * a.articolo.costo
     problemi = sorted(problemi.values(), key=lambda r: (-r['costo'], r['destinatario']))
 
+    # Scarti e ammanchi d'inventario per motivo
+    motivi = OrderedDict((k, {'codice': k, 'nome': v, 'quantita': 0, 'costo': Decimal('0'), 'articoli': OrderedDict()})
+                         for k, v in Movimento.MOTIVO_CHOICES)
+    for m in (Movimento.objects.filter(periodo, quantita__lt=0).exclude(motivo='')
+              .select_related('articolo').order_by('articolo__nome')):
+        gruppo = motivi[m.motivo]
+        costo = (-m.quantita * m.articolo.costo).quantize(Decimal('0.01'))
+        gruppo['quantita'] -= m.quantita
+        gruppo['costo'] += costo
+        riga = gruppo['articoli'].setdefault(m.articolo_id, {'articolo': m.articolo, 'quantita': 0,
+                                                            'costo': Decimal('0'), 'note': []})
+        riga['quantita'] -= m.quantita
+        riga['costo'] += costo
+        if m.nota and not m.nota.startswith('Inventario: contati'):
+            riga['note'].append(m.nota)
+    scarti = sorted(({**g, 'articoli': list(g['articoli'].values())} for g in motivi.values() if g['quantita']),
+                    key=lambda g: -g['costo'])
+
     # Acquisti per fornitore (consegne ricevute)
     acquisti = OrderedDict()
     for r in (RigaConsegna.objects.filter(consegna__data__gte=dal, consegna__data__lte=al)
@@ -1006,6 +1024,8 @@ def dati_report(dal, al):
         'totale_consumi': sum((g['costo'] for g in consumi), Decimal('0')),
         'problemi': problemi,
         'totale_problemi': sum((r['costo'] for r in problemi), Decimal('0')),
+        'scarti': scarti,
+        'totale_scarti': sum((g['costo'] for g in scarti), Decimal('0')),
         'acquisti': acquisti,
         'totale_acquisti': sum((r['importo'] for r in acquisti), Decimal('0')),
         'costo_consumabili': Decimal(costo_consumabili).quantize(Decimal('0.01')),

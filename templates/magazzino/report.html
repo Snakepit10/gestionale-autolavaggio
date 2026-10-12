@@ -22,6 +22,7 @@
         <div class="v">{% if costo_per_lavaggio is not None %}&euro;{{ costo_per_lavaggio }}{% else %}—{% endif %}</div>
         <small class="text-muted">&euro;{{ costo_consumabili }} su {{ n_lavaggi }} ordini</small></div></div>
     <div class="col-6 col-md-3"><div class="kpi"><div class="l">Usurati / rotti / smarriti</div><div class="v {% if totale_problemi %}text-danger{% endif %}">&euro;{{ totale_problemi|floatformat:2 }}</div></div></div>
+    <div class="col-6 col-md-3"><div class="kpi"><div class="l">Scarti e ammanchi</div><div class="v {% if totale_scarti %}text-danger{% endif %}">&euro;{{ totale_scarti|floatformat:2 }}</div></div></div>
     <div class="col-6 col-md-3"><div class="kpi"><div class="l">Acquisti (consegne)</div><div class="v">&euro;{{ totale_acquisti|floatformat:2 }}</div></div></div>
 </div>
 
@@ -63,6 +64,30 @@
                     </tbody>
                 </table>
                 {% else %}<div class="p-3 text-muted small">Nessuna segnalazione nel periodo.</div>{% endif %}
+            </div>
+        </div>
+
+        <div class="section-card accent-red">
+            <div class="section-title"><div class="label"><i class="bi bi-trash"></i> Scarti e ammanchi per motivo</div>
+                <a href="{% url 'magazzino:movimenti' %}?dal={{ dal|date:'Y-m-d' }}&al={{ al|date:'Y-m-d' }}" class="small">movimenti</a></div>
+            <div class="section-body">
+                {% if scarti %}
+                <table class="table table-sm">
+                    <thead><tr><th>Articolo</th><th class="text-end">Qtà</th><th class="text-end">Valore</th></tr></thead>
+                    {% for g in scarti %}
+                    <tbody>
+                        <tr class="table-light"><td><strong>{{ g.nome }}</strong>
+                            <a href="{% url 'magazzino:movimenti' %}?motivo={{ g.codice }}&dal={{ dal|date:'Y-m-d' }}&al={{ al|date:'Y-m-d' }}" class="small ms-1">dettaglio</a></td>
+                            <td class="text-end fw-bold">{{ g.quantita }}</td><td class="text-end fw-bold">&euro;{{ g.costo|floatformat:2 }}</td></tr>
+                        {% for r in g.articoli %}
+                        <tr><td class="ps-4">{{ r.articolo.nome }}{% if r.note %}<div class="small text-muted">{{ r.note|join:" · " }}</div>{% endif %}</td>
+                            <td class="text-end">{{ r.quantita }} {{ r.articolo.unita }}</td><td class="text-end">&euro;{{ r.costo|floatformat:2 }}</td></tr>
+                        {% endfor %}
+                    </tbody>
+                    {% endfor %}
+                    <tfoot><tr><td>Totale</td><td></td><td class="text-end">&euro;{{ totale_scarti|floatformat:2 }}</td></tr></tfoot>
+                </table>
+                {% else %}<div class="p-3 text-muted small">Nessuno scarto o ammanco nel periodo.</div>{% endif %}
             </div>
         </div>
 

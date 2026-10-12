@@ -1074,8 +1074,11 @@ def report_giornata(request):
 
     # ==================== QUADRATURA GIORNALIERA COMPLESSIVA ====================
     contesto_portali = _contesto_lavaggi_portali(data)
+    # Self service atteso in cassa = incasso totale - ricarica di ogni cassa:
+    # la ricarica la fanno gli operatori con i soldi del fondo cassa, il
+    # resto resta in cassa finche' il cliente non porta il ticket di resto.
     quadratura, spese_cassa, totale_spese_cassa = _quadratura_giornata(
-        data, cassa_servito, agg['vendita_totale'], totale_servito,
+        data, cassa_servito, agg['incasso_vendita'], totale_servito,
         contesto_portali['abbinamento']['valore_residuo'])
 
     # ==================== PIE CHART TOTALE GIORNATA ====================
@@ -1581,8 +1584,9 @@ def _saldo_giornata(data):
     cassa_servito = ChiusuraCassa.objects.filter(data=data).first()
     if cassa_servito:
         cassa_servito.ricalcola_totali()
+    # come nel report giornata: incasso totale - ricarica di ogni cassa
     vendita_self_service = sum(
-        (c.vendita_totale for c in ChiusuraCassaAutomatica.objects
+        (c.incasso_vendita for c in ChiusuraCassaAutomatica.objects
          .filter(data=data, cassa__modalita_registratore=False)),
         Decimal('0.00'))
     if cassa_servito:

@@ -216,7 +216,7 @@
         {% if quadratura.obj %}Modifica{% else %}Inserisci{% endif %} quadratura
       </a>
     </div>
-    <div class="panel-sub">Conta tutti i contanti scassettati + totale lettore carte servito, confronta con vendita self-service + ordini POS</div>
+    <div class="panel-sub">Conta tutti i contanti scassettati + totale lettore carte servito, confronta con self service (incasso &minus; ricarica) + ordini POS</div>
     <div class="panel-body">
 
       {% if quadratura.obj %}
@@ -255,7 +255,8 @@
           <div class="p-3" style="background:#f8fafc; border-radius:8px; border-left:4px solid #14b8a6;">
             <div class="text-muted small fw-bold text-uppercase mb-2"><i class="bi bi-calculator"></i> Atteso (teorico)</div>
             <div class="d-flex justify-content-between small mb-1">
-              <span>Vendita self-service (automatiche)</span>
+              <span>Self service: incasso &minus; ricarica casse
+                <div class="text-muted" style="font-size:.75rem">&euro;{{ agg.incasso_totale|floatformat:2 }} &minus; &euro;{{ agg.incasso_ricarica|floatformat:2 }} (la ricarica viene dal fondo cassa)</div></span>
               <span class="fw-bold">&euro;{{ quadratura.vendita_self_service|floatformat:2 }}</span>
             </div>
             <div class="d-flex justify-content-between small mb-1">
@@ -364,7 +365,7 @@
         </a>
         <div class="alert alert-info small mt-3 mb-0 text-start">
           <strong>Teorico atteso per oggi:</strong>
-          vendita self-service &euro;{{ quadratura.vendita_self_service|floatformat:2 }}
+          self service (incasso &minus; ricarica) &euro;{{ quadratura.vendita_self_service|floatformat:2 }}
           + servito POS &euro;{{ quadratura.totale_servito|floatformat:2 }}
           {% if quadratura.totale_crediti_pregressi %}(di cui crediti pregressi &euro;{{ quadratura.totale_crediti_pregressi|floatformat:2 }}){% endif %}
           = <strong>&euro;{{ quadratura.totale_teorico|floatformat:2 }}</strong>

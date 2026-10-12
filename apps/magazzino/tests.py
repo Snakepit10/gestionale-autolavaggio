@@ -639,3 +639,24 @@ class MotivoUscitaTest(TestCase):
         # filtro nel registro
         pagina = _pagina(self.user, 'movimenti')
         self.assertContains(pagina, 'Ammanco / smarrito')
+
+
+    def test_report_scarti_per_motivo(self):
+        from django.utils import timezone
+
+        from .views import dati_report
+        self.a.costo = Decimal('2')
+        self.a.save()
+        self._mov(tipo='scarto', quantita=2, motivo='rotto', nota='caduto dallo scaffale')
+        self._mov(tipo='scarto', quantita=1, motivo='scaduto')
+        self._mov(tipo='rettifica', quantita=4, motivo='ammanco')     # 10-3=7 -> 4: ammanco 3
+        oggi = timezone.localdate()
+        r = dati_report(oggi, oggi)
+        per_motivo = {g['codice']: (g['quantita'], g['costo']) for g in r['scarti']}
+        self.assertEqual(per_motivo, {'rotto': (2, Decimal('4.00')), 'scaduto': (1, Decimal('2.00')),
+                                      'ammanco': (3, Decimal('6.00'))})
+        self.assertEqual(r['totale_scarti'], Decimal('12.00'))
+        self.assertEqual(r['scarti'][0]['codice'], 'ammanco')       # il piu' costoso in cima
+        rotto = next(g for g in r['scarti'] if g['codice'] == 'rotto')
+        self.assertEqual(rotto['articoli'][0]['note'], ['caduto dallo scaffale'])
+        self.assertContains(_pagina(self.user, 'report'), 'Scarti e ammanchi per motivo')
