@@ -8,7 +8,7 @@ from datetime import datetime, time, timedelta
 from decimal import Decimal
 import json
 
-from .models import ChiusuraCassa, MovimentoCassa, Cassa, ChiusuraCassaAutomatica, QuadraturaGiornaliera, SpesaCassa
+from .models import ChiusuraCassa, MovimentoCassa, Cassa, ChiusuraCassaAutomatica, QuadraturaGiornaliera, SpesaCassa, TicketResto
 from .services import abbinamento_portali, allinea_scontrini, import_washtec
 
 # Metodi che non finiscono nel conteggio fisico della quadratura
@@ -1199,11 +1199,14 @@ def _quadratura_giornata(data, cassa_servito, vendita_self_service, totale_servi
     # si sommano al reale.
     spese_cassa = list(SpesaCassa.objects.filter(data=data).select_related('operatore'))
     totale_spese_cassa = sum((s.importo for s in spese_cassa), Decimal('0.00'))
+    # Ticket di resto ripagati con i contanti della cassa: idem
+    ticket_resto = list(TicketResto.objects.filter(data=data).select_related('operatore'))
+    totale_ticket_resto = sum((t.importo for t in ticket_resto), Decimal('0.00'))
 
     if quadratura_obj:
         fondo_cassa_iniziale = quadratura_obj.fondo_cassa_iniziale
         lordo_reale = quadratura_obj.contanti_totali + quadratura_obj.lettore_carte_servito
-        totale_reale = quadratura_obj.totale_reale + totale_spese_cassa
+        totale_reale = quadratura_obj.totale_reale + totale_spese_cassa + totale_ticket_resto
         differenza_quadratura = totale_reale - totale_teorico
         if abs(differenza_quadratura) < Decimal('0.50'):
             stato_quadratura = 'ok'
@@ -1230,6 +1233,8 @@ def _quadratura_giornata(data, cassa_servito, vendita_self_service, totale_servi
         'totale_teorico': totale_teorico,
         'fondo_cassa_iniziale': fondo_cassa_iniziale,
         'spese_cassa': totale_spese_cassa,
+        'ticket_resto': totale_ticket_resto,
+        'ticket_resto_lista': ticket_resto,
         'lordo_reale': lordo_reale,
         'totale_reale': totale_reale,
         'differenza': differenza_quadratura,
@@ -1543,7 +1548,7 @@ def riepilogo_saldi_portali(request):
     giorni = []
     tot = {'reale': Decimal('0.00'), 'teorico': Decimal('0.00'),
            'operatori': Decimal('0.00'), 'differenza': Decimal('0.00'),
-           'spese': Decimal('0.00'), 'n_quadrature': 0, 'n_ok': 0,
+           'spese': Decimal('0.00'), 'ticket': Decimal('0.00'), 'n_quadrature': 0, 'n_ok': 0,
            'n_portali_ok': 0, 'n_portali': 0}
     g = primo
     while g <= min(ultimo, oggi):
@@ -1565,6 +1570,7 @@ def riepilogo_saldi_portali(request):
             tot['operatori'] += quadratura['residuo_operatori']
             tot['differenza'] += quadratura['differenza']
             tot['spese'] += quadratura['spese_cassa']
+            tot['ticket'] += quadratura['ticket_resto']
         if riga['portali_con_scontrini']:
             tot['n_portali'] += 1
             tot['n_portali_ok'] += riga['portali_tornano']
@@ -1678,6 +1684,45 @@ def azione_spese_cassa(request):
             return redirect(torna)
         spesa.delete()
         messages.success(request, 'Spesa eliminata.')
+    return redirect(torna)
+
+
+@login_required
+@user_passes_test(is_staff_user)
+def azione_ticket_resto(request):
+    """POST dal report giornata: registra o elimina un ticket di resto
+    ripagato con i contanti della cassa (data del pagamento e importo)."""
+    from django.urls import reverse
+
+    data_str = request.POST.get('data', '')
+    torna = f"{reverse('finanze:report_giornata')}?data={data_str}#ticket-resto"
+    if request.method != 'POST':
+        return redirect('finanze:report_giornata')
+    azione = request.POST.get('azione')
+    if azione == 'aggiungi':
+        try:
+            giorno = datetime.strptime(request.POST.get('data_pagamento') or data_str, '%Y-%m-%d').date()
+            importo = Decimal((request.POST.get('importo') or '').replace(',', '.'))
+        except (ValueError, ArithmeticError):
+            messages.error(request, 'Data o importo del ticket non validi.')
+            return redirect(torna)
+        if importo <= 0:
+            messages.error(request, "L'importo deve essere maggiore di zero.")
+            return redirect(torna)
+        if giorno > timezone.localdate():
+            messages.error(request, 'La data del pagamento non può essere nel futuro.')
+            return redirect(torna)
+        TicketResto.objects.create(data=giorno, importo=importo.quantize(Decimal('0.01')),
+                                   nota=request.POST.get('nota', '').strip()[:100], operatore=request.user)
+        messages.success(request, f'Ticket di resto di €{importo:.2f} pagato il {giorno:%d/%m/%Y} registrato'
+                                  f'{"" if giorno.isoformat() == data_str else " (conta nella quadratura di quel giorno)"}.')
+    elif azione == 'elimina':
+        ticket = get_object_or_404(TicketResto, pk=request.POST.get('ticket_id'))
+        if not (request.user.is_superuser or ticket.operatore_id == request.user.id):
+            messages.error(request, "Solo chi l'ha inserito o l'amministratore può eliminare il ticket.")
+            return redirect(torna)
+        ticket.delete()
+        messages.success(request, 'Ticket di resto eliminato.')
     return redirect(torna)
 
 

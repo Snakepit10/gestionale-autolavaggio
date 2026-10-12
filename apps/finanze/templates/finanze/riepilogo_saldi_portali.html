@@ -79,6 +79,7 @@
             <th class="num">Pagati operatori</th>
             <th class="num">Differenza</th>
             <th class="num">Spese cassa</th>
+            <th class="num">Ticket resto</th>
             <th>Portali (scontrino / WashTec)</th>
             <th></th>
           </tr>
@@ -103,6 +104,7 @@
             </td>
             {% endif %}
             <td class="num">{% if r.q.spese_cassa %}&euro;{{ r.q.spese_cassa|floatformat:2 }}{% else %}<span class="text-muted">—</span>{% endif %}</td>
+            <td class="num">{% if r.q.ticket_resto %}&euro;{{ r.q.ticket_resto|floatformat:2 }}{% else %}<span class="text-muted">—</span>{% endif %}</td>
             <td class="portale-check">
               {% if not r.portali_con_scontrini %}
                 <span class="text-muted">scontrini non registrati</span>
@@ -132,6 +134,7 @@
             <td class="num">&euro;{{ tot.operatori|floatformat:2 }}</td>
             <td class="num">{% if tot.differenza > 0 %}+{% endif %}&euro;{{ tot.differenza|floatformat:2 }}</td>
             <td class="num">&euro;{{ tot.spese|floatformat:2 }}</td>
+            <td class="num">&euro;{{ tot.ticket|floatformat:2 }}</td>
             <td colspan="2" class="small text-muted fw-normal">I totali di reale, teorico e differenza contano solo i giorni con quadratura inserita.</td>
           </tr>
         </tfoot>

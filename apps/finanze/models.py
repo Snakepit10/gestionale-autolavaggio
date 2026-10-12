@@ -696,6 +696,27 @@ class QuadraturaGiornaliera(models.Model):
         return self.contanti_totali + self.lettore_carte_servito - self.fondo_cassa_iniziale
 
 
+class TicketResto(models.Model):
+    """Ticket di resto delle casse automatiche ripagato al cliente con i
+    contanti della cassa: nella quadratura si somma al reale (come le
+    spese), perche' quei soldi mancano dal conteggio."""
+    data = models.DateField('Data pagamento', default=timezone.localdate, db_index=True)
+    importo = models.DecimalField(
+        max_digits=8, decimal_places=2, validators=[MinValueValidator(Decimal('0.01'))])
+    nota = models.CharField(max_length=100, blank=True, help_text='N. ticket, cassa...')
+    operatore = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, blank=True,
+                                  related_name='ticket_resto')
+    creato_il = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        verbose_name = 'Ticket di resto pagato'
+        verbose_name_plural = 'Ticket di resto pagati'
+        ordering = ['data', 'creato_il']
+
+    def __str__(self):
+        return f"Ticket resto {self.data:%d/%m/%Y} €{self.importo}"
+
+
 class SpesaCassa(models.Model):
     """Costo sostenuto in giornata pagando con i contanti presi dalla
     cassa: nella quadratura si somma al reale, perche' quei soldi

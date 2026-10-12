@@ -661,3 +661,35 @@ class SelfServiceQuadraturaTest(TestCase):
         quadratura, _ = _saldo_giornata(giorno)
         self.assertEqual(quadratura['vendita_self_service'], Decimal('400'))
         self.assertEqual(quadratura['totale_teorico'], Decimal('400'))
+
+
+class TicketRestoTest(TestCase):
+    """Ticket di resto ripagati dalla cassa: si sommano al reale."""
+
+    def test_ticket_in_quadratura(self):
+        from datetime import date
+
+        from apps.finanze.models import QuadraturaGiornaliera, TicketResto
+        from apps.finanze.views import _saldo_giornata
+        giorno = date(2026, 10, 6)
+        QuadraturaGiornaliera.objects.create(data=giorno, contanti_totali=Decimal('100'))
+        admin = User.objects.create_superuser('boss', 'b@x.it', 'x')
+        self.client.force_login(admin)
+        url = reverse('finanze:azione_ticket_resto')
+        self.client.post(url, {'data': '2026-10-07', 'azione': 'aggiungi', 'data_pagamento': '2026-10-06',
+                               'importo': '4,50', 'nota': 'ticket 123'})
+        self.client.post(url, {'data': '2026-10-06', 'azione': 'aggiungi', 'importo': '2'})
+        self.assertEqual(TicketResto.objects.filter(data=giorno).count(), 2)
+        quadratura, _ = _saldo_giornata(giorno)
+        self.assertEqual(quadratura['ticket_resto'], Decimal('6.50'))
+        reale_base = QuadraturaGiornaliera.objects.get(data=giorno).totale_reale
+        self.assertEqual(quadratura['totale_reale'], reale_base + Decimal('6.50'))
+        # validazioni: importo zero o data futura
+        self.client.post(url, {'data': '2026-10-06', 'azione': 'aggiungi', 'importo': '0'})
+        self.client.post(url, {'data': '2026-10-06', 'azione': 'aggiungi', 'importo': '5',
+                               'data_pagamento': '2099-01-01'})
+        self.assertEqual(TicketResto.objects.count(), 2)
+        # elimina
+        t = TicketResto.objects.get(importo=Decimal('2'))
+        self.client.post(url, {'data': '2026-10-06', 'azione': 'elimina', 'ticket_id': t.pk})
+        self.assertEqual(TicketResto.objects.count(), 1)
