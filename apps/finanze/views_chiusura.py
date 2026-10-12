@@ -178,15 +178,13 @@ def _azione(request, giorno):
 # Tipi della distinta cartacea, nell'ordine delle caselle
 TIPI_DISTINTA = ['Resto', 'Ricarica', 'Omaggio', 'Promo', 'Spese', 'Extra']
 RIGHE_DISTINTA = 22
-TAGLI_BANCONOTE = ['500', '200', '100', '50', '20', '10', '5']
-TAGLI_MONETE = ['2', '1', '0,50', '0,20', '0,10', '0,05', '0,02', '0,01']
 
 
 @login_required
 def distinta_chiusura(request):
     """Distinta cartacea della chiusura giornata (A4 fronte/retro): sul
     fronte i movimenti (gia' registrati + righe vuote), sul retro il
-    conteggio della cassa per tagli. ?vuota=1 per un modulo in bianco."""
+    conteggio della cassa. ?vuota=1 per un modulo in bianco."""
     giorno = _data(request)
     vuota = request.GET.get('vuota') == '1'
     quadratura = QuadraturaGiornaliera.objects.filter(data=giorno).first()
@@ -210,6 +208,4 @@ def distinta_chiusura(request):
         'quadratura': None if vuota else quadratura,
         'righe': righe,
         'tipi': TIPI_DISTINTA,
-        'banconote': TAGLI_BANCONOTE,
-        'monete': TAGLI_MONETE,
     })

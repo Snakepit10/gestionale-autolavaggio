@@ -19,22 +19,18 @@ h2 { font-size:15px; margin:0 0 8px; }
 table { width:100%; border-collapse:collapse; }
 th, td { border:1px solid #333; padding:0 6px; height:26px; vertical-align:middle; }
 th { background:#e5e7eb; font-size:10px; text-transform:uppercase; letter-spacing:.3px; height:24px; }
-td.tipi { white-space:nowrap; font-size:10.5px; width:52%; }
-td.tipi span { display:inline-block; margin-right:7px; }
-.box { display:inline-block; width:11px; height:11px; border:1.3px solid #111; vertical-align:-1px; margin-right:2px; text-align:center; line-height:10px; font-size:10px; font-weight:bold; }
-td.imp { width:17%; text-align:right; font-weight:bold; }
+td.tipi { width:25%; padding:2px 4px; font-size:9px; line-height:1.25; }
+td.tipi .griglia { display:grid; grid-template-columns:repeat(3, auto); gap:1px 5px; white-space:nowrap; }
+.box { display:inline-block; width:9px; height:9px; border:1.2px solid #111; vertical-align:-1px; margin-right:2px; text-align:center; line-height:8px; font-size:8px; font-weight:bold; }
+td.imp { width:15%; text-align:right; font-weight:bold; }
 td.descr { font-size:11.5px; }
 .riepilogo { display:grid; grid-template-columns: repeat(6, 1fr); gap:6px; margin-top:12px; }
 .riepilogo .campo { min-height:40px; padding:4px 6px; }
 .firma { display:flex; justify-content:space-between; margin-top:16px; gap:20px; }
 .firma div { flex:1; border-top:1px solid #333; padding-top:3px; font-size:10px; color:#555; text-align:center; }
-.conteggio { display:grid; grid-template-columns: 1fr 1fr; gap:14px; }
-.conteggio td { height:30px; }
-.conteggio td.taglio { width:28%; font-weight:bold; text-align:right; }
-.conteggio td.x { width:8%; text-align:center; color:#777; border-left:none; border-right:none; }
-.totali td { height:34px; font-size:13px; }
+.totali td { height:40px; font-size:13px; }
 .totali td.et { width:60%; font-weight:bold; }
-.nota { border:1px solid #333; border-radius:4px; min-height:70px; padding:6px 8px; margin-top:12px; }
+.nota { border:1px solid #333; border-radius:4px; min-height:110px; padding:6px 8px; margin-top:12px; }
 .nota .et { font-size:10px; text-transform:uppercase; color:#555; }
 .azioni { text-align:center; margin:12px; }
 .azioni button { font-size:14px; padding:8px 18px; }
@@ -67,7 +63,7 @@ td.descr { font-size:11.5px; }
         <tbody>
         {% for r in righe %}
             <tr>
-                <td class="tipi">{% for t in tipi %}<span><span class="box">{% if r and r.tipo == t %}&#10003;{% endif %}</span>{{ t }}</span>{% endfor %}</td>
+                <td class="tipi"><div class="griglia">{% for t in tipi %}<span><span class="box">{% if r and r.tipo == t %}&#10003;{% endif %}</span>{{ t }}</span>{% endfor %}</div></td>
                 <td class="descr">{% if r %}{{ r.descrizione }}{% endif %}</td>
                 <td class="imp">{% if r %}{{ r.importo|floatformat:2 }}{% endif %}</td>
             </tr>
@@ -85,32 +81,11 @@ td.descr { font-size:11.5px; }
 {# ======================= RETRO ======================= #}
 <div class="foglio retro">
     <h2>CONTEGGIO CASSA {% if data %}&mdash; {{ data|date:"d/m/Y" }}{% endif %}</h2>
-    <div class="sotto">Conta tutti i contanti scassettati dalle macchine e dal registratore insieme: pezzi &times; taglio = totale</div>
-
-    <div class="conteggio">
-        <table>
-            <thead><tr><th>Banconote</th><th></th><th>Pezzi</th><th>Totale &euro;</th></tr></thead>
-            <tbody>
-            {% for b in banconote %}
-                <tr><td class="taglio">&euro; {{ b }}</td><td class="x">&times;</td><td></td><td></td></tr>
-            {% endfor %}
-                <tr><td class="taglio" colspan="3">Totale banconote</td><td></td></tr>
-            </tbody>
-        </table>
-        <table>
-            <thead><tr><th>Monete</th><th></th><th>Pezzi</th><th>Totale &euro;</th></tr></thead>
-            <tbody>
-            {% for m in monete %}
-                <tr><td class="taglio">&euro; {{ m }}</td><td class="x">&times;</td><td></td><td></td></tr>
-            {% endfor %}
-                <tr><td class="taglio" colspan="3">Totale monete</td><td></td></tr>
-            </tbody>
-        </table>
-    </div>
+    <div class="sotto">Conta tutti i contanti scassettati dalle macchine e dal registratore insieme</div>
 
     <table class="totali" style="margin-top:14px">
         <tbody>
-            <tr><td class="et">Contanti totali contati (banconote + monete)</td><td></td></tr>
+            <tr><td class="et">Contanti totali contati</td><td></td></tr>
             <tr><td class="et">Lettore carte POS servito (totale scontrino POS)</td><td></td></tr>
             <tr><td class="et">&minus; Cassa iniziale (fondo)</td><td>{% if quadratura.fondo_cassa_iniziale %}{{ quadratura.fondo_cassa_iniziale|floatformat:2 }}{% endif %}</td></tr>
             <tr><td class="et">= Totale reale</td><td></td></tr>
