@@ -105,6 +105,32 @@ def lavaggi_servito_giorno(giorno):
     for it in candidati:
         it.riferimento = _riferimento(it)
         it.rif = it.riferimento[3]
+        it.manuale = False
+        items.append(it)
+
+    # Ordini del servito senza servizi con programmi portale: compaiono
+    # comunque (un lavaggio per ordine, sul primo servizio) e si abbinano
+    # solo a mano; se non li abbina nessuno restano non associati.
+    con_programmi = {it.ordine_id for it in items}
+    altri = (
+        ItemOrdine.objects
+        .filter(servizio_prodotto__programmi_portale='', servizio_prodotto__tipo='servizio')
+        .exclude(ordine__stato='annullato')
+        .exclude(ordine__vendita_prodotti=True)
+        .exclude(ordine_id__in=con_programmi)
+        .filter(ordine__data_ora__gte=inizio, ordine__data_ora__lt=fine)
+        .select_related('ordine__cliente', 'servizio_prodotto')
+        .prefetch_related('abbinamenti_portale__transazione', 'ordine__items__servizio_prodotto')
+        .order_by('ordine_id', 'pk')
+    )
+    visti = set()
+    for it in altri:
+        if it.ordine_id in visti:
+            continue
+        visti.add(it.ordine_id)
+        it.riferimento = _riferimento(it)
+        it.rif = it.riferimento[3]
+        it.manuale = True
         items.append(it)
     items.sort(key=lambda i: i.riferimento[0])
     return items
@@ -137,7 +163,10 @@ def transazioni_libere(chiusura):
 
 
 def _slot_liberi(item):
-    return max(0, item.quantita - len(item.abbinamenti_portale.all()))
+    """Transazioni che l'item puo' ancora ricevere: una per pezzo, una
+    sola per gli ordini senza programmi (abbinati a mano)."""
+    posti = 1 if getattr(item, 'manuale', False) else item.quantita
+    return max(0, posti - len(item.abbinamenti_portale.all()))
 
 
 def proponi(chiusura, tolleranza=TOLLERANZA_DEFAULT, items=None, libere=None):
@@ -242,15 +271,22 @@ def riepilogo(chiusura, tolleranza=TOLLERANZA_DEFAULT):
         confermati = list(it.abbinamenti_portale.all())
         n_confermati += len(confermati)
         prop = proposte_per_item.get(it.pk, [])
-        scoperti = max(0, it.quantita - len(confermati) - len(prop))
         priorita = it.servizio_prodotto.programmi_portale_ordinati
         obiettivo = it.riferimento[0]
         compatibili = []
-        if _slot_liberi(it):
-            compatibili = sorted(
-                (t for t in libere if t.programma in priorita),
-                key=lambda t: (priorita.index(t.programma),
-                               abs((t.orario - obiettivo).total_seconds())))
+        if it.manuale:
+            # senza programmi: nessuna proposta, si sceglie tra tutte le
+            # transazioni libere del giorno, dalla piu' vicina d'orario
+            scoperti = 0
+            if _slot_liberi(it):
+                compatibili = sorted(libere, key=lambda t: abs((t.orario - obiettivo).total_seconds()))
+        else:
+            scoperti = max(0, it.quantita - len(confermati) - len(prop))
+            if _slot_liberi(it):
+                compatibili = sorted(
+                    (t for t in libere if t.programma in priorita),
+                    key=lambda t: (priorita.index(t.programma),
+                                   abs((t.orario - obiettivo).total_seconds())))
         righe.append({
             'item': it, 'rif': it.riferimento[3],
             'rif_tipo': it.riferimento[2],
@@ -259,6 +295,7 @@ def riepilogo(chiusura, tolleranza=TOLLERANZA_DEFAULT):
             'proposte': prop,
             'scoperti': scoperti,
             'compatibili': compatibili,
+            'manuale': it.manuale,
         })
 
     from apps.finanze.models import RettificaResiduo
@@ -285,7 +322,9 @@ def riepilogo(chiusura, tolleranza=TOLLERANZA_DEFAULT):
 
     return {
         'righe': righe,
-        'n_servito': sum(it.quantita for it in items),
+        'n_servito': sum(it.quantita for it in items if not it.manuale),
+        'n_manuali': sum(1 for it in items if it.manuale),
+        'n_manuali_aperti': sum(1 for r in righe if r['manuale'] and not r['confermati']),
         'n_confermati': n_confermati,
         'n_proposte': len(proposte),
         'n_scoperti': sum(r['scoperti'] for r in righe),
@@ -325,7 +364,7 @@ def abbina_manuale(chiusura, item_id, transazione_id, operatore=None):
     t = next((t for t in transazioni_abbinabili(chiusura.data) if t.pk == transazione_id), None)
     if t is None:
         return False, 'Transazione non disponibile (gia\' abbinata o di un altro giorno).'
-    if t.programma not in item.servizio_prodotto.lista_programmi_portale:
+    if not item.manuale and t.programma not in item.servizio_prodotto.lista_programmi_portale:
         return False, f'Programma P{t.programma} non compatibile con il servizio.'
     AbbinamentoPortale.objects.create(item=item, transazione=t, operatore=operatore)
     return True, 'Abbinamento salvato.'

@@ -1103,6 +1103,7 @@
         <span class="text-success"><i class="bi bi-check-circle-fill"></i> {{ abbinamento.n_confermati }} confermati</span>
         <span class="text-primary"><i class="bi bi-lightbulb"></i> {{ abbinamento.n_proposte }} proposti</span>
         {% if abbinamento.n_scoperti %}<span class="text-warning"><i class="bi bi-question-circle"></i> {{ abbinamento.n_scoperti }} senza transazione</span>{% endif %}
+        {% if abbinamento.n_manuali %}<span class="text-secondary" title="Ordini con servizi senza programmi portale nel catalogo: si abbinano solo a mano"><i class="bi bi-hand-index"></i> {{ abbinamento.n_manuali }} ordini senza programmi{% if abbinamento.n_manuali_aperti %} ({{ abbinamento.n_manuali_aperti }} da abbinare a mano){% endif %}</span>{% endif %}
         <span class="text-danger"><i class="bi bi-person-badge"></i> {{ abbinamento.residuo|length }} residui = &euro;{{ abbinamento.valore_residuo|floatformat:2 }}</span>
         {% if abbinamento.n_proposte %}
         <form method="post" action="{% url 'finanze:azione_abbinamento_portali' %}" class="ms-auto">
@@ -1127,7 +1128,7 @@
               </thead>
               <tbody>
                 {% for r in abbinamento.righe %}
-                <tr>
+                <tr{% if r.manuale and not r.confermati %} class="table-light"{% endif %}>
                   <td>
                     <a href="{% url 'ordini:ordine-detail' r.item.ordine.pk %}">#{{ r.item.ordine.numero_progressivo|slice:"-4:" }}</a>
                     <div class="small"><i class="bi bi-person text-muted"></i> {{ r.item.ordine.cliente|default:"—" }}</div>
@@ -1145,7 +1146,7 @@
                     <div class="small text-muted">+ {{ altro.servizio_prodotto.titolo }}{% if altro.quantita > 1 %} &times;{{ altro.quantita }}{% endif %}</div>
                     {% endif %}{% endfor %}
                   </td>
-                  <td class="text-muted small">{% for p in r.programmi %}P{{ p }}{% if not forloop.last %}/{% endif %}{% endfor %}</td>
+                  <td class="text-muted small">{% if r.manuale %}<span class="badge bg-light text-secondary border" title="Nessun servizio dell'ordine ha programmi portale nel catalogo">a mano</span>{% else %}{% for p in r.programmi %}P{{ p }}{% if not forloop.last %}/{% endif %}{% endfor %}{% endif %}</td>
                   <td>
                     {% for a in r.confermati %}
                     <form method="post" action="{% url 'finanze:azione_abbinamento_portali' %}" class="d-flex align-items-center gap-1 mb-1">
@@ -1169,6 +1170,9 @@
                     {% if r.scoperti %}
                     <div class="small text-warning mb-1"><i class="bi bi-question-circle"></i> {{ r.scoperti }} senza transazione compatibile</div>
                     {% endif %}
+                    {% if r.manuale and not r.confermati %}
+                    <div class="small text-muted mb-1">Non associato: se &egrave; passato dal portale scegli la transazione, altrimenti lascialo cos&igrave;.</div>
+                    {% endif %}
                     {% if r.compatibili %}
                     <form method="post" action="{% url 'finanze:azione_abbinamento_portali' %}" class="d-flex gap-1">
                       {% csrf_token %}
@@ -1191,8 +1195,7 @@
             </table>
           </div>
           {% else %}
-          <div class="text-muted small">Nessun lavaggio servito negli ordini del giorno
-            (servizi con "Programmi portale compatibili" impostati nel catalogo).</div>
+          <div class="text-muted small">Nessun ordine del servito in questo giorno.</div>
           {% endif %}
         </div>
 

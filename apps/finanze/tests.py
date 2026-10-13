@@ -235,6 +235,37 @@ class AbbinamentoPortaliTest(TestCase):
                                        ap.riepilogo(self.chiusura)['valore_residuo'])
         self.assertEqual(q['residuo_operatori'], Decimal('30.00'))
 
+    def test_ordini_senza_programmi_si_abbinano_a_mano(self):
+        cat = self.completo.categoria
+        sottoscocca = ServizioProdotto.objects.create(titolo='Lavaggio sottoscocca', categoria=cat,
+                                                      prezzo=Decimal('15'), descrizione='')
+        prodotto = ServizioProdotto.objects.create(titolo='Profumo', categoria=cat, prezzo=Decimal('5'),
+                                                   descrizione='', tipo='prodotto')
+        item = self._item(sottoscocca, completato='12:00')
+        ItemOrdine.objects.create(ordine=item.ordine, servizio_prodotto=sottoscocca, quantita=1,
+                                  prezzo_unitario=Decimal('15'))         # stesso ordine: una riga sola
+        solo_prodotto = Ordine.objects.create(totale=Decimal('5'), totale_finale=Decimal('5'))
+        Ordine.objects.filter(pk=solo_prodotto.pk).update(data_ora=ora('13:00'))
+        ItemOrdine.objects.create(ordine=solo_prodotto, servizio_prodotto=prodotto, quantita=1,
+                                  prezzo_unitario=Decimal('5'))
+        tx = self._tx('11:40', 3)
+
+        r = ap.riepilogo(self.chiusura)
+        manuali = [x for x in r['righe'] if x['manuale']]
+        self.assertEqual(len(manuali), 1)                                   # niente ordine di soli prodotti
+        self.assertEqual((r['n_manuali'], r['n_manuali_aperti'], r['n_scoperti'], r['n_proposte']), (1, 1, 0, 0))
+        self.assertEqual([t.pk for t in manuali[0]['compatibili']], [tx.pk])  # qualsiasi programma
+        self.assertIn(tx.pk, [x['transazione'].pk for x in r['residuo']])       # non associato: resta residuo
+
+        ok, _ = ap.abbina_manuale(self.chiusura, manuali[0]['item'].pk, tx.pk)
+        self.assertTrue(ok)
+        r = ap.riepilogo(self.chiusura)
+        self.assertNotIn(tx.pk, [x['transazione'].pk for x in r['residuo']])
+        self.assertEqual(r['n_manuali_aperti'], 0)
+        altra = self._tx('11:50', 4)
+        ok, _ = ap.abbina_manuale(self.chiusura, manuali[0]['item'].pk, altra.pk)
+        self.assertFalse(ok)                                                # una sola transazione
+
     def test_conferma_idempotente(self):
         self._item(self.completo, completato='10:30')
         self._tx('10:05', 4)
