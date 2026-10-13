@@ -279,13 +279,17 @@ class AbbinamentoPortaliTest(TestCase):
         item = self._item(self.a_mano, completato='10:30')
         p4 = self._tx('10:05', 4)
         p5 = self._tx('11:30', 5)
+        # a mano si sceglie anche un programma fuori standard (P4 su un
+        # completo a mano, standard P5): nell'elenco viene dopo i P5
+        riga = next(r for r in ap.riepilogo(self.chiusura)['righe'] if r['item'].pk == item.pk)
+        self.assertEqual([t.pk for t in riga['compatibili']], [p5.pk, p4.pk])
         ok, _ = ap.abbina_manuale(self.chiusura, item.pk, p4.pk)
-        self.assertFalse(ok)                    # programma incompatibile
-        ok, _ = ap.abbina_manuale(self.chiusura, item.pk, p5.pk)
         self.assertTrue(ok)
         item2 = self._item(self.a_mano, completato='12:10')
-        ok, _ = ap.abbina_manuale(self.chiusura, item2.pk, p5.pk)
+        ok, _ = ap.abbina_manuale(self.chiusura, item2.pk, p4.pk)
         self.assertFalse(ok)                    # transazione gia' usata
+        # le proposte automatiche restano sui programmi standard
+        self.assertEqual([p['transazione'].pk for p in ap.proponi(self.chiusura)], [p5.pk])
 
     def test_endpoint_conferma_e_rimuovi(self):
         user = utente_titolare('op', 'op@x.it', 'x', is_staff=True)

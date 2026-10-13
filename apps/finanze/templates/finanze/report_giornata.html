@@ -1182,7 +1182,7 @@
                       <select name="transazione_id" class="form-select form-select-sm" style="max-width:230px;">
                         <option value="">Abbina a mano&hellip;</option>
                         {% for t in r.compatibili %}
-                        <option value="{{ t.pk }}">{{ t.portale }} #{{ t.numero }} · {{ t.orario|date:"d/m H:i" }} · P{{ t.programma }}</option>
+                        <option value="{{ t.pk }}">{{ t.portale }} #{{ t.numero }} · {{ t.orario|date:"d/m H:i" }} · P{{ t.programma }}{% if not r.manuale and t.programma not in r.programmi %} (fuori standard){% endif %}</option>
                         {% endfor %}
                       </select>
                       <button type="submit" class="btn btn-outline-primary btn-sm"><i class="bi bi-link"></i></button>

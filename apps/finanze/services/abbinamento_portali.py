@@ -283,9 +283,13 @@ def riepilogo(chiusura, tolleranza=TOLLERANZA_DEFAULT):
         else:
             scoperti = max(0, it.quantita - len(confermati) - len(prop))
             if _slot_liberi(it):
+                # a mano si puo' scegliere anche un programma fuori standard:
+                # prima quelli del servizio (per priorita'), poi gli altri,
+                # sempre dal piu' vicino d'orario
                 compatibili = sorted(
-                    (t for t in libere if t.programma in priorita),
-                    key=lambda t: (priorita.index(t.programma),
+                    libere,
+                    key=lambda t: (t.programma not in priorita,
+                                   priorita.index(t.programma) if t.programma in priorita else 0,
                                    abs((t.orario - obiettivo).total_seconds())))
         righe.append({
             'item': it, 'rif': it.riferimento[3],
@@ -364,7 +368,5 @@ def abbina_manuale(chiusura, item_id, transazione_id, operatore=None):
     t = next((t for t in transazioni_abbinabili(chiusura.data) if t.pk == transazione_id), None)
     if t is None:
         return False, 'Transazione non disponibile (gia\' abbinata o di un altro giorno).'
-    if not item.manuale and t.programma not in item.servizio_prodotto.lista_programmi_portale:
-        return False, f'Programma P{t.programma} non compatibile con il servizio.'
     AbbinamentoPortale.objects.create(item=item, transazione=t, operatore=operatore)
     return True, 'Abbinamento salvato.'
