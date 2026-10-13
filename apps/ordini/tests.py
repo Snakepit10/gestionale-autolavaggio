@@ -208,3 +208,77 @@ class VenditaProdottiCrudTest(TestCase):
         req.user = self.user
         with self.assertRaises(Http404):
             vendita_pagamento(req, pk=ordine.pk)
+
+
+class StatiLiberiTest(TestCase):
+    """Ordini completati modificabili e cambi di stato senza restrizioni."""
+
+    def setUp(self):
+        from apps.core.models import Categoria, ServizioProdotto
+        cat = Categoria.objects.create(nome='Servito')
+        self.lavaggio = ServizioProdotto.objects.create(titolo='Lavaggio', categoria=cat, prezzo=Decimal('10'),
+                                                        descrizione='', tipo='servizio')
+        self.user = utente_titolare('op', 'op@x.it', 'x', is_staff=True)
+        self.client.force_login(self.user)
+        self.ordine = Ordine.objects.create(totale=Decimal('20'), totale_finale=Decimal('20'))
+        from apps.ordini.models import ItemOrdine
+        self.items = [ItemOrdine.objects.create(ordine=self.ordine, servizio_prodotto=self.lavaggio, quantita=1,
+                                                prezzo_unitario=Decimal('10')) for _ in range(2)]
+
+    def _stato(self, stato):
+        return self.client.post(reverse('ordini:cambia-stato', args=[self.ordine.pk]),
+                                data=json.dumps({'stato': stato}), content_type='application/json').json()
+
+    def test_riaprire_un_ordine_completato_o_annullato(self):
+        self.assertTrue(self._stato('completato')['success'])
+        self.assertTrue(self._stato('in_lavorazione')['success'])      # prima vietato
+        self.ordine.refresh_from_db()
+        self.assertEqual(self.ordine.stato, 'in_lavorazione')
+        self.assertEqual({i.stato for i in self.ordine.items.all()}, {'in_lavorazione'})
+        self.assertTrue(self._stato('annullato')['success'])
+        self.assertTrue(self._stato('in_attesa')['success'])
+        self.assertFalse(self._stato('in_attesa')['success'])          # gia' in questo stato
+
+    def test_stato_pagamento_libero(self):
+        url = reverse('ordini:cambia-stato-pagamento', args=[self.ordine.pk])
+        for stato in ('pagato', 'non_pagato', 'parziale', 'differito'):
+            r = self.client.post(url, data=json.dumps({'stato_pagamento': stato}), content_type='application/json').json()
+            self.assertTrue(r['success'], stato)
+
+    def test_servizio_completato_si_elimina(self):
+        self._stato('completato')
+        r = self.client.post(reverse('ordini:elimina-item-ordine', args=[self.ordine.pk]),
+                             data=json.dumps({'item_id': self.items[0].pk}), content_type='application/json')
+        self.assertTrue(r.json()['success'])
+        self.assertEqual(self.ordine.items.count(), 1)
+
+    def test_pagina_ordine_completato(self):
+        """La scheda ordine si apre (prima andava in errore) e su un ordine
+        completato offre modifica e tutti i cambi di stato."""
+        import re
+        import subprocess
+        import tempfile
+
+        from django.contrib.messages.storage.fallback import FallbackStorage
+        from django.test import RequestFactory
+
+        from apps.ordini.views import OrdineDetailView
+        Ordine.objects.filter(pk=self.ordine.pk).update(stato='completato', stato_pagamento='pagato')
+        req = RequestFactory().get('/')
+        req.user = self.user
+        req.session = {}
+        req._messages = FallbackStorage(req)
+        html = OrdineDetailView.as_view()(req, pk=self.ordine.pk).render().content.decode()
+        for testo in ('mostraModalModifica()', "cambiaStato('in_lavorazione')", "cambiaStato('in_attesa')",
+                      "cambiaStatoPagamento('non_pagato')", 'mostraModalModificaConServizio'):
+            self.assertIn(testo, html)
+        self.assertNotIn("cambiaStato('completato')", html)
+        # gli script della pagina sono JavaScript valido
+        script = '\n;\n'.join(re.findall(r'<script(?![^>]*src)[^>]*>(.*?)</script>', html, re.S))
+        with tempfile.NamedTemporaryFile('w', suffix='.js', delete=False, encoding='utf-8') as f:
+            f.write(script)
+        try:
+            esito = subprocess.run(['node', '--check', f.name], capture_output=True, text=True)
+        except FileNotFoundError:
+            return
+        self.assertEqual(esito.returncode, 0, esito.stderr)

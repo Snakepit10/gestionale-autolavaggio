@@ -1043,7 +1043,7 @@ class OrdineDetailView(LoginRequiredMixin, DetailView):
         context['clienti'] = Cliente.objects.all().order_by('cognome', 'nome', 'ragione_sociale')
         
         # Categorie e servizi per la modifica dei servizi
-        context['categorie'] = Categoria.objects.filter(attiva=True).prefetch_related('servizioprodotto_set')
+        context['categorie'] = Categoria.objects.filter(attiva=True).prefetch_related('servizi_primari')
         
         return context
 
@@ -1268,11 +1268,10 @@ def cambia_stato_ordine(request, pk):
                     'error': 'Stato non valido'
                 })
             
-            # Valida transizioni di stato
             if not _valida_transizione_stato(ordine.stato, nuovo_stato):
                 return JsonResponse({
                     'success': False,
-                    'error': 'Transizione di stato non consentita'
+                    'error': "L'ordine è già in questo stato"
                 })
             
             # Cambia lo stato
@@ -1290,10 +1289,14 @@ def cambia_stato_ordine(request, pk):
                             item.fine_lavorazione = timezone.now()
                         item.save()
                         print(f"Item {item.id} automaticamente completato per ordine completato")
-            elif nuovo_stato == 'annullato':
-                # Se l'ordine è annullato, potremmo voler gestire gli item diversamente
-                # Per ora li lasciamo come sono, ma potremmo aggiungere logica specifica
-                pass
+            elif nuovo_stato in ('in_attesa', 'in_lavorazione') and vecchio_stato in ('completato', 'annullato'):
+                # Ordine riaperto: i servizi tornano nello stesso stato (i
+                # prodotti restano completati), altrimenti salvando un item
+                # completato l'ordine tornerebbe da solo "completato"
+                for item in ordine.items.exclude(servizio_prodotto__tipo='prodotto'):
+                    if item.stato != nuovo_stato:
+                        item.stato = nuovo_stato
+                        item.save(update_fields=['stato'])
             
             # Log dell'operazione
             print(f"Ordine {ordine.numero_progressivo} cambiato da {vecchio_stato} a {nuovo_stato} da {request.user}")
@@ -1347,15 +1350,9 @@ def cambia_stato_ordine(request, pk):
 
 
 def _valida_transizione_stato(stato_attuale, nuovo_stato):
-    """Valida se una transizione di stato è consentita"""
-    transizioni_consentite = {
-        'in_attesa': ['in_lavorazione', 'annullato'],
-        'in_lavorazione': ['completato', 'annullato'],
-        'completato': [],  # Stato finale
-        'annullato': [],   # Stato finale
-    }
-    
-    return nuovo_stato in transizioni_consentite.get(stato_attuale, [])
+    """Qualsiasi cambio di stato e' consentito (anche riaprire un ordine
+    completato o annullato): basta che lo stato sia diverso."""
+    return nuovo_stato != stato_attuale
 
 
 @login_required
@@ -1376,11 +1373,10 @@ def cambia_stato_pagamento(request, pk):
                     'error': 'Stato pagamento non valido'
                 })
             
-            # Valida transizioni di stato pagamento
             if not _valida_transizione_stato_pagamento(ordine.stato_pagamento, nuovo_stato, ordine):
                 return JsonResponse({
                     'success': False,
-                    'error': 'Transizione di stato pagamento non consentita'
+                    'error': "L'ordine è già in questo stato di pagamento"
                 })
             
             # Cambia lo stato
@@ -1491,26 +1487,10 @@ def imposta_richiede_fattura(request, pk):
 
 
 def _valida_transizione_stato_pagamento(stato_attuale, nuovo_stato, ordine):
-    """Valida se una transizione di stato pagamento è consentita"""
-    # Controlli di base
-    if stato_attuale == nuovo_stato:
-        return False
-    
-    # Logica di transizione
-    if nuovo_stato == 'pagato':
-        # Può diventare pagato solo se l'importo pagato copre il totale
-        return ordine.importo_pagato >= ordine.totale_finale
-    elif nuovo_stato == 'parziale':
-        # Può diventare parziale se c'è un pagamento parziale
-        return ordine.importo_pagato > 0 and ordine.importo_pagato < ordine.totale_finale
-    elif nuovo_stato == 'non_pagato':
-        # Può tornare non pagato solo se non ci sono pagamenti
-        return ordine.importo_pagato == 0
-    elif nuovo_stato == 'differito':
-        # Può diventare differito da qualsiasi stato
-        return True
-    
-    return False
+    """Qualsiasi cambio di stato pagamento e' consentito, basta che sia
+    diverso. Nota: cambiare lo stato non registra ne' toglie pagamenti
+    (la quadratura conta i pagamenti registrati)."""
+    return nuovo_stato != stato_attuale
 
 
 @login_required
@@ -1891,13 +1871,6 @@ def modifica_item_ordine(request, pk):
                     'error': 'Item non trovato'
                 }, status=400)
             
-            # Verifica che l'item non sia già completato
-            if item.stato == 'completato':
-                return JsonResponse({
-                    'success': False,
-                    'error': 'Non è possibile modificare un servizio già completato'
-                }, status=400)
-            
             # Traccia i cambiamenti
             cambiamenti = []
             
@@ -2076,13 +2049,6 @@ def elimina_item_ordine(request, pk):
                 return JsonResponse({
                     'success': False,
                     'error': 'Item non trovato'
-                }, status=400)
-
-            # Verifica che l'item non sia già completato
-            if item.stato == 'completato':
-                return JsonResponse({
-                    'success': False,
-                    'error': 'Non è possibile eliminare un servizio già completato'
                 }, status=400)
 
             # Verifica che ci sia almeno un altro item nell'ordine

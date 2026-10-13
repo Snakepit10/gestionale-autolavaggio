@@ -15,35 +15,30 @@
         <button class="btn btn-outline-info me-2" onclick="stampaOrdine()">
             <i class="bi bi-printer"></i> Stampa
         </button>
-        {% if ordine.stato != 'completato' and ordine.stato != 'annullato' %}
+        {% if ordine.stato != 'annullato' %}
             <button class="btn btn-outline-primary me-2" onclick="mostraModalModifica()">
                 <i class="bi bi-pencil"></i> Modifica
             </button>
         {% endif %}
-        {% if ordine.stato != 'completato' and ordine.stato != 'annullato' %}
-            <div class="btn-group me-2">
-                <button class="btn btn-outline-warning dropdown-toggle" data-bs-toggle="dropdown">
-                    <i class="bi bi-gear"></i> Cambia Stato
-                </button>
-                <ul class="dropdown-menu">
-                    {% if ordine.stato == 'in_attesa' %}
-                        <li><a class="dropdown-item" href="#" onclick="cambiaStato('in_lavorazione')">
-                            <i class="bi bi-play-circle"></i> In Lavorazione
-                        </a></li>
-                        <li><a class="dropdown-item text-danger" href="#" onclick="cambiaStato('annullato')">
-                            <i class="bi bi-x-circle"></i> Annulla Ordine
-                        </a></li>
-                    {% elif ordine.stato == 'in_lavorazione' %}
-                        <li><a class="dropdown-item text-success" href="#" onclick="cambiaStato('completato')">
-                            <i class="bi bi-check-circle"></i> Completato
-                        </a></li>
-                        <li><a class="dropdown-item text-danger" href="#" onclick="cambiaStato('annullato')">
-                            <i class="bi bi-x-circle"></i> Annulla Ordine
-                        </a></li>
-                    {% endif %}
-                </ul>
-            </div>
-        {% endif %}
+        <div class="btn-group me-2">
+            <button class="btn btn-outline-warning dropdown-toggle" data-bs-toggle="dropdown">
+                <i class="bi bi-gear"></i> Cambia Stato
+            </button>
+            <ul class="dropdown-menu">
+                {% if ordine.stato != 'in_attesa' %}<li><a class="dropdown-item" href="#" onclick="cambiaStato('in_attesa')">
+                    <i class="bi bi-hourglass"></i> In Attesa
+                </a></li>{% endif %}
+                {% if ordine.stato != 'in_lavorazione' %}<li><a class="dropdown-item" href="#" onclick="cambiaStato('in_lavorazione')">
+                    <i class="bi bi-play-circle"></i> In Lavorazione
+                </a></li>{% endif %}
+                {% if ordine.stato != 'completato' %}<li><a class="dropdown-item text-success" href="#" onclick="cambiaStato('completato')">
+                    <i class="bi bi-check-circle"></i> Completato
+                </a></li>{% endif %}
+                {% if ordine.stato != 'annullato' %}<li><a class="dropdown-item text-danger" href="#" onclick="cambiaStato('annullato')">
+                    <i class="bi bi-x-circle"></i> Annulla Ordine
+                </a></li>{% endif %}
+            </ul>
+        </div>
 
         <!-- Avvisa cliente (auto pronta) -->
         {% if ordine.stato == 'completato' and ordine.cliente %}
@@ -65,53 +60,28 @@
         {% endif %}
 
         <!-- Cambio stato pagamento -->
-        {% if ordine.stato_pagamento != 'pagato' %}
-            <div class="btn-group me-2">
-                <button class="btn btn-outline-success dropdown-toggle" data-bs-toggle="dropdown">
-                    <i class="bi bi-credit-card"></i> Stato Pagamento
-                </button>
-                <ul class="dropdown-menu">
-                    {% if ordine.stato_pagamento == 'non_pagato' %}
-                        <li><a class="dropdown-item" href="#" onclick="cambiaStatoPagamento('parziale')">
-                            <i class="bi bi-clock"></i> Parziale
-                        </a></li>
-                        <li><a class="dropdown-item" href="#" onclick="cambiaStatoPagamento('differito')">
-                            <i class="bi bi-calendar"></i> Differito
-                        </a></li>
-                        {% if ordine.importo_pagato >= ordine.totale_finale %}
-                            <li><a class="dropdown-item text-success" href="#" onclick="cambiaStatoPagamento('pagato')">
-                                <i class="bi bi-check-circle"></i> Pagato
-                            </a></li>
-                        {% endif %}
-                    {% elif ordine.stato_pagamento == 'parziale' %}
-                        <li><a class="dropdown-item text-success" href="#" onclick="cambiaStatoPagamento('pagato')">
-                            <i class="bi bi-check-circle"></i> Pagato
-                        </a></li>
-                        <li><a class="dropdown-item" href="#" onclick="cambiaStatoPagamento('differito')">
-                            <i class="bi bi-calendar"></i> Differito
-                        </a></li>
-                        {% if ordine.importo_pagato == 0 %}
-                            <li><a class="dropdown-item text-danger" href="#" onclick="cambiaStatoPagamento('non_pagato')">
-                                <i class="bi bi-x-circle"></i> Non Pagato
-                            </a></li>
-                        {% endif %}
-                    {% elif ordine.stato_pagamento == 'differito' %}
-                        <li><a class="dropdown-item text-success" href="#" onclick="cambiaStatoPagamento('pagato')">
-                            <i class="bi bi-check-circle"></i> Pagato
-                        </a></li>
-                        <li><a class="dropdown-item" href="#" onclick="cambiaStatoPagamento('parziale')">
-                            <i class="bi bi-clock"></i> Parziale
-                        </a></li>
-                        {% if ordine.importo_pagato == 0 %}
-                            <li><a class="dropdown-item text-danger" href="#" onclick="cambiaStatoPagamento('non_pagato')">
-                                <i class="bi bi-x-circle"></i> Non Pagato
-                            </a></li>
-                        {% endif %}
-                    {% endif %}
-                </ul>
-            </div>
-        {% endif %}
-        
+        <div class="btn-group me-2">
+            <button class="btn btn-outline-success dropdown-toggle" data-bs-toggle="dropdown">
+                <i class="bi bi-credit-card"></i> Stato Pagamento
+            </button>
+            <ul class="dropdown-menu">
+                {% if ordine.stato_pagamento != 'pagato' %}<li><a class="dropdown-item text-success" href="#" onclick="cambiaStatoPagamento('pagato')">
+                    <i class="bi bi-check-circle"></i> Pagato
+                </a></li>{% endif %}
+                {% if ordine.stato_pagamento != 'parziale' %}<li><a class="dropdown-item" href="#" onclick="cambiaStatoPagamento('parziale')">
+                    <i class="bi bi-clock"></i> Parziale
+                </a></li>{% endif %}
+                {% if ordine.stato_pagamento != 'differito' %}<li><a class="dropdown-item" href="#" onclick="cambiaStatoPagamento('differito')">
+                    <i class="bi bi-calendar"></i> Differito
+                </a></li>{% endif %}
+                {% if ordine.stato_pagamento != 'non_pagato' %}<li><a class="dropdown-item text-danger" href="#" onclick="cambiaStatoPagamento('non_pagato')">
+                    <i class="bi bi-x-circle"></i> Non Pagato
+                </a></li>{% endif %}
+                <li><hr class="dropdown-divider"></li>
+                <li><span class="dropdown-item-text small text-muted">Cambia solo lo stato:<br>i pagamenti registrati restano quelli.</span></li>
+            </ul>
+        </div>
+
         <a href="{% url 'ordini:ordini-list' %}" class="btn btn-outline-secondary">
             <i class="bi bi-arrow-left"></i> Torna alla Lista
         </a>
@@ -324,7 +294,7 @@
                                             {% if postazione %}
                                                 <th>Stato</th>
                                             {% endif %}
-                                            {% if ordine.stato != 'completato' and ordine.stato != 'annullato' %}
+                                            {% if ordine.stato != 'annullato' %}
                                                 <th>Azioni</th>
                                             {% endif %}
                                         </tr>
@@ -359,15 +329,11 @@
                                                 {% endif %}
                                             </td>
                                             {% endif %}
-                                            {% if ordine.stato != 'completato' and ordine.stato != 'annullato' %}
+                                            {% if ordine.stato != 'annullato' %}
                                             <td>
-                                                {% if item.stato != 'completato' %}
-                                                    <button class="btn btn-sm btn-outline-primary" onclick="mostraModalModificaConServizio({{ item.id }})">
-                                                        <i class="bi bi-pencil"></i> Modifica
-                                                    </button>
-                                                {% else %}
-                                                    <span class="text-muted">Completato</span>
-                                                {% endif %}
+                                                <button class="btn btn-sm btn-outline-primary" onclick="mostraModalModificaConServizio({{ item.id }})">
+                                                    <i class="bi bi-pencil"></i> Modifica
+                                                </button>
                                             </td>
                                             {% endif %}
                                         </tr>
@@ -1372,7 +1338,6 @@ function annullaModificaItemDetail() {
                                 <select class="form-select" id="item-select" name="item_select" onchange="caricaDettagliItem()">
                                     <option value="">Seleziona un servizio...</option>
                                     {% for item in ordine.items.all %}
-                                        {% if item.stato != 'completato' %}
                                             <option value="{{ item.id }}"
                                                 data-servizio-id="{{ item.servizio_prodotto.id }}"
                                                 data-servizio-titolo="{{ item.servizio_prodotto.titolo }}"
@@ -1380,7 +1345,7 @@ function annullaModificaItemDetail() {
                                                 data-prezzo="{{ item.prezzo_unitario }}">
                                                 {{ item.servizio_prodotto.titolo }} (Qtà: {{ item.quantita }}, €{{ item.prezzo_unitario }})
                                             </option>
-                                        {% endif %}
+
                                     {% endfor %}
                                 </select>
                             </div>
@@ -1396,7 +1361,7 @@ function annullaModificaItemDetail() {
                                         <option value="">Seleziona un servizio/prodotto</option>
                                         {% for categoria in categorie %}
                                             <optgroup label="{{ categoria.nome }}">
-                                                {% for servizio in categoria.servizioprodotto_set.all %}
+                                                {% for servizio in categoria.servizi_primari.all %}
                                                     {% if servizio.attivo %}
                                                         <option value="{{ servizio.id }}"
                                                             data-prezzo="{{ servizio.prezzo }}"
@@ -1478,7 +1443,7 @@ function annullaModificaItemDetail() {
                                     <option value="">Seleziona per aggiungere...</option>
                                     {% for categoria in categorie %}
                                         <optgroup label="{{ categoria.nome }}">
-                                            {% for servizio in categoria.servizioprodotto_set.all %}
+                                            {% for servizio in categoria.servizi_primari.all %}
                                                 {% if servizio.attivo and servizio.disponibile %}
                                                     <option value="{{ servizio.id }}"
                                                         data-prezzo="{{ servizio.prezzo }}"
