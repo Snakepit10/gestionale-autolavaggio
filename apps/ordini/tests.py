@@ -357,4 +357,20 @@ class OraCompletamentoTest(TestCase):
         html = vista.render().content.decode()
         self.assertIn('bi-check2-circle', html)
         self.assertIn(timezone.localtime(fine).strftime('%H:%M'), html)
-        self.assertIn('35 min', html)
+        self.assertIn('tot 35 min', html)
+
+        # tempo di lavorazione: dalla prima lavorazione avviata (operatore o servizio)
+        self.assertEqual(ordine.tempo_lavorazione, '')
+        ItemOrdine.objects.filter(pk=item.pk).update(inizio_lavorazione=fine - timedelta(minutes=25))
+        ordine = Ordine.objects.get(pk=ordine.pk)
+        self.assertEqual(ordine.tempo_lavorazione, '25 min')
+        from apps.cq.models import PostazioneCQ
+        from apps.turni.models import LavorazioneOperatore, SessioneTurno
+        pcq = PostazioneCQ.objects.create(nome='Prelavaggio', codice='PRE')
+        sessione = SessioneTurno.objects.create(operatore=req.user)
+        LavorazioneOperatore.objects.create(sessione=sessione, ordine=ordine, postazione_cq=pcq,
+                                            inizio=fine - timedelta(hours=1, minutes=5))
+        ordine = Ordine.objects.get(pk=ordine.pk)
+        self.assertEqual(ordine.tempo_lavorazione, '1h 05m')
+        html = OrdiniListView.as_view()(req).render().content.decode()
+        self.assertIn('lav. 1h 05m', html)

@@ -821,7 +821,8 @@ class OrdiniListView(LoginRequiredMixin, ListView):
         queryset = Ordine.objects.select_related(
             'cliente', 'operatore', 'prenotazione', 'fattura'
         ).prefetch_related(
-            'items__servizio_prodotto', 'items__postazione_cq', 'items__aggiunto_da', 'pagamenti'
+            'items__servizio_prodotto', 'items__postazione_cq', 'items__aggiunto_da', 'pagamenti',
+            'lavorazioni_operatore'
         ).filter(data_ora__date=data, vendita_prodotti=False)
 
         # Layout sempre in 3 sezioni (attivi / da ritirare / completati):

@@ -195,12 +195,21 @@ class Ordine(models.Model):
         return max(orari) if orari else None
 
     @property
-    def tempo_completamento(self):
-        """Dalla creazione al completamento, es. '1h 41m' o '35 min'."""
-        fine = self.completato_il
-        if not fine or not self.data_ora or fine < self.data_ora:
+    def iniziato_il(self):
+        """Quando e' iniziata la lavorazione: la prima lavorazione avviata
+        da un operatore (dashboard turno) o, in mancanza, il primo servizio
+        messo in lavorazione. None se mai avviata."""
+        orari = [lav.inizio for lav in self.lavorazioni_operatore.all() if lav.inizio]
+        orari += [i.inizio_lavorazione for i in self.items.all()
+                  if i.inizio_lavorazione and i.servizio_prodotto.tipo != 'prodotto']
+        return min(orari) if orari else None
+
+    @staticmethod
+    def _durata(inizio, fine):
+        """'35 min', '1h 41m', oltre il giorno '1g 3h'; '' se non calcolabile."""
+        if not inizio or not fine or fine < inizio:
             return ''
-        minuti = int((fine - self.data_ora).total_seconds() // 60)
+        minuti = int((fine - inizio).total_seconds() // 60)
         if minuti < 60:
             return f'{minuti} min'
         ore, minuti = divmod(minuti, 60)
@@ -208,6 +217,17 @@ class Ordine(models.Model):
             giorni, ore = divmod(ore, 24)
             return f'{giorni}g {ore}h'
         return f'{ore}h {minuti:02d}m'
+
+    @property
+    def tempo_completamento(self):
+        """Dalla creazione al completamento, es. '1h 41m' o '35 min'."""
+        return self._durata(self.data_ora, self.completato_il)
+
+    @property
+    def tempo_lavorazione(self):
+        """Dall'inizio della lavorazione al completamento."""
+        fine = self.completato_il
+        return self._durata(self.iniziato_il, fine) if fine else ''
 
     @property
     def numero_display(self):

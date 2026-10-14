@@ -1157,7 +1157,7 @@ function ckEliminaPrenotazione() {
                                 <div>
                                     <strong>{{ ordine.data_ora|date:"d/m/Y" }}</strong>
                                     <br><small class="text-muted">{{ ordine.data_ora|date:"H:i" }}</small>
-                                    {% with fine=ordine.completato_il %}{% if fine %}<br><small class="text-success text-nowrap" title="Completato il {{ fine|date:'d/m/Y H:i' }}"><i class="bi bi-check2-circle"></i> {% if fine|date:'Ymd' != ordine.data_ora|date:'Ymd' %}{{ fine|date:'d/m' }} {% endif %}{{ fine|date:"H:i" }}{% if ordine.tempo_completamento %}<span class="text-muted" title="Tempo dalla creazione al completamento"> &middot; {{ ordine.tempo_completamento }}</span>{% endif %}</small>{% endif %}{% endwith %}
+                                    {% with fine=ordine.completato_il %}{% if fine %}<br><small class="text-success text-nowrap" title="Completato il {{ fine|date:'d/m/Y H:i' }}"><i class="bi bi-check2-circle"></i> {% if fine|date:'Ymd' != ordine.data_ora|date:'Ymd' %}{{ fine|date:'d/m' }} {% endif %}{{ fine|date:"H:i" }}{% if ordine.tempo_completamento %}<span class="text-muted" title="Tempo totale: dalla creazione dell'ordine al completamento"> &middot; tot {{ ordine.tempo_completamento }}</span>{% endif %}{% with lav=ordine.tempo_lavorazione %}{% if lav %}<span class="text-muted" title="Tempo di lavorazione: dall'inizio lavorazione al completamento"> &middot; lav. {{ lav }}</span>{% endif %}{% endwith %}</small>{% endif %}{% endwith %}
                                 </div>
                             
                             <td>
@@ -1429,7 +1429,7 @@ function ckEliminaPrenotazione() {
                                 <div>
                                     <strong>{{ ordine.data_ora|date:"d/m/Y" }}</strong>
                                     <br><small class="text-muted">{{ ordine.data_ora|date:"H:i" }}</small>
-                                    {% with fine=ordine.completato_il %}{% if fine %}<br><small class="text-success text-nowrap" title="Completato il {{ fine|date:'d/m/Y H:i' }}"><i class="bi bi-check2-circle"></i> {% if fine|date:'Ymd' != ordine.data_ora|date:'Ymd' %}{{ fine|date:'d/m' }} {% endif %}{{ fine|date:"H:i" }}{% if ordine.tempo_completamento %}<span class="text-muted" title="Tempo dalla creazione al completamento"> &middot; {{ ordine.tempo_completamento }}</span>{% endif %}</small>{% endif %}{% endwith %}
+                                    {% with fine=ordine.completato_il %}{% if fine %}<br><small class="text-success text-nowrap" title="Completato il {{ fine|date:'d/m/Y H:i' }}"><i class="bi bi-check2-circle"></i> {% if fine|date:'Ymd' != ordine.data_ora|date:'Ymd' %}{{ fine|date:'d/m' }} {% endif %}{{ fine|date:"H:i" }}{% if ordine.tempo_completamento %}<span class="text-muted" title="Tempo totale: dalla creazione dell'ordine al completamento"> &middot; tot {{ ordine.tempo_completamento }}</span>{% endif %}{% with lav=ordine.tempo_lavorazione %}{% if lav %}<span class="text-muted" title="Tempo di lavorazione: dall'inizio lavorazione al completamento"> &middot; lav. {{ lav }}</span>{% endif %}{% endwith %}</small>{% endif %}{% endwith %}
                                 </div>
                             </td>
                             <td>
@@ -1676,7 +1676,7 @@ function ckEliminaPrenotazione() {
                                 <div>
                                     <strong>{{ ordine.data_ora|date:"d/m/Y" }}</strong>
                                     <br><small class="text-muted">{{ ordine.data_ora|date:"H:i" }}</small>
-                                    {% with fine=ordine.completato_il %}{% if fine %}<br><small class="text-success text-nowrap" title="Completato il {{ fine|date:'d/m/Y H:i' }}"><i class="bi bi-check2-circle"></i> {% if fine|date:'Ymd' != ordine.data_ora|date:'Ymd' %}{{ fine|date:'d/m' }} {% endif %}{{ fine|date:"H:i" }}{% if ordine.tempo_completamento %}<span class="text-muted" title="Tempo dalla creazione al completamento"> &middot; {{ ordine.tempo_completamento }}</span>{% endif %}</small>{% endif %}{% endwith %}
+                                    {% with fine=ordine.completato_il %}{% if fine %}<br><small class="text-success text-nowrap" title="Completato il {{ fine|date:'d/m/Y H:i' }}"><i class="bi bi-check2-circle"></i> {% if fine|date:'Ymd' != ordine.data_ora|date:'Ymd' %}{{ fine|date:'d/m' }} {% endif %}{{ fine|date:"H:i" }}{% if ordine.tempo_completamento %}<span class="text-muted" title="Tempo totale: dalla creazione dell'ordine al completamento"> &middot; tot {{ ordine.tempo_completamento }}</span>{% endif %}{% with lav=ordine.tempo_lavorazione %}{% if lav %}<span class="text-muted" title="Tempo di lavorazione: dall'inizio lavorazione al completamento"> &middot; lav. {{ lav }}</span>{% endif %}{% endwith %}</small>{% endif %}{% endwith %}
                                 </div>
 
                             <td>
