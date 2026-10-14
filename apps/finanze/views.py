@@ -1515,13 +1515,20 @@ def azione_abbinamento_portali(request):
     elif azione == 'rettifica_residuo':
         _rettifica_residuo(request, chiusura)
     elif azione == 'rimuovi':
-        n, _ = AbbinamentoPortale.objects.filter(
-            pk=request.POST.get('abbinamento_id'),
-        ).filter(chiusura.q_transazioni('transazione__')).delete()
-        if n:
-            messages.success(request, 'Abbinamento rimosso.')
+        if abbinamento_portali.rimuovi(chiusura, request.POST.get('abbinamento_id'), request.user):
+            messages.success(request, 'Abbinamento rimosso: quella transazione non verrà più proposta per il lavaggio.')
         else:
             messages.error(request, 'Abbinamento non trovato.')
+    elif azione == 'rifiuta':
+        try:
+            item_id = int(request.POST.get('item_id'))
+            tx_id = int(request.POST.get('transazione_id'))
+        except (TypeError, ValueError):
+            item_id = tx_id = None
+        if item_id and abbinamento_portali.rifiuta(chiusura, item_id, tx_id, request.user):
+            messages.success(request, 'Proposta scartata.')
+        else:
+            messages.error(request, 'Proposta non trovata.')
     else:
         messages.error(request, 'Azione non valida.')
     return redirect(torna)

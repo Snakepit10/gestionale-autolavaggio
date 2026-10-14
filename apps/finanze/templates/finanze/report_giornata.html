@@ -1165,6 +1165,14 @@
                       <span class="small">{{ p.transazione.orario|date:"H:i" }} · P{{ p.transazione.programma }} ·
                         {% if r.rif_tipo == 'completato' %}{{ p.delta_min }} min prima del completamento{% else %}&Delta; {{ p.delta_min }} min dalla creazione{% endif %}</span>
                       {% if p.fuori_orario %}<span class="badge bg-warning-subtle text-warning-emphasis border border-warning-subtle" title="Nessun P4 compatibile per orario: abbinato al P4 libero piu' vicino">senza coincidenza d'orario</span>{% endif %}
+                      <form method="post" action="{% url 'finanze:azione_abbinamento_portali' %}" class="d-inline">
+                        {% csrf_token %}
+                        <input type="hidden" name="data" value="{{ data|date:'Y-m-d' }}">
+                        <input type="hidden" name="azione" value="rifiuta">
+                        <input type="hidden" name="item_id" value="{{ r.item.pk }}">
+                        <input type="hidden" name="transazione_id" value="{{ p.transazione.pk }}">
+                        <button type="submit" class="btn btn-link btn-sm text-danger p-0 ms-1" title="Scarta la proposta"><i class="bi bi-x-circle"></i></button>
+                      </form>
                     </div>
                     {% endfor %}
                     {% if r.scoperti %}

@@ -185,6 +185,10 @@ def proponi_giorno(giorno, tolleranza=TOLLERANZA_DEFAULT, items=None, libere=Non
     """
     items = lavaggi_servito_giorno(giorno) if items is None else items
     libere = transazioni_abbinabili(giorno) if libere is None else libere
+    # coppie rifiutate a mano: mai riproposte
+    from apps.finanze.models import AbbinamentoScartato
+    scartate = set(AbbinamentoScartato.objects.filter(item__in=[it.pk for it in items])
+                   .values_list('item_id', 'transazione_id'))
 
     slots = []
     for it in items:
@@ -203,7 +207,7 @@ def proponi_giorno(giorno, tolleranza=TOLLERANZA_DEFAULT, items=None, libere=Non
                 continue
             programma = priorita[giro]
             for t in libere:
-                if t.pk in tx_usate or t.programma != programma:
+                if t.pk in tx_usate or t.programma != programma or (it.pk, t.pk) in scartate:
                     continue
                 delta = _compatibile_orario(it, t, tolleranza)
                 if delta is not None:
@@ -229,7 +233,7 @@ def proponi_giorno(giorno, tolleranza=TOLLERANZA_DEFAULT, items=None, libere=Non
         if si in slot_usati or PROGRAMMA_RIPIEGO not in it.servizio_prodotto.lista_programmi_portale:
             continue
         for t in libere:
-            if t.pk not in tx_usate and t.programma == PROGRAMMA_RIPIEGO:
+            if t.pk not in tx_usate and t.programma == PROGRAMMA_RIPIEGO and (it.pk, t.pk) not in scartate:
                 coppie.append((abs((t.orario - it.riferimento[0]).total_seconds()), si, t.pk, t))
     coppie.sort(key=lambda c: (c[0], c[1], c[2]))
     for delta, si, tpk, t in coppie:
@@ -368,5 +372,40 @@ def abbina_manuale(chiusura, item_id, transazione_id, operatore=None):
     t = next((t for t in transazioni_abbinabili(chiusura.data) if t.pk == transazione_id), None)
     if t is None:
         return False, 'Transazione non disponibile (gia\' abbinata o di un altro giorno).'
+    from apps.finanze.models import AbbinamentoScartato
+    AbbinamentoScartato.objects.filter(item=item, transazione=t).delete()
     AbbinamentoPortale.objects.create(item=item, transazione=t, operatore=operatore)
     return True, 'Abbinamento salvato.'
+
+
+def rimuovi(chiusura, abbinamento_id, operatore=None):
+    """Toglie un abbinamento confermato di un lavaggio servito della
+    giornata (anche se la transazione cade fuori dalla finestra di
+    chiusura) e ricorda la coppia come scartata."""
+    from django.db.models import Q
+
+    from apps.finanze.models import AbbinamentoScartato
+    inizio, fine = _limiti_giorno(chiusura.data)
+    a = (AbbinamentoPortale.objects
+         .filter(pk=abbinamento_id)
+         .filter(Q(item__ordine__data_ora__gte=inizio, item__ordine__data_ora__lt=fine)
+                 | chiusura.q_transazioni('transazione__'))
+         .first())
+    if a is None:
+        return False
+    AbbinamentoScartato.objects.get_or_create(item_id=a.item_id, transazione_id=a.transazione_id,
+                                              defaults={'operatore': operatore})
+    a.delete()
+    return True
+
+
+def rifiuta(chiusura, item_id, transazione_id, operatore=None):
+    """Scarta una proposta: quella transazione non verra' piu' proposta
+    per quel lavaggio."""
+    from apps.finanze.models import AbbinamentoScartato
+    item = next((i for i in lavaggi_servito(chiusura) if i.pk == item_id), None)
+    if item is None or not TransazionePortale.objects.filter(pk=transazione_id).exists():
+        return False
+    AbbinamentoScartato.objects.get_or_create(item=item, transazione_id=transazione_id,
+                                              defaults={'operatore': operatore})
+    return True

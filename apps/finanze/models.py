@@ -642,6 +642,22 @@ class RettificaResiduo(models.Model):
         return f'{self.transazione} {self.get_motivo_display()} {self.importo}'
 
 
+class AbbinamentoScartato(models.Model):
+    """Coppia lavaggio servito / transazione rifiutata a mano (proposta
+    scartata o abbinamento rimosso): le proposte automatiche non la
+    ripropongono. Abbinarla a mano la ripristina."""
+    item = models.ForeignKey('ordini.ItemOrdine', on_delete=models.CASCADE, related_name='abbinamenti_scartati')
+    transazione = models.ForeignKey(TransazionePortale, on_delete=models.CASCADE, related_name='scarti')
+    operatore = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, blank=True,
+                                  related_name='abbinamenti_scartati')
+    creato_il = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        verbose_name = 'Abbinamento scartato'
+        verbose_name_plural = 'Abbinamenti scartati'
+        unique_together = [('item', 'transazione')]
+
+
 # ---------------------------------------------------------------------------
 # Quadratura giornaliera complessiva (scassettamento)
 # ---------------------------------------------------------------------------

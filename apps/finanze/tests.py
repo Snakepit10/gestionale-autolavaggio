@@ -266,6 +266,38 @@ class AbbinamentoPortaliTest(TestCase):
         ok, _ = ap.abbina_manuale(self.chiusura, manuali[0]['item'].pk, altra.pk)
         self.assertFalse(ok)                                                # una sola transazione
 
+    def test_rimuovi_fuori_finestra_e_scarti(self):
+        # finestra chiusa alle 18:00: lavaggio delle 19:45 abbinato alla
+        # transazione delle 19:26 (fuori finestra, stesso giorno)
+        item = self._item(self.a_mano, completato='19:45')
+        tx = self._tx('19:26', 5)
+        self.assertEqual([p['transazione'].pk for p in ap.proponi(self.chiusura)], [tx.pk])
+        ap.conferma_proposte(self.chiusura)
+        a = AbbinamentoPortale.objects.get()
+        self.assertTrue(ap.rimuovi(self.chiusura, a.pk))
+        self.assertFalse(AbbinamentoPortale.objects.exists())
+        self.assertEqual(ap.proponi(self.chiusura), [])                     # non riproposta
+        # abbinata di nuovo a mano: lo scarto sparisce
+        ok, _ = ap.abbina_manuale(self.chiusura, item.pk, tx.pk)
+        self.assertTrue(ok)
+        from apps.finanze.models import AbbinamentoScartato
+        self.assertFalse(AbbinamentoScartato.objects.exists())
+
+    def test_rifiuta_proposta(self):
+        item = self._item(self.completo, completato='10:30')
+        vicina = self._tx('10:00', 4)
+        altra = self._tx('09:40', 4)
+        self.assertEqual([p['transazione'].pk for p in ap.proponi(self.chiusura)], [vicina.pk])
+        self.assertTrue(ap.rifiuta(self.chiusura, item.pk, vicina.pk))
+        self.assertEqual([p['transazione'].pk for p in ap.proponi(self.chiusura)], [altra.pk])
+        user = utente_titolare('op2', 'op2@x.it', 'x', is_staff=True)
+        self.client.force_login(user)
+        r = self.client.post(reverse('finanze:azione_abbinamento_portali'),
+                             {'data': '2026-10-06', 'azione': 'rifiuta', 'item_id': item.pk,
+                              'transazione_id': altra.pk})
+        self.assertEqual(r.status_code, 302)
+        self.assertEqual(ap.proponi(self.chiusura), [])
+
     def test_conferma_idempotente(self):
         self._item(self.completo, completato='10:30')
         self._tx('10:05', 4)
