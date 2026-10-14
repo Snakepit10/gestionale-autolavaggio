@@ -10,6 +10,7 @@
     Ultima transazione in archivio: <strong>{{ ultima_transazione.orario|date:"d/m/Y H:i" }}</strong>
     ({{ ultima_transazione.get_portale_display }}). Al prossimo import parti da quel giorno
     (<strong>{{ ultima_transazione.orario|date:"d/m" }}</strong>), così non resta nessun buco: i doppioni vengono ignorati.
+    &middot; <a href="{% url 'finanze:transazioni_washtec' %}">Vedi tutte le transazioni</a>
   </div>
   {% endif %}
   {% if buchi %}

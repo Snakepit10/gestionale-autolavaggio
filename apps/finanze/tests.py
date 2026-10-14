@@ -882,3 +882,63 @@ class ChiusuraGiornataOperatoriTest(TestCase):
         for testo in ('Conteggio', 'Ticket di resto', 'Promo e omaggi', 'Spese pagate', 'Lavaggi extra'):
             self.assertIn(testo, pagina)
         self.assertNotIn('Report giornata</a>', pagina)       # l'operatore non vede il report
+
+
+class TransazioniWashtecTest(TestCase):
+    """Pagina con l'archivio delle transazioni estratte da WashTec."""
+
+    def setUp(self):
+        from apps.finanze.models import RettificaResiduo
+        self.admin = User.objects.create_superuser('boss', 'b@x.it', 'x')
+        oggi = timezone.localdate()
+
+        def alle(h, m=0):
+            return timezone.make_aware(datetime.combine(oggi, datetime.min.time()).replace(hour=h, minute=m))
+        self.contanti = TransazionePortale.objects.create(portale='A', numero=100, orario=alle(9), programma=1,
+                                                          origine='contanti')
+        self.unita = TransazionePortale.objects.create(portale='B', numero=200, orario=alle(10), programma=4,
+                                                       origine='unita')
+        self.omaggio = TransazionePortale.objects.create(portale='B', numero=201, orario=alle(11), programma=3,
+                                                         origine='unita')
+        RettificaResiduo.objects.create(transazione=self.omaggio, motivo='omaggio', importo=Decimal('0'))
+        TransazionePortale.objects.create(portale='A', numero=103, orario=alle(12), programma=4, origine='unita')
+
+    def _get(self, **params):
+        from django.test import RequestFactory
+
+        from apps.finanze.views_washtec import transazioni_washtec
+        req = RequestFactory().get('/', params)
+        req.user = self.admin
+        return transazioni_washtec(req)
+
+    def test_elenco_filtri_e_buchi(self):
+        html = self._get().content.decode()
+        self.assertIn('Transazioni WashTec', html)
+        self.assertIn('Omaggio', html)
+        self.assertIn('n. 101', html)                          # A: 100 -> 103, mancano 101-102
+        self.assertIn('200', self._get(portale='B', origine='unita').content.decode())
+        solo = self._get(stato='rettificata').content.decode()
+        self.assertIn('201', solo)
+        self.assertNotIn('>200<', solo)
+
+    def test_csv(self):
+        r = self._get(formato='csv')
+        self.assertEqual(r['Content-Type'], 'text/csv; charset=utf-8')
+        testo = r.content.decode('utf-8-sig')
+        self.assertEqual(len(testo.strip().splitlines()), 5)   # intestazione + 4
+        self.assertIn('Omaggio', testo)
+
+
+    def test_sezione_nel_report_giornata(self):
+        from django.contrib.messages.storage.fallback import FallbackStorage
+        from django.test import RequestFactory
+
+        from apps.finanze.views import report_giornata
+        req = RequestFactory().get('/', {'data': timezone.localdate().isoformat()})
+        req.user = self.admin
+        req.session = {}
+        req._messages = FallbackStorage(req)
+        html = report_giornata(req).content.decode()
+        self.assertIn('id="transazioni-washtec"', html)
+        self.assertIn('Omaggio', html)
+        self.assertIn('residuo &middot; pagato agli operatori', html)

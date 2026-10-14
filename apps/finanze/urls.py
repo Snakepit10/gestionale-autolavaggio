@@ -1,5 +1,5 @@
 from django.urls import path
-from . import views
+from . import views, views_washtec
 
 app_name = 'finanze'
 
@@ -38,6 +38,7 @@ urlpatterns = [
     path('report-giornata/chiusura-portali/', views.imposta_chiusura_portali, name='imposta_chiusura_portali'),
     path('report-giornata/allinea-periodo-portali/', views.allinea_periodo_portali, name='allinea_periodo_portali'),
     path('portali/saldi/', views.riepilogo_saldi_portali, name='riepilogo_saldi_portali'),
+    path('portali/transazioni/', views_washtec.transazioni_washtec, name='transazioni_washtec'),
     path('report-giornata/abbinamento-portali/', views.azione_abbinamento_portali, name='azione_abbinamento_portali'),
     path('report-giornata/spese-cassa/', views.azione_spese_cassa, name='azione_spese_cassa'),
     path('report-giornata/ticket-resto/', views.azione_ticket_resto, name='azione_ticket_resto'),

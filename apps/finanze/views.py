@@ -1416,7 +1416,27 @@ def _contesto_lavaggi_portali(data, completo=True):
         'portali_archivio_totale': TransazionePortale.objects.count(),
         'abbinamento': abbinamento,
         'washcycles_self': washcycles_self,
+        'transazioni_finestra': _transazioni_finestra(chiusura, abbinamento) if completo else [],
     }
+
+
+def _transazioni_finestra(chiusura, abbinamento):
+    """Tutte le transazioni WashTec della finestra di chiusura, ciascuna
+    con il suo stato: contanti, abbinata a un ordine, proposta, residuo
+    (pagato agli operatori) con l'eventuale rettifica."""
+    from .models import PREZZI_PROGRAMMA_PORTALE, TransazionePortale
+
+    residuo = {r['transazione'].pk for r in abbinamento['residuo']}
+    proposte = {p['transazione'].pk: p['item'] for r in abbinamento['righe'] for p in r['proposte']}
+    lista = list(TransazionePortale.objects.filter(chiusura.q_transazioni())
+                 .select_related('abbinamento__item__ordine__cliente', 'abbinamento__item__servizio_prodotto',
+                                 'rettifica_residuo')
+                 .order_by('orario', 'portale', 'numero'))
+    for t in lista:
+        t.listino = PREZZI_PROGRAMMA_PORTALE.get(t.programma, Decimal('0.00'))
+        t.in_residuo = t.pk in residuo
+        t.proposta_item = proposte.get(t.pk)
+    return lista
 
 
 def _rettifica_residuo(request, chiusura):

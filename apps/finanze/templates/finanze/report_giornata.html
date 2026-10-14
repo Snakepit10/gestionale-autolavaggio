@@ -1319,6 +1319,59 @@
   </div>
   {% endif %}
 
+  {# ====== Transazioni WashTec della finestra ====== #}
+  {% if transazioni_finestra %}
+  <div class="chart-panel mb-3" id="transazioni-washtec">
+    <div class="panel-title">
+      <i class="bi bi-list-columns text-primary"></i> Transazioni WashTec
+      <span class="badge bg-light text-dark ms-2">{{ transazioni_finestra|length }}</span>
+      <a href="{% url 'finanze:transazioni_washtec' %}?dal={{ data|date:'Y-m-d' }}" class="btn btn-sm btn-outline-secondary ms-auto"><i class="bi bi-box-arrow-up-right"></i> Archivio completo</a>
+    </div>
+    <div class="panel-sub">Tutti i lavaggi dei portali estratti da WashTec nella finestra di chiusura ({{ portali_chiusura.periodo_da|date:"d/m H:i" }} &rarr; {{ portali_chiusura.periodo_a|date:"d/m H:i" }}{% if portali_chiusura.orari_blu_diversi %}, Blu con orari propri{% endif %})</div>
+    <div class="panel-body">
+      <details>
+        <summary class="small text-primary mb-2">Mostra le {{ transazioni_finestra|length }} transazioni</summary>
+        <div class="table-responsive">
+          <table class="table table-sm data-table mb-0">
+            <thead class="table-light">
+              <tr><th>Ora</th><th>Portale</th><th>N&deg;</th><th>Prog.</th><th class="text-end">Listino</th><th>Origine</th><th>Stato</th></tr>
+            </thead>
+            <tbody>
+              {% for t in transazioni_finestra %}
+              <tr>
+                <td class="text-nowrap small">{{ t.orario|date:"d/m H:i:s" }}</td>
+                <td>{% if t.portale == 'A' %}Azzurro{% else %}Blu{% endif %}</td>
+                <td>{{ t.numero }}</td>
+                <td><strong>P{{ t.programma }}</strong></td>
+                <td class="text-end">&euro;{{ t.listino|floatformat:2 }}</td>
+                <td>{% if t.origine == 'contanti' %}<span class="badge bg-success-subtle text-success">Contanti</span>{% else %}<span class="badge bg-warning-subtle text-warning-emphasis">Unit&agrave; operativa</span>{% endif %}</td>
+                <td class="small">
+                  {% if t.abbinamento %}
+                    <i class="bi bi-link-45deg text-success"></i>
+                    <a href="{% url 'ordini:ordine-detail' t.abbinamento.item.ordine.pk %}">#{{ t.abbinamento.item.ordine.numero_progressivo|slice:"-4:" }}</a>
+                    {{ t.abbinamento.item.servizio_prodotto.titolo }}
+                  {% elif t.proposta_item %}
+                    <i class="bi bi-lightbulb text-primary"></i> proposta per
+                    <a href="{% url 'ordini:ordine-detail' t.proposta_item.ordine.pk %}">#{{ t.proposta_item.ordine.numero_progressivo|slice:"-4:" }}</a>
+                  {% elif t.in_residuo %}
+                    {% if t.rettifica_residuo %}<span class="badge bg-info text-dark">{{ t.rettifica_residuo.get_motivo_display }}</span> &euro;{{ t.rettifica_residuo.importo|floatformat:2 }}
+                    {% else %}<span class="text-danger">residuo &middot; pagato agli operatori</span>{% endif %}
+                  {% elif t.origine == 'unita' %}
+                    <span class="text-muted">proposta per un altro giorno</span>
+                  {% else %}
+                    <span class="text-muted">&mdash;</span>
+                  {% endif %}
+                </td>
+              </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+      </details>
+    </div>
+  </div>
+  {% endif %}
+
   {# ====== Ordini non incassati ====== #}
   {% if ordini_non_pagati %}
   <div class="chart-panel mb-3">

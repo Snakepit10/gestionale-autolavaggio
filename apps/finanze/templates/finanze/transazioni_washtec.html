@@ -1,0 +1,156 @@
+{% extends 'base.html' %}
+
+{% block title %}Transazioni WashTec{% endblock %}
+
+{% block extra_css %}
+<style>
+.page-header { display:flex; justify-content:space-between; align-items:center; margin-bottom:1rem; flex-wrap:wrap; gap:.75rem; }
+.page-header h1 { font-size:1.5rem; font-weight:700; color:#1a1a2e; margin:0; }
+.box { background:#fff; border:1px solid #e5e7eb; border-radius:12px; box-shadow:0 1px 2px rgba(0,0,0,.04); margin-bottom:1rem; }
+.box .testa { padding:10px 16px; border-bottom:1px solid #f1f5f9; font-weight:600; display:flex; justify-content:space-between; align-items:center; gap:.5rem; flex-wrap:wrap; }
+.box .corpo { padding:12px 16px; }
+.kpi { background:#fff; border:1px solid #e5e7eb; border-radius:12px; padding:10px 14px; height:100%; }
+.kpi .l { font-size:.75rem; color:#64748b; text-transform:uppercase; letter-spacing:.3px; }
+.kpi .v { font-size:1.3rem; font-weight:700; color:#1e293b; }
+table.tx thead th { background:#eef2f7; color:#475569; font-size:.72rem; text-transform:uppercase; letter-spacing:.3px; white-space:nowrap; }
+table.tx td { vertical-align:middle; }
+.badge-A { background:#e0f2fe; color:#0369a1; }
+.badge-B { background:#dbeafe; color:#1d4ed8; }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <h1><i class="bi bi-list-columns"></i> Transazioni WashTec</h1>
+    <div class="d-flex gap-2 flex-wrap">
+        <a class="btn btn-outline-secondary btn-sm" href="{% url 'finanze:importa_washtec' %}"><i class="bi bi-cloud-download"></i> Importa da WashTec</a>
+        <a class="btn btn-outline-success btn-sm" href="?{{ query }}&formato=csv"><i class="bi bi-filetype-csv"></i> Scarica CSV</a>
+    </div>
+</div>
+
+<p class="small text-muted">
+    Tutti i lavaggi dei portali estratti da WashTec Plus.
+    {% if ultima %}Ultima transazione in archivio: <strong>{{ ultima.get_portale_display }} #{{ ultima.numero }}</strong> del {{ ultima.orario|date:"d/m/Y H:i:s" }}.{% endif %}
+</p>
+
+<form method="get" class="box corpo">
+    <div class="row g-2 align-items-end">
+        <div class="col-6 col-md-2">
+            <label class="form-label small mb-0">Dal</label>
+            <input type="date" name="dal" value="{{ dal|date:'Y-m-d' }}" max="{{ oggi|date:'Y-m-d' }}" class="form-control form-control-sm">
+        </div>
+        <div class="col-6 col-md-2">
+            <label class="form-label small mb-0">Al</label>
+            <input type="date" name="al" value="{{ al|date:'Y-m-d' }}" max="{{ oggi|date:'Y-m-d' }}" class="form-control form-control-sm">
+        </div>
+        <div class="col-6 col-md-2">
+            <label class="form-label small mb-0">Portale</label>
+            <select name="portale" class="form-select form-select-sm">
+                <option value="">Entrambi</option>
+                {% for k, v in portali %}<option value="{{ k }}" {% if filtro.portale == k %}selected{% endif %}>{{ v }}</option>{% endfor %}
+            </select>
+        </div>
+        <div class="col-6 col-md-2">
+            <label class="form-label small mb-0">Origine</label>
+            <select name="origine" class="form-select form-select-sm">
+                <option value="">Tutte</option>
+                {% for k, v in origini %}<option value="{{ k }}" {% if filtro.origine == k %}selected{% endif %}>{{ v }}</option>{% endfor %}
+            </select>
+        </div>
+        <div class="col-4 col-md-1">
+            <label class="form-label small mb-0">Prog.</label>
+            <select name="programma" class="form-select form-select-sm">
+                <option value="">Tutti</option>
+                {% for n in "123456789" %}<option value="{{ n }}" {% if filtro.programma == n %}selected{% endif %}>P{{ n }}</option>{% endfor %}
+            </select>
+        </div>
+        <div class="col-8 col-md-2">
+            <label class="form-label small mb-0">Stato</label>
+            <select name="stato" class="form-select form-select-sm">
+                {% for k, v in stati %}<option value="{{ k }}" {% if filtro.stato == k %}selected{% endif %}>{{ v }}</option>{% endfor %}
+            </select>
+        </div>
+        <div class="col-6 col-md-1">
+            <label class="form-label small mb-0">N°</label>
+            <input type="text" inputmode="numeric" name="numero" value="{{ filtro.numero }}" class="form-control form-control-sm">
+        </div>
+        <div class="col-6 col-md-12 d-flex gap-2 justify-content-md-end">
+            <a href="?dal={{ giorno_prec|date:'Y-m-d' }}" class="btn btn-sm btn-outline-secondary" title="Giorno prima"><i class="bi bi-chevron-left"></i></a>
+            {% if giorno_succ <= oggi %}<a href="?dal={{ giorno_succ|date:'Y-m-d' }}" class="btn btn-sm btn-outline-secondary" title="Giorno dopo"><i class="bi bi-chevron-right"></i></a>{% endif %}
+            <a href="?" class="btn btn-sm btn-outline-secondary">Oggi</a>
+            <button class="btn btn-sm btn-primary"><i class="bi bi-funnel"></i> Filtra</button>
+        </div>
+    </div>
+</form>
+
+<div class="row g-2 mb-3">
+    <div class="col-6 col-md-3"><div class="kpi"><div class="l">Transazioni</div><div class="v">{{ totale }}</div></div></div>
+    <div class="col-6 col-md-3"><div class="kpi"><div class="l">Contanti (a listino)</div><div class="v">&euro;{{ valore_contanti|floatformat:2 }}</div></div></div>
+    <div class="col-6 col-md-3"><div class="kpi"><div class="l">Unità operativa (a listino)</div><div class="v">&euro;{{ valore_unita|floatformat:2 }}</div></div></div>
+    <div class="col-6 col-md-3"><div class="kpi"><div class="l">Per portale</div>
+        {% for r in riepilogo %}<div class="small"><strong>{{ r.portale }}</strong>: {{ r.contanti }} contanti &middot; {{ r.unita }} unità</div>{% endfor %}</div></div>
+</div>
+
+{% if programmi %}
+<p class="small text-muted mb-2">Per programma:
+    {% for p, n in programmi %}<span class="badge bg-light text-dark border">P{{ p }} &times; {{ n }}</span> {% endfor %}
+</p>
+{% endif %}
+
+{% if buchi %}
+<div class="alert alert-warning small">
+    <i class="bi bi-exclamation-triangle"></i> <strong>Mancano transazioni nell'archivio</strong> (numerazione con salti):
+    {% for b in buchi %}<div>{{ b.portale }}: n. {{ b.da_numero }}{% if b.quanti > 1 %}&ndash;{{ b.a_numero }}{% endif %} ({{ b.quanti }}) tra {{ b.dopo|date:"d/m H:i" }} e {{ b.prima|date:"d/m H:i" }}</div>{% endfor %}
+    Rifai l'importazione da WashTec per quel periodo.
+</div>
+{% endif %}
+
+<div class="box">
+    <div class="testa"><span><i class="bi bi-table"></i> Movimenti</span>
+        <span class="small text-muted fw-normal">{% if dal == al %}{{ dal|date:"l d/m/Y" }}{% else %}dal {{ dal|date:"d/m/Y" }} al {{ al|date:"d/m/Y" }}{% endif %}</span></div>
+    {% if pagina.object_list %}
+    <div class="table-responsive">
+        <table class="table table-sm table-hover tx mb-0">
+            <thead><tr><th>Data e ora</th><th>Portale</th><th>N°</th><th>Prog.</th><th class="text-end">Listino</th><th>Origine</th><th>Abbinamento / residuo</th></tr></thead>
+            <tbody>
+            {% for t in pagina.object_list %}
+                <tr>
+                    <td class="text-nowrap small">{{ t.orario|date:"d/m/Y H:i:s" }}</td>
+                    <td><span class="badge badge-{{ t.portale }}">{% if t.portale == 'A' %}Azzurro{% else %}Blu{% endif %}</span></td>
+                    <td>{{ t.numero }}</td>
+                    <td><strong>P{{ t.programma }}</strong></td>
+                    <td class="text-end">&euro;{{ t.listino|floatformat:2 }}</td>
+                    <td>{% if t.origine == 'contanti' %}<span class="badge bg-success-subtle text-success">Contanti</span>{% else %}<span class="badge bg-warning-subtle text-warning-emphasis">Unità operativa</span>{% endif %}</td>
+                    <td class="small">
+                        {% if t.abbinamento %}
+                            <i class="bi bi-link-45deg text-success"></i>
+                            <a href="{% url 'ordini:ordine-detail' t.abbinamento.item.ordine.pk %}">#{{ t.abbinamento.item.ordine.numero_progressivo|slice:"-4:" }}</a>
+                            {{ t.abbinamento.item.servizio_prodotto.titolo }}{% if t.abbinamento.item.ordine.cliente %} &middot; {{ t.abbinamento.item.ordine.cliente }}{% endif %}
+                        {% elif t.origine == 'unita' %}
+                            {% if t.rettifica_residuo %}
+                                <span class="badge bg-info text-dark">{{ t.rettifica_residuo.get_motivo_display }}</span> incassato &euro;{{ t.rettifica_residuo.importo|floatformat:2 }}{% if t.rettifica_residuo.nota %} &middot; {{ t.rettifica_residuo.nota }}{% endif %}
+                            {% else %}
+                                <span class="text-muted">non abbinata</span>
+                            {% endif %}
+                        {% else %}
+                            <span class="text-muted">—</span>
+                        {% endif %}
+                    </td>
+                </tr>
+            {% endfor %}
+            </tbody>
+        </table>
+    </div>
+    {% else %}
+    <div class="corpo text-muted">Nessuna transazione per questi filtri.{% if not ultima %} L'archivio è vuoto: importa da WashTec.{% endif %}</div>
+    {% endif %}
+</div>
+
+{% if pagina.has_other_pages %}
+<nav><ul class="pagination pagination-sm justify-content-center">
+    {% if pagina.has_previous %}<li class="page-item"><a class="page-link" href="?{{ query }}&page={{ pagina.previous_page_number }}">&laquo;</a></li>{% endif %}
+    <li class="page-item disabled"><span class="page-link">{{ pagina.number }} / {{ pagina.paginator.num_pages }}</span></li>
+    {% if pagina.has_next %}<li class="page-item"><a class="page-link" href="?{{ query }}&page={{ pagina.next_page_number }}">&raquo;</a></li>{% endif %}
+</ul></nav>
+{% endif %}
+{% endblock %}
