@@ -319,3 +319,35 @@ class ErroriNonLascianoItemTest(TestCase):
         art = prof.articolo
         art.refresh_from_db()
         self.assertEqual((art.quantita, list(art.giacenze.values_list('quantita', flat=True))), (9, [9]))
+
+
+class OraCompletamentoTest(TestCase):
+    def test_completato_il_e_lista(self):
+        from datetime import timedelta
+
+        from django.test import RequestFactory
+        from django.utils import timezone
+
+        from apps.core.models import Categoria, ServizioProdotto
+        from apps.ordini.models import ItemOrdine
+        from apps.ordini.views import OrdiniListView
+        cat = Categoria.objects.create(nome='S')
+        lav = ServizioProdotto.objects.create(titolo='Lavaggio', categoria=cat, prezzo=Decimal('22'), descrizione='')
+        prof = ServizioProdotto.objects.create(titolo='Profumo', categoria=cat, prezzo=Decimal('5'), descrizione='',
+                                               tipo='prodotto')
+        ordine = Ordine.objects.create(totale=Decimal('27'), totale_finale=Decimal('27'))
+        item = ItemOrdine.objects.create(ordine=ordine, servizio_prodotto=lav, quantita=1, prezzo_unitario=Decimal('22'))
+        self.assertIsNone(ordine.completato_il)
+        fine = timezone.now() + timedelta(hours=1)
+        ItemOrdine.objects.filter(pk=item.pk).update(stato='completato', fine_lavorazione=fine)
+        ItemOrdine.objects.create(ordine=ordine, servizio_prodotto=prof, quantita=1, prezzo_unitario=Decimal('5'))
+        ordine.refresh_from_db()
+        self.assertEqual(ordine.stato, 'completato')
+        self.assertEqual(ordine.completato_il, fine)               # il servizio, non il prodotto
+
+        req = RequestFactory().get('/')
+        req.user = utente_titolare('op', 'op@x.it', 'x', is_staff=True)
+        vista = OrdiniListView.as_view()(req)
+        html = vista.render().content.decode()
+        self.assertIn('bi-check2-circle', html)
+        self.assertIn(timezone.localtime(fine).strftime('%H:%M'), html)

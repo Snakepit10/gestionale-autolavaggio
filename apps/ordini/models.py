@@ -182,6 +182,19 @@ class Ordine(models.Model):
         return f"{prefisso}-{nuovo:03d}"
 
     @property
+    def completato_il(self):
+        """Quando e' stato completato l'ultimo servizio dell'ordine (i
+        prodotti solo se non ci sono servizi). None se non completato."""
+        if self.stato != 'completato':
+            return None
+        items = list(self.items.all())
+        orari = [i.fine_lavorazione for i in items
+                 if i.fine_lavorazione and i.servizio_prodotto.tipo != 'prodotto']
+        if not orari:
+            orari = [i.fine_lavorazione for i in items if i.fine_lavorazione]
+        return max(orari) if orari else None
+
+    @property
     def numero_display(self):
         """'V-003' per le vendite prodotti, '#7' per gli ordini."""
         if self.vendita_prodotti:
