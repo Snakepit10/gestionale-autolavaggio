@@ -53,7 +53,10 @@ def _ripartisci_uscita(articolo, quantita, primo):
     """[(posto, pezzi)] da cui far uscire `quantita`: prima dal posto
     `primo`, poi dagli altri posti con piu' merce; quello che manca va
     in negativo sul primo (inventario da rettificare)."""
-    giacenze = list(Giacenza.objects.select_for_update().filter(articolo=articolo).select_related('posto'))
+    # FOR UPDATE solo sulle giacenze: PostgreSQL rifiuta il blocco sul lato
+    # nullable della join con i posti (posto vuoto = senza posto)
+    giacenze = list(Giacenza.objects.select_for_update(of=('self',)).filter(articolo=articolo)
+                    .select_related('posto'))
     ordine = sorted(giacenze, key=lambda g: (g.posto_id != getattr(primo, 'pk', primo), -g.quantita))
     parti, resta = [], quantita
     for g in ordine:
@@ -171,6 +174,8 @@ def articolo_del_prodotto(prodotto):
             categoria=prodotto.gruppo or '', quantita=max(q, 0), traccia_scorte=q >= 0,
             scorta_minima=prodotto.quantita_minima_alert if q >= 0 else 0,
             prodotto=prodotto)
+        if q > 0:
+            Giacenza.objects.create(articolo=articolo, posto=None, quantita=q)
     return articolo
 
 

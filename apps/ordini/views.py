@@ -611,6 +611,7 @@ def completa_ordine(request):
         })
         
     except Exception as e:
+        transaction.set_rollback(True)
         return JsonResponse({'error': str(e)}, status=500)
 
 
@@ -1675,6 +1676,7 @@ def modifica_ordine(request, pk):
 
 
 @login_required
+@transaction.atomic
 def aggiungi_item_ordine(request, pk):
     """Aggiunge un nuovo servizio/prodotto a un ordine esistente"""
     print(f"DEBUG: aggiungi_item_ordine chiamato - ordine_id={pk}, metodo={request.method}, user={request.user}")
@@ -1818,12 +1820,14 @@ def aggiungi_item_ordine(request, pk):
             })
 
         except json.JSONDecodeError as e:
+            transaction.set_rollback(True)
             print(f"ERROR: JSONDecodeError - {str(e)}")
             return JsonResponse({
                 'success': False,
                 'error': 'Dati JSON non validi'
             }, status=400)
         except Exception as e:
+            transaction.set_rollback(True)
             import traceback
             print(f"ERROR: Exception durante aggiunta item - {str(e)}")
             print(f"ERROR: Traceback - {traceback.format_exc()}")
@@ -2003,11 +2007,13 @@ def modifica_item_ordine(request, pk):
                 })
 
         except json.JSONDecodeError:
+            transaction.set_rollback(True)
             return JsonResponse({
                 'success': False,
                 'error': 'Dati JSON non validi'
             }, status=400)
         except Exception as e:
+            transaction.set_rollback(True)
             return JsonResponse({
                 'success': False,
                 'error': f'Errore durante la modifica: {str(e)}'
@@ -2020,6 +2026,7 @@ def modifica_item_ordine(request, pk):
 
 
 @login_required
+@transaction.atomic
 def elimina_item_ordine(request, pk):
     """Elimina un item specifico dall'ordine"""
     ordine = get_object_or_404(Ordine, pk=pk)
@@ -2089,11 +2096,13 @@ def elimina_item_ordine(request, pk):
             })
 
         except json.JSONDecodeError:
+            transaction.set_rollback(True)
             return JsonResponse({
                 'success': False,
                 'error': 'Dati JSON non validi'
             }, status=400)
         except Exception as e:
+            transaction.set_rollback(True)
             return JsonResponse({
                 'success': False,
                 'error': f'Errore durante l\'eliminazione: {str(e)}'

@@ -282,3 +282,40 @@ class StatiLiberiTest(TestCase):
         except FileNotFoundError:
             return
         self.assertEqual(esito.returncode, 0, esito.stderr)
+
+
+
+class ErroriNonLascianoItemTest(TestCase):
+    """Se lo scarico di magazzino fallisce, l'item non resta nell'ordine."""
+
+    def test_aggiungi_item_annullato_se_lo_scarico_fallisce(self):
+        from unittest import mock
+
+        from apps.core.models import Categoria, ServizioProdotto
+        from apps.ordini.models import ItemOrdine
+        cat = Categoria.objects.create(nome='P')
+        prof = ServizioProdotto.objects.create(titolo='Profumo', categoria=cat, prezzo=Decimal('5'), descrizione='',
+                                               tipo='prodotto', quantita_disponibile=10)
+        ordine = Ordine.objects.create(totale=Decimal('0'), totale_finale=Decimal('0'))
+        user = utente_titolare('op', 'op@x.it', 'x', is_staff=True)
+        self.client.force_login(user)
+        from django.test import RequestFactory
+
+        from apps.ordini.views import aggiungi_item_ordine
+        req = RequestFactory().post('/', data=json.dumps({'servizio_id': prof.pk, 'quantita': 1, 'prezzo': 5}),
+                                    content_type='application/json')
+        req.user = user
+        with mock.patch('apps.magazzino.services.movimenta', side_effect=RuntimeError('db')):
+            r = aggiungi_item_ordine(req, pk=ordine.pk)
+        self.assertFalse(json.loads(r.content)['success'])
+        self.assertFalse(ItemOrdine.objects.filter(ordine=ordine).exists())
+        # senza errori: item, totale e scarico insieme
+        r = self.client.post(reverse('ordini:aggiungi-item-ordine', args=[ordine.pk]),
+                             data=json.dumps({'servizio_id': prof.pk, 'quantita': 1, 'prezzo': 5}),
+                             content_type='application/json')
+        self.assertTrue(r.json()['success'])
+        ordine.refresh_from_db()
+        self.assertEqual(ordine.totale_finale, Decimal('5.00'))
+        art = prof.articolo
+        art.refresh_from_db()
+        self.assertEqual((art.quantita, list(art.giacenze.values_list('quantita', flat=True))), (9, [9]))
