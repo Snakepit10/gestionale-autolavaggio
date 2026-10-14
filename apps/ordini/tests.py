@@ -344,6 +344,12 @@ class OraCompletamentoTest(TestCase):
         ordine.refresh_from_db()
         self.assertEqual(ordine.stato, 'completato')
         self.assertEqual(ordine.completato_il, fine)               # il servizio, non il prodotto
+        Ordine.objects.filter(pk=ordine.pk).update(data_ora=fine - timedelta(hours=1, minutes=41))
+        ordine.refresh_from_db()
+        self.assertEqual(ordine.tempo_completamento, '1h 41m')
+        Ordine.objects.filter(pk=ordine.pk).update(data_ora=fine - timedelta(minutes=35))
+        ordine.refresh_from_db()
+        self.assertEqual(ordine.tempo_completamento, '35 min')
 
         req = RequestFactory().get('/')
         req.user = utente_titolare('op', 'op@x.it', 'x', is_staff=True)
@@ -351,3 +357,4 @@ class OraCompletamentoTest(TestCase):
         html = vista.render().content.decode()
         self.assertIn('bi-check2-circle', html)
         self.assertIn(timezone.localtime(fine).strftime('%H:%M'), html)
+        self.assertIn('35 min', html)

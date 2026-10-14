@@ -195,6 +195,21 @@ class Ordine(models.Model):
         return max(orari) if orari else None
 
     @property
+    def tempo_completamento(self):
+        """Dalla creazione al completamento, es. '1h 41m' o '35 min'."""
+        fine = self.completato_il
+        if not fine or not self.data_ora or fine < self.data_ora:
+            return ''
+        minuti = int((fine - self.data_ora).total_seconds() // 60)
+        if minuti < 60:
+            return f'{minuti} min'
+        ore, minuti = divmod(minuti, 60)
+        if ore >= 24:
+            giorni, ore = divmod(ore, 24)
+            return f'{giorni}g {ore}h'
+        return f'{ore}h {minuti:02d}m'
+
+    @property
     def numero_display(self):
         """'V-003' per le vendite prodotti, '#7' per gli ordini."""
         if self.vendita_prodotti:
