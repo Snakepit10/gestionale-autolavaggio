@@ -829,3 +829,40 @@ class MigrazioneAssegnazioniAiPostiTest(TransactionTestCase):
         self.assertEqual(sorted(Assegnazione.objects.values_list('posto__nome', flat=True)),
                          ['Asciugatura M', 'Lavaggio M', 'Lavaggio M'])
         MigrationExecutor(connection).migrate(MigrationExecutor(connection).loader.graph.leaf_nodes())
+
+
+class CorrezioneVenditeOttobreTest(TestCase):
+    """Migrazione 0011: vendite senza scarico e totale dell'ordine #0010."""
+
+    def test_correzione_idempotente(self):
+        import importlib
+        from datetime import datetime
+
+        from django.utils import timezone
+
+        from apps.ordini.models import ItemOrdine, Ordine
+        cat = Categoria.objects.create(nome='P')
+        lav = ServizioProdotto.objects.create(titolo='Lavaggio', categoria=cat, prezzo=Decimal('22'), descrizione='')
+        odor = ServizioProdotto.objects.create(titolo='Odorbact', categoria=cat, prezzo=Decimal('15'),
+                                               descrizione='', tipo='prodotto', quantita_disponibile=12)
+        ordine = Ordine.objects.create(totale=Decimal('22'), totale_finale=Decimal('22'))
+        quando = timezone.make_aware(datetime(2026, 10, 14, 10, 46))
+        Ordine.objects.filter(pk=ordine.pk).update(numero_progressivo='20261014-0010', data_ora=quando)
+        ItemOrdine.objects.create(ordine=ordine, servizio_prodotto=lav, quantita=1, prezzo_unitario=Decimal('22'))
+        ItemOrdine.objects.create(ordine=ordine, servizio_prodotto=odor, quantita=1, prezzo_unitario=Decimal('15'))
+        # simula lo scarico fallito: niente movimento, quantita' invariata
+        art = odor.articolo
+        art.movimenti.all().delete()
+        Articolo.objects.filter(pk=art.pk).update(quantita=12)
+        art.giacenze.update(quantita=12)
+        Ordine.objects.filter(pk=ordine.pk).update(totale=Decimal('22'), totale_finale=Decimal('22'))
+
+        correggi = importlib.import_module('apps.magazzino.migrations.0011_correggi_vendite_12_14_ottobre').correggi
+        correggi(None, None)
+        correggi(None, None)                                   # seconda volta: nulla di nuovo
+        ordine.refresh_from_db()
+        art.refresh_from_db()
+        self.assertEqual(ordine.totale_finale, Decimal('37.00'))
+        self.assertEqual(art.quantita, 11)
+        mov = art.movimenti.get()
+        self.assertEqual((mov.tipo, mov.quantita, mov.ordine_id, mov.data), ('vendita', -1, ordine.pk, quando))
