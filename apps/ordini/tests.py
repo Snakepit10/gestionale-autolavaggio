@@ -374,3 +374,26 @@ class OraCompletamentoTest(TestCase):
         self.assertEqual(ordine.tempo_lavorazione, '1h 05m')
         html = OrdiniListView.as_view()(req).render().content.decode()
         self.assertIn('lav. 1h 05m', html)
+
+    def test_in_lavorazione_registra_inizio(self):
+        from django.test import RequestFactory
+
+        from apps.core.models import Categoria, ServizioProdotto
+        from apps.ordini.models import ItemOrdine
+        from apps.ordini.views import cambia_stato_ordine
+        cat = Categoria.objects.create(nome='S')
+        lav = ServizioProdotto.objects.create(titolo='Lavaggio', categoria=cat, prezzo=Decimal('22'), descrizione='')
+        ordine = Ordine.objects.create(totale=Decimal('22'), totale_finale=Decimal('22'))
+        item = ItemOrdine.objects.create(ordine=ordine, servizio_prodotto=lav, quantita=1, prezzo_unitario=Decimal('22'))
+        req = RequestFactory().post('/', data=json.dumps({'stato': 'in_lavorazione'}),
+                                    content_type='application/json')
+        req.user = utente_titolare('op3', 'op3@x.it', 'x', is_staff=True)
+        cambia_stato_ordine(req, ordine.pk)
+        item.refresh_from_db()
+        self.assertIsNotNone(item.inizio_lavorazione)
+        req = RequestFactory().post('/', data=json.dumps({'stato': 'completato'}),
+                                    content_type='application/json')
+        req.user = utente_titolare('op4', 'op4@x.it', 'x', is_staff=True)
+        cambia_stato_ordine(req, ordine.pk)
+        ordine = Ordine.objects.get(pk=ordine.pk)
+        self.assertEqual(ordine.tempo_lavorazione, '0 min')

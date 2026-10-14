@@ -1291,6 +1291,10 @@ def cambia_stato_ordine(request, pk):
                             item.fine_lavorazione = timezone.now()
                         item.save()
                         print(f"Item {item.id} automaticamente completato per ordine completato")
+            elif nuovo_stato == 'in_lavorazione' and vecchio_stato == 'in_attesa':
+                # inizio lavorazione: serve al tempo "lav." della lista ordini
+                ordine.items.exclude(servizio_prodotto__tipo='prodotto').filter(
+                    inizio_lavorazione__isnull=True).update(inizio_lavorazione=timezone.now())
             elif nuovo_stato in ('in_attesa', 'in_lavorazione') and vecchio_stato in ('completato', 'annullato'):
                 # Ordine riaperto: i servizi tornano nello stesso stato (i
                 # prodotti restano completati), altrimenti salvando un item
