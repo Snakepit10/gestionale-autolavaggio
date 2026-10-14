@@ -304,6 +304,10 @@ def riepilogo(chiusura, tolleranza=TOLLERANZA_DEFAULT):
             'scoperti': scoperti,
             'compatibili': compatibili,
             'manuale': it.manuale,
+            # abbinamenti confermati con un programma che il servizio non
+            # prevede (es. lavaggio a mano abbinato a un P4)
+            'fuori_standard': [] if it.manuale else
+            [a.pk for a in confermati if a.transazione.programma not in priorita],
         })
 
     from apps.finanze.models import RettificaResiduo
@@ -332,6 +336,7 @@ def riepilogo(chiusura, tolleranza=TOLLERANZA_DEFAULT):
         'righe': righe,
         'n_servito': sum(it.quantita for it in items if not it.manuale),
         'n_manuali': sum(1 for it in items if it.manuale),
+        'n_fuori_standard': sum(len(r['fuori_standard']) for r in righe),
         'n_manuali_aperti': sum(1 for r in righe if r['manuale'] and not r['confermati']),
         'n_confermati': n_confermati,
         'n_proposte': len(proposte),

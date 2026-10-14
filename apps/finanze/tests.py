@@ -298,6 +298,19 @@ class AbbinamentoPortaliTest(TestCase):
         self.assertEqual(r.status_code, 302)
         self.assertEqual(ap.proponi(self.chiusura), [])
 
+    def test_badge_fuori_standard(self):
+        a_mano = self._item(self.a_mano, completato='10:30')             # standard P5
+        completo = self._item(self.completo, completato='12:30')         # standard P8/P9/P7/P4
+        p4 = self._tx('10:05', 4)
+        p8 = self._tx('12:00', 8)
+        ap.abbina_manuale(self.chiusura, a_mano.pk, p4.pk)
+        ap.abbina_manuale(self.chiusura, completo.pk, p8.pk)
+        r = ap.riepilogo(self.chiusura)
+        per_item = {x['item'].pk: x['fuori_standard'] for x in r['righe']}
+        self.assertEqual(len(per_item[a_mano.pk]), 1)
+        self.assertEqual(per_item[completo.pk], [])
+        self.assertEqual(r['n_fuori_standard'], 1)
+
     def test_conferma_idempotente(self):
         self._item(self.completo, completato='10:30')
         self._tx('10:05', 4)

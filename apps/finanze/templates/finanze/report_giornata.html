@@ -1103,6 +1103,7 @@
         <span class="text-success"><i class="bi bi-check-circle-fill"></i> {{ abbinamento.n_confermati }} confermati</span>
         <span class="text-primary"><i class="bi bi-lightbulb"></i> {{ abbinamento.n_proposte }} proposti</span>
         {% if abbinamento.n_scoperti %}<span class="text-warning"><i class="bi bi-question-circle"></i> {{ abbinamento.n_scoperti }} senza transazione</span>{% endif %}
+        {% if abbinamento.n_fuori_standard %}<span class="badge bg-danger" title="Abbinamenti con un programma diverso da quelli del servizio"><i class="bi bi-exclamation-triangle"></i> {{ abbinamento.n_fuori_standard }} fuori standard</span>{% endif %}
         {% if abbinamento.n_manuali %}<span class="text-secondary" title="Ordini con servizi senza programmi portale nel catalogo: si abbinano solo a mano"><i class="bi bi-hand-index"></i> {{ abbinamento.n_manuali }} ordini senza programmi{% if abbinamento.n_manuali_aperti %} ({{ abbinamento.n_manuali_aperti }} da abbinare a mano){% endif %}</span>{% endif %}
         <span class="text-danger"><i class="bi bi-person-badge"></i> {{ abbinamento.residuo|length }} residui = &euro;{{ abbinamento.valore_residuo|floatformat:2 }}</span>
         {% if abbinamento.n_proposte %}
@@ -1156,6 +1157,7 @@
                       <input type="hidden" name="abbinamento_id" value="{{ a.pk }}">
                       <span class="badge bg-success"><i class="bi bi-check"></i> {{ a.transazione.portale }} #{{ a.transazione.numero }}</span>
                       <span class="small">{{ a.transazione.orario|date:"H:i" }} · P{{ a.transazione.programma }}</span>
+                      {% if a.pk in r.fuori_standard %}<span class="badge bg-danger" title="Il servizio prevede {% for p in r.programmi %}P{{ p }}{% if not forloop.last %}/{% endif %}{% endfor %}: abbinato a un programma diverso">fuori standard</span>{% endif %}
                       <button type="submit" class="btn btn-link btn-sm text-danger p-0 ms-1" title="Rimuovi abbinamento"><i class="bi bi-x-circle"></i></button>
                     </form>
                     {% endfor %}
