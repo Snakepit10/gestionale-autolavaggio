@@ -1519,6 +1519,20 @@ def azione_abbinamento_portali(request):
         (messages.success if ok else messages.error)(request, msg)
     elif azione == 'rettifica_residuo':
         _rettifica_residuo(request, chiusura)
+    elif azione == 'visto':
+        # spunta "vista" su una riga del residuo (solo promemoria)
+        from .models import ResiduoVisto, TransazionePortale
+        tx = TransazionePortale.objects.filter(pk=request.POST.get('transazione_id') or 0).first()
+        visto = request.POST.get('visto') == '1'
+        if tx is not None:
+            if visto:
+                ResiduoVisto.objects.get_or_create(transazione=tx, defaults={'operatore': request.user})
+            else:
+                ResiduoVisto.objects.filter(transazione=tx).delete()
+        if request.headers.get('X-Requested-With') == 'fetch':
+            return JsonResponse({'ok': tx is not None, 'visto': visto})
+        if tx is None:
+            messages.error(request, 'Transazione non trovata.')
     elif azione == 'rimuovi':
         if abbinamento_portali.rimuovi(chiusura, request.POST.get('abbinamento_id'), request.user):
             messages.success(request, 'Abbinamento rimosso: quella transazione non verrà più proposta per il lavaggio.')

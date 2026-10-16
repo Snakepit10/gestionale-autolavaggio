@@ -364,6 +364,21 @@ class AbbinamentoPortaliTest(TestCase):
         riga = ap.riepilogo(self.chiusura)['righe'][0]
         self.assertEqual((riga['slot_liberi'], riga['compatibili']), (0, []))
 
+    def test_residuo_segna_vista(self):
+        from apps.finanze.models import ResiduoVisto
+        tx = self._tx('15:00', 1)
+        self.client.force_login(utente_titolare('tit3', 'tit3@x.it', 'x', is_staff=True))
+        url = reverse('finanze:azione_abbinamento_portali')
+        base = {'data': '2026-10-06', 'azione': 'visto', 'transazione_id': tx.pk}
+        r = self.client.post(url, {**base, 'visto': '1'}, HTTP_X_REQUESTED_WITH='fetch')
+        self.assertEqual(r.json(), {'ok': True, 'visto': True})
+        r = ap.riepilogo(self.chiusura)
+        self.assertEqual((r['n_visti'], r['residuo'][0]['visto'].transazione_id), (1, tx.pk))
+        self.assertEqual(r['valore_residuo'], Decimal('15.00'))          # non cambia i conti
+        self.client.post(url, {**base, 'visto': '0'}, HTTP_X_REQUESTED_WITH='fetch')
+        self.assertFalse(ResiduoVisto.objects.exists())
+        self.assertIsNone(ap.riepilogo(self.chiusura)['residuo'][0]['visto'])
+
     def test_conferma_idempotente(self):
         self._item(self.completo, completato='10:30')
         self._tx('10:05', 4)

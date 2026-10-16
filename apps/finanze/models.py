@@ -613,6 +613,20 @@ class AbbinamentoPortale(models.Model):
         return f"{self.transazione} -> item {self.item_id}"
 
 
+class ResiduoVisto(models.Model):
+    """Riga del residuo (lavaggio pagato agli operatori) controllata:
+    serve solo come promemoria nel report giornata, non cambia i conti."""
+    transazione = models.OneToOneField(
+        TransazionePortale, on_delete=models.CASCADE, related_name='residuo_visto')
+    operatore = models.ForeignKey(
+        User, on_delete=models.SET_NULL, null=True, blank=True, related_name='residui_visti')
+    visto_il = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        verbose_name = 'Residuo visto'
+        verbose_name_plural = 'Residui visti'
+
+
 class RettificaResiduo(models.Model):
     """Un lavaggio del residuo (unita' operativa non abbinata al servito)
     che gli operatori NON hanno incassato a listino: omaggio, promo...

@@ -1227,11 +1227,13 @@
           <div class="table-responsive">
             <table class="table table-sm data-table mb-1">
               <thead class="table-light">
-                <tr><th>Portale</th><th>#</th><th>Ora</th><th>Prog.</th><th class="text-end">Listino</th><th class="text-end">Incassato</th><th></th></tr>
+                <tr><th title="Righe controllate">Vista</th><th>Portale</th><th>#</th><th>Ora</th><th>Prog.</th><th class="text-end">Listino</th><th class="text-end">Incassato</th><th></th></tr>
               </thead>
               <tbody>
                 {% for x in abbinamento.residuo %}
-                <tr data-tx="{{ x.transazione.pk }}">
+                <tr data-tx="{{ x.transazione.pk }}" class="riga-residuo{% if x.visto %} residuo-visto{% endif %}">
+                  <td><input type="checkbox" class="form-check-input spunta-visto" value="{{ x.transazione.pk }}"{% if x.visto %} checked{% endif %}
+                             title="{% if x.visto %}Vista da {{ x.visto.operatore.get_full_name|default:x.visto.operatore.username|default:'—' }} il {{ x.visto.visto_il|date:'d/m H:i' }}{% else %}Segna come vista{% endif %}"></td>
                   <td>{{ x.transazione.portale }}</td>
                   <td>{{ x.transazione.numero }}</td>
                   <td>{{ x.transazione.orario|date:"d/m H:i" }}</td>
@@ -1254,15 +1256,16 @@
                             data-nota="{{ x.rettifica.nota|default:'' }}"><i class="bi bi-pencil"></i></button>
                   </td>
                 </tr>
-                {% if x.rettifica.nota %}<tr class="small text-muted"><td colspan="7" class="pt-0 border-0 ps-3">&#8627; {{ x.rettifica.nota }}</td></tr>{% endif %}
+                {% if x.rettifica.nota %}<tr class="small text-muted" data-tx="{{ x.transazione.pk }}"><td colspan="8" class="pt-0 border-0 ps-3">&#8627; {{ x.rettifica.nota }}</td></tr>{% endif %}
                 {% endfor %}
               </tbody>
               <tfoot>
-                <tr class="fw-bold"><td colspan="4">Totale da verificare con gli operatori</td>
+                <tr class="fw-bold"><td colspan="5">Totale da verificare con gli operatori
+                  <span class="badge bg-light text-dark border fw-normal ms-1" title="Righe segnate come viste"><i class="bi bi-check2-square"></i> <span id="n-visti">{{ abbinamento.n_visti }}</span>/<span id="n-residui">{{ abbinamento.residuo|length }}</span> viste</span></td>
                   <td class="text-end {% if abbinamento.n_rettificati %}text-muted{% endif %}">&euro;{{ abbinamento.valore_residuo_listino|floatformat:2 }}</td>
                   <td class="text-end">&euro;{{ abbinamento.valore_residuo|floatformat:2 }}</td><td></td></tr>
                 {% if abbinamento.n_rettificati %}
-                <tr class="small"><td colspan="7" class="text-muted">{{ abbinamento.n_rettificati }} lavagg{{ abbinamento.n_rettificati|pluralize:"io,i" }} rettificat{{ abbinamento.n_rettificati|pluralize:"o,i" }} (omaggi, promo): &minus;&euro;{{ abbinamento.rettifica_residuo|floatformat:2 }} rispetto al listino. In quadratura conta l'incassato.</td></tr>
+                <tr class="small"><td colspan="8" class="text-muted">{{ abbinamento.n_rettificati }} lavagg{{ abbinamento.n_rettificati|pluralize:"io,i" }} rettificat{{ abbinamento.n_rettificati|pluralize:"o,i" }} (omaggi, promo): &minus;&euro;{{ abbinamento.rettifica_residuo|floatformat:2 }} rispetto al listino. In quadratura conta l'incassato.</td></tr>
                 {% endif %}
               </tfoot>
             </table>
@@ -1272,7 +1275,7 @@
             {{ abbinamento.residuo_senza_prezzo }} su programmi senza prezzo (contati a 0 &euro;)</div>
           {% endif %}
           <div class="small text-muted mt-1">Calcolato sugli abbinamenti confermati: ogni transazione che abbini a un ordine esce dal residuo.
-            Con <i class="bi bi-pencil"></i> segni un lavaggio come omaggio o promo.</div>
+            Con <i class="bi bi-pencil"></i> segni un lavaggio come omaggio o promo; la spunta <em>Vista</em> ricorda le righe gi&agrave; controllate (non cambia i conti).</div>
 
           <div class="modal fade" id="modaleRettificaResiduo" tabindex="-1">
             <div class="modal-dialog">
@@ -1429,6 +1432,36 @@
 {% endblock %}
 
 {% block extra_js %}
+<style>
+  #abbinamento-portali tr.residuo-visto > td { opacity: .55; }
+  #abbinamento-portali tr.residuo-visto > td:first-child { opacity: 1; }
+</style>
+<script>
+// Spunta "vista" sulle righe del residuo: salvata subito, senza ricaricare
+document.querySelectorAll('#abbinamento-portali .spunta-visto').forEach(function (box) {
+  box.addEventListener('change', function () {
+    var riga = box.closest('tr');
+    var dati = new FormData();
+    dati.append('csrfmiddlewaretoken', '{{ csrf_token }}');
+    dati.append('data', '{{ data|date:"Y-m-d" }}');
+    dati.append('azione', 'visto');
+    dati.append('transazione_id', box.value);
+    dati.append('visto', box.checked ? '1' : '0');
+    box.disabled = true;
+    fetch('{% url "finanze:azione_abbinamento_portali" %}', {method: 'POST', body: dati, headers: {'X-Requested-With': 'fetch'}})
+      .then(function (r) { return r.json(); })
+      .then(function (d) {
+        box.disabled = false;
+        if (!d.ok) { box.checked = !box.checked; alert('Riga non trovata: ricarica la pagina.'); return; }
+        riga.classList.toggle('residuo-visto', d.visto);
+        box.title = d.visto ? 'Vista ora' : 'Segna come vista';
+        var n = document.getElementById('n-visti');
+        if (n) n.textContent = document.querySelectorAll('#abbinamento-portali .spunta-visto:checked').length;
+      })
+      .catch(function () { box.disabled = false; box.checked = !box.checked; alert('Non salvato: riprova.'); });
+  });
+});
+</script>
 <script>
 // Abbinamento a mano senza ricaricare: la transazione scelta sparisce
 // subito da tutti gli elenchi e dal residuo; i totali si aggiornano
@@ -1455,6 +1488,9 @@ document.querySelectorAll('form.form-abbina').forEach(function (form) {
         form.parentNode.insertBefore(fatto, form);
         document.querySelectorAll('select[name=transazione_id] option[value="' + tx + '"]').forEach(function (o) { o.remove(); });
         document.querySelectorAll('#abbinamento-portali tr[data-tx="' + tx + '"]').forEach(function (r) { r.remove(); });
+        var nv = document.getElementById('n-visti'), nr = document.getElementById('n-residui');
+        if (nv) nv.textContent = document.querySelectorAll('#abbinamento-portali .spunta-visto:checked').length;
+        if (nr) nr.textContent = document.querySelectorAll('#abbinamento-portali .spunta-visto').length;
         var liberi = parseInt(form.dataset.liberi || '1', 10) - 1;
         form.dataset.liberi = liberi;
         if (liberi <= 0) form.remove();

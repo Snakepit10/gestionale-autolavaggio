@@ -301,12 +301,16 @@ def riepilogo(chiusura, tolleranza=TOLLERANZA_DEFAULT, con_proposte=False):
     residuo = transazioni_libere(chiusura)
     rettifiche = {r.transazione_id: r for r in RettificaResiduo.objects.filter(
         transazione__in=residuo).select_related('operatore')}
+    from apps.finanze.models import ResiduoVisto
+    visti = {v.transazione_id: v for v in ResiduoVisto.objects.filter(
+        transazione__in=residuo).select_related('operatore')}
     righe_residuo = []
     for t in residuo:
         listino = PREZZI_PROGRAMMA_PORTALE[t.programma]
         rettifica = rettifiche.get(t.pk)
         righe_residuo.append({'transazione': t, 'listino': listino, 'rettifica': rettifica,
-                              'valore': rettifica.importo if rettifica else listino})
+                              'valore': rettifica.importo if rettifica else listino,
+                              'visto': visti.get(t.pk)})
     valore_listino = sum((r['listino'] for r in righe_residuo), Decimal('0.00'))
     valore_residuo = sum((r['valore'] for r in righe_residuo), Decimal('0.00'))
     senza_prezzo = sum(1 for t in residuo if not PREZZI_PROGRAMMA_PORTALE[t.programma])
@@ -328,6 +332,7 @@ def riepilogo(chiusura, tolleranza=TOLLERANZA_DEFAULT, con_proposte=False):
         'valore_residuo_listino': valore_listino,
         'rettifica_residuo': valore_listino - valore_residuo,
         'n_rettificati': len(rettifiche),
+        'n_visti': len(visti),
         'residuo_senza_prezzo': senza_prezzo,
         'tolleranza_ore': tolleranza.total_seconds() / 3600,
         'anticipo_min': int(ANTICIPO_PORTALE.total_seconds() / 60),
