@@ -352,6 +352,18 @@ class AbbinamentoPortaliTest(TestCase):
                               'transazione_id': 0, 'proposte': '1'})
         self.assertIn('proposte=1', r['Location'])
 
+    def test_abbina_senza_ricaricare(self):
+        item = self._item(self.a_mano, completato='10:30')
+        p5 = self._tx('10:05', 5)
+        self.client.force_login(utente_titolare('tit2', 'tit2@x.it', 'x', is_staff=True))
+        r = self.client.post(reverse('finanze:azione_abbinamento_portali'),
+                             {'data': '2026-10-06', 'azione': 'abbina', 'item_id': item.pk,
+                              'transazione_id': p5.pk}, HTTP_X_REQUESTED_WITH='fetch')
+        self.assertTrue(r.json()['ok'])
+        self.assertTrue(AbbinamentoPortale.objects.filter(item=item, transazione=p5).exists())
+        riga = ap.riepilogo(self.chiusura)['righe'][0]
+        self.assertEqual((riga['slot_liberi'], riga['compatibili']), (0, []))
+
     def test_conferma_idempotente(self):
         self._item(self.completo, completato='10:30')
         self._tx('10:05', 4)
@@ -366,9 +378,9 @@ class AbbinamentoPortaliTest(TestCase):
         p4 = self._tx('10:05', 4)
         p5 = self._tx('11:30', 5)
         # a mano si sceglie anche un programma fuori standard (P4 su un
-        # completo a mano, standard P5): nell'elenco viene dopo i P5
+        # completo a mano, standard P5): l'elenco e' in ordine cronologico
         riga = next(r for r in ap.riepilogo(self.chiusura)['righe'] if r['item'].pk == item.pk)
-        self.assertEqual([t.pk for t in riga['compatibili']], [p5.pk, p4.pk])
+        self.assertEqual([t.pk for t in riga['compatibili']], [p4.pk, p5.pk])
         ok, _ = ap.abbina_manuale(self.chiusura, item.pk, p4.pk)
         self.assertTrue(ok)
         item2 = self._item(self.a_mano, completato='12:10')

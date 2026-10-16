@@ -249,8 +249,7 @@ def riepilogo(chiusura, tolleranza=TOLLERANZA_DEFAULT, con_proposte=False):
     - righe: un dict per item servito con abbinamenti confermati,
       proposte (solo se richieste con con_proposte: l'abbinamento
       automatico parte solo dal tasto), slot scoperti e transazioni
-      libere compatibili (per la scelta manuale: prima per priorita' di
-      programma, poi vicinanza);
+      libere compatibili (per la scelta manuale, in ordine cronologico);
     - residuo: transazioni 'unita' non abbinate (= lavaggi pagati agli
       operatori), con valore da listino e valore incassato (diverso dal
       listino se rettificato: omaggio, promo...). Conta solo gli
@@ -272,25 +271,14 @@ def riepilogo(chiusura, tolleranza=TOLLERANZA_DEFAULT, con_proposte=False):
         n_confermati += len(confermati)
         prop = proposte_per_item.get(it.pk, [])
         priorita = it.servizio_prodotto.programmi_portale_ordinati
-        obiettivo = it.riferimento[0]
-        compatibili = []
+        # scelta a mano: tutte le transazioni libere del giorno (anche con
+        # programmi fuori standard) in ordine cronologico
+        compatibili = libere if _slot_liberi(it) else []
         if it.manuale:
-            # senza programmi: nessuna proposta, si sceglie tra tutte le
-            # transazioni libere del giorno, dalla piu' vicina d'orario
+            # senza programmi: nessuna proposta
             scoperti = 0
-            if _slot_liberi(it):
-                compatibili = sorted(libere, key=lambda t: abs((t.orario - obiettivo).total_seconds()))
         else:
             scoperti = max(0, it.quantita - len(confermati) - len(prop))
-            if _slot_liberi(it):
-                # a mano si puo' scegliere anche un programma fuori standard:
-                # prima quelli del servizio (per priorita'), poi gli altri,
-                # sempre dal piu' vicino d'orario
-                compatibili = sorted(
-                    libere,
-                    key=lambda t: (t.programma not in priorita,
-                                   priorita.index(t.programma) if t.programma in priorita else 0,
-                                   abs((t.orario - obiettivo).total_seconds())))
         righe.append({
             'item': it, 'rif': it.riferimento[3],
             'rif_tipo': it.riferimento[2],
@@ -300,6 +288,8 @@ def riepilogo(chiusura, tolleranza=TOLLERANZA_DEFAULT, con_proposte=False):
             'scoperti': scoperti,
             'compatibili': compatibili,
             'manuale': it.manuale,
+            # quante transazioni puo' ancora prendere (abbinamento a mano)
+            'slot_liberi': max(0, it.quantita - len(confermati)),
             # abbinamenti confermati con un programma che il servizio non
             # prevede (es. lavaggio a mano abbinato a un P4)
             'fuori_standard': [] if it.manuale else

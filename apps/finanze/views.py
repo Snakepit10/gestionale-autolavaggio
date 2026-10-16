@@ -1513,6 +1513,9 @@ def azione_abbinamento_portali(request):
             return redirect(torna)
         ok, msg = abbinamento_portali.abbina_manuale(
             chiusura, item_id, tx_id, request.user)
+        if request.headers.get('X-Requested-With') == 'fetch':
+            # abbinamento dal report senza ricaricare la pagina
+            return JsonResponse({'ok': ok, 'msg': msg})
         (messages.success if ok else messages.error)(request, msg)
     elif azione == 'rettifica_residuo':
         _rettifica_residuo(request, chiusura)
