@@ -90,7 +90,7 @@ class AbbinamentoPortaliTest(TestCase):
     def test_ripiego_su_creazione(self):
         item = self._item(self.completo, creato='10:00')
         t = self._tx('10:20', 4)
-        r = ap.riepilogo(self.chiusura)
+        r = ap.riepilogo(self.chiusura, con_proposte=True)
         self.assertEqual(r['n_senza_completamento'], 1)
         self.assertEqual(r['righe'][0]['rif_tipo'], 'creato')
         self.assertEqual(r['righe'][0]['proposte'][0]['transazione'].pk, t.pk)
@@ -106,7 +106,7 @@ class AbbinamentoPortaliTest(TestCase):
             prezzo_unitario=self.a_mano.prezzo,
             fine_lavorazione=ora('15:00') + timedelta(hours=18))
         p5 = self._tx('15:25', 5)
-        r = ap.riepilogo(self.chiusura)
+        r = ap.riepilogo(self.chiusura, con_proposte=True)
         self.assertEqual(r['righe'][0]['rif_tipo'], 'tardivo')
         self.assertEqual(r['righe'][0]['proposte'][0]['transazione'].pk, p5.pk)
         self.assertEqual(r['n_senza_completamento'], 1)
@@ -136,13 +136,16 @@ class AbbinamentoPortaliTest(TestCase):
         self.assertIn(tardo.pk, [i.pk for i in ap.lavaggi_servito(self.chiusura)])
         self.assertEqual([(p['item'].pk, p['transazione'].pk) for p in ap.proponi(self.chiusura)],
                          [(tardo.pk, tx.pk)])
-        # Nel report del 07 il lavaggio non c'e' e la transazione non e' residuo
+        # Nel report del 07 il lavaggio non c'e'; la transazione e' residuo
+        # del 07 finche' non si conferma l'abbinamento col 06
         domani = ChiusuraPortali.objects.create(
             data=datetime(2026, 10, 7).date(), periodo_da=ora('18:00'),
             periodo_a=ora('18:00') + timedelta(days=1))
         r = ap.riepilogo(domani)
         self.assertEqual(r['n_servito'], 0)
-        self.assertNotIn(tx.pk, [x['transazione'].pk for x in r['residuo']])
+        self.assertIn(tx.pk, [x['transazione'].pk for x in r['residuo']])
+        ap.conferma_proposte(self.chiusura)
+        self.assertNotIn(tx.pk, [x['transazione'].pk for x in ap.riepilogo(domani)['residuo']])
         # una transazione libera dopo la chiusura resta residuo del 07
         libera = self._tx('20:30', 1)
         self.assertIn(libera.pk, [x['transazione'].pk for x in ap.riepilogo(domani)['residuo']])
@@ -174,7 +177,7 @@ class AbbinamentoPortaliTest(TestCase):
         self.assertEqual(proposte[secondo.pk]['transazione'].pk, lontano.pk)
         self.assertTrue(proposte[secondo.pk]['fuori_orario'])
         self.assertEqual(len(proposte), 2)
-        self.assertEqual(ap.riepilogo(self.chiusura)['n_scoperti'], 1)
+        self.assertEqual(ap.riepilogo(self.chiusura, con_proposte=True)['n_scoperti'], 1)
 
     def test_quantita_due_prende_due_transazioni(self):
         self._item(self.completo, completato='10:30', quantita=2)
@@ -192,11 +195,19 @@ class AbbinamentoPortaliTest(TestCase):
 
     def test_riepilogo_residuo(self):
         self._item(self.completo, completato='10:30')
-        self._tx('10:05', 4)                    # abbinata al servito
+        self._tx('10:05', 4)                    # da abbinare al servito
         self._tx('15:00', 1)                    # residuo 15 euro
         self._tx('16:00', 9)                    # residuo senza prezzo
+        # nessun abbinamento automatico: senza il tasto niente proposte
         r = ap.riepilogo(self.chiusura)
-        self.assertEqual(r['n_proposte'], 1)
+        self.assertEqual((r['n_proposte'], r['con_proposte'], r['n_scoperti']), (0, False, 1))
+        self.assertEqual(r['righe'][0]['proposte'], [])
+        self.assertEqual(len(r['residuo']), 3)
+        # con il tasto: proposte visibili, il residuo non cambia finche' non si conferma
+        r = ap.riepilogo(self.chiusura, con_proposte=True)
+        self.assertEqual((r['n_proposte'], len(r['residuo'])), (1, 3))
+        ap.conferma_proposte(self.chiusura)
+        r = ap.riepilogo(self.chiusura)
         self.assertEqual(len(r['residuo']), 2)
         self.assertEqual(r['valore_residuo'], Decimal('15.00'))
         self.assertEqual(r['residuo_senza_prezzo'], 1)
@@ -310,6 +321,36 @@ class AbbinamentoPortaliTest(TestCase):
         self.assertEqual(len(per_item[a_mano.pk]), 1)
         self.assertEqual(per_item[completo.pk], [])
         self.assertEqual(r['n_fuori_standard'], 1)
+
+    def test_report_proposte_solo_col_tasto(self):
+        from django.contrib.messages.storage.fallback import FallbackStorage
+        from django.test import RequestFactory
+
+        from apps.finanze.views import report_giornata
+        self._item(self.completo, completato='10:30')
+        self._tx('10:05', 4)
+        admin = utente_titolare('tit', 'tit@x.it', 'x', is_staff=True)
+
+        def pagina(**extra):
+            req = RequestFactory().get('/', {'data': '2026-10-06', **extra})
+            req.user = admin
+            req.session = {}
+            req._messages = FallbackStorage(req)
+            return report_giornata(req).content.decode()
+
+        html = pagina()
+        self.assertIn('Proponi abbinamenti', html)
+        self.assertNotIn('Conferma 1 proposta', html)
+        html = pagina(proposte='1')
+        self.assertIn('Conferma 1 proposta', html)
+        self.assertIn('Nascondi proposte', html)
+        self.assertFalse(AbbinamentoPortale.objects.exists())       # mostrare non salva nulla
+        # scartando una proposta si resta con le proposte visibili
+        self.client.force_login(admin)
+        r = self.client.post(reverse('finanze:azione_abbinamento_portali'),
+                             {'data': '2026-10-06', 'azione': 'rifiuta', 'item_id': 0,
+                              'transazione_id': 0, 'proposte': '1'})
+        self.assertIn('proposte=1', r['Location'])
 
     def test_conferma_idempotente(self):
         self._item(self.completo, completato='10:30')

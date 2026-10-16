@@ -1088,7 +1088,7 @@ def report_giornata(request):
             })
 
     # ==================== QUADRATURA GIORNALIERA COMPLESSIVA ====================
-    contesto_portali = _contesto_lavaggi_portali(data)
+    contesto_portali = _contesto_lavaggi_portali(data, con_proposte=request.GET.get('proposte') == '1')
     # Self service atteso in cassa = incasso totale - ricarica di ogni cassa:
     # la ricarica la fanno gli operatori con i soldi del fondo cassa, il
     # resto resta in cassa finche' il cliente non porta il ticket di resto.
@@ -1307,7 +1307,7 @@ def _chiusura_portali(data):
     ), False
 
 
-def _contesto_lavaggi_portali(data, completo=True):
+def _contesto_lavaggi_portali(data, completo=True, con_proposte=False):
     """Sezione 'Lavaggi portali (WashTec)' del report giornata.
 
     L'operatore imposta la finestra di chiusura (ChiusuraPortali);
@@ -1389,7 +1389,7 @@ def _contesto_lavaggi_portali(data, completo=True):
             'righe': [{'t': t, 'dentro': chiusura.contiene(t)} for t in vicine],
         })
 
-    abbinamento = abbinamento_portali.riepilogo(chiusura)
+    abbinamento = abbinamento_portali.riepilogo(chiusura, con_proposte=con_proposte)
 
     # WashCycles self service: lavaggi pagati in contanti al portale +
     # residuo unita' operativa (pagati direttamente agli operatori)
@@ -1484,7 +1484,9 @@ def azione_abbinamento_portali(request):
     from .models import AbbinamentoPortale
 
     data_str = request.POST.get('data', '')
-    torna = f"{reverse('finanze:report_giornata')}?data={data_str}#abbinamento-portali"
+    # dopo aver scartato una proposta si resta con le proposte visibili
+    proposte = '&proposte=1' if request.POST.get('proposte') == '1' else ''
+    torna = f"{reverse('finanze:report_giornata')}?data={data_str}{proposte}#abbinamento-portali"
     if request.method != 'POST':
         return redirect('finanze:report_giornata')
     try:

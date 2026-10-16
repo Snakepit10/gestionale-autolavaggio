@@ -56,13 +56,6 @@ def _limiti_giorno(giorno):
     return inizio, inizio + timedelta(days=1)
 
 
-def _giorni_finestra(chiusura):
-    """Giorni di calendario toccati dalla finestra di chiusura."""
-    da = timezone.localtime(min(chiusura.periodo_da, chiusura.finestra('B')[0])).date()
-    a = timezone.localtime(max(chiusura.periodo_a, chiusura.finestra('B')[1])).date()
-    return [da + timedelta(days=n) for n in range((a - da).days + 1)]
-
-
 def _riferimento(item):
     """(obiettivo, limite_max, tipo, orario_mostrato) dell'item.
 
@@ -250,24 +243,27 @@ def proponi_giorno(giorno, tolleranza=TOLLERANZA_DEFAULT, items=None, libere=Non
     return proposte
 
 
-def riepilogo(chiusura, tolleranza=TOLLERANZA_DEFAULT):
+def riepilogo(chiusura, tolleranza=TOLLERANZA_DEFAULT, con_proposte=False):
     """Dati per la sezione del report giornata.
 
     - righe: un dict per item servito con abbinamenti confermati,
-      proposte, slot scoperti e transazioni libere compatibili (per la
-      scelta manuale: prima per priorita' di programma, poi vicinanza);
-    - residuo: transazioni 'unita' che restano libere dopo le proposte
-      (= lavaggi pagati agli operatori), con valore da listino e valore
-      incassato (diverso dal listino se rettificato: omaggio, promo...).
+      proposte (solo se richieste con con_proposte: l'abbinamento
+      automatico parte solo dal tasto), slot scoperti e transazioni
+      libere compatibili (per la scelta manuale: prima per priorita' di
+      programma, poi vicinanza);
+    - residuo: transazioni 'unita' non abbinate (= lavaggi pagati agli
+      operatori), con valore da listino e valore incassato (diverso dal
+      listino se rettificato: omaggio, promo...). Conta solo gli
+      abbinamenti confermati: le proposte non lo cambiano finche' non
+      si confermano.
     """
     items = lavaggi_servito(chiusura)
     libere = transazioni_abbinabili(chiusura.data)
-    proposte = proponi(chiusura, tolleranza, items=items, libere=libere)
+    proposte = proponi(chiusura, tolleranza, items=items, libere=libere) if con_proposte else []
 
     proposte_per_item = {}
     for p in proposte:
         proposte_per_item.setdefault(p['item'].pk, []).append(p)
-    proposte_tx = {p['transazione'].pk for p in proposte}
 
     righe = []
     n_confermati = 0
@@ -312,14 +308,7 @@ def riepilogo(chiusura, tolleranza=TOLLERANZA_DEFAULT):
 
     from apps.finanze.models import RettificaResiduo
 
-    # Residuo della finestra: escono anche le transazioni proposte per i
-    # lavaggi servito degli altri giorni che la finestra tocca (es. un
-    # ordine delle 19:45 del giorno prima, passato al portale dopo la
-    # chiusura cassa)
-    for giorno in _giorni_finestra(chiusura):
-        if giorno != chiusura.data:
-            proposte_tx |= {p['transazione'].pk for p in proponi_giorno(giorno, tolleranza)}
-    residuo = [t for t in transazioni_libere(chiusura) if t.pk not in proposte_tx]
+    residuo = transazioni_libere(chiusura)
     rettifiche = {r.transazione_id: r for r in RettificaResiduo.objects.filter(
         transazione__in=residuo).select_related('operatore')}
     righe_residuo = []
@@ -340,6 +329,7 @@ def riepilogo(chiusura, tolleranza=TOLLERANZA_DEFAULT):
         'n_manuali_aperti': sum(1 for r in righe if r['manuale'] and not r['confermati']),
         'n_confermati': n_confermati,
         'n_proposte': len(proposte),
+        'con_proposte': con_proposte,
         'n_scoperti': sum(r['scoperti'] for r in righe),
         'n_senza_completamento': sum(1 for r in righe if r['rif_tipo'] != 'completato'),
         'residuo': righe_residuo,

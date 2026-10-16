@@ -1087,7 +1087,8 @@
   <div class="chart-panel mb-3" id="abbinamento-portali">
     <div class="panel-title"><i class="bi bi-link-45deg text-primary"></i> Abbinamento servito &harr; portali (unit&agrave; operativa)</div>
     <div class="panel-sub">
-      Abbinamento per priorit&agrave; di programma (ordine scritto nel catalogo, es. P8 &rarr; P9 &rarr; P7 &rarr; P4)
+      Gli abbinamenti si fanno a mano; con <strong>Proponi abbinamenti</strong> il gestionale suggerisce le coppie, da confermare o scartare.
+      Le proposte seguono la priorit&agrave; di programma (ordine scritto nel catalogo, es. P8 &rarr; P9 &rarr; P7 &rarr; P4)
       cercando all'indietro dal <strong>completamento</strong> del lavoro, a partire da ~{{ abbinamento.anticipo_min }} min prima
       (fino a {{ abbinamento.tolleranza_ore|floatformat:0 }} h). Senza completamento registrato si usa l'ora di creazione dell'ordine.
       I lavaggi del servito sono quelli degli <strong>ordini del giorno</strong> (anche dopo la chiusura cassa) e si abbinano alle transazioni dello stesso giorno;
@@ -1101,21 +1102,30 @@
       <div class="d-flex gap-3 flex-wrap align-items-center mb-3 small">
         <span><strong>{{ abbinamento.n_servito }}</strong> lavaggi servito</span>
         <span class="text-success"><i class="bi bi-check-circle-fill"></i> {{ abbinamento.n_confermati }} confermati</span>
-        <span class="text-primary"><i class="bi bi-lightbulb"></i> {{ abbinamento.n_proposte }} proposti</span>
+        {% if abbinamento.con_proposte %}<span class="text-primary"><i class="bi bi-lightbulb"></i> {{ abbinamento.n_proposte }} proposti</span>{% endif %}
         {% if abbinamento.n_scoperti %}<span class="text-warning"><i class="bi bi-question-circle"></i> {{ abbinamento.n_scoperti }} senza transazione</span>{% endif %}
         {% if abbinamento.n_fuori_standard %}<span class="badge bg-danger" title="Abbinamenti con un programma diverso da quelli del servizio"><i class="bi bi-exclamation-triangle"></i> {{ abbinamento.n_fuori_standard }} fuori standard</span>{% endif %}
         {% if abbinamento.n_manuali %}<span class="text-secondary" title="Ordini con servizi senza programmi portale nel catalogo: si abbinano solo a mano"><i class="bi bi-hand-index"></i> {{ abbinamento.n_manuali }} ordini senza programmi{% if abbinamento.n_manuali_aperti %} ({{ abbinamento.n_manuali_aperti }} da abbinare a mano){% endif %}</span>{% endif %}
         <span class="text-danger"><i class="bi bi-person-badge"></i> {{ abbinamento.residuo|length }} residui = &euro;{{ abbinamento.valore_residuo|floatformat:2 }}</span>
-        {% if abbinamento.n_proposte %}
-        <form method="post" action="{% url 'finanze:azione_abbinamento_portali' %}" class="ms-auto">
-          {% csrf_token %}
-          <input type="hidden" name="data" value="{{ data|date:'Y-m-d' }}">
-          <input type="hidden" name="azione" value="conferma">
-          <button type="submit" class="btn btn-primary btn-sm">
-            <i class="bi bi-check2-all"></i> Conferma {{ abbinamento.n_proposte }} propost{{ abbinamento.n_proposte|pluralize:"a,e" }}
-          </button>
-        </form>
+        <div class="ms-auto d-flex gap-2 align-items-center">
+        {% if abbinamento.con_proposte %}
+          {% if abbinamento.n_proposte %}
+          <form method="post" action="{% url 'finanze:azione_abbinamento_portali' %}">
+            {% csrf_token %}
+            <input type="hidden" name="data" value="{{ data|date:'Y-m-d' }}">
+            <input type="hidden" name="azione" value="conferma">
+            <button type="submit" class="btn btn-primary btn-sm">
+              <i class="bi bi-check2-all"></i> Conferma {{ abbinamento.n_proposte }} propost{{ abbinamento.n_proposte|pluralize:"a,e" }}
+            </button>
+          </form>
+          {% else %}
+          <span class="text-muted">Nessuna proposta trovata</span>
+          {% endif %}
+          <a href="?data={{ data|date:'Y-m-d' }}#abbinamento-portali" class="btn btn-outline-secondary btn-sm"><i class="bi bi-eye-slash"></i> Nascondi proposte</a>
+        {% else %}
+          <a href="?data={{ data|date:'Y-m-d' }}&proposte=1#abbinamento-portali" class="btn btn-outline-primary btn-sm" title="Calcola gli abbinamenti automatici: restano proposte da confermare o scartare"><i class="bi bi-magic"></i> Proponi abbinamenti</a>
         {% endif %}
+        </div>
       </div>
 
       <div class="row g-3">
@@ -1171,6 +1181,7 @@
                         {% csrf_token %}
                         <input type="hidden" name="data" value="{{ data|date:'Y-m-d' }}">
                         <input type="hidden" name="azione" value="rifiuta">
+                        <input type="hidden" name="proposte" value="1">
                         <input type="hidden" name="item_id" value="{{ r.item.pk }}">
                         <input type="hidden" name="transazione_id" value="{{ p.transazione.pk }}">
                         <button type="submit" class="btn btn-link btn-sm text-danger p-0 ms-1" title="Scarta la proposta"><i class="bi bi-x-circle"></i></button>
@@ -1259,7 +1270,7 @@
           <div class="small text-warning"><i class="bi bi-exclamation-circle"></i>
             {{ abbinamento.residuo_senza_prezzo }} su programmi senza prezzo (contati a 0 &euro;)</div>
           {% endif %}
-          <div class="small text-muted mt-1">Calcolato dopo le proposte: se ne rifiuti o cambi qualcuna il residuo si aggiorna.
+          <div class="small text-muted mt-1">Calcolato sugli abbinamenti confermati: ogni transazione che abbini a un ordine esce dal residuo.
             Con <i class="bi bi-pencil"></i> segni un lavaggio come omaggio o promo.</div>
 
           <div class="modal fade" id="modaleRettificaResiduo" tabindex="-1">
