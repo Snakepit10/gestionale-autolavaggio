@@ -2,6 +2,8 @@
 
 {% block title %}Magazzino - Articoli{% endblock %}
 
+{% block extra_css_magazzino %}{% include 'magazzino/_catalogo_css.html' %}{% endblock %}
+
 {% block pagina %}
 <div class="page-header">
     <h1><i class="bi bi-boxes"></i> Magazzino</h1>
@@ -14,7 +16,7 @@
     <div class="col-6 col-md-3"><div class="kpi"><div class="l">Articoli</div><div class="v">{{ articoli|length }}</div></div></div>
     <div class="col-6 col-md-3"><div class="kpi"><div class="l">Valore in magazzino</div><div class="v">&euro;{{ valore_totale|floatformat:2 }}</div></div></div>
     <div class="col-6 col-md-3">
-        <a href="?sotto=1" class="text-decoration-none"><div class="kpi"><div class="l">Sotto scorta</div>
+        <a href="?disponibilita=sotto&amp;disponibilita=esaurito" class="text-decoration-none"><div class="kpi"><div class="l">Sotto scorta</div>
             <div class="v {% if n_sotto_scorta %}text-danger{% endif %}">{{ n_sotto_scorta }}</div></div></a>
     </div>
     <div class="col-6 col-md-3">
@@ -23,120 +25,57 @@
     </div>
 </div>
 
-<form class="filter-card" method="get">
-    <div class="row g-2 align-items-center">
-        <div class="col-12 col-md-3">
-            <input type="search" name="q" value="{{ filtro.q }}" class="form-control form-control-sm" placeholder="Cerca nome o codice">
-        </div>
-        <div class="col-6 col-md-2">
-            <select name="tipo" class="form-select form-select-sm" onchange="this.form.submit()">
-                <option value="">Tutti i tipi</option>
-                {% for k, v in tipi %}<option value="{{ k }}" {% if filtro.tipo == k %}selected{% endif %}>{{ v }}</option>{% endfor %}
-            </select>
-        </div>
-        <div class="col-6 col-md-2">
-            <select name="categoria" class="form-select form-select-sm" onchange="this.form.submit()">
-                <option value="">Tutte le categorie</option>
-                {% for c in categorie %}<option value="{{ c }}" {% if filtro.categoria == c %}selected{% endif %}>{{ c }}</option>{% endfor %}
-            </select>
-        </div>
-        <div class="col-6 col-md-2">
-            <select name="posto" class="form-select form-select-sm" onchange="this.form.submit()">
-                <option value="">Tutti i posti</option>
-                {% for p in posti %}<option value="{{ p.pk }}" {% if filtro.posto == p.pk|stringformat:"s" %}selected{% endif %}>{{ p.nome }}</option>{% endfor %}
-                <option value="nessuno" {% if filtro.posto == 'nessuno' %}selected{% endif %}>Senza posto</option>
-            </select>
-        </div>
-        <div class="col-6 col-md-2">
-            <select name="uso" class="form-select form-select-sm" onchange="this.form.submit()">
-                <option value="">Ogni uso</option>
-                {% for campo, etichetta, sigla in usi %}<option value="{{ campo }}" {% if filtro.uso == campo %}selected{% endif %}>{{ etichetta }}</option>{% endfor %}
-            </select>
-        </div>
-        <div class="col-auto form-check ms-2">
-            <input class="form-check-input" type="checkbox" name="sotto" value="1" id="f-sotto" {% if filtro.sotto %}checked{% endif %} onchange="this.form.submit()">
-            <label class="form-check-label small" for="f-sotto">Solo sotto scorta</label>
-        </div>
-        <div class="col-auto form-check ms-2">
-            <input class="form-check-input" type="checkbox" name="tutti" value="1" id="f-tutti" {% if filtro.tutti %}checked{% endif %} onchange="this.form.submit()">
-            <label class="form-check-label small" for="f-tutti">Anche non attivi</label>
-        </div>
-        <div class="col-auto"><button class="btn btn-sm btn-outline-secondary"><i class="bi bi-search"></i></button></div>
-    </div>
-</form>
-
-<div class="section-card accent-blue">
-    <div class="section-title">
-        <div class="label"><i class="bi bi-boxes"></i> Articoli</div>
-        <span class="count">{{ articoli|length }}</span>
-    </div>
-    <div class="section-body">
+<div class="cat-layout">
+    {% include 'magazzino/_catalogo_filtri.html' with mostra_non_attivi=True %}
+    <div class="cat-main">
+        {% include 'magazzino/_catalogo_toolbar.html' %}
         {% if articoli %}
-        <div class="table-responsive">
-            <table class="table table-hover">
-                <thead>
-                    <tr>
-                        <th>Articolo</th>
-                        <th>Tipo</th>
-                        <th class="text-end">In magazzino</th>
-                        <th class="text-end">Assegnati</th>
-                        <th class="text-end">Scorta min.</th>
-                        <th class="text-end">Costo</th>
-                        <th class="text-end">Vendita</th>
-                        <th>Fornitore</th>
-                        <th class="text-center">Azioni</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    {% for a in articoli %}
-                    <tr class="{% if not a.attivo %}text-muted{% endif %}">
-                        <td>
-                            {% if a.foto_aggiornata %}<img src="{{ a.url_foto }}" alt="" loading="lazy" class="rounded border me-2 float-start" style="width:40px;height:40px;object-fit:cover">{% endif %}
-                            <a href="{% url 'magazzino:articolo' a.pk %}" class="fw-semibold text-decoration-none">{{ a.nome }}</a>
-                            {% if a.in_cassa %}<i class="bi bi-shop text-primary ms-1" title="In vendita in cassa"></i>{% endif %}
-                            {% if a.manca_in_cassa %}<span class="badge bg-warning text-dark ms-1 cursor-pointer" title="Manca il prezzo di vendita: aprilo e inseriscilo" onclick="apriArticolo({{ a.pk }}, {{ a.dati_modifica }})">non in cassa</span>{% endif %}
-                            <br><small class="text-muted">{% if a.ha_contenuto %}{{ a.unita }} da {{ a.contenuto|floatformat:"-3" }} {{ a.unita_contenuto }} &middot; {% endif %}{% if a.codice %}{{ a.codice }} &middot; {% endif %}{{ a.categoria|default:"" }}</small>
-                            {% if a.posto or a.usi %}<br><small>{% if a.posto and a.giacenze_elenco|length < 2 %}<span class="text-muted"><i class="bi bi-geo"></i> {{ a.posto }}</span>{% endif %}
-                                {% for etichetta, sigla in a.usi %}<span class="badge bg-light text-dark border" title="{{ etichetta }}">{{ etichetta }}</span>{% endfor %}
-                                {% if a.ha_scheda %}<i class="bi bi-file-earmark-text text-success" title="Scheda tecnica compilata"></i>{% endif %}</small>{% endif %}
-                        </td>
-                        <td><span class="badge {% if a.tipo == 'vendita' %}bg-primary{% elif a.tipo == 'strumento' %}bg-dark{% else %}bg-secondary{% endif %}">{{ a.get_tipo_display }}</span></td>
-                        <td class="text-end">
-                            {% if a.traccia_scorte %}
-                                <span class="{% if a.quantita < 0 %}qta-neg{% elif a.sotto_scorta %}text-danger fw-bold{% else %}fw-semibold{% endif %}">{{ a.quantita }}</span>
-                                <small class="text-muted">{{ a.unita }}</small>
-                                {% if a.ha_contenuto and a.quantita > 0 %}<br><small class="text-muted">{{ a.quantita_contenuto|floatformat:"-2" }} {{ a.unita_contenuto }}</small>{% endif %}
-                                {% if a.giacenze_elenco|length > 1 %}<br><small class="text-muted text-nowrap">{% for g in a.giacenze_elenco %}{{ g.quantita }} {{ g.posto|default:"senza posto" }}{% if not forloop.last %} &middot; {% endif %}{% endfor %}</small>{% endif %}
-                                {% if a.sotto_scorta %}<br><span class="badge bg-danger-subtle text-danger">sotto scorta</span>{% endif %}
-                            {% else %}<span class="text-muted small">non tracciato</span>{% endif %}
-                        </td>
-                        <td class="text-end">{% if a.n_assegnati %}{{ a.n_assegnati }}{% else %}<span class="text-muted">—</span>{% endif %}</td>
-                        <td class="text-end">{% if a.traccia_scorte %}{{ a.scorta_minima }}{% else %}—{% endif %}</td>
-                        <td class="text-end text-nowrap">&euro;{{ a.costo|floatformat:2 }}<small class="text-muted">/{{ a.unita }}</small>
-                            {% if a.ha_contenuto %}<br><small class="{% if a.prezzo_al_contenuto %}fw-semibold{% else %}text-muted{% endif %}">&euro;{{ a.costo_al_contenuto|floatformat:"-4" }}/{{ a.unita_contenuto }}</small>{% endif %}</td>
-                        <td class="text-end text-nowrap">{% if a.in_cassa %}<strong>&euro;{{ a.prodotto.prezzo|floatformat:2 }}</strong>{% elif a.tipo == 'vendita' %}<span class="text-muted">—</span>{% endif %}</td>
-                        <td class="small">{{ a.fornitore|default:"" }}</td>
-                        <td class="text-center text-nowrap">
-                            <button class="btn btn-sm btn-outline-success" title="Carico" onclick="apriMovimento({{ a.pk }}, 'carico', {{ a.dati_modifica }})"><i class="bi bi-box-arrow-in-down"></i></button>
-                            <button class="btn btn-sm btn-outline-secondary" title="Inventario" onclick="apriMovimento({{ a.pk }}, 'rettifica', {{ a.dati_modifica }})"><i class="bi bi-clipboard-check"></i></button>
-                            <button class="btn btn-sm btn-outline-primary" title="Modifica" onclick="apriArticolo({{ a.pk }}, {{ a.dati_modifica }})"><i class="bi bi-pencil"></i></button>
-                        </td>
-                    </tr>
-                    {% endfor %}
-                </tbody>
-            </table>
+        <div class="prod-grid">
+            {% for a in articoli %}
+            {% url 'magazzino:articolo' a.pk as url_scheda %}
+            <div class="prod-card {% if not a.attivo %}spento{% endif %}">
+                {% include 'magazzino/_prod_testa.html' %}
+                    <div class="qta">
+                        {% if a.traccia_scorte %}
+                            <strong class="{% if a.quantita < 0 %}qta-neg{% elif a.sotto_scorta %}text-danger{% endif %}">{{ a.quantita }}</strong>
+                            <span class="text-muted">{{ a.unita }}</span>
+                            {% if a.ha_contenuto and a.quantita > 0 %}<small class="text-muted">&middot; {{ a.quantita_contenuto|floatformat:"-2" }} {{ a.unita_contenuto }}</small>{% endif %}
+                            <small class="text-muted">&middot; min {{ a.scorta_minima }}</small>
+                        {% else %}<span class="text-muted small">non tracciato</span>{% endif %}
+                        {% if a.n_assegnati %}<br><small class="text-muted"><i class="bi bi-person-badge"></i> {{ a.n_assegnati }} assegnat{{ a.n_assegnati|pluralize:"o,i" }}</small>{% endif %}
+                        {% if a.giacenze_elenco|length > 1 %}<br><small class="text-muted">{% for g in a.giacenze_elenco %}{{ g.quantita }} {{ g.posto|default:"senza posto" }}{% if not forloop.last %} &middot; {% endif %}{% endfor %}</small>{% endif %}
+                    </div>
+                    <div class="prezzo">
+                        <span class="text-muted">Costo</span> &euro;{{ a.costo|floatformat:2 }}<small class="text-muted">/{{ a.unita }}</small>
+                        {% if a.in_cassa %}<span class="ms-1 text-primary fw-semibold" title="Prezzo in cassa"><i class="bi bi-shop"></i> &euro;{{ a.prodotto.prezzo|floatformat:2 }}</span>{% endif %}
+                        {% if a.manca_in_cassa %}<span class="badge bg-warning text-dark cursor-pointer" title="Manca il prezzo di vendita: aprilo e inseriscilo" onclick="apriArticolo({{ a.pk }}, {{ a.dati_modifica }})">non in cassa</span>{% endif %}
+                    </div>
+                    <div class="meta" title="{{ a.fornitore|default:'' }}">{% if a.fornitore %}<i class="bi bi-building"></i> {{ a.fornitore }}{% endif %}{% if a.posto and a.giacenze_elenco|length < 2 %}{% if a.fornitore %} &middot; {% endif %}<i class="bi bi-geo"></i> {{ a.posto }}{% endif %}
+                        {% if a.ha_scheda %}<i class="bi bi-file-earmark-text text-success" title="Scheda tecnica compilata"></i>{% endif %}</div>
+                </div>
+                <div class="prod-azioni">
+                    <button type="button" class="btn btn-sm btn-outline-success" title="Carico" onclick="apriMovimento({{ a.pk }}, 'carico', {{ a.dati_modifica }})"><i class="bi bi-box-arrow-in-down"></i></button>
+                    <button type="button" class="btn btn-sm btn-outline-secondary" title="Inventario" onclick="apriMovimento({{ a.pk }}, 'rettifica', {{ a.dati_modifica }})"><i class="bi bi-clipboard-check"></i></button>
+                    <button type="button" class="btn btn-sm btn-outline-primary" title="Modifica" onclick="apriArticolo({{ a.pk }}, {{ a.dati_modifica }})"><i class="bi bi-pencil"></i></button>
+                    {% if a.attivo %}<button type="button" class="btn btn-sm btn-outline-warning" title="Aggiungi al carrello acquisti" data-nome="{{ a.nome }}" data-unita="{{ a.unita }}" onclick="apriCarrello({{ a.pk }}, this.dataset.nome, this.dataset.unita)"><i class="bi bi-cart-plus"></i></button>{% endif %}
+                </div>
+            </div>
+            {% endfor %}
         </div>
         {% else %}
-        <div class="empty-state"><i class="bi bi-inbox"></i><h5>Nessun articolo</h5>
-            <p>Crea il primo articolo: consumabili (panni, detergenti), strumenti (aspiratori, pistole) o prodotti in vendita.</p></div>
+        <div class="section-card"><div class="empty-state"><i class="bi bi-inbox"></i><h5>Nessun articolo</h5>
+            {% if filtri_attivi or filtro.q %}<p>Nessun articolo con questi filtri.</p>
+            {% else %}<p>Crea il primo articolo: consumabili (panni, detergenti), strumenti (aspiratori, pistole) o prodotti in vendita.</p>{% endif %}</div></div>
         {% endif %}
     </div>
 </div>
 
 {% include 'magazzino/_modale_articolo.html' %}
 {% include 'magazzino/_modale_movimento.html' %}
+{% include 'magazzino/_modale_carrello.html' %}
 {% endblock %}
 
 {% block extra_js_magazzino %}
 {% include 'magazzino/_js_articolo.html' %}
+{% include 'magazzino/_js_carrello.html' %}
 {% endblock %}

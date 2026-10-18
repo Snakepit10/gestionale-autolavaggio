@@ -1,0 +1,22 @@
+{# Ricerca, conteggio, ordinamento e filtri scelti (campi del form #f-catalogo) #}
+<div class="cat-toolbar">
+    <button type="button" class="btn btn-outline-secondary btn-sm d-lg-none" data-bs-toggle="offcanvas" data-bs-target="#filtriCatalogo">
+        <i class="bi bi-funnel"></i> Filtri{% if filtri_attivi %} <span class="badge rounded-pill bg-primary">{{ filtri_attivi|length }}</span>{% endif %}
+    </button>
+    <div class="input-group input-group-sm cerca">
+        <span class="input-group-text"><i class="bi bi-search"></i></span>
+        <input type="search" name="q" form="f-catalogo" value="{{ filtro.q }}" class="form-control" placeholder="Cerca nome, marca o codice">
+    </div>
+    <span class="conta"><strong>{{ articoli|length }}</strong> prodott{{ articoli|length|pluralize:"o,i" }}</span>
+    <div class="ms-auto d-flex align-items-center gap-1">
+        <label class="small text-muted text-nowrap" for="f-ordina">Ordina per</label>
+        <select name="ordina" id="f-ordina" form="f-catalogo" class="form-select form-select-sm" onchange="this.form.submit()">
+            {% for k, v in ordinamenti %}<option value="{{ k }}" {% if filtro.ordina == k %}selected{% endif %}>{{ v }}</option>{% endfor %}
+        </select>
+    </div>
+</div>
+{% if filtri_attivi %}
+<div class="cat-pillole">
+    {% for f in filtri_attivi %}<a href="?{{ f.togli }}" title="Togli il filtro">{{ f.etichetta }} <i class="bi bi-x"></i></a>{% endfor %}
+</div>
+{% endif %}

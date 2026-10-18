@@ -1,0 +1,122 @@
+{% extends 'magazzino/_base.html' %}
+
+{% block title %}Magazzino - Carrello richieste{% endblock %}
+
+{% block pagina %}
+<div class="page-header">
+    <h1><i class="bi bi-cart3"></i> Carrello richieste</h1>
+    {% if n_righe %}
+    <button type="button" class="btn btn-primary" onclick="ordina('')">
+        <i class="bi bi-send"></i> Smista tutto negli ordini
+    </button>
+    {% endif %}
+</div>
+<p class="text-muted small">Gli operatori aggiungono qui ciò che serve. Controlla quantità e fornitore, poi smista: ogni fornitore riceve un ordine in bozza (se ne ha già uno in bozza, le righe si aggiungono a quello) da rivedere e inviare.</p>
+
+{% for g in gruppi %}
+<div class="section-card {% if g.fornitore %}accent-blue{% else %}accent-amber{% endif %}">
+    <div class="section-title">
+        <div class="label">
+            {% if g.fornitore %}<i class="bi bi-building"></i> {{ g.fornitore }}
+            {% else %}<i class="bi bi-question-circle"></i> Senza fornitore{% endif %}
+            <span class="count">{{ g.righe|length }}</span>
+        </div>
+        {% if g.fornitore %}
+        <div class="d-flex align-items-center gap-2">
+            <span class="small text-muted">Stima &euro;{{ g.totale|floatformat:2 }}</span>
+            {% if g.bozza %}<a href="{% url 'magazzino:ordine' g.bozza.pk %}" class="small">bozza {{ g.bozza.numero }}</a>{% endif %}
+            <button type="button" class="btn btn-sm btn-primary" onclick="ordina('{{ g.fornitore.pk }}')">
+                <i class="bi bi-cart-check"></i> {% if g.bozza %}Aggiungi alla bozza{% else %}Crea ordine{% endif %}
+            </button>
+        </div>
+        {% else %}
+        <span class="small text-muted">Scegli il fornitore di ogni riga per poterla ordinare</span>
+        {% endif %}
+    </div>
+    <div class="section-body">
+        <div class="table-responsive">
+            <table class="table table-hover align-middle">
+                <thead><tr><th>Articolo</th><th class="text-end" style="width:110px">Quantità</th><th>Richiesta da</th><th style="width:220px">Fornitore</th><th></th></tr></thead>
+                <tbody>
+                {% for r in g.righe %}
+                <tr>
+                    <td>
+                        {% if r.articolo.foto_aggiornata %}<img src="{{ r.articolo.url_foto }}" alt="" loading="lazy" class="rounded border me-2 float-start" style="width:40px;height:40px;object-fit:contain">{% endif %}
+                        <a href="{% url 'magazzino:articolo' r.articolo_id %}" class="fw-semibold text-decoration-none">{{ r.articolo.nome }}</a>
+                        {% if r.articolo.marca %}<small class="text-muted">&middot; {{ r.articolo.marca }}</small>{% endif %}
+                        <br><small class="text-muted">{% if r.articolo.traccia_scorte %}{{ r.articolo.quantita }} {{ r.articolo.unita }} in magazzino (min {{ r.articolo.scorta_minima }}){% else %}non tracciato{% endif %}</small>
+                        {% if r.nota %}<br><small><i class="bi bi-chat-left-text"></i> {{ r.nota }}</small>{% endif %}
+                    </td>
+                    <td class="text-end">
+                        <input type="number" min="1" class="form-control form-control-sm text-end" value="{{ r.quantita }}" onchange="modifica({{ r.pk }}, {quantita: this.value})">
+                    </td>
+                    <td class="small">{{ r.richiesta_da.get_full_name|default:r.richiesta_da.username|default:"—" }}<br><span class="text-muted">{{ r.richiesta_il|date:"d/m H:i" }}</span></td>
+                    <td>
+                        <select class="form-select form-select-sm" onchange="modifica({{ r.pk }}, {fornitore: this.value}, true)">
+                            <option value="">{% if r.articolo.fornitore %}abituale: {{ r.articolo.fornitore }}{% else %}— scegli —{% endif %}</option>
+                            {% for f in fornitori %}<option value="{{ f.pk }}" {% if r.fornitore_id == f.pk %}selected{% endif %}>{{ f }}</option>{% endfor %}
+                        </select>
+                    </td>
+                    <td class="text-end"><button type="button" class="btn btn-sm btn-outline-secondary" title="Scarta" onclick="scarta({{ r.pk }})"><i class="bi bi-x-lg"></i></button></td>
+                </tr>
+                {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+{% empty %}
+<div class="section-card"><div class="empty-state"><i class="bi bi-cart"></i><h5>Nessuna richiesta in attesa</h5>
+    <p>Quando un operatore aggiunge un prodotto al carrello, compare qui.</p></div></div>
+{% endfor %}
+
+{% if gestite %}
+<div class="section-card">
+    <div class="section-title"><div class="label"><i class="bi bi-clock-history"></i> Ultime gestite</div></div>
+    <div class="section-body">
+        <div class="table-responsive">
+            <table class="table table-sm">
+                <thead><tr><th>Quando</th><th>Articolo</th><th class="text-end">Q.tà</th><th>Richiesta da</th><th>Esito</th></tr></thead>
+                <tbody>
+                {% for r in gestite %}
+                <tr>
+                    <td class="small text-nowrap">{{ r.gestita_il|date:"d/m H:i" }}</td>
+                    <td>{{ r.articolo.nome }}</td>
+                    <td class="text-end">{{ r.quantita }}</td>
+                    <td class="small">{{ r.richiesta_da.get_full_name|default:r.richiesta_da.username|default:"—" }}</td>
+                    <td><span class="badge bg-{{ r.colore_stato }}">{{ r.get_stato_display }}</span>
+                        {% if r.ordine %}<a href="{% url 'magazzino:ordine' r.ordine_id %}" class="small">{{ r.ordine.numero }}</a>{% endif %}
+                        {% if r.risposta %}<small class="text-muted">{{ r.risposta }}</small>{% endif %}</td>
+                </tr>
+                {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+{% endif %}
+{% endblock %}
+
+{% block extra_js_magazzino %}
+<script>
+async function modifica(id, dati, ricarica) {
+    const j = await postJSON('{% url "magazzino:richiesta-modifica" 999999 %}'.replace('999999', id), dati);
+    if (!j.success) { alert(j.error); location.reload(); return; }
+    if (ricarica) location.reload();
+}
+async function scarta(id) {
+    const risposta = prompt('Scartare la richiesta? Puoi scrivere il motivo (lo vede chi l\'ha chiesta):', '');
+    if (risposta === null) return;
+    const j = await postJSON('{% url "magazzino:richiesta-scarta" 999999 %}'.replace('999999', id), {risposta});
+    if (!j.success) { alert(j.error); return; }
+    location.reload();
+}
+async function ordina(fornitore) {
+    const j = await postJSON('{% url "magazzino:carrello-ordina" %}', {fornitore});
+    if (!j.success) { alert(j.error); return; }
+    if (j.ordini.length === 1) { location.href = '{% url "magazzino:ordine" 999999 %}'.replace('999999', j.ordini[0].id); return; }
+    alert('Ordini in bozza aggiornati:\n' + j.ordini.map(o => o.numero + ' – ' + o.fornitore).join('\n'));
+    location.href = '{% url "magazzino:ordini" %}';
+}
+</script>
+{% endblock %}

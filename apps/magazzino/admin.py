@@ -1,7 +1,7 @@
 from django.contrib import admin
 
 from .models import (Posto, Articolo, Assegnazione, Consegna, Fornitore, Movimento, OrdineFornitore,
-                     RigaConsegna, RigaOrdineFornitore, StatoAssegnazione)
+                     RichiestaAcquisto, RigaConsegna, RigaOrdineFornitore, StatoAssegnazione)
 
 
 @admin.register(Posto)
@@ -19,7 +19,7 @@ class FornitoreAdmin(admin.ModelAdmin):
 class ArticoloAdmin(admin.ModelAdmin):
     list_display = ('nome', 'tipo', 'categoria', 'quantita', 'scorta_minima', 'traccia_scorte', 'attivo')
     list_filter = ('tipo', 'attivo', 'traccia_scorte')
-    search_fields = ('nome', 'codice')
+    search_fields = ('nome', 'codice', 'marca')
     # la quantita' cambia solo con i movimenti
     readonly_fields = ('quantita',)
 
@@ -69,3 +69,10 @@ class AssegnazioneAdmin(admin.ModelAdmin):
     list_display = ('articolo', 'quantita', 'utente', 'posto', 'stato', 'data', 'da_gestire')
     list_filter = ('stato', 'da_gestire')
     inlines = [StatoInline]
+
+
+@admin.register(RichiestaAcquisto)
+class RichiestaAcquistoAdmin(admin.ModelAdmin):
+    list_display = ('richiesta_il', 'articolo', 'quantita', 'richiesta_da', 'stato', 'fornitore', 'ordine')
+    list_filter = ('stato',)
+    search_fields = ('articolo__nome',)

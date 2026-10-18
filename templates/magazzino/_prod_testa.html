@@ -1,0 +1,14 @@
+{% comment %}Immagine, stelle, marca, nome e formato della scheda prodotto: lascia aperto
+.prod-body, che la pagina completa e chiude{% endcomment %}
+<a href="{{ url_scheda|default:'#' }}" class="prod-img" {% if not url_scheda %}onclick="return false"{% endif %}>
+    {% if a.foto_aggiornata %}<img src="{{ a.url_foto }}" alt="{{ a.nome }}" loading="lazy">{% else %}<span class="segnaposto"><i class="bi bi-box-seam"></i></span>{% endif %}
+    <span class="etichette">
+        <span>{% if a.disponibilita == 'esaurito' %}<span class="badge bg-danger">Esaurito</span>{% elif a.disponibilita == 'sotto' %}<span class="badge bg-warning text-dark">Sotto scorta</span>{% endif %}</span>
+        <span>{% if a.nel_carrello %}<span class="badge bg-primary"><i class="bi bi-cart-check"></i> {{ a.nel_carrello }}</span>{% endif %}</span>
+    </span>
+</a>
+<div class="prod-body">
+    {% include 'magazzino/_stelle.html' %}
+    <div class="marca">{{ a.marca|default:"&nbsp;" }}</div>
+    {% if url_scheda %}<a href="{{ url_scheda }}" class="nome" title="{{ a.nome }}">{{ a.nome }}</a>{% else %}<span class="nome" title="{{ a.nome }}">{{ a.nome }}</span>{% endif %}
+    <div class="formato">{% if a.ha_contenuto %}{{ a.unita }} da {{ a.contenuto|floatformat:"-3" }} {{ a.unita_contenuto }}{% else %}{{ a.categoria|default:a.get_tipo_display }}{% endif %}</div>

@@ -1,0 +1,37 @@
+{# Colonna "Filtri" (faccette); su schermi piccoli diventa un pannello laterale #}
+<aside class="cat-filtri offcanvas-lg offcanvas-start" tabindex="-1" id="filtriCatalogo">
+    <div class="offcanvas-header d-lg-none">
+        <h5 class="offcanvas-title"><i class="bi bi-funnel"></i> Filtri</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="offcanvas" data-bs-target="#filtriCatalogo"></button>
+    </div>
+    <div class="offcanvas-body p-lg-0">
+        <form method="get" id="f-catalogo" class="cat-filtri-box">
+            <div class="testa">
+                <span><i class="bi bi-funnel"></i> Filtri</span>
+                {% if filtri_attivi %}<a href="?{% if filtro.q %}q={{ filtro.q|urlencode }}{% endif %}" class="small fw-normal text-decoration-none">Azzera</a>{% endif %}
+            </div>
+            {% for f in faccette %}
+            <details class="faccetta" {% if forloop.counter <= 4 or f.n_scelti %}open{% endif %}>
+                <summary>{{ f.titolo }}{% if f.n_scelti %} <span class="badge rounded-pill bg-primary ms-1">{{ f.n_scelti }}</span>{% endif %}</summary>
+                <div class="voci">
+                    {% for o in f.opzioni %}
+                    <label class="{% if not o.n %}vuota{% endif %}">
+                        <input type="checkbox" class="form-check-input" name="{{ f.chiave }}" value="{{ o.valore }}" {% if o.scelto %}checked{% endif %} onchange="this.form.submit()">
+                        {% if f.chiave == 'stelle' %}<span class="stelle">{% for i in '12345' %}<i class="bi bi-star-fill{% if forloop.counter > o.valore|add:0 %} vuota{% endif %}"></i>{% endfor %}</span>{% if o.valore != '5' %}<small class="text-muted">e più</small>{% endif %}
+                        {% else %}<span>{{ o.etichetta }}</span>{% endif %}
+                        <span class="n">{{ o.n }}</span>
+                    </label>
+                    {% endfor %}
+                </div>
+            </details>
+            {% empty %}
+            <div class="p-3 small text-muted">Nessun filtro disponibile.</div>
+            {% endfor %}
+            {% if mostra_non_attivi %}
+            <div class="faccetta px-3 py-2">
+                <label class="small"><input type="checkbox" class="form-check-input" name="tutti" value="1" {% if filtro.tutti %}checked{% endif %} onchange="this.form.submit()"> Anche non attivi</label>
+            </div>
+            {% endif %}
+        </form>
+    </div>
+</aside>

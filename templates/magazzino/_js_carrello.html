@@ -1,0 +1,27 @@
+<script>
+function apriCarrello(id, nome, unita) {
+    document.getElementById('car-articolo').value = id;
+    document.getElementById('car-nome').textContent = nome;
+    document.getElementById('car-unita').textContent = unita || 'pz';
+    document.getElementById('car-quantita').value = 1;
+    document.getElementById('car-nota').value = '';
+    document.getElementById('car-errore').classList.add('d-none');
+    bootstrap.Modal.getOrCreateInstance(document.getElementById('modaleCarrello')).show();
+}
+function passoCarrello(d) {
+    const q = document.getElementById('car-quantita');
+    q.value = Math.max(1, (parseInt(q.value, 10) || 1) + d);
+}
+async function aggiungiCarrello() {
+    const j = await postJSON('{% url "magazzino:carrello-aggiungi" %}', {
+        articolo: document.getElementById('car-articolo').value,
+        quantita: document.getElementById('car-quantita').value,
+        nota: document.getElementById('car-nota').value,
+    });
+    if (!j.success) {
+        const e = document.getElementById('car-errore'); e.textContent = j.error; e.classList.remove('d-none');
+        return;
+    }
+    location.reload();
+}
+</script>

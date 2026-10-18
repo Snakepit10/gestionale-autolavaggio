@@ -68,6 +68,9 @@ class Articolo(models.Model):
     ]
     nome = models.CharField(max_length=150)
     codice = models.CharField(max_length=50, blank=True)
+    marca = models.CharField(max_length=80, blank=True)
+    # Giudizio del responsabile, da 0 (nessuno) a 5 stelle
+    valutazione = models.PositiveSmallIntegerField('Valutazione (stelle)', default=0)
     tipo = models.CharField(max_length=15, choices=TIPO_CHOICES, default='consumabile')
     categoria = models.CharField(max_length=60, blank=True)
     unita = models.CharField('Unità di conteggio', max_length=20, default='pz',
@@ -132,6 +135,20 @@ class Articolo(models.Model):
     def usi(self):
         """[(etichetta, sigla)] delle destinazioni d'uso spuntate."""
         return [(etichetta, sigla) for campo, etichetta, sigla in USI if getattr(self, campo)]
+
+    @property
+    def stelle(self):
+        """[True, True, False, False, False] per disegnare le stelle."""
+        return [i < self.valutazione for i in range(5)]
+
+    @property
+    def disponibilita(self):
+        """'esaurito', 'sotto' (sotto scorta) o 'disponibile'."""
+        if not self.traccia_scorte:
+            return 'disponibile'
+        if self.quantita <= 0:
+            return 'esaurito'
+        return 'sotto' if self.quantita <= self.scorta_minima else 'disponibile'
 
     @property
     def ha_scheda(self):
@@ -506,3 +523,45 @@ class StatoAssegnazione(models.Model):
     @property
     def da_stato_display(self):
         return dict(Assegnazione.STATO_CHOICES).get(self.da_stato, self.da_stato)
+
+
+class RichiestaAcquisto(models.Model):
+    """Riga del carrello: un operatore chiede di comprare un articolo; il
+    responsabile acquisti la smista nell'ordine del fornitore o la scarta."""
+    STATO_CHOICES = [
+        ('attesa', 'In attesa'),
+        ('ordinata', 'Ordinata'),
+        ('scartata', 'Scartata'),
+    ]
+    articolo = models.ForeignKey(Articolo, on_delete=models.CASCADE, related_name='richieste')
+    quantita = models.PositiveIntegerField(default=1)
+    nota = models.CharField(max_length=255, blank=True)
+    richiesta_da = models.ForeignKey(User, null=True, blank=True, on_delete=models.SET_NULL,
+                                     related_name='richieste_acquisto')
+    richiesta_il = models.DateTimeField(default=timezone.now)
+    stato = models.CharField(max_length=10, choices=STATO_CHOICES, default='attesa')
+    # Fornitore scelto dal responsabile (vuoto = quello abituale dell'articolo)
+    fornitore = models.ForeignKey(Fornitore, null=True, blank=True, on_delete=models.SET_NULL,
+                                  related_name='richieste')
+    ordine = models.ForeignKey(OrdineFornitore, null=True, blank=True, on_delete=models.SET_NULL,
+                               related_name='richieste')
+    gestita_da = models.ForeignKey(User, null=True, blank=True, on_delete=models.SET_NULL,
+                                   related_name='richieste_gestite')
+    gestita_il = models.DateTimeField(null=True, blank=True)
+    risposta = models.CharField(max_length=255, blank=True, help_text='Perché è stata scartata')
+
+    class Meta:
+        verbose_name = 'Richiesta di acquisto'
+        verbose_name_plural = 'Richieste di acquisto'
+        ordering = ['-richiesta_il', '-pk']
+
+    def __str__(self):
+        return f'{self.articolo} ×{self.quantita} ({self.get_stato_display()})'
+
+    @property
+    def fornitore_scelto(self):
+        return self.fornitore if self.fornitore_id else self.articolo.fornitore
+
+    @property
+    def colore_stato(self):
+        return {'attesa': 'warning', 'ordinata': 'success', 'scartata': 'secondary'}[self.stato]

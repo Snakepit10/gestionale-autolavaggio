@@ -61,6 +61,8 @@ function apriArticolo(id, a) {
     document.getElementById('art-id').value = id || '';
     document.getElementById('art-nome').value = a.nome || '';
     document.getElementById('art-codice').value = a.codice || '';
+    document.getElementById('art-marca').value = a.marca || '';
+    document.getElementById('art-valutazione').value = a.valutazione || 0;
     document.getElementById('art-tipo').value = a.tipo || 'consumabile';
     document.getElementById('art-prezzo-vendita').value = a.prezzo_vendita || '';
     document.getElementById('art-categoria-catalogo').value = a.categoria_catalogo || CATEGORIA_CATALOGO_DEFAULT;
@@ -102,7 +104,8 @@ function apriArticolo(id, a) {
 async function salvaArticolo() {
     const val = id => document.getElementById(id).value;
     const j = await postJSON(URL_ARTICOLO_SALVA, {
-        id: val('art-id') || null, nome: val('art-nome'), codice: val('art-codice'), tipo: val('art-tipo'),
+        id: val('art-id') || null, nome: val('art-nome'), codice: val('art-codice'),
+        marca: val('art-marca'), valutazione: val('art-valutazione'), tipo: val('art-tipo'),
         categoria: val('art-categoria'), unita: val('art-unita'), scorta_minima: val('art-scorta'),
         contenuto: val('art-contenuto'), unita_contenuto: val('art-unita-contenuto'),
         prezzo_per: document.querySelector('[name=art-prezzo-per]:checked').value,

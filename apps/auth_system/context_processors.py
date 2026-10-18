@@ -20,4 +20,9 @@ def sezioni_visibili(request):
             from apps.magazzino.models import Assegnazione
             return Assegnazione.objects.filter(da_gestire=True).count()
         contesto['n_segnalazioni_magazzino'] = SimpleLazyObject(conta)
+
+        def conta_carrello():
+            from apps.magazzino.models import RichiestaAcquisto
+            return RichiestaAcquisto.objects.filter(stato='attesa').count()
+        contesto['n_carrello_magazzino'] = SimpleLazyObject(conta_carrello)
     return contesto

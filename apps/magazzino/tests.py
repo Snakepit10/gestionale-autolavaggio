@@ -12,7 +12,7 @@ from apps.core.models import Categoria, ServizioProdotto
 from apps.cq.models import PostazioneCQ
 
 from . import services
-from .models import Articolo, Assegnazione, Fornitore, Movimento, OrdineFornitore
+from .models import Articolo, Assegnazione, Fornitore, Movimento, OrdineFornitore, RichiestaAcquisto
 
 
 def _pagina(user, nome, **kw):
@@ -866,3 +866,101 @@ class CorrezioneVenditeOttobreTest(TestCase):
         self.assertEqual(art.quantita, 11)
         mov = art.movimenti.get()
         self.assertEqual((mov.tipo, mov.quantita, mov.ordine_id, mov.data), ('vendita', -1, ordine.pk, quando))
+
+
+class CatalogoCarrelloTest(TestCase):
+    """Griglia con filtri a faccette e carrello delle richieste di acquisto."""
+
+    def setUp(self):
+        self.titolare = utente_titolare('tit', password='x')
+        self.operatore = User.objects.create_user('mario', password='x')
+        self.operatore.groups.add(Group.objects.get(name='operatore'))
+        self.chimica = Fornitore.objects.create(ragione_sociale='Chimica Srl')
+        self.panni_srl = Fornitore.objects.create(ragione_sociale='Panni Srl')
+        self.shampoo = Articolo.objects.create(nome='Shampoo T25', marca='Ma-Fra', valutazione=4, quantita=1,
+                                               scorta_minima=3, fornitore=self.chimica, costo=Decimal('8'))
+        self.cera = Articolo.objects.create(nome='Cera spray', marca='Koch', valutazione=2, quantita=10,
+                                            fornitore=self.chimica)
+        self.panno = Articolo.objects.create(nome='Panno blu', marca='Ma-Fra', quantita=0, costo=Decimal('1.5'))
+
+    def _get(self, user, nome, **params):
+        from django.urls import resolve
+        req = RequestFactory().get(reverse(f'magazzino:{nome}'), params)
+        req.user = User.objects.get(pk=user.pk)
+        return resolve(reverse(f'magazzino:{nome}')).func(req)
+
+    def test_faccette_e_conteggi(self):
+        from django.http import QueryDict
+
+        from . import views
+        req = RequestFactory().get('/', QueryDict('marca=Ma-Fra&disponibilita=esaurito'))
+        lista, faccette, attivi = views._catalogo(req, Articolo.objects.all(), views.FACCETTE_GESTIONE)
+        self.assertEqual([a.nome for a in lista], ['Panno blu'])
+        per = {f['chiave']: {o['valore']: o['n'] for o in f['opzioni']} for f in faccette}
+        # la marca conta con il filtro di disponibilita' (solo esauriti), e viceversa
+        self.assertEqual(per['marca'], {'Ma-Fra': 1})
+        self.assertEqual(per['disponibilita'], {'sotto': 1, 'esaurito': 1})
+        self.assertEqual(len(attivi), 2)
+        # stelle: "almeno 3" prende solo lo shampoo
+        req = RequestFactory().get('/', {'stelle': '3'})
+        lista, _, _ = views._catalogo(req, Articolo.objects.all(), views.FACCETTE_GESTIONE)
+        self.assertEqual([a.nome for a in lista], ['Shampoo T25'])
+        # vecchio link "sotto scorta"
+        req = RequestFactory().get('/', {'sotto': '1'})
+        lista, _, _ = views._catalogo(req, Articolo.objects.all(), views.FACCETTE_GESTIONE)
+        self.assertEqual({a.nome for a in lista}, {'Shampoo T25', 'Panno blu'})
+
+    def test_pagine(self):
+        r = self._get(self.titolare, 'articoli', marca='Koch')
+        self.assertContains(r, 'Cera spray')
+        self.assertNotContains(r, 'Shampoo T25')
+        self.assertContains(r, 'prod-card')
+        r = self._get(self.operatore, 'catalogo')
+        self.assertContains(r, 'Shampoo T25')
+        self.assertNotContains(r, 'Chimica Srl')  # niente fornitori e costi agli operatori
+        from apps.auth_system.sezioni import sezione_per_percorso
+        self.assertEqual(sezione_per_percorso(reverse('magazzino:catalogo')), 'mio_turno')
+        self.assertEqual(sezione_per_percorso(reverse('magazzino:carrello-aggiungi')), 'mio_turno')
+        self.assertEqual(sezione_per_percorso(reverse('magazzino:carrello')), 'magazzino')
+
+    def test_carrello_e_smistamento(self):
+        self.client.force_login(self.operatore)
+        self.assertTrue(_post(self.client, 'carrello-aggiungi', {'articolo': self.shampoo.pk, 'quantita': 2}).json()['success'])
+        # stesso articolo ancora in attesa: si somma
+        _post(self.client, 'carrello-aggiungi', {'articolo': self.shampoo.pk, 'quantita': 3, 'nota': 'finito'})
+        _post(self.client, 'carrello-aggiungi', {'articolo': self.panno.pk, 'quantita': 10})
+        _post(self.client, 'carrello-aggiungi', {'articolo': self.cera.pk, 'quantita': 1})
+        self.assertEqual(_post(self.client, 'carrello-aggiungi', {'articolo': self.cera.pk, 'quantita': 0}).status_code, 400)
+        r = RichiestaAcquisto.objects.get(articolo=self.shampoo)
+        self.assertEqual((r.quantita, r.nota), (5, 'finito'))
+        # l'operatore non smista
+        self.assertEqual(_post(self.client, 'carrello-ordina').status_code, 403)
+
+        self.client.force_login(self.titolare)
+        self.assertEqual(_pagina(self.titolare, 'carrello').status_code, 200)
+        cera = RichiestaAcquisto.objects.get(articolo=self.cera)
+        _post(self.client, 'richiesta-scarta', {'risposta': 'ce ne sono 10'}, pk=cera.pk)
+        panno = RichiestaAcquisto.objects.get(articolo=self.panno)
+        # il panno non ha fornitore abituale: resta in attesa finche' non lo si sceglie
+        j = _post(self.client, 'carrello-ordina').json()
+        self.assertEqual([o['fornitore'] for o in j['ordini']], ['Chimica Srl'])
+        panno.refresh_from_db()
+        self.assertEqual(panno.stato, 'attesa')
+        _post(self.client, 'richiesta-modifica', {'fornitore': self.panni_srl.pk, 'quantita': 12}, pk=panno.pk)
+        _post(self.client, 'carrello-ordina', {'fornitore': self.panni_srl.pk})
+        panno.refresh_from_db()
+        self.assertEqual((panno.stato, panno.ordine.fornitore, panno.ordine.righe.get().quantita),
+                         ('ordinata', self.panni_srl, 12))
+        ordine = OrdineFornitore.objects.get(fornitore=self.chimica)
+        self.assertEqual((ordine.stato, ordine.righe.get().quantita, ordine.righe.get().prezzo),
+                         ('bozza', 5, Decimal('8')))
+        # nuova richiesta dello stesso articolo: si somma nella bozza aperta
+        RichiestaAcquisto.objects.create(articolo=self.shampoo, quantita=1, richiesta_da=self.operatore)
+        _post(self.client, 'carrello-ordina')
+        self.assertEqual(OrdineFornitore.objects.filter(fornitore=self.chimica).count(), 1)
+        self.assertEqual(ordine.righe.get().quantita, 6)
+        cera.refresh_from_db()
+        self.assertEqual((cera.stato, cera.risposta), ('scartata', 'ce ne sono 10'))
+        # gestita: l'operatore non la toglie piu'
+        self.client.force_login(self.operatore)
+        self.assertEqual(_post(self.client, 'carrello-togli', pk=cera.pk).status_code, 400)

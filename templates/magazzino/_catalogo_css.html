@@ -1,0 +1,52 @@
+<style>
+/* Catalogo prodotti: filtri a faccette a sinistra, griglia di schede */
+.cat-layout { display:flex; gap:1.25rem; align-items:flex-start; }
+.cat-main { flex:1; min-width:0; }
+@media (min-width: 992px) {
+    .cat-filtri { width:250px; flex:0 0 250px; position:sticky; top:1rem; max-height:calc(100vh - 2rem); overflow-y:auto; }
+}
+.cat-filtri .offcanvas-body { flex-direction:column; }
+.cat-filtri-box { background:#fff; border:1px solid #e5e7eb; border-radius:12px; box-shadow:0 1px 2px rgba(0,0,0,.04); width:100%; }
+.cat-filtri-box .testa { display:flex; justify-content:space-between; align-items:center; padding:12px 16px; border-bottom:1px solid #f1f5f9; font-weight:700; color:#1e293b; }
+.faccetta { border-bottom:1px solid #f1f5f9; }
+.faccetta:last-child { border-bottom:0; }
+.faccetta summary { list-style:none; cursor:pointer; padding:10px 16px; font-size:.78rem; font-weight:700; text-transform:uppercase; letter-spacing:.4px; color:#475569; display:flex; justify-content:space-between; align-items:center; }
+.faccetta summary::-webkit-details-marker { display:none; }
+.faccetta summary::after { content:'\F282'; font-family:'bootstrap-icons'; font-size:.75rem; transition:transform .15s; }
+.faccetta[open] summary::after { transform:rotate(180deg); }
+.faccetta .voci { padding:0 16px 10px; max-height:240px; overflow-y:auto; }
+.faccetta label { display:flex; align-items:center; gap:8px; font-size:.88rem; padding:3px 0; cursor:pointer; color:#1e293b; }
+.faccetta label .n { margin-left:auto; color:#94a3b8; font-size:.78rem; }
+.faccetta label.vuota { color:#94a3b8; }
+.faccetta .form-check-input { margin:0; flex:0 0 auto; }
+.stelle { color:#f59e0b; font-size:.8rem; letter-spacing:1px; white-space:nowrap; }
+.stelle .vuota { color:#d1d5db; }
+.cat-toolbar { display:flex; gap:.5rem; align-items:center; flex-wrap:wrap; margin-bottom:.75rem; }
+.cat-toolbar .cerca { flex:1; min-width:180px; max-width:360px; }
+.cat-toolbar .conta { color:#64748b; font-size:.88rem; }
+.cat-pillole { display:flex; gap:.4rem; flex-wrap:wrap; margin-bottom:.75rem; }
+.cat-pillole a { background:#eef2ff; color:#3730a3; border-radius:20px; padding:2px 10px; font-size:.8rem; text-decoration:none; }
+.cat-pillole a:hover { background:#e0e7ff; }
+.prod-grid { display:grid; grid-template-columns:repeat(auto-fill, minmax(200px, 1fr)); gap:1rem; }
+@media (max-width: 575px) { .prod-grid { grid-template-columns:repeat(2, minmax(0, 1fr)); gap:.6rem; } }
+.prod-card { background:#fff; border:1px solid #e5e7eb; border-radius:12px; overflow:hidden; display:flex; flex-direction:column; box-shadow:0 1px 2px rgba(0,0,0,.04); transition:box-shadow .15s, transform .15s; }
+.prod-card:hover { box-shadow:0 6px 18px rgba(15,23,42,.08); transform:translateY(-1px); }
+.prod-card.spento { opacity:.6; }
+.prod-img { position:relative; display:block; aspect-ratio:1 / 1; background:#f8fafc; border-bottom:1px solid #f1f5f9; }
+.prod-img img { width:100%; height:100%; object-fit:contain; padding:8px; }
+.prod-img .segnaposto { position:absolute; inset:0; display:flex; align-items:center; justify-content:center; font-size:2.6rem; color:#cbd5e1; }
+.prod-img .etichette { position:absolute; top:8px; left:8px; right:8px; display:flex; justify-content:space-between; gap:4px; pointer-events:none; }
+.prod-img .etichette .badge { font-weight:600; }
+.prod-body { padding:10px 12px; flex:1; display:flex; flex-direction:column; gap:2px; min-width:0; }
+.prod-body .marca { font-size:.72rem; font-weight:700; text-transform:uppercase; letter-spacing:.5px; color:#64748b; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+.prod-body .nome { font-weight:600; color:#1e293b; line-height:1.25; text-decoration:none; display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical; overflow:hidden; }
+.prod-body a.nome:hover { color:#2563eb; }
+.prod-body .formato { font-size:.78rem; color:#64748b; }
+.prod-body .qta { margin-top:auto; padding-top:6px; font-size:.85rem; }
+.prod-body .qta strong { font-size:1.05rem; }
+.prod-body .prezzo { font-size:.85rem; }
+.prod-body .meta { font-size:.75rem; color:#94a3b8; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+.prod-azioni { display:flex; gap:4px; padding:8px 12px 12px; }
+.prod-azioni .btn { flex:1; padding:.3rem 0; }
+.prod-azioni .btn-carrello { flex:2; }
+</style>

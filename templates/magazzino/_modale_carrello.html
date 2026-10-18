@@ -1,0 +1,28 @@
+<div class="modal fade" id="modaleCarrello" tabindex="-1">
+    <div class="modal-dialog modal-sm modal-dialog-centered">
+        <div class="modal-content">
+            <div class="modal-header modal-clean">
+                <h5 class="modal-title"><i class="bi bi-cart-plus"></i> Aggiungi al carrello</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <input type="hidden" id="car-articolo">
+                <div class="fw-semibold mb-2" id="car-nome"></div>
+                <label class="form-label small mb-1">Quanti ne servono</label>
+                <div class="input-group mb-2">
+                    <button class="btn btn-outline-secondary" type="button" onclick="passoCarrello(-1)"><i class="bi bi-dash"></i></button>
+                    <input type="number" min="1" class="form-control text-center" id="car-quantita" value="1">
+                    <span class="input-group-text" id="car-unita">pz</span>
+                    <button class="btn btn-outline-secondary" type="button" onclick="passoCarrello(1)"><i class="bi bi-plus"></i></button>
+                </div>
+                <label class="form-label small mb-1">Nota per il responsabile acquisti</label>
+                <input type="text" class="form-control" id="car-nota" maxlength="255" placeholder="es. finito in postazione 2">
+                <div class="alert alert-danger small mt-2 mb-0 d-none" id="car-errore"></div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-light" data-bs-dismiss="modal">Annulla</button>
+                <button type="button" class="btn btn-primary" onclick="aggiungiCarrello()"><i class="bi bi-cart-plus"></i> Aggiungi</button>
+            </div>
+        </div>
+    </div>
+</div>

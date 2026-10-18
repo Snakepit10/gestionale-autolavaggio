@@ -1,0 +1,114 @@
+{% extends 'base.html' %}
+
+{% block title %}Prodotti{% endblock %}
+
+{% block extra_css %}
+{% include 'magazzino/_catalogo_css.html' %}
+<style>
+.cat-header { display:flex; justify-content:space-between; align-items:center; gap:.5rem; margin-bottom:1rem; flex-wrap:wrap; }
+.cat-header h1 { font-size:1.4rem; font-weight:700; margin:0; }
+.carrello-riga { display:flex; align-items:center; gap:10px; padding:8px 0; border-bottom:1px solid #f1f5f9; }
+.carrello-riga:last-child { border-bottom:0; }
+.carrello-riga .q { font-weight:700; min-width:40px; text-align:center; }
+.modal .modal-header.modal-clean { background:#fff; color:#1e293b; border-bottom:1px solid #f1f5f9; }
+</style>
+{% endblock %}
+
+{% block content %}
+{% csrf_token %}
+<div class="cat-header">
+    <h1><i class="bi bi-grid-3x3-gap"></i> Prodotti</h1>
+    <button type="button" class="btn btn-primary position-relative" data-bs-toggle="offcanvas" data-bs-target="#mioCarrello">
+        <i class="bi bi-cart3"></i> Il mio carrello
+        {% if carrello %}<span class="position-absolute top-0 start-100 translate-middle badge rounded-pill bg-danger">{{ carrello|length }}</span>{% endif %}
+    </button>
+</div>
+<p class="text-muted small mb-3">Se un prodotto sta finendo o ne serve uno, aggiungilo al carrello: il responsabile acquisti lo ordina al fornitore.</p>
+
+<div class="cat-layout">
+    {% include 'magazzino/_catalogo_filtri.html' %}
+    <div class="cat-main">
+        {% include 'magazzino/_catalogo_toolbar.html' %}
+        {% if articoli %}
+        <div class="prod-grid">
+            {% for a in articoli %}
+            <div class="prod-card">
+                {% include 'magazzino/_prod_testa.html' with url_scheda='' %}
+                    <div class="qta">
+                        {% if a.traccia_scorte %}
+                            <strong class="{% if a.disponibilita == 'esaurito' %}text-danger{% elif a.disponibilita == 'sotto' %}text-warning{% endif %}">{{ a.quantita|default:0 }}</strong>
+                            <span class="text-muted">{{ a.unita }} in magazzino</span>
+                        {% else %}<span class="text-muted small">sempre disponibile</span>{% endif %}
+                    </div>
+                    {% if a.posto %}<div class="meta"><i class="bi bi-geo"></i> {{ a.posto }}</div>{% endif %}
+                </div>
+                <div class="prod-azioni">
+                    <button type="button" class="btn btn-sm btn-primary btn-carrello" data-nome="{{ a.nome }}" data-unita="{{ a.unita }}" onclick="apriCarrello({{ a.pk }}, this.dataset.nome, this.dataset.unita)">
+                        <i class="bi bi-cart-plus"></i> {% if a.nel_carrello %}Aggiungi ancora{% else %}Aggiungi{% endif %}
+                    </button>
+                </div>
+            </div>
+            {% endfor %}
+        </div>
+        {% else %}
+        <div class="text-muted text-center py-5 bg-white border rounded-3">Nessun prodotto{% if filtri_attivi or filtro.q %} con questi filtri{% endif %}.</div>
+        {% endif %}
+    </div>
+</div>
+
+<div class="offcanvas offcanvas-end" tabindex="-1" id="mioCarrello">
+    <div class="offcanvas-header border-bottom">
+        <h5 class="offcanvas-title"><i class="bi bi-cart3"></i> Il mio carrello</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="offcanvas"></button>
+    </div>
+    <div class="offcanvas-body">
+        <div class="small text-muted text-uppercase fw-semibold mb-1">In attesa del responsabile</div>
+        {% for r in carrello %}
+        <div class="carrello-riga">
+            <span class="q">{{ r.quantita }}</span>
+            <div class="flex-grow-1 min-w-0">
+                <div class="fw-semibold">{{ r.articolo.nome }}</div>
+                <small class="text-muted">{{ r.richiesta_il|date:"d/m H:i" }}{% if r.nota %} &middot; {{ r.nota }}{% endif %}</small>
+            </div>
+            <button type="button" class="btn btn-sm btn-outline-danger" title="Togli" onclick="togliRichiesta({{ r.pk }})"><i class="bi bi-trash"></i></button>
+        </div>
+        {% empty %}
+        <div class="text-muted small py-2">Il carrello è vuoto.</div>
+        {% endfor %}
+
+        {% if storico %}
+        <div class="small text-muted text-uppercase fw-semibold mt-4 mb-1">Già gestite</div>
+        {% for r in storico %}
+        <div class="carrello-riga">
+            <span class="q text-muted">{{ r.quantita }}</span>
+            <div class="flex-grow-1">
+                <div>{{ r.articolo.nome }}</div>
+                <small class="text-muted">{{ r.gestita_il|date:"d/m" }}{% if r.risposta %} &middot; {{ r.risposta }}{% endif %}</small>
+            </div>
+            <span class="badge bg-{{ r.colore_stato }}">{{ r.get_stato_display }}</span>
+        </div>
+        {% endfor %}
+        {% endif %}
+    </div>
+</div>
+
+{% include 'magazzino/_modale_carrello.html' %}
+{% endblock %}
+
+{% block extra_js %}
+<script>
+function csrf() { return document.querySelector('[name=csrfmiddlewaretoken]').value; }
+async function postJSON(url, dati) {
+    const r = await fetch(url, {method: 'POST', headers: {'Content-Type': 'application/json', 'X-CSRFToken': csrf()},
+                                body: JSON.stringify(dati || {})});
+    try { return await r.json(); } catch (e) { return {success: false, error: 'Errore del server (' + r.status + ')'}; }
+}
+async function togliRichiesta(id) {
+    if (!confirm('Togliere questa richiesta dal carrello?')) return;
+    const j = await postJSON('{% url "magazzino:carrello-togli" 999999 %}'.replace('999999', id));
+    if (!j.success) { alert(j.error); return; }
+    location.reload();
+}
+</script>
+{% include 'magazzino/_js_carrello.html' %}
+{% endblock %}

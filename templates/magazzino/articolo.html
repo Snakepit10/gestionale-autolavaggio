@@ -2,6 +2,8 @@
 
 {% block title %}{{ articolo.nome }} - Magazzino{% endblock %}
 
+{% block extra_css_magazzino %}{% include 'magazzino/_catalogo_css.html' %}{% endblock %}
+
 {% block pagina %}
 <div class="page-header">
     <h1>
@@ -45,6 +47,8 @@
                 <dl class="row mb-0">
                     <dt class="col-5">Posto</dt><dd class="col-7">{% if articolo.posto %}<a href="{% url 'magazzino:articoli' %}?posto={{ articolo.posto_id }}">{{ articolo.posto }}</a>{% else %}<span class="text-muted">non indicato</span>{% endif %}</dd>
                     <dt class="col-5">Uso</dt><dd class="col-7">{% for etichetta, sigla in articolo.usi %}<span class="badge bg-light text-dark border">{{ etichetta }}</span> {% empty %}<span class="text-muted">—</span>{% endfor %}</dd>
+                    <dt class="col-5">Marca</dt><dd class="col-7">{% if articolo.marca %}<a href="{% url 'magazzino:articoli' %}?marca={{ articolo.marca|urlencode }}">{{ articolo.marca }}</a>{% else %}—{% endif %}</dd>
+                    <dt class="col-5">Valutazione</dt><dd class="col-7">{% include 'magazzino/_stelle.html' with a=articolo %}</dd>
                     <dt class="col-5">Codice</dt><dd class="col-7">{{ articolo.codice|default:"—" }}</dd>
                     <dt class="col-5">Pezzo</dt><dd class="col-7">{{ articolo.unita }}{% if articolo.ha_contenuto %} da {{ articolo.contenuto|floatformat:"-3" }} {{ articolo.unita_contenuto }}{% endif %}</dd>
                     <dt class="col-5">Categoria</dt><dd class="col-7">{{ articolo.categoria|default:"—" }}</dd>

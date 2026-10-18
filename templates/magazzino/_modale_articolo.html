@@ -16,6 +16,19 @@
                         <label class="form-label">Codice</label>
                         <input type="text" class="form-control" id="art-codice">
                     </div>
+                    <div class="col-md-8">
+                        <label class="form-label">Marca</label>
+                        <input type="text" class="form-control" id="art-marca" list="art-marche" autocomplete="off" placeholder="es. Ma-Fra, Koch-Chemie">
+                        <datalist id="art-marche">{% for m in marche %}<option value="{{ m }}">{% endfor %}</datalist>
+                    </div>
+                    <div class="col-md-4">
+                        <label class="form-label">Valutazione</label>
+                        <select class="form-select" id="art-valutazione">
+                            <option value="0">Nessuna</option>
+                            <option value="1">★☆☆☆☆</option><option value="2">★★☆☆☆</option><option value="3">★★★☆☆</option>
+                            <option value="4">★★★★☆</option><option value="5">★★★★★</option>
+                        </select>
+                    </div>
                     <div class="col-md-4">
                         <label class="form-label">Tipo</label>
                         <select class="form-select" id="art-tipo" onchange="tipoArticolo()">

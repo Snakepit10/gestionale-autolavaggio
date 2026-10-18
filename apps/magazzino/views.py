@@ -18,7 +18,7 @@ from apps.cq.models import PostazioneCQ
 
 from . import services
 from .models import (UNITA_CONTENUTO_CHOICES, USI, Articolo, FotoArticolo, Posto, Assegnazione, Consegna, Fornitore, Movimento, OrdineFornitore,
-                     RigaConsegna, RigaOrdineFornitore, StatoAssegnazione)
+                     RichiestaAcquisto, RigaConsegna, RigaOrdineFornitore, StatoAssegnazione)
 
 
 # ---------------------------------------------------------------------------
@@ -104,7 +104,7 @@ def _fmt(valore):
 def _dati_modifica(a):
     """Valori del modale di modifica articolo (numeri non localizzati)."""
     return json.dumps({
-        'nome': a.nome, 'codice': a.codice, 'tipo': a.tipo, 'categoria': a.categoria, 'unita': a.unita,
+        'nome': a.nome, 'codice': a.codice, 'marca': a.marca, 'valutazione': a.valutazione, 'tipo': a.tipo, 'categoria': a.categoria, 'unita': a.unita,
         'contenuto': _fmt(a.contenuto) if a.contenuto else '', 'unita_contenuto': a.unita_contenuto,
         'prezzo_per': a.prezzo_per, 'scorta_minima': a.scorta_minima, 'traccia_scorte': a.traccia_scorte,
         'costo': _fmt(a.costo_indicato), 'fornitore': a.fornitore_id or '', 'attivo': a.attivo,
@@ -130,6 +130,7 @@ def _contesto_modale():
         'tipi': Articolo.TIPO_CHOICES,
         'unita_contenuto': UNITA_CONTENUTO_CHOICES,
         'categorie': _categorie_articoli(),
+        'marche': sorted(set(Articolo.objects.exclude(marca='').values_list('marca', flat=True)), key=str.lower),
         'fornitori': Fornitore.objects.filter(attivo=True),
         'posti': Posto.objects.filter(attivo=True),
         'usi': USI,
@@ -167,6 +168,7 @@ def _contesto_base(attiva):
     return {
         'scheda': attiva,
         'n_segnalazioni': Assegnazione.objects.filter(da_gestire=True).count(),
+        'n_carrello': RichiestaAcquisto.objects.filter(stato='attesa').count(),
     }
 
 
@@ -174,34 +176,131 @@ def _contesto_base(attiva):
 # Articoli
 # ---------------------------------------------------------------------------
 
+DISPONIBILITA = [('disponibile', 'Disponibile'), ('sotto', 'Sotto scorta'), ('esaurito', 'Esaurito')]
+ORDINAMENTI = [('nome', 'Nome'), ('marca', 'Marca'), ('stelle', 'Più stelle'), ('quantita', 'Meno pezzi')]
+
+
+def _valori_faccetta(a, chiave):
+    """{valore: etichetta} dell'articolo per una faccetta."""
+    if chiave == 'tipo':
+        return {a.tipo: a.get_tipo_display()}
+    if chiave == 'categoria':
+        return {a.categoria: a.categoria} if a.categoria else {}
+    if chiave == 'marca':
+        return {a.marca: a.marca} if a.marca else {}
+    if chiave == 'fornitore':
+        return {str(a.fornitore_id): a.fornitore.ragione_sociale} if a.fornitore_id else {}
+    if chiave == 'posto':
+        posti = {str(g.posto_id): g.posto.nome for g in a.giacenze_elenco if g.posto_id}
+        if a.posto_id:
+            posti[str(a.posto_id)] = a.posto.nome
+        if not a.posto_id or any(g.posto_id is None for g in a.giacenze_elenco):
+            posti['nessuno'] = 'Senza posto'
+        return posti
+    if chiave == 'uso':
+        return {campo: etichetta for campo, etichetta, _ in USI if getattr(a, campo)}
+    if chiave == 'disponibilita':
+        return {a.disponibilita: dict(DISPONIBILITA)[a.disponibilita]}
+    if chiave == 'stelle':
+        # "almeno n stelle": un 4 stelle vale per 1, 2, 3 e 4
+        return {str(n): '' for n in range(1, a.valutazione + 1)}
+    return {}
+
+
+def _ordina_opzioni(chiave, opzioni):
+    if chiave == 'tipo':
+        ordine = [k for k, _ in Articolo.TIPO_CHOICES]
+    elif chiave == 'disponibilita':
+        ordine = [k for k, _ in DISPONIBILITA]
+    elif chiave == 'stelle':
+        ordine = ['5', '4', '3', '2', '1']
+    elif chiave == 'uso':
+        ordine = [campo for campo, _, _ in USI]
+    else:
+        return sorted(opzioni, key=lambda o: (o['valore'] == 'nessuno', o['etichetta'].lower()))
+    return sorted(opzioni, key=lambda o: ordine.index(o['valore']) if o['valore'] in ordine else 99)
+
+
+def _catalogo(request, qs, faccette):
+    """Griglia con filtri a faccette: ogni faccetta e' un elenco di
+    caselle (in OR tra loro, in AND con le altre faccette); il conteggio
+    accanto a ogni voce tiene conto delle altre faccette scelte.
+    Restituisce (articoli, faccette, scelti)."""
+    scelti = {chiave: set(request.GET.getlist(chiave)) - {''} for chiave, _ in faccette}
+    if request.GET.get('sotto') == '1' and 'disponibilita' in scelti:
+        scelti['disponibilita'] |= {'sotto', 'esaurito'}
+    tutti = list(qs)
+    valori = {a.pk: {chiave: _valori_faccetta(a, chiave) for chiave, _ in faccette} for a in tutti}
+
+    def passa(a, salta=None):
+        return all(not sel or sel & valori[a.pk][chiave].keys()
+                   for chiave, sel in scelti.items() if chiave != salta)
+
+    elenco = []
+    for chiave, titolo in faccette:
+        conteggi, etichette = {}, {}
+        for a in tutti:
+            if passa(a, salta=chiave):
+                for v, etichetta in valori[a.pk][chiave].items():
+                    conteggi[v] = conteggi.get(v, 0) + 1
+                    etichette[v] = etichetta
+        for v in scelti[chiave] - conteggi.keys():
+            conteggi[v], etichette[v] = 0, etichette.get(v) or v
+        if chiave == 'stelle':
+            etichette = {v: f'{v} e più' if v != '5' else '5' for v in conteggi}
+        if chiave == 'posto':
+            nomi = dict(Posto.objects.filter(pk__in=[v for v in conteggi if v.isdigit()])
+                        .values_list('pk', 'nome'))
+            etichette = {v: etichette.get(v) or nomi.get(int(v) if v.isdigit() else 0, v) for v in conteggi}
+        opzioni = [{'valore': v, 'etichetta': etichette[v], 'n': n, 'scelto': v in scelti[chiave]}
+                   for v, n in conteggi.items()]
+        if opzioni:
+            elenco.append({'chiave': chiave, 'titolo': titolo, 'opzioni': _ordina_opzioni(chiave, opzioni),
+                           'n_scelti': len(scelti[chiave])})
+
+    lista = [a for a in tutti if passa(a)]
+    ordina = request.GET.get('ordina', 'nome')
+    chiavi = {
+        'marca': lambda a: ((a.marca or '\uffff').lower(), a.nome.lower()),
+        'stelle': lambda a: (-a.valutazione, a.nome.lower()),
+        'quantita': lambda a: (not a.traccia_scorte, a.quantita, a.nome.lower()),
+    }
+    lista.sort(key=chiavi.get(ordina, lambda a: a.nome.lower()))
+    attivi = [{'chiave': f['chiave'], 'valore': o['valore'],
+               'etichetta': ('★ ' if f['chiave'] == 'stelle' else '') + o['etichetta']}
+              for f in elenco for o in f['opzioni'] if o['scelto']]
+    return lista, elenco, attivi
+
+
+def _url_senza(request, chiave, valore):
+    """Query string attuale senza un filtro (per le "pillole" dei filtri)."""
+    q = request.GET.copy()
+    q.setlist(chiave, [v for v in q.getlist(chiave) if v != valore])
+    if chiave == 'disponibilita':
+        q.pop('sotto', None)
+    return q.urlencode()
+
+
+FACCETTE_GESTIONE = [('disponibilita', 'Disponibilità'), ('tipo', 'Tipo'), ('categoria', 'Categoria'),
+                     ('marca', 'Marca'), ('stelle', 'Valutazione'), ('fornitore', 'Fornitore'),
+                     ('posto', 'Posto'), ('uso', 'Uso')]
+FACCETTE_OPERATORE = [('disponibilita', 'Disponibilità'), ('categoria', 'Categoria'), ('marca', 'Marca'),
+                      ('stelle', 'Valutazione'), ('uso', 'Uso'), ('posto', 'Posto')]
+
+
 @magazzino_required
 def articoli(request):
     qs = (Articolo.objects.select_related('fornitore', 'prodotto', 'posto', 'posto_vendita')
           .prefetch_related('giacenze__posto'))
-    tipo = request.GET.get('tipo', '')
-    categoria = request.GET.get('categoria', '')
     cerca = request.GET.get('q', '').strip()
-    sotto = request.GET.get('sotto') == '1'
     attivi = request.GET.get('tutti') != '1'
-    posto = request.GET.get('posto', '')
-    uso = request.GET.get('uso', '')
-    if posto == 'nessuno':
-        qs = qs.filter(Q(posto__isnull=True) | Q(giacenze__posto__isnull=True, giacenze__quantita__gt=0)).distinct()
-    elif posto:
-        qs = qs.filter(Q(posto_id=posto) | Q(giacenze__posto_id=posto, giacenze__quantita__gt=0)).distinct()
-    if uso in {campo for campo, _, _ in USI}:
-        qs = qs.filter(**{uso: True})
-    if tipo:
-        qs = qs.filter(tipo=tipo)
-    if categoria:
-        qs = qs.filter(categoria=categoria)
     if cerca:
-        qs = qs.filter(Q(nome__icontains=cerca) | Q(codice__icontains=cerca))
+        qs = qs.filter(Q(nome__icontains=cerca) | Q(codice__icontains=cerca) | Q(marca__icontains=cerca))
     if attivi:
         qs = qs.filter(attivo=True)
-    if sotto:
-        qs = qs.filter(traccia_scorte=True, quantita__lte=F('scorta_minima'))
-    lista = list(qs.order_by('tipo', 'categoria', 'nome'))
+    lista, faccette, filtri_attivi = _catalogo(request, qs, FACCETTE_GESTIONE)
+    for f in filtri_attivi:
+        f['togli'] = _url_senza(request, f['chiave'], f['valore'])
 
     assegnati = dict(Assegnazione.objects.filter(stato__in=Assegnazione.APERTI)
                      .values('articolo').annotate(t=Sum('quantita')).values_list('articolo', 't'))
@@ -213,8 +312,10 @@ def articoli(request):
     ctx.update({
         'articoli': lista,
         **_contesto_modale(),
-        'filtro': {'tipo': tipo, 'categoria': categoria, 'q': cerca, 'sotto': sotto, 'tutti': not attivi,
-                   'posto': posto, 'uso': uso},
+        'faccette': faccette,
+        'filtri_attivi': filtri_attivi,
+        'filtro': {'q': cerca, 'tutti': not attivi, 'ordina': request.GET.get('ordina', 'nome')},
+        'ordinamenti': ORDINAMENTI,
         'valore_totale': sum((a.valore for a in lista), Decimal('0')),
         'n_sotto_scorta': Articolo.objects.filter(attivo=True, traccia_scorte=True,
                                                   quantita__lte=F('scorta_minima')).count(),
@@ -259,6 +360,8 @@ def articolo_salva(request):
     articolo = get_object_or_404(Articolo, pk=pk) if pk else Articolo()
     articolo.nome = nome
     articolo.codice = (d.get('codice') or '').strip()
+    articolo.marca = (d.get('marca') or '').strip()[:80]
+    articolo.valutazione = min(max(_intero(d.get('valutazione')), 0), 5)
     articolo.tipo = tipo
     articolo.categoria = (d.get('categoria') or '').strip()
     articolo.unita = (d.get('unita') or 'pz').strip() or 'pz'
@@ -1000,6 +1103,193 @@ def mia_dotazione_stato(request, pk):
     if not services.puo_segnalare(request.user, a):
         return _errore('Non è una tua assegnazione né di un posto della tua postazione', 403)
     return _cambia_stato_json(request, a, 'operatore')
+
+
+@login_required
+def catalogo(request):
+    """I prodotti del magazzino per gli operatori: griglia con filtri e
+    carrello delle richieste di acquisto."""
+    if not _accesso_operatore(request.user):
+        return render(request, 'auth_system/accesso_negato.html', {'sezione': 'Il Mio Turno'}, status=403)
+    qs = Articolo.objects.filter(attivo=True).select_related('posto').prefetch_related('giacenze__posto')
+    cerca = request.GET.get('q', '').strip()
+    if cerca:
+        qs = qs.filter(Q(nome__icontains=cerca) | Q(codice__icontains=cerca) | Q(marca__icontains=cerca))
+    lista, faccette, filtri_attivi = _catalogo(request, qs, FACCETTE_OPERATORE)
+    for f in filtri_attivi:
+        f['togli'] = _url_senza(request, f['chiave'], f['valore'])
+    carrello = list(RichiestaAcquisto.objects.filter(richiesta_da=request.user, stato='attesa')
+                    .select_related('articolo'))
+    nel_carrello = {}
+    for r in carrello:
+        nel_carrello[r.articolo_id] = nel_carrello.get(r.articolo_id, 0) + r.quantita
+    for a in lista:
+        a.nel_carrello = nel_carrello.get(a.pk, 0)
+    return render(request, 'magazzino/catalogo.html', {
+        'articoli': lista,
+        'faccette': faccette,
+        'filtri_attivi': filtri_attivi,
+        'filtro': {'q': cerca, 'ordina': request.GET.get('ordina', 'nome')},
+        'ordinamenti': ORDINAMENTI,
+        'carrello': carrello,
+        'storico': (RichiestaAcquisto.objects.filter(richiesta_da=request.user).exclude(stato='attesa')
+                    .select_related('articolo', 'ordine')[:15]),
+    })
+
+
+def _accesso_operatore(user):
+    return ha_accesso(user, 'mio_turno') or ha_accesso(user, 'magazzino')
+
+
+@login_required
+def carrello_aggiungi(request):
+    """Aggiunge un articolo al carrello (JSON): se l'utente l'ha gia' in
+    attesa, somma la quantita'."""
+    if request.method != 'POST':
+        return _errore('Metodo non consentito', 405)
+    if not _accesso_operatore(request.user):
+        return _errore('Non hai accesso al catalogo', 403)
+    d = _dati(request)
+    articolo = Articolo.objects.filter(pk=d.get('articolo'), attivo=True).first()
+    if articolo is None:
+        return _errore('Articolo non trovato')
+    quantita = _intero(d.get('quantita'), 1)
+    if quantita <= 0:
+        return _errore('Indica quanti pezzi servono')
+    nota = (d.get('nota') or '').strip()[:255]
+    with transaction.atomic():
+        r = (RichiestaAcquisto.objects.select_for_update()
+             .filter(articolo=articolo, richiesta_da=request.user, stato='attesa').first())
+        if r:
+            r.quantita += quantita
+            if nota:
+                r.nota = f'{r.nota} · {nota}'[:255] if r.nota else nota
+            r.save(update_fields=['quantita', 'nota'])
+        else:
+            r = RichiestaAcquisto.objects.create(articolo=articolo, quantita=quantita, nota=nota,
+                                                 richiesta_da=request.user)
+    return JsonResponse({'success': True, 'id': r.pk, 'quantita': r.quantita})
+
+
+@login_required
+def carrello_togli(request, pk):
+    """L'operatore toglie una sua richiesta finche' e' in attesa."""
+    if request.method != 'POST':
+        return _errore('Metodo non consentito', 405)
+    r = get_object_or_404(RichiestaAcquisto, pk=pk)
+    if r.richiesta_da_id != request.user.pk and not ha_accesso(request.user, 'magazzino'):
+        return _errore('Non è una tua richiesta', 403)
+    if r.stato != 'attesa':
+        return _errore('La richiesta è già stata gestita')
+    r.delete()
+    return JsonResponse({'success': True})
+
+
+# ---------------------------------------------------------------------------
+# Carrello (responsabile acquisti)
+# ---------------------------------------------------------------------------
+
+@magazzino_required
+def carrello(request):
+    """Richieste in attesa raggruppate per fornitore, da smistare negli
+    ordini."""
+    attesa = list(RichiestaAcquisto.objects.filter(stato='attesa')
+                  .select_related('articolo__fornitore', 'fornitore', 'richiesta_da')
+                  .order_by('articolo__nome', 'richiesta_il'))
+    gruppi = OrderedDict()
+    for r in sorted(attesa, key=lambda r: (r.fornitore_scelto is None,
+                                           (r.fornitore_scelto.ragione_sociale if r.fornitore_scelto else '').lower())):
+        f = r.fornitore_scelto
+        g = gruppi.setdefault(f.pk if f else None, {'fornitore': f, 'righe': [], 'totale': Decimal('0'),
+                                                    'bozza': None})
+        g['righe'].append(r)
+        g['totale'] += (r.articolo.costo * r.quantita).quantize(Decimal('0.01'))
+    for pk, g in gruppi.items():
+        if pk:
+            g['bozza'] = OrdineFornitore.objects.filter(fornitore_id=pk, stato='bozza').first()
+    ctx = _contesto_base('carrello')
+    ctx.update({
+        'gruppi': list(gruppi.values()),
+        'n_righe': len(attesa),
+        'fornitori': Fornitore.objects.filter(attivo=True),
+        'gestite': (RichiestaAcquisto.objects.exclude(stato='attesa')
+                    .select_related('articolo', 'richiesta_da', 'ordine', 'gestita_da')
+                    .order_by('-gestita_il')[:30]),
+    })
+    return render(request, 'magazzino/carrello.html', ctx)
+
+
+@magazzino_required
+def richiesta_modifica(request, pk):
+    """Cambia fornitore o quantita' di una richiesta in attesa."""
+    if request.method != 'POST':
+        return _errore('Metodo non consentito', 405)
+    r = get_object_or_404(RichiestaAcquisto, pk=pk, stato='attesa')
+    d = _dati(request)
+    if 'fornitore' in d:
+        r.fornitore = Fornitore.objects.filter(pk=d.get('fornitore') or None).first()
+    if 'quantita' in d:
+        quantita = _intero(d.get('quantita'))
+        if quantita <= 0:
+            return _errore('La quantità deve essere almeno 1')
+        r.quantita = quantita
+    r.save(update_fields=['fornitore', 'quantita'])
+    return JsonResponse({'success': True})
+
+
+@magazzino_required
+def richiesta_scarta(request, pk):
+    if request.method != 'POST':
+        return _errore('Metodo non consentito', 405)
+    r = get_object_or_404(RichiestaAcquisto, pk=pk, stato='attesa')
+    r.stato = 'scartata'
+    r.risposta = (_dati(request).get('risposta') or '').strip()[:255]
+    r.gestita_da, r.gestita_il = request.user, timezone.now()
+    r.save(update_fields=['stato', 'risposta', 'gestita_da', 'gestita_il'])
+    return JsonResponse({'success': True})
+
+
+@magazzino_required
+def carrello_ordina(request):
+    """Smista le richieste in attesa negli ordini ai fornitori: una bozza
+    per fornitore (si aggiunge a quella gia' aperta, se c'e'), sommando le
+    quantita' dello stesso articolo. Con `fornitore` solo quel gruppo."""
+    if request.method != 'POST':
+        return _errore('Metodo non consentito', 405)
+    d = _dati(request)
+    solo = str(d.get('fornitore') or '')
+    with transaction.atomic():
+        richieste = list(RichiestaAcquisto.objects.select_for_update().filter(stato='attesa')
+                         .select_related('articolo__fornitore', 'fornitore'))
+        per_fornitore = OrderedDict()
+        for r in richieste:
+            f = r.fornitore_scelto
+            if f is None or (solo and str(f.pk) != solo):
+                continue
+            per_fornitore.setdefault(f, []).append(r)
+        if not per_fornitore:
+            return _errore('Nessuna richiesta con fornitore da ordinare: scegli il fornitore delle righe')
+        ordini = []
+        adesso = timezone.now()
+        for fornitore, righe in per_fornitore.items():
+            ordine = (OrdineFornitore.objects.select_for_update().filter(fornitore=fornitore, stato='bozza')
+                      .first())
+            if ordine is None:
+                ordine = OrdineFornitore.objects.create(fornitore=fornitore, creato_da=request.user,
+                                                        note='Dal carrello delle richieste')
+            for r in righe:
+                riga = ordine.righe.filter(articolo=r.articolo).first()
+                if riga:
+                    riga.quantita += r.quantita
+                    riga.save(update_fields=['quantita'])
+                else:
+                    RigaOrdineFornitore.objects.create(ordine=ordine, articolo=r.articolo,
+                                                       quantita=r.quantita, prezzo=r.articolo.costo)
+                r.stato, r.ordine, r.fornitore = 'ordinata', ordine, fornitore
+                r.gestita_da, r.gestita_il = request.user, adesso
+                r.save(update_fields=['stato', 'ordine', 'fornitore', 'gestita_da', 'gestita_il'])
+            ordini.append({'id': ordine.pk, 'numero': ordine.numero, 'fornitore': fornitore.ragione_sociale})
+    return JsonResponse({'success': True, 'ordini': ordini})
 
 
 # ---------------------------------------------------------------------------
