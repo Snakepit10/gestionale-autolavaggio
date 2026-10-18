@@ -284,8 +284,6 @@ def _url_senza(request, chiave, valore):
 FACCETTE_GESTIONE = [('disponibilita', 'Disponibilità'), ('tipo', 'Tipo'), ('categoria', 'Categoria'),
                      ('marca', 'Marca'), ('stelle', 'Valutazione'), ('fornitore', 'Fornitore'),
                      ('posto', 'Posto'), ('uso', 'Uso')]
-FACCETTE_OPERATORE = [('disponibilita', 'Disponibilità'), ('categoria', 'Categoria'), ('marca', 'Marca'),
-                      ('stelle', 'Valutazione'), ('uso', 'Uso'), ('posto', 'Posto')]
 
 
 @magazzino_required
@@ -1120,38 +1118,6 @@ def mia_dotazione_stato(request, pk):
     return _cambia_stato_json(request, a, 'operatore')
 
 
-@login_required
-def catalogo(request):
-    """I prodotti del magazzino per gli operatori: griglia con filtri e
-    carrello delle richieste di acquisto."""
-    if not _accesso_operatore(request.user):
-        return render(request, 'auth_system/accesso_negato.html', {'sezione': 'Il Mio Turno'}, status=403)
-    qs = Articolo.objects.filter(attivo=True).select_related('posto').prefetch_related('giacenze__posto')
-    cerca = request.GET.get('q', '').strip()
-    if cerca:
-        qs = qs.filter(Q(nome__icontains=cerca) | Q(codice__icontains=cerca) | Q(marca__icontains=cerca))
-    lista, faccette, filtri_attivi = _catalogo(request, qs, FACCETTE_OPERATORE)
-    for f in filtri_attivi:
-        f['togli'] = _url_senza(request, f['chiave'], f['valore'])
-    carrello = list(RichiestaAcquisto.objects.filter(richiesta_da=request.user, stato='attesa')
-                    .select_related('articolo'))
-    nel_carrello = {}
-    for r in carrello:
-        nel_carrello[r.articolo_id] = nel_carrello.get(r.articolo_id, 0) + r.quantita
-    for a in lista:
-        a.nel_carrello = nel_carrello.get(a.pk, 0)
-    return render(request, 'magazzino/catalogo.html', {
-        'articoli': lista,
-        'faccette': faccette,
-        'filtri_attivi': filtri_attivi,
-        'filtro': {'q': cerca, 'ordina': request.GET.get('ordina', 'nome')},
-        'ordinamenti': ORDINAMENTI,
-        'carrello': carrello,
-        'storico': (RichiestaAcquisto.objects.filter(richiesta_da=request.user).exclude(stato='attesa')
-                    .select_related('articolo', 'ordine')[:15]),
-    })
-
-
 def _accesso_operatore(user):
     return ha_accesso(user, 'mio_turno') or ha_accesso(user, 'magazzino')
 
@@ -1163,7 +1129,7 @@ def carrello_aggiungi(request):
     if request.method != 'POST':
         return _errore('Metodo non consentito', 405)
     if not _accesso_operatore(request.user):
-        return _errore('Non hai accesso al catalogo', 403)
+        return _errore('Non hai accesso al carrello', 403)
     d = _dati(request)
     articolo = Articolo.objects.filter(pk=d.get('articolo'), attivo=True).first()
     if articolo is None:
@@ -1184,20 +1150,6 @@ def carrello_aggiungi(request):
             r = RichiestaAcquisto.objects.create(articolo=articolo, quantita=quantita, nota=nota,
                                                  richiesta_da=request.user)
     return JsonResponse({'success': True, 'id': r.pk, 'quantita': r.quantita})
-
-
-@login_required
-def carrello_togli(request, pk):
-    """L'operatore toglie una sua richiesta finche' e' in attesa."""
-    if request.method != 'POST':
-        return _errore('Metodo non consentito', 405)
-    r = get_object_or_404(RichiestaAcquisto, pk=pk)
-    if r.richiesta_da_id != request.user.pk and not ha_accesso(request.user, 'magazzino'):
-        return _errore('Non è una tua richiesta', 403)
-    if r.stato != 'attesa':
-        return _errore('La richiesta è già stata gestita')
-    r.delete()
-    return JsonResponse({'success': True})
 
 
 # ---------------------------------------------------------------------------

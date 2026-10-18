@@ -46,9 +46,7 @@ urlpatterns = [
     path('mia-dotazione/', views.mia_dotazione, name='mia-dotazione'),
     path('mia-dotazione/<int:pk>/stato/', views.mia_dotazione_stato, name='mia-dotazione-stato'),
     path('mia-dotazione/schede/', views.schede_prodotti, name='schede-prodotti'),
-    path('mia-dotazione/catalogo/', views.catalogo, name='catalogo'),
     path('mia-dotazione/carrello/aggiungi/', views.carrello_aggiungi, name='carrello-aggiungi'),
-    path('mia-dotazione/carrello/<int:pk>/togli/', views.carrello_togli, name='carrello-togli'),
 
     path('carrello/', views.carrello, name='carrello'),
     path('carrello/ordina/', views.carrello_ordina, name='carrello-ordina'),

@@ -915,11 +915,7 @@ class CatalogoCarrelloTest(TestCase):
         self.assertContains(r, 'Cera spray')
         self.assertNotContains(r, 'Shampoo T25')
         self.assertContains(r, 'prod-card')
-        r = self._get(self.operatore, 'catalogo')
-        self.assertContains(r, 'Shampoo T25')
-        self.assertNotContains(r, 'Chimica Srl')  # niente fornitori e costi agli operatori
         from apps.auth_system.sezioni import sezione_per_percorso
-        self.assertEqual(sezione_per_percorso(reverse('magazzino:catalogo')), 'mio_turno')
         self.assertEqual(sezione_per_percorso(reverse('magazzino:carrello-aggiungi')), 'mio_turno')
         self.assertEqual(sezione_per_percorso(reverse('magazzino:carrello')), 'magazzino')
 
@@ -961,6 +957,3 @@ class CatalogoCarrelloTest(TestCase):
         self.assertEqual(ordine.righe.get().quantita, 6)
         cera.refresh_from_db()
         self.assertEqual((cera.stato, cera.risposta), ('scartata', 'ce ne sono 10'))
-        # gestita: l'operatore non la toglie piu'
-        self.client.force_login(self.operatore)
-        self.assertEqual(_post(self.client, 'carrello-togli', pk=cera.pk).status_code, 400)

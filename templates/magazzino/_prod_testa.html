@@ -4,7 +4,6 @@
     {% if a.foto_aggiornata %}<img src="{{ a.url_foto }}" alt="{{ a.nome }}" loading="lazy">{% else %}<span class="segnaposto"><i class="bi bi-box-seam"></i></span>{% endif %}
     <span class="etichette">
         <span>{% if a.disponibilita == 'esaurito' %}<span class="badge bg-danger">Esaurito</span>{% elif a.disponibilita == 'sotto' %}<span class="badge bg-warning text-dark">Sotto scorta</span>{% endif %}</span>
-        <span>{% if a.nel_carrello %}<span class="badge bg-primary"><i class="bi bi-cart-check"></i> {{ a.nel_carrello }}</span>{% endif %}</span>
     </span>
 </a>
 <div class="prod-body">
