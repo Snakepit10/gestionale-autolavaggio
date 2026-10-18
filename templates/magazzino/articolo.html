@@ -5,67 +5,75 @@
 {% block extra_css_magazzino %}{% include 'magazzino/_catalogo_css.html' %}
 <style>
 /* Scheda prodotto: galleria a sinistra, colonna d'acquisto a destra */
+.pd-pagina { max-width:980px; margin:0 auto; }
 .pd-briciole { display:flex; gap:.5rem; flex-wrap:wrap; align-items:center; }
 .pd-briciole a { color:#64748b; text-decoration:none; }
 .pd-briciole a:hover { color:#2563eb; }
 .pd-briciole span { color:#cbd5e1; }
 .pd-briciole span.text-muted { color:#94a3b8 !important; }
-.pd-galleria { position:relative; background:#fff; border:1px solid #e5e7eb; border-radius:16px; aspect-ratio:1 / 1; overflow:hidden; }
-.pd-galleria img { width:100%; height:100%; object-fit:contain; padding:24px; transition:transform .3s; }
+.pd-galleria { position:relative; background:#fff; border:1px solid #e5e7eb; border-radius:14px; aspect-ratio:1 / 1; overflow:hidden; max-width:340px; margin:0 auto; }
+.pd-galleria img { width:100%; height:100%; object-fit:contain; padding:16px; transition:transform .3s; }
 .pd-galleria a:hover img { transform:scale(1.04); }
 .pd-galleria .pd-zoom { position:absolute; right:14px; bottom:14px; width:36px; height:36px; border-radius:50%; background:#fff; border:1px solid #e5e7eb; display:flex; align-items:center; justify-content:center; color:#475569; pointer-events:none; }
 .pd-galleria .pd-etichette { position:absolute; top:14px; left:14px; display:flex; gap:6px; }
-.pd-senza-foto { width:100%; height:100%; border:0; background:#f8fafc; color:#94a3b8; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:.5rem; font-size:.95rem; }
-.pd-senza-foto i { font-size:3rem; }
+.pd-senza-foto { width:100%; height:100%; border:0; background:#f8fafc; color:#94a3b8; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:.5rem; font-size:.85rem; }
+.pd-senza-foto i { font-size:2rem; }
 .pd-senza-foto:hover { color:#2563eb; }
-.pd-info { position:sticky; top:1rem; }
-.pd-marca { display:inline-block; font-size:.8rem; font-weight:700; letter-spacing:1px; text-transform:uppercase; color:#64748b; text-decoration:none; margin-bottom:.25rem; }
+.pd-info { font-size:.9rem; }
+.pd-marca { display:inline-block; font-size:.72rem; font-weight:700; letter-spacing:1px; text-transform:uppercase; color:#64748b; text-decoration:none; margin-bottom:.25rem; }
 .pd-marca:hover { color:#2563eb; }
-.pd-nome { font-size:1.9rem; font-weight:800; color:#0f172a; line-height:1.15; margin-bottom:.4rem; }
-.pd-voto { display:flex; align-items:center; gap:.5rem; flex-wrap:wrap; margin-bottom:1rem; }
-.pd-voto .stelle { font-size:1rem; }
+.pd-nome { font-size:1.35rem; font-weight:700; color:#0f172a; line-height:1.15; margin-bottom:.4rem; }
+.pd-voto { display:flex; align-items:center; gap:.5rem; flex-wrap:wrap; margin-bottom:.6rem; }
+.pd-voto .stelle { font-size:.85rem; }
 .pd-prezzo { display:flex; align-items:baseline; gap:.35rem; flex-wrap:wrap; }
-.pd-prezzo .v { font-size:1.9rem; font-weight:800; color:#0f172a; }
+.pd-prezzo .v { font-size:1.3rem; font-weight:700; color:#0f172a; }
 .pd-prezzo .u { color:#64748b; }
 .pd-prezzo .l { color:#94a3b8; font-size:.8rem; text-transform:uppercase; letter-spacing:.4px; margin-right:.5rem; }
-.pd-cassa { background:#eff6ff; color:#1d4ed8; border-radius:20px; padding:2px 12px; font-weight:600; font-size:.9rem; }
-.pd-etichetta { font-size:.75rem; font-weight:700; text-transform:uppercase; letter-spacing:.5px; color:#475569; margin-bottom:.35rem; }
+.pd-cassa { background:#eff6ff; color:#1d4ed8; border-radius:20px; padding:1px 10px; font-weight:600; font-size:.8rem; }
+.pd-etichetta { font-size:.68rem; font-weight:700; text-transform:uppercase; letter-spacing:.5px; color:#475569; margin-bottom:.35rem; }
 .pd-formati { display:flex; gap:.4rem; flex-wrap:wrap; }
-.pd-formato { border:1px solid #cbd5e1; border-radius:8px; padding:6px 14px; font-size:.88rem; color:#334155; background:#fff; }
-.pd-formato.attivo { border:2px solid #0f172a; font-weight:600; padding:5px 13px; }
+.pd-formato { border:1px solid #cbd5e1; border-radius:6px; padding:3px 10px; font-size:.8rem; color:#334155; background:#fff; }
+.pd-formato.attivo { border:2px solid #0f172a; font-weight:600; padding:2px 9px; }
 .pd-disp { display:flex; align-items:center; gap:.4rem; flex-wrap:wrap; margin-bottom:.4rem; }
 .pd-disp .punto { width:10px; height:10px; border-radius:50%; background:#10b981; box-shadow:0 0 0 4px rgba(16,185,129,.15); }
 .pd-disp.sotto .punto { background:#f59e0b; box-shadow:0 0 0 4px rgba(245,158,11,.15); }
 .pd-disp.esaurito .punto { background:#ef4444; box-shadow:0 0 0 4px rgba(239,68,68,.15); }
 .pd-acquista { display:flex; gap:.5rem; }
-.pd-qta { width:140px; flex:0 0 140px; }
+.pd-acquista, #pd-nota, #pd-errore { max-width:420px; margin-left:auto; margin-right:auto; }
+.pd-qta { width:110px; flex:0 0 110px; }
 .pd-qta .form-control { font-weight:600; }
-.pd-azioni { display:flex; gap:.4rem; flex-wrap:wrap; margin-top:1rem; padding-top:1rem; border-top:1px solid #f1f5f9; }
-.pd-azioni .btn { font-size:.85rem; }
-.pd-garanzie { display:grid; grid-template-columns:repeat(3, 1fr); gap:.5rem; margin-top:1rem; }
-.pd-garanzie > div { display:flex; gap:.5rem; align-items:flex-start; background:#f8fafc; border-radius:10px; padding:10px; font-size:.82rem; color:#334155; min-width:0; }
-.pd-garanzie i { font-size:1.2rem; color:#2563eb; }
+.pd-azioni { display:flex; gap:.3rem; flex-wrap:wrap; margin-top:.75rem; padding-top:.75rem; border-top:1px solid #f1f5f9; }
+.pd-azioni .btn { font-size:.78rem; }
+.pd-garanzie { display:grid; grid-template-columns:repeat(3, 1fr); gap:.4rem; margin-top:.75rem; }
+.pd-garanzie > div { display:flex; gap:.5rem; align-items:flex-start; background:#f8fafc; border-radius:8px; padding:7px 8px; font-size:.76rem; color:#334155; min-width:0; }
+.pd-garanzie i { font-size:1rem; color:#2563eb; }
 .pd-garanzie span { min-width:0; overflow-wrap:anywhere; }
-.pd-garanzie strong { display:block; font-size:.7rem; text-transform:uppercase; letter-spacing:.4px; color:#64748b; }
-@media (max-width: 575px) { .pd-garanzie { grid-template-columns:1fr; } .pd-nome { font-size:1.5rem; } }
+.pd-garanzie strong { display:block; font-size:.62rem; text-transform:uppercase; letter-spacing:.4px; color:#64748b; }
+@media (max-width: 575px) { .pd-garanzie { grid-template-columns:1fr; } .pd-nome { font-size:1.2rem; } }
+.pd-info { text-align:center; }
+.pd-voto, .pd-prezzo, .pd-formati, .pd-disp, .pd-azioni { justify-content:center; }
+.pd-garanzie > div { text-align:left; }
+.pd-sezioni .accordion-body dd.fs-6 { font-size:.9rem !important; }
 .pd-sezioni .accordion-item { border-color:#e5e7eb; }
-.pd-sezioni .accordion-button { font-weight:600; color:#1e293b; }
+.pd-sezioni .accordion-button { font-weight:600; color:#1e293b; font-size:.9rem; padding:.7rem 1rem; }
+.pd-sezioni .accordion-body { font-size:.88rem; }
 .pd-sezioni .accordion-button:not(.collapsed) { background:#f8fafc; box-shadow:none; }
 .pd-specifiche th { width:180px; color:#64748b; font-weight:500; }
-.pd-titolo-correlati { font-size:1.25rem; font-weight:700; margin:1.5rem 0 1rem; }
+.pd-titolo-correlati { font-size:1.05rem; font-weight:700; margin:1.5rem 0 1rem; }
 </style>
 {% endblock %}
 
 {% block pagina %}
+<div class="pd-pagina">
 <nav class="pd-briciole small mb-3">
     <a href="{% url 'magazzino:articoli' %}"><i class="bi bi-arrow-left"></i> Magazzino</a>
     {% if articolo.categoria %}<span>/</span><a href="{% url 'magazzino:articoli' %}?categoria={{ articolo.categoria|urlencode }}">{{ articolo.categoria }}</a>{% endif %}
     <span>/</span><span class="text-muted">{{ articolo.nome }}</span>
 </nav>
 
-<div class="row g-4 mb-4">
+<div class="row g-4 mb-4 align-items-center">
     {# Galleria #}
-    <div class="col-lg-6">
+    <div class="col-md-5">
         <div class="pd-galleria">
             {% if articolo.foto_aggiornata %}
                 <a href="{{ articolo.url_foto }}" target="_blank" title="Apri la foto"><img src="{{ articolo.url_foto }}" alt="{{ articolo.nome }}"></a>
@@ -82,7 +90,7 @@
     </div>
 
     {# Colonna "acquisto" #}
-    <div class="col-lg-6">
+    <div class="col-md-7">
         <div class="pd-info">
             {% if articolo.marca %}<a class="pd-marca" href="{% url 'magazzino:articoli' %}?marca={{ articolo.marca|urlencode }}">{{ articolo.marca }}</a>{% endif %}
             <h1 class="pd-nome">{{ articolo.nome }}</h1>
@@ -119,7 +127,7 @@
                 {% endif %}
             </div>
             {% if in_arrivo or articolo.assegnati or richieste %}
-            <div class="small text-muted mb-3 d-flex flex-wrap gap-3">
+            <div class="small text-muted mb-3 d-flex flex-wrap justify-content-center gap-3">
                 {% if in_arrivo %}<span><i class="bi bi-truck"></i> in arrivo {% for r in in_arrivo %}{{ r.residuo }}{% if not forloop.last %} + {% endif %}{% endfor %} {{ articolo.unita }}</span>{% endif %}
                 {% if articolo.assegnati %}<span><i class="bi bi-person-badge"></i> {{ articolo.assegnati }} assegnat{{ articolo.assegnati|pluralize:"o,i" }}</span>{% endif %}
                 {% if richieste %}<a href="{% url 'magazzino:carrello' %}"><i class="bi bi-cart"></i> {{ richieste|length }} richiest{{ richieste|length|pluralize:"a,e" }} nel carrello</a>{% endif %}
@@ -128,23 +136,23 @@
 
             {% if articolo.attivo %}
             <div class="pd-acquista">
-                <div class="input-group pd-qta">
+                <div class="input-group input-group-sm pd-qta">
                     <button class="btn btn-outline-secondary" type="button" onclick="passoPd(-1)"><i class="bi bi-dash"></i></button>
                     <input type="number" min="1" class="form-control text-center" id="pd-quantita" value="1" aria-label="Quantità">
                     <button class="btn btn-outline-secondary" type="button" onclick="passoPd(1)"><i class="bi bi-plus"></i></button>
                 </div>
-                <button type="button" class="btn btn-primary btn-lg flex-grow-1" onclick="aggiungiPd()"><i class="bi bi-cart-plus"></i> Aggiungi al carrello</button>
+                <button type="button" class="btn btn-primary btn-sm flex-grow-1" onclick="aggiungiPd()"><i class="bi bi-cart-plus"></i> Aggiungi al carrello</button>
             </div>
             <input type="text" class="form-control form-control-sm mt-2" id="pd-nota" maxlength="255" placeholder="Nota per il responsabile acquisti (facoltativa)">
             <div class="alert alert-danger small mt-2 mb-0 d-none" id="pd-errore"></div>
             {% endif %}
 
             <div class="pd-azioni">
-                <button class="btn btn-outline-success" onclick="apriMovimento({{ articolo.pk }}, 'carico', {{ articolo.dati_modifica }})"><i class="bi bi-box-arrow-in-down"></i> Carico</button>
-                <button class="btn btn-outline-danger" onclick="apriMovimento({{ articolo.pk }}, 'scarto', {{ articolo.dati_modifica }})"><i class="bi bi-trash"></i> Scarto</button>
-                <button class="btn btn-outline-secondary" onclick="apriMovimento({{ articolo.pk }}, 'rettifica', {{ articolo.dati_modifica }})"><i class="bi bi-clipboard-check"></i> Inventario</button>
-                <a class="btn btn-outline-primary" href="{% url 'magazzino:assegnazioni' %}?articolo={{ articolo.pk }}"><i class="bi bi-person-badge"></i> Assegna</a>
-                <button class="btn btn-outline-dark" onclick="apriArticolo({{ articolo.pk }}, {{ articolo.dati_modifica }})"><i class="bi bi-pencil"></i> Modifica</button>
+                <button class="btn btn-sm btn-outline-success" onclick="apriMovimento({{ articolo.pk }}, 'carico', {{ articolo.dati_modifica }})"><i class="bi bi-box-arrow-in-down"></i> Carico</button>
+                <button class="btn btn-sm btn-outline-danger" onclick="apriMovimento({{ articolo.pk }}, 'scarto', {{ articolo.dati_modifica }})"><i class="bi bi-trash"></i> Scarto</button>
+                <button class="btn btn-sm btn-outline-secondary" onclick="apriMovimento({{ articolo.pk }}, 'rettifica', {{ articolo.dati_modifica }})"><i class="bi bi-clipboard-check"></i> Inventario</button>
+                <a class="btn btn-sm btn-outline-primary" href="{% url 'magazzino:assegnazioni' %}?articolo={{ articolo.pk }}"><i class="bi bi-person-badge"></i> Assegna</a>
+                <button class="btn btn-sm btn-outline-dark" onclick="apriArticolo({{ articolo.pk }}, {{ articolo.dati_modifica }})"><i class="bi bi-pencil"></i> Modifica</button>
             </div>
 
             <div class="pd-garanzie">
@@ -271,6 +279,8 @@
     {% endfor %}
 </div>
 {% endif %}
+
+</div>
 
 {% include 'magazzino/_modale_movimento.html' %}
 {% include 'magazzino/_modale_articolo.html' %}
