@@ -27,12 +27,25 @@
     <link rel="icon" type="image/png" sizes="32x32" href="{% static 'icons/icon-72x72.png' %}">
     <link rel="shortcut icon" href="{% static 'favicon.ico' %}">
 
+    <style>
+    /* Barra: voci su una riga, un po' piu' strette sugli schermi medi */
+    @media (min-width: 1200px) {
+        .navbar-nav .nav-link { white-space:nowrap; }
+    }
+    @media (min-width: 1200px) and (max-width: 1499px) {
+        .navbar-nav .nav-link { padding-left:.4rem !important; padding-right:.4rem !important; font-size:.92rem; }
+        .navbar-brand { margin-right:.5rem; }
+    }
+    @media (min-width: 1200px) and (max-width: 1399px) {
+        #navbarNav .nav-link > .bi { display:none; }
+    }
+    </style>
     {% block extra_css %}{% endblock %}
 </head>
 <body>
     {% block navbar %}
     <!-- Navigation -->
-    <nav class="navbar navbar-expand-lg navbar-dark bg-primary">
+    <nav class="navbar navbar-expand-xl navbar-dark bg-primary">
         <div class="container-fluid">
             <a class="navbar-brand" href="{% url 'core:home' %}">
                 <i class="bi bi-car-front"></i> Autolavaggio
@@ -45,64 +58,11 @@
             <div class="collapse navbar-collapse" id="navbarNav">
                 <ul class="navbar-nav me-auto">
                     {% if user.is_authenticated %}
-                        {# === Menu per TUTTI gli utenti autenticati === #}
-                        {% if 'clienti' in sezioni_visibili %}
-                        <li class="nav-item dropdown">
-                            <a class="nav-link dropdown-toggle" href="#" id="clientiDropdown" role="button" data-bs-toggle="dropdown">
-                                <i class="bi bi-people"></i> Clienti
-                            </a>
-                            <ul class="dropdown-menu">
-                                <li><a class="dropdown-item" href="{% url 'clienti:clienti-list' %}">Lista Clienti</a></li>
-                                <li><a class="dropdown-item" href="{% url 'clienti:cliente-create' %}">Nuovo Cliente</a></li>
-                                <li><hr class="dropdown-divider"></li>
-                                <li><a class="dropdown-item" href="{% url 'garage:registra' %}">
-                                    <i class="bi bi-car-front"></i> Garage veicoli</a></li>
-                            </ul>
-                        </li>
-                        {% endif %}
-
-                        {% if 'messaggi' in sezioni_visibili %}
-                        <li class="nav-item">
-                            <a class="nav-link" href="{% url 'messaggi:inbox' %}" id="navWaLink"
-                               title="Messaggi WhatsApp">
-                                <i class="bi bi-whatsapp"></i> Messaggi
-                                <span id="navbar-wa-badge" class="ms-1"
-                                      style="display:none;background:#25d366;color:#fff;
-                                             font-size:.75rem;font-weight:700;line-height:1;
-                                             padding:3px 8px;border-radius:11px;min-width:22px;
-                                             text-align:center;vertical-align:middle;
-                                             box-shadow:0 1px 4px rgba(0,0,0,.25);"></span>
-                            </a>
-                        </li>
-                        {% endif %}
-
+                        {# === Uso quotidiano === #}
                         {% if 'cassa' in sezioni_visibili %}
                         <li class="nav-item">
                             <a class="nav-link" href="{% url 'ordini:cassa' %}">
-                                <i class="bi bi-cash-register"></i> Cassa
-                            </a>
-                        </li>
-                        {% endif %}
-
-                        {% if 'task' in sezioni_visibili %}
-                        <li class="nav-item">
-                            <a class="nav-link" href="{% url 'tasks:lista' %}" id="navTaskLink"
-                               title="Task interni">
-                                <i class="bi bi-check2-square"></i> Task
-                                <span id="navbar-task-badge" class="ms-1"
-                                      style="display:none;background:#fd7e14;color:#fff;
-                                             font-size:.75rem;font-weight:700;line-height:1;
-                                             padding:3px 8px;border-radius:11px;min-width:22px;
-                                             text-align:center;vertical-align:middle;
-                                             box-shadow:0 1px 4px rgba(0,0,0,.25);"></span>
-                            </a>
-                        </li>
-                        {% endif %}
-
-                        {% if 'marketing' in sezioni_visibili %}
-                        <li class="nav-item">
-                            <a class="nav-link" href="{% url 'marketing:dashboard' %}">
-                                <i class="bi bi-megaphone"></i> Marketing
+                                <i class="bi bi-cash-stack"></i> Cassa
                             </a>
                         </li>
                         {% endif %}
@@ -112,28 +72,6 @@
                             <a class="nav-link" href="{% url 'ordini:ordini-list' %}">
                                 <i class="bi bi-receipt"></i> Ordini
                             </a>
-                        </li>
-                        {% endif %}
-
-                        {% if 'fatture' in sezioni_visibili %}
-                        <li class="nav-item">
-                            <a class="nav-link" href="{% url 'fatture:fatture-list' %}">
-                                <i class="bi bi-receipt-cutoff"></i> Fatture
-                            </a>
-                        </li>
-                        {% endif %}
-
-                        {% if 'abbonamenti' in sezioni_visibili %}
-                        <li class="nav-item dropdown">
-                            <a class="nav-link dropdown-toggle" href="#" id="abbonamentiDropdown" role="button" data-bs-toggle="dropdown">
-                                <i class="bi bi-card-checklist"></i> Abbonamenti
-                            </a>
-                            <ul class="dropdown-menu">
-                                <li><a class="dropdown-item" href="{% url 'abbonamenti:abbonamenti-list' %}">Lista Abbonamenti</a></li>
-                                <li><a class="dropdown-item" href="{% url 'abbonamenti:vendita-abbonamento' %}">Nuovo Abbonamento</a></li>
-                                <li><hr class="dropdown-divider"></li>
-                                <li><a class="dropdown-item" href="{% url 'abbonamenti:verifica-accesso' %}">Verifica Accesso</a></li>
-                            </ul>
                         </li>
                         {% endif %}
 
@@ -155,68 +93,97 @@
                         </li>
                         {% endif %}
 
-                        {% if 'qualita' in sezioni_visibili %}
+                        {% if 'clienti' in sezioni_visibili or 'abbonamenti' in sezioni_visibili or 'marketing' in sezioni_visibili %}
                         <li class="nav-item dropdown">
-                            <a class="nav-link dropdown-toggle" href="#" id="cqDropdown" role="button" data-bs-toggle="dropdown">
-                                <i class="bi bi-clipboard2-check"></i> Qualità
+                            <a class="nav-link dropdown-toggle" href="#" id="clientiDropdown" role="button" data-bs-toggle="dropdown">
+                                <i class="bi bi-people"></i> Clienti
                             </a>
                             <ul class="dropdown-menu">
-                                <li><a class="dropdown-item" href="{% url 'cq:mio_punteggio' %}">
-                                    <i class="bi bi-person-check"></i> Il mio punteggio
-                                </a></li>
+                                {% if 'clienti' in sezioni_visibili %}
+                                <li><a class="dropdown-item" href="{% url 'clienti:clienti-list' %}"><i class="bi bi-list-ul"></i> Lista Clienti</a></li>
+                                <li><a class="dropdown-item" href="{% url 'clienti:cliente-create' %}"><i class="bi bi-person-plus"></i> Nuovo Cliente</a></li>
+                                <li><a class="dropdown-item" href="{% url 'garage:registra' %}"><i class="bi bi-car-front"></i> Garage veicoli</a></li>
+                                {% endif %}
+                                {% if 'abbonamenti' in sezioni_visibili %}
                                 <li><hr class="dropdown-divider"></li>
-                                <li><a class="dropdown-item" href="{% url 'cq:dashboard' %}">
-                                    <i class="bi bi-bar-chart-line"></i> Dashboard CQ
-                                </a></li>
-                                <li><a class="dropdown-item" href="{% url 'cq:analytics' %}">
-                                    <i class="bi bi-graph-up-arrow"></i> Analytics &amp; Kaizen
-                                </a></li>
-                                <li><a class="dropdown-item" href="{% url 'cq:report_mensile' anno=today.year mese=today.month %}">
-                                    <i class="bi bi-trophy"></i> Report & Premi
-                                </a></li>
+                                <li><h6 class="dropdown-header">Abbonamenti</h6></li>
+                                <li><a class="dropdown-item" href="{% url 'abbonamenti:abbonamenti-list' %}"><i class="bi bi-card-checklist"></i> Lista Abbonamenti</a></li>
+                                <li><a class="dropdown-item" href="{% url 'abbonamenti:vendita-abbonamento' %}"><i class="bi bi-plus-circle"></i> Nuovo Abbonamento</a></li>
+                                <li><a class="dropdown-item" href="{% url 'abbonamenti:verifica-accesso' %}"><i class="bi bi-qr-code-scan"></i> Verifica Accesso</a></li>
+                                {% endif %}
+                                {% if 'marketing' in sezioni_visibili %}
+                                <li><hr class="dropdown-divider"></li>
+                                <li><a class="dropdown-item" href="{% url 'marketing:dashboard' %}"><i class="bi bi-megaphone"></i> Marketing</a></li>
+                                {% endif %}
                             </ul>
                         </li>
                         {% endif %}
 
-                        {# Turni: link diretto per operatore #}
-                        {% if 'mio_turno' in sezioni_visibili %}
+                        {% if 'messaggi' in sezioni_visibili %}
                         <li class="nav-item">
-                            <a class="nav-link" href="{% url 'turni:dashboard' %}">
-                                <i class="bi bi-person-workspace"></i> Il Mio Turno
+                            <a class="nav-link" href="{% url 'messaggi:inbox' %}" id="navWaLink"
+                               title="Messaggi WhatsApp">
+                                <i class="bi bi-whatsapp"></i> Messaggi
+                                <span id="navbar-wa-badge" class="ms-1"
+                                      style="display:none;background:#25d366;color:#fff;
+                                             font-size:.75rem;font-weight:700;line-height:1;
+                                             padding:3px 8px;border-radius:11px;min-width:22px;
+                                             text-align:center;vertical-align:middle;
+                                             box-shadow:0 1px 4px rgba(0,0,0,.25);"></span>
                             </a>
                         </li>
                         {% endif %}
 
-                        {% if 'mio_turno' in sezioni_visibili or 'magazzino' in sezioni_visibili %}
+                        {% if 'task' in sezioni_visibili %}
                         <li class="nav-item">
-                            <a class="nav-link" href="{% url 'magazzino:mia-dotazione' %}">
-                                <i class="bi bi-box-seam"></i> Dotazione
-                            </a>
-                        </li>
-                        <li class="nav-item">
-                            <a class="nav-link" href="{% url 'magazzino:schede-prodotti' %}">
-                                <i class="bi bi-file-earmark-text"></i> Schede prodotti
+                            <a class="nav-link" href="{% url 'tasks:lista' %}" id="navTaskLink"
+                               title="Task interni">
+                                <i class="bi bi-check2-square"></i> Task
+                                <span id="navbar-task-badge" class="ms-1"
+                                      style="display:none;background:#fd7e14;color:#fff;
+                                             font-size:.75rem;font-weight:700;line-height:1;
+                                             padding:3px 8px;border-radius:11px;min-width:22px;
+                                             text-align:center;vertical-align:middle;
+                                             box-shadow:0 1px 4px rgba(0,0,0,.25);"></span>
                             </a>
                         </li>
                         {% endif %}
 
-                        {# === Menu per responsabile/titolare === #}
-                        {% if 'report_turni' in sezioni_visibili %}
+                        {# === Turno: operatore, report turni e qualita' === #}
+                        {% if 'mio_turno' in sezioni_visibili or 'magazzino' in sezioni_visibili or 'report_turni' in sezioni_visibili or 'qualita' in sezioni_visibili %}
                         <li class="nav-item dropdown">
-                            <a class="nav-link dropdown-toggle" href="#" role="button" data-bs-toggle="dropdown">
-                                <i class="bi bi-clock-history"></i> Turni
+                            <a class="nav-link dropdown-toggle" href="#" id="turnoDropdown" role="button" data-bs-toggle="dropdown">
+                                <i class="bi bi-person-workspace"></i> Turno
                             </a>
                             <ul class="dropdown-menu">
-                                <li><a class="dropdown-item" href="{% url 'turni:report_lavorazioni' %}">
-                                    <i class="bi bi-graph-up"></i> Report Tempi
-                                </a></li>
-                                <li><a class="dropdown-item" href="{% url 'turni:storico_checklist' %}">
-                                    <i class="bi bi-speedometer2"></i> Dashboard Checklist
-                                </a></li>
+                                {% if 'mio_turno' in sezioni_visibili %}
+                                <li><a class="dropdown-item" href="{% url 'turni:dashboard' %}"><i class="bi bi-person-workspace"></i> Il Mio Turno</a></li>
+                                {% endif %}
+                                {% if 'mio_turno' in sezioni_visibili or 'magazzino' in sezioni_visibili %}
+                                <li><a class="dropdown-item" href="{% url 'magazzino:mia-dotazione' %}"><i class="bi bi-box-seam"></i> La mia dotazione</a></li>
+                                <li><a class="dropdown-item" href="{% url 'magazzino:schede-prodotti' %}"><i class="bi bi-file-earmark-text"></i> Schede prodotti</a></li>
+                                {% endif %}
+                                {% if 'qualita' in sezioni_visibili %}
+                                <li><a class="dropdown-item" href="{% url 'cq:mio_punteggio' %}"><i class="bi bi-person-check"></i> Il mio punteggio</a></li>
+                                {% endif %}
+                                {% if 'report_turni' in sezioni_visibili %}
+                                <li><hr class="dropdown-divider"></li>
+                                <li><h6 class="dropdown-header">Turni</h6></li>
+                                <li><a class="dropdown-item" href="{% url 'turni:report_lavorazioni' %}"><i class="bi bi-graph-up"></i> Report Tempi</a></li>
+                                <li><a class="dropdown-item" href="{% url 'turni:storico_checklist' %}"><i class="bi bi-speedometer2"></i> Dashboard Checklist</a></li>
+                                {% endif %}
+                                {% if 'qualita' in sezioni_visibili %}
+                                <li><hr class="dropdown-divider"></li>
+                                <li><h6 class="dropdown-header">Qualità</h6></li>
+                                <li><a class="dropdown-item" href="{% url 'cq:dashboard' %}"><i class="bi bi-bar-chart-line"></i> Dashboard CQ</a></li>
+                                <li><a class="dropdown-item" href="{% url 'cq:analytics' %}"><i class="bi bi-graph-up-arrow"></i> Analytics &amp; Kaizen</a></li>
+                                <li><a class="dropdown-item" href="{% url 'cq:report_mensile' anno=today.year mese=today.month %}"><i class="bi bi-trophy"></i> Report & Premi</a></li>
+                                {% endif %}
                             </ul>
                         </li>
                         {% endif %}
 
+                        {# === Gestione === #}
                         {% if 'magazzino' in sezioni_visibili %}
                         <li class="nav-item dropdown">
                             <a class="nav-link dropdown-toggle" href="#" id="magazzinoDropdown" role="button" data-bs-toggle="dropdown">
@@ -242,24 +209,23 @@
                         </li>
                         {% endif %}
 
-                        {% if 'finanze' in sezioni_visibili %}
+                        {% if 'fatture' in sezioni_visibili or 'finanze' in sezioni_visibili %}
                         <li class="nav-item dropdown">
-                            <a class="nav-link dropdown-toggle" href="#" role="button" data-bs-toggle="dropdown">
-                                <i class="bi bi-cash-coin"></i> Finanze
+                            <a class="nav-link dropdown-toggle" href="#" id="ammDropdown" role="button" data-bs-toggle="dropdown">
+                                <i class="bi bi-cash-coin"></i> Amministrazione
                             </a>
                             <ul class="dropdown-menu">
-                                <li><a class="dropdown-item" href="{% url 'finanze:report_giornata' %}">
-                                    <i class="bi bi-file-earmark-bar-graph"></i> Report Giornata
-                                </a></li>
-                                <li><a class="dropdown-item" href="{% url 'finanze:report_periodo' %}">
-                                    <i class="bi bi-graph-up-arrow"></i> Report Periodo
-                                </a></li>
-                                <li><a class="dropdown-item" href="{% url 'finanze:riepilogo_saldi_portali' %}">
-                                    <i class="bi bi-journal-check"></i> Saldi giornalieri
-                                </a></li>
-                                <li><a class="dropdown-item" href="{% url 'finanze:transazioni_washtec' %}">
-                                    <i class="bi bi-list-columns"></i> Transazioni WashTec
-                                </a></li>
+                                {% if 'fatture' in sezioni_visibili %}
+                                <li><a class="dropdown-item" href="{% url 'fatture:fatture-list' %}"><i class="bi bi-receipt-cutoff"></i> Fatture</a></li>
+                                {% endif %}
+                                {% if 'finanze' in sezioni_visibili %}
+                                {% if 'fatture' in sezioni_visibili %}<li><hr class="dropdown-divider"></li>{% endif %}
+                                <li><h6 class="dropdown-header">Finanze</h6></li>
+                                <li><a class="dropdown-item" href="{% url 'finanze:report_giornata' %}"><i class="bi bi-file-earmark-bar-graph"></i> Report Giornata</a></li>
+                                <li><a class="dropdown-item" href="{% url 'finanze:report_periodo' %}"><i class="bi bi-graph-up-arrow"></i> Report Periodo</a></li>
+                                <li><a class="dropdown-item" href="{% url 'finanze:riepilogo_saldi_portali' %}"><i class="bi bi-journal-check"></i> Saldi giornalieri</a></li>
+                                <li><a class="dropdown-item" href="{% url 'finanze:transazioni_washtec' %}"><i class="bi bi-list-columns"></i> Transazioni WashTec</a></li>
+                                {% endif %}
                             </ul>
                         </li>
                         {% endif %}
