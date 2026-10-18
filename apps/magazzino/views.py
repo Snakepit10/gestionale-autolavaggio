@@ -339,9 +339,24 @@ def articolo_scheda(request, pk):
             articolo=articolo, ordine__stato__in=('inviato', 'parziale')).select_related('ordine')
             if r.residuo > 0],
         'tipi': Articolo.TIPO_CHOICES,
+        'richieste': articolo.richieste.filter(stato='attesa').select_related('richiesta_da'),
+        'correlati': _correlati(articolo),
         **_contesto_modale(),
     })
     return render(request, 'magazzino/articolo.html', ctx)
+
+
+def _correlati(articolo, quanti=5):
+    """Prodotti simili: stessa categoria, poi stessa marca."""
+    qs = Articolo.objects.filter(attivo=True).exclude(pk=articolo.pk)
+    filtro = Q(pk__in=[])
+    if articolo.categoria:
+        filtro |= Q(categoria=articolo.categoria)
+    if articolo.marca:
+        filtro |= Q(marca=articolo.marca)
+    lista = list(qs.filter(filtro).select_related('posto', 'fornitore'))
+    lista.sort(key=lambda a: (a.categoria != articolo.categoria, -a.valutazione, a.nome.lower()))
+    return lista[:quanti]
 
 
 @magazzino_required

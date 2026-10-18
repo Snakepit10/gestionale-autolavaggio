@@ -2,142 +2,278 @@
 
 {% block title %}{{ articolo.nome }} - Magazzino{% endblock %}
 
-{% block extra_css_magazzino %}{% include 'magazzino/_catalogo_css.html' %}{% endblock %}
+{% block extra_css_magazzino %}{% include 'magazzino/_catalogo_css.html' %}
+<style>
+/* Scheda prodotto: galleria a sinistra, colonna d'acquisto a destra */
+.pd-briciole { display:flex; gap:.5rem; flex-wrap:wrap; align-items:center; }
+.pd-briciole a { color:#64748b; text-decoration:none; }
+.pd-briciole a:hover { color:#2563eb; }
+.pd-briciole span { color:#cbd5e1; }
+.pd-briciole span.text-muted { color:#94a3b8 !important; }
+.pd-galleria { position:relative; background:#fff; border:1px solid #e5e7eb; border-radius:16px; aspect-ratio:1 / 1; overflow:hidden; }
+.pd-galleria img { width:100%; height:100%; object-fit:contain; padding:24px; transition:transform .3s; }
+.pd-galleria a:hover img { transform:scale(1.04); }
+.pd-galleria .pd-zoom { position:absolute; right:14px; bottom:14px; width:36px; height:36px; border-radius:50%; background:#fff; border:1px solid #e5e7eb; display:flex; align-items:center; justify-content:center; color:#475569; pointer-events:none; }
+.pd-galleria .pd-etichette { position:absolute; top:14px; left:14px; display:flex; gap:6px; }
+.pd-senza-foto { width:100%; height:100%; border:0; background:#f8fafc; color:#94a3b8; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:.5rem; font-size:.95rem; }
+.pd-senza-foto i { font-size:3rem; }
+.pd-senza-foto:hover { color:#2563eb; }
+.pd-info { position:sticky; top:1rem; }
+.pd-marca { display:inline-block; font-size:.8rem; font-weight:700; letter-spacing:1px; text-transform:uppercase; color:#64748b; text-decoration:none; margin-bottom:.25rem; }
+.pd-marca:hover { color:#2563eb; }
+.pd-nome { font-size:1.9rem; font-weight:800; color:#0f172a; line-height:1.15; margin-bottom:.4rem; }
+.pd-voto { display:flex; align-items:center; gap:.5rem; flex-wrap:wrap; margin-bottom:1rem; }
+.pd-voto .stelle { font-size:1rem; }
+.pd-prezzo { display:flex; align-items:baseline; gap:.35rem; flex-wrap:wrap; }
+.pd-prezzo .v { font-size:1.9rem; font-weight:800; color:#0f172a; }
+.pd-prezzo .u { color:#64748b; }
+.pd-prezzo .l { color:#94a3b8; font-size:.8rem; text-transform:uppercase; letter-spacing:.4px; margin-right:.5rem; }
+.pd-cassa { background:#eff6ff; color:#1d4ed8; border-radius:20px; padding:2px 12px; font-weight:600; font-size:.9rem; }
+.pd-etichetta { font-size:.75rem; font-weight:700; text-transform:uppercase; letter-spacing:.5px; color:#475569; margin-bottom:.35rem; }
+.pd-formati { display:flex; gap:.4rem; flex-wrap:wrap; }
+.pd-formato { border:1px solid #cbd5e1; border-radius:8px; padding:6px 14px; font-size:.88rem; color:#334155; background:#fff; }
+.pd-formato.attivo { border:2px solid #0f172a; font-weight:600; padding:5px 13px; }
+.pd-disp { display:flex; align-items:center; gap:.4rem; flex-wrap:wrap; margin-bottom:.4rem; }
+.pd-disp .punto { width:10px; height:10px; border-radius:50%; background:#10b981; box-shadow:0 0 0 4px rgba(16,185,129,.15); }
+.pd-disp.sotto .punto { background:#f59e0b; box-shadow:0 0 0 4px rgba(245,158,11,.15); }
+.pd-disp.esaurito .punto { background:#ef4444; box-shadow:0 0 0 4px rgba(239,68,68,.15); }
+.pd-acquista { display:flex; gap:.5rem; }
+.pd-qta { width:140px; flex:0 0 140px; }
+.pd-qta .form-control { font-weight:600; }
+.pd-azioni { display:flex; gap:.4rem; flex-wrap:wrap; margin-top:1rem; padding-top:1rem; border-top:1px solid #f1f5f9; }
+.pd-azioni .btn { font-size:.85rem; }
+.pd-garanzie { display:grid; grid-template-columns:repeat(3, 1fr); gap:.5rem; margin-top:1rem; }
+.pd-garanzie > div { display:flex; gap:.5rem; align-items:flex-start; background:#f8fafc; border-radius:10px; padding:10px; font-size:.82rem; color:#334155; min-width:0; }
+.pd-garanzie i { font-size:1.2rem; color:#2563eb; }
+.pd-garanzie span { min-width:0; overflow-wrap:anywhere; }
+.pd-garanzie strong { display:block; font-size:.7rem; text-transform:uppercase; letter-spacing:.4px; color:#64748b; }
+@media (max-width: 575px) { .pd-garanzie { grid-template-columns:1fr; } .pd-nome { font-size:1.5rem; } }
+.pd-sezioni .accordion-item { border-color:#e5e7eb; }
+.pd-sezioni .accordion-button { font-weight:600; color:#1e293b; }
+.pd-sezioni .accordion-button:not(.collapsed) { background:#f8fafc; box-shadow:none; }
+.pd-specifiche th { width:180px; color:#64748b; font-weight:500; }
+.pd-titolo-correlati { font-size:1.25rem; font-weight:700; margin:1.5rem 0 1rem; }
+</style>
+{% endblock %}
 
 {% block pagina %}
-<div class="page-header">
-    <h1>
-        <a href="{% url 'magazzino:articoli' %}" class="text-decoration-none text-muted"><i class="bi bi-arrow-left"></i></a>
-        {{ articolo.nome }}
-        <span class="badge {% if articolo.tipo == 'vendita' %}bg-primary{% elif articolo.tipo == 'strumento' %}bg-dark{% else %}bg-secondary{% endif %} fs-6 align-middle">{{ articolo.get_tipo_display }}</span>
-        {% if not articolo.attivo %}<span class="badge bg-light text-muted fs-6 align-middle">non attivo</span>{% endif %}
-    </h1>
-    <div class="d-flex gap-2 flex-wrap">
-        <button class="btn btn-outline-success" onclick="apriMovimento({{ articolo.pk }}, 'carico', {{ articolo.dati_modifica }})"><i class="bi bi-box-arrow-in-down"></i> Carico</button>
-        <button class="btn btn-outline-danger" onclick="apriMovimento({{ articolo.pk }}, 'scarto', {{ articolo.dati_modifica }})"><i class="bi bi-trash"></i> Scarto</button>
-        <button class="btn btn-outline-secondary" onclick="apriMovimento({{ articolo.pk }}, 'rettifica', {{ articolo.dati_modifica }})"><i class="bi bi-clipboard-check"></i> Inventario</button>
-        <a class="btn btn-outline-primary" href="{% url 'magazzino:assegnazioni' %}?articolo={{ articolo.pk }}"><i class="bi bi-person-badge"></i> Assegna</a>
-        <button class="btn btn-primary" onclick="apriArticolo({{ articolo.pk }}, {{ articolo.dati_modifica }})"><i class="bi bi-pencil"></i> Modifica</button>
+<nav class="pd-briciole small mb-3">
+    <a href="{% url 'magazzino:articoli' %}"><i class="bi bi-arrow-left"></i> Magazzino</a>
+    {% if articolo.categoria %}<span>/</span><a href="{% url 'magazzino:articoli' %}?categoria={{ articolo.categoria|urlencode }}">{{ articolo.categoria }}</a>{% endif %}
+    <span>/</span><span class="text-muted">{{ articolo.nome }}</span>
+</nav>
+
+<div class="row g-4 mb-4">
+    {# Galleria #}
+    <div class="col-lg-6">
+        <div class="pd-galleria">
+            {% if articolo.foto_aggiornata %}
+                <a href="{{ articolo.url_foto }}" target="_blank" title="Apri la foto"><img src="{{ articolo.url_foto }}" alt="{{ articolo.nome }}"></a>
+                <span class="pd-zoom"><i class="bi bi-arrows-fullscreen"></i></span>
+            {% else %}
+                <button type="button" class="pd-senza-foto" onclick="apriArticolo({{ articolo.pk }}, {{ articolo.dati_modifica }})">
+                    <i class="bi bi-camera"></i><span>Aggiungi una foto</span></button>
+            {% endif %}
+            <div class="pd-etichette">
+                <span class="badge {% if articolo.tipo == 'vendita' %}bg-primary{% elif articolo.tipo == 'strumento' %}bg-dark{% else %}bg-secondary{% endif %}">{{ articolo.get_tipo_display }}</span>
+                {% if not articolo.attivo %}<span class="badge bg-light text-muted border">non attivo</span>{% endif %}
+            </div>
+        </div>
+    </div>
+
+    {# Colonna "acquisto" #}
+    <div class="col-lg-6">
+        <div class="pd-info">
+            {% if articolo.marca %}<a class="pd-marca" href="{% url 'magazzino:articoli' %}?marca={{ articolo.marca|urlencode }}">{{ articolo.marca }}</a>{% endif %}
+            <h1 class="pd-nome">{{ articolo.nome }}</h1>
+            <div class="pd-voto">
+                {% include 'magazzino/_stelle.html' with a=articolo %}
+                <span class="text-muted small">{% if articolo.valutazione %}{{ articolo.valutazione }}/5{% else %}nessuna valutazione{% endif %}</span>
+                {% if articolo.codice %}<span class="text-muted small">&middot; cod. {{ articolo.codice }}</span>{% endif %}
+            </div>
+
+            <div class="pd-prezzo">
+                <span class="v">&euro;{% if articolo.prezzo_al_contenuto %}{{ articolo.costo_indicato|floatformat:"-4" }}{% else %}{{ articolo.costo|floatformat:2 }}{% endif %}</span><span class="u">/{{ articolo.unita_prezzo }}</span>
+                <span class="l">costo</span>
+                {% if articolo.in_cassa %}<span class="pd-cassa"><i class="bi bi-shop"></i> in cassa &euro;{{ articolo.prodotto.prezzo|floatformat:2 }}</span>
+                {% elif articolo.manca_in_cassa %}<span class="badge bg-warning text-dark cursor-pointer" onclick="apriArticolo({{ articolo.pk }}, {{ articolo.dati_modifica }})">non in cassa: manca il prezzo</span>{% endif %}
+            </div>
+            <div class="small text-muted mb-3">
+                {% if articolo.prezzo_al_contenuto %}&euro;{{ articolo.costo|floatformat:2 }}/{{ articolo.unita }} &middot; {% elif articolo.ha_contenuto %}&euro;{{ articolo.costo_al_contenuto|floatformat:"-4" }}/{{ articolo.unita_contenuto }} &middot; {% endif %}valore in magazzino &euro;{{ articolo.valore|floatformat:2 }}
+            </div>
+
+            <div class="pd-etichetta">Formato</div>
+            <div class="pd-formati mb-3">
+                <span class="pd-formato attivo">{{ articolo.unita }}{% if articolo.ha_contenuto %} da {{ articolo.contenuto|floatformat:"-3" }} {{ articolo.unita_contenuto }}{% endif %}</span>
+                {% for etichetta, sigla in articolo.usi %}<span class="pd-formato">{{ etichetta }}</span>{% endfor %}
+            </div>
+
+            <div class="pd-disp {{ articolo.disponibilita }}">
+                <span class="punto"></span>
+                {% if not articolo.traccia_scorte %}<strong>Sempre disponibile</strong> <span class="text-muted">(quantità non tracciata)</span>
+                {% else %}
+                    <strong>{% if articolo.disponibilita == 'esaurito' %}Esaurito{% elif articolo.disponibilita == 'sotto' %}Sotto scorta{% else %}Disponibile{% endif %}</strong>
+                    &middot; <span class="{% if articolo.quantita < 0 %}qta-neg{% endif %}">{{ articolo.quantita }} {{ articolo.unita }}</span>
+                    {% if articolo.ha_contenuto and articolo.quantita > 0 %}<span class="text-muted">({{ articolo.quantita_contenuto|floatformat:"-2" }} {{ articolo.unita_contenuto }})</span>{% endif %}
+                    <span class="text-muted">&middot; minimo {{ articolo.scorta_minima }}</span>
+                {% endif %}
+            </div>
+            {% if in_arrivo or articolo.assegnati or richieste %}
+            <div class="small text-muted mb-3 d-flex flex-wrap gap-3">
+                {% if in_arrivo %}<span><i class="bi bi-truck"></i> in arrivo {% for r in in_arrivo %}{{ r.residuo }}{% if not forloop.last %} + {% endif %}{% endfor %} {{ articolo.unita }}</span>{% endif %}
+                {% if articolo.assegnati %}<span><i class="bi bi-person-badge"></i> {{ articolo.assegnati }} assegnat{{ articolo.assegnati|pluralize:"o,i" }}</span>{% endif %}
+                {% if richieste %}<a href="{% url 'magazzino:carrello' %}"><i class="bi bi-cart"></i> {{ richieste|length }} richiest{{ richieste|length|pluralize:"a,e" }} nel carrello</a>{% endif %}
+            </div>
+            {% else %}<div class="mb-3"></div>{% endif %}
+
+            {% if articolo.attivo %}
+            <div class="pd-acquista">
+                <div class="input-group pd-qta">
+                    <button class="btn btn-outline-secondary" type="button" onclick="passoPd(-1)"><i class="bi bi-dash"></i></button>
+                    <input type="number" min="1" class="form-control text-center" id="pd-quantita" value="1" aria-label="Quantità">
+                    <button class="btn btn-outline-secondary" type="button" onclick="passoPd(1)"><i class="bi bi-plus"></i></button>
+                </div>
+                <button type="button" class="btn btn-primary btn-lg flex-grow-1" onclick="aggiungiPd()"><i class="bi bi-cart-plus"></i> Aggiungi al carrello</button>
+            </div>
+            <input type="text" class="form-control form-control-sm mt-2" id="pd-nota" maxlength="255" placeholder="Nota per il responsabile acquisti (facoltativa)">
+            <div class="alert alert-danger small mt-2 mb-0 d-none" id="pd-errore"></div>
+            {% endif %}
+
+            <div class="pd-azioni">
+                <button class="btn btn-outline-success" onclick="apriMovimento({{ articolo.pk }}, 'carico', {{ articolo.dati_modifica }})"><i class="bi bi-box-arrow-in-down"></i> Carico</button>
+                <button class="btn btn-outline-danger" onclick="apriMovimento({{ articolo.pk }}, 'scarto', {{ articolo.dati_modifica }})"><i class="bi bi-trash"></i> Scarto</button>
+                <button class="btn btn-outline-secondary" onclick="apriMovimento({{ articolo.pk }}, 'rettifica', {{ articolo.dati_modifica }})"><i class="bi bi-clipboard-check"></i> Inventario</button>
+                <a class="btn btn-outline-primary" href="{% url 'magazzino:assegnazioni' %}?articolo={{ articolo.pk }}"><i class="bi bi-person-badge"></i> Assegna</a>
+                <button class="btn btn-outline-dark" onclick="apriArticolo({{ articolo.pk }}, {{ articolo.dati_modifica }})"><i class="bi bi-pencil"></i> Modifica</button>
+            </div>
+
+            <div class="pd-garanzie">
+                <div><i class="bi bi-geo-alt"></i><span><strong>Posto</strong>{% if articolo.posto %}<a href="{% url 'magazzino:articoli' %}?posto={{ articolo.posto_id }}">{{ articolo.posto }}</a>{% else %}non indicato{% endif %}</span></div>
+                <div><i class="bi bi-building"></i><span><strong>Fornitore</strong>{{ articolo.fornitore|default:"non indicato" }}</span></div>
+                <div><i class="bi bi-droplet-half"></i><span><strong>Diluizione</strong>{{ articolo.diluizione|default:"—" }}</span></div>
+            </div>
+        </div>
     </div>
 </div>
 
-<div class="row g-3 mb-3">
-    <div class="col-6 col-md-3"><div class="kpi"><div class="l">In magazzino</div>
-        <div class="v {% if articolo.quantita < 0 or articolo.sotto_scorta %}text-danger{% endif %}">
-            {% if articolo.traccia_scorte %}{{ articolo.quantita }} <small class="fs-6 text-muted">{{ articolo.unita }}</small>{% else %}<small class="fs-6">non tracciato</small>{% endif %}</div>
-            {% if articolo.ha_contenuto and articolo.traccia_scorte %}<small class="text-muted">= {{ articolo.quantita_contenuto|floatformat:"-2" }} {{ articolo.unita_contenuto }}</small>{% endif %}</div></div>
-    <div class="col-6 col-md-3"><div class="kpi"><div class="l">Assegnati</div><div class="v">{{ articolo.assegnati }}</div></div></div>
-    <div class="col-6 col-md-3"><div class="kpi"><div class="l">Scorta minima</div><div class="v">{{ articolo.scorta_minima }}</div></div></div>
-    <div class="col-6 col-md-3"><div class="kpi"><div class="l">Costo</div>
-        <div class="v">&euro;{{ articolo.costo_indicato|floatformat:"-4" }}<small class="fs-6 text-muted">/{{ articolo.unita_prezzo }}</small></div>
-        <small class="text-muted">{% if articolo.prezzo_al_contenuto %}&euro;{{ articolo.costo|floatformat:2 }}/{{ articolo.unita }} &middot; {% elif articolo.ha_contenuto %}&euro;{{ articolo.costo_al_contenuto|floatformat:"-4" }}/{{ articolo.unita_contenuto }} &middot; {% endif %}valore &euro;{{ articolo.valore|floatformat:2 }}</small></div></div>
-</div>
-
-<div class="row g-3">
-    <div class="col-lg-4">
-        <div class="section-card">
-            <div class="section-title"><div class="label"><i class="bi bi-info-circle"></i> Dati</div></div>
-            {% if articolo.foto_aggiornata %}
-            <a href="{{ articolo.url_foto }}" target="_blank"><img src="{{ articolo.url_foto }}" alt="{{ articolo.nome }}" class="w-100" style="max-height:320px;object-fit:contain;background:#f8fafc"></a>
-            {% else %}
-            <div class="text-center py-3 bg-light text-muted small cursor-pointer" onclick="apriArticolo({{ articolo.pk }}, {{ articolo.dati_modifica }})">
-                <i class="bi bi-camera fs-3 d-block"></i> Aggiungi una foto</div>
-            {% endif %}
-            <div class="section-body pad small">
-                <dl class="row mb-0">
-                    <dt class="col-5">Posto</dt><dd class="col-7">{% if articolo.posto %}<a href="{% url 'magazzino:articoli' %}?posto={{ articolo.posto_id }}">{{ articolo.posto }}</a>{% else %}<span class="text-muted">non indicato</span>{% endif %}</dd>
-                    <dt class="col-5">Uso</dt><dd class="col-7">{% for etichetta, sigla in articolo.usi %}<span class="badge bg-light text-dark border">{{ etichetta }}</span> {% empty %}<span class="text-muted">—</span>{% endfor %}</dd>
-                    <dt class="col-5">Marca</dt><dd class="col-7">{% if articolo.marca %}<a href="{% url 'magazzino:articoli' %}?marca={{ articolo.marca|urlencode }}">{{ articolo.marca }}</a>{% else %}—{% endif %}</dd>
-                    <dt class="col-5">Valutazione</dt><dd class="col-7">{% include 'magazzino/_stelle.html' with a=articolo %}</dd>
-                    <dt class="col-5">Codice</dt><dd class="col-7">{{ articolo.codice|default:"—" }}</dd>
-                    <dt class="col-5">Pezzo</dt><dd class="col-7">{{ articolo.unita }}{% if articolo.ha_contenuto %} da {{ articolo.contenuto|floatformat:"-3" }} {{ articolo.unita_contenuto }}{% endif %}</dd>
-                    <dt class="col-5">Categoria</dt><dd class="col-7">{{ articolo.categoria|default:"—" }}</dd>
-                    <dt class="col-5">Fornitore</dt><dd class="col-7">{{ articolo.fornitore|default:"—" }}</dd>
-                    <dt class="col-5">In cassa</dt><dd class="col-7">
+{# Sezioni a fisarmonica #}
+<div class="accordion pd-sezioni mb-4" id="pdSezioni">
+    <div class="accordion-item">
+        <h2 class="accordion-header"><button class="accordion-button" type="button" data-bs-toggle="collapse" data-bs-target="#pd-uso">
+            <i class="bi bi-file-earmark-text me-2"></i> Modo d'uso e scheda tecnica</button></h2>
+        <div id="pd-uso" class="accordion-collapse collapse show">
+            <div class="accordion-body">{% include 'magazzino/_scheda_tecnica.html' with a=articolo %}</div>
+        </div>
+    </div>
+    <div class="accordion-item">
+        <h2 class="accordion-header"><button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#pd-dettagli">
+            <i class="bi bi-info-circle me-2"></i> Dettagli</button></h2>
+        <div id="pd-dettagli" class="accordion-collapse collapse">
+            <div class="accordion-body">
+                <table class="table table-sm pd-specifiche mb-0"><tbody>
+                    <tr><th>Marca</th><td>{{ articolo.marca|default:"—" }}</td></tr>
+                    <tr><th>Codice</th><td>{{ articolo.codice|default:"—" }}</td></tr>
+                    <tr><th>Tipo</th><td>{{ articolo.get_tipo_display }}</td></tr>
+                    <tr><th>Categoria</th><td>{{ articolo.categoria|default:"—" }}</td></tr>
+                    <tr><th>Pezzo</th><td>{{ articolo.unita }}{% if articolo.ha_contenuto %} da {{ articolo.contenuto|floatformat:"-3" }} {{ articolo.unita_contenuto }}{% endif %}</td></tr>
+                    <tr><th>Uso</th><td>{% for etichetta, sigla in articolo.usi %}<span class="badge bg-light text-dark border">{{ etichetta }}</span> {% empty %}—{% endfor %}</td></tr>
+                    <tr><th>Fornitore abituale</th><td>{{ articolo.fornitore|default:"—" }}</td></tr>
+                    <tr><th>In cassa</th><td>
                         {% if articolo.in_cassa %}<strong>&euro;{{ articolo.prodotto.prezzo|floatformat:2 }}</strong>
                             &middot; {{ articolo.prodotto.categoria }}{% if articolo.prodotto.gruppo %} &rsaquo; {{ articolo.prodotto.gruppo }}{% endif %}
-                            <br><a href="{% url 'core:catalogo-update' articolo.prodotto.pk %}" class="small">apri nel catalogo</a>
-                        {% elif articolo.manca_in_cassa %}<span class="badge bg-warning text-dark">non in cassa</span> <small>manca il prezzo di vendita</small>
+                            &middot; <a href="{% url 'core:catalogo-update' articolo.prodotto.pk %}">apri nel catalogo</a>
+                        {% elif articolo.manca_in_cassa %}<span class="badge bg-warning text-dark">non in cassa</span> manca il prezzo di vendita
                         {% elif articolo.prodotto %}<span class="text-muted">disattivato in cassa</span>
-                        {% else %}—{% endif %}</dd>
-                    {% if articolo.note %}<dt class="col-5">Note</dt><dd class="col-7">{{ articolo.note|linebreaksbr }}</dd>{% endif %}
-                </dl>
+                        {% else %}—{% endif %}</td></tr>
+                    {% if articolo.note %}<tr><th>Note</th><td>{{ articolo.note|linebreaksbr }}</td></tr>{% endif %}
+                </tbody></table>
             </div>
         </div>
-
-        {% if articolo.traccia_scorte %}
-        <div class="section-card accent-blue">
-            <div class="section-title"><div class="label"><i class="bi bi-geo"></i> Dove si trova</div>
-                <button class="btn btn-sm btn-outline-primary" onclick="apriSposta()"><i class="bi bi-arrow-left-right"></i> Sposta</button></div>
-            <div class="section-body">
+    </div>
+    {% if articolo.traccia_scorte %}
+    <div class="accordion-item">
+        <h2 class="accordion-header"><button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#pd-posti">
+            <i class="bi bi-geo me-2"></i> Dove si trova <span class="badge bg-light text-dark border ms-2">{{ articolo.giacenze_elenco|length }}</span></button></h2>
+        <div id="pd-posti" class="accordion-collapse collapse">
+            <div class="accordion-body">
                 {% if articolo.giacenze_elenco %}
-                <table class="table table-sm mb-0">
-                    <tbody>
-                    {% for g in articolo.giacenze_elenco %}
-                        <tr><td>{{ g.posto|default:"Senza posto" }}
-                                {% if g.posto and g.posto == articolo.posto %}<span class="badge bg-light text-dark border">principale</span>{% endif %}
-                                {% if g.posto and g.posto == articolo.posto_vendita %}<span class="badge bg-primary-subtle text-primary">vendita</span>{% endif %}</td>
-                            <td class="text-end fw-semibold {% if g.quantita < 0 %}qta-neg{% endif %}">{{ g.quantita }} {{ articolo.unita }}</td></tr>
-                    {% endfor %}
-                    </tbody>
-                </table>
-                {% else %}<div class="p-3 text-muted small">Nessun pezzo in magazzino.</div>{% endif %}
+                <table class="table table-sm mb-2"><tbody>
+                {% for g in articolo.giacenze_elenco %}
+                    <tr><td>{{ g.posto|default:"Senza posto" }}
+                            {% if g.posto and g.posto == articolo.posto %}<span class="badge bg-light text-dark border">principale</span>{% endif %}
+                            {% if g.posto and g.posto == articolo.posto_vendita %}<span class="badge bg-primary-subtle text-primary">vendita</span>{% endif %}</td>
+                        <td class="text-end fw-semibold {% if g.quantita < 0 %}qta-neg{% endif %}">{{ g.quantita }} {{ articolo.unita }}</td></tr>
+                {% endfor %}
+                </tbody></table>
+                {% else %}<p class="text-muted small">Nessun pezzo in magazzino.</p>{% endif %}
+                <button class="btn btn-sm btn-outline-primary" onclick="apriSposta()"><i class="bi bi-arrow-left-right"></i> Sposta tra posti</button>
             </div>
         </div>
-        {% endif %}
-
-        <div class="section-card accent-green">
-            <div class="section-title"><div class="label"><i class="bi bi-file-earmark-text"></i> Scheda tecnica</div></div>
-            <div class="section-body pad small">
-                {% include 'magazzino/_scheda_tecnica.html' with a=articolo %}
-            </div>
-        </div>
-
-        <div class="section-card accent-amber">
-            <div class="section-title"><div class="label"><i class="bi bi-person-badge"></i> Chi ce l'ha</div><span class="count">{{ assegnazioni|length }}</span></div>
-            <div class="section-body">
+    </div>
+    {% endif %}
+    <div class="accordion-item">
+        <h2 class="accordion-header"><button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#pd-chi">
+            <i class="bi bi-person-badge me-2"></i> Chi ce l'ha <span class="badge bg-light text-dark border ms-2">{{ assegnazioni|length }}</span></button></h2>
+        <div id="pd-chi" class="accordion-collapse collapse">
+            <div class="accordion-body">
                 {% if assegnazioni %}
-                <table class="table table-sm">
-                    <tbody>
-                    {% for a in assegnazioni %}
-                        <tr><td>{% if a.posto_id %}<i class="bi bi-geo-alt"></i>{% else %}<i class="bi bi-person"></i>{% endif %} {{ a.destinatario }}</td>
-                            <td class="text-end">×{{ a.quantita }}</td>
-                            <td class="text-end"><span class="badge bg-{{ a.colore_stato }}">{{ a.get_stato_display }}</span></td></tr>
-                    {% endfor %}
-                    </tbody>
-                </table>
-                {% else %}<div class="p-3 text-muted small">Nessuna assegnazione aperta.</div>{% endif %}
+                <table class="table table-sm mb-0"><tbody>
+                {% for a in assegnazioni %}
+                    <tr><td>{% if a.posto_id %}<i class="bi bi-geo-alt"></i>{% else %}<i class="bi bi-person"></i>{% endif %} {{ a.destinatario }}</td>
+                        <td class="text-end">×{{ a.quantita }}</td>
+                        <td class="text-end"><span class="badge bg-{{ a.colore_stato }}">{{ a.get_stato_display }}</span></td></tr>
+                {% endfor %}
+                </tbody></table>
+                {% else %}<span class="text-muted small">Nessuna assegnazione aperta.</span>{% endif %}
             </div>
         </div>
-
-        {% if in_arrivo %}
-        <div class="section-card accent-green">
-            <div class="section-title"><div class="label"><i class="bi bi-truck"></i> In arrivo</div></div>
-            <div class="section-body">
-                <table class="table table-sm"><tbody>
+    </div>
+    {% if in_arrivo or richieste %}
+    <div class="accordion-item">
+        <h2 class="accordion-header"><button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#pd-acquisti">
+            <i class="bi bi-truck me-2"></i> In arrivo e richieste</button></h2>
+        <div id="pd-acquisti" class="accordion-collapse collapse">
+            <div class="accordion-body">
+                <table class="table table-sm mb-0"><tbody>
                 {% for r in in_arrivo %}
-                    <tr><td><a href="{% url 'magazzino:ordine' r.ordine.pk %}">{{ r.ordine.numero }}</a> <small class="text-muted">{{ r.ordine.fornitore }}</small></td>
+                    <tr><td><i class="bi bi-truck"></i> <a href="{% url 'magazzino:ordine' r.ordine.pk %}">{{ r.ordine.numero }}</a> <small class="text-muted">{{ r.ordine.fornitore }}</small></td>
                         <td class="text-end">{{ r.residuo }} {{ articolo.unita }}</td></tr>
+                {% endfor %}
+                {% for r in richieste %}
+                    <tr><td><i class="bi bi-cart"></i> {{ r.richiesta_da.get_full_name|default:r.richiesta_da.username|default:"—" }} <small class="text-muted">{{ r.richiesta_il|date:"d/m H:i" }}{% if r.nota %} &middot; {{ r.nota }}{% endif %}</small></td>
+                        <td class="text-end">{{ r.quantita }} {{ articolo.unita }}</td></tr>
                 {% endfor %}
                 </tbody></table>
             </div>
         </div>
-        {% endif %}
     </div>
+    {% endif %}
+</div>
 
-    <div class="col-lg-8">
-        <div class="section-card accent-blue">
-            <div class="section-title"><div class="label"><i class="bi bi-arrow-left-right"></i> Movimenti</div>
-                <a href="{% url 'magazzino:movimenti' %}?articolo={{ articolo.pk }}" class="small">tutti</a></div>
-            <div class="section-body">
-                {% include 'magazzino/_tabella_movimenti.html' with movimenti=movimenti senza_articolo=True %}
-            </div>
-        </div>
+<div class="section-card accent-blue">
+    <div class="section-title"><div class="label"><i class="bi bi-arrow-left-right"></i> Movimenti</div>
+        <a href="{% url 'magazzino:movimenti' %}?articolo={{ articolo.pk }}" class="small">tutti</a></div>
+    <div class="section-body">
+        {% include 'magazzino/_tabella_movimenti.html' with movimenti=movimenti senza_articolo=True %}
     </div>
 </div>
 
-{% include 'magazzino/_modale_articolo.html' %}
+{% if correlati %}
+<h2 class="pd-titolo-correlati">Potrebbe interessarti</h2>
+<div class="prod-grid mb-4">
+    {% for a in correlati %}
+    {% url 'magazzino:articolo' a.pk as url_scheda %}
+    <div class="prod-card">
+        {% include 'magazzino/_prod_testa.html' %}
+            <div class="qta">{% if a.traccia_scorte %}<strong class="{% if a.disponibilita == 'esaurito' %}text-danger{% endif %}">{{ a.quantita }}</strong> <span class="text-muted">{{ a.unita }}</span>{% else %}<span class="text-muted small">non tracciato</span>{% endif %}</div>
+        </div>
+    </div>
+    {% endfor %}
+</div>
+{% endif %}
+
 {% include 'magazzino/_modale_movimento.html' %}
+{% include 'magazzino/_modale_articolo.html' %}
 
 <div class="modal fade" id="modaleSposta" tabindex="-1">
     <div class="modal-dialog">
@@ -170,6 +306,18 @@
 {% block extra_js_magazzino %}
 {% include 'magazzino/_js_articolo.html' %}
 <script>
+function passoPd(d) {
+    const q = document.getElementById('pd-quantita');
+    q.value = Math.max(1, (parseInt(q.value, 10) || 1) + d);
+}
+async function aggiungiPd() {
+    const j = await postJSON('{% url "magazzino:carrello-aggiungi" %}', {
+        articolo: {{ articolo.pk }}, quantita: document.getElementById('pd-quantita').value,
+        nota: document.getElementById('pd-nota').value,
+    });
+    if (!j.success) { const e = document.getElementById('pd-errore'); e.textContent = j.error; e.classList.remove('d-none'); return; }
+    location.reload();
+}
 function apriSposta() {
     document.getElementById('sp-errore').classList.add('d-none');
     bootstrap.Modal.getOrCreateInstance(document.getElementById('modaleSposta')).show();
