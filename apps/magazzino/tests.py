@@ -957,3 +957,38 @@ class CatalogoCarrelloTest(TestCase):
         self.assertEqual(ordine.righe.get().quantita, 6)
         cera.refresh_from_db()
         self.assertEqual((cera.stato, cera.risposta), ('scartata', 'ce ne sono 10'))
+
+
+class OrdineWhatsappTest(TestCase):
+    def setUp(self):
+        self.user = utente_titolare('tit', password='x')
+        self.fornitore = Fornitore.objects.create(ragione_sociale='Chimica Srl', referente='Luca',
+                                                  telefono='333 123 4567')
+        self.ordine = OrdineFornitore.objects.create(fornitore=self.fornitore, note='Consegna al mattino')
+        shampoo = Articolo.objects.create(nome='Shampoo', marca='Ma-Fra', unita='bidoni', contenuto=Decimal('25'),
+                                          unita_contenuto='kg')
+        panni = Articolo.objects.create(nome='Panni')
+        from .models import RigaOrdineFornitore
+        RigaOrdineFornitore.objects.create(ordine=self.ordine, articolo=shampoo, quantita=3)
+        RigaOrdineFornitore.objects.create(ordine=self.ordine, articolo=panni, quantita=20)
+
+    def test_numero_e_messaggio(self):
+        for telefono, numero in [('333 123 4567', '393331234567'), ('+39 333 1234567', '393331234567'),
+                                 ('0039 333 1234567', '393331234567'), ('+41 79 123 45 67', '41791234567'),
+                                 ('', '')]:
+            self.fornitore.telefono = telefono
+            self.assertEqual(self.fornitore.numero_whatsapp, numero, telefono)
+        self.fornitore.telefono = '333 123 4567'
+        testo = self.ordine.testo_whatsapp
+        self.assertIn('Buongiorno Luca,', testo)
+        self.assertIn('• Shampoo (Ma-Fra) – formato bidoni da 25 kg – quantità 3 bidoni', testo)
+        self.assertIn('• Panni – quantità 20 pz', testo)
+        self.assertIn('Note: Consegna al mattino', testo)
+        self.assertTrue(self.ordine.link_whatsapp.startswith('whatsapp://send?phone=393331234567&text=Buongiorno'))
+
+    def test_pagine(self):
+        self.assertContains(_pagina(self.user, 'ordini'), 'whatsapp://send?phone=393331234567')
+        self.assertContains(_pagina(self.user, 'ordine', pk=self.ordine.pk), 'bi-whatsapp')
+        self.fornitore.telefono = ''
+        self.fornitore.save()
+        self.assertContains(_pagina(self.user, 'ordini'), 'Manca il telefono del fornitore')

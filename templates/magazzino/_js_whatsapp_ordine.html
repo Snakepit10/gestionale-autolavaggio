@@ -1,0 +1,16 @@
+<script>
+// Apre WhatsApp del PC con il messaggio d'ordine gia' scritto; se l'ordine
+// e' in bozza, dopo l'invio propone di segnarlo come inviato.
+function ordineWhatsapp(el) {
+    window.location.href = el.href;
+    if (el.dataset.bozza) {
+        setTimeout(async () => {
+            if (!confirm("Hai inviato il messaggio su WhatsApp?\nSegno l'ordine come inviato.")) return;
+            const j = await postJSON(el.dataset.statoUrl, {stato: 'inviato'});
+            if (!j.success) { alert(j.error); return; }
+            location.reload();
+        }, 1500);
+    }
+    return false;
+}
+</script>

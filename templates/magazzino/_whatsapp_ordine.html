@@ -1,0 +1,7 @@
+{% if o.fornitore.numero_whatsapp %}
+<a class="btn btn-sm btn-outline-success" href="{{ o.link_whatsapp }}" title="Invia l'ordine su WhatsApp (app del PC)"
+   data-stato-url="{% url 'magazzino:ordine-stato' o.pk %}" data-bozza="{% if o.stato == 'bozza' %}1{% endif %}" onclick="return ordineWhatsapp(this)"><i class="bi bi-whatsapp"></i>{% if etichetta %} WhatsApp{% endif %}</a>
+{% else %}
+<span class="d-inline-block" tabindex="0" title="Manca il telefono del fornitore: aggiungilo in Fornitori">
+    <button type="button" class="btn btn-sm btn-outline-secondary" disabled><i class="bi bi-whatsapp"></i>{% if etichetta %} WhatsApp{% endif %}</button></span>
+{% endif %}

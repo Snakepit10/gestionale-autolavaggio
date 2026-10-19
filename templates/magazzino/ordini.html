@@ -50,6 +50,7 @@
                         <td>{% include 'magazzino/_stato_ordine.html' with stato=o.stato nome=o.get_stato_display %}</td>
                         <td class="text-end" onclick="event.stopPropagation()">
                             <a class="btn btn-sm btn-outline-secondary" href="{% url 'magazzino:ordine-stampa' o.pk %}" target="_blank" title="Stampa"><i class="bi bi-printer"></i></a>
+                            {% if o.stato != 'annullato' %}{% include 'magazzino/_whatsapp_ordine.html' %}{% endif %}
                             {% if o.stato == 'inviato' or o.stato == 'parziale' %}
                             <a class="btn btn-sm btn-outline-success" href="{% url 'magazzino:consegne' %}?ordine={{ o.pk }}" title="Registra consegna"><i class="bi bi-truck"></i></a>
                             {% endif %}
@@ -64,4 +65,8 @@
         {% endif %}
     </div>
 </div>
+{% endblock %}
+
+{% block extra_js_magazzino %}
+{% include 'magazzino/_js_whatsapp_ordine.html' %}
 {% endblock %}

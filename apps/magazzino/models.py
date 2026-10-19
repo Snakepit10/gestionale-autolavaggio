@@ -30,6 +30,22 @@ class Fornitore(models.Model):
     def __str__(self):
         return self.ragione_sociale
 
+    @property
+    def numero_whatsapp(self):
+        """Telefono in formato internazionale senza '+' (es. 393331234567),
+        come lo vogliono i link di WhatsApp; '' se manca."""
+        grezzo = (self.telefono or '').strip()
+        cifre = ''.join(c for c in grezzo if c.isdigit())
+        if not cifre:
+            return ''
+        if grezzo.startswith('+'):
+            return cifre
+        if cifre.startswith('00'):
+            return cifre[2:]
+        if cifre.startswith('39') and len(cifre) >= 11:
+            return cifre
+        return '39' + cifre  # numero italiano senza prefisso
+
 
 UNITA_CONTENUTO_CHOICES = [('kg', 'kg'), ('g', 'g'), ('l', 'litri'), ('ml', 'ml')]
 PREZZO_PER_CHOICES = [('pezzo', 'Al pezzo'), ('contenuto', "All'unità di misura (kg, litro...)")]
@@ -346,6 +362,36 @@ class OrdineFornitore(models.Model):
     @property
     def modificabile(self):
         return self.stato in ('bozza', 'inviato')
+
+    @property
+    def testo_whatsapp(self):
+        """Messaggio d'ordine per il fornitore: prodotto, formato e quantita'."""
+        f = self.fornitore
+        righe = []
+        for r in self.righe.all():
+            a = r.articolo
+            nome = a.nome + (f' ({a.marca})' if a.marca else '') + (f' cod. {a.codice}' if a.codice else '')
+            parti = [nome]
+            if a.ha_contenuto:
+                parti.append(f'formato {a.unita} da {a.contenuto.normalize():f} {a.unita_contenuto}')
+            parti.append(f'quantità {r.quantita} {a.unita}')
+            righe.append('• ' + ' – '.join(parti))
+        testo = [f'Buongiorno{" " + f.referente if f.referente else ""},',
+                 f'vorremmo ordinare (ordine {self.numero}):', '', *righe]
+        if self.note:
+            testo += ['', f'Note: {self.note}']
+        testo += ['', 'Grazie!']
+        return '\n'.join(testo)
+
+    @property
+    def link_whatsapp(self):
+        """Apre WhatsApp del computer (app desktop) sulla chat del
+        fornitore con il messaggio gia' scritto: l'invio lo fa chi clicca."""
+        from urllib.parse import quote
+        numero = self.fornitore.numero_whatsapp
+        if not numero:
+            return ''
+        return f'whatsapp://send?phone={numero}&text={quote(self.testo_whatsapp)}'
 
     def aggiorna_stato(self):
         """Dopo una consegna: evaso se tutte le righe sono ricevute,

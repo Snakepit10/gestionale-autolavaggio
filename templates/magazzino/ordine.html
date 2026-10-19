@@ -14,6 +14,7 @@
     {% if ordine %}
     <div class="d-flex gap-2 flex-wrap">
         <a class="btn btn-outline-secondary" href="{% url 'magazzino:ordine-stampa' ordine.pk %}" target="_blank"><i class="bi bi-printer"></i> Stampa</a>
+        {% if ordine.stato != 'annullato' %}{% include 'magazzino/_whatsapp_ordine.html' with o=ordine etichetta=True %}{% endif %}
         {% if ordine.stato == 'bozza' %}
             <button class="btn btn-info" onclick="statoOrdine('inviato')"><i class="bi bi-send"></i> Segna inviato</button>
             <button class="btn btn-outline-danger" onclick="eliminaOrdine()"><i class="bi bi-trash"></i> Elimina</button>
@@ -133,6 +134,7 @@
 {% endblock %}
 
 {% block extra_js_magazzino %}
+{% include 'magazzino/_js_whatsapp_ordine.html' %}
 <script>
 const ARTICOLI = {{ articoli_json|safe }};
 const RIGHE_INIZIALI = {{ righe_json|safe }};
