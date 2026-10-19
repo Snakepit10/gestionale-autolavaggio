@@ -370,17 +370,16 @@ class OrdineFornitore(models.Model):
         righe = []
         for r in self.righe.all():
             a = r.articolo
-            nome = a.nome + (f' ({a.marca})' if a.marca else '') + (f' cod. {a.codice}' if a.codice else '')
+            nome = a.nome + (f' ({a.marca})' if a.marca else '')
             parti = [nome]
             if a.ha_contenuto:
                 parti.append(f'formato {a.unita} da {a.contenuto.normalize():f} {a.unita_contenuto}')
             parti.append(f'quantità {r.quantita} {a.unita}')
             righe.append('• ' + ' – '.join(parti))
-        testo = [f'Buongiorno{" " + f.referente if f.referente else ""},',
-                 f'vorremmo ordinare (ordine {self.numero}):', '', *righe]
+        testo = [f'Ciao{" " + f.referente if f.referente else ""}! Ci servirebbero:', '', *righe]
         if self.note:
             testo += ['', f'Note: {self.note}']
-        testo += ['', 'Grazie!']
+        testo += ['', 'Grazie mille, a presto!']
         return '\n'.join(testo)
 
     @property

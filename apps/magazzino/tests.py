@@ -965,7 +965,7 @@ class OrdineWhatsappTest(TestCase):
         self.fornitore = Fornitore.objects.create(ragione_sociale='Chimica Srl', referente='Luca',
                                                   telefono='333 123 4567')
         self.ordine = OrdineFornitore.objects.create(fornitore=self.fornitore, note='Consegna al mattino')
-        shampoo = Articolo.objects.create(nome='Shampoo', marca='Ma-Fra', unita='bidoni', contenuto=Decimal('25'),
+        shampoo = Articolo.objects.create(nome='Shampoo', marca='Ma-Fra', codice='MF-25', unita='bidoni', contenuto=Decimal('25'),
                                           unita_contenuto='kg')
         panni = Articolo.objects.create(nome='Panni')
         from .models import RigaOrdineFornitore
@@ -980,11 +980,13 @@ class OrdineWhatsappTest(TestCase):
             self.assertEqual(self.fornitore.numero_whatsapp, numero, telefono)
         self.fornitore.telefono = '333 123 4567'
         testo = self.ordine.testo_whatsapp
-        self.assertIn('Buongiorno Luca,', testo)
+        self.assertIn('Ciao Luca! Ci servirebbero:', testo)
         self.assertIn('• Shampoo (Ma-Fra) – formato bidoni da 25 kg – quantità 3 bidoni', testo)
         self.assertIn('• Panni – quantità 20 pz', testo)
         self.assertIn('Note: Consegna al mattino', testo)
-        self.assertTrue(self.ordine.link_whatsapp.startswith('whatsapp://send?phone=393331234567&text=Buongiorno'))
+        self.assertNotIn('MF-25', testo)
+        self.assertNotIn(self.ordine.numero, testo)
+        self.assertTrue(self.ordine.link_whatsapp.startswith('whatsapp://send?phone=393331234567&text=Ciao'))
 
     def test_pagine(self):
         self.assertContains(_pagina(self.user, 'ordini'), 'whatsapp://send?phone=393331234567')
