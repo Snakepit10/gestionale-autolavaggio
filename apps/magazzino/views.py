@@ -1226,7 +1226,7 @@ def carrello_ordina(request):
     d = _dati(request)
     solo = str(d.get('fornitore') or '')
     with transaction.atomic():
-        richieste = list(RichiestaAcquisto.objects.select_for_update().filter(stato='attesa')
+        richieste = list(RichiestaAcquisto.objects.select_for_update(of=('self',)).filter(stato='attesa')
                          .select_related('articolo__fornitore', 'fornitore'))
         per_fornitore = OrderedDict()
         for r in richieste:
