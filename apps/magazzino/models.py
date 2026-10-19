@@ -320,6 +320,9 @@ class Movimento(models.Model):
         return f'{self.articolo} {self.quantita:+d} ({self.get_tipo_display()})'
 
 
+NOTA_DA_CARRELLO = 'Dal carrello delle richieste'
+
+
 class OrdineFornitore(models.Model):
     STATO_CHOICES = [
         ('bozza', 'Bozza'),
@@ -376,10 +379,11 @@ class OrdineFornitore(models.Model):
                 parti.append(f'formato {a.unita} da {a.contenuto.normalize():f} {a.unita_contenuto}')
             parti.append(f'quantità {r.quantita} {a.unita}')
             righe.append('• ' + ' – '.join(parti))
-        testo = [f'Ciao{" " + f.referente if f.referente else ""}! Ci servirebbero:', '', *righe]
-        if self.note:
+        testo = [f'Ciao{" " + f.referente if f.referente else ""}, ci servirebbero:', '', *righe]
+        # la nota automatica degli ordini nati dal carrello resta interna
+        if self.note and self.note != NOTA_DA_CARRELLO:
             testo += ['', f'Note: {self.note}']
-        testo += ['', 'Grazie mille, a presto!']
+        testo += ['', 'Grazie mille, a presto']
         return '\n'.join(testo)
 
     @property

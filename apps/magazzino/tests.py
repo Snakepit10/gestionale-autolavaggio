@@ -980,12 +980,15 @@ class OrdineWhatsappTest(TestCase):
             self.assertEqual(self.fornitore.numero_whatsapp, numero, telefono)
         self.fornitore.telefono = '333 123 4567'
         testo = self.ordine.testo_whatsapp
-        self.assertIn('Ciao Luca! Ci servirebbero:', testo)
+        self.assertIn('Ciao Luca, ci servirebbero:', testo)
+        self.assertNotIn('!', testo)
         self.assertIn('• Shampoo (Ma-Fra) – formato bidoni da 25 kg – quantità 3 bidoni', testo)
         self.assertIn('• Panni – quantità 20 pz', testo)
         self.assertIn('Note: Consegna al mattino', testo)
         self.assertNotIn('MF-25', testo)
         self.assertNotIn(self.ordine.numero, testo)
+        self.ordine.note = 'Dal carrello delle richieste'
+        self.assertNotIn('Note:', self.ordine.testo_whatsapp)
         self.assertTrue(self.ordine.link_whatsapp.startswith('whatsapp://send?phone=393331234567&text=Ciao'))
 
     def test_pagine(self):

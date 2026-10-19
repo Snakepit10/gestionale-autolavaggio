@@ -17,7 +17,7 @@ from apps.auth_system.sezioni import ha_accesso
 from apps.cq.models import PostazioneCQ
 
 from . import services
-from .models import (UNITA_CONTENUTO_CHOICES, USI, Articolo, FotoArticolo, Posto, Assegnazione, Consegna, Fornitore, Movimento, OrdineFornitore,
+from .models import (NOTA_DA_CARRELLO, UNITA_CONTENUTO_CHOICES, USI, Articolo, FotoArticolo, Posto, Assegnazione, Consegna, Fornitore, Movimento, OrdineFornitore,
                      RichiestaAcquisto, RigaConsegna, RigaOrdineFornitore, StatoAssegnazione)
 
 
@@ -1243,7 +1243,7 @@ def carrello_ordina(request):
                       .first())
             if ordine is None:
                 ordine = OrdineFornitore.objects.create(fornitore=fornitore, creato_da=request.user,
-                                                        note='Dal carrello delle richieste')
+                                                        note=NOTA_DA_CARRELLO)
             for r in righe:
                 riga = ordine.righe.filter(articolo=r.articolo).first()
                 if riga:
