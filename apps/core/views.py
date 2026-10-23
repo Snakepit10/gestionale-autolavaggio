@@ -209,6 +209,66 @@ class CatalogoListView(LoginRequiredMixin, ListView):
         return context
 
 
+@login_required
+def esporta_listino_excel(request):
+    """Scarica il listino prezzi in Excel: un foglio con tutti gli item
+    attivi, raggruppati per categoria nell'ordine del catalogo."""
+    from django.http import HttpResponse
+    from django.utils import timezone
+    from openpyxl import Workbook
+    from openpyxl.styles import Alignment, Font, PatternFill
+
+    servizi = ServizioProdotto.objects.filter(attivo=True).select_related(
+        'categoria'
+    ).order_by(
+        'categoria__ordine_visualizzazione', 'categoria__nome',
+        'ordine_gruppo', 'gruppo', 'ordine_visualizzazione', 'titolo',
+    )
+
+    wb = Workbook()
+    ws = wb.active
+    ws.title = 'Listino'
+    ws.append([f"Listino prezzi - {timezone.localdate():%d/%m/%Y}"])
+    ws['A1'].font = Font(bold=True, size=14)
+    ws.append([])
+    intestazioni = ['Categoria', 'Gruppo', 'Titolo', 'Tipo', 'Prezzo (€)',
+                    'Durata (min)', 'Codice', 'Online', 'Descrizione']
+    ws.append(intestazioni)
+    riga_intestazioni = ws.max_row
+    for cella in ws[riga_intestazioni]:
+        cella.font = Font(bold=True, color='FFFFFF')
+        cella.fill = PatternFill('solid', fgColor='1F4E78')
+        cella.alignment = Alignment(horizontal='center')
+
+    for s in servizi:
+        ws.append([
+            s.categoria.nome,
+            s.gruppo,
+            s.titolo,
+            s.get_tipo_display(),
+            float(s.prezzo),
+            s.durata_minuti if s.tipo == 'servizio' else None,
+            s.codice_prodotto,
+            'Sì' if s.mostra_pubblico else 'No',
+            s.descrizione,
+        ])
+        ws.cell(row=ws.max_row, column=5).number_format = '#,##0.00 €'
+
+    ws.freeze_panes = ws.cell(row=riga_intestazioni + 1, column=1)
+    ws.auto_filter.ref = f"A{riga_intestazioni}:I{ws.max_row}"
+    for colonna, larghezza in zip('ABCDEFGHI', (22, 18, 40, 11, 12, 12, 14, 9, 60)):
+        ws.column_dimensions[colonna].width = larghezza
+
+    response = HttpResponse(
+        content_type='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+    )
+    response['Content-Disposition'] = (
+        f'attachment; filename="listino_prezzi_{timezone.localdate():%Y%m%d}.xlsx"'
+    )
+    wb.save(response)
+    return response
+
+
 class CatalogoCreateView(LoginRequiredMixin, CreateView):
     model = ServizioProdotto
     form_class = ServizioProdottoForm

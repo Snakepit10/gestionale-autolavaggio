@@ -7,9 +7,14 @@
 {% block content %}
 <div class="d-flex justify-content-between align-items-center mb-4">
     <h1><i class="bi bi-grid-3x3-gap"></i> Catalogo Prodotti e Servizi</h1>
-    <a href="{% url 'core:catalogo-create' %}" class="btn btn-primary">
-        <i class="bi bi-plus-circle"></i> Nuovo Prodotto/Servizio
-    </a>
+    <div class="d-flex gap-2">
+        <a href="{% url 'core:catalogo-esporta-excel' %}" class="btn btn-outline-success">
+            <i class="bi bi-file-earmark-excel"></i> Esporta listino Excel
+        </a>
+        <a href="{% url 'core:catalogo-create' %}" class="btn btn-primary">
+            <i class="bi bi-plus-circle"></i> Nuovo Prodotto/Servizio
+        </a>
+    </div>
 </div>
 
 <!-- Filtri -->

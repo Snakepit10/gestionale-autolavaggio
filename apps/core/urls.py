@@ -16,6 +16,7 @@ urlpatterns = [
     
     # CRUD Servizi/Prodotti
     path('catalogo/', views.CatalogoListView.as_view(), name='catalogo-list'),
+    path('catalogo/esporta-excel/', views.esporta_listino_excel, name='catalogo-esporta-excel'),
     path('catalogo/nuovo/', views.CatalogoCreateView.as_view(), name='catalogo-create'),
     path('catalogo/<int:pk>/modifica/', views.CatalogoUpdateView.as_view(), name='catalogo-update'),
     path('catalogo/<int:pk>/duplica/', views.duplica_servizio, name='catalogo-duplica'),
