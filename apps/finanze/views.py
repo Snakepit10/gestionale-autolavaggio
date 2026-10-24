@@ -15,6 +15,8 @@ from .services import abbinamento_portali, allinea_scontrini, import_washtec
 # Metodi che non finiscono nel conteggio fisico della quadratura
 # (contanti scassettati + lettore carte): esclusi dal servito atteso.
 METODI_NON_IN_CASSA = ('bonifico', 'assegno')
+# Prelavaggio prima del lavaggio a spazzole, aggiunto al listino nel residuo
+PRELAVAGGIO_DEFAULT = Decimal('4.00')
 from apps.ordini.models import Pagamento, Ordine, ItemOrdine
 from apps.core.models import Categoria
 
@@ -1556,8 +1558,13 @@ def _rettifica_residuo(request, chiusura):
     if motivo not in dict(RettificaResiduo.MOTIVO_CHOICES):
         messages.error(request, 'Motivo non valido.')
         return
+    testo = (request.POST.get('importo') or '').strip()
+    if motivo == 'prelavaggio' and not testo:
+        # di base il prelavaggio aggiunge 4 euro al listino
+        from .models import PREZZI_PROGRAMMA_PORTALE
+        testo = str(PREZZI_PROGRAMMA_PORTALE.get(transazione.programma, Decimal('0.00')) + PRELAVAGGIO_DEFAULT)
     try:
-        importo = Decimal((request.POST.get('importo') or '0').replace(',', '.'))
+        importo = Decimal((testo or '0').replace(',', '.'))
     except Exception:
         importo = Decimal('-1')
     if motivo == 'omaggio':

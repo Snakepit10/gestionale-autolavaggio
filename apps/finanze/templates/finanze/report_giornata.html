@@ -922,45 +922,35 @@ html { scroll-padding-top: 76px; scroll-behavior: smooth; }
               <thead class="table-light">
                 <tr><th title="Righe controllate">Vista</th><th>Portale</th><th>#</th><th>Ora</th><th>Prog.</th><th class="text-end">Listino</th><th class="text-end">Incassato</th><th></th></tr>
               </thead>
-              <tbody>
-                {% for x in abbinamento.residuo %}
-                <tr data-tx="{{ x.transazione.pk }}" class="riga-residuo{% if x.visto %} residuo-visto{% endif %}">
-                  <td><input type="checkbox" class="form-check-input spunta-visto" value="{{ x.transazione.pk }}"{% if x.visto %} checked{% endif %}
-                             title="{% if x.visto %}Vista da {{ x.visto.operatore.get_full_name|default:x.visto.operatore.username|default:'—' }} il {{ x.visto.visto_il|date:'d/m H:i' }}{% else %}Segna come vista{% endif %}"></td>
-                  <td>{{ x.transazione.portale }}</td>
-                  <td>{{ x.transazione.numero }}</td>
-                  <td class="text-nowrap">{{ x.transazione.orario|date:"d/m H:i" }}</td>
-                  <td>P{{ x.transazione.programma }}</td>
-                  <td class="text-end {% if x.rettifica %}text-muted text-decoration-line-through{% endif %}">{% if x.listino %}&euro;{{ x.listino|floatformat:2 }}{% else %}<span class="text-warning" title="Programma senza prezzo">&mdash;</span>{% endif %}</td>
-                  <td class="text-end text-nowrap">
-                    {% if x.rettifica %}
-                      <span class="badge {% if x.rettifica.motivo == 'omaggio' %}bg-success{% elif x.rettifica.motivo == 'promo' %}bg-info text-dark{% else %}bg-secondary{% endif %}"
-                            title="{{ x.rettifica.nota }}{% if x.rettifica.operatore %} — {{ x.rettifica.operatore.get_full_name|default:x.rettifica.operatore.username }}{% endif %}">{{ x.rettifica.get_motivo_display }}</span>
-                      {% if x.rettifica.nota %}<span class="nota-residuo" title="{{ x.rettifica.nota }}">{{ x.rettifica.nota }}</span>{% endif %}
-                      &euro;{{ x.valore|floatformat:2 }}
-                    {% else %}&euro;{{ x.valore|floatformat:2 }}{% endif %}
-                  </td>
-                  <td class="text-end">
-                    <button type="button" class="btn btn-link btn-sm p-0" title="Omaggio, promo..."
-                            data-bs-toggle="modal" data-bs-target="#modaleRettificaResiduo"
-                            data-tx="{{ x.transazione.pk }}" data-numero="{{ x.transazione.numero }}"
-                            data-listino="{{ x.listino|stringformat:'s' }}"
-                            data-motivo="{{ x.rettifica.motivo|default:'listino' }}"
-                            data-importo="{% if x.rettifica %}{{ x.rettifica.importo|stringformat:'s' }}{% endif %}"
-                            data-nota="{{ x.rettifica.nota|default:'' }}"><i class="bi bi-pencil"></i></button>
-                  </td>
-                </tr>
-                {% endfor %}
+              <tbody id="residuo-da-vedere">
+                {% for x in abbinamento.residuo %}{% if not x.visto %}
+                {% include 'finanze/_riga_residuo.html' %}
+                {% endif %}{% endfor %}
+                <tr class="riga-vuota"><td colspan="8" class="text-success small"><i class="bi bi-check2-all"></i> Tutte le transazioni sono state viste.</td></tr>
               </tbody>
               <tfoot>
-                <tr class="fw-bold"><td colspan="5">Totale da verificare con gli operatori
+                <tr class="fw-bold"><td colspan="5">Totale residuo (da vedere + già viste)
                   <span class="badge bg-light text-dark border fw-normal ms-1" title="Righe segnate come viste"><i class="bi bi-check2-square"></i> <span id="n-visti">{{ abbinamento.n_visti }}</span>/<span id="n-residui">{{ abbinamento.residuo|length }}</span> viste</span></td>
                   <td class="text-end {% if abbinamento.n_rettificati %}text-muted{% endif %}">&euro;{{ abbinamento.valore_residuo_listino|floatformat:2 }}</td>
                   <td class="text-end">&euro;{{ abbinamento.valore_residuo|floatformat:2 }}</td><td></td></tr>
                 {% if abbinamento.n_rettificati %}
-                <tr class="small"><td colspan="8" class="text-muted">{{ abbinamento.n_rettificati }} lavagg{{ abbinamento.n_rettificati|pluralize:"io,i" }} rettificat{{ abbinamento.n_rettificati|pluralize:"o,i" }} (omaggi, promo): &minus;&euro;{{ abbinamento.rettifica_residuo|floatformat:2 }} rispetto al listino. In quadratura conta l'incassato.</td></tr>
+                <tr class="small"><td colspan="8" class="text-muted">{{ abbinamento.n_rettificati }} lavagg{{ abbinamento.n_rettificati|pluralize:"io,i" }} rettificat{{ abbinamento.n_rettificati|pluralize:"o,i" }} (omaggi, promo, prelavaggi): {% if abbinamento.rettifica_residuo >= 0 %}&minus;&euro;{{ abbinamento.rettifica_residuo|floatformat:2 }}{% else %}+&euro;{{ abbinamento.rettifica_residuo|floatformat:2|slice:"1:" }}{% endif %} rispetto al listino. In quadratura conta l'incassato.</td></tr>
                 {% endif %}
               </tfoot>
+            </table>
+          </div>
+          <div class="fw-bold small text-uppercase text-muted mt-3 mb-1"><i class="bi bi-check2-square text-success"></i> Gi&agrave; viste</div>
+          <div class="table-responsive">
+            <table class="table table-sm data-table mb-1 tabella-viste">
+              <thead class="table-light">
+                <tr><th>Vista</th><th>Portale</th><th>#</th><th>Ora</th><th>Prog.</th><th class="text-end">Listino</th><th class="text-end">Incassato</th><th></th></tr>
+              </thead>
+              <tbody id="residuo-visti">
+                {% for x in abbinamento.residuo %}{% if x.visto %}
+                {% include 'finanze/_riga_residuo.html' %}
+                {% endif %}{% endfor %}
+                <tr class="riga-vuota"><td colspan="8" class="text-muted small">Nessuna transazione segnata come vista: spunta <em>Vista</em> per spostarla qui.</td></tr>
+              </tbody>
             </table>
           </div>
           {% if abbinamento.residuo_senza_prezzo %}
@@ -988,8 +978,17 @@ html { scroll-padding-top: 76px; scroll-behavior: smooth; }
                     <label class="btn btn-outline-success" for="rr-m-omaggio">Omaggio</label>
                     <input type="radio" class="btn-check" name="motivo" id="rr-m-promo" value="promo">
                     <label class="btn btn-outline-info" for="rr-m-promo">Promo / sconto</label>
+                    <input type="radio" class="btn-check" name="motivo" id="rr-m-prelavaggio" value="prelavaggio">
+                    <label class="btn btn-outline-primary" for="rr-m-prelavaggio"><i class="bi bi-plus-lg"></i> Prelavaggio</label>
                     <input type="radio" class="btn-check" name="motivo" id="rr-m-altro" value="altro">
                     <label class="btn btn-outline-secondary" for="rr-m-altro">Altro</label>
+                  </div>
+                  <div class="row g-2 align-items-end mb-2 d-none" id="rr-prelavaggio-box">
+                    <div class="col-4">
+                      <label class="form-label small mb-0">Prelavaggio &euro;</label>
+                      <input type="text" inputmode="decimal" class="form-control" id="rr-prelavaggio" value="4,00">
+                    </div>
+                    <div class="col small text-muted pb-2">Incassato = listino + prelavaggio</div>
                   </div>
                   <div class="row g-2" id="rr-dettagli">
                     <div class="col-4" id="rr-importo-box">
@@ -1010,19 +1009,33 @@ html { scroll-padding-top: 76px; scroll-behavior: smooth; }
           <script>
           (function () {
             const modale = document.getElementById('modaleRettificaResiduo');
+            const importo = document.getElementById('rr-importo');
+            const prelavaggio = document.getElementById('rr-prelavaggio');
+            const numero = v => parseFloat(String(v).replace(',', '.')) || 0;
+            const euro = v => v.toFixed(2).replace('.', ',');
+            let listino = 0;
             const aggiorna = () => {
               const m = (modale.querySelector('[name=motivo]:checked') || {}).value;
               document.getElementById('rr-dettagli').classList.toggle('d-none', m === 'listino');
               document.getElementById('rr-importo-box').classList.toggle('d-none', m === 'omaggio');
+              document.getElementById('rr-prelavaggio-box').classList.toggle('d-none', m !== 'prelavaggio');
             };
-            modale.querySelectorAll('[name=motivo]').forEach(r => r.addEventListener('change', aggiorna));
+            // Prelavaggio: l'incassato e' il listino piu' il prelavaggio (4 euro di base)
+            const conPrelavaggio = () => { importo.value = euro(listino + numero(prelavaggio.value)); };
+            modale.querySelectorAll('[name=motivo]').forEach(r => r.addEventListener('change', () => {
+              if (r.value === 'prelavaggio') conPrelavaggio();
+              aggiorna();
+            }));
+            prelavaggio.addEventListener('input', conPrelavaggio);
             modale.addEventListener('show.bs.modal', ev => {
               const b = ev.relatedTarget.dataset;
               document.getElementById('rr-tx').value = b.tx;
               document.getElementById('rr-numero').textContent = '#' + b.numero;
-              document.getElementById('rr-listino').textContent = Number(b.listino).toFixed(2).replace('.', ',');
+              listino = Number(b.listino) || 0;
+              document.getElementById('rr-listino').textContent = euro(listino);
               document.getElementById('rr-m-' + b.motivo).checked = true;
-              document.getElementById('rr-importo').value = (b.importo || '').replace('.', ',');
+              importo.value = (b.importo || '').replace('.', ',');
+              prelavaggio.value = b.motivo === 'prelavaggio' ? euro(numero(b.importo) - listino) : '4,00';
               document.getElementById('rr-nota').value = b.nota || '';
               aggiorna();
             });
@@ -1464,7 +1477,7 @@ html { scroll-padding-top: 76px; scroll-behavior: smooth; }
               </div>
               <div class="small text-muted">
                 Reale &minus; teorico {% if quadratura.differenza_reale_teorico >= 0 %}+{% endif %}&euro;{{ quadratura.differenza_reale_teorico|floatformat:2 }}
-                &middot; &minus; residuo pagati agli operatori &euro;{{ quadratura.residuo_operatori|floatformat:2 }}{% if quadratura.promo_operatori %} <span class="text-muted">(&euro;{{ quadratura.residuo_operatori_lordo|floatformat:2 }} &minus; promo operatori &euro;{{ quadratura.promo_operatori|floatformat:2 }})</span>{% endif %}{% if abbinamento.n_rettificati %} <span class="text-muted">(dopo {{ abbinamento.n_rettificati }} omaggi/promo)</span>{% endif %}
+                &middot; &minus; residuo pagati agli operatori &euro;{{ quadratura.residuo_operatori|floatformat:2 }}{% if quadratura.promo_operatori %} <span class="text-muted">(&euro;{{ quadratura.residuo_operatori_lordo|floatformat:2 }} &minus; promo operatori &euro;{{ quadratura.promo_operatori|floatformat:2 }})</span>{% endif %}{% if abbinamento.n_rettificati %} <span class="text-muted">(dopo {{ abbinamento.n_rettificati }} rettific{{ abbinamento.n_rettificati|pluralize:"a,he" }}: omaggi, promo, prelavaggi)</span>{% endif %}
                 {% if abbinamento %}<a href="#abbinamento-portali">(dettaglio)</a>{% else %}<span title="Imposta la chiusura portali della giornata per calcolare il residuo">(chiusura portali non impostata)</span>{% endif %}
               </div>
             </div>
@@ -1681,8 +1694,10 @@ html { scroll-padding-top: 76px; scroll-behavior: smooth; }
 
 {% block extra_js %}
 <style>
-  #abbinamento-portali tr.residuo-visto > td { opacity: .55; }
-  #abbinamento-portali tr.residuo-visto > td:first-child { opacity: 1; }
+  #abbinamento-portali .riga-vuota { display: none; }
+  #abbinamento-portali tbody:not(:has(tr.riga-residuo)) > .riga-vuota { display: table-row; }
+  #abbinamento-portali .tabella-viste { background: #f8fafc; }
+  #abbinamento-portali .tabella-viste td { color: #64748b; }
   #abbinamento-portali .nota-residuo { display: inline-block; max-width: 10rem; overflow: hidden; text-overflow: ellipsis;
                                        white-space: nowrap; vertical-align: bottom; font-size: .78rem; color: #64748b; }
 </style>
@@ -1704,6 +1719,12 @@ document.querySelectorAll('#abbinamento-portali .spunta-visto').forEach(function
         box.disabled = false;
         if (!d.ok) { box.checked = !box.checked; alert('Riga non trovata: ricarica la pagina.'); return; }
         riga.classList.toggle('residuo-visto', d.visto);
+        // la riga passa nella tabella delle viste (o torna su), in ordine d'orario
+        var dest = document.getElementById(d.visto ? 'residuo-visti' : 'residuo-da-vedere');
+        var prima = Array.prototype.find.call(dest.querySelectorAll('tr.riga-residuo'), function (r) {
+          return Number(r.dataset.ordine) > Number(riga.dataset.ordine);
+        });
+        dest.insertBefore(riga, prima || dest.querySelector('.riga-vuota'));
         box.title = d.visto ? 'Vista ora' : 'Segna come vista';
         var n = document.getElementById('n-visti');
         if (n) n.textContent = document.querySelectorAll('#abbinamento-portali .spunta-visto:checked').length;

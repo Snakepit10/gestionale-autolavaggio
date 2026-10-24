@@ -629,16 +629,18 @@ class ResiduoVisto(models.Model):
 
 class RettificaResiduo(models.Model):
     """Un lavaggio del residuo (unita' operativa non abbinata al servito)
-    che gli operatori NON hanno incassato a listino: omaggio, promo...
-    La quadratura conta l'importo indicato qui al posto del listino."""
+    che gli operatori NON hanno incassato a listino: omaggio, promo, o
+    piu' del listino col prelavaggio. La quadratura conta l'importo
+    indicato qui al posto del listino."""
     MOTIVO_CHOICES = [
         ('omaggio', 'Omaggio'),
         ('promo', 'Promo / sconto'),
+        ('prelavaggio', 'Prelavaggio'),
         ('altro', 'Altro'),
     ]
     transazione = models.OneToOneField(
         TransazionePortale, on_delete=models.CASCADE, related_name='rettifica_residuo')
-    motivo = models.CharField(max_length=10, choices=MOTIVO_CHOICES)
+    motivo = models.CharField(max_length=12, choices=MOTIVO_CHOICES)
     importo = models.DecimalField(
         max_digits=8, decimal_places=2, default=Decimal('0.00'),
         validators=[MinValueValidator(Decimal('0.00'))],

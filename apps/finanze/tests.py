@@ -240,6 +240,14 @@ class AbbinamentoPortaliTest(TestCase):
         self.client.post(url, {**base, 'transazione_id': promo.pk, 'motivo': 'promo', 'importo': '-3'})
         self.assertFalse(RettificaResiduo.objects.filter(transazione=promo).exists())
 
+        # prelavaggio: incassato piu' del listino (di base listino + 4 euro)
+        self.client.post(url, {**base, 'transazione_id': promo.pk, 'motivo': 'prelavaggio', 'importo': ''})
+        self.assertEqual(RettificaResiduo.objects.get(transazione=promo).importo, Decimal('19.00'))
+        self.client.post(url, {**base, 'transazione_id': promo.pk, 'motivo': 'prelavaggio', 'importo': '20'})
+        self.assertEqual(RettificaResiduo.objects.get(transazione=promo).get_motivo_display(), 'Prelavaggio')
+        self.assertEqual(ap.riepilogo(self.chiusura)['valore_residuo'], Decimal('35.00'))
+        self.client.post(url, {**base, 'transazione_id': promo.pk, 'motivo': 'listino'})
+
         # in quadratura conta l'incassato
         from apps.finanze.views import _quadratura_giornata
         q, _, _ = _quadratura_giornata(self.chiusura.data, None, Decimal('0'), Decimal('0'),
