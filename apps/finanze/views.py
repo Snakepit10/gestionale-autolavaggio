@@ -1644,6 +1644,18 @@ def azione_abbinamento_portali(request):
             messages.success(request, 'Abbinamento rimosso: quella transazione non verrà più proposta per il lavaggio.')
         else:
             messages.error(request, 'Abbinamento non trovato.')
+    elif azione in ('senza_portale', 'riapri'):
+        try:
+            item_id = int(request.POST.get('item_id'))
+        except (TypeError, ValueError):
+            item_id = None
+        if azione == 'senza_portale':
+            ok = bool(item_id) and abbinamento_portali.chiudi_senza_portale(chiusura, item_id, request.user)
+            msg = 'Lavaggio chiuso senza portale.' if ok else 'Lavaggio non trovato.'
+        else:
+            ok = bool(item_id) and abbinamento_portali.riapri_senza_portale(chiusura, item_id)
+            msg = 'Lavaggio riaperto: torna da abbinare.' if ok else 'Lavaggio non trovato.'
+        (messages.success if ok else messages.error)(request, msg)
     elif azione == 'rifiuta':
         try:
             item_id = int(request.POST.get('item_id'))

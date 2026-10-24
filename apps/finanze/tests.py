@@ -330,6 +330,32 @@ class AbbinamentoPortaliTest(TestCase):
         self.assertEqual(per_item[completo.pk], [])
         self.assertEqual(r['n_fuori_standard'], 1)
 
+    def test_chiudi_senza_portale(self):
+        item = self._item(self.completo, completato='10:30')
+        self._tx('10:05', 4)
+        r = ap.riepilogo(self.chiusura, con_proposte=True)
+        self.assertEqual((r['n_proposte'], r['n_scoperti']), (1, 0))
+
+        admin = User.objects.create_superuser('boss', 'b@x.it', 'x')
+        self.client.force_login(admin)
+        url = reverse('finanze:azione_abbinamento_portali')
+        report = reverse('finanze:report_giornata')
+        self.assertContains(self.client.get(report, {'data': '2026-10-06'}), 'Chiudi senza portale')
+        self.client.post(url, {'data': '2026-10-06', 'azione': 'senza_portale', 'item_id': item.pk})
+        pagina = self.client.get(report, {'data': '2026-10-06'})
+        self.assertContains(pagina, 'Chiuso senza portale')
+        self.assertNotContains(pagina, 'Chiudi senza portale')
+        r = ap.riepilogo(self.chiusura, con_proposte=True)
+        riga = r['righe'][0]
+        self.assertEqual((r['n_proposte'], r['n_scoperti'], r['n_senza_portale']), (0, 0, 1))
+        self.assertEqual((riga['compatibili'], riga['slot_liberi'], riga['senza_portale'].operatore), ([], 0, admin))
+        self.assertEqual(len(r['residuo']), 1)                  # la transazione resta pagata agli operatori
+        self.assertEqual(ap.conferma_proposte(self.chiusura), 0)
+
+        self.client.post(url, {'data': '2026-10-06', 'azione': 'riapri', 'item_id': item.pk})
+        r = ap.riepilogo(self.chiusura, con_proposte=True)
+        self.assertEqual((r['n_proposte'], r['n_senza_portale']), (1, 0))
+
     def test_report_proposte_solo_col_tasto(self):
         from django.contrib.messages.storage.fallback import FallbackStorage
         from django.test import RequestFactory
