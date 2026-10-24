@@ -929,13 +929,14 @@ html { scroll-padding-top: 76px; scroll-behavior: smooth; }
                              title="{% if x.visto %}Vista da {{ x.visto.operatore.get_full_name|default:x.visto.operatore.username|default:'—' }} il {{ x.visto.visto_il|date:'d/m H:i' }}{% else %}Segna come vista{% endif %}"></td>
                   <td>{{ x.transazione.portale }}</td>
                   <td>{{ x.transazione.numero }}</td>
-                  <td>{{ x.transazione.orario|date:"d/m H:i" }}</td>
+                  <td class="text-nowrap">{{ x.transazione.orario|date:"d/m H:i" }}</td>
                   <td>P{{ x.transazione.programma }}</td>
                   <td class="text-end {% if x.rettifica %}text-muted text-decoration-line-through{% endif %}">{% if x.listino %}&euro;{{ x.listino|floatformat:2 }}{% else %}<span class="text-warning" title="Programma senza prezzo">&mdash;</span>{% endif %}</td>
-                  <td class="text-end">
+                  <td class="text-end text-nowrap">
                     {% if x.rettifica %}
                       <span class="badge {% if x.rettifica.motivo == 'omaggio' %}bg-success{% elif x.rettifica.motivo == 'promo' %}bg-info text-dark{% else %}bg-secondary{% endif %}"
                             title="{{ x.rettifica.nota }}{% if x.rettifica.operatore %} — {{ x.rettifica.operatore.get_full_name|default:x.rettifica.operatore.username }}{% endif %}">{{ x.rettifica.get_motivo_display }}</span>
+                      {% if x.rettifica.nota %}<span class="nota-residuo" title="{{ x.rettifica.nota }}">{{ x.rettifica.nota }}</span>{% endif %}
                       &euro;{{ x.valore|floatformat:2 }}
                     {% else %}&euro;{{ x.valore|floatformat:2 }}{% endif %}
                   </td>
@@ -949,7 +950,6 @@ html { scroll-padding-top: 76px; scroll-behavior: smooth; }
                             data-nota="{{ x.rettifica.nota|default:'' }}"><i class="bi bi-pencil"></i></button>
                   </td>
                 </tr>
-                {% if x.rettifica.nota %}<tr class="small text-muted" data-tx="{{ x.transazione.pk }}"><td colspan="8" class="pt-0 border-0 ps-3">&#8627; {{ x.rettifica.nota }}</td></tr>{% endif %}
                 {% endfor %}
               </tbody>
               <tfoot>
@@ -1683,6 +1683,8 @@ html { scroll-padding-top: 76px; scroll-behavior: smooth; }
 <style>
   #abbinamento-portali tr.residuo-visto > td { opacity: .55; }
   #abbinamento-portali tr.residuo-visto > td:first-child { opacity: 1; }
+  #abbinamento-portali .nota-residuo { display: inline-block; max-width: 10rem; overflow: hidden; text-overflow: ellipsis;
+                                       white-space: nowrap; vertical-align: bottom; font-size: .78rem; color: #64748b; }
 </style>
 <script>
 // Spunta "vista" sulle righe del residuo: salvata subito, senza ricaricare
