@@ -175,46 +175,58 @@ def _azione(request, giorno):
         messages.error(request, 'Azione non valida.')
 
 
-# Tipi della distinta cartacea, nell'ordine delle caselle
-TIPI_DISTINTA = ['Resto', 'Ricarica', 'Omaggio', 'Promo', 'Spese', 'Extra']
-RIGHE_DISTINTA = 22
+# Righe minime di ogni riquadro dei movimenti della distinta cartacea
+RIGHE_DISTINTA = 8
+# Tagli del conteggio dei contanti sul retro
+TAGLI_BANCONOTE = ['100', '50', '20', '10', '5']
+TAGLI_MONETE = ['2', '1', '0,50', '0,20', '0,10', '0,05']
+
+
+def _con_righe_vuote(voci, minimo=RIGHE_DISTINTA):
+    return list(voci) + [None] * max(minimo - len(voci), 0)
 
 
 @login_required
 def distinta_chiusura(request):
-    """Distinta cartacea della chiusura giornata (A4 fronte/retro): sul
-    fronte i movimenti (gia' registrati + righe vuote) con i totali per
-    tipo, sul retro il conteggio della cassa fino al saldo finale, con
-    gli stessi passaggi della quadratura del report giornata.
-    ?vuota=1 per un modulo in bianco. Atteso e saldo si stampano gia'
-    calcolati solo per chi ha le Finanze: gli operatori li compilano."""
+    """Distinta cartacea della chiusura giornata (A4 fronte/retro).
+    Fronte: i movimenti della cassa in un riquadro per tipo (ricariche,
+    ticket di resto, spese, promo, lavaggi extra), con le voci gia'
+    registrate e righe vuote. Retro: conteggio dei contanti per taglio e
+    totale reale (operatore), poi atteso, residuo portali e saldo finale
+    (ufficio), con gli stessi passaggi della quadratura del report
+    giornata. ?vuota=1 per un modulo in bianco. Atteso e saldo si stampano
+    gia' calcolati solo per chi ha le Finanze: gli operatori li compilano."""
     giorno = _data(request)
     vuota = request.GET.get('vuota') == '1'
-    quadratura = QuadraturaGiornaliera.objects.filter(data=giorno).first()
-    righe = []
-    if not vuota:
-        for r in RicaricaCassa.objects.filter(data=giorno).select_related('cassa'):
-            righe.append(('Ricarica', f'{r.cassa.nome}{" - " + r.nota if r.nota else ""}', r.importo))
-        for t in TicketResto.objects.filter(data=giorno):
-            righe.append(('Resto', t.nota or 'Ticket di resto', t.importo))
-        for p in PromoGiornata.objects.filter(data=giorno):
-            righe.append(('Promo', f'{p.descrizione} ({"macchine" if p.tipo == "macchine" else "operatori"})',
-                          p.importo))
-        for s in SpesaCassa.objects.filter(data=giorno):
-            righe.append(('Spese', s.descrizione + (f' (n. {s.riferimento})' if s.riferimento else ''), s.importo))
-        for x in LavaggioExtra.objects.filter(data=giorno):
-            righe.append(('Extra', f'{x.descrizione} ({x.get_metodo_display().lower()})', x.importo))
-    righe = [{'tipo': t, 'descrizione': d, 'importo': i} for t, d, i in righe]
-    totali_tipo = [{'tipo': t, 'totale': sum((r['importo'] for r in righe if r['tipo'] == t), Decimal('0.00'))
-                    if any(r['tipo'] == t for r in righe) else None} for t in TIPI_DISTINTA]
-    righe += [None] * max(RIGHE_DISTINTA - len(righe), 6)
+    quadratura = None if vuota else QuadraturaGiornaliera.objects.filter(data=giorno).first()
+    voci = {nome: ([] if vuota else list(modello.objects.filter(data=giorno).select_related(
+                *(['cassa'] if nome == 'ricarica' else []))))
+            for nome, modello in VOCI.items()}
+
+    def totale(lista, filtro=lambda v: True):
+        scelte = [v.importo for v in lista if filtro(v)]
+        return sum(scelte, Decimal('0.00')) if scelte else None
+
+    saldo = None if vuota else _saldo_distinta(giorno, quadratura, ha_accesso(request.user, 'finanze'))
     return render(request, 'ordini/distinta_chiusura.html', {
         'data': None if vuota else giorno,
-        'quadratura': None if vuota else quadratura,
-        'righe': righe,
-        'tipi': TIPI_DISTINTA,
-        'totali_tipo': totali_tipo,
-        'saldo': None if vuota else _saldo_distinta(giorno, quadratura, ha_accesso(request.user, 'finanze')),
+        'quadratura': quadratura,
+        'ricariche': _con_righe_vuote(voci['ricarica']),
+        'ticket': _con_righe_vuote(voci['ticket']),
+        'spese': _con_righe_vuote(voci['spesa']),
+        'promo': _con_righe_vuote(voci['promo']),
+        'extra': _con_righe_vuote(voci['extra']),
+        'totali': {
+            'ricarica': totale(voci['ricarica']),
+            'ticket': totale(voci['ticket']),
+            'spesa': totale(voci['spesa']),
+            'promo_macchine': totale(voci['promo'], lambda p: p.tipo == 'macchine'),
+            'promo_operatori': totale(voci['promo'], lambda p: p.tipo == 'operatori'),
+            'extra': totale(voci['extra']),
+        },
+        'tagli_banconote': TAGLI_BANCONOTE,
+        'tagli_monete': TAGLI_MONETE,
+        'saldo': saldo,
     })
 
 
@@ -246,6 +258,8 @@ def _saldo_distinta(giorno, quadratura, con_atteso):
         'servito': q['totale_servito'],
         'extra': q['totale_extra'],
         'atteso': q['totale_teorico'],
+        'residuo_lordo': q['residuo_operatori_lordo'],
+        'promo_operatori': q['promo_operatori'],
         'operatori': q['residuo_operatori'],
         'saldo': q['differenza'],
         'stato': q['stato'],

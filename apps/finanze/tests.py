@@ -1029,7 +1029,7 @@ class ChiusuraGiornataOperatoriTest(TestCase):
         req = RequestFactory().get('/', {'data': self.oggi.isoformat()})
         req.user = self.operatore
         html = distinta_chiusura(req).content.decode()
-        self.assertIn('Gasolio (n. 45)', html)
+        self.assertIn('<td class="small">Gasolio</td><td class="small">45</td>', html)
         self.assertIn('150,00', html)
         self.assertIn('CONTEGGIO CASSA E SALDO FINALE', html)
         self.assertIn('-130,00</td>', html)                     # totale reale
@@ -1040,12 +1040,13 @@ class ChiusuraGiornataOperatoriTest(TestCase):
         html = distinta_chiusura(req).content.decode()
         self.assertIn('-130,00</td>', html)
         self.assertIn('<div class="v">-130,00</div>', html)
-        self.assertIn('<div class="val">20,00</div>', html)    # totale Spese sul fronte
+        self.assertIn('Totale spese</td><td class="imp">20,00</td>', html)   # totale sul fronte
         req = RequestFactory().get('/', {'vuota': '1'})
         req.user = self.operatore
         vuota = distinta_chiusura(req).content.decode()
         self.assertNotIn('Gasolio', vuota)
-        self.assertEqual(vuota.count('class="tipi"'), 22)
+        self.assertEqual(vuota.count('<tr class="totale">'), 6)          # 5 riquadri + contanti
+        self.assertIn('<td class="t">0,50</td>', vuota)                  # conteggio per taglio
 
     def test_validazioni(self):
         from apps.finanze.models import LavaggioExtra, PromoGiornata
