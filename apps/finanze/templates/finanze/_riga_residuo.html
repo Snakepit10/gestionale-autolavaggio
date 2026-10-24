@@ -1,0 +1,27 @@
+{# Riga del residuo pagato agli operatori (report giornata): x = voce di abbinamento.residuo #}
+<tr data-tx="{{ x.transazione.pk }}" data-ordine="{{ x.transazione.orario|date:'U' }}" class="riga-residuo{% if x.visto %} residuo-visto{% endif %}">
+  <td><input type="checkbox" class="form-check-input spunta-visto" value="{{ x.transazione.pk }}"{% if x.visto %} checked{% endif %}
+             title="{% if x.visto %}Vista da {{ x.visto.operatore.get_full_name|default:x.visto.operatore.username|default:'—' }} il {{ x.visto.visto_il|date:'d/m H:i' }}{% else %}Segna come vista{% endif %}"></td>
+  <td>{{ x.transazione.portale }}</td>
+  <td>{{ x.transazione.numero }}</td>
+  <td class="text-nowrap">{{ x.transazione.orario|date:"d/m H:i" }}</td>
+  <td>P{{ x.transazione.programma }}</td>
+  <td class="text-end {% if x.rettifica %}text-muted text-decoration-line-through{% endif %}">{% if x.listino %}&euro;{{ x.listino|floatformat:2 }}{% else %}<span class="text-warning" title="Programma senza prezzo">&mdash;</span>{% endif %}</td>
+  <td class="text-end text-nowrap">
+    {% if x.rettifica %}
+      <span class="badge {% if x.rettifica.motivo == 'omaggio' %}bg-success{% elif x.rettifica.motivo == 'promo' %}bg-info text-dark{% elif x.rettifica.motivo == 'prelavaggio' %}bg-primary{% else %}bg-secondary{% endif %}"
+            title="{{ x.rettifica.nota }}{% if x.rettifica.operatore %} — {{ x.rettifica.operatore.get_full_name|default:x.rettifica.operatore.username }}{% endif %}">{{ x.rettifica.get_motivo_display }}</span>
+      {% if x.rettifica.nota %}<span class="nota-residuo" title="{{ x.rettifica.nota }}">{{ x.rettifica.nota }}</span>{% endif %}
+      &euro;{{ x.valore|floatformat:2 }}
+    {% else %}&euro;{{ x.valore|floatformat:2 }}{% endif %}
+  </td>
+  <td class="text-end">
+    <button type="button" class="btn btn-link btn-sm p-0" title="Omaggio, promo..."
+            data-bs-toggle="modal" data-bs-target="#modaleRettificaResiduo"
+            data-tx="{{ x.transazione.pk }}" data-numero="{{ x.transazione.numero }}"
+            data-listino="{{ x.listino|stringformat:'s' }}"
+            data-motivo="{{ x.rettifica.motivo|default:'listino' }}"
+            data-importo="{% if x.rettifica %}{{ x.rettifica.importo|stringformat:'s' }}{% endif %}"
+            data-nota="{{ x.rettifica.nota|default:'' }}"><i class="bi bi-pencil"></i></button>
+  </td>
+</tr>
