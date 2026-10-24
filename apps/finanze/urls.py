@@ -42,6 +42,7 @@ urlpatterns = [
     path('report-giornata/abbinamento-portali/', views.azione_abbinamento_portali, name='azione_abbinamento_portali'),
     path('report-giornata/spese-cassa/', views.azione_spese_cassa, name='azione_spese_cassa'),
     path('report-giornata/ticket-resto/', views.azione_ticket_resto, name='azione_ticket_resto'),
+    path('report-giornata/ricariche/', views.azione_ricarica_cassa, name='azione_ricarica_cassa'),
     path('report-giornata/conferma/', views.azione_conferma_giornata, name='azione_conferma_giornata'),
     path('importa-washtec/', views.importa_washtec, name='importa_washtec'),
     path('importa-washtec/api/', views.importa_washtec_api, name='importa_washtec_api'),

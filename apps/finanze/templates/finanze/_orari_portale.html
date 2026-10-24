@@ -1,0 +1,30 @@
+{# Inizio e fine chiusura di un portale (p) nel report giornata: n_da e n_a sono i nomi dei campi #}
+<div class="row g-2">
+  <div class="col-sm-6">
+    <div class="orario-box inizio">
+      <div class="tit"><i class="bi bi-play-circle-fill"></i> Inizio chiusura</div>
+      <input type="datetime-local" name="{{ n_da }}" class="form-control form-control-sm" step="1"{% if p.codice == 'A' %} required{% endif %}
+             value="{{ p.finestra.0|date:'Y-m-d\TH:i:s' }}">
+      <div class="atteso">
+        {% if p.fine_giorno_prima %}
+          {% if p.fine_giorno_prima == p.finestra.0 %}
+          <i class="bi bi-link-45deg text-success"></i> attaccato alla fine del giorno prima
+          {% else %}
+          <i class="bi bi-exclamation-triangle text-warning"></i> fine del giorno prima {{ p.fine_giorno_prima|date:'d/m H:i:s' }}
+          <button type="button" class="btn btn-link" data-copia="{{ p.fine_giorno_prima|date:'Y-m-d\TH:i:s' }}" data-target="{{ n_da }}">usa</button>
+          {% endif %}
+        {% else %}
+          giorno prima senza chiusura salvata
+        {% endif %}
+      </div>
+    </div>
+  </div>
+  <div class="col-sm-6">
+    <div class="orario-box fine">
+      <div class="tit"><i class="bi bi-stop-circle-fill"></i> Fine chiusura</div>
+      <input type="datetime-local" name="{{ n_a }}" class="form-control form-control-sm" step="1"{% if p.codice == 'A' %} required{% endif %}
+             value="{{ p.finestra.1|date:'Y-m-d\TH:i:s' }}">
+      <div class="atteso">ora di chiusura dello scontrino {{ p.label }}</div>
+    </div>
+  </div>
+</div>

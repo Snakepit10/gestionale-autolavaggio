@@ -3,14 +3,59 @@
 
 {% block extra_css %}
 <style>
+html { scroll-padding-top: 76px; scroll-behavior: smooth; }
 .dash-page { background: #f0f2f5; min-height: 100vh; margin: -1rem; padding: 1.2rem; }
-.dash-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px; }
+.dash-header { display: flex; justify-content: space-between; align-items: center; gap: 8px; flex-wrap: wrap; margin-bottom: 12px; }
 .dash-header h4 { font-weight: 700; color: #1a1a2e; margin: 0; }
 
+/* Barra data + navigazione sezioni (resta in alto scorrendo) */
+.filter-bar { background: #fff; border-radius: 10px; padding: 8px 14px; box-shadow: 0 1px 3px rgba(0,0,0,.08); margin-bottom: 14px;
+              position: sticky; top: 0; z-index: 1020; }
+.section-nav { display: flex; gap: 4px; flex-wrap: wrap; margin-left: auto; }
+.section-nav a { font-size: .78rem; font-weight: 600; color: #475569; text-decoration: none; padding: 4px 10px; border-radius: 999px; white-space: nowrap; }
+@media (max-width: 767.98px) {
+  .section-nav { width: 100%; margin-left: 0; flex-wrap: nowrap; overflow-x: auto; scrollbar-width: none; }
+}
+.section-nav a:hover { background: #eef2ff; color: #1d4ed8; }
+.section-nav a .n { display: inline-flex; width: 18px; height: 18px; border-radius: 50%; background: #e2e8f0; font-size: .68rem;
+                    align-items: center; justify-content: center; margin-right: 4px; }
+.section-nav a.st-ok .n { background: #16a34a; color: #fff; }
+.section-nav a.st-warn .n { background: #f59e0b; color: #fff; }
+.section-nav a.st-danger .n { background: #dc2626; color: #fff; }
+
+/* Intestazione dei passi della chiusura */
+.step-head { display: flex; gap: 12px; align-items: center; margin: 28px 0 12px; }
+.step-num { width: 34px; height: 34px; border-radius: 50%; background: #1e3a8a; color: #fff; font-weight: 800; flex-shrink: 0;
+            display: flex; align-items: center; justify-content: center; }
+.step-num.analisi { background: #64748b; }
+.step-head h5 { margin: 0; font-weight: 800; color: #1a1a2e; font-size: 1.12rem; }
+.step-head .step-sub { font-size: .8rem; color: #64748b; }
+.step-head .step-actions { margin-left: auto; display: flex; gap: 6px; flex-wrap: wrap; }
+
+/* Checklist chiusura */
+.overview { background: #fff; border-radius: 12px; box-shadow: 0 1px 3px rgba(0,0,0,.06); padding: 16px; margin-bottom: 14px; }
+.esito { border-radius: 10px; padding: 14px 16px; height: 100%; }
+.esito.ok { background: #f0fdf4; border-left: 5px solid #16a34a; }
+.esito.ko { background: #fef2f2; border-left: 5px solid #dc2626; }
+.esito.na { background: #f8fafc; border-left: 5px solid #94a3b8; }
+.esito .lbl { font-size: .7rem; text-transform: uppercase; letter-spacing: .6px; font-weight: 700; color: #64748b; }
+.esito .big { font-size: 2rem; font-weight: 800; line-height: 1.1; }
+.check-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 8px; }
+.check-step { display: flex; gap: 10px; align-items: center; background: #fff; border: 1px solid #e2e8f0; border-left-width: 4px;
+              border-radius: 10px; padding: 8px 10px; text-decoration: none; color: inherit; height: 100%; transition: background .15s; }
+.check-step:hover { background: #f8fafc; }
+.check-step .ico { font-size: 1.25rem; flex-shrink: 0; }
+.check-step .t { font-weight: 700; font-size: .84rem; color: #1e293b; line-height: 1.15; }
+.check-step .d { font-size: .74rem; color: #64748b; }
+.check-step.ok { border-left-color: #16a34a; } .check-step.ok .ico { color: #16a34a; }
+.check-step.warn { border-left-color: #f59e0b; } .check-step.warn .ico { color: #d97706; }
+.check-step.danger { border-left-color: #dc2626; } .check-step.danger .ico { color: #dc2626; }
+.check-step.todo { border-left-color: #cbd5e1; } .check-step.todo .ico { color: #94a3b8; }
+
 /* KPI tiles */
-.kpi-tile { background: #fff; border-radius: 10px; padding: 14px 16px; box-shadow: 0 1px 3px rgba(0,0,0,.05); height: 100%; }
+.kpi-tile { background: #fff; border-radius: 10px; padding: 12px 14px; box-shadow: 0 1px 3px rgba(0,0,0,.05); height: 100%; }
 .kpi-tile .label { font-size: .7rem; text-transform: uppercase; letter-spacing: .6px; color: #8a94a6; font-weight: 700; }
-.kpi-tile .value { font-size: 1.7rem; font-weight: 800; line-height: 1.1; margin-top: 4px; color: #1e293b; }
+.kpi-tile .value { font-size: 1.5rem; font-weight: 800; line-height: 1.1; margin-top: 4px; color: #1e293b; }
 .kpi-tile .sub { font-size: .72rem; color: #94a3b8; margin-top: 2px; }
 .kpi-tile.success .value { color: #16a34a; }
 .kpi-tile.danger .value { color: #dc2626; }
@@ -26,7 +71,8 @@
 
 /* Chart panels */
 .chart-panel { background: #fff; border-radius: 10px; box-shadow: 0 1px 3px rgba(0,0,0,.05); height: 100%; overflow: hidden; }
-.chart-panel .panel-title { font-size: .78rem; font-weight: 700; color: #475569; padding: 14px 18px 4px; text-transform: uppercase; letter-spacing: .6px; display: flex; align-items: center; gap: 8px; }
+.chart-panel .panel-title { font-size: .78rem; font-weight: 700; color: #475569; padding: 14px 18px 4px; text-transform: uppercase; letter-spacing: .6px; display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.chart-panel .panel-title .btn { text-transform: none; letter-spacing: normal; }
 .chart-panel .panel-sub { font-size: .75rem; color: #94a3b8; padding: 0 18px 8px; }
 .chart-panel .panel-body { padding: 4px 14px 14px; }
 
@@ -34,9 +80,6 @@
 .data-table { font-size: .82rem; }
 .data-table th { font-size: .68rem; text-transform: uppercase; letter-spacing: .4px; color: #64748b; font-weight: 600; }
 .data-table td { vertical-align: middle; }
-
-/* Credit alert */
-.credit-alert { background: linear-gradient(135deg, #fee2e2 0%, #fca5a5 100%); color: #7f1d1d; border-radius: 10px; padding: 16px 18px; }
 
 /* Ranked list */
 .ranked-item { display: flex; align-items: center; padding: 10px 18px; border-bottom: 1px solid #f1f5f9; }
@@ -53,7 +96,46 @@
 .rank-3 { background: #cd7f32; }
 .rank-n { background: #64748b; }
 
-.filter-bar { background: #fff; border-radius: 10px; padding: 10px 16px; box-shadow: 0 1px 3px rgba(0,0,0,.05); margin-bottom: 14px; }
+/* Schede scontrino delle casse */
+.cassa-card { background: #fff; border: 1px solid #e2e8f0; border-top: 4px solid #f59e0b; border-radius: 10px; padding: 14px; height: 100%;
+              box-shadow: 0 1px 3px rgba(0,0,0,.04); }
+.cassa-card.salvata { border-top-color: #16a34a; }
+.cassa-card.confermata { border-top-color: #334155; }
+.cassa-card .cassa-nome { font-weight: 800; font-size: 1rem; color: #1e293b; }
+.field-group-title { font-size: .66rem; text-transform: uppercase; letter-spacing: .6px; color: #64748b; font-weight: 700;
+                     margin: 10px 0 4px; border-bottom: 1px solid #f1f5f9; padding-bottom: 2px; }
+.cassa-card .form-label { font-size: .76rem; font-weight: 600; color: #334155; margin-bottom: 2px; }
+.cassa-card input[type=number] { font-weight: 600; }
+.atteso { font-size: .72rem; color: #64748b; margin-top: 2px; }
+.atteso .btn-link { font-size: .72rem; padding: 0 2px; vertical-align: baseline; }
+.calc-box { background: #f8fafc; border-radius: 8px; padding: 8px 10px; font-size: .78rem; margin-top: 10px; }
+.calc-box .riga { display: flex; justify-content: space-between; }
+.calc-box .riga strong { font-variant-numeric: tabular-nums; }
+.pill-check { display: inline-flex; align-items: center; gap: 4px; font-size: .74rem; font-weight: 700; padding: 1px 8px; border-radius: 999px;
+              background: #f1f5f9; color: #64748b; white-space: nowrap; }
+.pill-check:empty { display: none; }
+.pill-check.ok { background: #dcfce7; color: #166534; }
+.pill-check.ko { background: #fee2e2; color: #991b1b; }
+
+/* Portali: una scheda per portale con inizio e fine */
+.portale-card { background: #fff; border: 1px solid #e2e8f0; border-top: 5px solid var(--pc); border-radius: 12px; padding: 16px; height: 100%;
+                box-shadow: 0 1px 3px rgba(0,0,0,.04); }
+.portale-A { --pc: #38bdf8; }
+.portale-B { --pc: #1d4ed8; }
+.portale-card .portale-nome { font-weight: 800; font-size: 1.1rem; color: #0f172a; }
+.portale-card .portale-nome i { color: var(--pc); }
+.orario-box { background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 10px; padding: 10px 12px; height: 100%; }
+.orario-box .tit { font-size: .7rem; font-weight: 800; text-transform: uppercase; letter-spacing: .6px; color: #475569; margin-bottom: 4px; }
+.orario-box.inizio .tit i { color: #16a34a; }
+.orario-box.fine .tit i { color: #dc2626; }
+.orario-box input { font-weight: 600; font-variant-numeric: tabular-nums; }
+.verifica { display: flex; justify-content: space-between; align-items: center; gap: 8px; padding: 7px 0; border-bottom: 1px dashed #e2e8f0; font-size: .84rem; }
+.verifica:last-child { border-bottom: none; }
+.verifica .lbl { color: #475569; }
+.verifica .val { font-variant-numeric: tabular-nums; }
+.portale-card details > summary { font-size: .8rem; color: #2563eb; cursor: pointer; margin-top: 8px; }
+.salva-orari { background: #fff; border: 1px solid #e2e8f0; border-radius: 10px; padding: 10px 14px;
+               margin-top: 12px; display: flex; gap: 10px; align-items: center; flex-wrap: wrap; z-index: 10; }
 </style>
 {% endblock %}
 
@@ -62,31 +144,90 @@
 
   {# ====== Header ====== #}
   <div class="dash-header">
-    <h4><i class="bi bi-file-earmark-bar-graph me-2"></i>Report Giornata — {{ data|date:"d/m/Y" }}</h4>
-    <div class="d-flex gap-2">
+    <h4><i class="bi bi-file-earmark-bar-graph me-2"></i>Report Giornata &mdash; {{ data|date:"l d/m/Y"|capfirst }}</h4>
+    <div class="d-flex gap-2 flex-wrap">
+      <a href="{% url 'ordini:chiusura-giornata' %}?data={{ data|date:'Y-m-d' }}" class="btn btn-sm btn-outline-secondary"><i class="bi bi-calculator"></i> Chiusura operatori</a>
       <a href="{% url 'finanze:riepilogo_saldi_portali' %}?mese={{ data|date:'Y-m' }}" class="btn btn-sm btn-outline-primary"><i class="bi bi-journal-check"></i> Saldi del mese</a>
       <a href="{% url 'finanze:report_periodo' %}" class="btn btn-sm btn-outline-primary"><i class="bi bi-graph-up-arrow"></i> Report periodo</a>
     </div>
   </div>
 
-  {# ====== Filter + navigazione giorni ====== #}
+  {# ====== Data + navigazione sezioni ====== #}
   <div class="filter-bar d-flex gap-2 align-items-center flex-wrap">
-    <i class="bi bi-calendar text-muted"></i>
-    <strong class="me-2">{{ data|date:"l d/m/Y" }}</strong>
     <a href="?data={{ data_prev|date:'Y-m-d' }}" class="btn btn-outline-secondary btn-sm" title="Giorno precedente">
       <i class="bi bi-chevron-left"></i>
     </a>
-    <input type="date" id="dateNav" class="form-control form-control-sm border-0 bg-light"
-           value="{{ data|date:'Y-m-d' }}" style="max-width:160px"
+    <input type="date" id="dateNav" class="form-control form-control-sm bg-light"
+           value="{{ data|date:'Y-m-d' }}" style="max-width:150px"
            onchange="location.href='?data='+this.value">
     <a href="?data={{ data_next|date:'Y-m-d' }}" class="btn btn-outline-secondary btn-sm" title="Giorno successivo">
       <i class="bi bi-chevron-right"></i>
     </a>
-    <a href="?data={{ oggi|date:'Y-m-d' }}" class="btn btn-outline-primary btn-sm">Oggi</a>
+    {% if data != oggi %}<a href="?data={{ oggi|date:'Y-m-d' }}" class="btn btn-outline-primary btn-sm">Oggi</a>{% endif %}
+    <nav class="section-nav">
+      {% with p=passi_chiusura %}
+      <a href="#scontrini" class="st-{{ p.0.stato }}"><span class="n">1</span>Scontrini</a>
+      <a href="#ricariche" class="st-{{ p.1.stato }}"><span class="n">2</span>Ricariche</a>
+      <a href="#portali" class="st-{{ p.2.stato }}"><span class="n">3</span>Portali</a>
+      <a href="#abbinamento-portali" class="st-{{ p.3.stato }}"><span class="n">4</span>Abbinamento</a>
+      <a href="#movimenti"><span class="n">5</span>Movimenti cassa</a>
+      <a href="#quadratura" class="st-{% if quadratura.stato == 'ok' %}ok{% elif quadratura.stato == 'non_rilevato' %}todo{% else %}danger{% endif %}"><span class="n">6</span>Quadratura</a>
+      <a href="#analisi"><i class="bi bi-bar-chart me-1"></i>Analisi</a>
+      {% endwith %}
+    </nav>
   </div>
 
-  {# ====== KPI Top Row: RIEPILOGO RICHIESTO ====== #}
-  <div class="row g-2 mb-3">
+  {# ====== Stato della chiusura di giornata ====== #}
+  <div class="overview">
+    <div class="row g-3 align-items-stretch">
+      <div class="col-12 col-lg-3">
+        <a href="#quadratura" class="text-decoration-none text-reset">
+        {% if quadratura.stato == 'non_rilevato' %}
+        <div class="esito na">
+          <div class="lbl">Quadratura</div>
+          <div class="big text-secondary">Da inserire</div>
+          <div class="small text-muted">Teorico atteso &euro;{{ quadratura.totale_teorico|floatformat:2 }} &middot; manca il conteggio dei contanti</div>
+        </div>
+        {% else %}
+        <div class="esito {% if quadratura.stato == 'ok' %}ok{% else %}ko{% endif %}">
+          <div class="lbl">Differenza quadratura
+            {% if quadratura.obj.confermata_il %}<span class="badge bg-dark ms-1"><i class="bi bi-lock-fill"></i> Confermata</span>{% endif %}</div>
+          <div class="big {% if quadratura.stato == 'ok' %}text-success{% else %}text-danger{% endif %}">
+            {% if quadratura.differenza >= 0 %}+{% endif %}&euro;{{ quadratura.differenza|floatformat:2 }}
+          </div>
+          <div class="small text-muted">
+            {% if quadratura.stato == 'ok' %}In quadra (tolleranza &plusmn;&euro;0,50){% elif quadratura.stato == 'mancante' %}Mancano dei soldi{% else %}Eccedenza in cassa{% endif %}
+            &middot; reale &euro;{{ quadratura.totale_reale|floatformat:2 }} / teorico &euro;{{ quadratura.totale_teorico|floatformat:2 }}
+          </div>
+        </div>
+        {% endif %}
+        </a>
+      </div>
+      <div class="col-12 col-lg-9">
+        <div class="d-flex justify-content-between align-items-center mb-2">
+          <div class="fw-bold small text-uppercase text-muted"><i class="bi bi-list-check"></i> Chiusura di giornata</div>
+          <div class="small text-muted">{{ passi_completati }} di {{ passi_chiusura|length }} completati</div>
+        </div>
+        <div class="progress mb-2" style="height:6px">
+          <div class="progress-bar bg-success" style="width:{% widthratio passi_completati passi_chiusura|length 100 %}%"></div>
+        </div>
+        <div class="check-grid">
+          {% for p in passi_chiusura %}
+            <a href="#{{ p.ancora }}" class="check-step {{ p.stato }}">
+              <i class="ico bi {% if p.stato == 'ok' %}bi-check-circle-fill{% elif p.stato == 'warn' %}bi-exclamation-circle-fill{% elif p.stato == 'danger' %}bi-x-circle-fill{% else %}bi-{{ p.icona }}{% endif %}"></i>
+              <div style="min-width:0">
+                <div class="t">{{ p.titolo }}</div>
+                <div class="d">{{ p.dettaglio }}</div>
+              </div>
+            </a>
+          {% endfor %}
+        </div>
+      </div>
+    </div>
+  </div>
+
+  {# ====== KPI: incassi della giornata ====== #}
+  <div class="row g-2 mb-2">
     <div class="col-6 col-lg-3">
       <div class="kpi-tile hero">
         <div class="label">Totale giornata</div>
@@ -98,41 +239,27 @@
       <div class="kpi-tile success">
         <div class="label">Totale servito</div>
         <div class="value">&euro;{{ totale_servito_ordinato|floatformat:2 }}</div>
-        <div class="sub">ordinato &mdash; include non pagati</div>
+        <div class="sub">ordinato &mdash; {{ kpis.num_ordini }} ordini</div>
       </div>
     </div>
     <div class="col-6 col-lg-3">
       <div class="kpi-tile info">
         <div class="label">Totale self service</div>
         <div class="value">&euro;{{ totale_self_service|floatformat:2 }}</div>
-        <div class="sub">Portali + Cambia gettoni</div>
+        <div class="sub">Portali &euro;{{ totale_portali|floatformat:2 }} &middot; Gettoni &euro;{{ totale_cambia_gettoni|floatformat:2 }}</div>
       </div>
     </div>
     <div class="col-6 col-lg-3">
+      <a href="#non-incassati" class="text-decoration-none">
       <div class="kpi-tile {% if totale_non_pagato > 0 %}danger{% else %}success{% endif %}">
         <div class="label">Totale non pagato</div>
         <div class="value">&euro;{{ totale_non_pagato|floatformat:2 }}</div>
         <div class="sub">{{ kpis.num_non_pagati }} ordini con saldo dovuto</div>
       </div>
+      </a>
     </div>
   </div>
-
-  {# ====== Seconda riga KPI: dettaglio self service + corrispettivi ====== #}
-  <div class="row g-2 mb-3">
-    <div class="col-6 col-lg">
-      <div class="kpi-tile primary">
-        <div class="label">Totale portali</div>
-        <div class="value">&euro;{{ totale_portali|floatformat:2 }}</div>
-        <div class="sub">Blu + Azzurro</div>
-      </div>
-    </div>
-    <div class="col-6 col-lg">
-      <div class="kpi-tile primary">
-        <div class="label">Totale cambia gettoni</div>
-        <div class="value">&euro;{{ totale_cambia_gettoni|floatformat:2 }}</div>
-        <div class="sub">solo cambia gettoni</div>
-      </div>
-    </div>
+  <div class="row g-2 mb-2">
     <div class="col-6 col-lg">
       <div class="kpi-tile" style="background:#fef3c7; border-left:4px solid #d97706;">
         <div class="label" style="color:#92400e">Totale corrispettivi</div>
@@ -143,13 +270,27 @@
       </div>
     </div>
     <div class="col-6 col-lg">
-      <div class="kpi-tile warning">
-        <div class="label">WashCycles portali</div>
-        <div class="value">{{ wash_cycles_portali }}</div>
-        <div class="sub">cicli di lavaggio erogati</div>
+      <div class="kpi-tile primary">
+        <div class="label">Totale portali</div>
+        <div class="value">&euro;{{ totale_portali|floatformat:2 }}</div>
+        <div class="sub">Blu + Azzurro (scontrini)</div>
       </div>
     </div>
     <div class="col-6 col-lg">
+      <div class="kpi-tile primary">
+        <div class="label">Totale cambia gettoni</div>
+        <div class="value">&euro;{{ totale_cambia_gettoni|floatformat:2 }}</div>
+        <div class="sub">solo cambia gettoni</div>
+      </div>
+    </div>
+    <div class="col-6 col-lg">
+      <div class="kpi-tile warning">
+        <div class="label">WashCycles portali</div>
+        <div class="value">{{ wash_cycles_portali }}</div>
+        <div class="sub">dagli scontrini delle casse</div>
+      </div>
+    </div>
+    <div class="col-12 col-lg">
       <a href="#abbinamento-portali" class="text-decoration-none">
         <div class="kpi-tile warning">
           <div class="label">WashCycles self service</div>
@@ -168,878 +309,333 @@
     </div>
   </div>
 
-  {# ====== Terza riga: ordini + confronto + pie chart ====== #}
-  <div class="row g-2 mb-3">
-    <div class="col-12 col-lg-4">
-      <div class="kpi-tile info h-100">
-        <div class="label">Ordini giornata</div>
-        <div class="value">{{ kpis.num_ordini }}</div>
-        <div class="sub">{{ kpis.num_transazioni }} transazioni &middot; &euro;{{ kpis.scontrino_medio|floatformat:2 }} avg{% if rp.n_vendite %} &middot; + {{ rp.n_vendite }} vendit{{ rp.n_vendite|pluralize:"a,e" }} prodotti{% endif %}</div>
-      </div>
-    </div>
-    <div class="col-12 col-lg-4">
-      <div class="kpi-tile {% if kpis.variazione_pct != None and kpis.variazione_pct >= 0 %}success{% elif kpis.variazione_pct != None %}danger{% else %}primary{% endif %} h-100">
-        <div class="label">vs ieri</div>
-        <div class="value">
-          {% if kpis.variazione_pct != None %}
-            {% if kpis.variazione_pct >= 0 %}<i class="bi bi-arrow-up"></i> +{{ kpis.variazione_pct|floatformat:1 }}%{% else %}<i class="bi bi-arrow-down"></i> {{ kpis.variazione_pct|floatformat:1 }}%{% endif %}
-          {% else %}&mdash;{% endif %}
-        </div>
-        <div class="sub">Ieri: &euro;{{ kpis.totale_ieri|floatformat:2 }} &middot; Picco {{ kpis.ora_picco }}</div>
-      </div>
-    </div>
-    <div class="col-12 col-lg-4">
-      <div class="chart-panel h-100">
-        <div class="panel-title"><i class="bi bi-pie-chart text-primary"></i> Totale giornata</div>
-        <div class="panel-sub">Portali &middot; Cambia gettoni &middot; Servito</div>
-        <div class="panel-body" style="position:relative; height:180px;"><canvas id="chartGiornataSplit"></canvas></div>
-      </div>
+  {# ====== 1. SCONTRINI DELLE CASSE AUTOMATICHE ====== #}
+  <div class="step-head" id="scontrini">
+    <span class="step-num">1</span>
+    <div>
+      <h5>Scontrini delle casse automatiche</h5>
+      <div class="step-sub">Copia i valori dagli scontrini di chiusura. Sotto i campi trovi i valori attesi (ricariche dichiarate, lavaggi WashTec) e i conti si aggiornano mentre scrivi.</div>
     </div>
   </div>
-
-  {# ====== QUADRATURA GIORNALIERA COMPLESSIVA ====== #}
-  <div class="chart-panel mb-3">
-    <div class="panel-title">
-      <i class="bi bi-cash-stack {% if quadratura.stato == 'ok' %}text-success{% elif quadratura.stato == 'non_rilevato' %}text-muted{% else %}text-danger{% endif %}"></i>
-      Quadratura giornaliera &mdash; scassettamento unificato
-      {% if quadratura.stato == 'ok' %}
-        <span class="badge bg-success ms-2">In quadra</span>
-      {% elif quadratura.stato == 'non_rilevato' %}
-        <span class="badge bg-secondary ms-2">Non ancora inserita</span>
-      {% elif quadratura.stato == 'mancante' %}
-        <span class="badge bg-danger ms-2">Mancante</span>
-      {% else %}
-        <span class="badge bg-warning text-dark ms-2">Eccedente</span>
-      {% endif %}
-      {% if quadratura.obj.confermata_il %}
-        <span class="badge bg-dark ms-2" title="Confermata da {{ quadratura.obj.confermata_da|default:'—' }} il {{ quadratura.obj.confermata_il|date:'d/m H:i' }}"><i class="bi bi-lock-fill"></i> Confermata</span>
-      {% endif %}
-      <a href="{% url 'ordini:chiusura-giornata' %}?data={{ data|date:'Y-m-d' }}" class="btn btn-sm btn-outline-secondary ms-auto">
-        <i class="bi bi-calculator"></i> Chiusura operatori
-      </a>
-      <a href="{% url 'finanze:quadratura_form' %}?data={{ data|date:'Y-m-d' }}" class="btn btn-sm btn-outline-primary">
-        <i class="bi bi-pencil"></i>
-        {% if quadratura.obj %}Modifica{% else %}Inserisci{% endif %} quadratura
-      </a>
-      {% if quadratura.obj %}
-      <form method="post" action="{% url 'finanze:azione_conferma_giornata' %}" class="d-inline">
-        {% csrf_token %}
-        <input type="hidden" name="data" value="{{ data|date:'Y-m-d' }}">
-        {% if quadratura.obj.confermata_il %}
-        <input type="hidden" name="azione" value="sblocca">
-        <button class="btn btn-sm btn-outline-dark"><i class="bi bi-unlock"></i> Sblocca</button>
-        {% else %}
-        <input type="hidden" name="azione" value="conferma">
-        <button class="btn btn-sm btn-dark" onclick="return confirm('Confermare la giornata? Gli operatori non potranno più modificarla.');"><i class="bi bi-lock"></i> Conferma giornata</button>
-        {% endif %}
-      </form>
-      {% endif %}
-    </div>
-    <div class="panel-sub">Conta tutti i contanti scassettati + totale lettore carte servito, confronta con self service (incasso &minus; ricarica) + ordini POS</div>
-    <div class="panel-body">
-
-      {% if quadratura.obj %}
-      <div class="row g-3">
-        {# Reale #}
-        <div class="col-md-6">
-          <div class="p-3" style="background:#f8fafc; border-radius:8px; border-left:4px solid #0ea5e9;">
-            <div class="text-muted small fw-bold text-uppercase mb-2"><i class="bi bi-eye"></i> Rilevato (reale)</div>
-            <div class="d-flex justify-content-between small mb-1">
-              <span>Contanti totali conteggiati</span>
-              <span class="fw-bold">&euro;{{ quadratura.obj.contanti_totali|floatformat:2 }}</span>
+  <div class="row g-3">
+    {% for entry in casse_form_data %}
+    <div class="col-md-6 col-xxl-4">
+      <div class="cassa-card {% if entry.chiusura.confermata %}confermata{% elif entry.chiusura %}salvata{% endif %}">
+        <div class="d-flex justify-content-between align-items-start mb-1">
+          <div>
+            <div class="cassa-nome">
+              {% if entry.cassa.modalita_registratore %}<i class="bi bi-receipt text-warning"></i>{% elif entry.cassa.tracking_washcycles %}<i class="bi bi-droplet-fill text-primary"></i>{% else %}<i class="bi bi-coin text-info"></i>{% endif %}
+              {{ entry.cassa.nome }}
             </div>
-            <div class="d-flex justify-content-between small mb-1">
-              <span>Lettore carte servito (POS)</span>
-              <span class="fw-bold">&euro;{{ quadratura.obj.lettore_carte_servito|floatformat:2 }}</span>
-            </div>
-            <div class="d-flex justify-content-between small mb-2 text-danger">
-              <span>&minus; Fondo cassa iniziale</span>
-              <span class="fw-bold">&minus;&euro;{{ quadratura.fondo_cassa_iniziale|floatformat:2 }}</span>
-            </div>
-            {% if quadratura.spese_cassa %}
-            <div class="d-flex justify-content-between small mb-2 text-success">
-              <span>+ Spese pagate dalla cassa <a href="#spese-cassa">(dettaglio)</a></span>
-              <span class="fw-bold">+&euro;{{ quadratura.spese_cassa|floatformat:2 }}</span>
-            </div>
-            {% endif %}
-            {% if quadratura.ticket_resto %}
-            <div class="d-flex justify-content-between small mb-2 text-success">
-              <span>+ Ticket di resto pagati <a href="#ticket-resto">(dettaglio)</a></span>
-              <span class="fw-bold">+&euro;{{ quadratura.ticket_resto|floatformat:2 }}</span>
-            </div>
-            {% endif %}
-            <div class="d-flex justify-content-between border-top pt-2">
-              <span class="fw-bold">Totale reale</span>
-              <span class="fs-5 fw-bold text-primary">&euro;{{ quadratura.totale_reale|floatformat:2 }}</span>
-            </div>
+            <small class="text-muted">
+              {% if entry.cassa.modalita_registratore %}Registratore servito{% elif entry.cassa.tracking_washcycles %}Portale{% else %}Cambia gettoni{% endif %}{% if entry.cassa.numero %} &middot; n. {{ entry.cassa.numero }}{% endif %}
+            </small>
           </div>
-        </div>
-
-        {# Teorico #}
-        <div class="col-md-6">
-          <div class="p-3" style="background:#f8fafc; border-radius:8px; border-left:4px solid #14b8a6;">
-            <div class="text-muted small fw-bold text-uppercase mb-2"><i class="bi bi-calculator"></i> Atteso (teorico)</div>
-            <div class="d-flex justify-content-between small mb-1">
-              <span>Self service: incasso &minus; ricarica casse
-                <div class="text-muted" style="font-size:.75rem">&euro;{{ agg.incasso_totale|floatformat:2 }} &minus; &euro;{{ agg.incasso_ricarica|floatformat:2 }} (la ricarica viene dal fondo cassa)</div></span>
-              <span class="fw-bold">&euro;{{ quadratura.vendita_self_service|floatformat:2 }}</span>
-            </div>
-            {% if quadratura.promo_macchine %}
-            <div class="d-flex justify-content-between small mb-1 text-danger">
-              <span>&minus; Gettoni/crediti regalati (promo macchine) <a href="#chiusura-operatori">(dettaglio)</a></span>
-              <span class="fw-bold">&minus;&euro;{{ quadratura.promo_macchine|floatformat:2 }}</span>
-            </div>
-            {% endif %}
-            {% if quadratura.totale_extra %}
-            <div class="d-flex justify-content-between small mb-1 text-success">
-              <span>+ Lavaggi extra senza ordine <a href="#chiusura-operatori">(dettaglio)</a></span>
-              <span class="fw-bold">+&euro;{{ quadratura.totale_extra|floatformat:2 }}</span>
-            </div>
-            {% endif %}
-            <div class="d-flex justify-content-between small mb-1">
-              <span>Servito: incassi ordini del giorno</span>
-              <span class="fw-bold">&euro;{{ quadratura.servito_ordini_giorno|floatformat:2 }}</span>
-            </div>
-            <div class="d-flex justify-content-between small mb-1">
-              <span>Servito: crediti pregressi incassati oggi
-                {% if quadratura.crediti_pregressi %}({{ quadratura.crediti_pregressi|length }} ordin{{ quadratura.crediti_pregressi|length|pluralize:"e,i" }}){% endif %}</span>
-              <span class="fw-bold">&euro;{{ quadratura.totale_crediti_pregressi|floatformat:2 }}</span>
-            </div>
-            {% if quadratura.crediti_pregressi %}
-            <details class="small mb-2">
-              <summary class="text-muted">Dettaglio crediti pregressi</summary>
-              <table class="table table-sm data-table mb-0 mt-1">
-                <thead class="table-light">
-                  <tr><th>Ordine</th><th>Del</th><th>Cliente</th><th>Metodo</th><th class="text-end">Incassato</th></tr>
-                </thead>
-                <tbody>
-                  {% for c in quadratura.crediti_pregressi %}
-                  <tr>
-                    <td><a href="{% url 'ordini:ordine-detail' c.ordine.pk %}">#{{ c.ordine.numero_progressivo|slice:"-4:" }}</a></td>
-                    <td>{{ c.ordine.data_ora|date:"d/m/Y" }}</td>
-                    <td>{{ c.ordine.cliente|default:"—" }}</td>
-                    <td>{{ c.metodi|join:", " }}{% if c.riferimenti %}<div class="text-muted">{{ c.riferimenti|join:", " }}</div>{% endif %}</td>
-                    <td class="text-end">&euro;{{ c.importo|floatformat:2 }}</td>
-                  </tr>
-                  {% endfor %}
-                </tbody>
-              </table>
-            </details>
+          {% if entry.chiusura %}
+            {% if entry.chiusura.confermata %}
+              <span class="badge bg-dark"><i class="bi bi-lock-fill"></i> Confermata</span>
             {% else %}
-            <div class="mb-2"></div>
+              <span class="badge bg-success" title="Salvata da {{ entry.chiusura.operatore|default:'—' }} il {{ entry.chiusura.aggiornato_il|date:'d/m H:i' }}"><i class="bi bi-check-lg"></i> Salvata</span>
             {% endif %}
-            {% if quadratura.non_in_cassa %}
-            <div class="d-flex justify-content-between small mb-1 text-muted">
-              <span><i class="bi bi-bank"></i> Bonifici e assegni del giorno (esclusi: non in cassa)</span>
-              <span>&euro;{{ quadratura.totale_non_in_cassa|floatformat:2 }}</span>
-            </div>
-            <details class="small mb-2">
-              <summary class="text-muted">Dettaglio bonifici e assegni</summary>
-              <table class="table table-sm data-table mb-0 mt-1">
-                <thead class="table-light">
-                  <tr><th>Ordine</th><th>Del</th><th>Cliente</th><th>Metodo</th><th class="text-end">Importo</th></tr>
-                </thead>
-                <tbody>
-                  {% for c in quadratura.non_in_cassa %}
-                  <tr>
-                    <td><a href="{% url 'ordini:ordine-detail' c.ordine.pk %}">#{{ c.ordine.numero_progressivo|slice:"-4:" }}</a></td>
-                    <td>{{ c.ordine.data_ora|date:"d/m/Y" }}</td>
-                    <td>{{ c.ordine.cliente|default:"—" }}</td>
-                    <td>{{ c.metodi|join:", " }}{% if c.riferimenti %}<div class="text-muted">{{ c.riferimenti|join:", " }}</div>{% endif %}</td>
-                    <td class="text-end">&euro;{{ c.importo|floatformat:2 }}</td>
-                  </tr>
-                  {% endfor %}
-                </tbody>
-              </table>
-            </details>
+          {% else %}
+            <span class="badge bg-warning text-dark">Da inserire</span>
+          {% endif %}
+        </div>
+
+        {% if entry.chiusura.confermata %}
+          {# Read-only #}
+          <div class="calc-box">
+            <div class="riga"><span>Incasso totale</span><strong>&euro;{{ entry.chiusura.incasso_totale|floatformat:2 }}</strong></div>
+            {% if not entry.cassa.modalita_registratore %}
+            <div class="riga"><span>Ricarica</span><strong>&euro;{{ entry.chiusura.incasso_ricarica|floatformat:2 }}</strong></div>
+            <div class="riga"><span>Vendita totale</span><strong>&euro;{{ entry.chiusura.vendita_totale|floatformat:2 }}</strong></div>
+            <div class="riga"><span>Resto teorico</span><strong>&euro;{{ entry.chiusura.resto_erogato_teorico|floatformat:2 }}</strong></div>
+            {% if entry.cassa.tracking_washcycles %}
+            <div class="riga"><span>WashCycles</span><strong>{{ entry.chiusura.wash_cycles|default:"—" }}</strong></div>
             {% endif %}
-            <div class="d-flex justify-content-between border-top pt-2">
-              <span class="fw-bold">Totale teorico</span>
-              <span class="fs-5 fw-bold" style="color:#0f766e">&euro;{{ quadratura.totale_teorico|floatformat:2 }}</span>
-            </div>
+            {% endif %}
           </div>
-        </div>
+        {% else %}
+          <form method="post" class="form-scontrino"
+                action="{% if entry.chiusura %}{% url 'finanze:chiusura_automatica_edit' entry.chiusura.pk %}{% else %}{% url 'finanze:chiusura_automatica_create' entry.cassa.pk %}?data={{ data|date:'Y-m-d' }}{% endif %}"
+                {% if entry.portale %}data-atteso-cicli="{{ entry.portale.tot.richieste }}" data-atteso-vendita="{{ entry.portale.tot.contanti|stringformat:'s' }}"{% endif %}>
+            {% csrf_token %}
+            <input type="hidden" name="next" value="report">
+            <input type="hidden" name="note" value="{{ entry.chiusura.note|default:'' }}">
 
-        {# Differenza #}
-        <div class="col-12">
-          <div class="p-3 d-flex justify-content-between align-items-center" style="background:{% if quadratura.stato == 'ok' %}#f0fdf4{% else %}#fef2f2{% endif %}; border-radius:8px; border-left:4px solid {% if quadratura.stato == 'ok' %}#16a34a{% else %}#dc2626{% endif %};">
-            <div>
-              <div class="text-muted small fw-bold text-uppercase">Differenza (reale &minus; teorico &minus; pagati agli operatori)</div>
-              <div class="fs-3 fw-bold {% if quadratura.stato == 'ok' %}text-success{% else %}text-danger{% endif %}">
-                {% if quadratura.differenza >= 0 %}+{% endif %}&euro;{{ quadratura.differenza|floatformat:2 }}
+            {% if entry.cassa.modalita_registratore %}
+              <label class="form-label mt-2">Totale scontrino &euro;</label>
+              <input type="number" step="0.01" min="0" name="incasso_totale" class="form-control" inputmode="decimal"
+                     value="{% if entry.chiusura %}{{ entry.chiusura.incasso_totale|stringformat:'.2f' }}{% endif %}" placeholder="0,00" required>
+              <input type="hidden" name="incasso_ricarica" value="0">
+              <input type="hidden" name="vendita_contante" value="0">
+              <input type="hidden" name="vendita_non_contante" value="0">
+              <input type="hidden" name="resto_erogato_reale" value="0">
+            {% else %}
+              <div class="field-group-title">Incassi</div>
+              <div class="row g-2">
+                <div class="col-6">
+                  <label class="form-label">Incasso totale</label>
+                  <input type="number" step="0.01" min="0" name="incasso_totale" class="form-control form-control-sm" inputmode="decimal"
+                         value="{% if entry.chiusura %}{{ entry.chiusura.incasso_totale|stringformat:'.2f' }}{% endif %}" placeholder="0,00" required>
+                </div>
+                <div class="col-6">
+                  <label class="form-label">Ricarica</label>
+                  <input type="number" step="0.01" min="0" name="incasso_ricarica" class="form-control form-control-sm" inputmode="decimal"
+                         value="{% if entry.chiusura %}{{ entry.chiusura.incasso_ricarica|stringformat:'.2f' }}{% endif %}" placeholder="0,00">
+                  <div class="atteso">
+                    {% if entry.ricarica_dichiarata %}
+                    Dichiarata &euro;{{ entry.ricarica_dichiarata|floatformat:2 }}
+                    <span class="pill-check" data-check="ricarica" data-atteso="{{ entry.ricarica_dichiarata|stringformat:'s' }}"></span>
+                    <button type="button" class="btn btn-link" data-copia="{{ entry.ricarica_dichiarata|stringformat:'.2f' }}" data-target="incasso_ricarica">usa</button>
+                    {% else %}<a href="#ricariche" class="text-muted">nessuna dichiarata</a>{% endif %}
+                  </div>
+                </div>
               </div>
-              <div class="small text-muted">
-                Reale &minus; teorico {% if quadratura.differenza_reale_teorico >= 0 %}+{% endif %}&euro;{{ quadratura.differenza_reale_teorico|floatformat:2 }}
-                &middot; &minus; residuo pagati agli operatori &euro;{{ quadratura.residuo_operatori|floatformat:2 }}{% if quadratura.promo_operatori %} <span class="text-muted">(&euro;{{ quadratura.residuo_operatori_lordo|floatformat:2 }} &minus; promo operatori &euro;{{ quadratura.promo_operatori|floatformat:2 }})</span>{% endif %}{% if abbinamento.n_rettificati %} <span class="text-muted">(dopo {{ abbinamento.n_rettificati }} omaggi/promo)</span>{% endif %}
-                {% if abbinamento %}<a href="#abbinamento-portali">(dettaglio)</a>{% else %}<span title="Imposta la chiusura portali della giornata per calcolare il residuo">(chiusura portali non impostata)</span>{% endif %}
+              <div class="field-group-title">Vendite</div>
+              <div class="row g-2">
+                <div class="col-6">
+                  <label class="form-label">Vendita contante</label>
+                  <input type="number" step="0.01" min="0" name="vendita_contante" class="form-control form-control-sm" inputmode="decimal"
+                         value="{% if entry.chiusura %}{{ entry.chiusura.vendita_contante|stringformat:'.2f' }}{% endif %}" placeholder="0,00">
+                </div>
+                <div class="col-6">
+                  <label class="form-label">Vendita non contante</label>
+                  <input type="number" step="0.01" min="0" name="vendita_non_contante" class="form-control form-control-sm" inputmode="decimal"
+                         value="{% if entry.chiusura %}{{ entry.chiusura.vendita_non_contante|stringformat:'.2f' }}{% endif %}" placeholder="0,00">
+                </div>
               </div>
-            </div>
-            <div>
-              {% if quadratura.stato == 'ok' %}
-                <span class="badge bg-success fs-6"><i class="bi bi-check-circle"></i> In quadra (tolleranza &plusmn;&euro;0.50)</span>
-              {% elif quadratura.stato == 'mancante' %}
-                <span class="badge bg-danger fs-6"><i class="bi bi-exclamation-triangle"></i> Mancano &euro;{{ quadratura.differenza|floatformat:2|slice:"1:" }}</span>
-              {% else %}
-                <span class="badge bg-warning text-dark fs-6"><i class="bi bi-exclamation-triangle"></i> Eccedenza di &euro;{{ quadratura.differenza|floatformat:2 }}</span>
-              {% endif %}
-            </div>
-          </div>
-        </div>
-      </div>
-
-      {% if quadratura.obj.note %}
-      <div class="alert alert-light small mt-3 mb-0">
-        <i class="bi bi-sticky"></i> <strong>Note:</strong> {{ quadratura.obj.note|linebreaksbr }}
-      </div>
-      {% endif %}
-
-      {% else %}
-      <div class="text-center py-4">
-        <i class="bi bi-inbox" style="font-size:2.5rem; color:#cbd5e1;"></i>
-        <p class="text-muted mb-3 mt-2">Quadratura non ancora inserita per questa data.</p>
-        <a href="{% url 'finanze:quadratura_form' %}?data={{ data|date:'Y-m-d' }}" class="btn btn-primary">
-          <i class="bi bi-plus-circle"></i> Inserisci quadratura
-        </a>
-        <div class="alert alert-info small mt-3 mb-0 text-start">
-          <strong>Teorico atteso per oggi:</strong>
-          self service (incasso &minus; ricarica) &euro;{{ quadratura.vendita_self_service|floatformat:2 }}
-          + servito POS &euro;{{ quadratura.totale_servito|floatformat:2 }}
-          {% if quadratura.totale_crediti_pregressi %}(di cui crediti pregressi &euro;{{ quadratura.totale_crediti_pregressi|floatformat:2 }}){% endif %}
-          = <strong>&euro;{{ quadratura.totale_teorico|floatformat:2 }}</strong>
-        </div>
-      </div>
-      {% endif %}
-    </div>
-  </div>
-
-  {# ====== SPESE PAGATE DALLA CASSA ====== #}
-  <div class="chart-panel mb-3" id="spese-cassa">
-    <div class="panel-title">
-      <i class="bi bi-receipt text-danger"></i> Spese pagate dalla cassa
-      <span class="badge bg-light text-dark ms-2">&euro;{{ totale_spese_cassa|floatformat:2 }}</span>
-    </div>
-    <div class="panel-sub">Costi della giornata pagati con i contanti presi dalla cassa: nella quadratura si sommano al reale</div>
-    <div class="panel-body">
-      {% if spese_cassa %}
-      <div class="table-responsive">
-        <table class="table table-sm data-table mb-3">
-          <thead class="table-light">
-            <tr><th>Descrizione</th><th>Categoria</th><th>Riferimento</th><th>Inserita da</th><th class="text-end">Importo</th><th></th></tr>
-          </thead>
-          <tbody>
-            {% for s in spese_cassa %}
-            <tr>
-              <td>{{ s.descrizione }}</td>
-              <td>{{ s.get_categoria_display }}</td>
-              <td>{{ s.riferimento|default:"—" }}</td>
-              <td class="text-muted small">{{ s.operatore|default:"—" }} &middot; {{ s.creato_il|date:"H:i" }}</td>
-              <td class="text-end fw-bold">&euro;{{ s.importo|floatformat:2 }}</td>
-              <td class="text-end">
-                {% if request.user.is_superuser or s.operatore_id == request.user.id %}
-                <form method="post" action="{% url 'finanze:azione_spese_cassa' %}" class="d-inline"
-                      onsubmit="return confirm('Eliminare la spesa &quot;{{ s.descrizione|escapejs }}&quot;?');">
-                  {% csrf_token %}
-                  <input type="hidden" name="data" value="{{ data|date:'Y-m-d' }}">
-                  <input type="hidden" name="azione" value="elimina">
-                  <input type="hidden" name="spesa_id" value="{{ s.pk }}">
-                  <button class="btn btn-sm btn-link text-danger p-0" title="Elimina"><i class="bi bi-trash"></i></button>
-                </form>
+              <div class="field-group-title">Verifiche</div>
+              <div class="row g-2">
+                <div class="col-6">
+                  <label class="form-label">Resto erogato reale</label>
+                  <input type="number" step="0.01" min="0" name="resto_erogato_reale" class="form-control form-control-sm" inputmode="decimal"
+                         value="{% if entry.chiusura %}{{ entry.chiusura.resto_erogato_reale|stringformat:'.2f' }}{% endif %}" placeholder="0,00">
+                </div>
+                {% if entry.cassa.tracking_washcycles %}
+                <div class="col-6">
+                  <label class="form-label">WashCycles</label>
+                  <input type="number" min="0" name="wash_cycles" class="form-control form-control-sm" inputmode="numeric"
+                         value="{% if entry.chiusura.wash_cycles is not None %}{{ entry.chiusura.wash_cycles }}{% endif %}">
+                  {% if entry.portale %}
+                  <div class="atteso">WashTec {{ entry.portale.tot.richieste }} <span class="pill-check" data-check="cicli"></span></div>
+                  {% endif %}
+                </div>
                 {% endif %}
-              </td>
-            </tr>
-            {% endfor %}
-          </tbody>
-          <tfoot>
-            <tr><th colspan="4">Totale</th><th class="text-end">&euro;{{ totale_spese_cassa|floatformat:2 }}</th><th></th></tr>
-          </tfoot>
-        </table>
+              </div>
+
+              <div class="calc-box">
+                <div class="riga"><span>Incasso vendita <span class="text-muted">(totale &minus; ricarica)</span></span><strong data-out="incasso-vendita">&mdash;</strong></div>
+                <div class="riga"><span>Vendita totale <span class="text-muted">(contante + non contante)</span></span><strong data-out="vendita-totale">&mdash;</strong></div>
+                <div class="riga"><span>Resto teorico</span><strong data-out="resto-teorico">&mdash;</strong></div>
+                <div class="riga"><span>Resto reale &minus; teorico</span><strong data-out="diff-resto">&mdash;</strong></div>
+                {% if entry.portale %}
+                <div class="riga border-top mt-1 pt-1"><span>Vendita vs contanti WashTec &euro;{{ entry.portale.tot.contanti|floatformat:2 }}</span>
+                  <span class="pill-check" data-check="vendita"></span></div>
+                {% endif %}
+              </div>
+            {% endif %}
+
+            <button type="submit" class="btn {% if entry.chiusura %}btn-outline-primary{% else %}btn-primary{% endif %} btn-sm w-100 mt-2">
+              <i class="bi bi-save"></i> {% if entry.chiusura %}Aggiorna scontrino{% else %}Salva scontrino{% endif %}
+            </button>
+          </form>
+        {% endif %}
       </div>
-      {% else %}
-      <p class="text-muted small">Nessuna spesa registrata per questa data.</p>
-      {% endif %}
-
-      <form method="post" action="{% url 'finanze:azione_spese_cassa' %}" class="row g-2 align-items-end">
-        {% csrf_token %}
-        <input type="hidden" name="data" value="{{ data|date:'Y-m-d' }}">
-        <input type="hidden" name="azione" value="aggiungi">
-        <div class="col-12 col-md-4">
-          <label class="form-label small mb-1">Descrizione</label>
-          <input type="text" name="descrizione" class="form-control form-control-sm" maxlength="200" required
-                 placeholder="es. Panni microfibra, gasolio generatore">
-        </div>
-        <div class="col-6 col-md-2">
-          <label class="form-label small mb-1">Categoria</label>
-          <select name="categoria" class="form-select form-select-sm">
-            {% for valore, etichetta in categorie_spesa %}
-            <option value="{{ valore }}"{% if valore == 'altro' %} selected{% endif %}>{{ etichetta }}</option>
-            {% endfor %}
-          </select>
-        </div>
-        <div class="col-6 col-md-2">
-          <label class="form-label small mb-1">Riferimento</label>
-          <input type="text" name="riferimento" class="form-control form-control-sm" maxlength="100" placeholder="n. scontrino">
-        </div>
-        <div class="col-6 col-md-2">
-          <label class="form-label small mb-1">Importo &euro;</label>
-          <input type="number" name="importo" class="form-control form-control-sm" step="0.01" min="0.01" required>
-        </div>
-        <div class="col-6 col-md-2">
-          <button class="btn btn-sm btn-danger w-100"><i class="bi bi-plus-circle"></i> Aggiungi spesa</button>
-        </div>
-      </form>
     </div>
+    {% empty %}
+    <div class="col-12"><div class="alert alert-info mb-0">Nessuna cassa automatica configurata.</div></div>
+    {% endfor %}
   </div>
 
-  {# ====== CHIUSURA OPERATORI: lavaggi extra e promo ====== #}
-  <div class="chart-panel mb-3" id="chiusura-operatori">
-    <div class="panel-title">
-      <i class="bi bi-calculator text-primary"></i> Lavaggi extra e promo (chiusura operatori)
-      <span class="badge bg-light text-dark ms-2">extra &euro;{{ quadratura.totale_extra|floatformat:2 }} &middot; promo &euro;{{ quadratura.promo_macchine|add:quadratura.promo_operatori|floatformat:2 }}</span>
-      <a href="{% url 'ordini:chiusura-giornata' %}?data={{ data|date:'Y-m-d' }}" class="btn btn-sm btn-outline-secondary ms-auto"><i class="bi bi-pencil"></i> Apri chiusura operatori</a>
-    </div>
-    <div class="panel-sub">Gli extra si aggiungono all'atteso; le promo macchine lo riducono; le promo operatori riducono il residuo "pagati agli operatori" (non segnare lo stesso omaggio anche con la matita del residuo)</div>
-    <div class="panel-body">
-      {% if quadratura.lavaggi_extra or quadratura.promo_lista %}
-      <table class="table table-sm data-table mb-0">
-        <thead class="table-light"><tr><th>Tipo</th><th>Descrizione</th><th>Inserito da</th><th class="text-end">Importo</th></tr></thead>
-        <tbody>
-          {% for x in quadratura.lavaggi_extra %}
-          <tr><td><span class="badge bg-success">Extra</span> {{ x.get_metodo_display }}</td><td>{{ x.descrizione }}</td>
-              <td class="text-muted small">{{ x.operatore|default:"—" }} &middot; {{ x.creato_il|date:"H:i" }}</td>
-              <td class="text-end fw-bold">+&euro;{{ x.importo|floatformat:2 }}</td></tr>
-          {% endfor %}
-          {% for p in quadratura.promo_lista %}
-          <tr><td><span class="badge {% if p.tipo == 'macchine' %}bg-info text-dark{% else %}bg-secondary{% endif %}">Promo {% if p.tipo == 'macchine' %}macchine{% else %}operatori{% endif %}</span></td>
-              <td>{{ p.descrizione }}</td>
-              <td class="text-muted small">{{ p.operatore|default:"—" }} &middot; {{ p.creato_il|date:"H:i" }}</td>
-              <td class="text-end fw-bold">&minus;&euro;{{ p.importo|floatformat:2 }}</td></tr>
-          {% endfor %}
-        </tbody>
-      </table>
-      {% else %}
-      <p class="text-muted small mb-0">Nessun lavaggio extra o promo dichiarati per questa data.</p>
-      {% endif %}
+  {# ====== 2. RICARICHE ====== #}
+  <div class="step-head" id="ricariche">
+    <span class="step-num">2</span>
+    <div>
+      <h5>Ricariche delle casse</h5>
+      <div class="step-sub">Ricariche fatte dagli operatori con i soldi del fondo cassa, confrontate con la ricarica dello scontrino di ogni cassa.</div>
     </div>
   </div>
-
-  {# ====== RICARICHE: operatori vs scontrini ====== #}
-  <div class="chart-panel mb-3" id="ricariche">
-    <div class="panel-title">
-      <i class="bi bi-arrow-repeat text-primary"></i> Ricariche delle casse
-      <a href="{% url 'ordini:chiusura-giornata' %}?data={{ data|date:'Y-m-d' }}#ricariche" class="btn btn-sm btn-outline-secondary ms-auto"><i class="bi bi-pencil"></i> Chiusura operatori</a>
-    </div>
-    <div class="panel-sub">Ricariche dichiarate dagli operatori (dal fondo cassa) confrontate con la ricarica dello scontrino di ogni cassa</div>
-    <div class="panel-body">
+  <div class="chart-panel">
+    <div class="panel-body pt-3">
       {% if confronto_ricariche %}
-      <table class="table table-sm data-table mb-0">
+      <div class="table-responsive">
+      <table class="table table-sm data-table mb-3">
         <thead class="table-light"><tr><th>Cassa</th><th>Dichiarate dagli operatori</th><th class="text-end">Dichiarato</th><th class="text-end">Scontrino</th><th class="text-end">Differenza</th></tr></thead>
         <tbody>
           {% for r in confronto_ricariche %}
           <tr>
             <td><strong>{{ r.cassa.nome }}</strong></td>
-            <td class="small">{% for x in r.righe %}&euro;{{ x.importo|floatformat:2 }}{% if x.nota %} ({{ x.nota }}){% endif %} &middot; {{ x.operatore|default:"—" }} {{ x.creato_il|date:"H:i" }}{% if not forloop.last %}<br>{% endif %}{% empty %}<span class="text-muted">nessuna</span>{% endfor %}</td>
+            <td class="small">
+              {% for x in r.righe %}
+              <div class="d-flex align-items-center gap-1">
+                <span class="fw-semibold">&euro;{{ x.importo|floatformat:2 }}</span>
+                {% if x.nota %}<span>({{ x.nota }})</span>{% endif %}
+                <span class="text-muted">&middot; {{ x.operatore|default:"—" }} {{ x.creato_il|date:"H:i" }}</span>
+                {% if request.user.is_superuser or x.operatore_id == request.user.id %}
+                <form method="post" action="{% url 'finanze:azione_ricarica_cassa' %}" class="d-inline"
+                      onsubmit="return confirm('Eliminare la ricarica di &euro;{{ x.importo|floatformat:2 }}?');">
+                  {% csrf_token %}
+                  <input type="hidden" name="data" value="{{ data|date:'Y-m-d' }}">
+                  <input type="hidden" name="azione" value="elimina">
+                  <input type="hidden" name="ricarica_id" value="{{ x.pk }}">
+                  <button class="btn btn-sm btn-link text-danger p-0" title="Elimina"><i class="bi bi-trash"></i></button>
+                </form>
+                {% endif %}
+              </div>
+              {% empty %}<span class="text-muted">nessuna</span>{% endfor %}
+            </td>
             <td class="text-end">&euro;{{ r.dichiarato|floatformat:2 }}</td>
-            <td class="text-end">{% if r.scontrino is not None %}&euro;{{ r.scontrino|floatformat:2 }}{% else %}<span class="text-muted" title="Chiusura della cassa non registrata">—</span>{% endif %}</td>
-            <td class="text-end">{% if r.differenza is None %}<span class="text-muted">—</span>{% elif r.differenza == 0 %}<span class="badge bg-success">torna</span>{% else %}<span class="badge bg-danger">{% if r.differenza > 0 %}+{% endif %}&euro;{{ r.differenza|floatformat:2 }}</span>{% endif %}</td>
+            <td class="text-end">{% if r.scontrino is not None %}&euro;{{ r.scontrino|floatformat:2 }}{% else %}<a href="#scontrini" class="text-muted" title="Scontrino della cassa non registrato">da inserire</a>{% endif %}</td>
+            <td class="text-end">{% if r.differenza is None %}<span class="text-muted">—</span>{% elif r.differenza == 0 %}<span class="badge bg-success"><i class="bi bi-check-lg"></i> torna</span>{% else %}<span class="badge bg-danger">{% if r.differenza > 0 %}+{% endif %}&euro;{{ r.differenza|floatformat:2 }}</span>{% endif %}</td>
           </tr>
           {% endfor %}
         </tbody>
       </table>
-      {% else %}
-      <p class="text-muted small mb-0">Nessuna ricarica dichiarata o registrata sugli scontrini per questa data.</p>
-      {% endif %}
-    </div>
-  </div>
-
-  {# ====== TICKET DI RESTO PAGATI ====== #}
-  <div class="chart-panel mb-3" id="ticket-resto">
-    <div class="panel-title">
-      <i class="bi bi-ticket-perforated text-danger"></i> Ticket di resto pagati
-      <span class="badge bg-light text-dark ms-2">&euro;{{ quadratura.ticket_resto|floatformat:2 }}</span>
-    </div>
-    <div class="panel-sub">Resti delle casse automatiche ripagati al cliente con i contanti della cassa: nella quadratura si sommano al reale</div>
-    <div class="panel-body">
-      {% if quadratura.ticket_resto_lista %}
-      <div class="table-responsive">
-        <table class="table table-sm data-table mb-3">
-          <thead class="table-light">
-            <tr><th>Data</th><th>Nota</th><th>Inserito da</th><th class="text-end">Importo</th><th></th></tr>
-          </thead>
-          <tbody>
-            {% for t in quadratura.ticket_resto_lista %}
-            <tr>
-              <td>{{ t.data|date:"d/m/Y" }}</td>
-              <td>{{ t.nota|default:"—" }}</td>
-              <td class="text-muted small">{{ t.operatore|default:"—" }} &middot; {{ t.creato_il|date:"d/m H:i" }}</td>
-              <td class="text-end fw-bold">&euro;{{ t.importo|floatformat:2 }}</td>
-              <td class="text-end">
-                {% if request.user.is_superuser or t.operatore_id == request.user.id %}
-                <form method="post" action="{% url 'finanze:azione_ticket_resto' %}" class="d-inline"
-                      onsubmit="return confirm('Eliminare il ticket di resto di &euro;{{ t.importo|floatformat:2 }}?');">
-                  {% csrf_token %}
-                  <input type="hidden" name="data" value="{{ data|date:'Y-m-d' }}">
-                  <input type="hidden" name="azione" value="elimina">
-                  <input type="hidden" name="ticket_id" value="{{ t.pk }}">
-                  <button class="btn btn-sm btn-link text-danger p-0" title="Elimina"><i class="bi bi-trash"></i></button>
-                </form>
-                {% endif %}
-              </td>
-            </tr>
-            {% endfor %}
-          </tbody>
-          <tfoot>
-            <tr><th colspan="3">Totale</th><th class="text-end">&euro;{{ quadratura.ticket_resto|floatformat:2 }}</th><th></th></tr>
-          </tfoot>
-        </table>
       </div>
       {% else %}
-      <p class="text-muted small">Nessun ticket di resto pagato in questa data.</p>
+      <p class="text-muted small">Nessuna ricarica dichiarata o registrata sugli scontrini per questa data.</p>
       {% endif %}
 
-      <form method="post" action="{% url 'finanze:azione_ticket_resto' %}" class="row g-2 align-items-end">
+      {% if casse_ricarica %}
+      <form method="post" action="{% url 'finanze:azione_ricarica_cassa' %}" class="row g-2 align-items-end">
         {% csrf_token %}
         <input type="hidden" name="data" value="{{ data|date:'Y-m-d' }}">
         <input type="hidden" name="azione" value="aggiungi">
-        <div class="col-6 col-md-3">
-          <label class="form-label small mb-1">Data pagamento</label>
-          <input type="date" name="data_pagamento" class="form-control form-control-sm" value="{{ data|date:'Y-m-d' }}"
-                 max="{{ oggi|date:'Y-m-d' }}" required>
+        <div class="col-12 col-md-4">
+          <label class="form-label small mb-1">Cassa ricaricata</label>
+          <select name="cassa" class="form-select form-select-sm" required>
+            <option value="">Scegli&hellip;</option>
+            {% for c in casse_ricarica %}<option value="{{ c.pk }}">{{ c.nome }}</option>{% endfor %}
+          </select>
         </div>
         <div class="col-6 col-md-2">
           <label class="form-label small mb-1">Importo &euro;</label>
-          <input type="number" name="importo" class="form-control form-control-sm" step="0.01" min="0.01" required>
+          <input type="number" name="importo" class="form-control form-control-sm" step="0.01" min="0.01" inputmode="decimal" required>
         </div>
-        <div class="col-12 col-md-4">
+        <div class="col-6 col-md-3">
           <label class="form-label small mb-1">Nota (facoltativa)</label>
-          <input type="text" name="nota" class="form-control form-control-sm" maxlength="100" placeholder="n. ticket, cassa">
+          <input type="text" name="nota" class="form-control form-control-sm" maxlength="100" placeholder="es. monete da 1 €">
         </div>
         <div class="col-12 col-md-3">
-          <button class="btn btn-sm btn-danger w-100"><i class="bi bi-plus-circle"></i> Aggiungi ticket</button>
+          <button class="btn btn-sm btn-primary w-100"><i class="bi bi-plus-circle"></i> Aggiungi ricarica</button>
         </div>
       </form>
+      {% endif %}
     </div>
   </div>
 
-  {# ====== Crediti alert ====== #}
-  {% if kpis.num_non_pagati > 0 %}
-  <div class="row g-2 mb-3">
-    <div class="col-12">
-      <div class="kpi-tile danger" style="background: linear-gradient(135deg, #fee2e2 0%, #fef2f2 100%);">
-        <div class="label"><i class="bi bi-exclamation-triangle"></i> Ordini NON incassati oggi</div>
-        <div class="value">{{ kpis.num_non_pagati }}</div>
-        <div class="sub">Crediti da riscuotere: <strong>&euro;{{ kpis.totale_crediti|floatformat:2 }}</strong></div>
+  {# ====== 3. LAVAGGI PORTALI: inizio e fine per portale ====== #}
+  <div class="step-head" id="portali">
+    <span class="step-num">3</span>
+    <div>
+      <h5>Lavaggi portali &mdash; inizio e fine chiusura</h5>
+      <div class="step-sub">
+        Per ogni portale imposta l'orario di inizio (escluso) e di fine (inclusa) della giornata, come sullo scontrino della sua cassa.
+        I lavaggi vengono dall'archivio WashTec ({{ portali_archivio_totale }} transazioni &middot;
+        <a href="{% url 'finanze:importa_washtec' %}"><i class="bi bi-cloud-download"></i> importa nuove</a>).
       </div>
     </div>
+  </div>
+
+  {% if portali_buchi %}
+  <div class="alert alert-danger small py-2">
+    <i class="bi bi-exclamation-triangle"></i> <strong>Mancano {{ portali_buchi_n }} lavagg{{ portali_buchi_n|pluralize:"io,i" }} nell'archivio WashTec</strong> per questa giornata
+    &rarr; <a href="{% url 'finanze:importa_washtec' %}">reimporta da WashTec</a> partendo dal {{ portali_buchi.0.dopo|date:"d/m" }}: finch&eacute; mancano, i conteggi dei portali non sono affidabili.
+    <details class="mt-1"><summary>Dettaglio dei numeri mancanti</summary>
+    {% for b in portali_buchi %}
+      {% if b.portale == 'A' %}Azzurro{% else %}Blu{% endif %} {{ b.quanti }} (#{{ b.da_numero }}{% if b.a_numero != b.da_numero %}&ndash;{{ b.a_numero }}{% endif %}, tra {{ b.dopo|date:"d/m H:i" }} e {{ b.prima|date:"d/m H:i" }}){% if not forloop.last %};{% endif %}
+    {% endfor %}
+    </details>
   </div>
   {% endif %}
 
-  {# ====== Grafici riga 1 ====== #}
-  <div class="row g-2 mb-3">
-    {# Trend orario #}
-    <div class="col-lg-8">
-      <div class="chart-panel">
-        <div class="panel-title"><i class="bi bi-graph-up text-primary"></i> Andamento orario</div>
-        <div class="panel-sub">Incassi distribuiti nelle 24 ore</div>
-        <div class="panel-body"><canvas id="chartTrend" height="80"></canvas></div>
-      </div>
-    </div>
-
-    {# Metodi di pagamento #}
-    <div class="col-lg-4">
-      <div class="chart-panel">
-        <div class="panel-title"><i class="bi bi-credit-card text-info"></i> Metodi di pagamento</div>
-        <div class="panel-sub">Distribuzione incassi</div>
-        <div class="panel-body"><canvas id="chartMetodi" height="220"></canvas></div>
-      </div>
-    </div>
-  </div>
-
-  {# ====== Grafici riga 2 ====== #}
-  <div class="row g-2 mb-3">
-    {# Top servizi #}
-    <div class="col-lg-7">
-      <div class="chart-panel">
-        <div class="panel-title"><i class="bi bi-trophy text-warning"></i> Top servizi per fatturato</div>
-        <div class="panel-sub">Servizi piu venduti del giorno (ordini pagati)</div>
-        <div class="panel-body" style="padding-top:8px">
-          {% for s in top_servizi %}
-          <div class="ranked-item">
-            <div class="rank {% if forloop.counter == 1 %}rank-1{% elif forloop.counter == 2 %}rank-2{% elif forloop.counter == 3 %}rank-3{% else %}rank-n{% endif %}">{{ forloop.counter }}</div>
-            <div class="info">
-              <div class="name">{{ s.nome }}</div>
-              <div class="cat">{{ s.categoria }} &middot; {{ s.quantita }} pz</div>
+  <form method="post" action="{% url 'finanze:imposta_chiusura_portali' %}" id="form-orari-portali">
+    {% csrf_token %}
+    <input type="hidden" name="data" value="{{ data|date:'Y-m-d' }}">
+    <div class="row g-3">
+      {% for p in lavaggi_portali %}
+      <div class="col-12 col-xl-6">
+        <div class="portale-card portale-{{ p.codice }}">
+          <div class="d-flex justify-content-between align-items-start gap-2 mb-2">
+            <div>
+              <div class="portale-nome"><i class="bi bi-droplet-fill"></i> {{ p.label }}</div>
+              <div class="small text-muted">{% if p.codice == 'A' %}Gli orari dell'Azzurro valgono anche per i lavaggi del servito{% else %}Di solito lo scontrino del Blu si chiude qualche minuto dopo l'Azzurro{% endif %}</div>
             </div>
-            <div class="bar">
-              <div class="bar-fill" style="width:{% widthratio s.fatturato top_servizi.0.fatturato 100 %}%"></div>
-            </div>
-            <div class="value">&euro;{{ s.fatturato|floatformat:2 }}</div>
-          </div>
-          {% empty %}
-          <div class="text-muted text-center py-4">Nessun servizio venduto oggi</div>
-          {% endfor %}
-        </div>
-      </div>
-    </div>
-
-    {# Categorie #}
-    <div class="col-lg-5">
-      <div class="chart-panel">
-        <div class="panel-title"><i class="bi bi-grid text-success"></i> Fatturato per categoria</div>
-        <div class="panel-sub">Confronto categorie</div>
-        <div class="panel-body"><canvas id="chartCategorie" height="240"></canvas></div>
-      </div>
-    </div>
-  </div>
-
-  {# ====== Vendita prodotti ====== #}
-  {% include 'finanze/_vendita_prodotti_report.html' with link_scheda=link_scheda_prodotti %}
-
-  {# ====== Dettagli cassa servito + automatiche ====== #}
-  <div class="row g-2 mb-3">
-    <div class="col-lg-6">
-      <div class="chart-panel h-100">
-        <div class="panel-title"><i class="bi bi-shop text-primary"></i> Cassa Servito</div>
-        <div class="panel-body">
-          {% if cassa_servito %}
-            <div class="row g-2 small">
-              <div class="col-6"><div class="text-muted">Contanti</div><div class="fw-bold">&euro;{{ cassa_servito.totale_incassi_contanti|floatformat:2 }}</div></div>
-              <div class="col-6"><div class="text-muted">Carte</div><div class="fw-bold">&euro;{{ cassa_servito.totale_carte|floatformat:2 }}</div></div>
-              <div class="col-6"><div class="text-muted">Bancomat</div><div class="fw-bold">&euro;{{ cassa_servito.totale_bancomat|floatformat:2 }}</div></div>
-              <div class="col-6"><div class="text-muted">Bonifici</div><div class="fw-bold">&euro;{{ cassa_servito.totale_bonifici|floatformat:2 }}</div></div>
-              <div class="col-6"><div class="text-muted">Altro</div><div class="fw-bold">&euro;{{ cassa_servito.totale_altro|floatformat:2 }}</div></div>
-              <div class="col-6"><div class="text-muted">Cassa teorica</div><div class="fw-bold">&euro;{{ cassa_servito.cassa_teorica_finale|floatformat:2 }}</div></div>
-              <div class="col-12 border-top pt-2 mt-1"><div class="text-muted">Totale incassi</div><div class="fs-5 fw-bold text-success">&euro;{{ cassa_servito.totale_incassi_giornalieri|floatformat:2 }}</div></div>
-            </div>
-          {% else %}
-            <p class="text-muted mb-0">Nessuna chiusura cassa servito per questa data.</p>
-          {% endif %}
-        </div>
-      </div>
-    </div>
-
-    <div class="col-lg-6">
-      <div class="chart-panel h-100">
-        <div class="panel-title"><i class="bi bi-robot text-info"></i> Casse Automatiche (aggregato)</div>
-        <div class="panel-body">
-          <div class="row g-2 small">
-            <div class="col-6"><div class="text-muted">Incasso totale</div><div class="fw-bold">&euro;{{ agg.incasso_totale|floatformat:2 }}</div></div>
-            <div class="col-6"><div class="text-muted">Incasso ricarica</div><div class="fw-bold">&euro;{{ agg.incasso_ricarica|floatformat:2 }}</div></div>
-            <div class="col-6"><div class="text-muted">Incasso vendita</div><div class="fw-bold">&euro;{{ agg.incasso_vendita|floatformat:2 }}</div></div>
-            <div class="col-6"><div class="text-muted">Vendita contante</div><div class="fw-bold">&euro;{{ agg.vendita_contante|floatformat:2 }}</div></div>
-            <div class="col-6"><div class="text-muted">Vendita non cont.</div><div class="fw-bold">&euro;{{ agg.vendita_non_contante|floatformat:2 }}</div></div>
-            <div class="col-6"><div class="text-muted">Vendita totale</div><div class="fw-bold text-success">&euro;{{ agg.vendita_totale|floatformat:2 }}</div></div>
-            <div class="col-12 border-top pt-2 mt-1"><div class="text-muted">Resto teorico</div><div class="fs-5 fw-bold">&euro;{{ agg.resto_erogato_teorico|floatformat:2 }}</div></div>
-          </div>
-        </div>
-      </div>
-    </div>
-  </div>
-
-  {# ====== Inserimento chiusure casse automatiche (inline) ====== #}
-  <div class="chart-panel mb-3">
-    <div class="panel-title"><i class="bi bi-cash-register"></i> Chiusure casse automatiche</div>
-    <div class="panel-sub">Inserisci o aggiorna i dati di chiusura di ogni cassa per questa giornata</div>
-    <div class="panel-body">
-      <div class="row g-3">
-        {% for entry in casse_form_data %}
-        <div class="col-md-6 col-xl-4">
-          <div class="border rounded p-3 h-100" style="background:#fafbfc;">
-            <div class="d-flex justify-content-between align-items-start mb-2">
-              <div>
-                <strong>{% if entry.cassa.modalita_registratore %}<i class="bi bi-receipt text-warning"></i>{% elif entry.cassa.tracking_washcycles %}<i class="bi bi-droplet text-primary"></i>{% else %}<i class="bi bi-coin text-info"></i>{% endif %} {{ entry.cassa.nome }}</strong>
-                {% if entry.cassa.numero %}<small class="text-muted d-block">n. {{ entry.cassa.numero }}</small>{% endif %}
-              </div>
-              <div>
-                {% if entry.chiusura %}
-                  {% if entry.chiusura.confermata %}
-                    <span class="badge bg-dark">Confermata</span>
-                  {% else %}
-                    <span class="badge bg-success">Salvata</span>
-                  {% endif %}
-                {% else %}
-                  <span class="badge bg-warning text-dark">Da chiudere</span>
-                {% endif %}
-              </div>
-            </div>
-
-            {% if entry.chiusura.confermata %}
-              {# Read-only #}
-              <ul class="list-unstyled small mb-0">
-                <li><strong>Incasso tot.:</strong> &euro;{{ entry.chiusura.incasso_totale|floatformat:2 }}</li>
-                {% if not entry.cassa.modalita_registratore %}
-                <li><strong>Ricarica:</strong> &euro;{{ entry.chiusura.incasso_ricarica|floatformat:2 }}</li>
-                <li><strong>Vendita totale:</strong> &euro;{{ entry.chiusura.vendita_totale|floatformat:2 }}</li>
-                {% if entry.cassa.tracking_washcycles %}
-                <li><strong>WashCycles:</strong> {{ entry.chiusura.wash_cycles|default:"—" }}</li>
-                {% endif %}
-                {% endif %}
-              </ul>
-            {% else %}
-              {# Form inline #}
-              <form method="post"
-                    action="{% if entry.chiusura %}{% url 'finanze:chiusura_automatica_edit' entry.chiusura.pk %}{% else %}{% url 'finanze:chiusura_automatica_create' entry.cassa.pk %}?data={{ data|date:'Y-m-d' }}{% endif %}">
-                {% csrf_token %}
-                <input type="hidden" name="next" value="report">
-
-                {% if entry.cassa.modalita_registratore %}
-                  {# Solo totale scontrino #}
-                  <label class="form-label small mb-1">Totale scontrino (&euro;)</label>
-                  <input type="number" step="0.01" min="0" name="incasso_totale" class="form-control form-control-sm mb-2"
-                         value="{% if entry.chiusura %}{{ entry.chiusura.incasso_totale|stringformat:'.2f' }}{% else %}0.00{% endif %}" required>
-                  <input type="hidden" name="incasso_ricarica" value="0">
-                  <input type="hidden" name="vendita_contante" value="0">
-                  <input type="hidden" name="vendita_non_contante" value="0">
-                  <input type="hidden" name="resto_erogato_reale" value="0">
-                {% else %}
-                  {# Modalita completa #}
-                  <div class="row g-1">
-                    <div class="col-6">
-                      <label class="form-label small mb-0">Incasso tot.</label>
-                      <input type="number" step="0.01" min="0" name="incasso_totale" class="form-control form-control-sm"
-                             value="{% if entry.chiusura %}{{ entry.chiusura.incasso_totale|stringformat:'.2f' }}{% else %}0.00{% endif %}" required>
-                    </div>
-                    <div class="col-6">
-                      <label class="form-label small mb-0">Ricarica</label>
-                      <input type="number" step="0.01" min="0" name="incasso_ricarica" class="form-control form-control-sm"
-                             value="{% if entry.chiusura %}{{ entry.chiusura.incasso_ricarica|stringformat:'.2f' }}{% else %}0.00{% endif %}">
-                    </div>
-                    <div class="col-6">
-                      <label class="form-label small mb-0">V. contante</label>
-                      <input type="number" step="0.01" min="0" name="vendita_contante" class="form-control form-control-sm"
-                             value="{% if entry.chiusura %}{{ entry.chiusura.vendita_contante|stringformat:'.2f' }}{% else %}0.00{% endif %}" required>
-                    </div>
-                    <div class="col-6">
-                      <label class="form-label small mb-0">V. non cont.</label>
-                      <input type="number" step="0.01" min="0" name="vendita_non_contante" class="form-control form-control-sm"
-                             value="{% if entry.chiusura %}{{ entry.chiusura.vendita_non_contante|stringformat:'.2f' }}{% else %}0.00{% endif %}">
-                    </div>
-                    <div class="col-6">
-                      <label class="form-label small mb-0">Resto reale</label>
-                      <input type="number" step="0.01" min="0" name="resto_erogato_reale" class="form-control form-control-sm"
-                             value="{% if entry.chiusura %}{{ entry.chiusura.resto_erogato_reale|stringformat:'.2f' }}{% else %}0.00{% endif %}">
-                    </div>
-                    {% if entry.cassa.tracking_washcycles %}
-                    <div class="col-6">
-                      <label class="form-label small mb-0">WashCycles</label>
-                      <input type="number" min="0" name="wash_cycles" class="form-control form-control-sm"
-                             value="{% if entry.chiusura.wash_cycles %}{{ entry.chiusura.wash_cycles }}{% endif %}">
-                    </div>
-                    {% endif %}
-                  </div>
-                {% endif %}
-
-                <button type="submit" class="btn btn-primary btn-sm w-100 mt-2">
-                  <i class="bi bi-save"></i>
-                  {% if entry.chiusura %}Aggiorna{% else %}Salva{% endif %}
-                </button>
-              </form>
-            {% endif %}
-          </div>
-        </div>
-        {% empty %}
-        <div class="col-12"><div class="alert alert-info mb-0">Nessuna cassa automatica configurata.</div></div>
-        {% endfor %}
-      </div>
-    </div>
-  </div>
-
-  {# ====== Lavaggi portali a spazzole (dati WashTec Plus) ====== #}
-  <div class="chart-panel mb-3">
-    <div class="panel-title"><i class="bi bi-droplet-half text-primary"></i> Lavaggi portali (WashTec)</div>
-    <div class="panel-sub">
-      Aggregato dall'archivio transazioni WashTec ({{ portali_archivio_totale }} in archivio &middot;
-      <a href="{% url 'finanze:importa_washtec' %}"><i class="bi bi-cloud-download"></i> importa nuove transazioni</a>).
-      La giornata dei portali va dalla chiusura precedente a quella di oggi: imposta gli orari reali.
-    </div>
-    <div class="panel-body">
-
-      {% with fa=lavaggi_portali.0.finestra fb=lavaggi_portali.1.finestra %}
-      <form method="post" action="{% url 'finanze:imposta_chiusura_portali' %}" class="mb-2">
-        {% csrf_token %}
-        <input type="hidden" name="data" value="{{ data|date:'Y-m-d' }}">
-        <div class="d-flex gap-2 align-items-end flex-wrap mb-2">
-          <div class="small fw-bold" style="width:7.5rem">Azzurro e servito</div>
-          <div>
-            <label class="form-label small mb-0">Inizio chiusura</label>
-            <input type="datetime-local" name="periodo_da" class="form-control form-control-sm" required step="1"
-                   value="{{ fa.0|date:'Y-m-d\TH:i:s' }}">
-          </div>
-          <div>
-            <label class="form-label small mb-0">Fine chiusura</label>
-            <input type="datetime-local" name="periodo_a" class="form-control form-control-sm" required step="1"
-                   value="{{ fa.1|date:'Y-m-d\TH:i:s' }}">
-          </div>
-        </div>
-        <div class="d-flex gap-2 align-items-end flex-wrap mb-2">
-          <div class="small fw-bold" style="width:7.5rem">Blu
-            <div class="fw-normal text-muted">se lo scontrino è chiuso a un altro orario</div></div>
-          <div>
-            <label class="form-label small mb-0">Inizio chiusura</label>
-            <input type="datetime-local" name="periodo_da_blu" class="form-control form-control-sm" step="1"
-                   value="{{ fb.0|date:'Y-m-d\TH:i:s' }}">
-          </div>
-          <div>
-            <label class="form-label small mb-0">Fine chiusura</label>
-            <input type="datetime-local" name="periodo_a_blu" class="form-control form-control-sm" step="1"
-                   value="{{ fb.1|date:'Y-m-d\TH:i:s' }}">
-          </div>
-          <button type="submit" class="btn btn-primary btn-sm">
-            <i class="bi bi-arrow-repeat"></i> {% if portali_chiusura_salvata %}Aggiorna{% else %}Salva orari{% endif %}
-          </button>
-          <span class="small text-muted">
-            {{ portali_n_transazioni }} lavaggi nella finestra
-            {% if not portali_chiusura_salvata %}
-            <span class="badge bg-light text-dark border" title="Calcolata con gli orari predefiniti: modificali e salva se la chiusura reale è diversa">orari predefiniti</span>
-            {% endif %}
-          </span>
-        </div>
-      </form>
-      {% endwith %}
-
-      {% if portali_buchi %}
-      <div class="alert alert-danger small py-2">
-        <i class="bi bi-exclamation-triangle"></i> <strong>Mancano lavaggi nell'archivio WashTec</strong> per questa giornata:
-        {% for b in portali_buchi %}
-          {% if b.portale == 'A' %}Azzurro{% else %}Blu{% endif %} {{ b.quanti }} (#{{ b.da_numero }}{% if b.a_numero != b.da_numero %}&ndash;{{ b.a_numero }}{% endif %}, tra {{ b.dopo|date:"d/m H:i" }} e {{ b.prima|date:"d/m H:i" }}){% if not forloop.last %};{% endif %}
-        {% endfor %}
-        &rarr; <a href="{% url 'finanze:importa_washtec' %}">reimporta da WashTec</a> partendo dal {{ portali_buchi.0.dopo|date:"d/m" }}.
-      </div>
-      {% endif %}
-
-      {# Confronto con i WashCycles degli scontrini delle casse #}
-      <div class="small mb-1 d-flex flex-wrap gap-3 align-items-center">
-        <span class="text-muted">Scontrini vs WashTec:</span>
-        {% for p in lavaggi_portali %}
-        <span>
-          {{ p.label }}:
-          {% if p.scontrino is None %}<span class="text-muted">scontrino non registrato &middot; WashTec {{ p.tot.richieste }}</span>
-          {% elif p.combacia %}<span class="text-success fw-bold"><i class="bi bi-check-circle"></i> {{ p.scontrino }} = {{ p.tot.richieste }}</span>
-          {% else %}<span class="text-danger fw-bold"><i class="bi bi-x-circle"></i> scontrino {{ p.scontrino }} &ne; WashTec {{ p.tot.richieste }}</span>{% endif %}
-        </span>
-        {% endfor %}
-      </div>
-      <div class="small mb-3 d-flex flex-wrap gap-3 align-items-center">
-        <span class="text-muted" title="Lavaggi pagati in contanti su WashTec (a listino) contro vendita contante + non contante dello scontrino della cassa">Contanti WashTec vs vendita scontrino:</span>
-        {% for p in lavaggi_portali %}
-        <span>
-          {{ p.label }}:
-          {% if p.vendita_scontrino is None %}<span class="text-muted">scontrino non registrato &middot; WashTec &euro;{{ p.tot.contanti|floatformat:2 }}</span>
-          {% elif p.contanti_combaciano %}<span class="text-success fw-bold"><i class="bi bi-check-circle"></i> &euro;{{ p.tot.contanti|floatformat:2 }} = &euro;{{ p.vendita_scontrino|floatformat:2 }}</span>
-          {% else %}<span class="text-danger fw-bold"><i class="bi bi-x-circle"></i> WashTec &euro;{{ p.tot.contanti|floatformat:2 }} &ne; scontrino &euro;{{ p.vendita_scontrino|floatformat:2 }}</span>{% endif %}
-        </span>
-        {% endfor %}
-      </div>
-
-      {% if portali_allineamento %}
-      <div class="alert alert-warning small">
-        <div class="fw-bold mb-1"><i class="bi bi-magic"></i> Orari che fanno tornare gli scontrini (prima i contanti, poi i WashCycles)</div>
-        <ul class="mb-2">
-          {% for codice, v in portali_allineamento.items %}
-          <li>
-            <strong>{% if codice == 'A' %}Azzurro{% else %}Blu{% endif %}</strong>
-            (scontrino {{ v.scontrino|default:"—" }} cicli, &euro;{{ v.vendita|floatformat:2 }}):
-            {% if v.errore %}<span class="text-danger">{{ v.errore }}</span>
-            {% else %}
-              {% if v.da != v.da_attuale %}inizio <strong>{{ v.da|date:'d/m H:i:s' }}</strong> (fine del giorno prima, ora {{ v.da_attuale|date:'d/m H:i:s' }}) &middot; {% endif %}
-              fine <strong>{{ v.fine|date:'d/m H:i:s' }}</strong>
-              {% if v.fine != v.fine_attuale %}(ora {{ v.fine_attuale|date:'d/m H:i:s' }}){% else %}(invariata){% endif %}
-              <span class="text-muted">&middot; va bene qualsiasi orario dal {{ v.tra.0|date:'d/m H:i:s' }} al {{ v.tra.1|date:'d/m H:i:s' }}</span>
-              <div>
-                {% if v.scarto_contanti %}<span class="text-danger">contanti WashTec &euro;{{ v.contanti|floatformat:2 }} (scarto {% if v.scarto_contanti > 0 %}+{% endif %}&euro;{{ v.scarto_contanti|floatformat:2 }})</span>
-                {% else %}<span class="text-success">contanti &euro;{{ v.contanti|floatformat:2 }} tornano</span>{% endif %}
-                &middot;
-                {% if v.scarto %}<span class="text-danger">WashTec {{ v.conteggio }} cicli (scarto {% if v.scarto > 0 %}+{% endif %}{{ v.scarto }})</span>
-                {% else %}<span class="text-success">{{ v.conteggio }} cicli tornano</span>{% endif %}
-              </div>
-            {% endif %}
-          </li>
-          {% endfor %}
-        </ul>
-        {% if portali_allineamento_cambia %}
-        {% with va=portali_allineamento.A vb=portali_allineamento.B fa=lavaggi_portali.0.finestra fb=lavaggi_portali.1.finestra %}
-        <form method="post" action="{% url 'finanze:imposta_chiusura_portali' %}" class="d-inline">
-          {% csrf_token %}
-          <input type="hidden" name="data" value="{{ data|date:'Y-m-d' }}">
-          <input type="hidden" name="allinea" value="1">
-          <input type="hidden" name="periodo_da" value="{% if va.fine %}{{ va.da|date:'Y-m-d\TH:i:s' }}{% else %}{{ fa.0|date:'Y-m-d\TH:i:s' }}{% endif %}">
-          <input type="hidden" name="periodo_a" value="{% if va.fine %}{{ va.fine|date:'Y-m-d\TH:i:s' }}{% else %}{{ fa.1|date:'Y-m-d\TH:i:s' }}{% endif %}">
-          <input type="hidden" name="periodo_da_blu" value="{% if vb.fine %}{{ vb.da|date:'Y-m-d\TH:i:s' }}{% else %}{{ fb.0|date:'Y-m-d\TH:i:s' }}{% endif %}">
-          <input type="hidden" name="periodo_a_blu" value="{% if vb.fine %}{{ vb.fine|date:'Y-m-d\TH:i:s' }}{% else %}{{ fb.1|date:'Y-m-d\TH:i:s' }}{% endif %}">
-          <button class="btn btn-sm btn-warning"><i class="bi bi-check2-all"></i> Applica questi orari</button>
-        </form>
-        {% endwith %}
-        {% else %}
-        <div>Gli orari attuali sono già i migliori possibili.</div>
-        {% endif %}
-        <div class="text-muted mt-2">L'inizio è sempre la fine del giorno prima: se il giorno prima non torna, allinea prima quello.</div>
-      </div>
-      {% endif %}
-
-      <form method="post" action="{% url 'finanze:allinea_periodo_portali' %}"
-            class="d-flex gap-2 align-items-end flex-wrap small mb-3"
-            onsubmit="return confirm('Riscrivere gli orari di chiusura portali di tutti i giorni del periodo?');">
-        {% csrf_token %}
-        <input type="hidden" name="data" value="{{ data|date:'Y-m-d' }}">
-        <div class="text-muted" style="max-width:22rem">
-          <i class="bi bi-calendar-range"></i> <strong>Allinea più giorni insieme</strong>: sceglie le chiusure di tutto
-          il periodo in modo che tornino prima i saldi e poi i WashCycles degli scontrini.
-        </div>
-        <div>
-          <label class="form-label small mb-0">Dal</label>
-          <input type="date" name="dal" class="form-control form-control-sm" required value="{{ data|date:'Y-m' }}-01">
-        </div>
-        <div>
-          <label class="form-label small mb-0">Al</label>
-          <input type="date" name="al" class="form-control form-control-sm" required value="{{ data|date:'Y-m-d' }}">
-        </div>
-        <button class="btn btn-sm btn-outline-warning"><i class="bi bi-magic"></i> Allinea periodo</button>
-      </form>
-
-      <details class="small mb-3">
-        <summary class="text-muted">Lavaggi a cavallo di inizio e fine chiusura (&plusmn;20 min, orari WashTec al secondo)</summary>
-        <div class="row g-3 mt-1">
-          {% for b in portali_bordi %}
-          <div class="col-12 col-lg-6">
-            <div class="fw-bold mb-1">{{ b.etichetta }} chiusura: {{ b.istante|date:'d/m H:i:s' }}</div>
-            {% if b.righe %}
-            <table class="table table-sm data-table mb-0">
-              <thead class="table-light"><tr><th>Orario</th><th>Portale</th><th>#</th><th>Prog.</th><th>Origine</th><th>Conta oggi</th></tr></thead>
-              <tbody>
-                {% for r in b.righe %}
-                <tr class="{% if r.dentro %}table-success{% else %}text-muted{% endif %}">
-                  <td>{{ r.t.orario|date:'d/m H:i:s' }}</td>
-                  <td>{{ r.t.get_portale_display }}</td>
-                  <td>{{ r.t.numero }}</td>
-                  <td>P{{ r.t.programma }}</td>
-                  <td>{{ r.t.get_origine_display }}</td>
-                  <td>{% if r.dentro %}<i class="bi bi-check-lg text-success"></i> s&igrave;{% else %}no{% endif %}</td>
-                </tr>
-                {% endfor %}
-              </tbody>
-            </table>
-            {% else %}
-            <div class="text-muted">Nessun lavaggio entro 20 minuti.</div>
-            {% endif %}
-          </div>
-          {% endfor %}
-        </div>
-        <div class="text-muted mt-2">
-          Gli orari degli scontrini delle casse possono differire di 1-2 minuti da quelli WashTec: se i WashCycles non tornano,
-          sposta inizio o fine tra due lavaggi di questa lista.
-        </div>
-      </details>
-
-      {% if portali_chiusura %}
-      <div class="row g-3">
-        {% for p in lavaggi_portali %}
-        <div class="col-12 col-xl-6">
-          <div class="border rounded p-3 h-100" style="background:#fafbfc;">
-            <div class="d-flex justify-content-between align-items-start mb-2">
-              <strong><i class="bi bi-droplet text-primary"></i> {{ p.label }}</strong>
+            <div class="text-end">
               <span class="badge bg-primary">{{ p.tot.richieste }} lavaggi</span>
+              <div class="mt-1">
+              {% if p.scontrino is None and p.vendita_scontrino is None %}
+                <span class="pill-check"><i class="bi bi-hourglass-split"></i> scontrino da inserire</span>
+              {% elif p.combacia and p.contanti_combaciano %}
+                <span class="pill-check ok"><i class="bi bi-check-circle-fill"></i> torna</span>
+              {% else %}
+                <span class="pill-check ko"><i class="bi bi-x-circle-fill"></i> non torna</span>
+              {% endif %}
+              </div>
             </div>
+          </div>
+
+          {% if p.codice == 'A' %}
+            {% with n_da='periodo_da' n_a='periodo_a' %}{% include 'finanze/_orari_portale.html' %}{% endwith %}
+          {% else %}
+            {% with n_da='periodo_da_blu' n_a='periodo_a_blu' %}{% include 'finanze/_orari_portale.html' %}{% endwith %}
+            <div class="small mt-1">
+              <button type="button" class="btn btn-link btn-sm p-0" id="copia-orari-azzurro"><i class="bi bi-files"></i> Stessi orari dell'Azzurro</button>
+              {% if not portali_chiusura.orari_blu_diversi %}<span class="text-muted">&middot; ora uguali all'Azzurro</span>{% endif %}
+            </div>
+          {% endif %}
+
+          <div class="mt-2">
+            <div class="verifica">
+              <span class="lbl"><i class="bi bi-arrow-repeat"></i> WashCycles: scontrino vs WashTec</span>
+              <span class="val">
+                {% if p.scontrino is None %}<span class="text-muted">&mdash; vs {{ p.tot.richieste }}</span>
+                {% elif p.combacia %}<span class="pill-check ok"><i class="bi bi-check"></i> {{ p.scontrino }} = {{ p.tot.richieste }}</span>
+                {% else %}<span class="pill-check ko">scontrino {{ p.scontrino }} &ne; WashTec {{ p.tot.richieste }}</span>{% endif %}
+              </span>
+            </div>
+            <div class="verifica">
+              <span class="lbl"><i class="bi bi-cash-coin"></i> Vendita scontrino vs contanti WashTec</span>
+              <span class="val">
+                {% if p.vendita_scontrino is None %}<span class="text-muted">&mdash; vs &euro;{{ p.tot.contanti|floatformat:2 }}</span>
+                {% elif p.contanti_combaciano %}<span class="pill-check ok"><i class="bi bi-check"></i> &euro;{{ p.vendita_scontrino|floatformat:2 }}</span>
+                {% else %}<span class="pill-check ko">&euro;{{ p.vendita_scontrino|floatformat:2 }} &ne; &euro;{{ p.tot.contanti|floatformat:2 }}</span>{% endif %}
+              </span>
+            </div>
+            <div class="verifica">
+              <span class="lbl"><i class="bi bi-person-badge"></i> Da unit&agrave; operativa (servito/operatori)</span>
+              <span class="val">&euro;{{ p.tot.unita|floatformat:2 }}</span>
+            </div>
+          </div>
+
+          {% with v=p.allineamento %}
+          {% if v %}
+          <div class="alert alert-warning small py-2 mt-2 mb-0">
+            <i class="bi bi-magic"></i> <strong>Orari che fanno tornare lo scontrino</strong>
+            {% if v.errore %}<div class="text-danger">{{ v.errore }}</div>
+            {% else %}
+            <div>
+              {% if v.da != v.da_attuale %}Inizio <strong>{{ v.da|date:'d/m H:i:s' }}</strong> (ora {{ v.da_attuale|date:'d/m H:i:s' }}) &middot; {% endif %}
+              Fine <strong>{{ v.fine|date:'d/m H:i:s' }}</strong> {% if v.fine != v.fine_attuale %}(ora {{ v.fine_attuale|date:'d/m H:i:s' }}){% else %}(invariata){% endif %}
+            </div>
+            <div class="text-muted">va bene qualsiasi fine dal {{ v.tra.0|date:'d/m H:i:s' }} al {{ v.tra.1|date:'d/m H:i:s' }}</div>
+            <div>
+              {% if v.scarto_contanti %}<span class="text-danger">contanti &euro;{{ v.contanti|floatformat:2 }} (scarto {% if v.scarto_contanti > 0 %}+{% endif %}&euro;{{ v.scarto_contanti|floatformat:2 }})</span>
+              {% else %}<span class="text-success">contanti &euro;{{ v.contanti|floatformat:2 }} tornano</span>{% endif %}
+              &middot;
+              {% if v.scarto %}<span class="text-danger">{{ v.conteggio }} cicli (scarto {% if v.scarto > 0 %}+{% endif %}{{ v.scarto }})</span>
+              {% else %}<span class="text-success">{{ v.conteggio }} cicli tornano</span>{% endif %}
+            </div>
+            {% endif %}
+          </div>
+          {% endif %}
+          {% endwith %}
+
+          <details>
+            <summary><i class="bi bi-table"></i> Lavaggi per programma</summary>
             {% if p.righe %}
-            <div class="table-responsive">
+            <div class="table-responsive mt-1">
               <table class="table table-sm data-table mb-1">
                 <thead class="table-light">
                   <tr><th>Prog.</th><th class="text-end">Prezzo</th>
@@ -1072,16 +668,113 @@
               {{ p.tot.senza_prezzo }} lavagg{{ p.tot.senza_prezzo|pluralize:"io,i" }} su programmi senza prezzo (contati a 0 &euro;)</div>
             {% endif %}
             {% else %}
-            <div class="text-muted small">Nessun lavaggio nella finestra per questo portale.</div>
+            <div class="text-muted small mt-1">Nessun lavaggio nella finestra per questo portale.</div>
             {% endif %}
-          </div>
+          </details>
+
+          <details>
+            <summary><i class="bi bi-clock-history"></i> Lavaggi a cavallo di inizio e fine (&plusmn;20 min)</summary>
+            {% for b in p.bordi %}
+            <div class="fw-bold small mt-2">{% if b.etichetta == 'Inizio' %}<i class="bi bi-play-circle text-success"></i>{% else %}<i class="bi bi-stop-circle text-danger"></i>{% endif %} {{ b.etichetta }}: {{ b.istante|date:'d/m H:i:s' }}</div>
+            {% if b.righe %}
+            <table class="table table-sm data-table mb-0">
+              <thead class="table-light"><tr><th>Orario</th><th>#</th><th>Prog.</th><th>Origine</th><th>Conta oggi</th><th></th></tr></thead>
+              <tbody>
+                {% for r in b.righe %}
+                <tr class="{% if r.dentro %}table-success{% else %}text-muted{% endif %}">
+                  <td>{{ r.t.orario|date:'d/m H:i:s' }}</td>
+                  <td>{{ r.t.numero }}</td>
+                  <td>P{{ r.t.programma }}</td>
+                  <td>{{ r.t.get_origine_display }}</td>
+                  <td>{% if r.dentro %}<i class="bi bi-check-lg text-success"></i> s&igrave;{% else %}no{% endif %}</td>
+                  <td class="text-end">
+                    <button type="button" class="btn btn-link btn-sm p-0" title="Imposta questo orario come {{ b.etichetta|lower }}"
+                            data-copia="{{ r.t.orario|date:'Y-m-d\TH:i:s' }}"
+                            data-target="{% if b.etichetta == 'Inizio' %}{% if p.codice == 'A' %}periodo_da{% else %}periodo_da_blu{% endif %}{% else %}{% if p.codice == 'A' %}periodo_a{% else %}periodo_a_blu{% endif %}{% endif %}">
+                      <i class="bi bi-box-arrow-in-down-left"></i></button>
+                  </td>
+                </tr>
+                {% endfor %}
+              </tbody>
+            </table>
+            {% else %}
+            <div class="text-muted small">Nessun lavaggio entro 20 minuti.</div>
+            {% endif %}
+            {% endfor %}
+            <div class="text-muted small mt-2">
+              Gli orari degli scontrini possono differire di 1-2 minuti da quelli WashTec: con <i class="bi bi-box-arrow-in-down-left"></i>
+              metti l'orario di un lavaggio come inizio o fine (poi salva).
+            </div>
+          </details>
         </div>
-        {% endfor %}
       </div>
+      {% endfor %}
+    </div>
+
+    <div class="salva-orari">
+      <button type="submit" class="btn btn-primary btn-sm" id="salva-orari-btn">
+        <i class="bi bi-save"></i> {% if portali_chiusura_salvata %}Aggiorna orari portali{% else %}Salva orari portali{% endif %}
+      </button>
+      <span class="small text-muted">{{ portali_n_transazioni }} lavaggi nella finestra</span>
+      {% if not portali_chiusura_salvata %}
+      <span class="badge bg-light text-dark border" title="Calcolata con gli orari predefiniti: modificali e salva se la chiusura reale è diversa">orari predefiniti, non ancora salvati</span>
       {% endif %}
+      <span class="small text-warning d-none" id="orari-modificati"><i class="bi bi-pencil"></i> orari modificati: salva per ricalcolare</span>
+    </div>
+  </form>
+
+  {% if portali_allineamento %}
+  <div class="d-flex gap-2 align-items-center flex-wrap mt-2 small">
+    {% if portali_allineamento_cambia %}
+    {% with va=portali_allineamento.A vb=portali_allineamento.B fa=lavaggi_portali.0.finestra fb=lavaggi_portali.1.finestra %}
+    <form method="post" action="{% url 'finanze:imposta_chiusura_portali' %}" class="d-inline">
+      {% csrf_token %}
+      <input type="hidden" name="data" value="{{ data|date:'Y-m-d' }}">
+      <input type="hidden" name="allinea" value="1">
+      <input type="hidden" name="periodo_da" value="{% if va.fine %}{{ va.da|date:'Y-m-d\TH:i:s' }}{% else %}{{ fa.0|date:'Y-m-d\TH:i:s' }}{% endif %}">
+      <input type="hidden" name="periodo_a" value="{% if va.fine %}{{ va.fine|date:'Y-m-d\TH:i:s' }}{% else %}{{ fa.1|date:'Y-m-d\TH:i:s' }}{% endif %}">
+      <input type="hidden" name="periodo_da_blu" value="{% if vb.fine %}{{ vb.da|date:'Y-m-d\TH:i:s' }}{% else %}{{ fb.0|date:'Y-m-d\TH:i:s' }}{% endif %}">
+      <input type="hidden" name="periodo_a_blu" value="{% if vb.fine %}{{ vb.fine|date:'Y-m-d\TH:i:s' }}{% else %}{{ fb.1|date:'Y-m-d\TH:i:s' }}{% endif %}">
+      <button class="btn btn-sm btn-warning"><i class="bi bi-check2-all"></i> Applica gli orari proposti a entrambi i portali</button>
+    </form>
+    {% endwith %}
+    {% else %}
+    <span class="text-muted"><i class="bi bi-info-circle"></i> Gli orari attuali sono già i migliori possibili.</span>
+    {% endif %}
+    <span class="text-muted">L'inizio è sempre la fine del giorno prima: se il giorno prima non torna, allinea prima quello.</span>
+  </div>
+  {% endif %}
+
+  <details class="small mt-2">
+    <summary class="text-muted"><i class="bi bi-calendar-range"></i> Allinea più giorni insieme</summary>
+    <form method="post" action="{% url 'finanze:allinea_periodo_portali' %}"
+          class="d-flex gap-2 align-items-end flex-wrap mt-2"
+          onsubmit="return confirm('Riscrivere gli orari di chiusura portali di tutti i giorni del periodo?');">
+      {% csrf_token %}
+      <input type="hidden" name="data" value="{{ data|date:'Y-m-d' }}">
+      <div class="text-muted" style="max-width:22rem">
+        Sceglie le chiusure di tutto il periodo in modo che tornino prima i saldi e poi i WashCycles degli scontrini.
+      </div>
+      <div>
+        <label class="form-label small mb-0">Dal</label>
+        <input type="date" name="dal" class="form-control form-control-sm" required value="{{ data|date:'Y-m' }}-01">
+      </div>
+      <div>
+        <label class="form-label small mb-0">Al</label>
+        <input type="date" name="al" class="form-control form-control-sm" required value="{{ data|date:'Y-m-d' }}">
+      </div>
+      <button class="btn btn-sm btn-outline-warning"><i class="bi bi-magic"></i> Allinea periodo</button>
+    </form>
+  </details>
+
+  {# ====== 4. ABBINAMENTO SERVITO <-> PORTALI ====== #}
+  <div class="step-head">
+    <span class="step-num">4</span>
+    <div>
+      <h5>Abbinamento lavaggi servito &harr; portali</h5>
+      <div class="step-sub">I lavaggi da unit&agrave; operativa non abbinati a un ordine sono il residuo pagato direttamente agli operatori: controllali e spuntali.</div>
     </div>
   </div>
-
   {# ====== Abbinamento lavaggi servito <-> portali unita' operativa ====== #}
   {% if abbinamento %}
   <div class="chart-panel mb-3" id="abbinamento-portali">
@@ -1397,9 +1090,425 @@
   </div>
   {% endif %}
 
+  {# ====== 5. MOVIMENTI DI CASSA ====== #}
+  <div class="step-head" id="movimenti">
+    <span class="step-num">5</span>
+    <div>
+      <h5>Movimenti di cassa</h5>
+      <div class="step-sub">Spese e ticket di resto pagati con i contanti della cassa, lavaggi extra e promo dichiarati dagli operatori.</div>
+    </div>
+    <div class="step-actions">
+      <a href="{% url 'ordini:chiusura-distinta' %}?data={{ data|date:'Y-m-d' }}" class="btn btn-sm btn-outline-secondary" target="_blank"><i class="bi bi-printer"></i> Distinta</a>
+    </div>
+  </div>
+  <div class="row g-3 mb-3">
+    <div class="col-12 col-xl-6">
+  {# ====== SPESE PAGATE DALLA CASSA ====== #}
+  <div class="chart-panel" id="spese-cassa">
+    <div class="panel-title">
+      <i class="bi bi-receipt text-danger"></i> Spese pagate dalla cassa
+      <span class="badge bg-light text-dark ms-2">&euro;{{ totale_spese_cassa|floatformat:2 }}</span>
+    </div>
+    <div class="panel-sub">Costi della giornata pagati con i contanti presi dalla cassa: nella quadratura si sommano al reale</div>
+    <div class="panel-body">
+      {% if spese_cassa %}
+      <div class="table-responsive">
+        <table class="table table-sm data-table mb-3">
+          <thead class="table-light">
+            <tr><th>Descrizione</th><th>Categoria</th><th>Riferimento</th><th>Inserita da</th><th class="text-end">Importo</th><th></th></tr>
+          </thead>
+          <tbody>
+            {% for s in spese_cassa %}
+            <tr>
+              <td>{{ s.descrizione }}</td>
+              <td>{{ s.get_categoria_display }}</td>
+              <td>{{ s.riferimento|default:"—" }}</td>
+              <td class="text-muted small">{{ s.operatore|default:"—" }} &middot; {{ s.creato_il|date:"H:i" }}</td>
+              <td class="text-end fw-bold">&euro;{{ s.importo|floatformat:2 }}</td>
+              <td class="text-end">
+                {% if request.user.is_superuser or s.operatore_id == request.user.id %}
+                <form method="post" action="{% url 'finanze:azione_spese_cassa' %}" class="d-inline"
+                      onsubmit="return confirm('Eliminare la spesa &quot;{{ s.descrizione|escapejs }}&quot;?');">
+                  {% csrf_token %}
+                  <input type="hidden" name="data" value="{{ data|date:'Y-m-d' }}">
+                  <input type="hidden" name="azione" value="elimina">
+                  <input type="hidden" name="spesa_id" value="{{ s.pk }}">
+                  <button class="btn btn-sm btn-link text-danger p-0" title="Elimina"><i class="bi bi-trash"></i></button>
+                </form>
+                {% endif %}
+              </td>
+            </tr>
+            {% endfor %}
+          </tbody>
+          <tfoot>
+            <tr><th colspan="4">Totale</th><th class="text-end">&euro;{{ totale_spese_cassa|floatformat:2 }}</th><th></th></tr>
+          </tfoot>
+        </table>
+      </div>
+      {% else %}
+      <p class="text-muted small">Nessuna spesa registrata per questa data.</p>
+      {% endif %}
+
+      <form method="post" action="{% url 'finanze:azione_spese_cassa' %}" class="row g-2 align-items-end">
+        {% csrf_token %}
+        <input type="hidden" name="data" value="{{ data|date:'Y-m-d' }}">
+        <input type="hidden" name="azione" value="aggiungi">
+        <div class="col-12 col-md-4">
+          <label class="form-label small mb-1">Descrizione</label>
+          <input type="text" name="descrizione" class="form-control form-control-sm" maxlength="200" required
+                 placeholder="es. Panni microfibra, gasolio generatore">
+        </div>
+        <div class="col-6 col-md-2">
+          <label class="form-label small mb-1">Categoria</label>
+          <select name="categoria" class="form-select form-select-sm">
+            {% for valore, etichetta in categorie_spesa %}
+            <option value="{{ valore }}"{% if valore == 'altro' %} selected{% endif %}>{{ etichetta }}</option>
+            {% endfor %}
+          </select>
+        </div>
+        <div class="col-6 col-md-2">
+          <label class="form-label small mb-1">Riferimento</label>
+          <input type="text" name="riferimento" class="form-control form-control-sm" maxlength="100" placeholder="n. scontrino">
+        </div>
+        <div class="col-6 col-md-2">
+          <label class="form-label small mb-1">Importo &euro;</label>
+          <input type="number" name="importo" class="form-control form-control-sm" step="0.01" min="0.01" required>
+        </div>
+        <div class="col-6 col-md-2">
+          <button class="btn btn-sm btn-danger w-100"><i class="bi bi-plus-circle"></i> Aggiungi spesa</button>
+        </div>
+      </form>
+    </div>
+  </div>
+    </div>
+    <div class="col-12 col-xl-6">
+  {# ====== TICKET DI RESTO PAGATI ====== #}
+  <div class="chart-panel" id="ticket-resto">
+    <div class="panel-title">
+      <i class="bi bi-ticket-perforated text-danger"></i> Ticket di resto pagati
+      <span class="badge bg-light text-dark ms-2">&euro;{{ quadratura.ticket_resto|floatformat:2 }}</span>
+    </div>
+    <div class="panel-sub">Resti delle casse automatiche ripagati al cliente con i contanti della cassa: nella quadratura si sommano al reale</div>
+    <div class="panel-body">
+      {% if quadratura.ticket_resto_lista %}
+      <div class="table-responsive">
+        <table class="table table-sm data-table mb-3">
+          <thead class="table-light">
+            <tr><th>Data</th><th>Nota</th><th>Inserito da</th><th class="text-end">Importo</th><th></th></tr>
+          </thead>
+          <tbody>
+            {% for t in quadratura.ticket_resto_lista %}
+            <tr>
+              <td>{{ t.data|date:"d/m/Y" }}</td>
+              <td>{{ t.nota|default:"—" }}</td>
+              <td class="text-muted small">{{ t.operatore|default:"—" }} &middot; {{ t.creato_il|date:"d/m H:i" }}</td>
+              <td class="text-end fw-bold">&euro;{{ t.importo|floatformat:2 }}</td>
+              <td class="text-end">
+                {% if request.user.is_superuser or t.operatore_id == request.user.id %}
+                <form method="post" action="{% url 'finanze:azione_ticket_resto' %}" class="d-inline"
+                      onsubmit="return confirm('Eliminare il ticket di resto di &euro;{{ t.importo|floatformat:2 }}?');">
+                  {% csrf_token %}
+                  <input type="hidden" name="data" value="{{ data|date:'Y-m-d' }}">
+                  <input type="hidden" name="azione" value="elimina">
+                  <input type="hidden" name="ticket_id" value="{{ t.pk }}">
+                  <button class="btn btn-sm btn-link text-danger p-0" title="Elimina"><i class="bi bi-trash"></i></button>
+                </form>
+                {% endif %}
+              </td>
+            </tr>
+            {% endfor %}
+          </tbody>
+          <tfoot>
+            <tr><th colspan="3">Totale</th><th class="text-end">&euro;{{ quadratura.ticket_resto|floatformat:2 }}</th><th></th></tr>
+          </tfoot>
+        </table>
+      </div>
+      {% else %}
+      <p class="text-muted small">Nessun ticket di resto pagato in questa data.</p>
+      {% endif %}
+
+      <form method="post" action="{% url 'finanze:azione_ticket_resto' %}" class="row g-2 align-items-end">
+        {% csrf_token %}
+        <input type="hidden" name="data" value="{{ data|date:'Y-m-d' }}">
+        <input type="hidden" name="azione" value="aggiungi">
+        <div class="col-6 col-md-3">
+          <label class="form-label small mb-1">Data pagamento</label>
+          <input type="date" name="data_pagamento" class="form-control form-control-sm" value="{{ data|date:'Y-m-d' }}"
+                 max="{{ oggi|date:'Y-m-d' }}" required>
+        </div>
+        <div class="col-6 col-md-2">
+          <label class="form-label small mb-1">Importo &euro;</label>
+          <input type="number" name="importo" class="form-control form-control-sm" step="0.01" min="0.01" required>
+        </div>
+        <div class="col-12 col-md-4">
+          <label class="form-label small mb-1">Nota (facoltativa)</label>
+          <input type="text" name="nota" class="form-control form-control-sm" maxlength="100" placeholder="n. ticket, cassa">
+        </div>
+        <div class="col-12 col-md-3">
+          <button class="btn btn-sm btn-danger w-100"><i class="bi bi-plus-circle"></i> Aggiungi ticket</button>
+        </div>
+      </form>
+    </div>
+  </div>
+    </div>
+  </div>
+  {# ====== CHIUSURA OPERATORI: lavaggi extra e promo ====== #}
+  <div class="chart-panel mb-3" id="chiusura-operatori">
+    <div class="panel-title">
+      <i class="bi bi-calculator text-primary"></i> Lavaggi extra e promo (chiusura operatori)
+      <span class="badge bg-light text-dark ms-2">extra &euro;{{ quadratura.totale_extra|floatformat:2 }} &middot; promo &euro;{{ quadratura.promo_macchine|add:quadratura.promo_operatori|floatformat:2 }}</span>
+      <a href="{% url 'ordini:chiusura-giornata' %}?data={{ data|date:'Y-m-d' }}" class="btn btn-sm btn-outline-secondary ms-auto"><i class="bi bi-pencil"></i> Apri chiusura operatori</a>
+    </div>
+    <div class="panel-sub">Gli extra si aggiungono all'atteso; le promo macchine lo riducono; le promo operatori riducono il residuo "pagati agli operatori" (non segnare lo stesso omaggio anche con la matita del residuo)</div>
+    <div class="panel-body">
+      {% if quadratura.lavaggi_extra or quadratura.promo_lista %}
+      <table class="table table-sm data-table mb-0">
+        <thead class="table-light"><tr><th>Tipo</th><th>Descrizione</th><th>Inserito da</th><th class="text-end">Importo</th></tr></thead>
+        <tbody>
+          {% for x in quadratura.lavaggi_extra %}
+          <tr><td><span class="badge bg-success">Extra</span> {{ x.get_metodo_display }}</td><td>{{ x.descrizione }}</td>
+              <td class="text-muted small">{{ x.operatore|default:"—" }} &middot; {{ x.creato_il|date:"H:i" }}</td>
+              <td class="text-end fw-bold">+&euro;{{ x.importo|floatformat:2 }}</td></tr>
+          {% endfor %}
+          {% for p in quadratura.promo_lista %}
+          <tr><td><span class="badge {% if p.tipo == 'macchine' %}bg-info text-dark{% else %}bg-secondary{% endif %}">Promo {% if p.tipo == 'macchine' %}macchine{% else %}operatori{% endif %}</span></td>
+              <td>{{ p.descrizione }}</td>
+              <td class="text-muted small">{{ p.operatore|default:"—" }} &middot; {{ p.creato_il|date:"H:i" }}</td>
+              <td class="text-end fw-bold">&minus;&euro;{{ p.importo|floatformat:2 }}</td></tr>
+          {% endfor %}
+        </tbody>
+      </table>
+      {% else %}
+      <p class="text-muted small mb-0">Nessun lavaggio extra o promo dichiarati per questa data.</p>
+      {% endif %}
+    </div>
+  </div>
+
+  {# ====== 6. QUADRATURA E CONFERMA ====== #}
+  <div class="step-head" id="quadratura">
+    <span class="step-num">6</span>
+    <div>
+      <h5>Quadratura e conferma della giornata</h5>
+      <div class="step-sub">Contanti scassettati + lettore carte servito, confrontati con self service (incasso &minus; ricarica) + ordini POS. A conti fatti, conferma la giornata.</div>
+    </div>
+  </div>
+  <div class="chart-panel mb-3">
+    <div class="panel-title">
+      <i class="bi bi-cash-stack {% if quadratura.stato == 'ok' %}text-success{% elif quadratura.stato == 'non_rilevato' %}text-muted{% else %}text-danger{% endif %}"></i>
+      Quadratura giornaliera &mdash; scassettamento unificato
+      {% if quadratura.stato == 'ok' %}
+        <span class="badge bg-success ms-2">In quadra</span>
+      {% elif quadratura.stato == 'non_rilevato' %}
+        <span class="badge bg-secondary ms-2">Non ancora inserita</span>
+      {% elif quadratura.stato == 'mancante' %}
+        <span class="badge bg-danger ms-2">Mancante</span>
+      {% else %}
+        <span class="badge bg-warning text-dark ms-2">Eccedente</span>
+      {% endif %}
+      {% if quadratura.obj.confermata_il %}
+        <span class="badge bg-dark ms-2" title="Confermata da {{ quadratura.obj.confermata_da|default:'—' }} il {{ quadratura.obj.confermata_il|date:'d/m H:i' }}"><i class="bi bi-lock-fill"></i> Confermata</span>
+      {% endif %}
+      <a href="{% url 'ordini:chiusura-giornata' %}?data={{ data|date:'Y-m-d' }}" class="btn btn-sm btn-outline-secondary ms-md-auto">
+        <i class="bi bi-calculator"></i> Chiusura operatori
+      </a>
+      <a href="{% url 'finanze:quadratura_form' %}?data={{ data|date:'Y-m-d' }}" class="btn btn-sm btn-outline-primary">
+        <i class="bi bi-pencil"></i>
+        {% if quadratura.obj %}Modifica{% else %}Inserisci{% endif %} quadratura
+      </a>
+      {% if quadratura.obj %}
+      <form method="post" action="{% url 'finanze:azione_conferma_giornata' %}" class="d-inline">
+        {% csrf_token %}
+        <input type="hidden" name="data" value="{{ data|date:'Y-m-d' }}">
+        {% if quadratura.obj.confermata_il %}
+        <input type="hidden" name="azione" value="sblocca">
+        <button class="btn btn-sm btn-outline-dark"><i class="bi bi-unlock"></i> Sblocca</button>
+        {% else %}
+        <input type="hidden" name="azione" value="conferma">
+        <button class="btn btn-sm btn-dark" onclick="return confirm('Confermare la giornata? Gli operatori non potranno più modificarla.');"><i class="bi bi-lock"></i> Conferma giornata</button>
+        {% endif %}
+      </form>
+      {% endif %}
+    </div>
+    <div class="panel-sub">Conta tutti i contanti scassettati + totale lettore carte servito, confronta con self service (incasso &minus; ricarica) + ordini POS</div>
+    <div class="panel-body">
+
+      {% if quadratura.obj %}
+      <div class="row g-3">
+        {# Reale #}
+        <div class="col-md-6">
+          <div class="p-3" style="background:#f8fafc; border-radius:8px; border-left:4px solid #0ea5e9;">
+            <div class="text-muted small fw-bold text-uppercase mb-2"><i class="bi bi-eye"></i> Rilevato (reale)</div>
+            <div class="d-flex justify-content-between small mb-1">
+              <span>Contanti totali conteggiati</span>
+              <span class="fw-bold">&euro;{{ quadratura.obj.contanti_totali|floatformat:2 }}</span>
+            </div>
+            <div class="d-flex justify-content-between small mb-1">
+              <span>Lettore carte servito (POS)</span>
+              <span class="fw-bold">&euro;{{ quadratura.obj.lettore_carte_servito|floatformat:2 }}</span>
+            </div>
+            <div class="d-flex justify-content-between small mb-2 text-danger">
+              <span>&minus; Fondo cassa iniziale</span>
+              <span class="fw-bold">&minus;&euro;{{ quadratura.fondo_cassa_iniziale|floatformat:2 }}</span>
+            </div>
+            {% if quadratura.spese_cassa %}
+            <div class="d-flex justify-content-between small mb-2 text-success">
+              <span>+ Spese pagate dalla cassa <a href="#spese-cassa">(dettaglio)</a></span>
+              <span class="fw-bold">+&euro;{{ quadratura.spese_cassa|floatformat:2 }}</span>
+            </div>
+            {% endif %}
+            {% if quadratura.ticket_resto %}
+            <div class="d-flex justify-content-between small mb-2 text-success">
+              <span>+ Ticket di resto pagati <a href="#ticket-resto">(dettaglio)</a></span>
+              <span class="fw-bold">+&euro;{{ quadratura.ticket_resto|floatformat:2 }}</span>
+            </div>
+            {% endif %}
+            <div class="d-flex justify-content-between border-top pt-2">
+              <span class="fw-bold">Totale reale</span>
+              <span class="fs-5 fw-bold text-primary">&euro;{{ quadratura.totale_reale|floatformat:2 }}</span>
+            </div>
+          </div>
+        </div>
+
+        {# Teorico #}
+        <div class="col-md-6">
+          <div class="p-3" style="background:#f8fafc; border-radius:8px; border-left:4px solid #14b8a6;">
+            <div class="text-muted small fw-bold text-uppercase mb-2"><i class="bi bi-calculator"></i> Atteso (teorico)</div>
+            <div class="d-flex justify-content-between small mb-1">
+              <span>Self service: incasso &minus; ricarica casse
+                <div class="text-muted" style="font-size:.75rem">&euro;{{ agg.incasso_totale|floatformat:2 }} &minus; &euro;{{ agg.incasso_ricarica|floatformat:2 }} (la ricarica viene dal fondo cassa)</div></span>
+              <span class="fw-bold">&euro;{{ quadratura.vendita_self_service|floatformat:2 }}</span>
+            </div>
+            {% if quadratura.promo_macchine %}
+            <div class="d-flex justify-content-between small mb-1 text-danger">
+              <span>&minus; Gettoni/crediti regalati (promo macchine) <a href="#chiusura-operatori">(dettaglio)</a></span>
+              <span class="fw-bold">&minus;&euro;{{ quadratura.promo_macchine|floatformat:2 }}</span>
+            </div>
+            {% endif %}
+            {% if quadratura.totale_extra %}
+            <div class="d-flex justify-content-between small mb-1 text-success">
+              <span>+ Lavaggi extra senza ordine <a href="#chiusura-operatori">(dettaglio)</a></span>
+              <span class="fw-bold">+&euro;{{ quadratura.totale_extra|floatformat:2 }}</span>
+            </div>
+            {% endif %}
+            <div class="d-flex justify-content-between small mb-1">
+              <span>Servito: incassi ordini del giorno</span>
+              <span class="fw-bold">&euro;{{ quadratura.servito_ordini_giorno|floatformat:2 }}</span>
+            </div>
+            <div class="d-flex justify-content-between small mb-1">
+              <span>Servito: crediti pregressi incassati oggi
+                {% if quadratura.crediti_pregressi %}({{ quadratura.crediti_pregressi|length }} ordin{{ quadratura.crediti_pregressi|length|pluralize:"e,i" }}){% endif %}</span>
+              <span class="fw-bold">&euro;{{ quadratura.totale_crediti_pregressi|floatformat:2 }}</span>
+            </div>
+            {% if quadratura.crediti_pregressi %}
+            <details class="small mb-2">
+              <summary class="text-muted">Dettaglio crediti pregressi</summary>
+              <table class="table table-sm data-table mb-0 mt-1">
+                <thead class="table-light">
+                  <tr><th>Ordine</th><th>Del</th><th>Cliente</th><th>Metodo</th><th class="text-end">Incassato</th></tr>
+                </thead>
+                <tbody>
+                  {% for c in quadratura.crediti_pregressi %}
+                  <tr>
+                    <td><a href="{% url 'ordini:ordine-detail' c.ordine.pk %}">#{{ c.ordine.numero_progressivo|slice:"-4:" }}</a></td>
+                    <td>{{ c.ordine.data_ora|date:"d/m/Y" }}</td>
+                    <td>{{ c.ordine.cliente|default:"—" }}</td>
+                    <td>{{ c.metodi|join:", " }}{% if c.riferimenti %}<div class="text-muted">{{ c.riferimenti|join:", " }}</div>{% endif %}</td>
+                    <td class="text-end">&euro;{{ c.importo|floatformat:2 }}</td>
+                  </tr>
+                  {% endfor %}
+                </tbody>
+              </table>
+            </details>
+            {% else %}
+            <div class="mb-2"></div>
+            {% endif %}
+            {% if quadratura.non_in_cassa %}
+            <div class="d-flex justify-content-between small mb-1 text-muted">
+              <span><i class="bi bi-bank"></i> Bonifici e assegni del giorno (esclusi: non in cassa)</span>
+              <span>&euro;{{ quadratura.totale_non_in_cassa|floatformat:2 }}</span>
+            </div>
+            <details class="small mb-2">
+              <summary class="text-muted">Dettaglio bonifici e assegni</summary>
+              <table class="table table-sm data-table mb-0 mt-1">
+                <thead class="table-light">
+                  <tr><th>Ordine</th><th>Del</th><th>Cliente</th><th>Metodo</th><th class="text-end">Importo</th></tr>
+                </thead>
+                <tbody>
+                  {% for c in quadratura.non_in_cassa %}
+                  <tr>
+                    <td><a href="{% url 'ordini:ordine-detail' c.ordine.pk %}">#{{ c.ordine.numero_progressivo|slice:"-4:" }}</a></td>
+                    <td>{{ c.ordine.data_ora|date:"d/m/Y" }}</td>
+                    <td>{{ c.ordine.cliente|default:"—" }}</td>
+                    <td>{{ c.metodi|join:", " }}{% if c.riferimenti %}<div class="text-muted">{{ c.riferimenti|join:", " }}</div>{% endif %}</td>
+                    <td class="text-end">&euro;{{ c.importo|floatformat:2 }}</td>
+                  </tr>
+                  {% endfor %}
+                </tbody>
+              </table>
+            </details>
+            {% endif %}
+            <div class="d-flex justify-content-between border-top pt-2">
+              <span class="fw-bold">Totale teorico</span>
+              <span class="fs-5 fw-bold" style="color:#0f766e">&euro;{{ quadratura.totale_teorico|floatformat:2 }}</span>
+            </div>
+          </div>
+        </div>
+
+        {# Differenza #}
+        <div class="col-12">
+          <div class="p-3 d-flex justify-content-between align-items-center" style="background:{% if quadratura.stato == 'ok' %}#f0fdf4{% else %}#fef2f2{% endif %}; border-radius:8px; border-left:4px solid {% if quadratura.stato == 'ok' %}#16a34a{% else %}#dc2626{% endif %};">
+            <div>
+              <div class="text-muted small fw-bold text-uppercase">Differenza (reale &minus; teorico &minus; pagati agli operatori)</div>
+              <div class="fs-3 fw-bold {% if quadratura.stato == 'ok' %}text-success{% else %}text-danger{% endif %}">
+                {% if quadratura.differenza >= 0 %}+{% endif %}&euro;{{ quadratura.differenza|floatformat:2 }}
+              </div>
+              <div class="small text-muted">
+                Reale &minus; teorico {% if quadratura.differenza_reale_teorico >= 0 %}+{% endif %}&euro;{{ quadratura.differenza_reale_teorico|floatformat:2 }}
+                &middot; &minus; residuo pagati agli operatori &euro;{{ quadratura.residuo_operatori|floatformat:2 }}{% if quadratura.promo_operatori %} <span class="text-muted">(&euro;{{ quadratura.residuo_operatori_lordo|floatformat:2 }} &minus; promo operatori &euro;{{ quadratura.promo_operatori|floatformat:2 }})</span>{% endif %}{% if abbinamento.n_rettificati %} <span class="text-muted">(dopo {{ abbinamento.n_rettificati }} omaggi/promo)</span>{% endif %}
+                {% if abbinamento %}<a href="#abbinamento-portali">(dettaglio)</a>{% else %}<span title="Imposta la chiusura portali della giornata per calcolare il residuo">(chiusura portali non impostata)</span>{% endif %}
+              </div>
+            </div>
+            <div>
+              {% if quadratura.stato == 'ok' %}
+                <span class="badge bg-success fs-6"><i class="bi bi-check-circle"></i> In quadra (tolleranza &plusmn;&euro;0.50)</span>
+              {% elif quadratura.stato == 'mancante' %}
+                <span class="badge bg-danger fs-6"><i class="bi bi-exclamation-triangle"></i> Mancano &euro;{{ quadratura.differenza|floatformat:2|slice:"1:" }}</span>
+              {% else %}
+                <span class="badge bg-warning text-dark fs-6"><i class="bi bi-exclamation-triangle"></i> Eccedenza di &euro;{{ quadratura.differenza|floatformat:2 }}</span>
+              {% endif %}
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {% if quadratura.obj.note %}
+      <div class="alert alert-light small mt-3 mb-0">
+        <i class="bi bi-sticky"></i> <strong>Note:</strong> {{ quadratura.obj.note|linebreaksbr }}
+      </div>
+      {% endif %}
+
+      {% else %}
+      <div class="text-center py-4">
+        <i class="bi bi-inbox" style="font-size:2.5rem; color:#cbd5e1;"></i>
+        <p class="text-muted mb-3 mt-2">Quadratura non ancora inserita per questa data.</p>
+        <a href="{% url 'finanze:quadratura_form' %}?data={{ data|date:'Y-m-d' }}" class="btn btn-primary">
+          <i class="bi bi-plus-circle"></i> Inserisci quadratura
+        </a>
+        <div class="alert alert-info small mt-3 mb-0 text-start">
+          <strong>Teorico atteso per oggi:</strong>
+          self service (incasso &minus; ricarica) &euro;{{ quadratura.vendita_self_service|floatformat:2 }}
+          + servito POS &euro;{{ quadratura.totale_servito|floatformat:2 }}
+          {% if quadratura.totale_crediti_pregressi %}(di cui crediti pregressi &euro;{{ quadratura.totale_crediti_pregressi|floatformat:2 }}){% endif %}
+          = <strong>&euro;{{ quadratura.totale_teorico|floatformat:2 }}</strong>
+        </div>
+      </div>
+      {% endif %}
+    </div>
+  </div>
+
   {# ====== Ordini non incassati ====== #}
   {% if ordini_non_pagati %}
-  <div class="chart-panel mb-3">
+  <div class="chart-panel mb-3" id="non-incassati">
     <div class="panel-title text-danger"><i class="bi bi-exclamation-triangle"></i> Ordini non incassati del giorno ({{ ordini_non_pagati|length }})</div>
     <div class="panel-sub">Totale crediti da riscuotere: <strong>&euro;{{ kpis.totale_crediti|floatformat:2 }}</strong></div>
     <div class="table-responsive">
@@ -1427,6 +1536,145 @@
     </div>
   </div>
   {% endif %}
+
+  {# ====== ANALISI DELLA GIORNATA ====== #}
+  <div class="step-head" id="analisi">
+    <span class="step-num analisi"><i class="bi bi-bar-chart"></i></span>
+    <div>
+      <h5>Analisi della giornata</h5>
+      <div class="step-sub">Andamento, metodi di pagamento, servizi e prodotti venduti.</div>
+    </div>
+  </div>
+
+  <div class="row g-2 mb-3">
+    <div class="col-12 col-lg-4">
+      <div class="kpi-tile info h-100">
+        <div class="label">Ordini giornata</div>
+        <div class="value">{{ kpis.num_ordini }}</div>
+        <div class="sub">{{ kpis.num_transazioni }} transazioni &middot; &euro;{{ kpis.scontrino_medio|floatformat:2 }} medio{% if rp.n_vendite %} &middot; + {{ rp.n_vendite }} vendit{{ rp.n_vendite|pluralize:"a,e" }} prodotti{% endif %}</div>
+      </div>
+    </div>
+    <div class="col-12 col-lg-4">
+      <div class="kpi-tile {% if kpis.variazione_pct != None and kpis.variazione_pct >= 0 %}success{% elif kpis.variazione_pct != None %}danger{% else %}primary{% endif %} h-100">
+        <div class="label">vs ieri</div>
+        <div class="value">
+          {% if kpis.variazione_pct != None %}
+            {% if kpis.variazione_pct >= 0 %}<i class="bi bi-arrow-up"></i> +{{ kpis.variazione_pct|floatformat:1 }}%{% else %}<i class="bi bi-arrow-down"></i> {{ kpis.variazione_pct|floatformat:1 }}%{% endif %}
+          {% else %}&mdash;{% endif %}
+        </div>
+        <div class="sub">Ieri: &euro;{{ kpis.totale_ieri|floatformat:2 }} &middot; Picco {{ kpis.ora_picco }}</div>
+      </div>
+    </div>
+    <div class="col-12 col-lg-4">
+      <div class="chart-panel h-100">
+        <div class="panel-title"><i class="bi bi-pie-chart text-primary"></i> Totale giornata</div>
+        <div class="panel-sub">Portali &middot; Cambia gettoni &middot; Servito</div>
+        <div class="panel-body" style="position:relative; height:180px;"><canvas id="chartGiornataSplit"></canvas></div>
+      </div>
+    </div>
+  </div>
+
+  {# ====== Grafici riga 1 ====== #}
+  <div class="row g-2 mb-3">
+    {# Trend orario #}
+    <div class="col-lg-8">
+      <div class="chart-panel">
+        <div class="panel-title"><i class="bi bi-graph-up text-primary"></i> Andamento orario</div>
+        <div class="panel-sub">Incassi distribuiti nelle 24 ore</div>
+        <div class="panel-body"><canvas id="chartTrend" height="80"></canvas></div>
+      </div>
+    </div>
+
+    {# Metodi di pagamento #}
+    <div class="col-lg-4">
+      <div class="chart-panel">
+        <div class="panel-title"><i class="bi bi-credit-card text-info"></i> Metodi di pagamento</div>
+        <div class="panel-sub">Distribuzione incassi</div>
+        <div class="panel-body"><canvas id="chartMetodi" height="220"></canvas></div>
+      </div>
+    </div>
+  </div>
+
+  {# ====== Grafici riga 2 ====== #}
+  <div class="row g-2 mb-3">
+    {# Top servizi #}
+    <div class="col-lg-7">
+      <div class="chart-panel">
+        <div class="panel-title"><i class="bi bi-trophy text-warning"></i> Top servizi per fatturato</div>
+        <div class="panel-sub">Servizi piu venduti del giorno (ordini pagati)</div>
+        <div class="panel-body" style="padding-top:8px">
+          {% for s in top_servizi %}
+          <div class="ranked-item">
+            <div class="rank {% if forloop.counter == 1 %}rank-1{% elif forloop.counter == 2 %}rank-2{% elif forloop.counter == 3 %}rank-3{% else %}rank-n{% endif %}">{{ forloop.counter }}</div>
+            <div class="info">
+              <div class="name">{{ s.nome }}</div>
+              <div class="cat">{{ s.categoria }} &middot; {{ s.quantita }} pz</div>
+            </div>
+            <div class="bar">
+              <div class="bar-fill" style="width:{% widthratio s.fatturato top_servizi.0.fatturato 100 %}%"></div>
+            </div>
+            <div class="value">&euro;{{ s.fatturato|floatformat:2 }}</div>
+          </div>
+          {% empty %}
+          <div class="text-muted text-center py-4">Nessun servizio venduto oggi</div>
+          {% endfor %}
+        </div>
+      </div>
+    </div>
+
+    {# Categorie #}
+    <div class="col-lg-5">
+      <div class="chart-panel">
+        <div class="panel-title"><i class="bi bi-grid text-success"></i> Fatturato per categoria</div>
+        <div class="panel-sub">Confronto categorie</div>
+        <div class="panel-body"><canvas id="chartCategorie" height="240"></canvas></div>
+      </div>
+    </div>
+  </div>
+
+  {# ====== Vendita prodotti ====== #}
+  {% include 'finanze/_vendita_prodotti_report.html' with link_scheda=link_scheda_prodotti %}
+
+  {# ====== Dettagli cassa servito + automatiche ====== #}
+  <div class="row g-2 mb-3">
+    <div class="col-lg-6">
+      <div class="chart-panel h-100">
+        <div class="panel-title"><i class="bi bi-shop text-primary"></i> Cassa Servito</div>
+        <div class="panel-body">
+          {% if cassa_servito %}
+            <div class="row g-2 small">
+              <div class="col-6"><div class="text-muted">Contanti</div><div class="fw-bold">&euro;{{ cassa_servito.totale_incassi_contanti|floatformat:2 }}</div></div>
+              <div class="col-6"><div class="text-muted">Carte</div><div class="fw-bold">&euro;{{ cassa_servito.totale_carte|floatformat:2 }}</div></div>
+              <div class="col-6"><div class="text-muted">Bancomat</div><div class="fw-bold">&euro;{{ cassa_servito.totale_bancomat|floatformat:2 }}</div></div>
+              <div class="col-6"><div class="text-muted">Bonifici</div><div class="fw-bold">&euro;{{ cassa_servito.totale_bonifici|floatformat:2 }}</div></div>
+              <div class="col-6"><div class="text-muted">Altro</div><div class="fw-bold">&euro;{{ cassa_servito.totale_altro|floatformat:2 }}</div></div>
+              <div class="col-6"><div class="text-muted">Cassa teorica</div><div class="fw-bold">&euro;{{ cassa_servito.cassa_teorica_finale|floatformat:2 }}</div></div>
+              <div class="col-12 border-top pt-2 mt-1"><div class="text-muted">Totale incassi</div><div class="fs-5 fw-bold text-success">&euro;{{ cassa_servito.totale_incassi_giornalieri|floatformat:2 }}</div></div>
+            </div>
+          {% else %}
+            <p class="text-muted mb-0">Nessuna chiusura cassa servito per questa data.</p>
+          {% endif %}
+        </div>
+      </div>
+    </div>
+
+    <div class="col-lg-6">
+      <div class="chart-panel h-100">
+        <div class="panel-title"><i class="bi bi-robot text-info"></i> Casse Automatiche (aggregato)</div>
+        <div class="panel-body">
+          <div class="row g-2 small">
+            <div class="col-6"><div class="text-muted">Incasso totale</div><div class="fw-bold">&euro;{{ agg.incasso_totale|floatformat:2 }}</div></div>
+            <div class="col-6"><div class="text-muted">Incasso ricarica</div><div class="fw-bold">&euro;{{ agg.incasso_ricarica|floatformat:2 }}</div></div>
+            <div class="col-6"><div class="text-muted">Incasso vendita</div><div class="fw-bold">&euro;{{ agg.incasso_vendita|floatformat:2 }}</div></div>
+            <div class="col-6"><div class="text-muted">Vendita contante</div><div class="fw-bold">&euro;{{ agg.vendita_contante|floatformat:2 }}</div></div>
+            <div class="col-6"><div class="text-muted">Vendita non cont.</div><div class="fw-bold">&euro;{{ agg.vendita_non_contante|floatformat:2 }}</div></div>
+            <div class="col-6"><div class="text-muted">Vendita totale</div><div class="fw-bold text-success">&euro;{{ agg.vendita_totale|floatformat:2 }}</div></div>
+            <div class="col-12 border-top pt-2 mt-1"><div class="text-muted">Resto teorico</div><div class="fs-5 fw-bold">&euro;{{ agg.resto_erogato_teorico|floatformat:2 }}</div></div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
 
 </div>
 {% endblock %}
@@ -1652,5 +1900,81 @@ if (ctxCat && categorie.length > 0) {
     }
   });
 }
+</script>
+<script>
+// Schede scontrino: conti e verifiche aggiornati mentre si scrive
+(function () {
+  var euro = function (x) { return (x < 0 ? '−' : '') + '€' + Math.abs(x).toFixed(2).replace('.', ','); };
+  var pill = function (el, ok, testo) {
+    if (!el) return;
+    el.classList.toggle('ok', ok === true);
+    el.classList.toggle('ko', ok === false);
+    el.innerHTML = ok === null ? '' : '<i class="bi ' + (ok ? 'bi-check-circle-fill' : 'bi-x-circle-fill') + '"></i> ' + testo;
+  };
+  document.querySelectorAll('form.form-scontrino').forEach(function (form) {
+    var campo = function (n) { return form.elements[n]; };
+    var num = function (n) { var c = campo(n); return c ? (parseFloat(String(c.value).replace(',', '.')) || 0) : 0; };
+    var out = function (k, v) { var el = form.querySelector('[data-out="' + k + '"]'); if (el) el.textContent = v; };
+    var aggiorna = function () {
+      if (!campo('vendita_contante') || campo('vendita_contante').type === 'hidden') return;
+      var incassoVendita = num('incasso_totale') - num('incasso_ricarica');
+      var venditaTotale = num('vendita_contante') + num('vendita_non_contante');
+      var restoTeorico = incassoVendita - venditaTotale;
+      var diffResto = num('resto_erogato_reale') - restoTeorico;
+      out('incasso-vendita', euro(incassoVendita));
+      out('vendita-totale', euro(venditaTotale));
+      out('resto-teorico', euro(restoTeorico));
+      out('diff-resto', campo('resto_erogato_reale').value === '' ? '—' : (diffResto > 0 ? '+' : '') + euro(diffResto));
+      var r = form.querySelector('[data-check="ricarica"]');
+      if (r) {
+        var atteso = parseFloat(r.dataset.atteso);
+        pill(r, campo('incasso_ricarica').value === '' ? null : Math.abs(num('incasso_ricarica') - atteso) < 0.005,
+             Math.abs(num('incasso_ricarica') - atteso) < 0.005 ? 'torna' : 'diversa');
+      }
+      if (form.dataset.attesoVendita !== undefined) {
+        var attesa = parseFloat(form.dataset.attesoVendita);
+        var vuota = campo('vendita_contante').value === '' && campo('vendita_non_contante').value === '';
+        var ok = Math.abs(venditaTotale - attesa) < 0.005;
+        pill(form.querySelector('[data-check="vendita"]'), vuota ? null : ok,
+             ok ? 'torna' : euro(venditaTotale) + ' ≠ ' + euro(attesa));
+      }
+      if (form.dataset.attesoCicli !== undefined && campo('wash_cycles')) {
+        var cicli = campo('wash_cycles').value;
+        var okc = parseInt(cicli, 10) === parseInt(form.dataset.attesoCicli, 10);
+        pill(form.querySelector('[data-check="cicli"]'), cicli === '' ? null : okc, okc ? 'torna' : 'diverso');
+      }
+    };
+    form.addEventListener('input', aggiorna);
+    aggiorna();
+  });
+
+  // Pulsanti "usa": copiano un valore nel campo indicato
+  document.querySelectorAll('[data-copia]').forEach(function (b) {
+    b.addEventListener('click', function () {
+      var t = b.closest('form').elements[b.dataset.target];
+      if (!t) return;
+      t.value = b.dataset.copia;
+      t.dispatchEvent(new Event('input', {bubbles: true}));
+      t.focus();
+    });
+  });
+
+  // Orari portali: il Blu segue l'Azzurro finche' ha gli stessi orari
+  var fo = document.getElementById('form-orari-portali');
+  if (fo) {
+    var e = fo.elements;
+    var uguali = function () { return e.periodo_da_blu.value === e.periodo_da.value && e.periodo_a_blu.value === e.periodo_a.value; };
+    var legato = uguali();
+    var copia = function () { e.periodo_da_blu.value = e.periodo_da.value; e.periodo_a_blu.value = e.periodo_a.value; };
+    fo.addEventListener('input', function (ev) {
+      if ((ev.target === e.periodo_da || ev.target === e.periodo_a) && legato) copia();
+      if (ev.target === e.periodo_da_blu || ev.target === e.periodo_a_blu) legato = uguali();
+      document.getElementById('orari-modificati').classList.remove('d-none');
+      document.getElementById('salva-orari-btn').classList.replace('btn-primary', 'btn-warning');
+    });
+    var bc = document.getElementById('copia-orari-azzurro');
+    if (bc) bc.addEventListener('click', function () { copia(); legato = true; fo.dispatchEvent(new Event('input')); });
+  }
+})();
 </script>
 {% endblock %}

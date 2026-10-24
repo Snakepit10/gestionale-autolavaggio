@@ -1076,6 +1076,9 @@ def report_giornata(request):
     # ==================== RICARICHE: dichiarate dagli operatori vs scontrini ====================
     ricariche_dichiarate = list(RicaricaCassa.objects.filter(data=data).select_related('cassa', 'operatore'))
     confronto_ricariche = []
+    for entry in casse_form_data:
+        entry['ricarica_dichiarata'] = sum(
+            (r.importo for r in ricariche_dichiarate if r.cassa_id == entry['cassa'].pk), Decimal('0.00'))
     for ca in casse_attive.filter(modalita_registratore=False):
         dichiarate = [r for r in ricariche_dichiarate if r.cassa_id == ca.pk]
         dichiarato = sum((r.importo for r in dichiarate), Decimal('0.00'))
@@ -1096,6 +1099,19 @@ def report_giornata(request):
         data, cassa_servito, agg['incasso_vendita'], totale_servito,
         contesto_portali['abbinamento']['valore_residuo'])
 
+    # Scontrini dei portali: accanto ai campi i valori attesi da WashTec
+    _portale_per_cassa = {c.pk: codice for codice, c in
+                          allinea_scontrini.chiusure_casse_portali(data).items() if c}
+    _lavaggi_per_codice = {p['codice']: p for p in contesto_portali['lavaggi_portali']}
+    for entry in casse_form_data:
+        codice = _portale_per_cassa.get(entry['cassa'].pk)
+        if codice is None and entry['cassa'].tracking_washcycles:
+            nome = entry['cassa'].nome.lower()
+            codice = next((c for c, parola in allinea_scontrini.CASSA_PORTALE.items() if parola in nome), None)
+        entry['portale'] = _lavaggi_per_codice.get(codice)
+
+    passi_chiusura = _passi_chiusura(casse_form_data, confronto_ricariche, contesto_portali, quadratura)
+
     # ==================== PIE CHART TOTALE GIORNATA ====================
     # Split: portali / cambia gettoni / servito (ordinato, include non pagati)
     giornata_split = [
@@ -1115,6 +1131,9 @@ def report_giornata(request):
         'casse_form_data': casse_form_data,
         'agg': agg,
         'confronto_ricariche': confronto_ricariche,
+        'casse_ricarica': [e['cassa'] for e in casse_form_data if not e['cassa'].modalita_registratore],
+        'passi_chiusura': passi_chiusura,
+        'passi_completati': sum(1 for p in passi_chiusura if p['stato'] == 'ok'),
         'totale_giornata': totale_giornata,
         'totale_ordinato': totale_ordinato,
         # Nuovi totali per categoria (richiesti)
@@ -1155,6 +1174,79 @@ def report_giornata(request):
         'categorie_spesa': SpesaCassa.CATEGORIA_CHOICES,
     })
     return render(request, 'finanze/report_giornata.html', context)
+
+
+def _passi_chiusura(casse_form_data, confronto_ricariche, portali, quadratura):
+    """Checklist della chiusura di giornata in testa al report: per ogni
+    passo stato ('ok', 'warn', 'todo', 'danger'), dettaglio e ancora."""
+    passi = []
+
+    n_casse = len(casse_form_data)
+    n_chiuse = sum(1 for e in casse_form_data if e['chiusura'])
+    passi.append({
+        'titolo': 'Scontrini casse', 'ancora': 'scontrini', 'icona': 'receipt',
+        'stato': 'ok' if n_chiuse == n_casse else ('todo' if not n_chiuse else 'warn'),
+        'dettaglio': f'{n_chiuse}/{n_casse} registrati',
+    })
+
+    diversi = [r for r in confronto_ricariche if r['differenza'] not in (None, Decimal('0.00'))]
+    senza_scontrino = [r for r in confronto_ricariche if r['differenza'] is None]
+    if diversi:
+        stato, dettaglio = 'warn', f'{len(diversi)} non torna{"no" if len(diversi) > 1 else ""}'
+    elif senza_scontrino:
+        stato, dettaglio = 'todo', 'manca lo scontrino'
+    else:
+        stato = 'ok'
+        dettaglio = 'tornano' if confronto_ricariche else 'nessuna ricarica'
+    passi.append({'titolo': 'Ricariche', 'ancora': 'ricariche', 'icona': 'arrow-repeat',
+                  'stato': stato, 'dettaglio': dettaglio})
+
+    lavaggi = portali['lavaggi_portali']
+    con_scontrino = [p for p in lavaggi if p['scontrino'] is not None or p['vendita_scontrino'] is not None]
+    tornano = all(p['combacia'] and p['contanti_combaciano'] for p in lavaggi)
+    if portali['portali_buchi']:
+        stato, dettaglio = 'danger', 'mancano lavaggi WashTec'
+    elif not tornano:
+        stato, dettaglio = 'warn', 'scontrini ≠ WashTec'
+    elif not portali['portali_chiusura_salvata']:
+        stato, dettaglio = 'todo', 'orari predefiniti'
+    else:
+        stato = 'ok'
+        dettaglio = 'tornano con gli scontrini' if con_scontrino else 'orari salvati'
+    passi.append({'titolo': 'Orari portali', 'ancora': 'portali', 'icona': 'droplet-half',
+                  'stato': stato, 'dettaglio': dettaglio})
+
+    abb = portali['abbinamento']
+    n_residui = len(abb['residuo'])
+    da_vedere = n_residui - abb['n_visti']
+    if abb['n_scoperti'] or abb.get('n_manuali_aperti'):
+        stato = 'warn'
+        dettaglio = f"{abb['n_scoperti'] + (abb.get('n_manuali_aperti') or 0)} lavaggi senza transazione"
+    elif da_vedere > 0:
+        stato, dettaglio = 'todo', f'{da_vedere} residu{"i" if da_vedere > 1 else "o"} da vedere'
+    else:
+        stato = 'ok'
+        dettaglio = f'{n_residui} residu{"i" if n_residui != 1 else "o"} · €{abb["valore_residuo"]:.2f}'
+    passi.append({'titolo': 'Abbinamento portali', 'ancora': 'abbinamento-portali', 'icona': 'link-45deg',
+                  'stato': stato, 'dettaglio': dettaglio})
+
+    q = quadratura
+    if q['obj'] is None:
+        passi.append({'titolo': 'Conteggio cassa', 'ancora': 'quadratura', 'icona': 'cash-stack',
+                      'stato': 'todo', 'dettaglio': 'non inserito'})
+    else:
+        passi.append({'titolo': 'Conteggio cassa', 'ancora': 'quadratura', 'icona': 'cash-stack',
+                      'stato': 'ok', 'dettaglio': f"contanti €{q['obj'].contanti_totali:.2f}"})
+        segno = '+' if q['differenza'] >= 0 else ''
+        passi.append({'titolo': 'Quadratura', 'ancora': 'quadratura', 'icona': 'calculator',
+                      'stato': 'ok' if q['stato'] == 'ok' else 'danger',
+                      'dettaglio': 'in quadra' if q['stato'] == 'ok' else f"{segno}€{q['differenza']:.2f}"})
+    confermata = bool(q['obj'] and q['obj'].confermata_il)
+    passi.append({'titolo': 'Conferma', 'ancora': 'quadratura', 'icona': 'lock',
+                  'stato': 'ok' if confermata else 'todo',
+                  'dettaglio': f"il {timezone.localtime(q['obj'].confermata_il):%d/%m %H:%M}" if confermata
+                  else 'da confermare'})
+    return passi
 
 
 def _quadratura_giornata(data, cassa_servito, vendita_self_service, totale_servito,
@@ -1316,7 +1408,7 @@ def _contesto_lavaggi_portali(data, completo=True, con_proposte=False):
     divisi per origine (contanti / unita' operativa). I programmi
     senza prezzo di listino vengono segnalati.
     """
-    from .models import PREZZI_PROGRAMMA_PORTALE, TransazionePortale
+    from .models import PREZZI_PROGRAMMA_PORTALE, ChiusuraPortali, TransazionePortale
 
     chiusura, salvata = _chiusura_portali(data)
     transazioni = list(TransazionePortale.objects.filter(chiusura.q_transazioni()))
@@ -1370,24 +1462,29 @@ def _contesto_lavaggi_portali(data, completo=True, con_proposte=False):
         if tornano and not allineamento_cambia:
             allineamento = None
 
-    # Lavaggi a cavallo di inizio e fine (+-20 min, al secondo): per
-    # far combaciare la finestra con gli scontrini senza andare a tentativi
+    # Per portale: lavaggi a cavallo di inizio e fine (+-20 min, al
+    # secondo) per far combaciare la finestra con gli scontrini senza
+    # andare a tentativi, e fine della chiusura del giorno prima
     margine = timedelta(minutes=20)
     bordi = []
-    istanti = [('Inizio', chiusura.periodo_da), ('Fine', chiusura.periodo_a)]
-    if chiusura.orari_blu_diversi:
-        da_blu, a_blu = chiusura.finestra('B')
-        istanti = [('Inizio Azzurro', chiusura.periodo_da), ('Fine Azzurro', chiusura.periodo_a)]
-        istanti += [(e, i) for e, i in (('Inizio Blu', da_blu), ('Fine Blu', a_blu))
-                    if i not in (chiusura.periodo_da, chiusura.periodo_a)]
-    for etichetta, istante in (istanti if completo else []):
-        vicine = (TransazionePortale.objects
-                  .filter(orario__gte=istante - margine, orario__lte=istante + margine)
-                  .order_by('orario', 'numero'))
-        bordi.append({
-            'etichetta': etichetta, 'istante': istante,
-            'righe': [{'t': t, 'dentro': chiusura.contiene(t)} for t in vicine],
-        })
+    prec = (ChiusuraPortali.objects.filter(data=data - timedelta(days=1)).first()
+            if completo else None)
+    for p in portali:
+        p['bordi'] = []
+        p['allineamento'] = (allineamento or {}).get(p['codice'])
+        if not completo:
+            continue
+        p['fine_giorno_prima'] = prec.finestra(p['codice'])[1] if prec else None
+        for etichetta, istante in zip(('Inizio', 'Fine'), p['finestra']):
+            vicine = (TransazionePortale.objects
+                      .filter(portale=p['codice'],
+                              orario__gte=istante - margine, orario__lte=istante + margine)
+                      .order_by('orario', 'numero'))
+            p['bordi'].append({
+                'etichetta': etichetta, 'istante': istante, 'portale': p['codice'],
+                'righe': [{'t': t, 'dentro': chiusura.contiene(t)} for t in vicine],
+            })
+        bordi += p['bordi']
 
     abbinamento = abbinamento_portali.riepilogo(chiusura, con_proposte=con_proposte)
 
@@ -1402,15 +1499,17 @@ def _contesto_lavaggi_portali(data, completo=True, con_proposte=False):
         'n_operatori': len(abbinamento['residuo']),
     }
 
+    buchi = import_washtec.buchi_archivio(
+        min(chiusura.finestra('A')[0], chiusura.finestra('B')[0]),
+        max(chiusura.finestra('A')[1], chiusura.finestra('B')[1]))
     return {
         'portali_chiusura': chiusura,
         'portali_chiusura_salvata': salvata,
         'lavaggi_portali': portali,
         'portali_n_transazioni': len(transazioni),
         'portali_bordi': bordi,
-        'portali_buchi': import_washtec.buchi_archivio(
-            min(chiusura.finestra('A')[0], chiusura.finestra('B')[0]),
-            max(chiusura.finestra('A')[1], chiusura.finestra('B')[1])),
+        'portali_buchi': buchi,
+        'portali_buchi_n': sum(b['quanti'] for b in buchi),
         'portali_allineamento': allineamento,
         'portali_allineamento_cambia': allineamento_cambia,
         'portali_archivio_totale': TransazionePortale.objects.count(),
@@ -1761,6 +1860,49 @@ def azione_spese_cassa(request):
             return redirect(torna)
         spesa.delete()
         messages.success(request, 'Spesa eliminata.')
+    return redirect(torna)
+
+
+@login_required
+@user_passes_test(is_staff_user)
+def azione_ricarica_cassa(request):
+    """POST dal report giornata: aggiunge o elimina una ricarica di una
+    cassa automatica fatta con i soldi del fondo cassa (come nella
+    chiusura operatori). Elimina solo chi l'ha inserita o l'admin."""
+    from django.urls import reverse
+
+    from .views_chiusura import casse_ricaricabili
+
+    data_str = request.POST.get('data', '')
+    torna = f"{reverse('finanze:report_giornata')}?data={data_str}#ricariche"
+    if request.method != 'POST':
+        return redirect('finanze:report_giornata')
+
+    azione = request.POST.get('azione')
+    if azione == 'aggiungi':
+        try:
+            data = datetime.strptime(data_str, '%Y-%m-%d').date()
+            importo = Decimal((request.POST.get('importo') or '').replace(',', '.'))
+        except (ValueError, ArithmeticError):
+            messages.error(request, 'Data o importo della ricarica non validi.')
+            return redirect(torna)
+        cassa = casse_ricaricabili().filter(pk=request.POST.get('cassa') or None).first()
+        if cassa is None:
+            messages.error(request, 'Scegli la cassa ricaricata.')
+            return redirect(torna)
+        if importo <= 0:
+            messages.error(request, "L'importo deve essere maggiore di zero.")
+            return redirect(torna)
+        RicaricaCassa.objects.create(data=data, cassa=cassa, importo=importo.quantize(Decimal('0.01')),
+                                     nota=request.POST.get('nota', '').strip()[:100], operatore=request.user)
+        messages.success(request, f'Ricarica di €{importo:.2f} su {cassa} registrata.')
+    elif azione == 'elimina':
+        ricarica = get_object_or_404(RicaricaCassa, pk=request.POST.get('ricarica_id'))
+        if not (request.user.is_superuser or ricarica.operatore_id == request.user.id):
+            messages.error(request, "Solo chi l'ha inserita o l'amministratore può eliminare la ricarica.")
+            return redirect(torna)
+        ricarica.delete()
+        messages.success(request, 'Ricarica eliminata.')
     return redirect(torna)
 
 

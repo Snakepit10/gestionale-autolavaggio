@@ -925,6 +925,38 @@ class ChiusuraGiornataOperatoriTest(TestCase):
         self.assertIn('Ricariche delle casse', pagina)
         self.assertIn('+&euro;10,00', pagina)                 # dichiarato 50, scontrino 40
 
+    def test_ricariche_dal_report_giornata(self):
+        from apps.finanze.models import Cassa, ChiusuraCassaAutomatica, RicaricaCassa
+        cassa = Cassa.objects.create(nome='Cambia gettoni', tipo='automatica')
+        registratore = Cassa.objects.create(nome='Registratore', tipo='automatica', modalita_registratore=True)
+        url = reverse('finanze:azione_ricarica_cassa')
+        self.client.force_login(self.titolare)
+        r = self.client.post(url, {'data': self.oggi.isoformat(), 'azione': 'aggiungi', 'cassa': cassa.pk,
+                                   'importo': '25,50', 'nota': 'monete'})
+        self.assertRedirects(r, f"{reverse('finanze:report_giornata')}?data={self.oggi.isoformat()}#ricariche",
+                             fetch_redirect_response=False)
+        self.client.post(url, {'data': self.oggi.isoformat(), 'azione': 'aggiungi', 'cassa': registratore.pk,
+                               'importo': '5'})                                  # non ricaricabile
+        ricarica = RicaricaCassa.objects.get()
+        self.assertEqual((ricarica.cassa, ricarica.importo, ricarica.operatore), (cassa, Decimal('25.50'), self.titolare))
+        # lo scontrino della cassa propone la ricarica dichiarata; la checklist la confronta
+        ChiusuraCassaAutomatica.objects.create(cassa=cassa, data=self.oggi, incasso_totale=Decimal('100'),
+                                               incasso_ricarica=Decimal('25.50'), note='rotolo cambiato')
+        pagina = self.client.get(reverse('finanze:report_giornata'), {'data': self.oggi.isoformat()})
+        passi = {p['titolo']: p for p in pagina.context['passi_chiusura']}
+        self.assertEqual((passi['Ricariche']['stato'], passi['Ricariche']['dettaglio']), ('ok', 'tornano'))
+        self.assertEqual(passi['Conteggio cassa']['stato'], 'todo')
+        self.assertContains(pagina, 'data-copia="25.50" data-target="incasso_ricarica"')
+        # aggiornare lo scontrino dal report non cancella le note
+        self.assertContains(pagina, 'name="note" value="rotolo cambiato"')
+        # l'operatore non elimina la ricarica del titolare
+        self.client.force_login(self.operatore)
+        self.client.post(url, {'data': self.oggi.isoformat(), 'azione': 'elimina', 'ricarica_id': ricarica.pk})
+        self.assertTrue(RicaricaCassa.objects.exists())
+        self.client.force_login(self.titolare)
+        self.client.post(url, {'data': self.oggi.isoformat(), 'azione': 'elimina', 'ricarica_id': ricarica.pk})
+        self.assertFalse(RicaricaCassa.objects.exists())
+
     def test_distinta_cartacea(self):
         from apps.finanze.models import SpesaCassa
         SpesaCassa.objects.create(data=self.oggi, descrizione='Gasolio', importo=Decimal('20'), riferimento='45')
