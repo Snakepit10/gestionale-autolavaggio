@@ -607,6 +607,14 @@ html { scroll-padding-top: 76px; scroll-behavior: smooth; }
               <span class="lbl"><i class="bi bi-person-badge"></i> Da unit&agrave; operativa (servito/operatori)</span>
               <span class="val">&euro;{{ p.tot.unita|floatformat:2 }}</span>
             </div>
+            {% if p.interrotte %}
+            <div class="verifica">
+              <span class="lbl text-warning"><i class="bi bi-pause-circle"></i> Lavaggi interrotti (non contano)</span>
+              <span class="val small text-end">
+                {% for t in p.interrotte %}<span class="d-block">#{{ t.numero }} &middot; {{ t.orario|date:'d/m H:i:s' }} &middot; P{{ t.programma }} &middot; {{ t.get_origine_display }}</span>{% endfor %}
+              </span>
+            </div>
+            {% endif %}
           </div>
 
           {% with v=p.allineamento %}
@@ -681,12 +689,12 @@ html { scroll-padding-top: 76px; scroll-behavior: smooth; }
               <thead class="table-light"><tr><th>Orario</th><th>#</th><th>Prog.</th><th>Origine</th><th>Conta oggi</th><th></th></tr></thead>
               <tbody>
                 {% for r in b.righe %}
-                <tr class="{% if r.dentro %}table-success{% else %}text-muted{% endif %}">
+                <tr class="{% if not r.t.eseguita %}table-warning text-muted{% elif r.dentro %}table-success{% else %}text-muted{% endif %}">
                   <td>{{ r.t.orario|date:'d/m H:i:s' }}</td>
                   <td>{{ r.t.numero }}</td>
                   <td>P{{ r.t.programma }}</td>
                   <td>{{ r.t.get_origine_display }}</td>
-                  <td>{% if r.dentro %}<i class="bi bi-check-lg text-success"></i> s&igrave;{% else %}no{% endif %}</td>
+                  <td>{% if not r.t.eseguita %}<span class="badge bg-warning text-dark">interrotto</span>{% elif r.dentro %}<i class="bi bi-check-lg text-success"></i> s&igrave;{% else %}no{% endif %}</td>
                   <td class="text-end">
                     <button type="button" class="btn btn-link btn-sm p-0" title="Imposta questo orario come {{ b.etichetta|lower }}"
                             data-copia="{{ r.t.orario|date:'Y-m-d\TH:i:s' }}"
@@ -1098,7 +1106,9 @@ html { scroll-padding-top: 76px; scroll-behavior: smooth; }
                 <td class="text-end">&euro;{{ t.listino|floatformat:2 }}</td>
                 <td>{% if t.origine == 'contanti' %}<span class="badge bg-success-subtle text-success">Contanti</span>{% else %}<span class="badge bg-warning-subtle text-warning-emphasis">Unit&agrave; operativa</span>{% endif %}</td>
                 <td class="small">
-                  {% if t.abbinamento %}
+                  {% if not t.eseguita %}
+                    <span class="badge bg-warning text-dark"><i class="bi bi-pause-circle"></i> Interrotto</span> non conta
+                  {% elif t.abbinamento %}
                     <i class="bi bi-link-45deg text-success"></i>
                     <a href="{% url 'ordini:ordine-detail' t.abbinamento.item.ordine.pk %}">#{{ t.abbinamento.item.ordine.numero_progressivo|slice:"-4:" }}</a>
                     {{ t.abbinamento.item.servizio_prodotto.titolo }}

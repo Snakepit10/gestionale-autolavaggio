@@ -91,6 +91,12 @@ table.tx td { vertical-align:middle; }
         {% for r in riepilogo %}<div class="small"><strong>{{ r.portale }}</strong>: {{ r.contanti }} contanti &middot; {{ r.unita }} unità</div>{% endfor %}</div></div>
 </div>
 
+{% if n_interrotte %}
+<p class="small text-warning mb-2"><i class="bi bi-pause-circle"></i> {{ n_interrotte }} lavagg{{ n_interrotte|pluralize:"io interrotto,i interrotti" }} (spazzole bloccate):
+    in elenco ma esclus{{ n_interrotte|pluralize:"o,i" }} dai totali.
+    {% if filtro.stato != 'interrotta' %}<a href="?{{ query }}{% if query %}&{% endif %}stato=interrotta">mostra solo questi</a>{% endif %}</p>
+{% endif %}
+
 {% if programmi %}
 <p class="small text-muted mb-2">Per programma:
     {% for p, n in programmi %}<span class="badge bg-light text-dark border">P{{ p }} &times; {{ n }}</span> {% endfor %}
@@ -114,7 +120,7 @@ table.tx td { vertical-align:middle; }
             <thead><tr><th>Data e ora</th><th>Portale</th><th>N°</th><th>Prog.</th><th class="text-end">Listino</th><th>Origine</th><th>Abbinamento / residuo</th></tr></thead>
             <tbody>
             {% for t in pagina.object_list %}
-                <tr>
+                <tr{% if not t.eseguita %} class="table-warning text-muted"{% endif %}>
                     <td class="text-nowrap small">{{ t.orario|date:"d/m/Y H:i:s" }}</td>
                     <td><span class="badge badge-{{ t.portale }}">{% if t.portale == 'A' %}Azzurro{% else %}Blu{% endif %}</span></td>
                     <td>{{ t.numero }}</td>
@@ -122,7 +128,9 @@ table.tx td { vertical-align:middle; }
                     <td class="text-end">&euro;{{ t.listino|floatformat:2 }}</td>
                     <td>{% if t.origine == 'contanti' %}<span class="badge bg-success-subtle text-success">Contanti</span>{% else %}<span class="badge bg-warning-subtle text-warning-emphasis">Unità operativa</span>{% endif %}</td>
                     <td class="small">
-                        {% if t.abbinamento %}
+                        {% if not t.eseguita %}
+                            <span class="badge bg-warning text-dark"><i class="bi bi-pause-circle"></i> Interrotto</span> non conta
+                        {% elif t.abbinamento %}
                             <i class="bi bi-link-45deg text-success"></i>
                             <a href="{% url 'ordini:ordine-detail' t.abbinamento.item.ordine.pk %}">#{{ t.abbinamento.item.ordine.numero_progressivo|slice:"-4:" }}</a>
                             {{ t.abbinamento.item.servizio_prodotto.titolo }}{% if t.abbinamento.item.ordine.cliente %} &middot; {{ t.abbinamento.item.ordine.cliente }}{% endif %}

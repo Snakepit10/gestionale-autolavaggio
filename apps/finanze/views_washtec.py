@@ -19,6 +19,7 @@ STATI = [
     ('abbinata', 'Abbinate a un ordine'),
     ('libera', 'Unità operativa non abbinate'),
     ('rettificata', 'Rettificate (omaggio, promo)'),
+    ('interrotta', 'Interrotte (non contano)'),
 ]
 
 
@@ -38,7 +39,7 @@ def transazioni_washtec(request):
     inizio = timezone.make_aware(datetime.combine(dal, time.min))
     fine = timezone.make_aware(datetime.combine(al + timedelta(days=1), time.min))
 
-    qs = (TransazionePortale.objects.filter(orario__gte=inizio, orario__lt=fine)
+    qs = (TransazionePortale.tutte.filter(orario__gte=inizio, orario__lt=fine)
           .select_related('abbinamento__item__ordine__cliente', 'abbinamento__item__servizio_prodotto',
                           'rettifica_residuo')
           .order_by('orario', 'portale', 'numero'))
@@ -54,15 +55,18 @@ def transazioni_washtec(request):
     if filtro['stato'] == 'abbinata':
         qs = qs.filter(abbinamento__isnull=False)
     elif filtro['stato'] == 'libera':
-        qs = qs.filter(origine='unita', abbinamento__isnull=True)
+        qs = qs.filter(origine='unita', abbinamento__isnull=True, eseguita=True)
     elif filtro['stato'] == 'rettificata':
         qs = qs.filter(rettifica_residuo__isnull=False)
+    elif filtro['stato'] == 'interrotta':
+        qs = qs.filter(eseguita=False)
 
     if request.GET.get('formato') == 'csv':
         return _csv(qs, dal, al)
 
     # riepilogo sull'intero filtro (non solo la pagina)
-    righe = list(qs.values_list('portale', 'origine', 'programma'))
+    # i lavaggi interrotti si elencano ma non contano
+    righe = list(qs.filter(eseguita=True).values_list('portale', 'origine', 'programma'))
     per_origine = Counter((p, o) for p, o, _ in righe)
     valore = {o: sum((PREZZI_PROGRAMMA_PORTALE.get(pr, Decimal('0')) for _, oo, pr in righe if oo == o),
                      Decimal('0')) for o in ('contanti', 'unita')}
@@ -78,6 +82,7 @@ def transazioni_washtec(request):
         'portali': TransazionePortale.PORTALE_CHOICES, 'origini': TransazionePortale.ORIGINE_CHOICES,
         'pagina': pagina, 'query': query,
         'totale': len(righe),
+        'n_interrotte': qs.filter(eseguita=False).count(),
         'riepilogo': [{'portale': nome, 'contanti': per_origine[(codice, 'contanti')],
                        'unita': per_origine[(codice, 'unita')]}
                       for codice, nome in TransazionePortale.PORTALE_CHOICES],
@@ -95,7 +100,7 @@ def _csv(qs, dal, al):
     risposta.write('﻿')                         # Excel legge l'UTF-8
     w = csv.writer(risposta, delimiter=';')
     w.writerow(['Data', 'Ora', 'Portale', 'Numero', 'Programma', 'Origine', 'Listino', 'Ordine abbinato',
-                'Servizio', 'Rettifica', 'Incassato'])
+                'Servizio', 'Rettifica', 'Incassato', 'Eseguito'])
     for t in qs:
         abb = getattr(t, 'abbinamento', None) if hasattr(t, 'abbinamento') else None
         rett = getattr(t, 'rettifica_residuo', None) if hasattr(t, 'rettifica_residuo') else None
@@ -107,5 +112,6 @@ def _csv(qs, dal, al):
             abb.item.servizio_prodotto.titolo if abb else '',
             rett.get_motivo_display() if rett else '',
             str(rett.importo).replace('.', ',') if rett else '',
+            'Sì' if t.eseguita else 'No (interrotto)',
         ])
     return risposta

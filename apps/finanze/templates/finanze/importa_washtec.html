@@ -285,9 +285,14 @@ const CERCA_SRC = "[...document.querySelectorAll('button[title=Cerca]')].find(e 
       h += '<div class="alert alert-warning small py-2"><strong>Da verificare (' + d.anomalie.length + '):</strong><br>' +
         d.anomalie.map(esc).join('<br>') + '</div>';
     }
+    if (d.interrotte.length) {
+      h += '<details class="small mb-1"><summary class="text-warning"><i class="bi bi-pause-circle"></i> ' + d.interrotte.length +
+        ' lavagg' + (d.interrotte.length === 1 ? 'io interrotto' : 'i interrotti') +
+        ' (spazzole bloccate: salvati, non contano)</summary>' + d.interrotte.map(esc).join('<br>') + '</details>';
+    }
     if (d.escluse.length) {
       h += '<details class="small text-muted"><summary>' + d.escluse.length +
-        ' escluse (manutenzione / non eseguite)</summary>' + d.escluse.map(esc).join('<br>') + '</details>';
+        ' escluse (manutenzione)</summary>' + d.escluse.map(esc).join('<br>') + '</details>';
     }
     det.innerHTML = h;
   };

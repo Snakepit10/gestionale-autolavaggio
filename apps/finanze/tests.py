@@ -490,6 +490,18 @@ class AbbinamentoPortaliTest(TestCase):
         self.assertEqual(timezone.localtime(c.periodo_a).strftime('%H:%M:%S'), '17:48:05')
         self.assertEqual(timezone.localtime(c.periodo_da).strftime('%H:%M:%S'), '19:30:00')
 
+    def test_interrotti_nel_report(self):
+        from apps.finanze.views import _contesto_lavaggi_portali
+        self._tx('10:05', 4)
+        fermo = self._tx('11:00', 4)
+        TransazionePortale.tutte.filter(pk=fermo.pk).update(eseguita=False)
+        ctx = _contesto_lavaggi_portali(self.chiusura.data)
+        azzurro = ctx['lavaggi_portali'][0]
+        self.assertEqual((azzurro['tot']['richieste'], [t.pk for t in azzurro['interrotte']]), (1, [fermo.pk]))
+        self.assertEqual([r['transazione'].numero for r in ctx['abbinamento']['residuo']], [fermo.numero - 1])
+        stato = {t.pk: t.eseguita for t in ctx['transazioni_finestra']}
+        self.assertEqual(stato[fermo.pk], False)                # elencata, segnata interrotta
+
     def test_lavaggi_ai_bordi(self):
         from apps.finanze.views import _contesto_lavaggi_portali
         # finestra 05/10 19:00 -> 06/10 18:00
@@ -716,6 +728,22 @@ class ImportWashtecTest(TestCase):
         self.assertEqual([(b['portale'], b['da_numero'], b['a_numero'], b['quanti']) for b in buchi],
                          [('A', 13301, 13302, 2)])
         self.assertEqual(iw.buchi_archivio(ora('13:00'), ora('20:00')), [])   # fuori finestra
+
+    def test_lavaggi_interrotti(self):
+        # eseguito = No: salvato come interrotto, non conta e non fa buco
+        from apps.finanze.services import import_washtec as iw
+        righe = [self.riga(13301, 'In contanti', orario='06/10/26 10:00:00'),
+                 self.riga(13302, 'In contanti', eseguito='No', orario='06/10/26 10:05:00'),
+                 self.riga(13303, 'In contanti', orario='06/10/26 10:10:00')]
+        esito = iw.importa(righe, conferma=True)
+        self.assertEqual((esito['nuove'], len(esito['interrotte']), esito['escluse']), (3, 1, []))
+        self.assertEqual(esito['per_giorno'], [{'data': '2026-10-06', 'A': 2, 'B': 0}])
+        interrotta = TransazionePortale.tutte.get(numero=13302)
+        self.assertFalse(interrotta.eseguita)
+        self.assertFalse(TransazionePortale.objects.filter(numero=13302).exists())
+        self.assertEqual(iw.buchi_archivio(ora('07:00'), ora('20:00')), [])
+        # reimportare non la duplica
+        self.assertEqual(iw.importa(righe, conferma=True)['nuove'], 0)
 
     def test_import_idempotente(self):
         from apps.finanze.services import import_washtec as iw

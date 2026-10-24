@@ -475,6 +475,14 @@ PREZZI_PROGRAMMA_PORTALE = {
 }
 
 
+class TransazioniEseguite(models.Manager):
+    """Solo i lavaggi eseguiti: quelli interrotti (spazzole bloccate)
+    restano in archivio ma non contano in nessun totale."""
+
+    def get_queryset(self):
+        return super().get_queryset().filter(eseguita=True)
+
+
 class TransazionePortale(models.Model):
     """Singola transazione dei portali a spazzole, estratta da WashTec
     Plus (Report > Dati transazione): l'archivio grezzo da cui il
@@ -485,6 +493,10 @@ class TransazionePortale(models.Model):
     services/import_washtec). A = Azzurro e B = Blu: dedotto l'08/10/26
     dalle vendite in contanti degli scontrini delle due casse.
     L'import e' idempotente: (portale, numero) e' univoco.
+
+    I lavaggi interrotti (WashTec: eseguito = No, es. spazzole bloccate e
+    fatte ripartire) si salvano con eseguita=False: si vedono negli
+    elenchi ma non contano. `objects` li esclude, `tutte` li comprende.
     """
     PORTALE_CHOICES = [
         ('A', 'Portale Azzurro (A)'),
@@ -507,9 +519,15 @@ class TransazionePortale(models.Model):
     programma = models.PositiveSmallIntegerField(
         validators=[MinValueValidator(1), MaxValueValidator(9)])
     origine = models.CharField(max_length=10, choices=ORIGINE_CHOICES)
+    eseguita = models.BooleanField(
+        default=True, help_text='No = lavaggio interrotto su WashTec: non conta nei totali')
     importato_il = models.DateTimeField(auto_now_add=True)
 
+    tutte = models.Manager()
+    objects = TransazioniEseguite()
+
     class Meta:
+        default_manager_name = 'tutte'
         verbose_name = 'Transazione portale (WashTec)'
         verbose_name_plural = 'Transazioni portali (WashTec)'
         ordering = ['orario']
