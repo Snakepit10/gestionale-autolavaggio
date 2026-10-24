@@ -1088,6 +1088,21 @@ class ChiusuraGiornataOperatoriTest(TestCase):
         self._post(self.titolare, azione='conteggio', contanti_totali='120')
         self.assertEqual(QuadraturaGiornaliera.objects.get().contanti_totali, Decimal('120.00'))
 
+    def test_permesso_conteggio_per_utente(self):
+        # il conteggio si concede o si toglie al singolo utente (Configurazione > Permessi)
+        from apps.auth_system.models import PermessoUtente
+        from apps.finanze.models import QuadraturaGiornaliera
+        PermessoUtente.objects.create(user=self.operatore, sezione='conteggio_cassa', consenti=True)
+        self.client.force_login(self.operatore)
+        self.assertContains(self.client.get(self.url), 'name="contanti_totali"')
+        self._post(self.operatore, azione='conteggio', contanti_totali='80')
+        self.assertEqual(QuadraturaGiornaliera.objects.get().contanti_totali, Decimal('80.00'))
+        # al titolare si puo' togliere
+        PermessoUtente.objects.create(user=self.titolare, sezione='conteggio_cassa', consenti=False)
+        self._post(self.titolare, azione='conteggio', contanti_totali='99')
+        self.assertEqual(QuadraturaGiornaliera.objects.get().contanti_totali, Decimal('80.00'))
+        self.assertNotContains(self.client.get(self.url), 'name="contanti_totali"')
+
     def test_pagina_e_permessi(self):
         from django.contrib.messages.storage.fallback import FallbackStorage
         from django.test import RequestFactory

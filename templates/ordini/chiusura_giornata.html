@@ -51,7 +51,7 @@
 </div>
 {% else %}
 <p class="text-muted small">Riporta qui i movimenti della cassa scritti sulla prima pagina della distinta: ogni voce nel suo riquadro.
-    {% if not vede_report %}Il conteggio della cassa lo fa il titolare.{% endif %}</p>
+    {% if not fa_conteggio %}Il conteggio della cassa lo fa il titolare.{% endif %}</p>
 {% endif %}
 
 <div class="row g-3">
@@ -206,14 +206,14 @@
 </div>
 </div>
 
-{# ===== Conteggio cassa: solo il titolare ===== #}
-{% if vede_report %}
+{# ===== Conteggio cassa: solo con il permesso "Conteggio cassa" ===== #}
+{% if fa_conteggio %}
 <div class="col-12 col-xl-6">
 <div class="section-card accent-dark" id="conteggio">
-    <div class="section-title"><div class="label"><i class="bi bi-cash-stack"></i> Conteggio cassa <span class="badge bg-dark fw-normal">titolare</span></div>
+    <div class="section-title"><div class="label"><i class="bi bi-cash-stack"></i> Conteggio cassa <span class="badge bg-dark fw-normal" title="Permesso Conteggio cassa (Configurazione &gt; Permessi)">riservato</span></div>
         {% if quadratura %}<span class="count fw-normal">salvato{% if quadratura.operatore %} da {{ quadratura.operatore.get_full_name|default:quadratura.operatore.username }}{% endif %} &middot; {{ quadratura.aggiornato_il|date:"H:i" }}</span>{% endif %}</div>
     <div class="section-body">
-        <div class="spiega">Tutti i contanti scassettati dalle macchine e dal registratore, contati insieme, più il totale del lettore carte (POS) del servito. Gli operatori non vedono questo riquadro.</div>
+        <div class="spiega">Tutti i contanti scassettati dalle macchine e dal registratore, contati insieme, più il totale del lettore carte (POS) del servito. Lo vede solo chi ha il permesso <em>Conteggio cassa</em> (Configurazione &rsaquo; Permessi).</div>
         <form method="post" class="row g-2 align-items-end">
             {% csrf_token %}
             <input type="hidden" name="data" value="{{ data|date:'Y-m-d' }}">

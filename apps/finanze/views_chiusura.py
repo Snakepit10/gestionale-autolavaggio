@@ -3,9 +3,10 @@
 Gli operatori riportano i movimenti della prima pagina della distinta:
 ricariche delle casse, ticket di resto pagati, spese pagate dalla cassa,
 promo e omaggi, lavaggi extra fatti senza ordine. Il conteggio della
-cassa (contanti, POS, fondo) lo fa il titolare, che fa anche l'incrocio
-con la vendita nel report giornata e conferma la giornata: da quel
-momento gli operatori non modificano piu' nulla.
+cassa (contanti, POS, fondo) lo fa solo chi ha il permesso "Conteggio
+cassa" (Configurazione > Permessi). Il titolare fa l'incrocio con la
+vendita nel report giornata e conferma la giornata: da quel momento gli
+operatori non modificano piu' nulla.
 """
 from datetime import datetime, timedelta
 from decimal import Decimal, InvalidOperation
@@ -53,6 +54,11 @@ def casse_ricaricabili():
     return Cassa.objects.filter(tipo='automatica', attiva=True, modalita_registratore=False).order_by('ordine')
 
 
+def fa_conteggio(user):
+    """Vede e salva il conteggio della cassa (e atteso/saldo stampati)."""
+    return ha_accesso(user, 'conteggio_cassa')
+
+
 def giornata_confermata(giorno):
     return QuadraturaGiornaliera.objects.filter(data=giorno, confermata_il__isnull=False).exists()
 
@@ -96,6 +102,7 @@ def chiusura_giornata(request):
         'tipi_promo': PromoGiornata.TIPO_CHOICES,
         'metodi_extra': LavaggioExtra.METODO_CHOICES,
         'vede_report': ha_accesso(request.user, 'finanze'),
+        'fa_conteggio': fa_conteggio(request.user),
     })
 
 
@@ -103,8 +110,8 @@ def _azione(request, giorno):
     p = request.POST
     azione = p.get('azione', '')
     if azione == 'conteggio':
-        if not ha_accesso(request.user, 'finanze'):
-            messages.error(request, 'Il conteggio della cassa lo fa il titolare.')
+        if not fa_conteggio(request.user):
+            messages.error(request, 'Non hai il permesso per il conteggio della cassa.')
             return
         valori = {}
         for campo in ('contanti_totali', 'lettore_carte_servito', 'fondo_cassa_iniziale'):
@@ -199,7 +206,7 @@ def distinta_chiusura(request):
     totale reale (operatore), poi atteso, residuo portali e saldo finale
     (ufficio), con gli stessi passaggi della quadratura del report
     giornata. ?vuota=1 per un modulo in bianco. Atteso e saldo si stampano
-    gia' calcolati solo per chi ha le Finanze: gli operatori li compilano."""
+    gia' calcolati solo per chi ha il permesso "Conteggio cassa"."""
     giorno = _data(request)
     vuota = request.GET.get('vuota') == '1'
     quadratura = None if vuota else QuadraturaGiornaliera.objects.filter(data=giorno).first()
@@ -211,7 +218,7 @@ def distinta_chiusura(request):
         scelte = [v.importo for v in lista if filtro(v)]
         return sum(scelte, Decimal('0.00')) if scelte else None
 
-    saldo = None if vuota else _saldo_distinta(giorno, quadratura, ha_accesso(request.user, 'finanze'))
+    saldo = None if vuota else _saldo_distinta(giorno, quadratura, fa_conteggio(request.user))
     return render(request, 'ordini/distinta_chiusura.html', {
         'data': None if vuota else giorno,
         'quadratura': quadratura,
