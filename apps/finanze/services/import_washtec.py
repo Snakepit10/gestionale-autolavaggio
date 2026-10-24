@@ -20,7 +20,9 @@ Regole (vedi anche le note su TransazionePortale):
   contiene, altrimenti quello compatibile nel tempo (il contatore non
   torna mai indietro) o l'opposto della catena dell'altro portale che
   corre negli stessi giorni;
-- si tengono solo manutenzione = No ed eseguito = Si'.
+- si tengono solo le righe con manutenzione = No; quelle con eseguito =
+  No (lavaggio interrotto, es. spazzole bloccate) si salvano come non
+  eseguite: servono alla numerazione e si vedono, ma non contano.
 """
 from datetime import datetime, timedelta
 from decimal import Decimal, InvalidOperation
@@ -73,7 +75,8 @@ def _assegna_portali_senza_archivio(numeri):
 
 def classifica(righe):
     """Ritorna {'transazioni': [...dict TransazionePortale...],
-    'jetwash': int, 'escluse': [...], 'anomalie': [...]}."""
+    'jetwash': int, 'escluse': [...], 'anomalie': [...]}; le
+    transazioni interrotte hanno eseguita=False."""
     candidati, anomalie, escluse = [], [], []
     jetwash = 0
     for r in righe:
@@ -95,16 +98,17 @@ def classifica(righe):
             else:
                 anomalie.append(f'#{numero} {r[1]}: metodo "{r[3]}" importo {r[4]}')
             continue
-        if manut != 'No' or eseguito not in ('Sì', 'Si', 'Sí'):
+        if manut != 'No':
             escluse.append(f'#{numero} {r[1]}: manutenzione {manut}, eseguito {eseguito}')
             continue
         if not 1 <= programma <= 9:
             anomalie.append(f'#{numero} {r[1]}: programma {programma}')
             continue
         candidati.append({'numero': numero, 'orario': orario,
-                          'programma': programma, 'origine': origine})
+                          'programma': programma, 'origine': origine,
+                          'eseguita': eseguito in ('Sì', 'Si', 'Sí')})
 
-    noti = list(TransazionePortale.objects.values_list('numero', 'orario', 'portale'))
+    noti = list(TransazionePortale.tutte.values_list('numero', 'orario', 'portale'))
     if noti:
         portali = _assegna_portali(candidati, noti)
     else:
@@ -243,12 +247,15 @@ def importa(righe, conferma=False):
     """Classifica e (se conferma) salva in archivio. Idempotente."""
     esito = classifica(righe)
     trans = esito['transazioni']
-    esistenti = set(TransazionePortale.objects.filter(
+    esistenti = set(TransazionePortale.tutte.filter(
         numero__in=[t['numero'] for t in trans]).values_list('portale', 'numero'))
     nuove = [t for t in trans if (t['portale'], t['numero']) not in esistenti]
+    interrotte = [t for t in nuove if not t['eseguita']]
 
     per_giorno = {}
     for t in nuove:
+        if not t['eseguita']:
+            continue
         g = timezone.localtime(t['orario']).date()
         cella = per_giorno.setdefault(g, {'A': 0, 'B': 0})
         cella[t['portale']] += 1
@@ -260,7 +267,9 @@ def importa(righe, conferma=False):
     return {
         'righe': len(righe),
         'portali': len(trans),
-        'nuove': len(nuove),
+        'nuove': len(nuove),                  # comprese le interrotte
+        'interrotte': [f"#{t['numero']} {timezone.localtime(t['orario']):%d/%m/%y %H:%M:%S} "
+                       f"{'Azzurro' if t['portale'] == 'A' else 'Blu'} P{t['programma']}" for t in interrotte],
         'gia_presenti': len(trans) - len(nuove),
         'jetwash': esito['jetwash'],
         'escluse': esito['escluse'],
@@ -268,7 +277,7 @@ def importa(righe, conferma=False):
         'per_giorno': [{'data': g.isoformat(), 'A': v['A'], 'B': v['B']}
                        for g, v in sorted(per_giorno.items())],
         'importato': bool(conferma),
-        'totale_archivio': TransazionePortale.objects.count(),
+        'totale_archivio': TransazionePortale.tutte.count(),
     }
 
 
@@ -276,11 +285,12 @@ def buchi_archivio(da, a, margine=timedelta(days=2)):
     """Lavaggi mancanti nell'archivio tra da e a: ogni portale numera le
     sue transazioni senza salti, quindi un numero che manca tra due
     transazioni importate e' un lavaggio non importato (o una riga
-    scartata dall'import: manutenzione, non eseguita). Ritorna
+    scartata dall'import: manutenzione). Gli interrotti sono in archivio
+    e non fanno buco. Ritorna
     [{'portale', 'da_numero', 'a_numero', 'quanti', 'dopo', 'prima'}]."""
     buchi = []
     for portale, _ in TransazionePortale.PORTALE_CHOICES:
-        righe = list(TransazionePortale.objects
+        righe = list(TransazionePortale.tutte
                      .filter(portale=portale, orario__gte=da - margine, orario__lte=a + margine)
                      .order_by('numero').values_list('numero', 'orario'))
         for (n1, t1), (n2, t2) in zip(righe, righe[1:]):

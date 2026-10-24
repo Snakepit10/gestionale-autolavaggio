@@ -1414,6 +1414,9 @@ def _contesto_lavaggi_portali(data, completo=True, con_proposte=False):
 
     chiusura, salvata = _chiusura_portali(data)
     transazioni = list(TransazionePortale.objects.filter(chiusura.q_transazioni()))
+    # lavaggi interrotti (spazzole bloccate): si mostrano, non contano
+    interrotte = list(TransazionePortale.tutte.filter(chiusura.q_transazioni(), eseguita=False)
+                      .order_by('orario'))
     casse = allinea_scontrini.chiusure_casse_portali(data)
     scontrini = {p: (c.wash_cycles if c else None) for p, c in casse.items()}
 
@@ -1446,6 +1449,7 @@ def _contesto_lavaggi_portali(data, completo=True, con_proposte=False):
             # i lavaggi pagati in contanti (a listino) devono fare la
             # vendita contante + non contante dello scontrino della cassa
             'vendita_scontrino': casse[codice].vendita_totale if casse[codice] else None,
+            'interrotte': [t for t in interrotte if t.portale == codice],
         })
         portali[-1]['contanti_combaciano'] = (
             portali[-1]['vendita_scontrino'] is None
@@ -1478,13 +1482,14 @@ def _contesto_lavaggi_portali(data, completo=True, con_proposte=False):
             continue
         p['fine_giorno_prima'] = prec.finestra(p['codice'])[1] if prec else None
         for etichetta, istante in zip(('Inizio', 'Fine'), p['finestra']):
-            vicine = (TransazionePortale.objects
+            # anche gli interrotti: aiutano a capire dove cade la chiusura
+            vicine = (TransazionePortale.tutte
                       .filter(portale=p['codice'],
                               orario__gte=istante - margine, orario__lte=istante + margine)
                       .order_by('orario', 'numero'))
             p['bordi'].append({
                 'etichetta': etichetta, 'istante': istante, 'portale': p['codice'],
-                'righe': [{'t': t, 'dentro': chiusura.contiene(t)} for t in vicine],
+                'righe': [{'t': t, 'dentro': t.eseguita and chiusura.contiene(t)} for t in vicine],
             })
         bordi += p['bordi']
 
@@ -1524,12 +1529,12 @@ def _contesto_lavaggi_portali(data, completo=True, con_proposte=False):
 def _transazioni_finestra(chiusura, abbinamento):
     """Tutte le transazioni WashTec della finestra di chiusura, ciascuna
     con il suo stato: contanti, abbinata a un ordine, proposta, residuo
-    (pagato agli operatori) con l'eventuale rettifica."""
+    (pagato agli operatori) con l'eventuale rettifica, interrotta."""
     from .models import PREZZI_PROGRAMMA_PORTALE, TransazionePortale
 
     residuo = {r['transazione'].pk for r in abbinamento['residuo']}
     proposte = {p['transazione'].pk: p['item'] for r in abbinamento['righe'] for p in r['proposte']}
-    lista = list(TransazionePortale.objects.filter(chiusura.q_transazioni())
+    lista = list(TransazionePortale.tutte.filter(chiusura.q_transazioni())
                  .select_related('abbinamento__item__ordine__cliente', 'abbinamento__item__servizio_prodotto',
                                  'rettifica_residuo')
                  .order_by('orario', 'portale', 'numero'))
