@@ -613,6 +613,24 @@ class AbbinamentoPortale(models.Model):
         return f"{self.transazione} -> item {self.item_id}"
 
 
+class LavaggioSenzaPortale(models.Model):
+    """Lavaggio del servito chiuso senza transazione portale: l'auto non
+    e' passata dalle spazzole (es. lavaggio solo a mano). Non e' piu'
+    scoperto, non riceve proposte e non si abbina."""
+    item = models.OneToOneField(
+        'ordini.ItemOrdine', on_delete=models.CASCADE, related_name='senza_portale')
+    operatore = models.ForeignKey(
+        User, on_delete=models.SET_NULL, null=True, blank=True, related_name='lavaggi_senza_portale')
+    creato_il = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        verbose_name = 'Lavaggio servito senza portale'
+        verbose_name_plural = 'Lavaggi servito senza portale'
+
+    def __str__(self):
+        return f'Item {self.item_id} senza portale'
+
+
 class ResiduoVisto(models.Model):
     """Riga del residuo (lavaggio pagato agli operatori) controllata:
     serve solo come promemoria nel report giornata, non cambia i conti."""

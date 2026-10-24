@@ -126,6 +126,12 @@ def lavaggi_servito_giorno(giorno):
         it.manuale = True
         items.append(it)
     items.sort(key=lambda i: i.riferimento[0])
+    # chiusi a mano senza transazione: l'auto non e' passata dal portale
+    from apps.finanze.models import LavaggioSenzaPortale
+    chiusi = {s.item_id: s for s in LavaggioSenzaPortale.objects
+              .filter(item__in=[it.pk for it in items]).select_related('operatore')}
+    for it in items:
+        it.chiuso_senza_portale = chiusi.get(it.pk)
     return items
 
 
@@ -158,6 +164,8 @@ def transazioni_libere(chiusura):
 def _slot_liberi(item):
     """Transazioni che l'item puo' ancora ricevere: una per pezzo, una
     sola per gli ordini senza programmi (abbinati a mano)."""
+    if getattr(item, 'chiuso_senza_portale', None):
+        return 0
     posti = 1 if getattr(item, 'manuale', False) else item.quantita
     return max(0, posti - len(item.abbinamenti_portale.all()))
 
@@ -274,8 +282,8 @@ def riepilogo(chiusura, tolleranza=TOLLERANZA_DEFAULT, con_proposte=False):
         # scelta a mano: tutte le transazioni libere del giorno (anche con
         # programmi fuori standard) in ordine cronologico
         compatibili = libere if _slot_liberi(it) else []
-        if it.manuale:
-            # senza programmi: nessuna proposta
+        if it.manuale or it.chiuso_senza_portale:
+            # senza programmi o chiuso senza portale: nessuna proposta
             scoperti = 0
         else:
             scoperti = max(0, it.quantita - len(confermati) - len(prop))
@@ -288,8 +296,9 @@ def riepilogo(chiusura, tolleranza=TOLLERANZA_DEFAULT, con_proposte=False):
             'scoperti': scoperti,
             'compatibili': compatibili,
             'manuale': it.manuale,
+            'senza_portale': it.chiuso_senza_portale,
             # quante transazioni puo' ancora prendere (abbinamento a mano)
-            'slot_liberi': max(0, it.quantita - len(confermati)),
+            'slot_liberi': _slot_liberi(it),
             # abbinamenti confermati con un programma che il servizio non
             # prevede (es. lavaggio a mano abbinato a un P4)
             'fuori_standard': [] if it.manuale else
@@ -320,7 +329,8 @@ def riepilogo(chiusura, tolleranza=TOLLERANZA_DEFAULT, con_proposte=False):
         'n_servito': sum(it.quantita for it in items if not it.manuale),
         'n_manuali': sum(1 for it in items if it.manuale),
         'n_fuori_standard': sum(len(r['fuori_standard']) for r in righe),
-        'n_manuali_aperti': sum(1 for r in righe if r['manuale'] and not r['confermati']),
+        'n_manuali_aperti': sum(1 for r in righe if r['manuale'] and not r['confermati'] and not r['senza_portale']),
+        'n_senza_portale': sum(1 for r in righe if r['senza_portale']),
         'n_confermati': n_confermati,
         'n_proposte': len(proposte),
         'con_proposte': con_proposte,
@@ -387,6 +397,26 @@ def rimuovi(chiusura, abbinamento_id, operatore=None):
                                               defaults={'operatore': operatore})
     a.delete()
     return True
+
+
+def chiudi_senza_portale(chiusura, item_id, operatore=None):
+    """Chiude un lavaggio servito della giornata senza transazione: non
+    e' passato dal portale. Gli abbinamenti gia' confermati restano."""
+    from apps.finanze.models import LavaggioSenzaPortale
+    item = next((i for i in lavaggi_servito(chiusura) if i.pk == item_id), None)
+    if item is None:
+        return False
+    LavaggioSenzaPortale.objects.get_or_create(item=item, defaults={'operatore': operatore})
+    return True
+
+
+def riapri_senza_portale(chiusura, item_id):
+    """Toglie la chiusura senza portale: il lavaggio torna da abbinare."""
+    from apps.finanze.models import LavaggioSenzaPortale
+    item = next((i for i in lavaggi_servito(chiusura) if i.pk == item_id), None)
+    if item is None:
+        return False
+    return LavaggioSenzaPortale.objects.filter(item=item).delete()[0] > 0
 
 
 def rifiuta(chiusura, item_id, transazione_id, operatore=None):

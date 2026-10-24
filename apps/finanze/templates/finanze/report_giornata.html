@@ -796,6 +796,7 @@ html { scroll-padding-top: 76px; scroll-behavior: smooth; }
         <span><strong>{{ abbinamento.n_servito }}</strong> lavaggi servito</span>
         <span class="text-success"><i class="bi bi-check-circle-fill"></i> {{ abbinamento.n_confermati }} confermati</span>
         {% if abbinamento.con_proposte %}<span class="text-primary"><i class="bi bi-lightbulb"></i> {{ abbinamento.n_proposte }} proposti</span>{% endif %}
+        {% if abbinamento.n_senza_portale %}<span class="text-secondary"><i class="bi bi-slash-circle"></i> {{ abbinamento.n_senza_portale }} senza portale</span>{% endif %}
         {% if abbinamento.n_scoperti %}<span class="text-warning"><i class="bi bi-question-circle"></i> {{ abbinamento.n_scoperti }} senza transazione</span>{% endif %}
         {% if abbinamento.n_fuori_standard %}<span class="badge bg-danger" title="Abbinamenti con un programma diverso da quelli del servizio"><i class="bi bi-exclamation-triangle"></i> {{ abbinamento.n_fuori_standard }} fuori standard</span>{% endif %}
         {% if abbinamento.n_manuali %}<span class="text-secondary" title="Ordini con servizi senza programmi portale nel catalogo: si abbinano solo a mano"><i class="bi bi-hand-index"></i> {{ abbinamento.n_manuali }} ordini senza programmi{% if abbinamento.n_manuali_aperti %} ({{ abbinamento.n_manuali_aperti }} da abbinare a mano){% endif %}</span>{% endif %}
@@ -833,7 +834,7 @@ html { scroll-padding-top: 76px; scroll-behavior: smooth; }
               </thead>
               <tbody>
                 {% for r in abbinamento.righe %}
-                <tr{% if r.manuale and not r.confermati %} class="table-light"{% endif %}>
+                <tr{% if r.senza_portale or r.manuale and not r.confermati %} class="table-light"{% endif %}>
                   <td>
                     <a href="{% url 'ordini:ordine-detail' r.item.ordine.pk %}">#{{ r.item.ordine.numero_progressivo|slice:"-4:" }}</a>
                     <div class="small"><i class="bi bi-person text-muted"></i> {{ r.item.ordine.cliente|default:"—" }}</div>
@@ -885,8 +886,8 @@ html { scroll-padding-top: 76px; scroll-behavior: smooth; }
                     {% if r.scoperti %}
                     <div class="small text-warning mb-1"><i class="bi bi-question-circle"></i> {{ r.scoperti }} senza transazione compatibile</div>
                     {% endif %}
-                    {% if r.manuale and not r.confermati %}
-                    <div class="small text-muted mb-1">Non associato: se &egrave; passato dal portale scegli la transazione, altrimenti lascialo cos&igrave;.</div>
+                    {% if r.manuale and not r.confermati and not r.senza_portale %}
+                    <div class="small text-muted mb-1">Non associato: se &egrave; passato dal portale scegli la transazione, altrimenti chiudilo senza portale.</div>
                     {% endif %}
                     {% if r.compatibili %}
                     <form method="post" action="{% url 'finanze:azione_abbinamento_portali' %}" class="d-flex gap-1 form-abbina" data-liberi="{{ r.slot_liberi }}">
@@ -901,6 +902,26 @@ html { scroll-padding-top: 76px; scroll-behavior: smooth; }
                         {% endfor %}
                       </select>
                       <button type="submit" class="btn btn-outline-primary btn-sm"><i class="bi bi-link"></i></button>
+                    </form>
+                    {% endif %}
+                    {% if r.senza_portale %}
+                    <form method="post" action="{% url 'finanze:azione_abbinamento_portali' %}" class="d-flex align-items-center gap-1 mb-1">
+                      {% csrf_token %}
+                      <input type="hidden" name="data" value="{{ data|date:'Y-m-d' }}">
+                      <input type="hidden" name="azione" value="riapri">
+                      {% if abbinamento.con_proposte %}<input type="hidden" name="proposte" value="1">{% endif %}
+                      <input type="hidden" name="item_id" value="{{ r.item.pk }}">
+                      <span class="badge bg-secondary" title="Chiuso da {{ r.senza_portale.operatore|default:'—' }} il {{ r.senza_portale.creato_il|date:'d/m H:i' }}"><i class="bi bi-slash-circle"></i> Chiuso senza portale</span>
+                      <button type="submit" class="btn btn-link btn-sm text-danger p-0 ms-1" title="Riapri: torna da abbinare"><i class="bi bi-arrow-counterclockwise"></i></button>
+                    </form>
+                    {% elif r.slot_liberi %}
+                    <form method="post" action="{% url 'finanze:azione_abbinamento_portali' %}" class="mt-1">
+                      {% csrf_token %}
+                      <input type="hidden" name="data" value="{{ data|date:'Y-m-d' }}">
+                      <input type="hidden" name="azione" value="senza_portale">
+                      {% if abbinamento.con_proposte %}<input type="hidden" name="proposte" value="1">{% endif %}
+                      <input type="hidden" name="item_id" value="{{ r.item.pk }}">
+                      <button type="submit" class="btn btn-outline-secondary btn-sm py-0" title="L'auto non è passata dalle spazzole: il lavaggio si chiude senza transazione"><i class="bi bi-slash-circle"></i> Chiudi senza portale</button>
                     </form>
                     {% endif %}
                   </td>
