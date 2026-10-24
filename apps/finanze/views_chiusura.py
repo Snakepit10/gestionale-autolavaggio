@@ -1,10 +1,11 @@
-"""Chiusura giornata degli operatori (dalla lista ordini).
+"""Distinta di chiusura giornata (scheda "Distinta" della sezione Ordini).
 
-Gli operatori contano i contanti e il POS e dichiarano ticket di resto
-pagati, promo e omaggi, spese pagate dalla cassa e lavaggi extra fatti
-senza ordine. L'incrocio con la vendita lo fa il report giornata, dove il
-titolare conferma la giornata: da quel momento gli operatori non
-modificano piu' nulla.
+Gli operatori riportano i movimenti della prima pagina della distinta:
+ricariche delle casse, ticket di resto pagati, spese pagate dalla cassa,
+promo e omaggi, lavaggi extra fatti senza ordine. Il conteggio della
+cassa (contanti, POS, fondo) lo fa il titolare, che fa anche l'incrocio
+con la vendita nel report giornata e conferma la giornata: da quel
+momento gli operatori non modificano piu' nulla.
 """
 from datetime import datetime, timedelta
 from decimal import Decimal, InvalidOperation
@@ -102,6 +103,9 @@ def _azione(request, giorno):
     p = request.POST
     azione = p.get('azione', '')
     if azione == 'conteggio':
+        if not ha_accesso(request.user, 'finanze'):
+            messages.error(request, 'Il conteggio della cassa lo fa il titolare.')
+            return
         valori = {}
         for campo in ('contanti_totali', 'lettore_carte_servito', 'fondo_cassa_iniziale'):
             testo = (p.get(campo) or '0').replace(',', '.').strip() or '0'

@@ -945,7 +945,7 @@ class ChiusuraGiornataOperatoriTest(TestCase):
         from apps.finanze.models import (LavaggioExtra, PromoGiornata, QuadraturaGiornaliera, SpesaCassa,
                                          TicketResto)
         from apps.finanze.views import _quadratura_giornata
-        self._post(self.operatore, azione='conteggio', contanti_totali='300', lettore_carte_servito='50',
+        self._post(self.titolare, azione='conteggio', contanti_totali='300', lettore_carte_servito='50',
                    fondo_cassa_iniziale='100')
         self._post(self.operatore, azione='aggiungi_ticket', importo='3')
         self._post(self.operatore, azione='aggiungi_spesa', importo='10', descrizione='Gasolio')
@@ -1022,7 +1022,7 @@ class ChiusuraGiornataOperatoriTest(TestCase):
     def test_distinta_cartacea(self):
         from apps.finanze.models import SpesaCassa
         SpesaCassa.objects.create(data=self.oggi, descrizione='Gasolio', importo=Decimal('20'), riferimento='45')
-        self._post(self.operatore, azione='conteggio', contanti_totali='0', fondo_cassa_iniziale='150')
+        self._post(self.titolare, azione='conteggio', contanti_totali='0', fondo_cassa_iniziale='150')
         from django.test import RequestFactory
 
         from apps.finanze.views_chiusura import distinta_chiusura
@@ -1057,7 +1057,10 @@ class ChiusuraGiornataOperatoriTest(TestCase):
 
     def test_conferma_blocca_gli_operatori(self):
         from apps.finanze.models import LavaggioExtra, QuadraturaGiornaliera
-        self._post(self.operatore, azione='conteggio', contanti_totali='100')
+        # il conteggio lo fa il titolare: quello dell'operatore non passa
+        self._post(self.operatore, azione='conteggio', contanti_totali='50')
+        self.assertFalse(QuadraturaGiornaliera.objects.exists())
+        self._post(self.titolare, azione='conteggio', contanti_totali='100')
         self._post(self.operatore, azione='aggiungi_extra', importo='5', descrizione='Moto')
         extra = LavaggioExtra.objects.get()
         # un altro operatore non elimina le voci altrui
@@ -1080,7 +1083,9 @@ class ChiusuraGiornataOperatoriTest(TestCase):
         self.assertEqual(LavaggioExtra.objects.count(), 2)
         self.client.post(reverse('finanze:azione_conferma_giornata'), {'data': self.oggi.isoformat(),
                                                                         'azione': 'sblocca'})
-        self._post(self.operatore, azione='conteggio', contanti_totali='120')
+        self._post(self.operatore, azione='aggiungi_extra', importo='3', descrizione='Moto')
+        self.assertEqual(LavaggioExtra.objects.count(), 3)
+        self._post(self.titolare, azione='conteggio', contanti_totali='120')
         self.assertEqual(QuadraturaGiornaliera.objects.get().contanti_totali, Decimal('120.00'))
 
     def test_pagina_e_permessi(self):
@@ -1096,9 +1101,14 @@ class ChiusuraGiornataOperatoriTest(TestCase):
         req.session = {}
         req._messages = FallbackStorage(req)
         pagina = chiusura_giornata(req).content.decode()
-        for testo in ('Conteggio', 'Ticket di resto', 'Promo e omaggi', 'Spese pagate', 'Lavaggi extra'):
+        for testo in ('Ricariche delle casse', 'Ticket di resto', 'Promo e omaggi', 'Spese pagate', 'Lavaggi extra',
+                      'Il conteggio della cassa lo fa il titolare'):
             self.assertIn(testo, pagina)
+        self.assertNotIn('name="contanti_totali"', pagina)    # il conteggio lo fa il titolare
         self.assertNotIn('Report giornata</a>', pagina)       # l'operatore non vede il report
+        req.user = self.titolare
+        pagina = chiusura_giornata(req).content.decode()
+        self.assertIn('name="contanti_totali"', pagina)
 
 
 class TransazioniWashtecTest(TestCase):
