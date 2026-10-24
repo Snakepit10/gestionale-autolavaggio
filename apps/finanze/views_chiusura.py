@@ -183,8 +183,11 @@ RIGHE_DISTINTA = 22
 @login_required
 def distinta_chiusura(request):
     """Distinta cartacea della chiusura giornata (A4 fronte/retro): sul
-    fronte i movimenti (gia' registrati + righe vuote), sul retro il
-    conteggio della cassa. ?vuota=1 per un modulo in bianco."""
+    fronte i movimenti (gia' registrati + righe vuote) con i totali per
+    tipo, sul retro il conteggio della cassa fino al saldo finale, con
+    gli stessi passaggi della quadratura del report giornata.
+    ?vuota=1 per un modulo in bianco. Atteso e saldo si stampano gia'
+    calcolati solo per chi ha le Finanze: gli operatori li compilano."""
     giorno = _data(request)
     vuota = request.GET.get('vuota') == '1'
     quadratura = QuadraturaGiornaliera.objects.filter(data=giorno).first()
@@ -202,10 +205,50 @@ def distinta_chiusura(request):
         for x in LavaggioExtra.objects.filter(data=giorno):
             righe.append(('Extra', f'{x.descrizione} ({x.get_metodo_display().lower()})', x.importo))
     righe = [{'tipo': t, 'descrizione': d, 'importo': i} for t, d, i in righe]
+    totali_tipo = [{'tipo': t, 'totale': sum((r['importo'] for r in righe if r['tipo'] == t), Decimal('0.00'))
+                    if any(r['tipo'] == t for r in righe) else None} for t in TIPI_DISTINTA]
     righe += [None] * max(RIGHE_DISTINTA - len(righe), 6)
     return render(request, 'ordini/distinta_chiusura.html', {
         'data': None if vuota else giorno,
         'quadratura': None if vuota else quadratura,
         'righe': righe,
         'tipi': TIPI_DISTINTA,
+        'totali_tipo': totali_tipo,
+        'saldo': None if vuota else _saldo_distinta(giorno, quadratura, ha_accesso(request.user, 'finanze')),
     })
+
+
+def _saldo_distinta(giorno, quadratura, con_atteso):
+    """Righe del retro della distinta (stessi conti della quadratura del
+    report giornata): i valori noti sono gia' compilati, gli altri restano
+    vuoti da scrivere a mano. Atteso e saldo solo se con_atteso."""
+    from .models import ChiusuraCassaAutomatica
+    from .views import _saldo_giornata
+
+    q, _ = _saldo_giornata(giorno)
+    contato = quadratura is not None
+    saldo = {
+        'contanti': quadratura.contanti_totali if contato else None,
+        'pos': quadratura.lettore_carte_servito if contato else None,
+        'fondo': quadratura.fondo_cassa_iniziale if contato else None,
+        'spese': q['spese_cassa'] if q['spese_cassa'] else None,
+        'ticket': q['ticket_resto'] if q['ticket_resto'] else None,
+        'reale': q['totale_reale'],
+    }
+    if not con_atteso:
+        return saldo
+    scontrini = list(ChiusuraCassaAutomatica.objects.filter(data=giorno, cassa__modalita_registratore=False))
+    if scontrini:
+        saldo['incasso_casse'] = sum((c.incasso_totale for c in scontrini), Decimal('0.00'))
+        saldo['ricarica_casse'] = sum((c.incasso_ricarica for c in scontrini), Decimal('0.00'))
+    saldo.update({
+        'promo_macchine': q['promo_macchine'],
+        'servito': q['totale_servito'],
+        'extra': q['totale_extra'],
+        'atteso': q['totale_teorico'],
+        'operatori': q['residuo_operatori'],
+        'saldo': q['differenza'],
+        'stato': q['stato'],
+        'con_atteso': True,
+    })
+    return saldo

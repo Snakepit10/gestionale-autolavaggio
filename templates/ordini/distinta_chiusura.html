@@ -30,7 +30,18 @@ td.descr { font-size:11.5px; }
 .firma div { flex:1; border-top:1px solid #333; padding-top:3px; font-size:10px; color:#555; text-align:center; }
 .totali td { height:40px; font-size:13px; }
 .totali td.et { width:60%; font-weight:bold; }
-.nota { border:1px solid #333; border-radius:4px; min-height:110px; padding:6px 8px; margin-top:12px; }
+.conti td { height:30px; font-size:12px; }
+.conti td.n { width:7%; text-align:center; font-weight:bold; color:#555; }
+.conti td.v { width:22%; text-align:right; font-weight:bold; font-size:13px; }
+.conti tr.sez td { background:#e5e7eb; height:24px; font-size:10px; text-transform:uppercase; letter-spacing:.4px; font-weight:bold; }
+.conti tr.tot td { height:34px; font-weight:bold; font-size:13px; background:#f8fafc; }
+.conti .aiuto { font-size:9.5px; color:#555; font-weight:normal; }
+.saldo { display:flex; align-items:center; gap:14px; border:2.5px solid #111; border-radius:6px; padding:10px 14px; margin-top:12px; }
+.saldo .et { font-size:15px; font-weight:bold; flex:1; }
+.saldo .et .aiuto { display:block; font-size:10px; color:#555; font-weight:normal; margin-top:2px; }
+.saldo .v { width:42mm; height:44px; border:1px solid #333; border-radius:4px; text-align:right; padding:6px 8px; font-size:20px; font-weight:bold; }
+.esiti { display:flex; gap:16px; font-size:11px; margin-top:6px; }
+.nota { border:1px solid #333; border-radius:4px; min-height:70px; padding:6px 8px; margin-top:12px; }
 .nota .et { font-size:10px; text-transform:uppercase; color:#555; }
 .azioni { text-align:center; margin:12px; }
 .azioni button { font-size:14px; padding:8px 18px; }
@@ -72,7 +83,7 @@ td.descr { font-size:11.5px; }
     </table>
 
     <div class="riepilogo">
-        {% for t in tipi %}<div class="campo"><div class="et">Totale {{ t }}</div><div class="val">&nbsp;</div></div>{% endfor %}
+        {% for t in totali_tipo %}<div class="campo"><div class="et">Totale {{ t.tipo }}</div><div class="val">{% if data and t.totale is not None %}{{ t.totale|floatformat:2 }}{% else %}&nbsp;{% endif %}</div></div>{% endfor %}
     </div>
 
     <div class="firma"><div>Firma operatore</div><div>Firma responsabile</div></div>
@@ -80,17 +91,45 @@ td.descr { font-size:11.5px; }
 
 {# ======================= RETRO ======================= #}
 <div class="foglio retro">
-    <h2>CONTEGGIO CASSA {% if data %}&mdash; {{ data|date:"d/m/Y" }}{% endif %}</h2>
-    <div class="sotto">Conta tutti i contanti scassettati dalle macchine e dal registratore insieme</div>
+    <h2>CONTEGGIO CASSA E SALDO FINALE {% if data %}&mdash; {{ data|date:"d/m/Y" }}{% endif %}</h2>
+    <div class="sotto">Conta tutti i contanti scassettati dalle macchine e dal registratore insieme, poi segui le righe fino al saldo.
+        Sono gli stessi conti della quadratura del report giornata.</div>
 
-    <table class="totali" style="margin-top:14px">
+    {% with s=saldo %}
+    <table class="conti">
         <tbody>
-            <tr><td class="et">Contanti totali contati</td><td></td></tr>
-            <tr><td class="et">Lettore carte POS servito (totale scontrino POS)</td><td></td></tr>
-            <tr><td class="et">&minus; Cassa iniziale (fondo)</td><td>{% if quadratura.fondo_cassa_iniziale %}{{ quadratura.fondo_cassa_iniziale|floatformat:2 }}{% endif %}</td></tr>
-            <tr><td class="et">= Totale reale</td><td></td></tr>
+            <tr class="sez"><td colspan="3">A &middot; Reale: cosa c'&egrave; in cassa</td></tr>
+            <tr><td class="n">1</td><td>Contanti totali contati</td><td class="v">{% if s.contanti is not None %}{{ s.contanti|floatformat:2 }}{% endif %}</td></tr>
+            <tr><td class="n">2</td><td>+ Lettore carte POS servito <span class="aiuto">(totale scontrino POS)</span></td><td class="v">{% if s.pos is not None %}{{ s.pos|floatformat:2 }}{% endif %}</td></tr>
+            <tr><td class="n">3</td><td>&minus; Cassa iniziale (fondo)</td><td class="v">{% if s.fondo is not None %}{{ s.fondo|floatformat:2 }}{% elif quadratura.fondo_cassa_iniziale %}{{ quadratura.fondo_cassa_iniziale|floatformat:2 }}{% endif %}</td></tr>
+            <tr><td class="n">4</td><td>+ Spese pagate dalla cassa <span class="aiuto">(Totale Spese sul fronte)</span></td><td class="v">{% if s.spese %}{{ s.spese|floatformat:2 }}{% endif %}</td></tr>
+            <tr><td class="n">5</td><td>+ Ticket di resto pagati <span class="aiuto">(Totale Resto sul fronte)</span></td><td class="v">{% if s.ticket %}{{ s.ticket|floatformat:2 }}{% endif %}</td></tr>
+            <tr class="tot"><td class="n">A</td><td>= Totale reale <span class="aiuto">(1 + 2 &minus; 3 + 4 + 5)</span></td><td class="v">{% if s.reale is not None %}{{ s.reale|floatformat:2 }}{% endif %}</td></tr>
+
+            <tr class="sez"><td colspan="3">B &middot; Atteso: cosa dovrebbe esserci</td></tr>
+            <tr><td class="n">6</td><td>Incasso totale casse automatiche <span class="aiuto">(somma degli scontrini, escluso registratore)</span></td><td class="v">{% if s.incasso_casse is not None %}{{ s.incasso_casse|floatformat:2 }}{% endif %}</td></tr>
+            <tr><td class="n">7</td><td>&minus; Ricarica delle casse <span class="aiuto">(somma della ricarica sugli scontrini)</span></td><td class="v">{% if s.ricarica_casse is not None %}{{ s.ricarica_casse|floatformat:2 }}{% endif %}</td></tr>
+            <tr><td class="n">8</td><td>&minus; Promo macchine <span class="aiuto">(gettoni e crediti regalati)</span></td><td class="v">{% if s.con_atteso %}{{ s.promo_macchine|floatformat:2 }}{% endif %}</td></tr>
+            <tr><td class="n">9</td><td>+ Servito incassato in contanti e carte <span class="aiuto">(dal gestionale, esclusi bonifici e assegni)</span></td><td class="v">{% if s.con_atteso %}{{ s.servito|floatformat:2 }}{% endif %}</td></tr>
+            <tr><td class="n">10</td><td>+ Lavaggi extra senza ordine <span class="aiuto">(Totale Extra sul fronte)</span></td><td class="v">{% if s.con_atteso %}{{ s.extra|floatformat:2 }}{% endif %}</td></tr>
+            <tr class="tot"><td class="n">B</td><td>= Totale atteso <span class="aiuto">(6 &minus; 7 &minus; 8 + 9 + 10)</span></td><td class="v">{% if s.con_atteso %}{{ s.atteso|floatformat:2 }}{% endif %}</td></tr>
+
+            <tr class="sez"><td colspan="3">C &middot; Lavaggi ai portali pagati agli operatori</td></tr>
+            <tr class="tot"><td class="n">C</td><td>Residuo portali <span class="aiuto">(lavaggi da unit&agrave; operativa senza ordine, tolti omaggi e promo operatori)</span></td><td class="v">{% if s.con_atteso %}{{ s.operatori|floatformat:2 }}{% endif %}</td></tr>
         </tbody>
     </table>
+
+    <div class="saldo">
+        <div class="et">SALDO FINALE = A &minus; B &minus; C
+            <span class="aiuto">0 = in quadra (tolleranza &plusmn;0,50 &euro;) &middot; negativo = mancano soldi &middot; positivo = soldi in pi&ugrave;</span></div>
+        <div class="v">{% if s.con_atteso and s.saldo is not None %}{% if s.saldo > 0 %}+{% endif %}{{ s.saldo|floatformat:2 }}{% endif %}</div>
+    </div>
+    <div class="esiti">
+        <span><span class="box">{% if s.stato == 'ok' %}&#10003;{% endif %}</span> In quadra</span>
+        <span><span class="box">{% if s.stato == 'mancante' %}&#10003;{% endif %}</span> Mancano</span>
+        <span><span class="box">{% if s.stato == 'eccedente' %}&#10003;{% endif %}</span> Eccedenza</span>
+    </div>
+    {% endwith %}
 
     <div class="nota"><div class="et">Note (differenze, ricariche non scritte, anomalie delle casse)</div></div>
 

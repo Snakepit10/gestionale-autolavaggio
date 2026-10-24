@@ -1031,7 +1031,16 @@ class ChiusuraGiornataOperatoriTest(TestCase):
         html = distinta_chiusura(req).content.decode()
         self.assertIn('Gasolio (n. 45)', html)
         self.assertIn('150,00', html)
-        self.assertIn('CONTEGGIO CASSA', html)
+        self.assertIn('CONTEGGIO CASSA E SALDO FINALE', html)
+        self.assertIn('-130,00</td>', html)                     # totale reale
+        self.assertNotIn('<div class="v">-130,00</div>', html)   # l'operatore non vede il saldo
+        # il titolare la stampa con atteso e saldo: reale 0 - 150 + 20 = -130, atteso 0
+        req = RequestFactory().get('/', {'data': self.oggi.isoformat()})
+        req.user = self.titolare
+        html = distinta_chiusura(req).content.decode()
+        self.assertIn('-130,00</td>', html)
+        self.assertIn('<div class="v">-130,00</div>', html)
+        self.assertIn('<div class="val">20,00</div>', html)    # totale Spese sul fronte
         req = RequestFactory().get('/', {'vuota': '1'})
         req.user = self.operatore
         vuota = distinta_chiusura(req).content.decode()
