@@ -39,6 +39,8 @@ SEZIONI = [
     ('conteggio_cassa', 'Conteggio cassa',
      'Nella Distinta (Ordini) vede e salva il conteggio di contanti e POS; '
      'sulla distinta stampata vede atteso e saldo', ()),
+    ('scontrini_casse', 'Scontrini casse',
+     'Nella Distinta (Ordini) inserisce gli scontrini di chiusura delle casse automatiche', ()),
     ('monete', 'Monete', 'Gestione monete digitali', ('/monete/',)),
     ('configurazione', 'Configurazione', 'Catalogo, categorie, postazioni, checklist, slot, abbonamenti...',
      ('/categorie/', '/catalogo/', '/sconti/', '/stampanti/', '/postazioni/',

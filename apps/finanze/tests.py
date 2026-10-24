@@ -1103,6 +1103,42 @@ class ChiusuraGiornataOperatoriTest(TestCase):
         self.assertEqual(QuadraturaGiornaliera.objects.get().contanti_totali, Decimal('80.00'))
         self.assertNotContains(self.client.get(self.url), 'name="contanti_totali"')
 
+    def test_scontrini_casse_dalla_distinta(self):
+        from apps.auth_system.models import PermessoUtente
+        from apps.finanze.models import Cassa, ChiusuraCassaAutomatica
+        portale = Cassa.objects.create(nome='Portale Blu', tipo='automatica', tracking_washcycles=True)
+        registratore = Cassa.objects.create(nome='Registratore', tipo='automatica', modalita_registratore=True)
+        self.client.force_login(self.operatore)
+        self.assertContains(self.client.get(self.url), 'Scontrini delle casse automatiche')
+        self._post(self.operatore, azione='scontrino', cassa=portale.pk, incasso_totale='310,50',
+                   incasso_ricarica='', vendita_contante='280', vendita_non_contante='20', wash_cycles='41')
+        self._post(self.operatore, azione='scontrino', cassa=registratore.pk, incasso_totale='412.5',
+                   vendita_contante='99')                                     # il registratore ha solo il totale
+        c = ChiusuraCassaAutomatica.objects.get(cassa=portale)
+        self.assertEqual((c.incasso_totale, c.incasso_ricarica, c.vendita_totale, c.wash_cycles, c.operatore),
+                         (Decimal('310.50'), Decimal('0.00'), Decimal('300.00'), 41, self.operatore))
+        r = ChiusuraCassaAutomatica.objects.get(cassa=registratore)
+        self.assertEqual((r.incasso_totale, r.vendita_contante), (Decimal('412.50'), Decimal('0.00')))
+        # aggiornare non tocca le note; importi negativi rifiutati
+        ChiusuraCassaAutomatica.objects.filter(pk=c.pk).update(note='rotolo cambiato')
+        self._post(self.operatore, azione='scontrino', cassa=portale.pk, incasso_totale='-1')
+        self._post(self.operatore, azione='scontrino', cassa=portale.pk, incasso_totale='320')
+        c.refresh_from_db()
+        self.assertEqual((c.incasso_totale, c.note), (Decimal('320.00'), 'rotolo cambiato'))
+        # confermato: non si modifica
+        ChiusuraCassaAutomatica.objects.filter(pk=c.pk).update(confermata=True)
+        self._post(self.operatore, azione='scontrino', cassa=portale.pk, incasso_totale='1')
+        c.refresh_from_db()
+        self.assertEqual(c.incasso_totale, Decimal('320.00'))
+        # senza il permesso niente riquadro e niente salvataggio
+        PermessoUtente.objects.create(user=self.operatore, sezione='scontrini_casse', consenti=False)
+        self.operatore = User.objects.get(pk=self.operatore.pk)
+        self.client.force_login(self.operatore)
+        self.assertNotContains(self.client.get(self.url), 'Scontrini delle casse automatiche')
+        self._post(self.operatore, azione='scontrino', cassa=registratore.pk, incasso_totale='1')
+        r.refresh_from_db()
+        self.assertEqual(r.incasso_totale, Decimal('412.50'))
+
     def test_pagina_e_permessi(self):
         from django.contrib.messages.storage.fallback import FallbackStorage
         from django.test import RequestFactory

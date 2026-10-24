@@ -19,7 +19,7 @@ from django.utils import timezone
 
 from apps.auth_system.sezioni import ha_accesso
 
-from .models import (Cassa, LavaggioExtra, PromoGiornata, QuadraturaGiornaliera, RicaricaCassa, SpesaCassa,
+from .models import (Cassa, ChiusuraCassaAutomatica, LavaggioExtra, PromoGiornata, QuadraturaGiornaliera, RicaricaCassa, SpesaCassa,
                      TicketResto)
 
 # azione -> modello delle voci che si aggiungono/eliminano
@@ -57,6 +57,20 @@ def casse_ricaricabili():
 def fa_conteggio(user):
     """Vede e salva il conteggio della cassa (e atteso/saldo stampati)."""
     return ha_accesso(user, 'conteggio_cassa')
+
+
+def fa_scontrini(user):
+    """Inserisce gli scontrini di chiusura delle casse automatiche."""
+    return ha_accesso(user, 'scontrini_casse')
+
+
+def _scontrini_casse(giorno, ricariche):
+    """Casse automatiche attive con lo scontrino del giorno (se c'e') e
+    il totale delle ricariche dichiarate dagli operatori."""
+    chiusure = {c.cassa_id: c for c in ChiusuraCassaAutomatica.objects.filter(data=giorno)}
+    return [{'cassa': c, 'chiusura': chiusure.get(c.pk),
+             'ricarica_dichiarata': sum((r.importo for r in ricariche if r.cassa_id == c.pk), Decimal('0.00'))}
+            for c in Cassa.objects.filter(tipo='automatica', attiva=True).order_by('ordine')]
 
 
 def giornata_confermata(giorno):
@@ -103,12 +117,61 @@ def chiusura_giornata(request):
         'metodi_extra': LavaggioExtra.METODO_CHOICES,
         'vede_report': ha_accesso(request.user, 'finanze'),
         'fa_conteggio': fa_conteggio(request.user),
+        'fa_scontrini': fa_scontrini(request.user),
+        'scontrini': _scontrini_casse(giorno, voci['ricarica']) if fa_scontrini(request.user) else [],
+        'scontrini_salvati': ChiusuraCassaAutomatica.objects.filter(
+            data=giorno, cassa__tipo='automatica', cassa__attiva=True).count(),
     })
+
+
+def _salva_scontrino(request, giorno):
+    """Crea o aggiorna lo scontrino di chiusura di una cassa automatica
+    (stessi campi del report giornata). Vuoto = 0; il registratore ha
+    solo il totale. Uno scontrino confermato non si modifica."""
+    p = request.POST
+    cassa = Cassa.objects.filter(tipo='automatica', attiva=True, pk=p.get('cassa') or None).first()
+    if cassa is None:
+        messages.error(request, 'Cassa non trovata.')
+        return
+    campi = ['incasso_totale'] if cassa.modalita_registratore else [
+        'incasso_totale', 'incasso_ricarica', 'vendita_contante', 'vendita_non_contante', 'resto_erogato_reale']
+    valori = {}
+    for campo in campi:
+        try:
+            valori[campo] = Decimal((p.get(campo) or '0').replace(',', '.').strip() or '0').quantize(Decimal('0.01'))
+        except InvalidOperation:
+            valori[campo] = None
+        if valori[campo] is None or valori[campo] < 0:
+            messages.error(request, f'{cassa}: importi non validi.')
+            return
+    if cassa.tracking_washcycles:
+        testo = (p.get('wash_cycles') or '').strip()
+        if testo and not testo.isdigit():
+            messages.error(request, f'{cassa}: WashCycles non validi.')
+            return
+        valori['wash_cycles'] = int(testo) if testo else None
+    chiusura = ChiusuraCassaAutomatica.objects.filter(cassa=cassa, data=giorno).first()
+    if chiusura and chiusura.confermata:
+        messages.error(request, f'Lo scontrino di {cassa} è confermato: non si modifica.')
+        return
+    if chiusura is None:
+        chiusura = ChiusuraCassaAutomatica(cassa=cassa, data=giorno, operatore=request.user)
+    for campo, valore in valori.items():
+        setattr(chiusura, campo, valore)
+    chiusura.save()
+    messages.success(request, f'Scontrino di {cassa} salvato.')
 
 
 def _azione(request, giorno):
     p = request.POST
     azione = p.get('azione', '')
+    if azione == 'scontrino':
+        if not fa_scontrini(request.user):
+            messages.error(request, 'Non hai il permesso per inserire gli scontrini delle casse.')
+            return
+        _salva_scontrino(request, giorno)
+        return
+
     if azione == 'conteggio':
         if not fa_conteggio(request.user):
             messages.error(request, 'Non hai il permesso per il conteggio della cassa.')

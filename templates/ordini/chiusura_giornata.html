@@ -245,5 +245,76 @@
 </div>
 {% endif %}
 
+{# ===== 6. Scontrini delle casse automatiche ===== #}
+{% if fa_scontrini %}
+<div class="col-12">
+<div class="section-card accent-dark" id="scontrini">
+    <div class="section-title"><div class="label"><i class="bi bi-receipt-cutoff"></i> 6. Scontrini delle casse automatiche</div>
+        <span class="count">{{ scontrini_salvati }}/{{ scontrini|length }} inseriti</span></div>
+    <div class="section-body">
+        <div class="spiega">Copia i valori dagli scontrini di chiusura di ogni cassa. Lasciare vuoto vale 0.</div>
+        <div class="row g-3">
+        {% for e in scontrini %}
+        <div class="col-12 col-md-6 col-xxl-4">
+            <form method="post" class="border rounded p-3 h-100 {% if e.chiusura %}bg-light{% endif %}">
+                {% csrf_token %}
+                <input type="hidden" name="data" value="{{ data|date:'Y-m-d' }}">
+                <input type="hidden" name="azione" value="scontrino">
+                <input type="hidden" name="cassa" value="{{ e.cassa.pk }}">
+                <input type="hidden" name="ancora" value="#scontrini">
+                <div class="d-flex justify-content-between align-items-start mb-2">
+                    <div>
+                        <strong>{% if e.cassa.modalita_registratore %}<i class="bi bi-receipt text-warning"></i>{% elif e.cassa.tracking_washcycles %}<i class="bi bi-droplet-fill text-primary"></i>{% else %}<i class="bi bi-coin text-info"></i>{% endif %} {{ e.cassa.nome }}</strong>
+                        <div class="small text-muted">{% if e.cassa.modalita_registratore %}Registratore servito{% elif e.cassa.tracking_washcycles %}Portale{% else %}Cambia gettoni{% endif %}</div>
+                    </div>
+                    {% if e.chiusura.confermata %}<span class="badge bg-dark"><i class="bi bi-lock-fill"></i> Confermato</span>
+                    {% elif e.chiusura %}<span class="badge bg-success" title="{{ e.chiusura.aggiornato_il|date:'d/m H:i' }}"><i class="bi bi-check-lg"></i> Inserito</span>
+                    {% else %}<span class="badge bg-warning text-dark">Da inserire</span>{% endif %}
+                </div>
+                {% with c=e.chiusura bloccato=e.chiusura.confermata %}
+                {% if e.cassa.modalita_registratore %}
+                <label class="form-label small mb-1">Totale scontrino &euro;</label>
+                <input type="number" step="0.01" min="0" name="incasso_totale" class="form-control" inputmode="decimal" placeholder="0,00"
+                       value="{% if c %}{{ c.incasso_totale|stringformat:'.2f' }}{% endif %}" {% if bloccato or not modificabile %}disabled{% endif %}>
+                {% else %}
+                <div class="row g-2">
+                    <div class="col-6"><label class="form-label small mb-1">Incasso totale</label>
+                        <input type="number" step="0.01" min="0" name="incasso_totale" class="form-control" inputmode="decimal" placeholder="0,00"
+                               value="{% if c %}{{ c.incasso_totale|stringformat:'.2f' }}{% endif %}" {% if bloccato or not modificabile %}disabled{% endif %}></div>
+                    <div class="col-6"><label class="form-label small mb-1">Ricarica</label>
+                        <input type="number" step="0.01" min="0" name="incasso_ricarica" class="form-control" inputmode="decimal" placeholder="0,00"
+                               value="{% if c %}{{ c.incasso_ricarica|stringformat:'.2f' }}{% endif %}" {% if bloccato or not modificabile %}disabled{% endif %}>
+                        {% if e.ricarica_dichiarata %}<div class="small text-muted">dichiarate &euro;{{ e.ricarica_dichiarata|floatformat:2 }}</div>{% endif %}</div>
+                    <div class="col-6"><label class="form-label small mb-1">Vendita contante</label>
+                        <input type="number" step="0.01" min="0" name="vendita_contante" class="form-control" inputmode="decimal" placeholder="0,00"
+                               value="{% if c %}{{ c.vendita_contante|stringformat:'.2f' }}{% endif %}" {% if bloccato or not modificabile %}disabled{% endif %}></div>
+                    <div class="col-6"><label class="form-label small mb-1">Vendita non contante</label>
+                        <input type="number" step="0.01" min="0" name="vendita_non_contante" class="form-control" inputmode="decimal" placeholder="0,00"
+                               value="{% if c %}{{ c.vendita_non_contante|stringformat:'.2f' }}{% endif %}" {% if bloccato or not modificabile %}disabled{% endif %}></div>
+                    <div class="col-6"><label class="form-label small mb-1">Resto erogato reale</label>
+                        <input type="number" step="0.01" min="0" name="resto_erogato_reale" class="form-control" inputmode="decimal" placeholder="0,00"
+                               value="{% if c %}{{ c.resto_erogato_reale|stringformat:'.2f' }}{% endif %}" {% if bloccato or not modificabile %}disabled{% endif %}></div>
+                    {% if e.cassa.tracking_washcycles %}
+                    <div class="col-6"><label class="form-label small mb-1">WashCycles</label>
+                        <input type="number" min="0" name="wash_cycles" class="form-control" inputmode="numeric"
+                               value="{% if c.wash_cycles is not None %}{{ c.wash_cycles }}{% endif %}" {% if bloccato or not modificabile %}disabled{% endif %}></div>
+                    {% endif %}
+                </div>
+                {% endif %}
+                {% if modificabile and not bloccato %}
+                <button class="btn {% if c %}btn-outline-dark{% else %}btn-dark{% endif %} w-100 mt-2"><i class="bi bi-save"></i> {% if c %}Aggiorna scontrino{% else %}Salva scontrino{% endif %}</button>
+                {% endif %}
+                {% endwith %}
+            </form>
+        </div>
+        {% empty %}
+        <div class="col-12 text-muted small">Nessuna cassa automatica configurata.</div>
+        {% endfor %}
+        </div>
+    </div>
+</div>
+</div>
+{% endif %}
+
 </div>
 {% endblock %}
