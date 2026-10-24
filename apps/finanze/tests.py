@@ -945,7 +945,7 @@ class ChiusuraGiornataOperatoriTest(TestCase):
         from apps.finanze.models import (LavaggioExtra, PromoGiornata, QuadraturaGiornaliera, SpesaCassa,
                                          TicketResto)
         from apps.finanze.views import _quadratura_giornata
-        self._post(self.operatore, azione='conteggio', contanti_totali='300', lettore_carte_servito='50',
+        self._post(self.titolare, azione='conteggio', contanti_totali='300', lettore_carte_servito='50',
                    fondo_cassa_iniziale='100')
         self._post(self.operatore, azione='aggiungi_ticket', importo='3')
         self._post(self.operatore, azione='aggiungi_spesa', importo='10', descrizione='Gasolio')
@@ -1022,21 +1022,31 @@ class ChiusuraGiornataOperatoriTest(TestCase):
     def test_distinta_cartacea(self):
         from apps.finanze.models import SpesaCassa
         SpesaCassa.objects.create(data=self.oggi, descrizione='Gasolio', importo=Decimal('20'), riferimento='45')
-        self._post(self.operatore, azione='conteggio', contanti_totali='0', fondo_cassa_iniziale='150')
+        self._post(self.titolare, azione='conteggio', contanti_totali='0', fondo_cassa_iniziale='150')
         from django.test import RequestFactory
 
         from apps.finanze.views_chiusura import distinta_chiusura
         req = RequestFactory().get('/', {'data': self.oggi.isoformat()})
         req.user = self.operatore
         html = distinta_chiusura(req).content.decode()
-        self.assertIn('Gasolio (n. 45)', html)
+        self.assertIn('<td class="small">Gasolio</td><td class="small">45</td>', html)
         self.assertIn('150,00', html)
-        self.assertIn('CONTEGGIO CASSA', html)
+        self.assertIn('CONTEGGIO CASSA E SALDO FINALE', html)
+        self.assertIn('-130,00</td>', html)                     # totale reale
+        self.assertNotIn('<div class="v">-130,00</div>', html)   # l'operatore non vede il saldo
+        # il titolare la stampa con atteso e saldo: reale 0 - 150 + 20 = -130, atteso 0
+        req = RequestFactory().get('/', {'data': self.oggi.isoformat()})
+        req.user = self.titolare
+        html = distinta_chiusura(req).content.decode()
+        self.assertIn('-130,00</td>', html)
+        self.assertIn('<div class="v">-130,00</div>', html)
+        self.assertIn('Totale spese</td><td class="imp">20,00</td>', html)   # totale sul fronte
         req = RequestFactory().get('/', {'vuota': '1'})
         req.user = self.operatore
         vuota = distinta_chiusura(req).content.decode()
         self.assertNotIn('Gasolio', vuota)
-        self.assertEqual(vuota.count('class="tipi"'), 22)
+        self.assertEqual(vuota.count('<tr class="totale">'), 6)          # 5 riquadri + contanti
+        self.assertIn('<td class="t">0,50</td>', vuota)                  # conteggio per taglio
 
     def test_validazioni(self):
         from apps.finanze.models import LavaggioExtra, PromoGiornata
@@ -1047,7 +1057,10 @@ class ChiusuraGiornataOperatoriTest(TestCase):
 
     def test_conferma_blocca_gli_operatori(self):
         from apps.finanze.models import LavaggioExtra, QuadraturaGiornaliera
-        self._post(self.operatore, azione='conteggio', contanti_totali='100')
+        # il conteggio lo fa il titolare: quello dell'operatore non passa
+        self._post(self.operatore, azione='conteggio', contanti_totali='50')
+        self.assertFalse(QuadraturaGiornaliera.objects.exists())
+        self._post(self.titolare, azione='conteggio', contanti_totali='100')
         self._post(self.operatore, azione='aggiungi_extra', importo='5', descrizione='Moto')
         extra = LavaggioExtra.objects.get()
         # un altro operatore non elimina le voci altrui
@@ -1070,8 +1083,61 @@ class ChiusuraGiornataOperatoriTest(TestCase):
         self.assertEqual(LavaggioExtra.objects.count(), 2)
         self.client.post(reverse('finanze:azione_conferma_giornata'), {'data': self.oggi.isoformat(),
                                                                         'azione': 'sblocca'})
-        self._post(self.operatore, azione='conteggio', contanti_totali='120')
+        self._post(self.operatore, azione='aggiungi_extra', importo='3', descrizione='Moto')
+        self.assertEqual(LavaggioExtra.objects.count(), 3)
+        self._post(self.titolare, azione='conteggio', contanti_totali='120')
         self.assertEqual(QuadraturaGiornaliera.objects.get().contanti_totali, Decimal('120.00'))
+
+    def test_permesso_conteggio_per_utente(self):
+        # il conteggio si concede o si toglie al singolo utente (Configurazione > Permessi)
+        from apps.auth_system.models import PermessoUtente
+        from apps.finanze.models import QuadraturaGiornaliera
+        PermessoUtente.objects.create(user=self.operatore, sezione='conteggio_cassa', consenti=True)
+        self.client.force_login(self.operatore)
+        self.assertContains(self.client.get(self.url), 'name="contanti_totali"')
+        self._post(self.operatore, azione='conteggio', contanti_totali='80')
+        self.assertEqual(QuadraturaGiornaliera.objects.get().contanti_totali, Decimal('80.00'))
+        # al titolare si puo' togliere
+        PermessoUtente.objects.create(user=self.titolare, sezione='conteggio_cassa', consenti=False)
+        self._post(self.titolare, azione='conteggio', contanti_totali='99')
+        self.assertEqual(QuadraturaGiornaliera.objects.get().contanti_totali, Decimal('80.00'))
+        self.assertNotContains(self.client.get(self.url), 'name="contanti_totali"')
+
+    def test_scontrini_casse_dalla_distinta(self):
+        from apps.auth_system.models import PermessoUtente
+        from apps.finanze.models import Cassa, ChiusuraCassaAutomatica
+        portale = Cassa.objects.create(nome='Portale Blu', tipo='automatica', tracking_washcycles=True)
+        registratore = Cassa.objects.create(nome='Registratore', tipo='automatica', modalita_registratore=True)
+        self.client.force_login(self.operatore)
+        self.assertContains(self.client.get(self.url), 'Scontrini delle casse automatiche')
+        self._post(self.operatore, azione='scontrino', cassa=portale.pk, incasso_totale='310,50',
+                   incasso_ricarica='', vendita_contante='280', vendita_non_contante='20', wash_cycles='41')
+        self._post(self.operatore, azione='scontrino', cassa=registratore.pk, incasso_totale='412.5',
+                   vendita_contante='99')                                     # il registratore ha solo il totale
+        c = ChiusuraCassaAutomatica.objects.get(cassa=portale)
+        self.assertEqual((c.incasso_totale, c.incasso_ricarica, c.vendita_totale, c.wash_cycles, c.operatore),
+                         (Decimal('310.50'), Decimal('0.00'), Decimal('300.00'), 41, self.operatore))
+        r = ChiusuraCassaAutomatica.objects.get(cassa=registratore)
+        self.assertEqual((r.incasso_totale, r.vendita_contante), (Decimal('412.50'), Decimal('0.00')))
+        # aggiornare non tocca le note; importi negativi rifiutati
+        ChiusuraCassaAutomatica.objects.filter(pk=c.pk).update(note='rotolo cambiato')
+        self._post(self.operatore, azione='scontrino', cassa=portale.pk, incasso_totale='-1')
+        self._post(self.operatore, azione='scontrino', cassa=portale.pk, incasso_totale='320')
+        c.refresh_from_db()
+        self.assertEqual((c.incasso_totale, c.note), (Decimal('320.00'), 'rotolo cambiato'))
+        # confermato: non si modifica
+        ChiusuraCassaAutomatica.objects.filter(pk=c.pk).update(confermata=True)
+        self._post(self.operatore, azione='scontrino', cassa=portale.pk, incasso_totale='1')
+        c.refresh_from_db()
+        self.assertEqual(c.incasso_totale, Decimal('320.00'))
+        # senza il permesso niente riquadro e niente salvataggio
+        PermessoUtente.objects.create(user=self.operatore, sezione='scontrini_casse', consenti=False)
+        self.operatore = User.objects.get(pk=self.operatore.pk)
+        self.client.force_login(self.operatore)
+        self.assertNotContains(self.client.get(self.url), 'Scontrini delle casse automatiche')
+        self._post(self.operatore, azione='scontrino', cassa=registratore.pk, incasso_totale='1')
+        r.refresh_from_db()
+        self.assertEqual(r.incasso_totale, Decimal('412.50'))
 
     def test_pagina_e_permessi(self):
         from django.contrib.messages.storage.fallback import FallbackStorage
@@ -1086,9 +1152,14 @@ class ChiusuraGiornataOperatoriTest(TestCase):
         req.session = {}
         req._messages = FallbackStorage(req)
         pagina = chiusura_giornata(req).content.decode()
-        for testo in ('Conteggio', 'Ticket di resto', 'Promo e omaggi', 'Spese pagate', 'Lavaggi extra'):
+        for testo in ('Ricariche delle casse', 'Ticket di resto', 'Promo e omaggi', 'Spese pagate', 'Lavaggi extra',
+                      'Il conteggio della cassa lo fa il titolare'):
             self.assertIn(testo, pagina)
+        self.assertNotIn('name="contanti_totali"', pagina)    # il conteggio lo fa il titolare
         self.assertNotIn('Report giornata</a>', pagina)       # l'operatore non vede il report
+        req.user = self.titolare
+        pagina = chiusura_giornata(req).content.decode()
+        self.assertIn('name="contanti_totali"', pagina)
 
 
 class TransazioniWashtecTest(TestCase):

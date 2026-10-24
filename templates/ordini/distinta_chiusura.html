@@ -5,33 +5,60 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Distinta chiusura {% if data %}{{ data|date:"d/m/Y" }}{% endif %}</title>
 <style>
-@page { size: A4; margin: 12mm; }
+@page { size: A4; margin: 10mm; }
 * { box-sizing: border-box; }
-body { font-family: Arial, Helvetica, sans-serif; color:#111; font-size:12px; margin:0; background:#f1f5f9; }
-.foglio { background:#fff; width:210mm; min-height:297mm; margin:12px auto; padding:12mm; box-shadow:0 1px 4px rgba(0,0,0,.15); }
-h1 { font-size:18px; margin:0 0 2px; letter-spacing:.3px; }
-h2 { font-size:15px; margin:0 0 8px; }
-.sotto { color:#555; font-size:11px; margin-bottom:10px; }
-.testa { display:grid; grid-template-columns: 1.1fr 1.4fr 1fr; gap:10px; margin:10px 0 12px; }
-.campo { border:1px solid #333; border-radius:4px; padding:6px 8px; min-height:44px; }
-.campo .et { font-size:10px; text-transform:uppercase; color:#555; letter-spacing:.4px; }
-.campo .val { font-size:15px; font-weight:bold; margin-top:4px; }
+body { font-family: Arial, Helvetica, sans-serif; color:#111; font-size:11px; margin:0; background:#f1f5f9; }
+.foglio { background:#fff; width:210mm; min-height:297mm; margin:12px auto; padding:10mm 11mm; box-shadow:0 1px 4px rgba(0,0,0,.15); }
+h1 { font-size:17px; margin:0 0 2px; letter-spacing:.3px; }
+h2 { font-size:14px; margin:0 0 2px; }
+.sotto { color:#555; font-size:10px; margin-bottom:8px; }
+.testa { display:grid; grid-template-columns: 1fr 1.5fr 1fr; gap:8px; margin:8px 0 10px; }
+.campo { border:1px solid #333; border-radius:4px; padding:4px 7px; min-height:38px; }
+.campo .et, .riq .tit .aiuto, .aiuto { font-size:9px; color:#555; }
+.campo .et { text-transform:uppercase; letter-spacing:.4px; }
+.campo .val { font-size:14px; font-weight:bold; margin-top:3px; }
+
+/* riquadri dei movimenti */
+.griglia { display:grid; grid-template-columns: 1fr 1fr; gap:9px; }
+.riq { border:1.5px solid #111; border-radius:5px; overflow:hidden; }
+.riq .tit { background:#111; color:#fff; font-weight:bold; font-size:11px; padding:4px 7px; letter-spacing:.4px;
+            display:flex; justify-content:space-between; align-items:baseline; }
+.riq .tit .aiuto { color:#d1d5db; font-weight:normal; }
 table { width:100%; border-collapse:collapse; }
-th, td { border:1px solid #333; padding:0 6px; height:26px; vertical-align:middle; }
-th { background:#e5e7eb; font-size:10px; text-transform:uppercase; letter-spacing:.3px; height:24px; }
-td.tipi { width:25%; padding:2px 4px; font-size:9px; line-height:1.25; }
-td.tipi .griglia { display:grid; grid-template-columns:repeat(3, auto); gap:1px 5px; white-space:nowrap; }
-.box { display:inline-block; width:9px; height:9px; border:1.2px solid #111; vertical-align:-1px; margin-right:2px; text-align:center; line-height:8px; font-size:8px; font-weight:bold; }
-td.imp { width:15%; text-align:right; font-weight:bold; }
-td.descr { font-size:11.5px; }
-.riepilogo { display:grid; grid-template-columns: repeat(6, 1fr); gap:6px; margin-top:12px; }
-.riepilogo .campo { min-height:40px; padding:4px 6px; }
-.firma { display:flex; justify-content:space-between; margin-top:16px; gap:20px; }
-.firma div { flex:1; border-top:1px solid #333; padding-top:3px; font-size:10px; color:#555; text-align:center; }
-.totali td { height:40px; font-size:13px; }
-.totali td.et { width:60%; font-weight:bold; }
-.nota { border:1px solid #333; border-radius:4px; min-height:110px; padding:6px 8px; margin-top:12px; }
-.nota .et { font-size:10px; text-transform:uppercase; color:#555; }
+th, td { border:1px solid #9ca3af; padding:0 5px; height:22px; vertical-align:middle; }
+th { background:#e5e7eb; font-size:8.5px; text-transform:uppercase; letter-spacing:.3px; height:17px; text-align:left; }
+.riq table { border-style:hidden; }
+td.imp, th.imp { width:23%; text-align:right; }
+td.imp { font-weight:bold; }
+td.small { font-size:9.5px; }
+tr.totale td { height:24px; font-weight:bold; background:#f3f4f6; border-top:1.5px solid #111; }
+tr.ufficio td { height:24px; background:#fff; font-size:9.5px; color:#444; }
+.firma { display:flex; justify-content:space-between; margin-top:14px; gap:20px; }
+.firma div { flex:1; border-top:1px solid #333; padding-top:3px; font-size:9.5px; color:#555; text-align:center; }
+
+/* retro */
+.blocco { border:1.5px solid #111; border-radius:5px; padding:7px 9px; margin-top:9px; }
+.blocco .intest { display:flex; justify-content:space-between; align-items:baseline; margin-bottom:5px; }
+.blocco .intest strong { font-size:12px; letter-spacing:.3px; }
+.etichetta { font-size:9px; font-weight:bold; text-transform:uppercase; letter-spacing:.5px; padding:2px 6px; border-radius:3px; }
+.etichetta.op { background:#e5e7eb; }
+.etichetta.uff { background:#111; color:#fff; }
+.due { display:grid; grid-template-columns: 0.9fr 1.1fr; gap:10px; }
+.tagli td { height:20px; }
+.tagli td.t { width:30%; font-weight:bold; text-align:right; }
+.tagli td.x { width:12%; text-align:center; color:#555; }
+.conti td { height:25px; }
+.conti td.n { width:8%; text-align:center; font-weight:bold; color:#555; }
+.conti td.v { width:25%; text-align:right; font-weight:bold; font-size:12px; }
+.conti tr.tot td { height:29px; font-weight:bold; font-size:12px; background:#f3f4f6; }
+.saldo { display:flex; align-items:center; gap:14px; border:2.5px solid #111; border-radius:6px; padding:8px 12px; margin-top:9px; }
+.saldo .et { font-size:14px; font-weight:bold; flex:1; }
+.saldo .et .aiuto { display:block; font-size:9.5px; font-weight:normal; margin-top:2px; }
+.saldo .v { width:42mm; height:40px; border:1px solid #333; border-radius:4px; text-align:right; padding:5px 8px; font-size:19px; font-weight:bold; }
+.esiti { display:flex; gap:16px; font-size:10.5px; margin-top:5px; }
+.box { display:inline-block; width:10px; height:10px; border:1.2px solid #111; vertical-align:-1px; margin-right:3px; text-align:center; line-height:9px; font-size:9px; font-weight:bold; }
+.nota { border:1px solid #333; border-radius:4px; min-height:52px; padding:4px 7px; margin-top:9px; }
+.nota .et { font-size:9px; text-transform:uppercase; color:#555; }
 .azioni { text-align:center; margin:12px; }
 .azioni button { font-size:14px; padding:8px 18px; }
 @media print {
@@ -45,10 +72,10 @@ td.descr { font-size:11.5px; }
 <body>
 <div class="azioni"><button onclick="window.print()">Stampa (fronte/retro)</button></div>
 
-{# ======================= FRONTE ======================= #}
+{# ======================= FRONTE: movimenti della cassa ======================= #}
 <div class="foglio">
     <h1>DISTINTA CHIUSURA GIORNATA</h1>
-    <div class="sotto">Master Wash &middot; segna ogni movimento della cassa; a fine giornata riportalo in Ordini &rsaquo; Chiusura giornata</div>
+    <div class="sotto">Master Wash &middot; scrivi ogni movimento della cassa nel riquadro giusto; a fine giornata riportalo in Ordini &rsaquo; Chiusura giornata</div>
 
     <div class="testa">
         <div class="campo"><div class="et">Data</div><div class="val">{% if data %}{{ data|date:"d/m/Y" }}{% else %}&nbsp;&nbsp;&nbsp;/&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;/{% endif %}</div></div>
@@ -56,45 +83,162 @@ td.descr { font-size:11.5px; }
         <div class="campo"><div class="et">Cassa iniziale (fondo) &euro;</div><div class="val">{% if quadratura.fondo_cassa_iniziale %}{{ quadratura.fondo_cassa_iniziale|floatformat:2 }}{% else %}&nbsp;{% endif %}</div></div>
     </div>
 
-    <table>
-        <thead>
-            <tr><th>Tipo movimento</th><th>Descrizione</th><th>Importo &euro;</th></tr>
-        </thead>
-        <tbody>
-        {% for r in righe %}
-            <tr>
-                <td class="tipi"><div class="griglia">{% for t in tipi %}<span><span class="box">{% if r and r.tipo == t %}&#10003;{% endif %}</span>{{ t }}</span>{% endfor %}</div></td>
-                <td class="descr">{% if r %}{{ r.descrizione }}{% endif %}</td>
-                <td class="imp">{% if r %}{{ r.importo|floatformat:2 }}{% endif %}</td>
-            </tr>
-        {% endfor %}
-        </tbody>
-    </table>
+    <div class="griglia">
+        <div class="riq">
+            <div class="tit">RICARICHE DELLE CASSE <span class="aiuto">dal fondo alle macchine</span></div>
+            <table>
+                <thead><tr><th>Cassa</th><th>Nota</th><th class="imp">&euro;</th></tr></thead>
+                <tbody>
+                {% for r in ricariche %}
+                    <tr><td>{% if r %}{{ r.cassa.nome }}{% endif %}</td><td class="small">{% if r %}{{ r.nota }}{% endif %}</td><td class="imp">{% if r %}{{ r.importo|floatformat:2 }}{% endif %}</td></tr>
+                {% endfor %}
+                    <tr class="totale"><td colspan="2">Totale ricariche</td><td class="imp">{% if totali.ricarica is not None %}{{ totali.ricarica|floatformat:2 }}{% endif %}</td></tr>
+                    <tr class="ufficio"><td colspan="2">Ufficio: ricarica sugli scontrini delle casse</td><td class="imp">{% if saldo.ricarica_casse is not None %}{{ saldo.ricarica_casse|floatformat:2 }}{% endif %}</td></tr>
+                </tbody>
+            </table>
+        </div>
 
-    <div class="riepilogo">
-        {% for t in tipi %}<div class="campo"><div class="et">Totale {{ t }}</div><div class="val">&nbsp;</div></div>{% endfor %}
+        <div class="riq">
+            <div class="tit">TICKET DI RESTO PAGATI <span class="aiuto">resti delle macchine ridati al cliente</span></div>
+            <table>
+                <thead><tr><th>Nota (n. ticket, cassa)</th><th class="imp">&euro;</th></tr></thead>
+                <tbody>
+                {% for t in ticket %}
+                    <tr><td class="small">{% if t %}{{ t.nota|default:"Ticket di resto" }}{% endif %}</td><td class="imp">{% if t %}{{ t.importo|floatformat:2 }}{% endif %}</td></tr>
+                {% endfor %}
+                    <tr class="totale"><td>Totale ticket di resto</td><td class="imp">{% if totali.ticket is not None %}{{ totali.ticket|floatformat:2 }}{% endif %}</td></tr>
+                </tbody>
+            </table>
+        </div>
+
+        <div class="riq">
+            <div class="tit">SPESE PAGATE DALLA CASSA <span class="aiuto">acquisti pagati coi contanti</span></div>
+            <table>
+                <thead><tr><th>Descrizione</th><th style="width:18%">N. scontr.</th><th class="imp">&euro;</th></tr></thead>
+                <tbody>
+                {% for x in spese %}
+                    <tr><td class="small">{% if x %}{{ x.descrizione }}{% endif %}</td><td class="small">{% if x %}{{ x.riferimento }}{% endif %}</td><td class="imp">{% if x %}{{ x.importo|floatformat:2 }}{% endif %}</td></tr>
+                {% endfor %}
+                    <tr class="totale"><td colspan="2">Totale spese</td><td class="imp">{% if totali.spesa is not None %}{{ totali.spesa|floatformat:2 }}{% endif %}</td></tr>
+                </tbody>
+            </table>
+        </div>
+
+        <div class="riq">
+            <div class="tit">PROMO E OMAGGI <span class="aiuto">regalati alle macchine o sui lavaggi</span></div>
+            <table>
+                <thead><tr><th>Descrizione</th><th class="imp">Macchine &euro;</th><th class="imp">Operatori &euro;</th></tr></thead>
+                <tbody>
+                {% for x in promo %}
+                    <tr><td class="small">{% if x %}{{ x.descrizione }}{% endif %}</td>
+                        <td class="imp">{% if x and x.tipo == 'macchine' %}{{ x.importo|floatformat:2 }}{% endif %}</td>
+                        <td class="imp">{% if x and x.tipo == 'operatori' %}{{ x.importo|floatformat:2 }}{% endif %}</td></tr>
+                {% endfor %}
+                    <tr class="totale"><td>Totali</td>
+                        <td class="imp">{% if totali.promo_macchine is not None %}{{ totali.promo_macchine|floatformat:2 }}{% endif %}</td>
+                        <td class="imp">{% if totali.promo_operatori is not None %}{{ totali.promo_operatori|floatformat:2 }}{% endif %}</td></tr>
+                    <tr class="ufficio"><td colspan="3"><strong>Macchine</strong> = gettoni/crediti regalati &middot; <strong>Operatori</strong> = omaggio o sconto su un lavaggio</td></tr>
+                </tbody>
+            </table>
+        </div>
+
+        <div class="riq">
+            <div class="tit">LAVAGGI EXTRA SENZA ORDINE <span class="aiuto">incassati ma non nel gestionale</span></div>
+            <table>
+                <thead><tr><th>Descrizione</th><th style="width:22%">Contanti / Carta</th><th class="imp">&euro;</th></tr></thead>
+                <tbody>
+                {% for x in extra %}
+                    <tr><td class="small">{% if x %}{{ x.descrizione }}{% endif %}</td><td class="small">{% if x %}{% if x.metodo == 'carta' %}Carta{% else %}Contanti{% endif %}{% endif %}</td><td class="imp">{% if x %}{{ x.importo|floatformat:2 }}{% endif %}</td></tr>
+                {% endfor %}
+                    <tr class="totale"><td colspan="2">Totale lavaggi extra</td><td class="imp">{% if totali.extra is not None %}{{ totali.extra|floatformat:2 }}{% endif %}</td></tr>
+                </tbody>
+            </table>
+        </div>
+
+        <div class="riq">
+            <div class="tit">NOTE DELLA GIORNATA <span class="aiuto">anomalie, guasti, spazzole bloccate</span></div>
+            <table>
+                <tbody>
+                {% for _ in extra %}<tr><td>&nbsp;</td></tr>{% endfor %}
+                    <tr><td>&nbsp;</td></tr><tr><td>&nbsp;</td></tr>
+                </tbody>
+            </table>
+        </div>
     </div>
 
     <div class="firma"><div>Firma operatore</div><div>Firma responsabile</div></div>
 </div>
 
-{# ======================= RETRO ======================= #}
+{# ======================= RETRO: conteggio e saldo ======================= #}
+{% with s=saldo %}
 <div class="foglio retro">
-    <h2>CONTEGGIO CASSA {% if data %}&mdash; {{ data|date:"d/m/Y" }}{% endif %}</h2>
-    <div class="sotto">Conta tutti i contanti scassettati dalle macchine e dal registratore insieme</div>
+    <h2>CONTEGGIO CASSA E SALDO FINALE {% if data %}&mdash; {{ data|date:"d/m/Y" }}{% endif %}</h2>
+    <div class="sotto">Gli stessi conti della quadratura del report giornata: l'operatore compila la parte A, l'ufficio le parti B e C e il saldo.</div>
 
-    <table class="totali" style="margin-top:14px">
-        <tbody>
-            <tr><td class="et">Contanti totali contati</td><td></td></tr>
-            <tr><td class="et">Lettore carte POS servito (totale scontrino POS)</td><td></td></tr>
-            <tr><td class="et">&minus; Cassa iniziale (fondo)</td><td>{% if quadratura.fondo_cassa_iniziale %}{{ quadratura.fondo_cassa_iniziale|floatformat:2 }}{% endif %}</td></tr>
-            <tr><td class="et">= Totale reale</td><td></td></tr>
-        </tbody>
-    </table>
+    <div class="blocco">
+        <div class="intest"><strong>A &middot; REALE: COSA C'&Egrave; IN CASSA</strong><span class="etichetta op">Operatore</span></div>
+        <div class="due">
+            <table class="tagli">
+                <thead><tr><th style="text-align:right">Taglio &euro;</th><th></th><th>Quantit&agrave;</th><th class="imp">&euro;</th></tr></thead>
+                <tbody>
+                {% for t in tagli_banconote %}<tr><td class="t">{{ t }}</td><td class="x">&times;</td><td></td><td class="imp"></td></tr>{% endfor %}
+                {% for t in tagli_monete %}<tr><td class="t">{{ t }}</td><td class="x">&times;</td><td></td><td class="imp"></td></tr>{% endfor %}
+                    <tr class="totale"><td colspan="3">Contanti totali contati</td><td class="imp">{% if s.contanti is not None %}{{ s.contanti|floatformat:2 }}{% endif %}</td></tr>
+                </tbody>
+            </table>
+            <table class="conti">
+                <tbody>
+                    <tr><td class="n">1</td><td>Contanti totali contati <span class="aiuto">(dal conteggio a sinistra)</span></td><td class="v">{% if s.contanti is not None %}{{ s.contanti|floatformat:2 }}{% endif %}</td></tr>
+                    <tr><td class="n">2</td><td>+ Lettore carte POS servito <span class="aiuto">(totale scontrino POS)</span></td><td class="v">{% if s.pos is not None %}{{ s.pos|floatformat:2 }}{% endif %}</td></tr>
+                    <tr><td class="n">3</td><td>&minus; Cassa iniziale (fondo)</td><td class="v">{% if s.fondo is not None %}{{ s.fondo|floatformat:2 }}{% elif quadratura.fondo_cassa_iniziale %}{{ quadratura.fondo_cassa_iniziale|floatformat:2 }}{% endif %}</td></tr>
+                    <tr><td class="n">4</td><td>+ Spese pagate dalla cassa <span class="aiuto">(totale spese sul fronte)</span></td><td class="v">{% if s.spese %}{{ s.spese|floatformat:2 }}{% endif %}</td></tr>
+                    <tr><td class="n">5</td><td>+ Ticket di resto pagati <span class="aiuto">(totale sul fronte)</span></td><td class="v">{% if s.ticket %}{{ s.ticket|floatformat:2 }}{% endif %}</td></tr>
+                    <tr class="tot"><td class="n">A</td><td>= Totale reale <span class="aiuto">(1 + 2 &minus; 3 + 4 + 5)</span></td><td class="v">{% if s.reale is not None %}{{ s.reale|floatformat:2 }}{% endif %}</td></tr>
+                </tbody>
+            </table>
+        </div>
+    </div>
 
-    <div class="nota"><div class="et">Note (differenze, ricariche non scritte, anomalie delle casse)</div></div>
+    <div class="blocco">
+        <div class="intest"><strong>B &middot; ATTESO: COSA DOVREBBE ESSERCI</strong><span class="etichetta uff">Ufficio</span></div>
+        <table class="conti">
+            <tbody>
+                <tr><td class="n">6</td><td>Incasso totale casse automatiche <span class="aiuto">(somma degli scontrini, escluso registratore)</span></td><td class="v">{% if s.incasso_casse is not None %}{{ s.incasso_casse|floatformat:2 }}{% endif %}</td></tr>
+                <tr><td class="n">7</td><td>&minus; Ricarica delle casse <span class="aiuto">(somma della ricarica sugli scontrini)</span></td><td class="v">{% if s.ricarica_casse is not None %}{{ s.ricarica_casse|floatformat:2 }}{% endif %}</td></tr>
+                <tr><td class="n">8</td><td>&minus; Promo macchine <span class="aiuto">(totale "Macchine" sul fronte)</span></td><td class="v">{% if s.con_atteso %}{{ s.promo_macchine|floatformat:2 }}{% endif %}</td></tr>
+                <tr><td class="n">9</td><td>+ Servito incassato in contanti e carte <span class="aiuto">(dal gestionale, esclusi bonifici e assegni)</span></td><td class="v">{% if s.con_atteso %}{{ s.servito|floatformat:2 }}{% endif %}</td></tr>
+                <tr><td class="n">10</td><td>+ Lavaggi extra senza ordine <span class="aiuto">(totale sul fronte)</span></td><td class="v">{% if s.con_atteso %}{{ s.extra|floatformat:2 }}{% endif %}</td></tr>
+                <tr class="tot"><td class="n">B</td><td>= Totale atteso <span class="aiuto">(6 &minus; 7 &minus; 8 + 9 + 10)</span></td><td class="v">{% if s.con_atteso %}{{ s.atteso|floatformat:2 }}{% endif %}</td></tr>
+            </tbody>
+        </table>
+    </div>
+
+    <div class="blocco">
+        <div class="intest"><strong>C &middot; LAVAGGI AI PORTALI PAGATI AGLI OPERATORI</strong><span class="etichetta uff">Ufficio</span></div>
+        <table class="conti">
+            <tbody>
+                <tr><td class="n">11</td><td>Residuo portali <span class="aiuto">(lavaggi da unit&agrave; operativa senza ordine, dal report giornata)</span></td><td class="v">{% if s.con_atteso %}{{ s.residuo_lordo|floatformat:2 }}{% endif %}</td></tr>
+                <tr><td class="n">12</td><td>&minus; Promo operatori <span class="aiuto">(totale "Operatori" sul fronte)</span></td><td class="v">{% if s.con_atteso %}{{ s.promo_operatori|floatformat:2 }}{% endif %}</td></tr>
+                <tr class="tot"><td class="n">C</td><td>= Pagati agli operatori <span class="aiuto">(11 &minus; 12)</span></td><td class="v">{% if s.con_atteso %}{{ s.operatori|floatformat:2 }}{% endif %}</td></tr>
+            </tbody>
+        </table>
+    </div>
+
+    <div class="saldo">
+        <div class="et">SALDO FINALE = A &minus; B &minus; C
+            <span class="aiuto">0 = in quadra (tolleranza &plusmn;0,50 &euro;) &middot; negativo = mancano soldi &middot; positivo = soldi in pi&ugrave;</span></div>
+        <div class="v">{% if s.con_atteso and s.saldo is not None %}{% if s.saldo > 0 %}+{% endif %}{{ s.saldo|floatformat:2 }}{% endif %}</div>
+    </div>
+    <div class="esiti">
+        <span><span class="box">{% if s.stato == 'ok' %}&#10003;{% endif %}</span> In quadra</span>
+        <span><span class="box">{% if s.stato == 'mancante' %}&#10003;{% endif %}</span> Mancano</span>
+        <span><span class="box">{% if s.stato == 'eccedente' %}&#10003;{% endif %}</span> Eccedenza</span>
+    </div>
+
+    <div class="nota"><div class="et">Note dell'ufficio (differenze, ricariche non scritte, anomalie delle casse)</div></div>
 
     <div class="firma"><div>Firma operatore</div><div>Firma responsabile</div></div>
 </div>
+{% endwith %}
 </body>
 </html>

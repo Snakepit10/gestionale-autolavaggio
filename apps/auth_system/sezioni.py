@@ -9,6 +9,9 @@ sola, usata da menu, middleware, viste e WebSocket:
 2. eccezione per l'utente sulla sezione -> vale quella (consenti/nega);
 3. altrimenti -> se uno dei suoi gruppi ha la sezione spuntata.
 
+Alcune voci non hanno indirizzi (nessun prefisso): sono permessi per una
+funzione dentro una pagina, es. il conteggio cassa nella Distinta.
+
 La matrice si modifica dalla pagina Configurazione > Permessi.
 """
 
@@ -32,6 +35,12 @@ SEZIONI = [
     ('magazzino', 'Magazzino', 'Articoli, fornitori, ordini, consegne, assegnazioni a operatori e postazioni',
      ('/magazzino/', '/scorte/')),
     ('finanze', 'Finanze', 'Report giornata/periodo, saldi, quadrature', ('/finanze/',)),
+    # Permesso senza pagine proprie (nessun prefisso): abilita una funzione
+    ('conteggio_cassa', 'Conteggio cassa',
+     'Nella Distinta (Ordini) vede e salva il conteggio di contanti e POS; '
+     'sulla distinta stampata vede atteso e saldo', ()),
+    ('scontrini_casse', 'Scontrini casse',
+     'Nella Distinta (Ordini) inserisce gli scontrini di chiusura delle casse automatiche', ()),
     ('monete', 'Monete', 'Gestione monete digitali', ('/monete/',)),
     ('configurazione', 'Configurazione', 'Catalogo, categorie, postazioni, checklist, slot, abbonamenti...',
      ('/categorie/', '/catalogo/', '/sconti/', '/stampanti/', '/postazioni/',

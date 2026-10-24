@@ -1,30 +1,32 @@
 {% extends 'base.html' %}
 
-{% block title %}Chiusura giornata {{ data|date:"d/m/Y" }}{% endblock %}
+{% block title %}Distinta {{ data|date:"d/m/Y" }}{% endblock %}
 
 {% block extra_css %}
 <style>
 .page-header { display:flex; justify-content:space-between; align-items:center; margin-bottom:1rem; flex-wrap:wrap; gap:.75rem; }
 .page-header h1 { font-size:1.5rem; font-weight:700; color:#1a1a2e; margin:0; }
-.section-card { background:#fff; border:1px solid #e5e7eb; border-radius:12px; box-shadow:0 1px 2px rgba(0,0,0,.04); margin-bottom:1.25rem; overflow:hidden; }
-.section-card .section-title { padding:12px 18px; display:flex; align-items:center; justify-content:space-between; border-bottom:1px solid #f1f5f9; gap:.5rem; }
-.section-card .section-title .label { display:flex; align-items:center; gap:10px; font-weight:600; color:#1e293b; }
-.section-card .section-title .count { background:#f1f5f9; color:#475569; font-size:.8rem; font-weight:600; padding:2px 10px; border-radius:20px; }
-.section-card .section-body { padding:14px 18px; }
-.section-card .spiega { font-size:.82rem; color:#64748b; margin-bottom:.6rem; }
-.section-card table { margin-bottom:.75rem; }
+.section-card { background:#fff; border:1px solid #e5e7eb; border-radius:12px; box-shadow:0 1px 2px rgba(0,0,0,.04); overflow:hidden; height:100%; }
+.section-card .section-title { padding:10px 16px; display:flex; align-items:center; justify-content:space-between; border-bottom:1px solid #f1f5f9; gap:.5rem; }
+.section-card .section-title .label { display:flex; align-items:center; gap:10px; font-weight:700; color:#1e293b; }
+.section-card .section-title .count { background:#f1f5f9; color:#1e293b; font-size:.85rem; font-weight:700; padding:2px 10px; border-radius:20px; }
+.section-card .section-body { padding:12px 16px; }
+.section-card .spiega { font-size:.8rem; color:#64748b; margin-bottom:.5rem; }
+.section-card table { margin-bottom:.5rem; }
+.section-card form.aggiungi { border-top:1px dashed #e2e8f0; padding-top:.6rem; }
 .accent-blue { border-left:4px solid #3b82f6; } .accent-blue .label i { color:#3b82f6; }
 .accent-amber { border-left:4px solid #f59e0b; } .accent-amber .label i { color:#f59e0b; }
 .accent-green { border-left:4px solid #10b981; } .accent-green .label i { color:#10b981; }
 .accent-red { border-left:4px solid #ef4444; } .accent-red .label i { color:#ef4444; }
 .accent-violet { border-left:4px solid #8b5cf6; } .accent-violet .label i { color:#8b5cf6; }
+.accent-dark { border-left:4px solid #1e293b; } .accent-dark .label i { color:#1e293b; }
 .form-control-lg, .form-select-lg { font-size:1.05rem; }
 </style>
 {% endblock %}
 
 {% block content %}
 <div class="page-header">
-    <h1><i class="bi bi-calculator"></i> Chiusura giornata</h1>
+    <h1><i class="bi bi-journal-text"></i> Distinta di chiusura</h1>
     <div class="d-flex gap-2 align-items-center flex-wrap">
         <a href="?data={{ data_prev|date:'Y-m-d' }}" class="btn btn-outline-secondary btn-sm"><i class="bi bi-chevron-left"></i></a>
         <strong>{{ data|date:"l d/m/Y" }}</strong>
@@ -34,10 +36,11 @@
             <a href="{% url 'ordini:chiusura-distinta' %}?data={{ data|date:'Y-m-d' }}" target="_blank" class="btn btn-outline-dark"><i class="bi bi-printer"></i> Stampa distinta</a>
             <a href="{% url 'ordini:chiusura-distinta' %}?vuota=1" target="_blank" class="btn btn-outline-dark" title="Modulo in bianco">in bianco</a>
         </div>
-        <a href="{% url 'ordini:ordini-list' %}" class="btn btn-outline-secondary btn-sm"><i class="bi bi-arrow-left"></i> Ordini</a>
         {% if vede_report %}<a href="{% url 'finanze:report_giornata' %}?data={{ data|date:'Y-m-d' }}#quadratura" class="btn btn-outline-primary btn-sm"><i class="bi bi-graph-up"></i> Report giornata</a>{% endif %}
     </div>
 </div>
+
+{% include 'ordini/_schede_ordini.html' with attiva='distinta' %}
 
 {% if confermata %}
 <div class="alert alert-success d-flex align-items-center gap-2">
@@ -47,98 +50,100 @@
         {% if modificabile %}Puoi ancora modificare perché hai accesso alle Finanze.{% else %}Non si può più modificare: per correzioni chiedi al titolare.{% endif %}</div>
 </div>
 {% else %}
-<p class="text-muted small">Conta i soldi e segna tutto quello che non è passato dal gestionale. Il confronto con le vendite lo fa il titolare nel report giornata, poi conferma la giornata.</p>
+<p class="text-muted small">Riporta qui i movimenti della cassa scritti sulla prima pagina della distinta: ogni voce nel suo riquadro.
+    {% if not fa_conteggio %}Il conteggio della cassa lo fa il titolare.{% endif %}</p>
 {% endif %}
 
-{# ===== 1. Conteggio ===== #}
-<div class="section-card accent-blue" id="conteggio">
-    <div class="section-title"><div class="label"><i class="bi bi-cash-stack"></i> 1. Conteggio</div>
-        {% if quadratura %}<span class="count">salvato{% if quadratura.operatore %} da {{ quadratura.operatore.get_full_name|default:quadratura.operatore.username }}{% endif %} &middot; {{ quadratura.aggiornato_il|date:"H:i" }}</span>{% endif %}</div>
-    <div class="section-body">
-        <div class="spiega">Tutti i contanti scassettati dalle macchine e dal registratore, contati insieme, più il totale del lettore carte (POS) del servito.</div>
-        <form method="post" class="row g-2 align-items-end">
-            {% csrf_token %}
-            <input type="hidden" name="data" value="{{ data|date:'Y-m-d' }}">
-            <input type="hidden" name="azione" value="conteggio">
-            <input type="hidden" name="ancora" value="#conteggio">
-            <div class="col-12 col-md-3">
-                <label class="form-label small mb-1">Contanti totali contati &euro;</label>
-                <input type="number" step="0.01" min="0" name="contanti_totali" class="form-control form-control-lg"
-                       value="{{ quadratura.contanti_totali|default:''|stringformat:'s' }}" {% if not modificabile %}disabled{% endif %} required>
-            </div>
-            <div class="col-6 col-md-3">
-                <label class="form-label small mb-1">Lettore carte POS &euro;</label>
-                <input type="number" step="0.01" min="0" name="lettore_carte_servito" class="form-control form-control-lg"
-                       value="{{ quadratura.lettore_carte_servito|default:''|stringformat:'s' }}" {% if not modificabile %}disabled{% endif %}>
-            </div>
-            <div class="col-6 col-md-2">
-                <label class="form-label small mb-1">Fondo cassa iniziale &euro;</label>
-                <input type="number" step="0.01" min="0" name="fondo_cassa_iniziale" class="form-control form-control-lg"
-                       value="{{ quadratura.fondo_cassa_iniziale|default:''|stringformat:'s' }}" {% if not modificabile %}disabled{% endif %}>
-            </div>
-            <div class="col-12 col-md-2">
-                <label class="form-label small mb-1">Note</label>
-                <input type="text" name="note" class="form-control form-control-lg" value="{{ quadratura.note|default:'' }}" {% if not modificabile %}disabled{% endif %}>
-            </div>
-            {% if modificabile %}
-            <div class="col-12 col-md-2"><button class="btn btn-primary btn-lg w-100"><i class="bi bi-check-circle"></i> Salva</button></div>
-            {% endif %}
-        </form>
-    </div>
-</div>
+<div class="row g-3">
 
-{# ===== Ricariche ===== #}
+{# ===== 1. Ricariche ===== #}
+<div class="col-12 col-xl-6">
 <div class="section-card accent-blue" id="ricariche">
-    <div class="section-title"><div class="label"><i class="bi bi-arrow-repeat"></i> 2. Ricariche delle casse</div>
+    <div class="section-title"><div class="label"><i class="bi bi-arrow-repeat"></i> 1. Ricariche delle casse</div>
         <span class="count">&euro;{{ totali.ricarica|floatformat:2 }}</span></div>
     <div class="section-body">
         <div class="spiega">Soldi del fondo cassa messi nelle casse automatiche (resti, gettoni): una riga per ogni ricarica.</div>
         {% include 'ordini/_chiusura_voci.html' with lista=voci.ricarica tipo='ricarica' %}
         {% if modificabile %}
-        <form method="post" class="row g-2 align-items-end">
+        <form method="post" class="row g-2 align-items-end aggiungi">
             {% csrf_token %}
             <input type="hidden" name="data" value="{{ data|date:'Y-m-d' }}">
             <input type="hidden" name="azione" value="aggiungi_ricarica">
             <input type="hidden" name="ancora" value="#ricariche">
-            <div class="col-12 col-md-4"><label class="form-label small mb-1">Cassa</label>
+            <div class="col-12 col-sm-5"><label class="form-label small mb-1">Cassa</label>
                 <select name="cassa" class="form-select" required>
                     <option value="">— scegli —</option>
                     {% for c in casse_ricarica %}<option value="{{ c.pk }}">{{ c.nome }}</option>{% endfor %}
                 </select></div>
-            <div class="col-5 col-md-2"><label class="form-label small mb-1">Importo &euro;</label>
-                <input type="number" step="0.01" min="0.01" name="importo" class="form-control" required></div>
-            <div class="col-7 col-md-3"><label class="form-label small mb-1">Nota</label>
+            <div class="col-5 col-sm-3"><label class="form-label small mb-1">Importo &euro;</label>
+                <input type="number" step="0.01" min="0.01" name="importo" class="form-control" inputmode="decimal" required></div>
+            <div class="col-7 col-sm-4"><label class="form-label small mb-1">Nota</label>
                 <input type="text" name="nota" class="form-control" maxlength="100" placeholder="es. monete da 1 €"></div>
-            <div class="col-12 col-md-3"><button class="btn btn-outline-primary w-100"><i class="bi bi-plus-circle"></i> Aggiungi ricarica</button></div>
+            <div class="col-12"><button class="btn btn-outline-primary w-100"><i class="bi bi-plus-circle"></i> Aggiungi ricarica</button></div>
         </form>
         {% endif %}
     </div>
 </div>
+</div>
 
 {# ===== 2. Ticket di resto ===== #}
+<div class="col-12 col-xl-6">
 <div class="section-card accent-red" id="ticket">
-    <div class="section-title"><div class="label"><i class="bi bi-ticket-perforated"></i> 3. Ticket di resto pagati</div>
+    <div class="section-title"><div class="label"><i class="bi bi-ticket-perforated"></i> 2. Ticket di resto pagati</div>
         <span class="count">&euro;{{ totali.ticket|floatformat:2 }}</span></div>
     <div class="section-body">
         <div class="spiega">Resti delle casse automatiche ridati al cliente con i contanti della cassa.</div>
         {% include 'ordini/_chiusura_voci.html' with lista=voci.ticket tipo='ticket' %}
         {% if modificabile %}
-        <form method="post" class="row g-2 align-items-end">
+        <form method="post" class="row g-2 align-items-end aggiungi">
             {% csrf_token %}
             <input type="hidden" name="data" value="{{ data|date:'Y-m-d' }}">
             <input type="hidden" name="azione" value="aggiungi_ticket">
             <input type="hidden" name="ancora" value="#ticket">
-            <div class="col-5 col-md-3"><label class="form-label small mb-1">Importo &euro;</label>
-                <input type="number" step="0.01" min="0.01" name="importo" class="form-control" required></div>
-            <div class="col-7 col-md-6"><label class="form-label small mb-1">Nota</label>
+            <div class="col-5"><label class="form-label small mb-1">Importo &euro;</label>
+                <input type="number" step="0.01" min="0.01" name="importo" class="form-control" inputmode="decimal" required></div>
+            <div class="col-7"><label class="form-label small mb-1">Nota</label>
                 <input type="text" name="nota" class="form-control" maxlength="100" placeholder="n. ticket, cassa"></div>
-            <div class="col-12 col-md-3"><button class="btn btn-outline-danger w-100"><i class="bi bi-plus-circle"></i> Aggiungi ticket</button></div>
+            <div class="col-12"><button class="btn btn-outline-danger w-100"><i class="bi bi-plus-circle"></i> Aggiungi ticket</button></div>
         </form>
         {% endif %}
     </div>
 </div>
+</div>
 
-{# ===== 3. Promo e omaggi ===== #}
+{# ===== 3. Spese ===== #}
+<div class="col-12 col-xl-6">
+<div class="section-card accent-amber" id="spese">
+    <div class="section-title"><div class="label"><i class="bi bi-receipt"></i> 3. Spese pagate dalla cassa</div>
+        <span class="count">&euro;{{ totali.spesa|floatformat:2 }}</span></div>
+    <div class="section-body">
+        <div class="spiega">Acquisti o pagamenti fatti con i contanti presi dalla cassa.</div>
+        {% include 'ordini/_chiusura_voci.html' with lista=voci.spesa tipo='spesa' %}
+        {% if modificabile %}
+        <form method="post" class="row g-2 align-items-end aggiungi">
+            {% csrf_token %}
+            <input type="hidden" name="data" value="{{ data|date:'Y-m-d' }}">
+            <input type="hidden" name="azione" value="aggiungi_spesa">
+            <input type="hidden" name="ancora" value="#spese">
+            <div class="col-12 col-sm-7"><label class="form-label small mb-1">Cosa</label>
+                <input type="text" name="descrizione" class="form-control" maxlength="200" required placeholder="es. gasolio generatore"></div>
+            <div class="col-6 col-sm-5"><label class="form-label small mb-1">Categoria</label>
+                <select name="categoria" class="form-select">
+                    {% for k, v in categorie_spesa %}<option value="{{ k }}"{% if k == 'altro' %} selected{% endif %}>{{ v }}</option>{% endfor %}
+                </select></div>
+            <div class="col-6 col-sm-5"><label class="form-label small mb-1">Scontrino n.</label>
+                <input type="text" name="riferimento" class="form-control" maxlength="100"></div>
+            <div class="col-12 col-sm-7"><label class="form-label small mb-1">Importo &euro;</label>
+                <input type="number" step="0.01" min="0.01" name="importo" class="form-control" inputmode="decimal" required></div>
+            <div class="col-12"><button class="btn btn-outline-warning w-100"><i class="bi bi-plus-circle"></i> Aggiungi spesa</button></div>
+        </form>
+        {% endif %}
+    </div>
+</div>
+</div>
+
+{# ===== 4. Promo e omaggi ===== #}
+<div class="col-12 col-xl-6">
 <div class="section-card accent-violet" id="promo">
     <div class="section-title"><div class="label"><i class="bi bi-gift"></i> 4. Promo e omaggi</div>
         <span class="count">&euro;{{ totali.promo|floatformat:2 }}</span></div>
@@ -147,79 +152,169 @@
             <strong>Operatori:</strong> lavaggi fatti dagli operatori gratis o scontati (lo sconto concesso).</div>
         {% include 'ordini/_chiusura_voci.html' with lista=voci.promo tipo='promo' %}
         {% if modificabile %}
-        <form method="post" class="row g-2 align-items-end">
+        <form method="post" class="row g-2 align-items-end aggiungi">
             {% csrf_token %}
             <input type="hidden" name="data" value="{{ data|date:'Y-m-d' }}">
             <input type="hidden" name="azione" value="aggiungi_promo">
             <input type="hidden" name="ancora" value="#promo">
-            <div class="col-12 col-md-3"><label class="form-label small mb-1">Tipo</label>
-                <select name="tipo" class="form-select" required>
-                    <option value="">— scegli —</option>
-                    {% for k, v in tipi_promo %}<option value="{{ k }}">{{ v }}</option>{% endfor %}
-                </select></div>
-            <div class="col-12 col-md-4"><label class="form-label small mb-1">Descrizione</label>
+            <div class="col-12">
+                <label class="form-label small mb-1 d-block">Tipo</label>
+                <div class="btn-group w-100" role="group">
+                    <input type="radio" class="btn-check" name="tipo" id="promo-macchine" value="macchine" required>
+                    <label class="btn btn-outline-secondary" for="promo-macchine">Macchine</label>
+                    <input type="radio" class="btn-check" name="tipo" id="promo-operatori" value="operatori">
+                    <label class="btn btn-outline-secondary" for="promo-operatori">Operatori</label>
+                </div>
+            </div>
+            <div class="col-12 col-sm-7"><label class="form-label small mb-1">Descrizione</label>
                 <input type="text" name="descrizione" class="form-control" maxlength="150" required placeholder="es. 2 gettoni a cliente abbonato"></div>
-            <div class="col-5 col-md-2"><label class="form-label small mb-1">Importo &euro;</label>
-                <input type="number" step="0.01" min="0.01" name="importo" class="form-control" required></div>
-            <div class="col-7 col-md-3"><button class="btn btn-outline-primary w-100" style="color:#8b5cf6;border-color:#8b5cf6"><i class="bi bi-plus-circle"></i> Aggiungi promo</button></div>
+            <div class="col-12 col-sm-5"><label class="form-label small mb-1">Importo &euro;</label>
+                <input type="number" step="0.01" min="0.01" name="importo" class="form-control" inputmode="decimal" required></div>
+            <div class="col-12"><button class="btn btn-outline-primary w-100" style="color:#8b5cf6;border-color:#8b5cf6"><i class="bi bi-plus-circle"></i> Aggiungi promo</button></div>
         </form>
         {% endif %}
     </div>
 </div>
-
-{# ===== 4. Spese ===== #}
-<div class="section-card accent-amber" id="spese">
-    <div class="section-title"><div class="label"><i class="bi bi-receipt"></i> 5. Spese pagate dalla cassa</div>
-        <span class="count">&euro;{{ totali.spesa|floatformat:2 }}</span></div>
-    <div class="section-body">
-        <div class="spiega">Acquisti o pagamenti fatti con i contanti presi dalla cassa.</div>
-        {% include 'ordini/_chiusura_voci.html' with lista=voci.spesa tipo='spesa' %}
-        {% if modificabile %}
-        <form method="post" class="row g-2 align-items-end">
-            {% csrf_token %}
-            <input type="hidden" name="data" value="{{ data|date:'Y-m-d' }}">
-            <input type="hidden" name="azione" value="aggiungi_spesa">
-            <input type="hidden" name="ancora" value="#spese">
-            <div class="col-12 col-md-4"><label class="form-label small mb-1">Cosa</label>
-                <input type="text" name="descrizione" class="form-control" maxlength="200" required placeholder="es. gasolio generatore"></div>
-            <div class="col-6 col-md-2"><label class="form-label small mb-1">Categoria</label>
-                <select name="categoria" class="form-select">
-                    {% for k, v in categorie_spesa %}<option value="{{ k }}"{% if k == 'altro' %} selected{% endif %}>{{ v }}</option>{% endfor %}
-                </select></div>
-            <div class="col-6 col-md-2"><label class="form-label small mb-1">Scontrino n.</label>
-                <input type="text" name="riferimento" class="form-control" maxlength="100"></div>
-            <div class="col-5 col-md-2"><label class="form-label small mb-1">Importo &euro;</label>
-                <input type="number" step="0.01" min="0.01" name="importo" class="form-control" required></div>
-            <div class="col-7 col-md-2"><button class="btn btn-outline-warning w-100"><i class="bi bi-plus-circle"></i> Aggiungi spesa</button></div>
-        </form>
-        {% endif %}
-    </div>
 </div>
 
 {# ===== 5. Lavaggi extra ===== #}
+<div class="col-12 col-xl-6">
 <div class="section-card accent-green" id="extra">
-    <div class="section-title"><div class="label"><i class="bi bi-plus-square"></i> 6. Lavaggi extra non segnati</div>
+    <div class="section-title"><div class="label"><i class="bi bi-plus-square"></i> 5. Lavaggi extra senza ordine</div>
         <span class="count">&euro;{{ totali.extra|floatformat:2 }}</span></div>
     <div class="section-body">
         <div class="spiega">Lavaggi o servizi fatti e incassati senza ordine nel gestionale.</div>
         {% include 'ordini/_chiusura_voci.html' with lista=voci.extra tipo='extra' %}
         {% if modificabile %}
-        <form method="post" class="row g-2 align-items-end">
+        <form method="post" class="row g-2 align-items-end aggiungi">
             {% csrf_token %}
             <input type="hidden" name="data" value="{{ data|date:'Y-m-d' }}">
             <input type="hidden" name="azione" value="aggiungi_extra">
             <input type="hidden" name="ancora" value="#extra">
-            <div class="col-12 col-md-5"><label class="form-label small mb-1">Lavaggio</label>
+            <div class="col-12"><label class="form-label small mb-1">Lavaggio</label>
                 <input type="text" name="descrizione" class="form-control" maxlength="150" required placeholder="es. Lavaggio completo Fiat Panda"></div>
-            <div class="col-6 col-md-2"><label class="form-label small mb-1">Pagato con</label>
+            <div class="col-6"><label class="form-label small mb-1">Pagato con</label>
                 <select name="metodo" class="form-select">
                     {% for k, v in metodi_extra %}<option value="{{ k }}">{{ v }}</option>{% endfor %}
                 </select></div>
-            <div class="col-6 col-md-2"><label class="form-label small mb-1">Importo &euro;</label>
-                <input type="number" step="0.01" min="0.01" name="importo" class="form-control" required></div>
-            <div class="col-12 col-md-3"><button class="btn btn-outline-success w-100"><i class="bi bi-plus-circle"></i> Aggiungi lavaggio</button></div>
+            <div class="col-6"><label class="form-label small mb-1">Importo &euro;</label>
+                <input type="number" step="0.01" min="0.01" name="importo" class="form-control" inputmode="decimal" required></div>
+            <div class="col-12"><button class="btn btn-outline-success w-100"><i class="bi bi-plus-circle"></i> Aggiungi lavaggio</button></div>
         </form>
         {% endif %}
     </div>
+</div>
+</div>
+
+{# ===== Conteggio cassa: solo con il permesso "Conteggio cassa" ===== #}
+{% if fa_conteggio %}
+<div class="col-12 col-xl-6">
+<div class="section-card accent-dark" id="conteggio">
+    <div class="section-title"><div class="label"><i class="bi bi-cash-stack"></i> Conteggio cassa <span class="badge bg-dark fw-normal" title="Permesso Conteggio cassa (Configurazione &gt; Permessi)">riservato</span></div>
+        {% if quadratura %}<span class="count fw-normal">salvato{% if quadratura.operatore %} da {{ quadratura.operatore.get_full_name|default:quadratura.operatore.username }}{% endif %} &middot; {{ quadratura.aggiornato_il|date:"H:i" }}</span>{% endif %}</div>
+    <div class="section-body">
+        <div class="spiega">Tutti i contanti scassettati dalle macchine e dal registratore, contati insieme, più il totale del lettore carte (POS) del servito. Lo vede solo chi ha il permesso <em>Conteggio cassa</em> (Configurazione &rsaquo; Permessi).</div>
+        <form method="post" class="row g-2 align-items-end">
+            {% csrf_token %}
+            <input type="hidden" name="data" value="{{ data|date:'Y-m-d' }}">
+            <input type="hidden" name="azione" value="conteggio">
+            <input type="hidden" name="ancora" value="#conteggio">
+            <div class="col-12 col-sm-6">
+                <label class="form-label small mb-1">Contanti totali contati &euro;</label>
+                <input type="number" step="0.01" min="0" name="contanti_totali" class="form-control form-control-lg" inputmode="decimal"
+                       value="{{ quadratura.contanti_totali|default:''|stringformat:'s' }}" required>
+            </div>
+            <div class="col-6 col-sm-3">
+                <label class="form-label small mb-1">POS &euro;</label>
+                <input type="number" step="0.01" min="0" name="lettore_carte_servito" class="form-control form-control-lg" inputmode="decimal"
+                       value="{{ quadratura.lettore_carte_servito|default:''|stringformat:'s' }}">
+            </div>
+            <div class="col-6 col-sm-3">
+                <label class="form-label small mb-1">Fondo &euro;</label>
+                <input type="number" step="0.01" min="0" name="fondo_cassa_iniziale" class="form-control form-control-lg" inputmode="decimal"
+                       value="{{ quadratura.fondo_cassa_iniziale|default:''|stringformat:'s' }}">
+            </div>
+            <div class="col-12">
+                <label class="form-label small mb-1">Note</label>
+                <input type="text" name="note" class="form-control" value="{{ quadratura.note|default:'' }}">
+            </div>
+            <div class="col-12"><button class="btn btn-dark w-100"><i class="bi bi-check-circle"></i> Salva conteggio</button></div>
+        </form>
+    </div>
+</div>
+</div>
+{% endif %}
+
+{# ===== 6. Scontrini delle casse automatiche ===== #}
+{% if fa_scontrini %}
+<div class="col-12">
+<div class="section-card accent-dark" id="scontrini">
+    <div class="section-title"><div class="label"><i class="bi bi-receipt-cutoff"></i> 6. Scontrini delle casse automatiche</div>
+        <span class="count">{{ scontrini_salvati }}/{{ scontrini|length }} inseriti</span></div>
+    <div class="section-body">
+        <div class="spiega">Copia i valori dagli scontrini di chiusura di ogni cassa. Lasciare vuoto vale 0.</div>
+        <div class="row g-3">
+        {% for e in scontrini %}
+        <div class="col-12 col-md-6 col-xxl-4">
+            <form method="post" class="border rounded p-3 h-100 {% if e.chiusura %}bg-light{% endif %}">
+                {% csrf_token %}
+                <input type="hidden" name="data" value="{{ data|date:'Y-m-d' }}">
+                <input type="hidden" name="azione" value="scontrino">
+                <input type="hidden" name="cassa" value="{{ e.cassa.pk }}">
+                <input type="hidden" name="ancora" value="#scontrini">
+                <div class="d-flex justify-content-between align-items-start mb-2">
+                    <div>
+                        <strong>{% if e.cassa.modalita_registratore %}<i class="bi bi-receipt text-warning"></i>{% elif e.cassa.tracking_washcycles %}<i class="bi bi-droplet-fill text-primary"></i>{% else %}<i class="bi bi-coin text-info"></i>{% endif %} {{ e.cassa.nome }}</strong>
+                        <div class="small text-muted">{% if e.cassa.modalita_registratore %}Registratore servito{% elif e.cassa.tracking_washcycles %}Portale{% else %}Cambia gettoni{% endif %}</div>
+                    </div>
+                    {% if e.chiusura.confermata %}<span class="badge bg-dark"><i class="bi bi-lock-fill"></i> Confermato</span>
+                    {% elif e.chiusura %}<span class="badge bg-success" title="{{ e.chiusura.aggiornato_il|date:'d/m H:i' }}"><i class="bi bi-check-lg"></i> Inserito</span>
+                    {% else %}<span class="badge bg-warning text-dark">Da inserire</span>{% endif %}
+                </div>
+                {% with c=e.chiusura bloccato=e.chiusura.confermata %}
+                {% if e.cassa.modalita_registratore %}
+                <label class="form-label small mb-1">Totale scontrino &euro;</label>
+                <input type="number" step="0.01" min="0" name="incasso_totale" class="form-control" inputmode="decimal" placeholder="0,00"
+                       value="{% if c %}{{ c.incasso_totale|stringformat:'.2f' }}{% endif %}" {% if bloccato or not modificabile %}disabled{% endif %}>
+                {% else %}
+                <div class="row g-2">
+                    <div class="col-6"><label class="form-label small mb-1">Incasso totale</label>
+                        <input type="number" step="0.01" min="0" name="incasso_totale" class="form-control" inputmode="decimal" placeholder="0,00"
+                               value="{% if c %}{{ c.incasso_totale|stringformat:'.2f' }}{% endif %}" {% if bloccato or not modificabile %}disabled{% endif %}></div>
+                    <div class="col-6"><label class="form-label small mb-1">Ricarica</label>
+                        <input type="number" step="0.01" min="0" name="incasso_ricarica" class="form-control" inputmode="decimal" placeholder="0,00"
+                               value="{% if c %}{{ c.incasso_ricarica|stringformat:'.2f' }}{% endif %}" {% if bloccato or not modificabile %}disabled{% endif %}>
+                        {% if e.ricarica_dichiarata %}<div class="small text-muted">dichiarate &euro;{{ e.ricarica_dichiarata|floatformat:2 }}</div>{% endif %}</div>
+                    <div class="col-6"><label class="form-label small mb-1">Vendita contante</label>
+                        <input type="number" step="0.01" min="0" name="vendita_contante" class="form-control" inputmode="decimal" placeholder="0,00"
+                               value="{% if c %}{{ c.vendita_contante|stringformat:'.2f' }}{% endif %}" {% if bloccato or not modificabile %}disabled{% endif %}></div>
+                    <div class="col-6"><label class="form-label small mb-1">Vendita non contante</label>
+                        <input type="number" step="0.01" min="0" name="vendita_non_contante" class="form-control" inputmode="decimal" placeholder="0,00"
+                               value="{% if c %}{{ c.vendita_non_contante|stringformat:'.2f' }}{% endif %}" {% if bloccato or not modificabile %}disabled{% endif %}></div>
+                    <div class="col-6"><label class="form-label small mb-1">Resto erogato reale</label>
+                        <input type="number" step="0.01" min="0" name="resto_erogato_reale" class="form-control" inputmode="decimal" placeholder="0,00"
+                               value="{% if c %}{{ c.resto_erogato_reale|stringformat:'.2f' }}{% endif %}" {% if bloccato or not modificabile %}disabled{% endif %}></div>
+                    {% if e.cassa.tracking_washcycles %}
+                    <div class="col-6"><label class="form-label small mb-1">WashCycles</label>
+                        <input type="number" min="0" name="wash_cycles" class="form-control" inputmode="numeric"
+                               value="{% if c.wash_cycles is not None %}{{ c.wash_cycles }}{% endif %}" {% if bloccato or not modificabile %}disabled{% endif %}></div>
+                    {% endif %}
+                </div>
+                {% endif %}
+                {% if modificabile and not bloccato %}
+                <button class="btn {% if c %}btn-outline-dark{% else %}btn-dark{% endif %} w-100 mt-2"><i class="bi bi-save"></i> {% if c %}Aggiorna scontrino{% else %}Salva scontrino{% endif %}</button>
+                {% endif %}
+                {% endwith %}
+            </form>
+        </div>
+        {% empty %}
+        <div class="col-12 text-muted small">Nessuna cassa automatica configurata.</div>
+        {% endfor %}
+        </div>
+    </div>
+</div>
+</div>
+{% endif %}
+
 </div>
 {% endblock %}

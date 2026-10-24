@@ -146,7 +146,7 @@ html { scroll-padding-top: 76px; scroll-behavior: smooth; }
   <div class="dash-header">
     <h4><i class="bi bi-file-earmark-bar-graph me-2"></i>Report Giornata &mdash; {{ data|date:"l d/m/Y"|capfirst }}</h4>
     <div class="d-flex gap-2 flex-wrap">
-      <a href="{% url 'ordini:chiusura-giornata' %}?data={{ data|date:'Y-m-d' }}" class="btn btn-sm btn-outline-secondary"><i class="bi bi-calculator"></i> Chiusura operatori</a>
+      <a href="{% url 'ordini:chiusura-giornata' %}?data={{ data|date:'Y-m-d' }}" class="btn btn-sm btn-outline-secondary"><i class="bi bi-journal-text"></i> Distinta operatori</a>
       <a href="{% url 'finanze:riepilogo_saldi_portali' %}?mese={{ data|date:'Y-m' }}" class="btn btn-sm btn-outline-primary"><i class="bi bi-journal-check"></i> Saldi del mese</a>
       <a href="{% url 'finanze:report_periodo' %}" class="btn btn-sm btn-outline-primary"><i class="bi bi-graph-up-arrow"></i> Report periodo</a>
     </div>
@@ -314,7 +314,7 @@ html { scroll-padding-top: 76px; scroll-behavior: smooth; }
     <span class="step-num">1</span>
     <div>
       <h5>Scontrini delle casse automatiche</h5>
-      <div class="step-sub">Copia i valori dagli scontrini di chiusura. Sotto i campi trovi i valori attesi (ricariche dichiarate, lavaggi WashTec) e i conti si aggiornano mentre scrivi.</div>
+      <div class="step-sub">Copia i valori dagli scontrini di chiusura (chi chiude la sera li pu&ograve; inserire anche dalla Distinta, negli Ordini). Sotto i campi trovi i valori attesi (ricariche dichiarate, lavaggi WashTec) e i conti si aggiornano mentre scrivi.</div>
     </div>
   </div>
   <div class="row g-3">
@@ -1301,7 +1301,7 @@ html { scroll-padding-top: 76px; scroll-behavior: smooth; }
     <div class="panel-title">
       <i class="bi bi-calculator text-primary"></i> Lavaggi extra e promo (chiusura operatori)
       <span class="badge bg-light text-dark ms-2">extra &euro;{{ quadratura.totale_extra|floatformat:2 }} &middot; promo &euro;{{ quadratura.promo_macchine|add:quadratura.promo_operatori|floatformat:2 }}</span>
-      <a href="{% url 'ordini:chiusura-giornata' %}?data={{ data|date:'Y-m-d' }}" class="btn btn-sm btn-outline-secondary ms-auto"><i class="bi bi-pencil"></i> Apri chiusura operatori</a>
+      <a href="{% url 'ordini:chiusura-giornata' %}?data={{ data|date:'Y-m-d' }}" class="btn btn-sm btn-outline-secondary ms-auto"><i class="bi bi-pencil"></i> Apri distinta operatori</a>
     </div>
     <div class="panel-sub">Gli extra si aggiungono all'atteso; le promo macchine lo riducono; le promo operatori riducono il residuo "pagati agli operatori" (non segnare lo stesso omaggio anche con la matita del residuo)</div>
     <div class="panel-body">
@@ -1353,7 +1353,7 @@ html { scroll-padding-top: 76px; scroll-behavior: smooth; }
         <span class="badge bg-dark ms-2" title="Confermata da {{ quadratura.obj.confermata_da|default:'—' }} il {{ quadratura.obj.confermata_il|date:'d/m H:i' }}"><i class="bi bi-lock-fill"></i> Confermata</span>
       {% endif %}
       <a href="{% url 'ordini:chiusura-giornata' %}?data={{ data|date:'Y-m-d' }}" class="btn btn-sm btn-outline-secondary ms-md-auto">
-        <i class="bi bi-calculator"></i> Chiusura operatori
+        <i class="bi bi-journal-text"></i> Distinta e conteggio
       </a>
       <a href="{% url 'finanze:quadratura_form' %}?data={{ data|date:'Y-m-d' }}" class="btn btn-sm btn-outline-primary">
         <i class="bi bi-pencil"></i>

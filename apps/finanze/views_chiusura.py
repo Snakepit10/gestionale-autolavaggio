@@ -1,10 +1,12 @@
-"""Chiusura giornata degli operatori (dalla lista ordini).
+"""Distinta di chiusura giornata (scheda "Distinta" della sezione Ordini).
 
-Gli operatori contano i contanti e il POS e dichiarano ticket di resto
-pagati, promo e omaggi, spese pagate dalla cassa e lavaggi extra fatti
-senza ordine. L'incrocio con la vendita lo fa il report giornata, dove il
-titolare conferma la giornata: da quel momento gli operatori non
-modificano piu' nulla.
+Gli operatori riportano i movimenti della prima pagina della distinta:
+ricariche delle casse, ticket di resto pagati, spese pagate dalla cassa,
+promo e omaggi, lavaggi extra fatti senza ordine. Il conteggio della
+cassa (contanti, POS, fondo) lo fa solo chi ha il permesso "Conteggio
+cassa" (Configurazione > Permessi). Il titolare fa l'incrocio con la
+vendita nel report giornata e conferma la giornata: da quel momento gli
+operatori non modificano piu' nulla.
 """
 from datetime import datetime, timedelta
 from decimal import Decimal, InvalidOperation
@@ -17,7 +19,7 @@ from django.utils import timezone
 
 from apps.auth_system.sezioni import ha_accesso
 
-from .models import (Cassa, LavaggioExtra, PromoGiornata, QuadraturaGiornaliera, RicaricaCassa, SpesaCassa,
+from .models import (Cassa, ChiusuraCassaAutomatica, LavaggioExtra, PromoGiornata, QuadraturaGiornaliera, RicaricaCassa, SpesaCassa,
                      TicketResto)
 
 # azione -> modello delle voci che si aggiungono/eliminano
@@ -50,6 +52,25 @@ def _importo(valore):
 def casse_ricaricabili():
     """Casse automatiche self service (non il registratore)."""
     return Cassa.objects.filter(tipo='automatica', attiva=True, modalita_registratore=False).order_by('ordine')
+
+
+def fa_conteggio(user):
+    """Vede e salva il conteggio della cassa (e atteso/saldo stampati)."""
+    return ha_accesso(user, 'conteggio_cassa')
+
+
+def fa_scontrini(user):
+    """Inserisce gli scontrini di chiusura delle casse automatiche."""
+    return ha_accesso(user, 'scontrini_casse')
+
+
+def _scontrini_casse(giorno, ricariche):
+    """Casse automatiche attive con lo scontrino del giorno (se c'e') e
+    il totale delle ricariche dichiarate dagli operatori."""
+    chiusure = {c.cassa_id: c for c in ChiusuraCassaAutomatica.objects.filter(data=giorno)}
+    return [{'cassa': c, 'chiusura': chiusure.get(c.pk),
+             'ricarica_dichiarata': sum((r.importo for r in ricariche if r.cassa_id == c.pk), Decimal('0.00'))}
+            for c in Cassa.objects.filter(tipo='automatica', attiva=True).order_by('ordine')]
 
 
 def giornata_confermata(giorno):
@@ -95,13 +116,66 @@ def chiusura_giornata(request):
         'tipi_promo': PromoGiornata.TIPO_CHOICES,
         'metodi_extra': LavaggioExtra.METODO_CHOICES,
         'vede_report': ha_accesso(request.user, 'finanze'),
+        'fa_conteggio': fa_conteggio(request.user),
+        'fa_scontrini': fa_scontrini(request.user),
+        'scontrini': _scontrini_casse(giorno, voci['ricarica']) if fa_scontrini(request.user) else [],
+        'scontrini_salvati': ChiusuraCassaAutomatica.objects.filter(
+            data=giorno, cassa__tipo='automatica', cassa__attiva=True).count(),
     })
+
+
+def _salva_scontrino(request, giorno):
+    """Crea o aggiorna lo scontrino di chiusura di una cassa automatica
+    (stessi campi del report giornata). Vuoto = 0; il registratore ha
+    solo il totale. Uno scontrino confermato non si modifica."""
+    p = request.POST
+    cassa = Cassa.objects.filter(tipo='automatica', attiva=True, pk=p.get('cassa') or None).first()
+    if cassa is None:
+        messages.error(request, 'Cassa non trovata.')
+        return
+    campi = ['incasso_totale'] if cassa.modalita_registratore else [
+        'incasso_totale', 'incasso_ricarica', 'vendita_contante', 'vendita_non_contante', 'resto_erogato_reale']
+    valori = {}
+    for campo in campi:
+        try:
+            valori[campo] = Decimal((p.get(campo) or '0').replace(',', '.').strip() or '0').quantize(Decimal('0.01'))
+        except InvalidOperation:
+            valori[campo] = None
+        if valori[campo] is None or valori[campo] < 0:
+            messages.error(request, f'{cassa}: importi non validi.')
+            return
+    if cassa.tracking_washcycles:
+        testo = (p.get('wash_cycles') or '').strip()
+        if testo and not testo.isdigit():
+            messages.error(request, f'{cassa}: WashCycles non validi.')
+            return
+        valori['wash_cycles'] = int(testo) if testo else None
+    chiusura = ChiusuraCassaAutomatica.objects.filter(cassa=cassa, data=giorno).first()
+    if chiusura and chiusura.confermata:
+        messages.error(request, f'Lo scontrino di {cassa} è confermato: non si modifica.')
+        return
+    if chiusura is None:
+        chiusura = ChiusuraCassaAutomatica(cassa=cassa, data=giorno, operatore=request.user)
+    for campo, valore in valori.items():
+        setattr(chiusura, campo, valore)
+    chiusura.save()
+    messages.success(request, f'Scontrino di {cassa} salvato.')
 
 
 def _azione(request, giorno):
     p = request.POST
     azione = p.get('azione', '')
+    if azione == 'scontrino':
+        if not fa_scontrini(request.user):
+            messages.error(request, 'Non hai il permesso per inserire gli scontrini delle casse.')
+            return
+        _salva_scontrino(request, giorno)
+        return
+
     if azione == 'conteggio':
+        if not fa_conteggio(request.user):
+            messages.error(request, 'Non hai il permesso per il conteggio della cassa.')
+            return
         valori = {}
         for campo in ('contanti_totali', 'lettore_carte_servito', 'fondo_cassa_iniziale'):
             testo = (p.get(campo) or '0').replace(',', '.').strip() or '0'
@@ -175,37 +249,94 @@ def _azione(request, giorno):
         messages.error(request, 'Azione non valida.')
 
 
-# Tipi della distinta cartacea, nell'ordine delle caselle
-TIPI_DISTINTA = ['Resto', 'Ricarica', 'Omaggio', 'Promo', 'Spese', 'Extra']
-RIGHE_DISTINTA = 22
+# Righe minime di ogni riquadro dei movimenti della distinta cartacea
+RIGHE_DISTINTA = 8
+# Tagli del conteggio dei contanti sul retro
+TAGLI_BANCONOTE = ['100', '50', '20', '10', '5']
+TAGLI_MONETE = ['2', '1', '0,50', '0,20', '0,10', '0,05']
+
+
+def _con_righe_vuote(voci, minimo=RIGHE_DISTINTA):
+    return list(voci) + [None] * max(minimo - len(voci), 0)
 
 
 @login_required
 def distinta_chiusura(request):
-    """Distinta cartacea della chiusura giornata (A4 fronte/retro): sul
-    fronte i movimenti (gia' registrati + righe vuote), sul retro il
-    conteggio della cassa. ?vuota=1 per un modulo in bianco."""
+    """Distinta cartacea della chiusura giornata (A4 fronte/retro).
+    Fronte: i movimenti della cassa in un riquadro per tipo (ricariche,
+    ticket di resto, spese, promo, lavaggi extra), con le voci gia'
+    registrate e righe vuote. Retro: conteggio dei contanti per taglio e
+    totale reale (operatore), poi atteso, residuo portali e saldo finale
+    (ufficio), con gli stessi passaggi della quadratura del report
+    giornata. ?vuota=1 per un modulo in bianco. Atteso e saldo si stampano
+    gia' calcolati solo per chi ha il permesso "Conteggio cassa"."""
     giorno = _data(request)
     vuota = request.GET.get('vuota') == '1'
-    quadratura = QuadraturaGiornaliera.objects.filter(data=giorno).first()
-    righe = []
-    if not vuota:
-        for r in RicaricaCassa.objects.filter(data=giorno).select_related('cassa'):
-            righe.append(('Ricarica', f'{r.cassa.nome}{" - " + r.nota if r.nota else ""}', r.importo))
-        for t in TicketResto.objects.filter(data=giorno):
-            righe.append(('Resto', t.nota or 'Ticket di resto', t.importo))
-        for p in PromoGiornata.objects.filter(data=giorno):
-            righe.append(('Promo', f'{p.descrizione} ({"macchine" if p.tipo == "macchine" else "operatori"})',
-                          p.importo))
-        for s in SpesaCassa.objects.filter(data=giorno):
-            righe.append(('Spese', s.descrizione + (f' (n. {s.riferimento})' if s.riferimento else ''), s.importo))
-        for x in LavaggioExtra.objects.filter(data=giorno):
-            righe.append(('Extra', f'{x.descrizione} ({x.get_metodo_display().lower()})', x.importo))
-    righe = [{'tipo': t, 'descrizione': d, 'importo': i} for t, d, i in righe]
-    righe += [None] * max(RIGHE_DISTINTA - len(righe), 6)
+    quadratura = None if vuota else QuadraturaGiornaliera.objects.filter(data=giorno).first()
+    voci = {nome: ([] if vuota else list(modello.objects.filter(data=giorno).select_related(
+                *(['cassa'] if nome == 'ricarica' else []))))
+            for nome, modello in VOCI.items()}
+
+    def totale(lista, filtro=lambda v: True):
+        scelte = [v.importo for v in lista if filtro(v)]
+        return sum(scelte, Decimal('0.00')) if scelte else None
+
+    saldo = None if vuota else _saldo_distinta(giorno, quadratura, fa_conteggio(request.user))
     return render(request, 'ordini/distinta_chiusura.html', {
         'data': None if vuota else giorno,
-        'quadratura': None if vuota else quadratura,
-        'righe': righe,
-        'tipi': TIPI_DISTINTA,
+        'quadratura': quadratura,
+        'ricariche': _con_righe_vuote(voci['ricarica']),
+        'ticket': _con_righe_vuote(voci['ticket']),
+        'spese': _con_righe_vuote(voci['spesa']),
+        'promo': _con_righe_vuote(voci['promo']),
+        'extra': _con_righe_vuote(voci['extra']),
+        'totali': {
+            'ricarica': totale(voci['ricarica']),
+            'ticket': totale(voci['ticket']),
+            'spesa': totale(voci['spesa']),
+            'promo_macchine': totale(voci['promo'], lambda p: p.tipo == 'macchine'),
+            'promo_operatori': totale(voci['promo'], lambda p: p.tipo == 'operatori'),
+            'extra': totale(voci['extra']),
+        },
+        'tagli_banconote': TAGLI_BANCONOTE,
+        'tagli_monete': TAGLI_MONETE,
+        'saldo': saldo,
     })
+
+
+def _saldo_distinta(giorno, quadratura, con_atteso):
+    """Righe del retro della distinta (stessi conti della quadratura del
+    report giornata): i valori noti sono gia' compilati, gli altri restano
+    vuoti da scrivere a mano. Atteso e saldo solo se con_atteso."""
+    from .models import ChiusuraCassaAutomatica
+    from .views import _saldo_giornata
+
+    q, _ = _saldo_giornata(giorno)
+    contato = quadratura is not None
+    saldo = {
+        'contanti': quadratura.contanti_totali if contato else None,
+        'pos': quadratura.lettore_carte_servito if contato else None,
+        'fondo': quadratura.fondo_cassa_iniziale if contato else None,
+        'spese': q['spese_cassa'] if q['spese_cassa'] else None,
+        'ticket': q['ticket_resto'] if q['ticket_resto'] else None,
+        'reale': q['totale_reale'],
+    }
+    if not con_atteso:
+        return saldo
+    scontrini = list(ChiusuraCassaAutomatica.objects.filter(data=giorno, cassa__modalita_registratore=False))
+    if scontrini:
+        saldo['incasso_casse'] = sum((c.incasso_totale for c in scontrini), Decimal('0.00'))
+        saldo['ricarica_casse'] = sum((c.incasso_ricarica for c in scontrini), Decimal('0.00'))
+    saldo.update({
+        'promo_macchine': q['promo_macchine'],
+        'servito': q['totale_servito'],
+        'extra': q['totale_extra'],
+        'atteso': q['totale_teorico'],
+        'residuo_lordo': q['residuo_operatori_lordo'],
+        'promo_operatori': q['promo_operatori'],
+        'operatori': q['residuo_operatori'],
+        'saldo': q['differenza'],
+        'stato': q['stato'],
+        'con_atteso': True,
+    })
+    return saldo
