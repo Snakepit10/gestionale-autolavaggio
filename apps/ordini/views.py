@@ -1165,21 +1165,34 @@ class OrdiniNonPagatiView(LoginRequiredMixin, ListView):
         # Toggle "Mostra archiviati": la pagina mostra o gli ordini
         # attivi o quelli archiviati a mano, mai insieme.
         self.mostra_archiviati = self.request.GET.get('archiviati') == '1'
+        # Filtri del form: stato pagamento (default non pagati +
+        # parziali) e intervallo di date sul giorno dell'ordine.
+        stato = self.request.GET.get('stato_pagamento')
+        stati = ([stato] if stato in ('non_pagato', 'parziale', 'differito')
+                 else ['non_pagato', 'parziale'])
         # Fuori: gli annullati (non sono crediti) e gli ordini avviati
         # alla fatturazione (flag o gia' in fattura), che si gestiscono
         # dalla pagina Fatture.
-        return Ordine.objects.filter(
-            stato_pagamento__in=['non_pagato', 'parziale'],
+        qs = Ordine.objects.filter(
+            stato_pagamento__in=stati,
             non_pagato_archiviato=self.mostra_archiviati,
             richiede_fattura=False,
             fattura__isnull=True,
-        ).exclude(stato='annullato').select_related(
-            'cliente', 'fattura').order_by('-data_ora')
+        ).exclude(stato='annullato')
+        for campo, lookup in (('data_da', 'gte'), ('data_a', 'lte')):
+            try:
+                giorno = datetime.strptime(
+                    self.request.GET.get(campo) or '', '%Y-%m-%d').date()
+            except ValueError:
+                continue
+            qs = qs.filter(**{f'data_ora__date__{lookup}': giorno})
+        return qs.select_related('cliente', 'fattura').order_by('-data_ora')
 
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
         ordini = list(context['ordini'])
         context['mostra_archiviati'] = self.mostra_archiviati
+        context['ieri'] = timezone.localdate() - timedelta(days=1)
         context['n_archiviati'] = Ordine.objects.filter(
             stato_pagamento__in=['non_pagato', 'parziale'],
             non_pagato_archiviato=True,

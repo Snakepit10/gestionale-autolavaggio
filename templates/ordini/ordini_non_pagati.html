@@ -104,7 +104,8 @@ tr.gruppo-header .meta { font-size: .8rem; color: #64748b; }
 <!-- Filtri -->
 <div class="card mb-4">
     <div class="card-body">
-        <form method="get" class="row g-3">
+        <form method="get" class="row g-3" id="form-filtri">
+            {% if mostra_archiviati %}<input type="hidden" name="archiviati" value="1">{% endif %}
             <div class="col-md-3">
                 <label class="form-label">Stato Pagamento:</label>
                 <select name="stato_pagamento" class="form-select">
@@ -124,11 +125,17 @@ tr.gruppo-header .meta { font-size: .8rem; color: #64748b; }
             </div>
             <div class="col-md-3">
                 <label class="form-label">&nbsp;</label>
-                <div class="d-flex gap-2">
+                <div class="d-flex gap-2 flex-wrap">
                     <button type="submit" class="btn btn-primary">
                         <i class="bi bi-search"></i> Filtra
                     </button>
-                    <a href="{% url 'ordini:ordini-non-pagati' %}" class="btn btn-outline-secondary">
+                    <button type="button" class="btn btn-outline-primary"
+                            title="Mostra solo gli ordini fino a ieri (esclude quelli di oggi, ancora aperti)"
+                            onclick="const f = document.getElementById('form-filtri'); f.data_a.value = '{{ ieri|date:'Y-m-d' }}'; f.submit();">
+                        Escludi oggi
+                    </button>
+                    <a href="{% url 'ordini:ordini-non-pagati' %}{% if mostra_archiviati %}?archiviati=1{% endif %}"
+                       class="btn btn-outline-secondary" title="Azzera i filtri">
                         <i class="bi bi-arrow-clockwise"></i>
                     </a>
                 </div>

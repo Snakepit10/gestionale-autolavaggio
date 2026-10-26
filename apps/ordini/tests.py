@@ -4,7 +4,7 @@ from decimal import Decimal
 
 from django.contrib.auth.models import User
 from apps.auth_system.testutils import utente_titolare
-from django.test import TestCase
+from django.test import TestCase, override_settings
 from django.urls import reverse
 
 from apps.ordini.models import Ordine
@@ -39,6 +39,55 @@ class ArchiviaNonPagatiTest(TestCase):
         self.assertTrue(self._post(admin, archivia=False).json()['success'])
         self.ordine.refresh_from_db()
         self.assertFalse(self.ordine.non_pagato_archiviato)
+
+
+@override_settings(STORAGES={
+    'default': {'BACKEND': 'django.core.files.storage.FileSystemStorage'},
+    'staticfiles': {
+        'BACKEND': 'django.contrib.staticfiles.storage.StaticFilesStorage'},
+})
+class FiltriNonPagatiTest(TestCase):
+    """Filtri della pagina ordini non pagati (stato e intervallo date)."""
+
+    def setUp(self):
+        from datetime import timedelta
+        from django.utils import timezone
+        adesso = timezone.now()
+        self.oggi = Ordine.objects.create(
+            totale=Decimal('10'), totale_finale=Decimal('10'),
+            stato_pagamento='non_pagato')
+        self.ieri = Ordine.objects.create(
+            totale=Decimal('10'), totale_finale=Decimal('10'),
+            stato_pagamento='parziale')
+        Ordine.objects.filter(pk=self.ieri.pk).update(
+            data_ora=adesso - timedelta(days=1))
+        self.data_oggi = timezone.localdate()
+        self.client.force_login(
+            utente_titolare('op', 'op@x.it', 'x', is_staff=True))
+
+    def _pk(self, **params):
+        r = self.client.get(reverse('ordini:ordini-non-pagati'), params)
+        self.assertEqual(r.status_code, 200)
+        return {o.pk for o in r.context['ordini']}
+
+    def test_senza_filtri(self):
+        self.assertEqual(self._pk(), {self.oggi.pk, self.ieri.pk})
+
+    def test_data_a_esclude_oggi(self):
+        from datetime import timedelta
+        ieri = (self.data_oggi - timedelta(days=1)).isoformat()
+        self.assertEqual(self._pk(data_a=ieri), {self.ieri.pk})
+
+    def test_data_da(self):
+        self.assertEqual(self._pk(data_da=self.data_oggi.isoformat()),
+                         {self.oggi.pk})
+
+    def test_stato_pagamento(self):
+        self.assertEqual(self._pk(stato_pagamento='parziale'),
+                         {self.ieri.pk})
+
+    def test_data_non_valida_ignorata(self):
+        self.assertEqual(self._pk(data_a='boh'), {self.oggi.pk, self.ieri.pk})
 
 
 class VenditaProdottiTest(TestCase):
