@@ -183,7 +183,7 @@
         </div>
     {% endif %}
     {% for gf in gruppi_fatture_da_pagare %}
-        {% include 'fatture/_gruppo_fatture.html' %}
+        {% include 'fatture/_gruppo_fatture.html' with sezione='da-pagare' %}
     {% endfor %}
     </div>
 
@@ -199,7 +199,7 @@
         <div class="alert alert-light border">Ancora nessuna fattura pagata.</div>
     {% endif %}
     {% for gf in gruppi_fatture_pagate %}
-        {% include 'fatture/_gruppo_fatture.html' %}
+        {% include 'fatture/_gruppo_fatture.html' with sezione='pagate' %}
     {% endfor %}
     </div>
 

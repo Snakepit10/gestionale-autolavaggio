@@ -442,6 +442,32 @@ class StampaPdfTest(BaseFattureTest):
             contenuto = b''.join(r.streaming_content)
             self.assertTrue(contenuto.startswith(b'%PDF'))
 
+    def test_pdf_riepilogo_cliente(self):
+        fattura = Fattura.objects.create(
+            numero='1/2026', data=date(2026, 1, 1),
+            ragione_sociale='X', cliente=self.cliente_a)
+        _crea_ordine(self.cliente_a, richiede_fattura=True, fattura=fattura)
+        Fattura.objects.create(numero='2/2026', data=date(2026, 1, 2),
+                               ragione_sociale='Y')
+        url = reverse('fatture:stampa', args=['da-pagare'])
+        for cliente in [str(self.cliente_a.pk), 'nessuno']:
+            r = self.client.get(url, {'cliente': cliente})
+            self.assertEqual(r.status_code, 200)
+            self.assertIn(f'cliente-{cliente}', r['Content-Disposition'])
+            contenuto = b''.join(r.streaming_content)
+            self.assertTrue(contenuto.startswith(b'%PDF'))
+        r = self.client.get(url, {'cliente': 'boh'})
+        self.assertEqual(r.status_code, 404)
+
+    def test_card_mostra_pulsante_riepilogo(self):
+        from django.template.loader import render_to_string
+        html = render_to_string('fatture/_gruppo_fatture.html', {
+            'gf': {'cliente': self.cliente_a, 'fatture': [],
+                   'totale': 0, 'saldo': 0},
+            'sezione': 'da-pagare'})
+        self.assertIn(reverse('fatture:stampa', args=['da-pagare'])
+                      + f'?cliente={self.cliente_a.pk}', html)
+
     def test_sezione_sconosciuta_404(self):
         r = self.client.get(reverse('fatture:stampa', args=['boh']))
         self.assertEqual(r.status_code, 404)

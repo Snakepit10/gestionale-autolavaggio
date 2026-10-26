@@ -557,6 +557,11 @@ def stampa_pdf(request, sezione):
 
     if sezione not in _STAMPA_TITOLI:
         return HttpResponse('Sezione sconosciuta', status=404)
+    # ?cliente=<pk> (o 'nessuno'): riepilogo del singolo cliente con
+    # il dettaglio delle fatture. Solo per le schede delle fatture emesse.
+    cliente_param = (request.GET.get('cliente') or '').strip()
+    if sezione == 'da-fatturare':
+        cliente_param = ''
 
     base = getSampleStyleSheet()
     styles = {
@@ -568,6 +573,8 @@ def stampa_pdf(request, sezione):
         'gruppo': ParagraphStyle('gruppo', parent=base['Heading3'],
                                  fontSize=11, spaceBefore=10, spaceAfter=3),
         'cella': ParagraphStyle('cella', parent=base['Normal'], fontSize=8),
+        'fattura': ParagraphStyle('fattura', parent=base['Normal'],
+                                  fontSize=9, spaceBefore=8, spaceAfter=2),
     }
     stile_tabella = TableStyle([
         ('FONTSIZE', (0, 0), (-1, -1), 8),
@@ -582,8 +589,9 @@ def stampa_pdf(request, sezione):
         ('BOTTOMPADDING', (0, 0), (-1, -1), 3),
     ])
 
+    from django.utils.html import escape
+
     def _p(testo):
-        from django.utils.html import escape
         return Paragraph(escape(str(testo or '-')), styles['cella'])
 
     def _eur(valore):
@@ -597,6 +605,7 @@ def stampa_pdf(request, sezione):
             styles['sotto']),
     ]
     totale_generale = Decimal('0')
+    saldo_generale = Decimal('0')
 
     if sezione == 'da-fatturare':
         gruppi, senza_cliente, voci_senza = _dati_da_fatturare()
@@ -637,6 +646,65 @@ def stampa_pdf(request, sezione):
             totale_generale += gruppo['totale']
             elementi.append(Table(righe, colWidths=larghezze,
                                   style=stile_tabella, repeatRows=1))
+    elif cliente_param:
+        # Riepilogo di un singolo cliente col dettaglio di ogni fattura
+        stati = (['da_pagare'] if sezione == 'da-pagare'
+                 else ['pagata', 'archiviata'])
+        if cliente_param == 'nessuno':
+            fatture = [f for f in _fatture_emesse()
+                       if f.stato in stati and not f.cliente_id]
+        elif cliente_param.isdigit():
+            fatture = [f for f in _fatture_emesse()
+                       if f.stato in stati
+                       and f.cliente_id == int(cliente_param)]
+        else:
+            return HttpResponse('Cliente non valido', status=404)
+        gruppi = _raggruppa_fatture(fatture)
+        intest = ['Ordine', 'Data', 'Tipo auto', 'Servizi', 'Targa',
+                  'Matricola', 'Nota', 'Importo']
+        larghezze = [55, 42, 88, 320, 48, 55, 100, 55]
+        for gruppo in gruppi:
+            elementi.append(_pdf_intestazione_gruppo(gruppo, styles))
+            for f in gruppo['fatture']:
+                testo = (f'Fattura <b>{escape(f.numero)}</b> del '
+                         f'{f.data.strftime("%d/%m/%Y")} - '
+                         f'{escape(f.ragione_sociale)}'
+                         f' <font color="#64748b" size="8">'
+                         f'({f.get_stato_display()})</font>')
+                elementi.append(Paragraph(testo, styles['fattura']))
+                righe = [intest]
+                for o in f.ordini.all():
+                    servizi = ', '.join(
+                        i.servizio_prodotto.titolo for i in o.items.all()
+                    ) or (o.nota or '-')
+                    righe.append([
+                        f'#{o.numero_breve}',
+                        timezone.localtime(o.data_ora).strftime('%d/%m/%y'),
+                        _p(o.tipo_auto), _p(servizi), _p(o.fattura_targa),
+                        _p(o.fattura_matricola), _p(o.fattura_nota),
+                        _eur(o.importo_in_fattura),
+                    ])
+                for r in f.righe.all():
+                    righe.append([
+                        'voce', r.data.strftime('%d/%m/%y'),
+                        _p(r.tipo_auto), _p(r.descrizione), _p(r.targa),
+                        _p(r.matricola), _p(r.nota), _eur(r.importo),
+                    ])
+                if f.saldo_dovuto != f.totale:
+                    righe.append(['', '', '', '', '', '',
+                                  'Saldo dovuto', _eur(f.saldo_dovuto)])
+                righe.append(['', '', '', '', '', '', 'Totale fattura',
+                              _eur(f.totale)])
+                elementi.append(Table(righe, colWidths=larghezze,
+                                      style=stile_tabella, repeatRows=1))
+            totale_generale += gruppo['totale']
+            saldo_generale += gruppo['saldo']
+        if gruppi:
+            nome = (gruppi[0]['cliente'].nome_completo
+                    if gruppi[0]['cliente'] else 'Senza cliente')
+            elementi[0] = Paragraph(
+                f'{_STAMPA_TITOLI[sezione]} - {escape(nome)}',
+                styles['titolo'])
     else:
         stati = (['da_pagare'] if sezione == 'da-pagare'
                  else ['pagata', 'archiviata'])
@@ -669,6 +737,10 @@ def stampa_pdf(request, sezione):
         elementi.append(Paragraph(
             f'<b>Totale complessivo: {_eur(totale_generale)}</b>',
             styles['gruppo']))
+        if cliente_param and sezione == 'da-pagare':
+            elementi.append(Paragraph(
+                f'<b>Saldo da incassare: {_eur(saldo_generale)}</b>',
+                styles['gruppo']))
 
     buffer = io.BytesIO()
     doc = SimpleDocTemplate(
@@ -678,6 +750,8 @@ def stampa_pdf(request, sezione):
         title=_STAMPA_TITOLI[sezione])
     doc.build(elementi)
     buffer.seek(0)
+    if cliente_param:
+        sezione = f'{sezione}-cliente-{cliente_param}'
     nome_file = (f'{sezione}-'
                  f'{timezone.localdate().strftime("%Y%m%d")}.pdf')
     return FileResponse(buffer, filename=nome_file,

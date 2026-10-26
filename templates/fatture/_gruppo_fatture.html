@@ -1,6 +1,7 @@
 {% comment %}
 Card collassabile con le fatture di un cliente (variabile `gf`:
-cliente, fatture, totale, saldo). Usata nelle schede "da pagare"
+cliente, fatture, totale, saldo; `sezione` opzionale abilita la
+stampa del riepilogo per cliente). Usata nelle schede "da pagare"
 e "pagate".
 {% endcomment %}
 <div class="gruppo-card">
@@ -26,6 +27,14 @@ e "pagate".
             {% if gf.saldo > 0 %}
             <span class="badge rounded-pill bg-danger-subtle text-danger-emphasis border border-danger-subtle">
                 da incassare &euro;{{ gf.saldo }}</span>
+            {% endif %}
+            {% if sezione %}
+            <a href="{% url 'fatture:stampa' sezione %}?cliente={% if gf.cliente %}{{ gf.cliente.pk }}{% else %}nessuno{% endif %}"
+               target="_blank" onclick="event.stopPropagation()"
+               class="btn btn-sm btn-outline-secondary"
+               title="Stampa il riepilogo del cliente con il dettaglio delle fatture">
+                <i class="bi bi-printer"></i> Riepilogo
+            </a>
             {% endif %}
         </div>
     </div>
