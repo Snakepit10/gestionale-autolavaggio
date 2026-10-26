@@ -74,19 +74,27 @@ def _dati_da_fatturare():
     for cliente in voci_per_cliente:
         if cliente not in gruppi:
             clienti_gruppi.append(cliente)
-    gruppi_cliente = []
-    for cliente in clienti_gruppi:
-        ordini = gruppi.get(cliente, [])
-        voci = voci_per_cliente.get(cliente, [])
-        gruppi_cliente.append({
-            'cliente': cliente, 'ordini': ordini, 'voci': voci,
-            'n_elementi': len(ordini) + len(voci),
-            'totale': (
-                sum((o.totale_finale or Decimal('0') for o in ordini),
-                    Decimal('0'))
-                + sum((v.importo for v in voci), Decimal('0'))),
-        })
+    gruppi_cliente = [
+        _gruppo_da_fatturare(cliente, gruppi.get(cliente, []),
+                             voci_per_cliente.get(cliente, []))
+        for cliente in clienti_gruppi
+    ]
     return gruppi_cliente, senza_cliente, voci_senza_cliente
+
+
+def _gruppo_da_fatturare(cliente, ordini, voci):
+    gruppo = {
+        'cliente': cliente, 'ordini': ordini, 'voci': voci,
+        'n_elementi': len(ordini) + len(voci),
+        'totale': (
+            sum((o.totale_finale or Decimal('0') for o in ordini),
+                Decimal('0'))
+            + sum((v.importo for v in voci), Decimal('0'))),
+    }
+    gruppo['whatsapp_numero'] = _numero_whatsapp(
+        cliente.telefono if cliente else '')
+    gruppo['whatsapp_testo'] = _testo_whatsapp_da_fatturare(gruppo)
+    return gruppo
 
 
 def _numero_whatsapp(telefono):
@@ -123,6 +131,40 @@ def _testo_whatsapp_riepilogo(gruppo):
         righe.append(f'Da saldare: {_eur_testo(gruppo["saldo"])}')
     righe.append('In allegato il dettaglio in PDF. Grazie!')
     return '\n'.join(righe)
+
+
+def _testo_whatsapp_da_fatturare(gruppo):
+    """Messaggio precompilato per WhatsApp Web coi servizi ancora da
+    fatturare (ordini + voci manuali) e il totale."""
+    cliente = gruppo['cliente']
+    righe = [f'Buongiorno{" " + cliente.nome_completo if cliente else ""},',
+             'le inviamo il riepilogo dei servizi da fatturare:']
+    for o in gruppo['ordini']:
+        servizi = ', '.join(
+            i.servizio_prodotto.titolo for i in o.items.all()
+        ) or (o.nota or 'Ordine')
+        targa = f' ({o.fattura_targa})' if o.fattura_targa else ''
+        righe.append(
+            f'- {timezone.localtime(o.data_ora).strftime("%d/%m/%Y")} '
+            f'{servizi}{targa}: {_eur_testo(o.totale_finale or Decimal("0"))}')
+    for v in gruppo['voci']:
+        targa = f' ({v.targa})' if v.targa else ''
+        righe.append(f'- {v.data.strftime("%d/%m/%Y")} {v.descrizione}'
+                     f'{targa}: {_eur_testo(v.importo)}')
+    righe.append(f'Totale: {_eur_testo(gruppo["totale"])}')
+    righe.append('In allegato il dettaglio in PDF. Grazie!')
+    return '\n'.join(righe)
+
+
+def _filtra_gruppi_cliente(gruppi, cliente_param):
+    """Tiene solo il gruppo del cliente richiesto ('nessuno' = senza
+    cliente); None se il parametro non e' valido."""
+    if cliente_param == 'nessuno':
+        return [g for g in gruppi if g['cliente'] is None]
+    if cliente_param.isdigit():
+        return [g for g in gruppi if g['cliente']
+                and g['cliente'].pk == int(cliente_param)]
+    return None
 
 
 def _gruppo_fatture(cliente, lista):
@@ -193,6 +235,8 @@ def fatture_home(request):
     fatture_da_pagare = [f for f in fatture if f.stato == 'da_pagare']
     fatture_pagate = [f for f in fatture
                       if f.stato in ('pagata', 'archiviata')]
+    gruppo_senza_cliente = _gruppo_da_fatturare(
+        None, senza_cliente, voci_senza_cliente)
 
     return render(request, 'fatture/fatture_list.html', {
         'fatture_json': fatture_json,
@@ -206,11 +250,9 @@ def fatture_home(request):
         'gruppi_cliente': gruppi_cliente,
         'senza_cliente': senza_cliente,
         'voci_senza_cliente': voci_senza_cliente,
-        'n_senza_cliente': len(senza_cliente) + len(voci_senza_cliente),
-        'totale_senza_cliente': (
-            sum((o.totale_finale or Decimal('0') for o in senza_cliente),
-                Decimal('0'))
-            + sum((v.importo for v in voci_senza_cliente), Decimal('0'))),
+        'n_senza_cliente': gruppo_senza_cliente['n_elementi'],
+        'totale_senza_cliente': gruppo_senza_cliente['totale'],
+        'gruppo_senza_cliente': gruppo_senza_cliente,
         'fatture': fatture,
         'metodi_pagamento': Pagamento.METODO_CHOICES,
         'oggi': timezone.localdate(),
@@ -597,11 +639,9 @@ def stampa_pdf(request, sezione):
 
     if sezione not in _STAMPA_TITOLI:
         return HttpResponse('Sezione sconosciuta', status=404)
-    # ?cliente=<pk> (o 'nessuno'): riepilogo del singolo cliente con
-    # il dettaglio delle fatture. Solo per le schede delle fatture emesse.
+    # ?cliente=<pk> (o 'nessuno'): riepilogo del singolo cliente; per
+    # le fatture emesse col dettaglio di ogni fattura.
     cliente_param = (request.GET.get('cliente') or '').strip()
-    if sezione == 'da-fatturare':
-        cliente_param = ''
 
     base = getSampleStyleSheet()
     styles = {
@@ -650,14 +690,12 @@ def stampa_pdf(request, sezione):
     if sezione == 'da-fatturare':
         gruppi, senza_cliente, voci_senza = _dati_da_fatturare()
         if senza_cliente or voci_senza:
-            gruppi.append({
-                'cliente': None, 'ordini': senza_cliente,
-                'voci': voci_senza,
-                'totale': (
-                    sum((o.totale_finale or Decimal('0')
-                         for o in senza_cliente), Decimal('0'))
-                    + sum((v.importo for v in voci_senza), Decimal('0'))),
-            })
+            gruppi.append(
+                _gruppo_da_fatturare(None, senza_cliente, voci_senza))
+        if cliente_param:
+            gruppi = _filtra_gruppi_cliente(gruppi, cliente_param)
+            if gruppi is None:
+                return HttpResponse('Cliente non valido', status=404)
         intest = ['Ordine', 'Data', 'Tipo auto', 'Servizi', 'Targa',
                   'Matricola', 'Nota', 'Totale']
         larghezze = [55, 42, 88, 320, 48, 55, 100, 55]
@@ -690,16 +728,11 @@ def stampa_pdf(request, sezione):
         # Riepilogo di un singolo cliente col dettaglio di ogni fattura
         stati = (['da_pagare'] if sezione == 'da-pagare'
                  else ['pagata', 'archiviata'])
-        if cliente_param == 'nessuno':
-            fatture = [f for f in _fatture_emesse()
-                       if f.stato in stati and not f.cliente_id]
-        elif cliente_param.isdigit():
-            fatture = [f for f in _fatture_emesse()
-                       if f.stato in stati
-                       and f.cliente_id == int(cliente_param)]
-        else:
+        gruppi = _filtra_gruppi_cliente(_raggruppa_fatture(
+            [f for f in _fatture_emesse() if f.stato in stati]),
+            cliente_param)
+        if gruppi is None:
             return HttpResponse('Cliente non valido', status=404)
-        gruppi = _raggruppa_fatture(fatture)
         intest = ['Ordine', 'Data', 'Tipo auto', 'Servizi', 'Targa',
                   'Matricola', 'Nota', 'Importo']
         larghezze = [55, 42, 88, 320, 48, 55, 100, 55]
@@ -739,12 +772,6 @@ def stampa_pdf(request, sezione):
                                       style=stile_tabella, repeatRows=1))
             totale_generale += gruppo['totale']
             saldo_generale += gruppo['saldo']
-        if gruppi:
-            nome = (gruppi[0]['cliente'].nome_completo
-                    if gruppi[0]['cliente'] else 'Senza cliente')
-            elementi[0] = Paragraph(
-                f'{_STAMPA_TITOLI[sezione]} - {escape(nome)}',
-                styles['titolo'])
     else:
         stati = (['da_pagare'] if sezione == 'da-pagare'
                  else ['pagata', 'archiviata'])
@@ -769,6 +796,12 @@ def stampa_pdf(request, sezione):
             totale_generale += gruppo['totale']
             elementi.append(Table(righe, colWidths=larghezze,
                                   style=stile_tabella, repeatRows=1))
+
+    if cliente_param and gruppi:
+        nome = (gruppi[0]['cliente'].nome_completo
+                if gruppi[0]['cliente'] else 'Senza cliente')
+        elementi[0] = Paragraph(
+            f'{_STAMPA_TITOLI[sezione]} - {escape(nome)}', styles['titolo'])
 
     if len(elementi) == 2:
         elementi.append(Paragraph('Nessun elemento.', styles['cella']))

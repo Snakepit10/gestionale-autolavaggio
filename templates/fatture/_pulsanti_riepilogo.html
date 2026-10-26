@@ -1,0 +1,27 @@
+{% comment %}
+Pulsanti del riepilogo di un cliente: stampa, scarica PDF, invio su
+WhatsApp Web. Variabili: `sezione` (scheda), `g` (gruppo con cliente,
+whatsapp_numero, whatsapp_testo).
+{% endcomment %}
+{% url 'fatture:stampa' sezione as url_stampa %}
+{% with cliente_q=g.cliente.pk|default:'nessuno' %}
+<div class="btn-group" onclick="event.stopPropagation()">
+    <a href="{{ url_stampa }}?cliente={{ cliente_q }}"
+       target="_blank" class="btn btn-sm btn-outline-secondary"
+       title="Stampa il riepilogo del cliente con il dettaglio">
+        <i class="bi bi-printer"></i> Riepilogo
+    </a>
+    <a href="{{ url_stampa }}?cliente={{ cliente_q }}&download=1"
+       class="btn btn-sm btn-outline-secondary" title="Scarica il PDF del riepilogo">
+        <i class="bi bi-download"></i>
+    </a>
+    <button type="button" class="btn btn-sm btn-outline-success"
+            title="Invia su WhatsApp Web: scarica il PDF e apre la chat col messaggio pronto"
+            data-pdf-url="{{ url_stampa }}?cliente={{ cliente_q }}&download=1"
+            data-numero="{{ g.whatsapp_numero }}"
+            data-testo="{{ g.whatsapp_testo }}"
+            onclick="inviaRiepilogoWhatsapp(this)">
+        <i class="bi bi-whatsapp"></i>
+    </button>
+</div>
+{% endwith %}

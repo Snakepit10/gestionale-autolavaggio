@@ -119,6 +119,7 @@
                 <span class="badge rounded-pill badge-soft">
                     {{ gruppo.n_elementi }} element{{ gruppo.n_elementi|pluralize:"o,i" }}</span>
                 <span class="badge rounded-pill badge-tot">&euro;{{ gruppo.totale }}</span>
+                {% include 'fatture/_pulsanti_riepilogo.html' with sezione='da-fatturare' g=gruppo %}
                 <button class="btn btn-sm btn-outline-primary"
                         onclick="apriModalOrdineManuale('{{ gruppo.cliente.pk }}', '{{ gruppo.cliente.nome_completo }}')"
                         title="Aggiungi una voce manuale da fatturare per questo cliente">
@@ -155,6 +156,7 @@
                 <span class="badge rounded-pill badge-soft">
                     {{ n_senza_cliente }} element{{ n_senza_cliente|pluralize:"o,i" }}</span>
                 <span class="badge rounded-pill badge-tot">&euro;{{ totale_senza_cliente }}</span>
+                {% include 'fatture/_pulsanti_riepilogo.html' with sezione='da-fatturare' g=gruppo_senza_cliente %}
                 <button class="btn btn-sm btn-primary btn-raggruppa" disabled
                         onclick="apriModalCrea(this)"
                         data-cliente-id="" data-ragione-sociale="">

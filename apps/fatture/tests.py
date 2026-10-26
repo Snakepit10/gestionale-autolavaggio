@@ -461,6 +461,26 @@ class StampaPdfTest(BaseFattureTest):
         r = self.client.get(url, {'cliente': 'boh'})
         self.assertEqual(r.status_code, 404)
 
+    def test_pdf_riepilogo_cliente_da_fatturare(self):
+        _crea_ordine(self.cliente_a, richiede_fattura=True)
+        _crea_ordine(None, richiede_fattura=True)
+        url = reverse('fatture:stampa', args=['da-fatturare'])
+        for cliente in [str(self.cliente_a.pk), 'nessuno']:
+            r = self.client.get(url, {'cliente': cliente, 'download': '1'})
+            self.assertEqual(r.status_code, 200)
+            self.assertIn(f'cliente-{cliente}', r['Content-Disposition'])
+            self.assertTrue(b''.join(r.streaming_content).startswith(b'%PDF'))
+        r = self.client.get(url, {'cliente': 'boh'})
+        self.assertEqual(r.status_code, 404)
+
+    def test_testo_whatsapp_da_fatturare(self):
+        from .views import _dati_da_fatturare
+        _crea_ordine(self.cliente_a, richiede_fattura=True)
+        gruppo = _dati_da_fatturare()[0][0]
+        self.assertEqual(gruppo['whatsapp_numero'], '393330000001')
+        self.assertIn('servizi da fatturare', gruppo['whatsapp_testo'])
+        self.assertIn('Totale:', gruppo['whatsapp_testo'])
+
     def test_card_mostra_pulsante_riepilogo(self):
         from django.template.loader import render_to_string
         html = render_to_string('fatture/_gruppo_fatture.html', {
