@@ -89,13 +89,53 @@ def _dati_da_fatturare():
     return gruppi_cliente, senza_cliente, voci_senza_cliente
 
 
+def _numero_whatsapp(telefono):
+    """Telefono in formato internazionale senza '+' (es. 393331234567),
+    come lo vogliono i link di WhatsApp; '' se manca."""
+    grezzo = (telefono or '').strip()
+    cifre = ''.join(c for c in grezzo if c.isdigit())
+    if not cifre:
+        return ''
+    if grezzo.startswith('+'):
+        return cifre
+    if cifre.startswith('00'):
+        return cifre[2:]
+    if cifre.startswith('39') and len(cifre) >= 11:
+        return cifre
+    return '39' + cifre  # numero italiano senza prefisso
+
+
+def _eur_testo(valore):
+    return f'€{valore:.2f}'.replace('.', ',')
+
+
+def _testo_whatsapp_riepilogo(gruppo):
+    """Messaggio precompilato per WhatsApp Web: elenco fatture col totale
+    e, se c'e', il saldo ancora da incassare. Il PDF va allegato a mano."""
+    cliente = gruppo['cliente']
+    righe = [f'Buongiorno{" " + cliente.nome_completo if cliente else ""},',
+             'le inviamo il riepilogo delle fatture:']
+    for f in gruppo['fatture']:
+        righe.append(f'- Fattura {f.numero} del '
+                     f'{f.data.strftime("%d/%m/%Y")}: {_eur_testo(f.totale)}')
+    righe.append(f'Totale: {_eur_testo(gruppo["totale"])}')
+    if gruppo['saldo'] > 0:
+        righe.append(f'Da saldare: {_eur_testo(gruppo["saldo"])}')
+    righe.append('In allegato il dettaglio in PDF. Grazie!')
+    return '\n'.join(righe)
+
+
 def _gruppo_fatture(cliente, lista):
-    return {
+    gruppo = {
         'cliente': cliente,
         'fatture': lista,
         'totale': sum((f.totale for f in lista), Decimal('0')),
         'saldo': sum((f.saldo_dovuto for f in lista), Decimal('0')),
     }
+    gruppo['whatsapp_numero'] = _numero_whatsapp(
+        cliente.telefono if cliente else '')
+    gruppo['whatsapp_testo'] = _testo_whatsapp_riepilogo(gruppo)
+    return gruppo
 
 
 def _raggruppa_fatture(lista):
@@ -754,5 +794,7 @@ def stampa_pdf(request, sezione):
         sezione = f'{sezione}-cliente-{cliente_param}'
     nome_file = (f'{sezione}-'
                  f'{timezone.localdate().strftime("%Y%m%d")}.pdf')
+    # ?download=1: scarica il file invece di aprirlo nel browser
     return FileResponse(buffer, filename=nome_file,
+                        as_attachment=bool(request.GET.get('download')),
                         content_type='application/pdf')

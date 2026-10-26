@@ -486,6 +486,22 @@
 <form id="fatCsrfForm" style="display:none">{% csrf_token %}</form>
 {{ fatture_json|json_script:"fatture-data" }}
 <script>
+// Riepilogo cliente su WhatsApp Web: un link non puo' allegare file,
+// quindi scarica il PDF e apre la chat col testo gia' scritto; il file
+// si trascina nella chat (o si allega con la graffetta).
+function inviaRiepilogoWhatsapp(btn) {
+    const a = document.createElement('a');
+    a.href = btn.dataset.pdfUrl;
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    let url = 'https://web.whatsapp.com/send?text=' + encodeURIComponent(btn.dataset.testo);
+    if (btn.dataset.numero) url += '&phone=' + encodeURIComponent(btn.dataset.numero);
+    window.open(url, 'whatsapp');
+    alert('Il PDF del riepilogo e\' stato scaricato.\n'
+          + (btn.dataset.numero ? '' : 'Il cliente non ha un telefono: scegli tu la chat.\n')
+          + 'In WhatsApp Web allegalo con la graffetta (o trascinalo nella chat) e invia.');
+}
 function _fatCsrf() {
     return document.querySelector('#fatCsrfForm [name=csrfmiddlewaretoken]').value;
 }

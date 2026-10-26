@@ -29,12 +29,28 @@ e "pagate".
                 da incassare &euro;{{ gf.saldo }}</span>
             {% endif %}
             {% if sezione %}
-            <a href="{% url 'fatture:stampa' sezione %}?cliente={% if gf.cliente %}{{ gf.cliente.pk }}{% else %}nessuno{% endif %}"
-               target="_blank" onclick="event.stopPropagation()"
-               class="btn btn-sm btn-outline-secondary"
-               title="Stampa il riepilogo del cliente con il dettaglio delle fatture">
-                <i class="bi bi-printer"></i> Riepilogo
-            </a>
+            {% url 'fatture:stampa' sezione as url_stampa %}
+            {% with cliente_q=gf.cliente.pk|default:'nessuno' %}
+            <div class="btn-group" onclick="event.stopPropagation()">
+                <a href="{{ url_stampa }}?cliente={{ cliente_q }}"
+                   target="_blank" class="btn btn-sm btn-outline-secondary"
+                   title="Stampa il riepilogo del cliente con il dettaglio delle fatture">
+                    <i class="bi bi-printer"></i> Riepilogo
+                </a>
+                <a href="{{ url_stampa }}?cliente={{ cliente_q }}&download=1"
+                   class="btn btn-sm btn-outline-secondary" title="Scarica il PDF del riepilogo">
+                    <i class="bi bi-download"></i>
+                </a>
+                <button type="button" class="btn btn-sm btn-outline-success"
+                        title="Invia su WhatsApp Web: scarica il PDF e apre la chat col messaggio pronto"
+                        data-pdf-url="{{ url_stampa }}?cliente={{ cliente_q }}&download=1"
+                        data-numero="{{ gf.whatsapp_numero }}"
+                        data-testo="{{ gf.whatsapp_testo }}"
+                        onclick="inviaRiepilogoWhatsapp(this)">
+                    <i class="bi bi-whatsapp"></i>
+                </button>
+            </div>
+            {% endwith %}
             {% endif %}
         </div>
     </div>

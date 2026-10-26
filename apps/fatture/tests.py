@@ -456,6 +456,8 @@ class StampaPdfTest(BaseFattureTest):
             self.assertIn(f'cliente-{cliente}', r['Content-Disposition'])
             contenuto = b''.join(r.streaming_content)
             self.assertTrue(contenuto.startswith(b'%PDF'))
+        r = self.client.get(url, {'cliente': 'nessuno', 'download': '1'})
+        self.assertTrue(r['Content-Disposition'].startswith('attachment'))
         r = self.client.get(url, {'cliente': 'boh'})
         self.assertEqual(r.status_code, 404)
 
@@ -467,6 +469,17 @@ class StampaPdfTest(BaseFattureTest):
             'sezione': 'da-pagare'})
         self.assertIn(reverse('fatture:stampa', args=['da-pagare'])
                       + f'?cliente={self.cliente_a.pk}', html)
+        self.assertIn('inviaRiepilogoWhatsapp', html)
+
+    def test_testo_e_numero_whatsapp(self):
+        from .views import _numero_whatsapp, _raggruppa_fatture
+        self.assertEqual(_numero_whatsapp('333 123 4567'), '393331234567')
+        self.assertEqual(_numero_whatsapp('+41 79 123 45 67'), '41791234567')
+        self.assertEqual(_numero_whatsapp(''), '')
+        Fattura.objects.create(numero='5/2026', data=date(2026, 3, 4),
+                               ragione_sociale='X', cliente=self.cliente_a)
+        gruppo = _raggruppa_fatture(list(Fattura.objects.all()))[0]
+        self.assertIn('Fattura 5/2026 del 04/03/2026', gruppo['whatsapp_testo'])
 
     def test_sezione_sconosciuta_404(self):
         r = self.client.get(reverse('fatture:stampa', args=['boh']))
