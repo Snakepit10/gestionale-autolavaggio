@@ -198,25 +198,49 @@ def _login(pagina, utente, password):
         raise RuntimeError('Login WashTec non riuscito: controlla WASHTEC_UTENTE e WASHTEC_PASSWORD.')
 
 
-def ciclo(attesa=15, estrai=None, giri=None, scrivi=print):
+def verifica_database():
+    """Messaggio d'errore se il worker non puo' lavorare sul database del
+    gestionale (None se e' tutto a posto): senza DATABASE_URL Django
+    ripiega su un SQLite vuoto dentro il container."""
+    from django.db import connection
+    if connection.vendor == 'sqlite' and not settings.DEBUG:
+        return ('DATABASE_URL non impostata: collega a questo servizio la variabile del Postgres '
+                'del gestionale (Variables > Add Reference).')
+    if EsecuzioneImportWashtec._meta.db_table not in connection.introspection.table_names():
+        return 'Mancano le migrazioni sul database: lancia `python manage.py migrate`.'
+    return None
+
+
+def ciclo(attesa=15, estrai=None, giri=None, scrivi=print, attesa_errore=60):
     """Worker: ogni `attesa` secondi guarda se c'e' una richiesta e, in
     orario, fa comunque un giro ogni intervallo(). `giri` limita i
-    controlli (per i test)."""
+    controlli (per i test). Un errore (es. database irraggiungibile) non
+    ferma il worker: si scrive nel log e si riprova dopo `attesa_errore`."""
+    from django.db import close_old_connections
+
     ultimo_programmato = None
     n = 0
     while giri is None or n < giri:
         n += 1
-        _chiudi_giri_morti()
-        richiesta = EsecuzioneImportWashtec.objects.filter(esito='richiesta').order_by('creata_il').first()
-        adesso = timezone.now()
-        dovuto = in_orario(adesso) and (ultimo_programmato is None
-                                        or adesso - ultimo_programmato >= intervallo())
-        if richiesta or dovuto:
-            if not richiesta:
-                ultimo_programmato = adesso
-            e = esegui(richiesta, estrai=estrai)
-            scrivi(f'{timezone.localtime(e.finita_il):%d/%m %H:%M:%S} import WashTec {e.esito}: '
-                   f'{e.righe} righe, {e.nuove} nuove {e.messaggio[:200]}'.strip())
+        pausa = attesa
+        # fuori dalle richieste web Django non chiude ne' ricontrolla le
+        # connessioni (CONN_MAX_AGE): senza, un riavvio del Postgres
+        # lascerebbe il worker rotto per sempre
+        close_old_connections()
+        try:
+            _chiudi_giri_morti()
+            richiesta = EsecuzioneImportWashtec.objects.filter(esito='richiesta').order_by('creata_il').first()
+            adesso = timezone.now()
+            dovuto = in_orario(adesso) and (ultimo_programmato is None
+                                            or adesso - ultimo_programmato >= intervallo())
+            if richiesta or dovuto:
+                if not richiesta:
+                    ultimo_programmato = adesso
+                e = esegui(richiesta, estrai=estrai)
+                scrivi(f'{timezone.localtime(e.finita_il):%d/%m %H:%M:%S} import WashTec {e.esito}: '
+                       f'{e.righe} righe, {e.nuove} nuove {e.messaggio[:200]}'.strip())
+        except Exception as e:                  # noqa: BLE001 - il worker deve restare in piedi
+            scrivi(f'Import WashTec: errore nel ciclo, riprovo tra {attesa_errore} s: {e}')
+            pausa = attesa_errore
         if giri is None or n < giri:
-            orologio.sleep(attesa)
-
+            orologio.sleep(pausa)

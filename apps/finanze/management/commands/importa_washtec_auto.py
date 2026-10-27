@@ -36,6 +36,9 @@ class Command(BaseCommand):
         parser.add_argument('--visibile', action='store_true', help='Mostra il browser (debug in locale).')
 
     def handle(self, *args, **opz):
+        problema = import_automatico.verifica_database()
+        if problema:
+            raise CommandError(problema)
         if opz['ciclo']:
             self.stdout.write('Import WashTec: worker avviato.')
             import_automatico.ciclo(scrivi=self.stdout.write)

@@ -1280,6 +1280,25 @@ class ImportAutomaticoWashtecTest(TestCase):
         self.assertIsNotNone(e.richiesta_da)
         self.assertFalse(self.client.get(reverse('ordini:washtec-stato')).json()['in_attesa'])
 
+    def test_ciclo_sopravvive_a_un_errore(self):
+        from unittest import mock
+
+        from apps.finanze.services import import_automatico as ia
+        ia.richiedi()
+        log = []
+        with mock.patch.object(ia, '_chiudi_giri_morti', side_effect=[Exception('db giu'), None, None]), \
+                mock.patch.object(ia.orologio, 'sleep') as dorme:
+            ia.ciclo(attesa=0, estrai=self.estrai, giri=2, scrivi=log.append, attesa_errore=60)
+        self.assertIn('db giu', log[0])
+        dorme.assert_called_once_with(60)
+        self.assertEqual(ia.EsecuzioneImportWashtec.objects.get().esito, 'ok')
+
+    def test_comando_senza_database_url(self):
+        from django.core.management import CommandError, call_command
+        with self.settings(DEBUG=False):
+            with self.assertRaisesMessage(CommandError, 'DATABASE_URL'):
+                call_command('importa_washtec_auto', '--ciclo')
+
     def test_richiesta_mai_presa_diventa_errore(self):
         from apps.finanze.services import import_automatico as ia
         e = ia.richiedi()
