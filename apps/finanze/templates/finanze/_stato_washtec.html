@@ -1,0 +1,51 @@
+{# Stato dell'import automatico WashTec + tasto "Aggiorna ora". Parametro: stato_washtec (import_automatico.stato()). #}
+{% now "Y-m-d" as oggi_sw %}{% with s=stato_washtec %}
+<div class="stato-washtec d-flex align-items-center gap-2 flex-wrap small {% if s.allarme %}text-danger{% else %}text-muted{% endif %}"
+     data-stato-url="{% url 'ordini:washtec-stato' %}" data-in-attesa="{% if s.in_attesa %}1{% endif %}">
+  <span class="sw-testo">
+    {% if s.in_attesa %}
+      <span class="spinner-border spinner-border-sm text-primary"></span> <span class="text-primary">Aggiornamento da WashTec in corso&hellip;</span>
+    {% elif s.errore %}
+      <i class="bi bi-exclamation-triangle-fill"></i> WashTec non aggiornato: {{ s.errore.messaggio|truncatechars:160 }}
+      {% if s.ultima_ok %}<span class="text-muted">(ultimo ok {{ s.ultima_ok.finita_il|date:"d/m H:i" }})</span>{% endif %}
+    {% elif s.ultima_ok %}
+      <i class="bi {% if s.allarme %}bi-exclamation-triangle-fill{% else %}bi-cloud-check{% endif %}"></i>
+      WashTec aggiornato alle <strong>{{ s.ultima_ok.finita_il|date:"H:i" }}</strong>{% if s.ultima_ok.finita_il|date:"Y-m-d" != oggi_sw %} del {{ s.ultima_ok.finita_il|date:"d/m" }}{% endif %}
+    {% else %}
+      <i class="bi bi-cloud-slash"></i> Aggiornamento automatico WashTec non ancora attivo
+      {% if s.ultima_transazione %}<span class="text-muted">(ultimo lavaggio in archivio {{ s.ultima_transazione.orario|date:"d/m H:i" }})</span>{% endif %}
+    {% endif %}
+  </span>
+  <form method="post" action="{% url 'ordini:washtec-aggiorna' %}" class="sw-form d-inline">
+    {% csrf_token %}
+    <input type="hidden" name="torna" value="{{ request.get_full_path }}">
+    <button type="submit" class="btn btn-outline-primary btn-sm py-0" {% if s.in_attesa %}disabled{% endif %}
+            title="Scarica subito i lavaggi da WashTec senza aspettare il prossimo aggiornamento automatico">
+      <i class="bi bi-arrow-clockwise"></i> Aggiorna ora</button>
+  </form>
+</div>
+<script>
+(function () {
+  const box = document.currentScript.previousElementSibling;
+  const testo = box.querySelector('.sw-testo');
+  const bottone = box.querySelector('button');
+  const attendi = () => {
+    bottone.disabled = true;
+    testo.innerHTML = '<span class="spinner-border spinner-border-sm text-primary"></span> ' +
+      '<span class="text-primary">Aggiornamento da WashTec in corso&hellip;</span>';
+    const giro = () => fetch(box.dataset.statoUrl).then(r => r.json()).then(d => {
+      if (d.in_attesa) { setTimeout(giro, 3000); return; }
+      // finito: ricarico per mostrare le transazioni (e le proposte) nuove
+      location.reload();
+    }).catch(() => setTimeout(giro, 5000));
+    setTimeout(giro, 3000);
+  };
+  box.querySelector('.sw-form').addEventListener('submit', ev => {
+    ev.preventDefault();
+    fetch(ev.target.action, {method: 'POST', body: new FormData(ev.target), headers: {'X-Requested-With': 'fetch'}})
+      .then(r => r.json()).then(attendi).catch(() => ev.target.submit());
+  });
+  if (box.dataset.inAttesa) attendi();
+})();
+</script>
+{% endwith %}

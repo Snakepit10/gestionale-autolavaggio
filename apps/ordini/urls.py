@@ -1,5 +1,6 @@
 from django.urls import path
 from apps.finanze.views_chiusura import chiusura_giornata, distinta_chiusura
+from apps.finanze.views_spazzole import aggiorna_washtec, spazzole_giornata, stato_washtec
 
 from . import views
 
@@ -8,6 +9,9 @@ app_name = 'ordini'
 urlpatterns = [
     path('chiusura-giornata/', chiusura_giornata, name='chiusura-giornata'),
     path('chiusura-giornata/distinta/', distinta_chiusura, name='chiusura-distinta'),
+    path('chiusura-giornata/spazzole/', spazzole_giornata, name='spazzole-giornata'),
+    path('chiusura-giornata/washtec/aggiorna/', aggiorna_washtec, name='washtec-aggiorna'),
+    path('chiusura-giornata/washtec/stato/', stato_washtec, name='washtec-stato'),
     # Punto Cassa
     path('cassa/', views.CassaView.as_view(), name='cassa'),
     path('cassa/mobile/', views.CassaMobileView.as_view(), name='cassa-mobile'),

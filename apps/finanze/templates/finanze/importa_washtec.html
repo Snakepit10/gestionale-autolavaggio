@@ -5,6 +5,34 @@
 <div class="container py-3" style="max-width: 960px;">
   <h4 class="mb-3"><i class="bi bi-cloud-download me-2"></i>Importa transazioni WashTec</h4>
 
+  <div class="card border-0 shadow-sm mb-3">
+    <div class="card-body">
+      <h6 class="fw-bold mb-2"><i class="bi bi-robot me-1"></i> Aggiornamento automatico</h6>
+      {% include 'finanze/_stato_washtec.html' %}
+      <p class="small text-muted mt-2 mb-2">Il servizio <code>importa_washtec_auto --ciclo</code> su Railway scarica i lavaggi da solo
+        ogni 10 minuti in orario di apertura; <em>Aggiorna ora</em> lo fa partire subito. Il preferito qui sotto resta come riserva.</p>
+      {% if esecuzioni %}
+      <details class="small">
+        <summary>Ultime esecuzioni</summary>
+        <table class="table table-sm mb-0 mt-2">
+          <thead><tr><th>Quando</th><th>Esito</th><th>Periodo</th><th class="text-end">Righe</th><th class="text-end">Nuove</th><th>Note</th></tr></thead>
+          <tbody>
+          {% for e in esecuzioni %}
+          <tr>
+            <td class="text-nowrap">{{ e.creata_il|date:"d/m H:i" }}{% if e.richiesta_da %} <span class="text-muted">({{ e.richiesta_da }})</span>{% endif %}</td>
+            <td>{% if e.esito == 'ok' %}<span class="badge bg-success">ok</span>{% elif e.esito == 'errore' %}<span class="badge bg-danger">errore</span>{% else %}<span class="badge bg-secondary">{{ e.get_esito_display }}</span>{% endif %}</td>
+            <td class="text-nowrap">{% if e.dal %}{{ e.dal|date:"d/m" }}&ndash;{{ e.al|date:"d/m" }}{% endif %}</td>
+            <td class="text-end">{{ e.righe }}</td><td class="text-end">{{ e.nuove }}</td>
+            <td class="text-muted" style="white-space:pre-line">{{ e.messaggio|truncatechars:300 }}</td>
+          </tr>
+          {% endfor %}
+          </tbody>
+        </table>
+      </details>
+      {% endif %}
+    </div>
+  </div>
+
   {% if ultima_transazione %}
   <div class="small text-muted mb-2">
     Ultima transazione in archivio: <strong>{{ ultima_transazione.orario|date:"d/m/Y H:i" }}</strong>
@@ -77,11 +105,14 @@
 {% endblock %}
 
 {% block extra_js %}
+{% load static %}
+<script src="{% static 'js/washtec_estrazione.js' %}"></script>
 <script>
 // ===== Bookmarklet: gira dentro plus.washtec.com =====
 // Il codice viene serializzato nel link (toString), quindi deve essere
-// autosufficiente: nessun riferimento a variabili esterne tranne il
-// segnaposto __GESTIONALE__ sostituito qui sotto.
+// autosufficiente: nessun riferimento a variabili esterne tranne
+// estraiWashtec (serializzata insieme) e il segnaposto __GESTIONALE__
+// sostituito qui sotto.
 function bookmarkletWashtec() {
   (async () => {
     const GESTIONALE = '__GESTIONALE__';
@@ -101,44 +132,10 @@ function bookmarkletWashtec() {
       box.innerHTML = '<b>WashTec &rarr; Gestionale</b><br>' + t;
     };
     scrivi('Estrazione in corso&hellip;');
-    const sleep = ms => new Promise(r => setTimeout(r, ms));
-    const fire = el => ['mousedown', 'mouseup', 'click'].forEach(t =>
-      el.dispatchEvent(new MouseEvent(t, { bubbles: true, view: window })));
-    const until = async (f, ms) => {
-      const t0 = Date.now();
-      while (Date.now() - t0 < (ms || 20000)) { const v = f(); if (v) return v; await sleep(250); }
-      return null;
-    };
-    const foglia = re => [...document.querySelectorAll('div,td,span,a')]
-      .find(e => e.children.length === 0 && e.offsetParent && re.test(e.textContent.trim()));
-    // Paginatore: "1-25 di 96" oppure, su periodi lunghi, "976-1.000 di oltre 1.000"
-    // (punto delle migliaia; totale non ancora noto: diventa esatto solo alla fine).
-    const pag = () => foglia(/^[\d.]+-[\d.]+ di (oltre )?[\d.]+$/);
-    // Durante il cambio pagina WashTec ridisegna il paginatore: per un
-    // attimo non esiste, quindi si legge sempre in modo tollerante.
-    const testoPag = () => { const p = pag(); return p ? p.textContent.trim() : ''; };
-    const infoPag = () => {
-      const m = testoPag().replace(/\./g, '').match(/^(\d+)-(\d+) di (oltre )?(\d+)$/);
-      return m ? { a: +m[2], totale: +m[4], esatto: !m[3] } : null;
-    };
     const fmt = d => String(d.getDate()).padStart(2, '0') + '/' +
       String(d.getMonth() + 1).padStart(2, '0') + '/' + String(d.getFullYear()).slice(2);
-    const imposta = (el, v) => {
-      el.focus(); el.value = v;
-      ['input', 'change', 'keyup', 'blur'].forEach(t => el.dispatchEvent(new Event(t, { bubbles: true })));
-    };
     try {
       if (!/plus\.washtec\.com/.test(location.host)) throw 'apri prima plus.washtec.com e fai il login';
-      if (location.hash !== '#reporting') location.hash = '#reporting';
-      const scheda = await until(() => foglia(/^Dati transazione$/));
-      if (!scheda) throw 'sezione Report non trovata: hai fatto il login?';
-      fire(scheda);
-      const date = await until(() => {
-        const a = [...document.querySelectorAll('input')].filter(i => i.offsetParent && /^\d\d\/\d\d\/\d\d$/.test(i.value));
-        return a.length >= 2 ? a : null;
-      });
-      if (!date) throw 'campi data non trovati';
-
       const oggi = new Date(), tre = new Date();
       tre.setDate(oggi.getDate() - 3);
       // Accetta gg/mm, gg/mm/aa, gg/mm/aaaa (anche con . o -); senza anno
@@ -162,53 +159,8 @@ function bookmarkletWashtec() {
       const al = leggiData(testoAl);
       if (!al) throw 'data di fine non valida: "' + testoAl + '" (usa gg/mm o gg/mm/aa)';
       if (al[1] < dal[1]) throw 'la data di fine (' + al[0] + ') e\' prima di quella di inizio (' + dal[0] + ')';
-      scrivi('Estrazione dal ' + dal[0] + ' al ' + al[0] + '&hellip;');
-      imposta(date[0], dal[0]);
-      imposta(date[1], al[0]);
 
-      const prima = testoPag();
-      const lente = __CERCA__;
-      if (!lente) throw 'bottone di ricerca non trovato';
-      fire(lente);
-      await until(() => testoPag() && testoPag() !== prima, 60000);
-      await sleep(800);
-      if (!testoPag()) throw 'nessun risultato per il periodo';
-
-      const righe = {};
-      const raccogli = () => [...document.querySelectorAll('tr')].filter(tr => tr.offsetParent).forEach(tr => {
-        const c = [...tr.cells].map(x => x.innerText.trim());
-        if (c.length >= 10 && /^\d+$/.test(c[1]) && /^\d\d\/\d\d\/\d\d \d\d:\d\d:\d\d$/.test(c[2]))
-          righe[c[1] + '|' + c[2]] = [c[1], c[2], c[3], c[5], c[6], c[8], c[9]];
-      });
-      const frecce = () => pag().closest('table').querySelectorAll('img');
-      // Cambio pagina: attende che il paginatore mostri un testo nuovo
-      // e stabile, poi lascia renderizzare le righe.
-      const primaRiga = () => {
-        const tr = [...document.querySelectorAll('tr')].find(tr => tr.offsetParent &&
-          tr.cells.length >= 10 && /^\d+$/.test(tr.cells[1].innerText.trim()));
-        return tr ? tr.cells[1].innerText.trim() + '|' + tr.cells[2].innerText.trim() : '';
-      };
-      const vaiA = async indiceFreccia => {
-        const t = testoPag(), r = primaRiga();
-        fire(frecce()[indiceFreccia]);
-        const ok = await until(() => testoPag() && testoPag() !== t &&
-                                     primaRiga() && primaRiga() !== r, 15000);
-        await sleep(400);
-        return ok;
-      };
-      // dalla prima pagina, poi avanti finche' non le ho tutte
-      if (!/^1-/.test(testoPag())) await vaiA(0);
-      let info = infoPag();
-      for (let giro = 0; giro < 1000; giro++) {
-        raccogli();
-        info = infoPag() || info;
-        scrivi('Lette ' + Object.keys(righe).length + ' righe su ' +
-               (info.esatto ? '' : 'oltre ') + info.totale + '&hellip;');
-        if (info.esatto && info.a >= info.totale) break;
-        if (!await vaiA(2)) throw 'la tabella non avanza di pagina';
-      }
-      const dati = Object.values(righe);
-      if (!info.esatto || dati.length !== info.totale) throw 'lette ' + dati.length + ' righe su ' + info.totale;
+      const dati = await estraiWashtec(dal[0], al[0], scrivi);
       scrivi('Lette tutte le ' + dati.length + ' righe: apro il gestionale&hellip;');
       location.href = GESTIONALE + '/finanze/importa-washtec/#' + encodeURIComponent(JSON.stringify(dati));
     } catch (e) {
@@ -218,19 +170,14 @@ function bookmarkletWashtec() {
   })();
 }
 
-// Espressione (valutata dentro WashTec) che trova il bottone lente
-const CERCA_SRC = "[...document.querySelectorAll('button[title=Cerca]')].find(e => e.offsetParent)";
-
 (function () {
   // Chrome, salvando il preferito, puo' togliere gli a-capo: un commento
   // // spegnerebbe tutto il codice che segue. Si generano quindi un'unica
-  // riga e nessun commento.
-  const codice = bookmarkletWashtec.toString()
-    .replace(/^\s*\/\/.*$/mg, '')
-    .replace(/\s*\n\s*/g, ' ');
-  const sorgente = '(' + codice
-    .replace('__GESTIONALE__', '{{ origine_gestionale }}')
-    .replace('__CERCA__', CERCA_SRC) + ')()';
+  // riga e nessun commento. L'estrazione vera e' in washtec_estrazione.js
+  // (la stessa che usa l'import automatico sul server).
+  const riga = f => f.toString().replace(/^\s*\/\/.*$/mg, '').replace(/\s*\n\s*/g, ' ');
+  const sorgente = '(function () { ' + riga(estraiWashtec) + '; (' +
+    riga(bookmarkletWashtec).replace('__GESTIONALE__', '{{ origine_gestionale }}') + ')(); })()';
   const href = 'javascript:' + encodeURIComponent(sorgente);
   document.getElementById('bookmarklet').href = href;
   const copia = document.getElementById('btn-copia-bm');

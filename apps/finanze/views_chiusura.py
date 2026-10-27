@@ -99,7 +99,10 @@ def chiusura_giornata(request):
             for nome, modello in VOCI.items()}
     totali = {nome: sum((v.importo for v in lista), Decimal('0.00')) for nome, lista in voci.items()}
     oggi = timezone.localdate()
+    from .views_spazzole import fa_spazzole, riepilogo_spazzole
+    spazzole = riepilogo_spazzole(giorno) if fa_spazzole(request.user) else None
     return render(request, 'ordini/chiusura_giornata.html', {
+        'spazzole': spazzole,
         'data': giorno,
         'oggi': oggi,
         'data_prev': giorno - timedelta(days=1),

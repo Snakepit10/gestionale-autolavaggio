@@ -1,6 +1,7 @@
 from django.contrib import admin
 from django.utils.html import format_html
-from .models import ChiusuraCassa, MovimentoCassa, Cassa, ChiusuraCassaAutomatica, QuadraturaGiornaliera, SpesaCassa, TransazionePortale
+from .models import (ChiusuraCassa, MovimentoCassa, Cassa, ChiusuraCassaAutomatica, QuadraturaGiornaliera, SpesaCassa, TransazionePortale,
+                     EsecuzioneImportWashtec)
 
 
 @admin.register(QuadraturaGiornaliera)
@@ -231,4 +232,14 @@ class TransazionePortaleAdmin(admin.ModelAdmin):
         return False
 
     def has_change_permission(self, request, obj=None):
+        return False
+
+
+@admin.register(EsecuzioneImportWashtec)
+class EsecuzioneImportWashtecAdmin(admin.ModelAdmin):
+    list_display = ['creata_il', 'esito', 'richiesta_da', 'dal', 'al', 'righe', 'nuove', 'messaggio']
+    list_filter = ['esito']
+    readonly_fields = [f.name for f in EsecuzioneImportWashtec._meta.fields]
+
+    def has_add_permission(self, request):
         return False

@@ -41,6 +41,8 @@ SEZIONI = [
      'sulla distinta stampata vede atteso e saldo', ()),
     ('scontrini_casse', 'Scontrini casse',
      'Nella Distinta (Ordini) inserisce gli scontrini di chiusura delle casse automatiche', ()),
+    ('spazzole_servito', 'Abbinamento spazzole',
+     'Nella Distinta (Ordini) abbina le spazzole agli ordini del servito e avvia l\'aggiornamento da WashTec', ()),
     ('monete', 'Monete', 'Gestione monete digitali', ('/monete/',)),
     ('configurazione', 'Configurazione', 'Catalogo, categorie, postazioni, checklist, slot, abbonamenti...',
      ('/categorie/', '/catalogo/', '/sconti/', '/stampanti/', '/postazioni/',

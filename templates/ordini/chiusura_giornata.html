@@ -245,6 +245,22 @@
 </div>
 {% endif %}
 
+{# ===== Spazzole <-> servito ===== #}
+{% if spazzole %}
+<div class="col-12">
+<div class="section-card accent-violet" id="spazzole">
+    <div class="section-title"><div class="label"><i class="bi bi-droplet-half"></i> Spazzole &harr; servito</div>
+        <span class="count">{% if spazzole.n_proposto or spazzole.n_da_sistemare %}{{ spazzole.n_proposto|add:spazzole.n_da_sistemare }} da fare{% else %}tutto a posto{% endif %}</span></div>
+    <div class="section-body d-flex align-items-center gap-2 flex-wrap">
+        <span class="badge bg-success">{{ spazzole.n_ok }} a posto</span>
+        {% if spazzole.n_proposto %}<span class="badge bg-primary">{{ spazzole.n_proposto }} da confermare</span>{% endif %}
+        {% if spazzole.n_da_sistemare %}<span class="badge bg-warning text-dark">{{ spazzole.n_da_sistemare }} da sistemare</span>{% endif %}
+        <a href="{% url 'ordini:spazzole-giornata' %}?data={{ data|date:'Y-m-d' }}" class="btn btn-primary btn-sm ms-auto"><i class="bi bi-link-45deg"></i> Abbina spazzole</a>
+    </div>
+</div>
+</div>
+{% endif %}
+
 {# ===== 6. Scontrini delle casse automatiche ===== #}
 {% if fa_scontrini %}
 <div class="col-12">
