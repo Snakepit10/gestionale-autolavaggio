@@ -157,10 +157,11 @@ def estrai_playwright(dal, al, visibile=False):
     """Login su WashTec Plus e estrazione delle righe dal `dal` al `al`."""
     from playwright.sync_api import sync_playwright
 
+    committente = os.environ.get('WASHTEC_COMMITTENTE')
     utente = os.environ.get('WASHTEC_UTENTE')
     password = os.environ.get('WASHTEC_PASSWORD')
-    if not utente or not password:
-        raise RuntimeError('Credenziali mancanti: imposta WASHTEC_UTENTE e WASHTEC_PASSWORD.')
+    if not committente or not utente or not password:
+        raise RuntimeError('Credenziali mancanti: imposta WASHTEC_COMMITTENTE, WASHTEC_UTENTE e WASHTEC_PASSWORD.')
     script = SCRIPT_ESTRAZIONE.read_text(encoding='utf-8')
     with sync_playwright() as p:
         browser = p.chromium.launch(headless=not visibile)
@@ -173,7 +174,7 @@ def estrai_playwright(dal, al, visibile=False):
             pagina = contesto.new_page()
             pagina.set_default_timeout(60000)
             pagina.goto(URL_WASHTEC)
-            _login(pagina, utente, password)
+            _login(pagina, committente, utente, password)
             return pagina.evaluate(
                 '([dal, al]) => { ' + script + '\n return estraiWashtec(dal, al); }',
                 [dal.strftime('%d/%m/%y'), al.strftime('%d/%m/%y')])
@@ -184,18 +185,22 @@ def estrai_playwright(dal, al, visibile=False):
             browser.close()
 
 
-def _login(pagina, utente, password):
+def _login(pagina, committente, utente, password):
+    """Il login di WashTec Plus ha tre campi, in quest'ordine:
+    Committente, Nome utente e Password."""
     campo_password = pagina.locator('input[type=password]:visible').first
     campo_password.wait_for()
-    campo_utente = pagina.locator(
-        'input[type=text]:visible, input[type=email]:visible, input:not([type]):visible').first
-    campo_utente.fill(utente)
+    testi = pagina.locator('input[type=text]:visible, input[type=email]:visible, input:not([type]):visible')
+    if testi.count() < 2:
+        raise RuntimeError('Pagina di login WashTec diversa dal previsto: non trovo i campi Committente e Nome utente.')
+    testi.nth(0).fill(committente)
+    testi.nth(1).fill(utente)
     campo_password.fill(password)
     campo_password.press('Enter')
     try:
         campo_password.wait_for(state='hidden', timeout=30000)
     except Exception:
-        raise RuntimeError('Login WashTec non riuscito: controlla WASHTEC_UTENTE e WASHTEC_PASSWORD.')
+        raise RuntimeError('Login WashTec non riuscito: controlla WASHTEC_COMMITTENTE, WASHTEC_UTENTE e WASHTEC_PASSWORD.')
 
 
 def verifica_database():

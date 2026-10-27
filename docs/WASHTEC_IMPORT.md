@@ -22,16 +22,19 @@ pagina usa GWT-RPC, troppo fragile da chiamare direttamente.
 Nuovo **servizio** nel progetto Railway, dallo stesso repository del web
 (non un cron: deve restare acceso per rispondere al tasto).
 
-- **Build command:**
-  `pip install -r requirements.txt && playwright install --with-deps chromium`
+- **Build command:** vuoto (ci pensa Railpack).
+- **Pre-deploy command:** `python manage.py migrate --noinput`
 - **Start command:** `python manage.py importa_washtec_auto --ciclo`
 - **Variabili:** le stesse del web per il database (`DATABASE_URL`,
   `SECRET_KEY`, ...) e in piu':
 
 | Variabile | Valore |
 |---|---|
-| `WASHTEC_UTENTE` | utente di plus.washtec.com |
+| `WASHTEC_COMMITTENTE` | campo "Committente" del login (es. `WT-IT_...`) |
+| `WASHTEC_UTENTE` | campo "Nome utente" |
 | `WASHTEC_PASSWORD` | password |
+| `RAILPACK_PYTHON_PLAYWRIGHT_INSTALL` | `1` (Railpack installa Chromium) |
+| `MISE_PYTHON_GITHUB_ATTESTATIONS` | `false` (altrimenti Python 3.11.9 non si installa) |
 | `WASHTEC_ORA_INIZIO` | (facoltativa) ora locale di inizio, default `7` |
 | `WASHTEC_ORA_FINE` | (facoltativa) ora locale di fine, default `22` |
 | `WASHTEC_INTERVALLO_MIN` | (facoltativa) minuti tra un giro e l'altro, default `10` |
@@ -44,7 +47,7 @@ l'estrazione legge i testi italiani della pagina.
 
 ```bash
 pip install playwright && playwright install chromium
-export WASHTEC_UTENTE=... WASHTEC_PASSWORD=...
+export WASHTEC_COMMITTENTE=... WASHTEC_UTENTE=... WASHTEC_PASSWORD=...
 python manage.py importa_washtec_auto --dry-run --visibile   # legge senza salvare, browser visibile
 python manage.py importa_washtec_auto --dal 2026-10-01 --al 2026-10-05   # recupera un periodo
 ```

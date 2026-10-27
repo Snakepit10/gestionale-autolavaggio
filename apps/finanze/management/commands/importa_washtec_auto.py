@@ -6,7 +6,7 @@ Uso:
     python manage.py importa_washtec_auto --dal 2026-10-01 --al 2026-10-05
     python manage.py importa_washtec_auto --dry-run --visibile   # prova in locale
 
-Credenziali: WASHTEC_UTENTE e WASHTEC_PASSWORD. Orari del ciclo:
+Credenziali: WASHTEC_COMMITTENTE, WASHTEC_UTENTE e WASHTEC_PASSWORD. Orari del ciclo:
 WASHTEC_ORA_INIZIO / WASHTEC_ORA_FINE (ora locale, default 7-22),
 WASHTEC_INTERVALLO_MIN (default 10). Vedi docs/WASHTEC_IMPORT.md.
 """
