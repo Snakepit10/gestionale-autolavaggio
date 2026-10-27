@@ -808,6 +808,7 @@ html { scroll-padding-top: 76px; scroll-behavior: smooth; }
         {% if abbinamento.n_scoperti %}<span class="text-warning"><i class="bi bi-question-circle"></i> {{ abbinamento.n_scoperti }} senza transazione</span>{% endif %}
         {% if abbinamento.n_fuori_standard %}<span class="badge bg-danger" title="Abbinamenti con un programma diverso da quelli del servizio"><i class="bi bi-exclamation-triangle"></i> {{ abbinamento.n_fuori_standard }} fuori standard</span>{% endif %}
         {% if abbinamento.n_manuali %}<span class="text-secondary" title="Ordini con servizi senza programmi portale nel catalogo: si abbinano solo a mano"><i class="bi bi-hand-index"></i> {{ abbinamento.n_manuali }} ordini senza programmi{% if abbinamento.n_manuali_aperti %} ({{ abbinamento.n_manuali_aperti }} da abbinare a mano){% endif %}</span>{% endif %}
+        {% if abbinamento.n_voci_abbinate %}<span class="text-success" title="Transazioni abbinate a lavaggi extra e promo della chiusura operatori"><i class="bi bi-link-45deg"></i> {{ abbinamento.n_voci_abbinate }} extra/promo</span>{% endif %}
         <span class="text-danger"><i class="bi bi-person-badge"></i> {{ abbinamento.residuo|length }} residui = &euro;{{ abbinamento.valore_residuo|floatformat:2 }}</span>
         <div class="ms-auto d-flex gap-2 align-items-center">
         <a href="?data={{ data|date:'Y-m-d' }}{% if abbinamento.con_proposte %}&proposte=1{% endif %}#abbinamento-portali" id="abbina-ricarica" class="btn btn-warning btn-sm d-none" title="Gli abbinamenti sono salvati: ricarica per aggiornare residuo e quadratura"><i class="bi bi-arrow-clockwise"></i> Aggiorna totali</a>
@@ -941,6 +942,66 @@ html { scroll-padding-top: 76px; scroll-behavior: smooth; }
           {% else %}
           <div class="text-muted small">Nessun ordine del servito in questo giorno.</div>
           {% endif %}
+
+          <div class="fw-bold small text-uppercase text-muted mt-3 mb-1">Lavaggi extra e promo (chiusura operatori)</div>
+          {% if abbinamento.voci_chiusura %}
+          <div class="table-responsive">
+            <table class="table table-sm data-table mb-0">
+              <thead class="table-light">
+                <tr><th>Tipo</th><th>Descrizione</th><th class="text-end">Importo</th><th>Transazione portale</th></tr>
+              </thead>
+              <tbody>
+                {% for v in abbinamento.voci_chiusura %}
+                <tr>
+                  <td>
+                    {% if v.tipo == 'extra' %}<span class="badge bg-success">Extra</span> <span class="small">{{ v.voce.get_metodo_display }}</span>
+                    {% else %}<span class="badge {% if v.voce.tipo == 'macchine' %}bg-info text-dark{% else %}bg-secondary{% endif %}">Promo {% if v.voce.tipo == 'macchine' %}macchine{% else %}operatori{% endif %}</span>{% endif %}
+                  </td>
+                  <td>{{ v.voce.descrizione }}
+                    <div class="small text-muted">{{ v.voce.operatore|default:"—" }} &middot; {{ v.voce.creato_il|date:"H:i" }}</div></td>
+                  <td class="text-end fw-bold">{% if v.tipo == 'extra' %}+{% else %}&minus;{% endif %}&euro;{{ v.voce.importo|floatformat:2 }}</td>
+                  <td>
+                    {% for a in v.confermati %}
+                    <form method="post" action="{% url 'finanze:azione_abbinamento_portali' %}" class="d-flex align-items-center gap-1 mb-1">
+                      {% csrf_token %}
+                      <input type="hidden" name="data" value="{{ data|date:'Y-m-d' }}">
+                      <input type="hidden" name="azione" value="rimuovi_chiusura">
+                      {% if abbinamento.con_proposte %}<input type="hidden" name="proposte" value="1">{% endif %}
+                      <input type="hidden" name="abbinamento_id" value="{{ a.pk }}">
+                      <span class="badge bg-success"><i class="bi bi-check"></i> {{ a.transazione.portale }} #{{ a.transazione.numero }}</span>
+                      <span class="small">{{ a.transazione.orario|date:"H:i" }} · P{{ a.transazione.programma }}</span>
+                      <button type="submit" class="btn btn-link btn-sm text-danger p-0 ms-1" title="Rimuovi abbinamento"><i class="bi bi-x-circle"></i></button>
+                    </form>
+                    {% endfor %}
+                    {% if v.compatibili %}
+                    <form method="post" action="{% url 'finanze:azione_abbinamento_portali' %}" class="d-flex gap-1 form-abbina" data-liberi="99">
+                      {% csrf_token %}
+                      <input type="hidden" name="data" value="{{ data|date:'Y-m-d' }}">
+                      <input type="hidden" name="azione" value="abbina_chiusura">
+                      <input type="hidden" name="tipo" value="{{ v.tipo }}">
+                      <input type="hidden" name="voce_id" value="{{ v.voce.pk }}">
+                      <select name="transazione_id" class="form-select form-select-sm" style="max-width:230px;">
+                        <option value="">Abbina a mano&hellip;</option>
+                        {% for t in v.compatibili %}
+                        <option value="{{ t.pk }}">{{ t.portale }} #{{ t.numero }} · {{ t.orario|date:"d/m H:i" }} · P{{ t.programma }}</option>
+                        {% endfor %}
+                      </select>
+                      <button type="submit" class="btn btn-outline-primary btn-sm"><i class="bi bi-link"></i></button>
+                    </form>
+                    {% elif not v.confermati %}
+                    <span class="small text-muted">Nessuna transazione libera nel giorno</span>
+                    {% endif %}
+                  </td>
+                </tr>
+                {% endfor %}
+              </tbody>
+            </table>
+          </div>
+          <div class="small text-muted mt-1">Se il lavaggio extra o la promo &egrave; passato dalle spazzole, abbinalo alla transazione: esce dal residuo.
+            Un extra abbinato non si conta due volte (&egrave; gi&agrave; nell'atteso come extra); una promo abbinata non cambia i conti, indica solo quale lavaggio &egrave; stato scontato o regalato.</div>
+          {% else %}
+          <div class="text-muted small">Nessun lavaggio extra o promo dichiarati per questa data.</div>
+          {% endif %}
         </div>
 
         <div class="col-12 col-xl-5">
@@ -986,7 +1047,7 @@ html { scroll-padding-top: 76px; scroll-behavior: smooth; }
           <div class="small text-warning"><i class="bi bi-exclamation-circle"></i>
             {{ abbinamento.residuo_senza_prezzo }} su programmi senza prezzo (contati a 0 &euro;)</div>
           {% endif %}
-          <div class="small text-muted mt-1">Calcolato sugli abbinamenti confermati: ogni transazione che abbini a un ordine esce dal residuo.
+          <div class="small text-muted mt-1">Calcolato sugli abbinamenti confermati: ogni transazione che abbini a un ordine, a un lavaggio extra o a una promo esce dal residuo.
             Con <i class="bi bi-pencil"></i> segni un lavaggio come omaggio o promo; la spunta <em>Vista</em> ricorda le righe gi&agrave; controllate (non cambia i conti).</div>
 
           <div class="modal fade" id="modaleRettificaResiduo" tabindex="-1">
@@ -1112,6 +1173,9 @@ html { scroll-padding-top: 76px; scroll-behavior: smooth; }
                     <i class="bi bi-link-45deg text-success"></i>
                     <a href="{% url 'ordini:ordine-detail' t.abbinamento.item.ordine.pk %}">#{{ t.abbinamento.item.ordine.numero_progressivo|slice:"-4:" }}</a>
                     {{ t.abbinamento.item.servizio_prodotto.titolo }}
+                  {% elif t.abbinamento_chiusura %}
+                    <i class="bi bi-link-45deg text-success"></i>
+                    {% if t.abbinamento_chiusura.lavaggio_extra_id %}<span class="badge bg-success">Extra</span> {{ t.abbinamento_chiusura.lavaggio_extra.descrizione }}{% else %}<span class="badge bg-secondary">Promo</span> {{ t.abbinamento_chiusura.promo.descrizione }}{% endif %}
                   {% elif t.proposta_item %}
                     <i class="bi bi-lightbulb text-primary"></i> proposta per
                     <a href="{% url 'ordini:ordine-detail' t.proposta_item.ordine.pk %}">#{{ t.proposta_item.ordine.numero_progressivo|slice:"-4:" }}</a>
@@ -1508,7 +1572,7 @@ html { scroll-padding-top: 76px; scroll-behavior: smooth; }
               </div>
               <div class="small text-muted">
                 Reale &minus; teorico {% if quadratura.differenza_reale_teorico >= 0 %}+{% endif %}&euro;{{ quadratura.differenza_reale_teorico|floatformat:2 }}
-                &middot; &minus; residuo pagati agli operatori &euro;{{ quadratura.residuo_operatori|floatformat:2 }}{% if quadratura.promo_operatori %} <span class="text-muted">(&euro;{{ quadratura.residuo_operatori_lordo|floatformat:2 }} &minus; promo operatori &euro;{{ quadratura.promo_operatori|floatformat:2 }})</span>{% endif %}{% if abbinamento.n_rettificati %} <span class="text-muted">(dopo {{ abbinamento.n_rettificati }} rettific{{ abbinamento.n_rettificati|pluralize:"a,he" }}: omaggi, promo, prelavaggi)</span>{% endif %}
+                &middot; &minus; residuo pagati agli operatori &euro;{{ quadratura.residuo_operatori|floatformat:2 }}{% if quadratura.promo_operatori %} <span class="text-muted">(&euro;{{ quadratura.residuo_operatori_lordo|floatformat:2 }} &minus; promo operatori &euro;{{ quadratura.promo_operatori|floatformat:2 }})</span>{% endif %}{% if abbinamento.valore_promo_abbinate %} <span class="text-muted">(compresi &euro;{{ abbinamento.valore_promo_abbinate|floatformat:2 }} di lavaggi abbinati a promo)</span>{% endif %}{% if abbinamento.n_rettificati %} <span class="text-muted">(dopo {{ abbinamento.n_rettificati }} rettific{{ abbinamento.n_rettificati|pluralize:"a,he" }}: omaggi, promo, prelavaggi)</span>{% endif %}
                 {% if abbinamento %}<a href="#abbinamento-portali">(dettaglio)</a>{% else %}<span title="Imposta la chiusura portali della giornata per calcolare il residuo">(chiusura portali non impostata)</span>{% endif %}
               </div>
             </div>

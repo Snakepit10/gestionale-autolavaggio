@@ -28,6 +28,10 @@ Regole di proposta:
 
 Le proposte sono calcolate al volo (nessuna scrittura); diventano
 AbbinamentoPortale solo alla conferma dell'operatore.
+
+Anche i lavaggi extra e le promo della chiusura operatori (stesso giorno)
+si abbinano, solo a mano, alle transazioni libere del giorno
+(AbbinamentoPortaleChiusura): la transazione esce dal residuo.
 """
 from datetime import datetime, time, timedelta
 from decimal import Decimal
@@ -36,6 +40,7 @@ from django.db import transaction
 from django.utils import timezone
 
 from apps.finanze.models import (PREZZI_PROGRAMMA_PORTALE, AbbinamentoPortale,
+                                 AbbinamentoPortaleChiusura, LavaggioExtra, PromoGiornata,
                                  TransazionePortale)
 from apps.ordini.models import ItemOrdine
 
@@ -148,6 +153,7 @@ def transazioni_abbinabili(giorno):
         orario__gte=inizio, orario__lt=fine,
         origine='unita',
         abbinamento__isnull=True,
+        abbinamento_chiusura__isnull=True,
     ).order_by('orario'))
 
 
@@ -158,6 +164,7 @@ def transazioni_libere(chiusura):
         chiusura.q_transazioni(),
         origine='unita',
         abbinamento__isnull=True,
+        abbinamento_chiusura__isnull=True,
     ).order_by('orario'))
 
 
@@ -321,6 +328,17 @@ def riepilogo(chiusura, tolleranza=TOLLERANZA_DEFAULT, con_proposte=False):
                               'valore': rettifica.importo if rettifica else listino,
                               'visto': visti.get(t.pk)})
     valore_listino = sum((r['listino'] for r in righe_residuo), Decimal('0.00'))
+
+    # lavaggi extra e promo della chiusura operatori, abbinati a mano
+    voci = voci_chiusura(chiusura.data)
+    for v in voci:
+        v['compatibili'] = libere
+    # transazioni della finestra abbinate a extra/promo: fuori dal residuo,
+    # ma quelle delle promo restano a listino nei conti (vedi modello)
+    abbinate_chiusura = list(AbbinamentoPortaleChiusura.objects.filter(
+        chiusura.q_transazioni('transazione__')).select_related('transazione'))
+    valore_promo_abbinate = sum((PREZZI_PROGRAMMA_PORTALE[a.transazione.programma]
+                                 for a in abbinate_chiusura if a.promo_id), Decimal('0.00'))
     valore_residuo = sum((r['valore'] for r in righe_residuo), Decimal('0.00'))
     senza_prezzo = sum(1 for t in residuo if not PREZZI_PROGRAMMA_PORTALE[t.programma])
 
@@ -344,6 +362,14 @@ def riepilogo(chiusura, tolleranza=TOLLERANZA_DEFAULT, con_proposte=False):
         'n_rettificati': len(rettifiche),
         'n_visti': len(visti),
         'residuo_senza_prezzo': senza_prezzo,
+        'voci_chiusura': voci,
+        'n_voci_abbinate': sum(len(v['confermati']) for v in voci),
+        'n_abbinate_chiusura': len(abbinate_chiusura),
+        'valore_abbinate_chiusura_listino': sum(
+            (PREZZI_PROGRAMMA_PORTALE[a.transazione.programma] for a in abbinate_chiusura), Decimal('0.00')),
+        'valore_promo_abbinate': valore_promo_abbinate,
+        # residuo che conta in quadratura (prima delle promo operatori)
+        'valore_residuo_quadratura': valore_residuo + valore_promo_abbinate,
         'tolleranza_ore': tolleranza.total_seconds() / 3600,
         'anticipo_min': int(ANTICIPO_PORTALE.total_seconds() / 60),
     }
@@ -429,3 +455,38 @@ def rifiuta(chiusura, item_id, transazione_id, operatore=None):
     AbbinamentoScartato.objects.get_or_create(item=item, transazione_id=transazione_id,
                                               defaults={'operatore': operatore})
     return True
+
+
+def voci_chiusura(giorno):
+    """Lavaggi extra e promo dichiarati nella chiusura operatori del
+    giorno, con le transazioni portale gia' abbinate."""
+    voci = []
+    for tipo, modello in (('extra', LavaggioExtra), ('promo', PromoGiornata)):
+        for v in (modello.objects.filter(data=giorno).select_related('operatore')
+                  .prefetch_related('abbinamenti_portale__transazione')):
+            voci.append({'tipo': tipo, 'voce': v, 'confermati': list(v.abbinamenti_portale.all())})
+    return voci
+
+
+def abbina_chiusura(chiusura, tipo, voce_id, transazione_id, operatore=None):
+    """Abbina a mano una transazione libera del giorno a un lavaggio extra
+    o a una promo della chiusura operatori. Ritorna (ok, messaggio)."""
+    modello = {'extra': LavaggioExtra, 'promo': PromoGiornata}.get(tipo)
+    voce = modello.objects.filter(pk=voce_id, data=chiusura.data).first() if modello else None
+    if voce is None:
+        return False, 'Lavaggio extra o promo non presente in questa giornata.'
+    t = next((t for t in transazioni_abbinabili(chiusura.data) if t.pk == transazione_id), None)
+    if t is None:
+        return False, 'Transazione non disponibile (gia\' abbinata o di un altro giorno).'
+    AbbinamentoPortaleChiusura.objects.create(
+        transazione=t, operatore=operatore,
+        **({'lavaggio_extra': voce} if tipo == 'extra' else {'promo': voce}))
+    return True, 'Abbinamento salvato.'
+
+
+def rimuovi_chiusura(chiusura, abbinamento_id):
+    """Toglie un abbinamento extra/promo della giornata: la transazione
+    torna libera (e nel residuo, se cade nella finestra)."""
+    from django.db.models import Q
+    return AbbinamentoPortaleChiusura.objects.filter(pk=abbinamento_id).filter(
+        Q(lavaggio_extra__data=chiusura.data) | Q(promo__data=chiusura.data)).delete()[0] > 0

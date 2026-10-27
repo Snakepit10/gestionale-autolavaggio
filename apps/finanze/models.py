@@ -844,6 +844,47 @@ class PromoGiornata(models.Model):
         return f"{self.data:%d/%m/%Y} {self.get_tipo_display()} €{self.importo}"
 
 
+class AbbinamentoPortaleChiusura(models.Model):
+    """Collega un lavaggio extra o una promo della chiusura operatori alla
+    transazione portale (unita' operativa) che li ha eseguiti, come
+    AbbinamentoPortale fa per il servito. La transazione esce dal residuo
+    "pagati agli operatori":
+    - extra: l'incasso e' gia' nell'atteso come lavaggio extra, quindi il
+      lavaggio non si conta una seconda volta nel residuo;
+    - promo: i conti non cambiano (la transazione resta valutata a listino
+      e la promo continua a scalare il suo importo), l'abbinamento dice
+      solo quale lavaggio e' stato scontato o regalato.
+    Una transazione si abbina una sola volta, a un ordine o a una voce
+    della chiusura operatori."""
+    transazione = models.OneToOneField(
+        TransazionePortale, on_delete=models.CASCADE, related_name='abbinamento_chiusura')
+    lavaggio_extra = models.ForeignKey(
+        LavaggioExtra, on_delete=models.CASCADE, null=True, blank=True,
+        related_name='abbinamenti_portale')
+    promo = models.ForeignKey(
+        PromoGiornata, on_delete=models.CASCADE, null=True, blank=True,
+        related_name='abbinamenti_portale')
+    operatore = models.ForeignKey(
+        User, on_delete=models.SET_NULL, null=True, blank=True,
+        related_name='abbinamenti_portale_chiusura')
+    creato_il = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        verbose_name = 'Abbinamento portale extra/promo'
+        verbose_name_plural = 'Abbinamenti portale extra/promo'
+        ordering = ['transazione__orario']
+        constraints = [
+            models.CheckConstraint(
+                check=(models.Q(lavaggio_extra__isnull=False, promo__isnull=True)
+                           | models.Q(lavaggio_extra__isnull=True, promo__isnull=False)),
+                name='abbinamento_chiusura_extra_o_promo'),
+        ]
+
+    def __str__(self):
+        voce = f'extra {self.lavaggio_extra_id}' if self.lavaggio_extra_id else f'promo {self.promo_id}'
+        return f"{self.transazione} -> {voce}"
+
+
 class TicketResto(models.Model):
     """Ticket di resto delle casse automatiche ripagato al cliente con i
     contanti della cassa: nella quadratura si somma al reale (come le

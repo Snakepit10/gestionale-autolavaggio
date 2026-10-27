@@ -52,6 +52,48 @@ class AbbinamentoPortaliTest(TestCase):
             portale='A', numero=13000 + self.n_tx, orario=ora(alle),
             programma=programma, origine=origine)
 
+    def test_extra_e_promo_abbinati_escono_dal_residuo(self):
+        from apps.finanze.models import PREZZI_PROGRAMMA_PORTALE, LavaggioExtra, PromoGiornata
+        giorno = self.chiusura.data
+        extra = LavaggioExtra.objects.create(data=giorno, descrizione='Panda', importo=Decimal('20'))
+        promo = PromoGiornata.objects.create(data=giorno, tipo='operatori', descrizione='omaggio',
+                                             importo=Decimal('8'))
+        t_extra, t_promo, libera = self._tx('10:00', 8), self._tx('11:00', 4), self._tx('12:00', 7)
+        prima = ap.riepilogo(self.chiusura)
+        self.assertEqual(len(prima['voci_chiusura']), 2)
+        self.assertEqual(len(prima['residuo']), 3)
+
+        self.assertTrue(ap.abbina_chiusura(self.chiusura, 'extra', extra.pk, t_extra.pk)[0])
+        self.assertTrue(ap.abbina_chiusura(self.chiusura, 'promo', promo.pk, t_promo.pk)[0])
+        # gia' abbinata: non riutilizzabile, ne' per il servito
+        self.assertFalse(ap.abbina_chiusura(self.chiusura, 'promo', promo.pk, t_extra.pk)[0])
+        self.assertNotIn(t_extra.pk, [t.pk for t in ap.transazioni_abbinabili(giorno)])
+
+        r = ap.riepilogo(self.chiusura)
+        self.assertEqual([x['transazione'].pk for x in r['residuo']], [libera.pk])
+        self.assertEqual(r['n_voci_abbinate'], 2)
+        # l'extra e' gia' nell'atteso: esce dai conti del residuo; la promo no
+        self.assertEqual(r['valore_residuo_quadratura'],
+                         PREZZI_PROGRAMMA_PORTALE[7] + PREZZI_PROGRAMMA_PORTALE[4])
+
+        abb = t_extra.abbinamento_chiusura
+        self.assertTrue(ap.rimuovi_chiusura(self.chiusura, abb.pk))
+        self.assertEqual(len(ap.riepilogo(self.chiusura)['residuo']), 2)
+
+    def test_abbina_chiusura_dal_report(self):
+        from apps.finanze.models import LavaggioExtra
+        extra = LavaggioExtra.objects.create(data=self.chiusura.data, descrizione='Panda', importo=Decimal('20'))
+        t = self._tx('10:00', 8)
+        self.client.force_login(utente_titolare('tit', password='x'))
+        r = self.client.post(reverse('finanze:azione_abbinamento_portali'), {
+            'data': '2026-10-06', 'azione': 'abbina_chiusura', 'tipo': 'extra',
+            'voce_id': extra.pk, 'transazione_id': t.pk})
+        self.assertEqual(r.status_code, 302)
+        self.assertEqual(extra.abbinamenti_portale.get().transazione_id, t.pk)
+        r = self.client.get(reverse('finanze:report_giornata') + '?data=2026-10-06')
+        self.assertContains(r, 'Lavaggi extra e promo (chiusura operatori)')
+        self.assertContains(r, 'name="azione" value="rimuovi_chiusura"')
+
     def test_indietro_dal_completamento(self):
         # completato 10:30 -> obiettivo 10:00: vince la piu' vicina a 10:00
         item = self._item(self.completo, completato='10:30')

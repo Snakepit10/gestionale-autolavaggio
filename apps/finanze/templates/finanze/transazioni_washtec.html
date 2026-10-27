@@ -134,6 +134,9 @@ table.tx td { vertical-align:middle; }
                             <i class="bi bi-link-45deg text-success"></i>
                             <a href="{% url 'ordini:ordine-detail' t.abbinamento.item.ordine.pk %}">#{{ t.abbinamento.item.ordine.numero_progressivo|slice:"-4:" }}</a>
                             {{ t.abbinamento.item.servizio_prodotto.titolo }}{% if t.abbinamento.item.ordine.cliente %} &middot; {{ t.abbinamento.item.ordine.cliente }}{% endif %}
+                        {% elif t.abbinamento_chiusura %}
+                            <i class="bi bi-link-45deg text-success"></i>
+                            {% if t.abbinamento_chiusura.lavaggio_extra_id %}<span class="badge bg-success">Extra</span> {{ t.abbinamento_chiusura.lavaggio_extra.descrizione }}{% else %}<span class="badge bg-secondary">Promo</span> {{ t.abbinamento_chiusura.promo.descrizione }}{% endif %}
                         {% elif t.origine == 'unita' %}
                             {% if t.rettifica_residuo %}
                                 <span class="badge bg-info text-dark">{{ t.rettifica_residuo.get_motivo_display }}</span> incassato &euro;{{ t.rettifica_residuo.importo|floatformat:2 }}{% if t.rettifica_residuo.nota %} &middot; {{ t.rettifica_residuo.nota }}{% endif %}
