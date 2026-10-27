@@ -1099,7 +1099,7 @@ def report_giornata(request):
     # resto resta in cassa finche' il cliente non porta il ticket di resto.
     quadratura, spese_cassa, totale_spese_cassa = _quadratura_giornata(
         data, cassa_servito, agg['incasso_vendita'], totale_servito,
-        contesto_portali['abbinamento']['valore_residuo_quadratura'])
+        contesto_portali['abbinamento']['valore_residuo'])
 
     # Scontrini dei portali: accanto ai campi i valori attesi da WashTec
     _portale_per_cassa = {c.pk: codice for codice, c in
@@ -1496,17 +1496,14 @@ def _contesto_lavaggi_portali(data, completo=True, con_proposte=False):
     abbinamento = abbinamento_portali.riepilogo(chiusura, con_proposte=con_proposte)
 
     # WashCycles self service: lavaggi pagati in contanti al portale +
-    # residuo unita' operativa (pagati direttamente agli operatori), con
-    # quelli abbinati a lavaggi extra e promo della chiusura operatori
+    # residuo unita' operativa (pagati direttamente agli operatori)
     n_contanti = sum(1 for t in transazioni if t.origine == 'contanti')
     v_contanti = sum((p['tot']['contanti'] for p in portali), Decimal('0.00'))
-    n_operatori = len(abbinamento['residuo']) + abbinamento['n_abbinate_chiusura']
     washcycles_self = {
-        'n': n_contanti + n_operatori,
-        'valore': (v_contanti + abbinamento['valore_residuo_listino']
-                   + abbinamento['valore_abbinate_chiusura_listino']),
+        'n': n_contanti + len(abbinamento['residuo']),
+        'valore': v_contanti + abbinamento['valore_residuo_listino'],
         'n_contanti': n_contanti,
-        'n_operatori': n_operatori,
+        'n_operatori': len(abbinamento['residuo']),
     }
 
     buchi = import_washtec.buchi_archivio(
@@ -1539,7 +1536,6 @@ def _transazioni_finestra(chiusura, abbinamento):
     proposte = {p['transazione'].pk: p['item'] for r in abbinamento['righe'] for p in r['proposte']}
     lista = list(TransazionePortale.tutte.filter(chiusura.q_transazioni())
                  .select_related('abbinamento__item__ordine__cliente', 'abbinamento__item__servizio_prodotto',
-                                 'abbinamento_chiusura__lavaggio_extra', 'abbinamento_chiusura__promo',
                                  'rettifica_residuo')
                  .order_by('orario', 'portale', 'numero'))
     for t in lista:
@@ -1632,24 +1628,6 @@ def azione_abbinamento_portali(request):
             # abbinamento dal report senza ricaricare la pagina
             return JsonResponse({'ok': ok, 'msg': msg})
         (messages.success if ok else messages.error)(request, msg)
-    elif azione == 'abbina_chiusura':
-        # lavaggio extra o promo della chiusura operatori
-        try:
-            voce_id = int(request.POST.get('voce_id'))
-            tx_id = int(request.POST.get('transazione_id'))
-        except (TypeError, ValueError):
-            messages.error(request, 'Seleziona una transazione.')
-            return redirect(torna)
-        ok, msg = abbinamento_portali.abbina_chiusura(
-            chiusura, request.POST.get('tipo'), voce_id, tx_id, request.user)
-        if request.headers.get('X-Requested-With') == 'fetch':
-            return JsonResponse({'ok': ok, 'msg': msg})
-        (messages.success if ok else messages.error)(request, msg)
-    elif azione == 'rimuovi_chiusura':
-        if abbinamento_portali.rimuovi_chiusura(chiusura, request.POST.get('abbinamento_id') or 0):
-            messages.success(request, 'Abbinamento rimosso: la transazione torna libera.')
-        else:
-            messages.error(request, 'Abbinamento non trovato.')
     elif azione == 'rettifica_residuo':
         _rettifica_residuo(request, chiusura)
     elif azione == 'visto':
@@ -1825,7 +1803,7 @@ def _saldo_giornata(data):
     portali = _contesto_lavaggi_portali(data, completo=False)
     quadratura, _, _ = _quadratura_giornata(
         data, cassa_servito, vendita_self_service, totale_servito,
-        portali['abbinamento']['valore_residuo_quadratura'])
+        portali['abbinamento']['valore_residuo'])
     return quadratura, portali
 
 

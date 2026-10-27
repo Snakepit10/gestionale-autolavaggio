@@ -6,7 +6,6 @@ from decimal import Decimal
 
 from django.contrib.auth.decorators import login_required, user_passes_test
 from django.core.paginator import Paginator
-from django.db.models import Q
 from django.http import HttpResponse
 from django.shortcuts import render
 from django.utils import timezone
@@ -42,7 +41,6 @@ def transazioni_washtec(request):
 
     qs = (TransazionePortale.tutte.filter(orario__gte=inizio, orario__lt=fine)
           .select_related('abbinamento__item__ordine__cliente', 'abbinamento__item__servizio_prodotto',
-                          'abbinamento_chiusura__lavaggio_extra', 'abbinamento_chiusura__promo',
                           'rettifica_residuo')
           .order_by('orario', 'portale', 'numero'))
     filtro = {k: request.GET.get(k, '') for k in ('portale', 'origine', 'programma', 'stato', 'numero')}
@@ -55,10 +53,9 @@ def transazioni_washtec(request):
     if filtro['numero'].isdigit():
         qs = qs.filter(numero=int(filtro['numero']))
     if filtro['stato'] == 'abbinata':
-        qs = qs.filter(Q(abbinamento__isnull=False) | Q(abbinamento_chiusura__isnull=False))
+        qs = qs.filter(abbinamento__isnull=False)
     elif filtro['stato'] == 'libera':
-        qs = qs.filter(origine='unita', abbinamento__isnull=True, abbinamento_chiusura__isnull=True,
-                       eseguita=True)
+        qs = qs.filter(origine='unita', abbinamento__isnull=True, eseguita=True)
     elif filtro['stato'] == 'rettificata':
         qs = qs.filter(rettifica_residuo__isnull=False)
     elif filtro['stato'] == 'interrotta':
@@ -107,16 +104,12 @@ def _csv(qs, dal, al):
     for t in qs:
         abb = getattr(t, 'abbinamento', None) if hasattr(t, 'abbinamento') else None
         rett = getattr(t, 'rettifica_residuo', None) if hasattr(t, 'rettifica_residuo') else None
-        voce = getattr(t, 'abbinamento_chiusura', None) if hasattr(t, 'abbinamento_chiusura') else None
-        if voce:
-            voce = (f'Extra: {voce.lavaggio_extra.descrizione}' if voce.lavaggio_extra_id
-                    else f'Promo: {voce.promo.descrizione}')
         locale = timezone.localtime(t.orario)
         w.writerow([
             f'{locale:%d/%m/%Y}', f'{locale:%H:%M:%S}', t.get_portale_display(), t.numero, f'P{t.programma}',
             t.get_origine_display(), str(PREZZI_PROGRAMMA_PORTALE.get(t.programma, '')).replace('.', ','),
             abb.item.ordine.numero_progressivo if abb else '',
-            abb.item.servizio_prodotto.titolo if abb else (voce or ''),
+            abb.item.servizio_prodotto.titolo if abb else '',
             rett.get_motivo_display() if rett else '',
             str(rett.importo).replace('.', ',') if rett else '',
             'Sì' if t.eseguita else 'No (interrotto)',
