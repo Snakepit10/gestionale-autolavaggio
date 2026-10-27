@@ -36,3 +36,7 @@ stripe>=9.0
 
 # Consulente AI marketing (Claude API)
 anthropic>=0.120
+
+# Import automatico WashTec Plus (browser headless, worker Railway)
+playwright>=1.40
+

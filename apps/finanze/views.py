@@ -1166,6 +1166,8 @@ def report_giornata(request):
         'orario_counts_json': json.dumps(orario_counts),
     }
     context.update(contesto_portali)
+    from .services import import_automatico
+    context['stato_washtec'] = import_automatico.stato()
     from django.urls import reverse
     from apps.ordini.vendite import riepilogo_prodotti
     context['rp'] = riepilogo_prodotti(data, data)
@@ -2044,7 +2046,8 @@ def importa_washtec(request):
     """Pagina di arrivo del bookmarklet WashTec: legge le righe dal
     fragment dell'URL (#...) lato browser, mostra l'anteprima e importa.
     Contiene anche il bookmarklet da trascinare nei preferiti."""
-    from .models import TransazionePortale
+    from .models import EsecuzioneImportWashtec, TransazionePortale
+    from .services import import_automatico
 
     adesso = timezone.now()
     ultima = TransazionePortale.objects.order_by('-orario').first()
@@ -2052,6 +2055,8 @@ def importa_washtec(request):
         'origine_gestionale': request.build_absolute_uri('/').rstrip('/'),
         'ultima_transazione': ultima,
         'buchi': import_washtec.buchi_archivio(adesso - timedelta(days=60), adesso),
+        'stato_washtec': import_automatico.stato(),
+        'esecuzioni': EsecuzioneImportWashtec.objects.select_related('richiesta_da')[:15],
     })
 
 

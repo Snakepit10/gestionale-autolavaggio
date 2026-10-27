@@ -1220,3 +1220,150 @@ class TransazioniWashtecTest(TestCase):
         self.assertIn('id="transazioni-washtec"', html)
         self.assertIn('Omaggio', html)
         self.assertIn('residuo &middot; pagato agli operatori', html)
+
+
+class ImportAutomaticoWashtecTest(TestCase):
+    """Import automatico (worker) e tasto "Aggiorna ora"."""
+
+    def setUp(self):
+        TransazionePortale.objects.create(portale='A', numero=13300, orario=ora('08:00'),
+                                          programma=4, origine='unita')
+
+    @staticmethod
+    def estrai(dal, al):
+        return [['13301', '06/10/26 10:00:00', '8', 'In contanti', '0,00 EUR', 'No', 'Sì'],
+                ['13302', '06/10/26 10:20:00', '4', 'In contanti', '0,00 EUR', 'No', 'Sì']]
+
+    def test_giro_salva_le_transazioni(self):
+        from apps.finanze.services import import_automatico as ia
+        e = ia.esegui(estrai=self.estrai)
+        self.assertEqual((e.esito, e.righe, e.nuove), ('ok', 2, 2))
+        self.assertEqual(TransazionePortale.objects.count(), 3)
+        # idempotente: il giro dopo non trova nulla di nuovo
+        self.assertEqual(ia.esegui(estrai=self.estrai).nuove, 0)
+        self.assertEqual(ia.stato()['ultima_ok'].pk, ia.EsecuzioneImportWashtec.objects.first().pk)
+
+    def test_errore_registrato_e_in_rosso(self):
+        from apps.finanze.services import import_automatico as ia
+
+        def rotto(dal, al):
+            raise RuntimeError('sezione Report non trovata')
+        e = ia.esegui(estrai=rotto)
+        self.assertEqual(e.esito, 'errore')
+        self.assertIn('Report', e.messaggio)
+        stato = ia.stato()
+        self.assertTrue(stato['allarme'])
+        self.assertEqual(stato['errore'].pk, e.pk)
+
+    def test_periodo(self):
+        from apps.finanze.services import import_automatico as ia
+        oggi = datetime(2026, 10, 9).date()
+        # ultima transazione il 06/10: si riparte dal 05/10
+        self.assertEqual(ia.periodo(oggi), (datetime(2026, 10, 5).date(), oggi))
+        # archivio aggiornato: almeno da ieri
+        self.assertEqual(ia.periodo(datetime(2026, 10, 6).date())[0], datetime(2026, 10, 5).date())
+        TransazionePortale.objects.all().delete()
+        self.assertEqual(ia.periodo(oggi)[0], datetime(2026, 10, 6).date())
+
+    def test_aggiorna_ora_una_richiesta_e_il_worker_la_chiude(self):
+        from apps.finanze.services import import_automatico as ia
+        self.client.force_login(utente_titolare('tit', password='x'))
+        url = reverse('ordini:washtec-aggiorna')
+        self.client.post(url, HTTP_X_REQUESTED_WITH='fetch')
+        r = self.client.post(url, HTTP_X_REQUESTED_WITH='fetch')
+        self.assertTrue(r.json()['in_attesa'])
+        self.assertEqual(ia.EsecuzioneImportWashtec.objects.filter(esito='richiesta').count(), 1)
+
+        ia.ciclo(attesa=0, estrai=self.estrai, giri=1, scrivi=lambda *a: None)
+        e = ia.EsecuzioneImportWashtec.objects.get()
+        self.assertEqual((e.esito, e.nuove), ('ok', 2))
+        self.assertIsNotNone(e.richiesta_da)
+        self.assertFalse(self.client.get(reverse('ordini:washtec-stato')).json()['in_attesa'])
+
+    def test_ciclo_sopravvive_a_un_errore(self):
+        from unittest import mock
+
+        from apps.finanze.services import import_automatico as ia
+        ia.richiedi()
+        log = []
+        with mock.patch.object(ia, '_chiudi_giri_morti', side_effect=[Exception('db giu'), None, None]), \
+                mock.patch.object(ia.orologio, 'sleep') as dorme:
+            ia.ciclo(attesa=0, estrai=self.estrai, giri=2, scrivi=log.append, attesa_errore=60)
+        self.assertIn('db giu', log[0])
+        dorme.assert_called_once_with(60)
+        self.assertEqual(ia.EsecuzioneImportWashtec.objects.get().esito, 'ok')
+
+    def test_comando_senza_database_url(self):
+        from django.core.management import CommandError, call_command
+        with self.settings(DEBUG=False):
+            with self.assertRaisesMessage(CommandError, 'DATABASE_URL'):
+                call_command('importa_washtec_auto', '--ciclo')
+
+    def test_richiesta_mai_presa_diventa_errore(self):
+        from apps.finanze.services import import_automatico as ia
+        e = ia.richiedi()
+        ia.EsecuzioneImportWashtec.objects.filter(pk=e.pk).update(
+            creata_il=timezone.now() - timedelta(minutes=5))
+        stato = ia.stato()
+        self.assertIsNone(stato['in_attesa'])
+        self.assertIn('non risponde', stato['errore'].messaggio)
+
+
+class SpazzoleOperatoriTest(TestCase):
+    """Pagina Spazzole della Distinta: abbinamenti fatti dagli operatori."""
+
+    def setUp(self):
+        from django.contrib.auth.models import Group
+        cat = Categoria.objects.create(nome='Servito')
+        servizio = ServizioProdotto.objects.create(
+            titolo='Lavaggio Completo', categoria=cat, prezzo=Decimal('22'), descrizione='',
+            programmi_portale='8,4')
+        from datetime import time
+        self.giorno = timezone.localdate()
+        adesso = timezone.make_aware(datetime.combine(self.giorno, time(12, 0)))
+        ordine = Ordine.objects.create(totale=Decimal('22'), totale_finale=Decimal('22'))
+        Ordine.objects.filter(pk=ordine.pk).update(data_ora=adesso - timedelta(minutes=1))
+        self.item = ItemOrdine.objects.create(ordine=ordine, servizio_prodotto=servizio, quantita=1,
+                                              prezzo_unitario=Decimal('22'))
+        self.altro = ItemOrdine.objects.create(
+            ordine=Ordine.objects.create(totale=Decimal('22'), totale_finale=Decimal('22')),
+            servizio_prodotto=servizio, quantita=1, prezzo_unitario=Decimal('22'))
+        Ordine.objects.filter(pk=self.altro.ordine_id).update(data_ora=adesso - timedelta(minutes=30))
+        self.tx = TransazionePortale.objects.create(portale='A', numero=500, orario=adesso,
+                                                    programma=8, origine='unita')
+        self.operatore = User.objects.create_user('op', password='x')
+        self.operatore.groups.add(Group.objects.get(name='operatore'))
+        self.url = reverse('ordini:spazzole-giornata')
+
+    def _post(self, **dati):
+        self.client.force_login(self.operatore)
+        return self.client.post(self.url, {'data': self.giorno.isoformat(), **dati})
+
+    def test_operatore_conferma_e_chiude_senza_portale(self):
+        self.client.force_login(self.operatore)
+        r = self.client.get(self.url)
+        self.assertContains(r, 'Conferma tutte le proposte (1)')
+        self.assertContains(r, 'Aggiorna ora')
+        self._post(azione='conferma')
+        self.assertEqual(AbbinamentoPortale.objects.get().transazione_id, self.tx.pk)
+        self._post(azione='senza_portale', item_id=self.altro.pk)
+        from apps.finanze.views_spazzole import riepilogo_spazzole
+        r = riepilogo_spazzole(self.giorno)
+        self.assertEqual((r['n_ok'], r['n_proposto'], r['n_da_sistemare']), (2, 0, 0))
+        # riquadro nella Distinta
+        r = self.client.get(reverse('ordini:chiusura-giornata'))
+        self.assertContains(r, 'tutto a posto')
+
+    def test_senza_permesso(self):
+        from apps.auth_system.models import PermessoUtente
+        PermessoUtente.objects.create(user=self.operatore, sezione='spazzole_servito', consenti=False)
+        self.client.force_login(self.operatore)
+        self.assertEqual(self.client.get(self.url).status_code, 403)
+        self.assertEqual(self.client.post(reverse('ordini:washtec-aggiorna')).status_code, 403)
+        self.assertNotContains(self.client.get(reverse('ordini:chiusura-giornata')), 'Abbina spazzole')
+
+    def test_giornata_confermata_non_si_modifica(self):
+        from apps.finanze.models import QuadraturaGiornaliera
+        QuadraturaGiornaliera.objects.create(data=self.giorno, confermata_il=timezone.now())
+        self._post(azione='conferma')
+        self.assertFalse(AbbinamentoPortale.objects.exists())

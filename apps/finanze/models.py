@@ -602,6 +602,39 @@ class ChiusuraPortali(models.Model):
         return q
 
 
+class EsecuzioneImportWashtec(models.Model):
+    """Un giro dell'import automatico WashTec (comando
+    importa_washtec_auto). Il tasto "Aggiorna ora" crea una riga
+    'richiesta' che il worker prende subito; i giri programmati nascono
+    gia' 'in_corso' e senza richiedente."""
+    ESITO_CHOICES = [
+        ('richiesta', 'Richiesta'),
+        ('in_corso', 'In corso'),
+        ('ok', 'Completata'),
+        ('errore', 'Errore'),
+    ]
+    esito = models.CharField(max_length=10, choices=ESITO_CHOICES, default='richiesta', db_index=True)
+    richiesta_da = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, blank=True,
+                                     related_name='import_washtec_richiesti')
+    creata_il = models.DateTimeField(auto_now_add=True)
+    avviata_il = models.DateTimeField(null=True, blank=True)
+    finita_il = models.DateTimeField(null=True, blank=True)
+    dal = models.DateField(null=True, blank=True)
+    al = models.DateField(null=True, blank=True)
+    righe = models.PositiveIntegerField(default=0)
+    nuove = models.PositiveIntegerField(default=0)
+    # errore, oppure anomalie dell'import da verificare
+    messaggio = models.TextField(blank=True)
+
+    class Meta:
+        verbose_name = 'Import WashTec automatico'
+        verbose_name_plural = 'Import WashTec automatici'
+        ordering = ['-creata_il']
+
+    def __str__(self):
+        return f"{self.creata_il:%d/%m %H:%M} {self.get_esito_display()}"
+
+
 class AbbinamentoPortale(models.Model):
     """Collega un lavaggio del servito (ItemOrdine con programmi_portale)
     alla transazione portale WashTec, avviata da unita' operativa, che
