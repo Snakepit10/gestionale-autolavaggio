@@ -1385,6 +1385,9 @@ def _quadratura_giornata(data, cassa_servito, vendita_self_service, totale_servi
     quadratura['residuo_operatori_lordo'] = residuo_operatori
     residuo_operatori = max(residuo_operatori - promo_operatori, Decimal('0.00'))
     quadratura['residuo_operatori'] = residuo_operatori
+    # Atteso in cassa: il teorico + i lavaggi pagati agli operatori (quei
+    # soldi finiscono nel cassetto). Differenza = reale - atteso.
+    quadratura['totale_atteso'] = totale_teorico + residuo_operatori
     if quadratura['differenza'] is not None:
         quadratura['differenza_reale_teorico'] = quadratura['differenza']
         quadratura['differenza'] = quadratura['differenza'] - residuo_operatori

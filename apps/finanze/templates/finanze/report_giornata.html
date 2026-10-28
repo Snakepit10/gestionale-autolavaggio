@@ -186,7 +186,7 @@ html { scroll-padding-top: 76px; scroll-behavior: smooth; }
         <div class="esito na">
           <div class="lbl">Quadratura</div>
           <div class="big text-secondary">Da inserire</div>
-          <div class="small text-muted">Teorico atteso &euro;{{ quadratura.totale_teorico|floatformat:2 }} &middot; manca il conteggio dei contanti</div>
+          <div class="small text-muted">Atteso &euro;{{ quadratura.totale_atteso|floatformat:2 }} &middot; manca il conteggio dei contanti</div>
         </div>
         {% else %}
         <div class="esito {% if quadratura.stato == 'ok' %}ok{% else %}ko{% endif %}">
@@ -197,7 +197,7 @@ html { scroll-padding-top: 76px; scroll-behavior: smooth; }
           </div>
           <div class="small text-muted">
             {% if quadratura.stato == 'ok' %}In quadra (tolleranza &plusmn;&euro;0,50){% elif quadratura.stato == 'mancante' %}Mancano dei soldi{% else %}Eccedenza in cassa{% endif %}
-            &middot; reale &euro;{{ quadratura.totale_reale|floatformat:2 }} / teorico &euro;{{ quadratura.totale_teorico|floatformat:2 }}
+            &middot; reale &euro;{{ quadratura.totale_reale|floatformat:2 }} / atteso &euro;{{ quadratura.totale_atteso|floatformat:2 }}
           </div>
         </div>
         {% endif %}
@@ -1498,9 +1498,18 @@ html { scroll-padding-top: 76px; scroll-behavior: smooth; }
             {% if quadratura.pagamenti_estratto %}
             <div class="small mb-2"><a href="#estratto-pagamenti" class="text-decoration-none"><i class="bi bi-receipt"></i> Estratto pagamenti del giorno ({{ quadratura.pagamenti_estratto|length }} &middot; &euro;{{ quadratura.totale_pagamenti_estratto|floatformat:2 }})</a></div>
             {% endif %}
+            <div class="d-flex justify-content-between small mb-1">
+              <span>+ Pagati agli operatori (lavaggi portale non abbinati)
+                <div class="text-muted" style="font-size:.75rem">
+                  {% if quadratura.promo_operatori %}&euro;{{ quadratura.residuo_operatori_lordo|floatformat:2 }} &minus; promo operatori &euro;{{ quadratura.promo_operatori|floatformat:2 }}{% endif %}
+                  {% if abbinamento.n_rettificati %}dopo {{ abbinamento.n_rettificati }} rettific{{ abbinamento.n_rettificati|pluralize:"a,he" }} (omaggi, promo, prelavaggi){% endif %}
+                  {% if abbinamento %}<a href="#abbinamento-portali">(dettaglio)</a>{% else %}<span title="Imposta la chiusura portali della giornata per calcolare il residuo">(chiusura portali non impostata)</span>{% endif %}
+                </div></span>
+              <span class="fw-bold">+&euro;{{ quadratura.residuo_operatori|floatformat:2 }}</span>
+            </div>
             <div class="d-flex justify-content-between border-top pt-2">
-              <span class="fw-bold">Totale teorico</span>
-              <span class="fs-5 fw-bold" style="color:#0f766e">&euro;{{ quadratura.totale_teorico|floatformat:2 }}</span>
+              <span class="fw-bold">Totale atteso</span>
+              <span class="fs-5 fw-bold" style="color:#0f766e">&euro;{{ quadratura.totale_atteso|floatformat:2 }}</span>
             </div>
           </div>
         </div>
@@ -1509,14 +1518,12 @@ html { scroll-padding-top: 76px; scroll-behavior: smooth; }
         <div class="col-12">
           <div class="p-3 d-flex justify-content-between align-items-center" style="background:{% if quadratura.stato == 'ok' %}#f0fdf4{% else %}#fef2f2{% endif %}; border-radius:8px; border-left:4px solid {% if quadratura.stato == 'ok' %}#16a34a{% else %}#dc2626{% endif %};">
             <div>
-              <div class="text-muted small fw-bold text-uppercase">Differenza (reale &minus; teorico &minus; pagati agli operatori)</div>
+              <div class="text-muted small fw-bold text-uppercase">Differenza (reale &minus; atteso)</div>
               <div class="fs-3 fw-bold {% if quadratura.stato == 'ok' %}text-success{% else %}text-danger{% endif %}">
                 {% if quadratura.differenza >= 0 %}+{% endif %}&euro;{{ quadratura.differenza|floatformat:2 }}
               </div>
               <div class="small text-muted">
-                Reale &minus; teorico {% if quadratura.differenza_reale_teorico >= 0 %}+{% endif %}&euro;{{ quadratura.differenza_reale_teorico|floatformat:2 }}
-                &middot; &minus; residuo pagati agli operatori &euro;{{ quadratura.residuo_operatori|floatformat:2 }}{% if quadratura.promo_operatori %} <span class="text-muted">(&euro;{{ quadratura.residuo_operatori_lordo|floatformat:2 }} &minus; promo operatori &euro;{{ quadratura.promo_operatori|floatformat:2 }})</span>{% endif %}{% if abbinamento.n_rettificati %} <span class="text-muted">(dopo {{ abbinamento.n_rettificati }} rettific{{ abbinamento.n_rettificati|pluralize:"a,he" }}: omaggi, promo, prelavaggi)</span>{% endif %}
-                {% if abbinamento %}<a href="#abbinamento-portali">(dettaglio)</a>{% else %}<span title="Imposta la chiusura portali della giornata per calcolare il residuo">(chiusura portali non impostata)</span>{% endif %}
+                Reale &euro;{{ quadratura.totale_reale|floatformat:2 }} &minus; atteso &euro;{{ quadratura.totale_atteso|floatformat:2 }}
               </div>
             </div>
             <div>
@@ -1546,11 +1553,12 @@ html { scroll-padding-top: 76px; scroll-behavior: smooth; }
           <i class="bi bi-plus-circle"></i> Inserisci quadratura
         </a>
         <div class="alert alert-info small mt-3 mb-0 text-start">
-          <strong>Teorico atteso per oggi:</strong>
+          <strong>Atteso per oggi:</strong>
           self service (incasso &minus; ricarica) &euro;{{ quadratura.vendita_self_service|floatformat:2 }}
           + servito POS &euro;{{ quadratura.totale_servito|floatformat:2 }}
           {% if quadratura.totale_crediti_pregressi %}(di cui crediti pregressi &euro;{{ quadratura.totale_crediti_pregressi|floatformat:2 }}){% endif %}
-          = <strong>&euro;{{ quadratura.totale_teorico|floatformat:2 }}</strong>
+          + pagati agli operatori &euro;{{ quadratura.residuo_operatori|floatformat:2 }}
+          = <strong>&euro;{{ quadratura.totale_atteso|floatformat:2 }}</strong>
         </div>
       </div>
       {% endif %}

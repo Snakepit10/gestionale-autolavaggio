@@ -1419,3 +1419,20 @@ class EstrattoPagamentiTest(TestCase):
         self.assertEqual(q['totale_pagamenti_estratto'], Decimal('50'))
         self.assertEqual([(m['metodo'], m['in_cassa']) for m in q['pagamenti_per_metodo']],
                          [('Contanti', True), ('Abbonamento', False)])
+
+
+class AttesoConOperatoriTest(TestCase):
+    """Il pagato agli operatori e' una voce dell'atteso: differenza = reale - atteso."""
+
+    def test_atteso_comprende_operatori(self):
+        from datetime import date
+
+        from apps.finanze.models import QuadraturaGiornaliera
+        from apps.finanze.views import _quadratura_giornata
+        giorno = date(2026, 10, 6)
+        QuadraturaGiornaliera.objects.create(data=giorno, contanti_totali=Decimal('150'))
+        q, _, _ = _quadratura_giornata(giorno, None, Decimal('100'), Decimal('0'), Decimal('40'))
+        self.assertEqual((q['totale_teorico'], q['residuo_operatori'], q['totale_atteso']),
+                         (Decimal('100'), Decimal('40'), Decimal('140')))
+        self.assertEqual(q['differenza'], q['totale_reale'] - q['totale_atteso'])
+        self.assertEqual(q['differenza'], Decimal('10'))
