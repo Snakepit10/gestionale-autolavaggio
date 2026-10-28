@@ -1394,3 +1394,28 @@ class ReportPeriodoQuadratureTest(TestCase):
         self.assertIn('Atteso in cassa', html)
         self.assertIn('&euro;115,00', html)          # rilevato con spese e ticket
         self.assertIn('+&euro;115,00', html)         # differenza come nel report giornata
+
+
+class EstrattoPagamentiTest(TestCase):
+    """Report giornata: estratto dei pagamenti del giorno; abbonamenti fuori cassa."""
+
+    def test_estratto_e_abbonamento_escluso(self):
+        from datetime import date, datetime as dt
+
+        from apps.finanze.models import QuadraturaGiornaliera
+        from apps.finanze.views import _saldo_giornata
+        from apps.ordini.models import Ordine, Pagamento
+        giorno = date(2026, 10, 6)
+        QuadraturaGiornaliera.objects.create(data=giorno, contanti_totali=Decimal('20'))
+        ora_g = timezone.make_aware(dt(2026, 10, 6, 10, 0))
+        o = Ordine.objects.create(totale=Decimal('50'), totale_finale=Decimal('50'))
+        Ordine.objects.filter(pk=o.pk).update(data_ora=ora_g)
+        Pagamento.objects.create(ordine=o, importo=Decimal('20'), metodo='contanti', data_pagamento=ora_g)
+        Pagamento.objects.create(ordine=o, importo=Decimal('30'), metodo='abbonamento', data_pagamento=ora_g)
+        q, _ = _saldo_giornata(giorno)
+        self.assertEqual(q['totale_servito'], Decimal('20'))           # l'abbonamento non e' in cassa
+        self.assertEqual(q['differenza'], Decimal('0'))
+        self.assertEqual(len(q['pagamenti_estratto']), 2)
+        self.assertEqual(q['totale_pagamenti_estratto'], Decimal('50'))
+        self.assertEqual([(m['metodo'], m['in_cassa']) for m in q['pagamenti_per_metodo']],
+                         [('Contanti', True), ('Abbonamento', False)])

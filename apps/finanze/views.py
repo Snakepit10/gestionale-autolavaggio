@@ -14,7 +14,8 @@ from .services import abbinamento_portali, allinea_scontrini, import_washtec
 
 # Metodi che non finiscono nel conteggio fisico della quadratura
 # (contanti scassettati + lettore carte): esclusi dal servito atteso.
-METODI_NON_IN_CASSA = ('bonifico', 'assegno')
+# non passano dal cassetto ne' dal POS (l'abbonamento scala un credito gia' pagato)
+METODI_NON_IN_CASSA = ('bonifico', 'assegno', 'abbonamento')
 # Prelavaggio prima del lavaggio a spazzole, aggiunto al listino nel residuo
 PRELAVAGGIO_DEFAULT = Decimal('4.00')
 from apps.ordini.models import Pagamento, Ordine, ItemOrdine
@@ -1314,6 +1315,18 @@ def _quadratura_giornata(data, cassa_servito, vendita_self_service, totale_servi
                                    Decimal('0.00'))
     servito_ordini_giorno = servito_atteso - totale_crediti_pregressi
 
+    # Estratto di tutti i pagamenti registrati nel giorno (per controllo)
+    pagamenti_estratto = list(pagamenti_giorno_qs.select_related('operatore').order_by('data_pagamento'))
+    per_metodo = {}
+    for p in pagamenti_estratto:
+        p.pregresso = timezone.localtime(p.ordine.data_ora).date() < data if p.ordine.data_ora else False
+        p.in_cassa = p.metodo not in METODI_NON_IN_CASSA
+        voce = per_metodo.setdefault(p.metodo, {'metodo': p.get_metodo_display(), 'in_cassa': p.in_cassa,
+                                                'n': 0, 'totale': Decimal('0.00')})
+        voce['n'] += 1
+        voce['totale'] += p.importo
+    pagamenti_per_metodo = sorted(per_metodo.values(), key=lambda v: (not v['in_cassa'], -v['totale']))
+
     # Spese pagate coi contanti della cassa: mancano dal conteggio, quindi
     # si sommano al reale.
     spese_cassa = list(SpesaCassa.objects.filter(data=data).select_related('operatore'))
@@ -1353,6 +1366,9 @@ def _quadratura_giornata(data, cassa_servito, vendita_self_service, totale_servi
         'crediti_pregressi': crediti_pregressi,
         'totale_crediti_pregressi': totale_crediti_pregressi,
         'non_in_cassa': non_in_cassa,
+        'pagamenti_estratto': pagamenti_estratto,
+        'pagamenti_per_metodo': pagamenti_per_metodo,
+        'totale_pagamenti_estratto': sum((p.importo for p in pagamenti_estratto), Decimal('0.00')),
         'totale_non_in_cassa': totale_non_in_cassa,
         'totale_teorico': totale_teorico,
         'fondo_cassa_iniziale': fondo_cassa_iniziale,
