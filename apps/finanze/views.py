@@ -1255,6 +1255,29 @@ def _passi_chiusura(casse_form_data, confronto_ricariche, portali, quadratura):
     return passi
 
 
+def estratto_pagamenti(data):
+    """Estratto di tutti i pagamenti registrati nel giorno (per controllo),
+    in ordine di numero d'ordine e poi di incasso. Usato dal report
+    giornata e dalla Distinta degli operatori."""
+    from apps.ordini.models import Pagamento
+    pagamenti = list(Pagamento.objects.filter(data_pagamento__date=data)
+                     .select_related('ordine__cliente', 'operatore')
+                     .order_by('ordine__numero_progressivo', 'data_pagamento'))
+    per_metodo = {}
+    for p in pagamenti:
+        p.pregresso = timezone.localtime(p.ordine.data_ora).date() < data if p.ordine.data_ora else False
+        p.in_cassa = p.metodo not in METODI_NON_IN_CASSA
+        voce = per_metodo.setdefault(p.metodo, {'metodo': p.get_metodo_display(), 'in_cassa': p.in_cassa,
+                                                'n': 0, 'totale': Decimal('0.00')})
+        voce['n'] += 1
+        voce['totale'] += p.importo
+    return {
+        'pagamenti_estratto': pagamenti,
+        'pagamenti_per_metodo': sorted(per_metodo.values(), key=lambda v: (not v['in_cassa'], -v['totale'])),
+        'totale_pagamenti_estratto': sum((p.importo for p in pagamenti), Decimal('0.00')),
+    }
+
+
 def _quadratura_giornata(data, cassa_servito, vendita_self_service, totale_servito,
                          residuo_operatori):
     """Quadratura giornaliera complessiva (scassettamento unificato).
@@ -1316,17 +1339,6 @@ def _quadratura_giornata(data, cassa_servito, vendita_self_service, totale_servi
                                    Decimal('0.00'))
     servito_ordini_giorno = servito_atteso - totale_crediti_pregressi
 
-    # Estratto di tutti i pagamenti registrati nel giorno (per controllo)
-    pagamenti_estratto = list(pagamenti_giorno_qs.select_related('operatore').order_by('data_pagamento'))
-    per_metodo = {}
-    for p in pagamenti_estratto:
-        p.pregresso = timezone.localtime(p.ordine.data_ora).date() < data if p.ordine.data_ora else False
-        p.in_cassa = p.metodo not in METODI_NON_IN_CASSA
-        voce = per_metodo.setdefault(p.metodo, {'metodo': p.get_metodo_display(), 'in_cassa': p.in_cassa,
-                                                'n': 0, 'totale': Decimal('0.00')})
-        voce['n'] += 1
-        voce['totale'] += p.importo
-    pagamenti_per_metodo = sorted(per_metodo.values(), key=lambda v: (not v['in_cassa'], -v['totale']))
 
     # Spese pagate coi contanti della cassa: mancano dal conteggio, quindi
     # si sommano al reale.
@@ -1367,9 +1379,7 @@ def _quadratura_giornata(data, cassa_servito, vendita_self_service, totale_servi
         'crediti_pregressi': crediti_pregressi,
         'totale_crediti_pregressi': totale_crediti_pregressi,
         'non_in_cassa': non_in_cassa,
-        'pagamenti_estratto': pagamenti_estratto,
-        'pagamenti_per_metodo': pagamenti_per_metodo,
-        'totale_pagamenti_estratto': sum((p.importo for p in pagamenti_estratto), Decimal('0.00')),
+        **estratto_pagamenti(data),
         'totale_non_in_cassa': totale_non_in_cassa,
         'totale_teorico': totale_teorico,
         'fondo_cassa_iniziale': fondo_cassa_iniziale,

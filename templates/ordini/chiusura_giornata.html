@@ -252,6 +252,9 @@
 </div>
 {% endif %}
 
+{# ===== Estratto pagamenti del giorno (come nel report giornata) ===== #}
+<div class="col-12">{% include 'finanze/_estratto_pagamenti.html' %}</div>
+
 {# ===== Spazzole <-> servito ===== #}
 {% if abbinamento %}<div class="col-12">{% include 'finanze/_abbinamento_portali.html' %}</div>{% endif %}
 

@@ -1472,3 +1472,33 @@ class AttesoConOperatoriTest(TestCase):
                          (Decimal('100'), Decimal('40'), Decimal('140')))
         self.assertEqual(q['differenza'], q['totale_reale'] - q['totale_atteso'])
         self.assertEqual(q['differenza'], Decimal('10'))
+
+
+class EstrattoOrdineTest(TestCase):
+    """Estratto pagamenti: per numero d'ordine e poi per incasso; anche nella Distinta."""
+
+    def test_ordine_e_distinta(self):
+        from datetime import date, datetime as dt
+
+        from django.contrib.messages.storage.fallback import FallbackStorage
+        from django.test import RequestFactory
+
+        from apps.finanze.views import estratto_pagamenti
+        from apps.finanze.views_chiusura import chiusura_giornata
+        from apps.ordini.models import Ordine, Pagamento
+        giorno = date(2026, 10, 6)
+        ora = lambda h, m: timezone.make_aware(dt(2026, 10, 6, h, m))
+        o1 = Ordine.objects.create(numero_progressivo='202610060001', totale=Decimal('30'), totale_finale=Decimal('30'))
+        o2 = Ordine.objects.create(numero_progressivo='202610060002', totale=Decimal('20'), totale_finale=Decimal('20'))
+        Ordine.objects.filter(pk__in=[o1.pk, o2.pk]).update(data_ora=ora(9, 0))
+        a = Pagamento.objects.create(ordine=o2, importo=Decimal('20'), metodo='contanti', data_pagamento=ora(10, 0))
+        b = Pagamento.objects.create(ordine=o1, importo=Decimal('10'), metodo='carta', data_pagamento=ora(17, 0))
+        c = Pagamento.objects.create(ordine=o1, importo=Decimal('20'), metodo='contanti', data_pagamento=ora(11, 0))
+        self.assertEqual([p.pk for p in estratto_pagamenti(giorno)['pagamenti_estratto']], [c.pk, b.pk, a.pk])
+        req = RequestFactory().get('/', {'data': '2026-10-06'})
+        req.user = User.objects.create_superuser('boss3', 'b3@x.it', 'x')
+        req.session = {}
+        req._messages = FallbackStorage(req)
+        html = chiusura_giornata(req).content.decode()
+        self.assertIn('id="estratto-pagamenti"', html)
+        self.assertIn('&euro;50,00', html)

@@ -100,13 +100,14 @@ def chiusura_giornata(request):
     totali = {nome: sum((v.importo for v in lista), Decimal('0.00')) for nome, lista in voci.items()}
     oggi = timezone.localdate()
     from .services import import_automatico
-    from .views import _contesto_lavaggi_portali
+    from .views import _contesto_lavaggi_portali, estratto_pagamenti
     from .views_spazzole import fa_spazzole
     # Abbinamento spazzole <-> servito: lo stesso riquadro del report giornata
     abbinamento = (_contesto_lavaggi_portali(giorno, completo=False, con_proposte=request.GET.get('proposte') == '1')
                    ['abbinamento'] if fa_spazzole(request.user) else None)
     return render(request, 'ordini/chiusura_giornata.html', {
         'abbinamento': abbinamento,
+        'estratto': estratto_pagamenti(giorno),
         'stato_washtec': import_automatico.stato() if abbinamento else None,
         'url_abbinamento': reverse('ordini:chiusura-abbinamento'),
         'data': giorno,

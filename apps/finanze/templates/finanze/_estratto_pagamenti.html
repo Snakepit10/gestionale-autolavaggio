@@ -1,0 +1,41 @@
+{# Estratto dei pagamenti del giorno (report giornata e Distinta). Parametro: estratto = dict di estratto_pagamenti() (anche la quadratura). #}
+  {# ====== Estratto pagamenti del giorno ====== #}
+  {% if estratto.pagamenti_estratto %}
+  <div class="chart-panel mb-3" id="estratto-pagamenti">
+    <div class="panel-title"><i class="bi bi-receipt text-primary"></i> Estratto pagamenti del giorno
+      <span class="badge bg-light text-dark ms-2">{{ estratto.pagamenti_estratto|length }} &middot; &euro;{{ estratto.totale_pagamenti_estratto|floatformat:2 }}</span></div>
+    <div class="panel-sub">Tutti i pagamenti registrati con data di questo giorno (campo "Pagato il"), anche di ordini di giorni precedenti.
+      Quelli non in cassa (bonifici, assegni, abbonamenti) sono esclusi dal servito atteso.</div>
+    <div class="panel-body small">
+      <div class="d-flex flex-wrap gap-2 my-2">
+                {% for m in estratto.pagamenti_per_metodo %}
+                <span class="badge {% if m.in_cassa %}bg-light text-dark border{% else %}bg-secondary-subtle text-secondary-emphasis{% endif %}"
+                      title="{% if m.in_cassa %}Conta nel servito atteso{% else %}Non in cassa: escluso dall'atteso{% endif %}">
+                  {{ m.metodo }}: {{ m.n }} &middot; &euro;{{ m.totale|floatformat:2 }}</span>
+                {% endfor %}
+              </div>
+              <div class="table-responsive">
+                <table class="table table-sm data-table mb-0">
+                  <thead class="table-light">
+                    <tr><th>Ordine</th><th>Pagato il</th><th>Cliente</th><th>Metodo</th><th>Registrato da</th><th class="text-end">Importo</th></tr>
+                  </thead>
+                  <tbody>
+                    {% for p in estratto.pagamenti_estratto %}
+                    <tr{% if not p.in_cassa %} class="text-muted"{% endif %}>
+                      <td class="text-nowrap"><a href="{% url 'ordini:ordine-detail' p.ordine.pk %}">{% if p.ordine.vendita_prodotti %}{{ p.ordine.numero_progressivo }}{% else %}#{{ p.ordine.numero_progressivo|slice:"-4:" }}{% endif %}</a>
+                        {% if p.pregresso %}<span class="badge bg-warning-subtle text-warning-emphasis" title="Ordine di un giorno precedente">del {{ p.ordine.data_ora|date:"d/m" }}</span>{% endif %}</td>
+                      <td class="text-nowrap">{{ p.data_pagamento|date:"H:i" }}</td>
+                      <td>{{ p.ordine.cliente|default:"—" }}</td>
+                      <td>{{ p.get_metodo_display }}{% if not p.in_cassa %} <span class="badge bg-secondary-subtle text-secondary-emphasis">non in cassa</span>{% endif %}
+                        {% if p.riferimento %}<div class="text-muted">{{ p.riferimento }}</div>{% endif %}</td>
+                      <td>{% if p.operatore %}{{ p.operatore.get_full_name|default:p.operatore.username }}{% else %}—{% endif %}
+                        {% if p.nota %}<div class="text-muted">{{ p.nota }}</div>{% endif %}</td>
+                      <td class="text-end">&euro;{{ p.importo|floatformat:2 }}</td>
+                    </tr>
+                    {% endfor %}
+                  </tbody>
+                </table>
+              </div>
+    </div>
+  </div>
+  {% endif %}
