@@ -21,6 +21,12 @@
 .accent-violet { border-left:4px solid #8b5cf6; } .accent-violet .label i { color:#8b5cf6; }
 .accent-dark { border-left:4px solid #1e293b; } .accent-dark .label i { color:#1e293b; }
 .form-control-lg, .form-select-lg { font-size:1.05rem; }
+.sotto-menu { background:#fff; border:1px solid #e5e7eb; border-radius:12px; padding:4px; gap:4px; flex-wrap:nowrap; overflow-x:auto; }
+.sotto-menu .nav-item { flex:1 0 auto; }
+.sotto-menu .nav-link { color:#334155; font-weight:600; padding:.55rem .5rem; white-space:nowrap; }
+.sotto-menu .nav-link.active { background:#1e293b; color:#fff; }
+.sotto-menu .nav-link.active .badge.bg-light { background:#fff !important; }
+.js-schede .sotto-scheda:not(.attiva) { display:none; }
 .chart-panel { background:#fff; border:1px solid #e5e7eb; border-left:4px solid #8b5cf6; border-radius:12px; box-shadow:0 1px 2px rgba(0,0,0,.04); overflow:hidden; }
 .chart-panel .panel-title { font-weight:700; color:#1e293b; padding:10px 16px 4px; display:flex; align-items:center; gap:8px; flex-wrap:wrap; }
 .chart-panel .panel-sub { font-size:.78rem; color:#64748b; padding:0 16px 8px; }
@@ -61,7 +67,23 @@
     {% if not fa_conteggio %}Il conteggio della cassa lo fa il titolare.{% endif %}</p>
 {% endif %}
 
-<div class="row g-3">
+{# Sotto-schede della Distinta: una parte alla volta (si ricorda con #scheda-...) #}
+<ul class="nav nav-pills nav-fill sotto-menu mb-3" role="tablist">
+    <li class="nav-item"><a class="nav-link" href="#scheda-movimenti" data-scheda="movimenti">
+        <i class="bi bi-pencil-square"></i> Movimenti <span class="badge rounded-pill bg-light text-dark">{{ n_movimenti }}</span></a></li>
+    {% if fa_conteggio or fa_scontrini %}
+    <li class="nav-item"><a class="nav-link" href="#scheda-cassa" data-scheda="cassa">
+        <i class="bi bi-cash-stack"></i> Cassa e scontrini{% if fa_scontrini %} <span class="badge rounded-pill {% if scontrini_salvati < scontrini|length %}bg-warning text-dark{% else %}bg-light text-dark{% endif %}">{{ scontrini_salvati }}/{{ scontrini|length }}</span>{% endif %}</a></li>
+    {% endif %}
+    {% if abbinamento %}
+    <li class="nav-item"><a class="nav-link" href="#scheda-spazzole" data-scheda="spazzole">
+        <i class="bi bi-droplet-half"></i> Spazzole{% if abbinamento.n_scoperti %} <span class="badge rounded-pill bg-warning text-dark" title="Lavaggi del servito senza transazione">{{ abbinamento.n_scoperti }}</span>{% endif %}</a></li>
+    {% endif %}
+    <li class="nav-item"><a class="nav-link" href="#scheda-pagamenti" data-scheda="pagamenti">
+        <i class="bi bi-receipt"></i> Pagamenti <span class="badge rounded-pill bg-light text-dark">{{ estratto.pagamenti_estratto|length }}</span></a></li>
+</ul>
+
+<div class="row g-3 sotto-scheda" id="scheda-movimenti">
 
 {# ===== 1. Ricariche ===== #}
 <div class="col-12 col-xl-6">
@@ -213,6 +235,11 @@
 </div>
 </div>
 
+</div>
+
+{% if fa_conteggio or fa_scontrini %}
+<div class="row g-3 sotto-scheda" id="scheda-cassa">
+
 {# ===== Conteggio cassa: solo con il permesso "Conteggio cassa" ===== #}
 {% if fa_conteggio %}
 <div class="col-12 col-xl-6">
@@ -251,12 +278,6 @@
 </div>
 </div>
 {% endif %}
-
-{# ===== Estratto pagamenti del giorno (come nel report giornata) ===== #}
-<div class="col-12">{% include 'finanze/_estratto_pagamenti.html' %}</div>
-
-{# ===== Spazzole <-> servito ===== #}
-{% if abbinamento %}<div class="col-12">{% include 'finanze/_abbinamento_portali.html' %}</div>{% endif %}
 
 {# ===== 6. Scontrini delle casse automatiche ===== #}
 {% if fa_scontrini %}
@@ -330,8 +351,58 @@
 {% endif %}
 
 </div>
+{% endif %}
+
+{% if abbinamento %}
+<div class="row g-3 sotto-scheda" id="scheda-spazzole">
+
+{# ===== Spazzole <-> servito ===== #}
+{% if abbinamento %}<div class="col-12">{% include 'finanze/_abbinamento_portali.html' %}</div>{% endif %}
+
+</div>
+{% endif %}
+
+<div class="row g-3 sotto-scheda" id="scheda-pagamenti">
+
+{# ===== Estratto pagamenti del giorno (come nel report giornata) ===== #}
+<div class="col-12">{% include 'finanze/_estratto_pagamenti.html' %}
+{% if not estratto.pagamenti_estratto %}<div class="text-muted small">Nessun pagamento registrato in questo giorno.</div>{% endif %}</div>
+
+</div>
 {% endblock %}
 
 {% block extra_js %}
+<script>
+// Sotto-schede: si vede una parte alla volta. La scheda si sceglie
+// dall'indirizzo (#scheda-... o l'ancora di un riquadro dopo un salvataggio).
+(function () {
+  var schede = document.querySelectorAll('.sotto-scheda');
+  var link = document.querySelectorAll('.sotto-menu [data-scheda]');
+  if (!schede.length) return;
+  function mostra(nome, scrivi) {
+    var scheda = document.getElementById('scheda-' + nome) || schede[0];
+    schede.forEach(function (s) { s.classList.toggle('attiva', s === scheda); });
+    link.forEach(function (a) { a.classList.toggle('active', 'scheda-' + a.dataset.scheda === scheda.id); });
+    var hash = '#' + scheda.id;
+    if (scrivi) history.replaceState(null, '', hash);
+    // cambiando giorno si resta sulla stessa scheda
+    document.querySelectorAll('.page-header a[href^="?"]').forEach(function (a) {
+      a.setAttribute('href', a.getAttribute('href').split('#')[0] + hash);
+    });
+  }
+  function daIndirizzo() {
+    var el = location.hash && document.getElementById(location.hash.slice(1));
+    var scheda = el && (el.classList.contains('sotto-scheda') ? el : el.closest('.sotto-scheda'));
+    mostra(scheda ? scheda.id.replace('scheda-', '') : 'movimenti', false);
+    if (el && el !== scheda) el.scrollIntoView();
+  }
+  document.body.classList.add('js-schede');
+  link.forEach(function (a) {
+    a.addEventListener('click', function (ev) { ev.preventDefault(); mostra(a.dataset.scheda, true); });
+  });
+  window.addEventListener('hashchange', daIndirizzo);
+  daIndirizzo();
+})();
+</script>
 {% include 'finanze/_js_abbinamento_portali.html' %}
 {% endblock %}

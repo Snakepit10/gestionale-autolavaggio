@@ -119,6 +119,7 @@ def chiusura_giornata(request):
         'modificabile': puo_modificare(request.user, giorno),
         'voci': voci,
         'totali': totali,
+        'n_movimenti': sum(len(lista) for lista in voci.values()),
         'promo_macchine': sum((p.importo for p in voci['promo'] if p.tipo == 'macchine'), Decimal('0.00')),
         'promo_operatori': sum((p.importo for p in voci['promo'] if p.tipo == 'operatori'), Decimal('0.00')),
         'categorie_spesa': SpesaCassa.CATEGORIA_CHOICES,
