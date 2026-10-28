@@ -1333,11 +1333,12 @@ class SpazzoleOperatoriTest(TestCase):
                                                     programma=8, origine='unita')
         self.operatore = User.objects.create_user('op', password='x')
         self.operatore.groups.add(Group.objects.get(name='operatore'))
-        self.url = reverse('ordini:spazzole-giornata')
+        self.url = reverse('ordini:chiusura-abbinamento')
 
-    def _post(self, **dati):
+    def _post(self, fetch=False, **dati):
         self.client.force_login(self.operatore)
-        return self.client.post(self.url, {'data': self.giorno.isoformat(), **dati})
+        extra = {'HTTP_X_REQUESTED_WITH': 'fetch'} if fetch else {}
+        return self.client.post(self.url, {'data': self.giorno.isoformat(), **dati}, **extra)
 
     def _distinta(self, **get):
         from django.contrib.messages.storage.fallback import FallbackStorage
@@ -1350,55 +1351,57 @@ class SpazzoleOperatoriTest(TestCase):
         req._messages = FallbackStorage(req)
         return chiusura_giornata(req).content.decode()
 
-    def test_riquadro_nella_distinta_senza_proposte_automatiche(self):
+    def test_riquadro_del_report_nella_distinta(self):
         html = self._distinta()
-        self.assertIn('id="spazzole"', html)
+        self.assertIn('id="abbinamento-portali"', html)
         self.assertIn('Proponi abbinamenti', html)
-        self.assertIn('form-spazzole', html)                 # elenco a mano
+        self.assertIn('form-abbina', html)                   # elenco a mano
+        self.assertIn('Residuo: pagati agli operatori', html)
+        self.assertIn('spunta-visto', html)
+        self.assertIn('modaleRettificaResiduo', html)        # omaggi e promo
+        self.assertIn(self.url, html)
         self.assertNotIn('Conferma 1 proposta', html)
-        html = self._distinta(proposte='1')
-        self.assertIn('Conferma 1 proposta', html)
-        self.assertIn('Nascondi proposte', html)
+        self.assertIn('Conferma 1 proposta', self._distinta(proposte='1'))
         # la vecchia pagina porta alla Distinta
         self.client.force_login(self.operatore)
-        r = self.client.get(self.url, {'data': self.giorno.isoformat(), 'proposte': '1'})
-        self.assertRedirects(r, reverse('ordini:chiusura-giornata') + f'?data={self.giorno.isoformat()}&proposte=1#spazzole',
+        r = self.client.get(reverse('ordini:spazzole-giornata'), {'data': self.giorno.isoformat(), 'proposte': '1'})
+        self.assertRedirects(r, reverse('ordini:chiusura-giornata')
+                             + f'?data={self.giorno.isoformat()}&proposte=1#abbinamento-portali',
                              fetch_redirect_response=False)
 
-    def test_operatore_conferma_e_chiude_senza_portale(self):
+    def test_operatore_abbina_spunta_e_rettifica(self):
+        from apps.finanze.models import ResiduoVisto, RettificaResiduo
         r = self._post(azione='conferma', proposte='1')
-        self.assertEqual(r['Location'],
-                         reverse('ordini:chiusura-giornata') + f'?data={self.giorno.isoformat()}&proposte=1#spazzole')
+        self.assertEqual(r['Location'], reverse('ordini:chiusura-giornata')
+                         + f'?data={self.giorno.isoformat()}&proposte=1#abbinamento-portali')
         self.assertEqual(AbbinamentoPortale.objects.get().transazione_id, self.tx.pk)
-        self._post(azione='senza_portale', item_id=self.altro.pk)
-        from apps.finanze.views_spazzole import riepilogo_spazzole
-        r = riepilogo_spazzole(self.giorno)
-        self.assertEqual((r['n_ok'], r['n_proposto'], r['n_da_sistemare']), (2, 0, 0))
-        self.assertIn('tutto a posto', self._distinta())
-
-    def test_abbina_a_mano_senza_ricaricare(self):
-        self.client.force_login(self.operatore)
-        r = self.client.post(self.url, {'data': self.giorno.isoformat(), 'azione': 'abbina',
-                                        'item_id': self.item.pk, 'transazione_id': self.tx.pk},
-                             HTTP_X_REQUESTED_WITH='fetch')
-        self.assertTrue(r.json()['ok'])
+        AbbinamentoPortale.objects.all().delete()
+        self.assertTrue(self._post(fetch=True, azione='abbina', item_id=self.item.pk,
+                                   transazione_id=self.tx.pk).json()['ok'])
         self.assertEqual(AbbinamentoPortale.objects.get().item_id, self.item.pk)
-        r = self.client.post(self.url, {'data': self.giorno.isoformat(), 'azione': 'abbina', 'item_id': self.item.pk},
-                             HTTP_X_REQUESTED_WITH='fetch')
-        self.assertFalse(r.json()['ok'])
+        libera = TransazionePortale.objects.create(portale='B', numero=7, orario=self.tx.orario,
+                                                   programma=8, origine='unita')
+        self.assertTrue(self._post(fetch=True, azione='visto', transazione_id=libera.pk, visto='1').json()['ok'])
+        self.assertTrue(ResiduoVisto.objects.filter(transazione=libera).exists())
+        self._post(azione='rettifica_residuo', transazione_id=libera.pk, motivo='omaggio')
+        self.assertEqual(RettificaResiduo.objects.get(transazione=libera).motivo, 'omaggio')
 
     def test_senza_permesso(self):
         from apps.auth_system.models import PermessoUtente
         PermessoUtente.objects.create(user=self.operatore, sezione='spazzole_servito', consenti=False)
         self.client.force_login(self.operatore)
-        self.assertEqual(self.client.get(self.url).status_code, 403)
+        self.assertEqual(self.client.get(reverse('ordini:spazzole-giornata')).status_code, 403)
+        self.assertEqual(self._post(azione='conferma').status_code, 403)
         self.assertEqual(self.client.post(reverse('ordini:washtec-aggiorna')).status_code, 403)
-        self.assertNotIn('id="spazzole"', self._distinta())
+        self.assertNotIn('id="abbinamento-portali"', self._distinta())
 
     def test_giornata_confermata_non_si_modifica(self):
         from apps.finanze.models import QuadraturaGiornaliera
         QuadraturaGiornaliera.objects.create(data=self.giorno, confermata_il=timezone.now())
         self._post(azione='conferma')
+        self.assertFalse(AbbinamentoPortale.objects.exists())
+        r = self._post(fetch=True, azione='abbina', item_id=self.item.pk, transazione_id=self.tx.pk)
+        self.assertFalse(r.json()['ok'])
         self.assertFalse(AbbinamentoPortale.objects.exists())
 
 

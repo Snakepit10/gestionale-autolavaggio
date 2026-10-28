@@ -1,5 +1,6 @@
 from django.urls import path
 from apps.finanze.views_chiusura import chiusura_giornata, distinta_chiusura
+from apps.finanze.views import azione_abbinamento_portali
 from apps.finanze.views_spazzole import aggiorna_washtec, spazzole_giornata, stato_washtec
 
 from . import views
@@ -10,6 +11,8 @@ urlpatterns = [
     path('chiusura-giornata/', chiusura_giornata, name='chiusura-giornata'),
     path('chiusura-giornata/distinta/', distinta_chiusura, name='chiusura-distinta'),
     path('chiusura-giornata/spazzole/', spazzole_giornata, name='spazzole-giornata'),
+    # azioni del riquadro abbinamento della Distinta (stessa vista del report giornata)
+    path('chiusura-giornata/abbinamento/', azione_abbinamento_portali, name='chiusura-abbinamento'),
     path('chiusura-giornata/washtec/aggiorna/', aggiorna_washtec, name='washtec-aggiorna'),
     path('chiusura-giornata/washtec/stato/', stato_washtec, name='washtec-stato'),
     # Punto Cassa

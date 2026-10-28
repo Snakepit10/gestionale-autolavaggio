@@ -3,6 +3,7 @@ from django.contrib.auth.decorators import login_required, user_passes_test
 from django.contrib import messages
 from django.utils import timezone
 from django.db.models import Sum, Q, Count
+from django.core.exceptions import PermissionDenied
 from django.http import JsonResponse
 from datetime import datetime, time, timedelta
 from decimal import Decimal
@@ -1607,32 +1608,51 @@ def _rettifica_residuo(request, chiusura):
 
 
 @login_required
-@user_passes_test(is_staff_user)
 def azione_abbinamento_portali(request):
-    """POST dal report giornata: conferma le proposte, abbina a mano o
-    rimuove un abbinamento servito <-> transazione portale."""
+    """POST dal riquadro abbinamento (report giornata, o Distinta degli
+    operatori da ordini:chiusura-abbinamento): conferma le proposte, abbina a mano,
+    rimuove un abbinamento servito <-> transazione portale, spunta Vista."""
     from django.urls import reverse
 
-    from .models import AbbinamentoPortale
+    from apps.auth_system.sezioni import ha_accesso
 
+    from .views_chiusura import puo_modificare
+    from .views_spazzole import fa_spazzole
+
+    titolare = is_staff_user(request.user)
+    if not (titolare or fa_spazzole(request.user)):
+        raise PermissionDenied
+    distinta = request.resolver_match.url_name == 'chiusura-abbinamento' or not titolare
+    pagina = 'ordini:chiusura-giornata' if distinta else 'finanze:report_giornata'
     data_str = request.POST.get('data', '')
     # dopo aver scartato una proposta si resta con le proposte visibili
     proposte = '&proposte=1' if request.POST.get('proposte') == '1' else ''
-    torna = f"{reverse('finanze:report_giornata')}?data={data_str}{proposte}#abbinamento-portali"
+    torna = f"{reverse(pagina)}?data={data_str}{proposte}#abbinamento-portali"
+    da_fetch = request.headers.get('X-Requested-With') == 'fetch'
     if request.method != 'POST':
-        return redirect('finanze:report_giornata')
+        return redirect(pagina)
     try:
         data = datetime.strptime(data_str, '%Y-%m-%d').date()
     except ValueError:
         messages.error(request, 'Data non valida.')
-        return redirect('finanze:report_giornata')
-    # Abbinare fissa la finestra: quella predefinita viene salvata
+        return redirect(pagina)
+    azione = request.POST.get('azione')
+    blocco = None
+    if not puo_modificare(request.user, data):
+        blocco = 'La giornata è già stata confermata: chiedi al titolare di sbloccarla.'
+    if blocco:
+        if da_fetch:
+            return JsonResponse({'ok': False, 'msg': blocco})
+        messages.error(request, blocco)
+        return redirect(torna)
     chiusura, salvata = _chiusura_portali(data)
-    if not salvata:
+    if not salvata and ha_accesso(request.user, 'finanze'):
+        # Abbinare dal report fissa la finestra: quella predefinita viene
+        # salvata (agli abbinamenti del servito basta il giorno, quindi
+        # dalla Distinta degli operatori non si salva)
         chiusura.operatore = request.user
         chiusura.save()
 
-    azione = request.POST.get('azione')
     if azione == 'conferma':
         n = abbinamento_portali.conferma_proposte(chiusura, request.user)
         messages.success(request, f'{n} abbinament{"o confermato" if n == 1 else "i confermati"}.')
@@ -1645,8 +1665,8 @@ def azione_abbinamento_portali(request):
             return redirect(torna)
         ok, msg = abbinamento_portali.abbina_manuale(
             chiusura, item_id, tx_id, request.user)
-        if request.headers.get('X-Requested-With') == 'fetch':
-            # abbinamento dal report senza ricaricare la pagina
+        if da_fetch:
+            # abbinamento senza ricaricare la pagina
             return JsonResponse({'ok': ok, 'msg': msg})
         (messages.success if ok else messages.error)(request, msg)
     elif azione == 'rettifica_residuo':
@@ -1661,7 +1681,7 @@ def azione_abbinamento_portali(request):
                 ResiduoVisto.objects.get_or_create(transazione=tx, defaults={'operatore': request.user})
             else:
                 ResiduoVisto.objects.filter(transazione=tx).delete()
-        if request.headers.get('X-Requested-With') == 'fetch':
+        if da_fetch:
             return JsonResponse({'ok': tx is not None, 'visto': visto})
         if tx is None:
             messages.error(request, 'Transazione non trovata.')

@@ -21,11 +21,13 @@
 .accent-violet { border-left:4px solid #8b5cf6; } .accent-violet .label i { color:#8b5cf6; }
 .accent-dark { border-left:4px solid #1e293b; } .accent-dark .label i { color:#1e293b; }
 .form-control-lg, .form-select-lg { font-size:1.05rem; }
-.riga-spazzole { background:#fff; border:1px solid #e5e7eb; border-left:4px solid #94a3b8; border-radius:10px; padding:10px 14px; margin-bottom:.6rem; }
-.riga-spazzole.stato-ok { border-left-color:#10b981; }
-.riga-spazzole.stato-proposto { border-left-color:#3b82f6; }
-.riga-spazzole.stato-da_sistemare { border-left-color:#f59e0b; }
-.riga-spazzole .tx { display:inline-flex; align-items:center; gap:.35rem; flex-wrap:wrap; margin:.2rem .5rem .2rem 0; }
+.chart-panel { background:#fff; border:1px solid #e5e7eb; border-left:4px solid #8b5cf6; border-radius:12px; box-shadow:0 1px 2px rgba(0,0,0,.04); overflow:hidden; }
+.chart-panel .panel-title { font-weight:700; color:#1e293b; padding:10px 16px 4px; display:flex; align-items:center; gap:8px; flex-wrap:wrap; }
+.chart-panel .panel-sub { font-size:.78rem; color:#64748b; padding:0 16px 8px; }
+.chart-panel .panel-body { padding:4px 14px 14px; }
+.data-table { font-size:.82rem; }
+.data-table th { font-size:.68rem; text-transform:uppercase; letter-spacing:.4px; color:#64748b; font-weight:600; }
+.data-table td { vertical-align:middle; }
 </style>
 {% endblock %}
 
@@ -251,7 +253,7 @@
 {% endif %}
 
 {# ===== Spazzole <-> servito ===== #}
-{% if spazzole %}{% include 'ordini/_spazzole_distinta.html' %}{% endif %}
+{% if abbinamento %}<div class="col-12">{% include 'finanze/_abbinamento_portali.html' %}</div>{% endif %}
 
 {# ===== 6. Scontrini delle casse automatiche ===== #}
 {% if fa_scontrini %}
@@ -328,44 +330,5 @@
 {% endblock %}
 
 {% block extra_js %}
-<script>
-// Spazzole: collega senza ricaricare. Il lavaggio scelto sparisce subito
-// dagli altri elenchi; i conteggi si aggiornano ricaricando.
-document.querySelectorAll('#spazzole form.form-spazzole').forEach(function (form) {
-  form.addEventListener('submit', function (ev) {
-    ev.preventDefault();
-    var select = form.querySelector('select[name=transazione_id]');
-    if (!select.value) { select.classList.add('is-invalid'); return; }
-    select.classList.remove('is-invalid');
-    var scelta = select.options[select.selectedIndex];
-    var bottone = form.querySelector('button');
-    bottone.disabled = true;
-    fetch(form.action, {method: 'POST', body: new FormData(form), headers: {'X-Requested-With': 'fetch'}})
-      .then(function (r) { return r.json(); })
-      .then(function (d) {
-        bottone.disabled = false;
-        if (!d.ok) { alert(d.msg); return; }
-        var tx = select.value, riga = form.closest('.riga-spazzole');
-        var fatto = document.createElement('span');
-        fatto.className = 'tx';
-        fatto.innerHTML = '<span class="badge bg-success"><i class="bi bi-link-45deg"></i> </span> <span class="small text-muted">collegato ora</span>';
-        fatto.querySelector('.badge').appendChild(document.createTextNode(scelta.text.replace(' (fuori standard)', '')));
-        riga.insertBefore(fatto, form.parentNode);
-        document.querySelectorAll('#spazzole select[name=transazione_id] option[value="' + tx + '"]').forEach(function (o) { o.remove(); });
-        var liberi = parseInt(form.dataset.liberi || '1', 10) - 1;
-        form.dataset.liberi = liberi;
-        if (liberi <= 0) {
-          form.parentNode.remove();
-          riga.className = 'riga-spazzole stato-ok';
-          riga.querySelector('.stato-riga').innerHTML = '<span class="badge bg-success"><i class="bi bi-check-circle"></i> A posto</span>';
-        }
-        document.querySelectorAll('#spazzole form.form-spazzole').forEach(function (f) {
-          if (f.querySelector('select[name=transazione_id]').options.length <= 1) f.remove();
-        });
-        document.getElementById('spazzole-ricarica').classList.remove('d-none');
-      })
-      .catch(function () { bottone.disabled = false; alert('Collegamento non salvato: riprova.'); });
-  });
-});
-</script>
+{% include 'finanze/_js_abbinamento_portali.html' %}
 {% endblock %}

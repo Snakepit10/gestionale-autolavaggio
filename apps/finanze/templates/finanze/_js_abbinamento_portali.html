@@ -1,0 +1,84 @@
+{# Script del riquadro _abbinamento_portali.html (spunta Vista, abbinamento senza ricaricare) #}
+{% url 'finanze:azione_abbinamento_portali' as url_report %}
+<style>
+  #abbinamento-portali .riga-vuota { display: none; }
+  #abbinamento-portali tbody:not(:has(tr.riga-residuo)) > .riga-vuota { display: table-row; }
+  #abbinamento-portali .tabella-viste { background: #f8fafc; }
+  #abbinamento-portali .tabella-viste td { color: #64748b; }
+  #abbinamento-portali .nota-residuo { display: inline-block; max-width: 10rem; overflow: hidden; text-overflow: ellipsis;
+                                       white-space: nowrap; vertical-align: bottom; font-size: .78rem; color: #64748b; }
+</style>
+<script>
+// Spunta "vista" sulle righe del residuo: salvata subito, senza ricaricare
+document.querySelectorAll('#abbinamento-portali .spunta-visto').forEach(function (box) {
+  box.addEventListener('change', function () {
+    var riga = box.closest('tr');
+    var dati = new FormData();
+    dati.append('csrfmiddlewaretoken', '{{ csrf_token }}');
+    dati.append('data', '{{ data|date:"Y-m-d" }}');
+    dati.append('azione', 'visto');
+    dati.append('transazione_id', box.value);
+    dati.append('visto', box.checked ? '1' : '0');
+    box.disabled = true;
+    fetch('{% firstof url_abbinamento url_report %}', {method: 'POST', body: dati, headers: {'X-Requested-With': 'fetch'}})
+      .then(function (r) { return r.json(); })
+      .then(function (d) {
+        box.disabled = false;
+        if (!d.ok) { box.checked = !box.checked; alert(d.msg || 'Riga non trovata: ricarica la pagina.'); return; }
+        riga.classList.toggle('residuo-visto', d.visto);
+        // la riga passa nella tabella delle viste (o torna su), in ordine d'orario
+        var dest = document.getElementById(d.visto ? 'residuo-visti' : 'residuo-da-vedere');
+        var prima = Array.prototype.find.call(dest.querySelectorAll('tr.riga-residuo'), function (r) {
+          return Number(r.dataset.ordine) > Number(riga.dataset.ordine);
+        });
+        dest.insertBefore(riga, prima || dest.querySelector('.riga-vuota'));
+        box.title = d.visto ? 'Vista ora' : 'Segna come vista';
+        var n = document.getElementById('n-visti');
+        if (n) n.textContent = document.querySelectorAll('#abbinamento-portali .spunta-visto:checked').length;
+      })
+      .catch(function () { box.disabled = false; box.checked = !box.checked; alert('Non salvato: riprova.'); });
+  });
+});
+</script>
+<script>
+// Abbinamento a mano senza ricaricare: la transazione scelta sparisce
+// subito da tutti gli elenchi e dal residuo; i totali si aggiornano
+// ricaricando la pagina.
+document.querySelectorAll('form.form-abbina').forEach(function (form) {
+  form.addEventListener('submit', function (ev) {
+    ev.preventDefault();
+    var select = form.querySelector('select[name=transazione_id]');
+    var scelta = select.options[select.selectedIndex];
+    if (!select.value) { select.classList.add('is-invalid'); return; }
+    select.classList.remove('is-invalid');
+    var bottone = form.querySelector('button');
+    bottone.disabled = true;
+    fetch(form.action, {method: 'POST', body: new FormData(form), headers: {'X-Requested-With': 'fetch'}})
+      .then(function (r) { return r.json(); })
+      .then(function (d) {
+        bottone.disabled = false;
+        if (!d.ok) { alert(d.msg); return; }
+        var tx = select.value, testo = scelta.text.replace(' (fuori standard)', '');
+        var fatto = document.createElement('div');
+        fatto.className = 'mb-1';
+        fatto.innerHTML = '<span class="badge bg-success"><i class="bi bi-check"></i> </span> <span class="small text-muted">abbinato ora</span>';
+        fatto.querySelector('.badge').appendChild(document.createTextNode(testo));
+        form.parentNode.insertBefore(fatto, form);
+        document.querySelectorAll('select[name=transazione_id] option[value="' + tx + '"]').forEach(function (o) { o.remove(); });
+        document.querySelectorAll('#abbinamento-portali tr[data-tx="' + tx + '"]').forEach(function (r) { r.remove(); });
+        var nv = document.getElementById('n-visti'), nr = document.getElementById('n-residui');
+        if (nv) nv.textContent = document.querySelectorAll('#abbinamento-portali .spunta-visto:checked').length;
+        if (nr) nr.textContent = document.querySelectorAll('#abbinamento-portali .spunta-visto').length;
+        var liberi = parseInt(form.dataset.liberi || '1', 10) - 1;
+        form.dataset.liberi = liberi;
+        if (liberi <= 0) form.remove();
+        document.querySelectorAll('form.form-abbina').forEach(function (f) {
+          if (f.querySelector('select[name=transazione_id]').options.length <= 1) f.remove();
+        });
+        var avviso = document.getElementById('abbina-ricarica');
+        if (avviso) avviso.classList.remove('d-none');
+      })
+      .catch(function () { bottone.disabled = false; alert('Abbinamento non salvato: riprova.'); });
+  });
+});
+</script>
