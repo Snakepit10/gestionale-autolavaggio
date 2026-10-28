@@ -516,7 +516,9 @@ class Pagamento(models.Model):
     ordine = models.ForeignKey(Ordine, related_name='pagamenti', on_delete=models.CASCADE)
     importo = models.DecimalField(max_digits=10, decimal_places=2)
     metodo = models.CharField(max_length=20, choices=METODO_CHOICES)
-    data_pagamento = models.DateTimeField(auto_now_add=True)
+    # quando il cliente ha pagato: di default adesso, ma chi registra in
+    # ritardo indica il giorno vero (conta nella quadratura di quel giorno)
+    data_pagamento = models.DateTimeField('Pagato il', default=timezone.now)
     riferimento = models.CharField(max_length=100, blank=True, help_text="Num. transazione, assegno, etc.")
     nota = models.TextField(blank=True)
     operatore = models.ForeignKey(User, on_delete=models.SET_NULL, null=True)

@@ -286,12 +286,19 @@ tr.gruppo-header .meta { font-size: .8rem; color: #64748b; }
                             <option value="">Seleziona metodo</option>
                             <option value="contanti">Contanti</option>
                             <option value="carta">Carta di Credito/Debito</option>
-                            <option value="pos">POS</option>
-                            <option value="satispay">Satispay</option>
+                            <option value="bancomat">Bancomat</option>
                             <option value="bonifico">Bonifico</option>
+                            <option value="assegno">Assegno</option>
+                            <option value="abbonamento">Abbonamento</option>
                         </select>
                     </div>
-                    
+
+                    <div class="mb-3">
+                        <label class="form-label">Pagato il:</label>
+                        <input type="datetime-local" class="form-control" id="pagato-il" required>
+                        <div class="form-text">Se registri in ritardo, metti quando il cliente ha pagato davvero.</div>
+                    </div>
+
                     <div class="mb-3">
                         <label class="form-label">Note:</label>
                         <textarea class="form-control" id="note-pagamento" rows="2"></textarea>
@@ -454,6 +461,12 @@ document.querySelectorAll('.ordine-checkbox').forEach(checkbox => {
 });
 
 // Registra pagamento
+function adessoLocale() {
+    // 'YYYY-MM-DDTHH:MM' nell'ora locale, per i campi datetime-local
+    const d = new Date();
+    d.setMinutes(d.getMinutes() - d.getTimezoneOffset());
+    return d.toISOString().slice(0, 16);
+}
 function registraPagamento(ordineId) {
     fetch(`/ordini/${ordineId}/dettaglio-json/`)
         .then(response => response.json())
@@ -470,6 +483,7 @@ function registraPagamento(ordineId) {
             `;
             
             document.getElementById('importo-pagamento').value = residuo.toFixed(2);
+            document.getElementById('pagato-il').value = adessoLocale();
             
             const modal = new bootstrap.Modal(document.getElementById('modalPagamento'));
             modal.show();
@@ -484,7 +498,8 @@ document.getElementById('form-pagamento').addEventListener('submit', function(e)
     const importo = document.getElementById('importo-pagamento').value;
     const metodo = document.getElementById('metodo-pagamento').value;
     const note = document.getElementById('note-pagamento').value;
-    
+    const pagatoIl = document.getElementById('pagato-il').value;
+
     fetch(`/ordini/${ordineId}/registra-pagamento/`, {
         method: 'POST',
         headers: {
@@ -494,7 +509,8 @@ document.getElementById('form-pagamento').addEventListener('submit', function(e)
         body: JSON.stringify({
             importo: importo,
             metodo_pagamento: metodo,
-            note: note
+            note: note,
+            pagato_il: pagatoIl
         })
     })
     .then(response => response.json())

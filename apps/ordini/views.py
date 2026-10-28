@@ -1063,20 +1063,25 @@ def registra_pagamento(request, pk):
                 importo = float(data.get('importo', 0))
                 metodo = data.get('metodo_pagamento', 'contanti')
                 note = data.get('note', '')
-                
+
                 if importo <= 0:
                     return JsonResponse({
                         'success': False,
                         'error': 'Importo non valido'
                     })
-                
+                from .pagamenti import leggi_pagato_il, nota_registrazione
+                pagato_il, errore = leggi_pagato_il(data.get('pagato_il'))
+                if errore:
+                    return JsonResponse({'success': False, 'error': errore})
+
                 # Crea pagamento
                 pagamento = Pagamento.objects.create(
                     ordine=ordine,
                     importo=importo,
                     metodo=metodo,
-                    nota=note,
-                    operatore=request.user
+                    nota=nota_registrazione(note, pagato_il, request.user),
+                    operatore=request.user,
+                    data_pagamento=pagato_il,
                 )
 
                 # Notifica WebSocket alla lista ordini (con timeout
@@ -1104,9 +1109,11 @@ def registra_pagamento(request, pk):
             # Gestione form normale
             form = PagamentoForm(request.POST)
             if form.is_valid():
+                from .pagamenti import nota_registrazione
                 pagamento = form.save(commit=False)
                 pagamento.ordine = ordine
                 pagamento.operatore = request.user
+                pagamento.nota = nota_registrazione(pagamento.nota, pagamento.data_pagamento, request.user)
                 pagamento.save()
                 
                 messages.success(request, f'Pagamento di €{pagamento.importo} registrato')
@@ -1115,9 +1122,37 @@ def registra_pagamento(request, pk):
                 if ordine.is_pagato:
                     messages.success(request, 'Ordine completamente saldato')
             else:
-                messages.error(request, 'Errore nei dati del pagamento')
-    
+                errori = '; '.join(e for lista in form.errors.values() for e in lista)
+                messages.error(request, f'Errore nei dati del pagamento: {errori}')
+
     return redirect('ordini:ordine-detail', pk=pk)
+
+
+@login_required
+def modifica_data_pagamento(request, pk):
+    """Sposta un pagamento gia' registrato al giorno in cui il cliente ha
+    pagato davvero (titolare/responsabile). Resta traccia nella nota."""
+    pagamento = get_object_or_404(Pagamento.objects.select_related('ordine'), pk=pk)
+    if request.method != 'POST':
+        return redirect('ordini:ordine-detail', pk=pagamento.ordine_id)
+    if not request.user.is_staff:
+        messages.error(request, 'Solo titolare o responsabile possono cambiare la data di un pagamento.')
+        return redirect('ordini:ordine-detail', pk=pagamento.ordine_id)
+    from .pagamenti import leggi_pagato_il
+    quando, errore = leggi_pagato_il(request.POST.get('pagato_il'))
+    if errore or not request.POST.get('pagato_il'):
+        messages.error(request, errore or 'Indica la data del pagamento.')
+        return redirect('ordini:ordine-detail', pk=pagamento.ordine_id)
+    prima = timezone.localtime(pagamento.data_pagamento)
+    chi = request.user.get_full_name() or request.user.username
+    traccia = (f"Data cambiata da {prima:%d/%m/%Y %H:%M} il "
+               f"{timezone.localtime():%d/%m/%Y %H:%M} da {chi}")
+    pagamento.data_pagamento = quando
+    pagamento.nota = f"{pagamento.nota} - {traccia}" if pagamento.nota else traccia
+    pagamento.save(update_fields=['data_pagamento', 'nota'])
+    messages.success(request, f'Pagamento di €{pagamento.importo} spostato al '
+                              f'{timezone.localtime(quando):%d/%m/%Y %H:%M}.')
+    return redirect('ordini:ordine-detail', pk=pagamento.ordine_id)
 
 
 @login_required

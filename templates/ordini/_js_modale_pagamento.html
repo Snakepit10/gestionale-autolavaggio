@@ -1,4 +1,10 @@
 {# JS del modale pagamento: incluso dentro un <script> #}
+function adessoLocale() {
+    // 'YYYY-MM-DDTHH:MM' nell'ora locale, per i campi datetime-local
+    const d = new Date();
+    d.setMinutes(d.getMinutes() - d.getTimezoneOffset());
+    return d.toISOString().slice(0, 16);
+}
 function aggiungiPagamento(ordineId) {
     // Recupera dati ordine
     fetch(`{% url 'ordini:dettaglio-json' 0 %}`.replace('0', ordineId))
@@ -10,6 +16,7 @@ function aggiungiPagamento(ordineId) {
             document.getElementById('ordine-pagato').textContent = `€${data.importo_pagato.toFixed(2)}`;
             document.getElementById('ordine-residuo').textContent = `€${data.saldo_dovuto.toFixed(2)}`;
             document.getElementById('importo-pagamento').value = data.saldo_dovuto.toFixed(2);
+            document.getElementById('pagato-il').value = adessoLocale();
             
             const modal = new bootstrap.Modal(document.getElementById('modalPagamento'));
             modal.show();
@@ -38,6 +45,7 @@ document.getElementById('form-pagamento').addEventListener('submit', function(e)
     const importo = document.getElementById('importo-pagamento').value;
     const metodo = document.getElementById('metodo-pagamento-modal').value;
     const note = document.getElementById('note-pagamento').value;
+    const pagatoIl = document.getElementById('pagato-il').value;
 
     fetch(`{% url 'ordini:registra-pagamento' 0 %}`.replace('0', ordineId), {
         method: 'POST',
@@ -48,7 +56,8 @@ document.getElementById('form-pagamento').addEventListener('submit', function(e)
         body: JSON.stringify({
             importo: importo,
             metodo_pagamento: metodo,
-            note: note
+            note: note,
+            pagato_il: pagatoIl
         })
     })
     .then(response => response.json())

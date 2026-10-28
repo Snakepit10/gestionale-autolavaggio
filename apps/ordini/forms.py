@@ -1,3 +1,4 @@
+from django.utils import timezone
 from django import forms
 from crispy_forms.helper import FormHelper
 from crispy_forms.layout import Layout, Div, Field, HTML, Submit
@@ -29,22 +30,36 @@ class OrdineForm(forms.ModelForm):
 
 
 class PagamentoForm(forms.ModelForm):
+    def clean_data_pagamento(self):
+        from .pagamenti import controlla_pagato_il
+        valore = self.cleaned_data.get('data_pagamento')
+        errore = controlla_pagato_il(valore)
+        if errore:
+            raise forms.ValidationError(errore)
+        return valore
+
     class Meta:
         model = Pagamento
-        fields = ['importo', 'metodo', 'riferimento', 'nota']
+        fields = ['importo', 'metodo', 'data_pagamento', 'riferimento', 'nota']
         widgets = {
             'importo': forms.NumberInput(attrs={'step': '0.01', 'min': '0'}),
+            'data_pagamento': forms.DateTimeInput(attrs={'type': 'datetime-local'}, format='%Y-%m-%dT%H:%M'),
             'nota': forms.Textarea(attrs={'rows': 2}),
         }
     
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
+        self.fields['data_pagamento'].input_formats = ['%Y-%m-%dT%H:%M', '%Y-%m-%dT%H:%M:%S']
+        self.fields['data_pagamento'].help_text = 'Se registri in ritardo, metti quando il cliente ha pagato davvero'
+        if not self.is_bound:
+            self.initial.setdefault('data_pagamento', timezone.localtime().replace(second=0, microsecond=0))
         self.helper = FormHelper()
         self.helper.form_method = 'post'
         self.helper.layout = Layout(
             Div(
                 Field('importo'),
                 Field('metodo'),
+                Field('data_pagamento'),
                 css_class='col-md-6'
             ),
             Div(

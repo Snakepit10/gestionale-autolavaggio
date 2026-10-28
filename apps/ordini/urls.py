@@ -44,6 +44,7 @@ urlpatterns = [
     path('<int:pk>/', views.OrdineDetailView.as_view(), name='ordine-detail'),
     path('<int:pk>/dettaglio/', views.dettaglio_ordine_json, name='dettaglio-json'),
     path('<int:pk>/registra-pagamento/', views.registra_pagamento, name='registra-pagamento'),
+    path('pagamenti/<int:pk>/data/', views.modifica_data_pagamento, name='pagamento-data'),
     path('<int:pk>/cambia-stato/', views.cambia_stato_ordine, name='cambia-stato'),
     path('<int:pk>/cambia-stato-pagamento/', views.cambia_stato_pagamento, name='cambia-stato-pagamento'),
     path('<int:pk>/imposta-richiede-fattura/', views.imposta_richiede_fattura, name='imposta-richiede-fattura'),

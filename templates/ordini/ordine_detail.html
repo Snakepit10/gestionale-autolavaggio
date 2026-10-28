@@ -455,16 +455,30 @@
                         <div class="border rounded p-2 mb-2">
                             <div class="d-flex justify-content-between">
                                 <span><strong>€{{ pagamento.importo }}</strong></span>
-                                <small class="text-muted">{{ pagamento.data_pagamento|date:"d/m/Y H:i" }}</small>
+                                <small class="text-muted" title="Pagato il">{{ pagamento.data_pagamento|date:"d/m/Y H:i" }}
+                                  {% if user.is_staff %}<a href="#" class="ms-1 text-decoration-none" title="Cambia la data del pagamento"
+                                     onclick="document.getElementById('data-pag-{{ pagamento.pk }}').classList.toggle('d-none'); return false;"><i class="bi bi-calendar-event"></i></a>{% endif %}</small>
                             </div>
                             <div>
-                                <span class="badge bg-info">{{ pagamento.metodo_pagamento|title }}</span>
+                                <span class="badge bg-info">{{ pagamento.get_metodo_display }}</span>
                                 {% if pagamento.operatore %}
                                     <small class="text-muted">- {{ pagamento.operatore.username }}</small>
                                 {% endif %}
                             </div>
-                            {% if pagamento.note %}
-                                <small class="text-muted">{{ pagamento.note }}</small>
+                            {% if pagamento.nota %}
+                                <small class="text-muted">{{ pagamento.nota }}</small>
+                            {% endif %}
+                            {% if user.is_staff %}
+                            <form method="post" action="{% url 'ordini:pagamento-data' pagamento.pk %}" id="data-pag-{{ pagamento.pk }}" class="d-none mt-2">
+                                {% csrf_token %}
+                                <label class="form-label small mb-1">Pagato il</label>
+                                <div class="input-group input-group-sm">
+                                    <input type="datetime-local" name="pagato_il" class="form-control" required
+                                           value="{{ pagamento.data_pagamento|date:'Y-m-d\TH:i' }}">
+                                    <button type="submit" class="btn btn-primary">Sposta</button>
+                                </div>
+                                <div class="form-text">Il pagamento conta nella quadratura del giorno scelto.</div>
+                            </form>
                             {% endif %}
                         </div>
                     {% endfor %}

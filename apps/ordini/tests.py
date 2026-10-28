@@ -446,3 +446,81 @@ class OraCompletamentoTest(TestCase):
         cambia_stato_ordine(req, ordine.pk)
         ordine = Ordine.objects.get(pk=ordine.pk)
         self.assertEqual(ordine.tempo_lavorazione, '0 min')
+
+
+class PagatoIlTest(TestCase):
+    """Pagamento registrato in ritardo: conta nel giorno in cui e' stato fatto."""
+
+    def setUp(self):
+        from apps.core.models import Categoria, ServizioProdotto
+        from apps.ordini.models import ItemOrdine
+        cat = Categoria.objects.create(nome='S')
+        lav = ServizioProdotto.objects.create(titolo='Lavaggio', categoria=cat, prezzo=Decimal('25'), descrizione='')
+        self.ordine = Ordine.objects.create(totale=Decimal('25'), totale_finale=Decimal('25'))
+        ItemOrdine.objects.create(ordine=self.ordine, servizio_prodotto=lav, quantita=1, prezzo_unitario=Decimal('25'))
+        self.user = utente_titolare('tit', 'tit@x.it', 'x', is_staff=True)
+        self.client.force_login(self.user)
+
+    def test_registra_con_data_vera(self):
+        from datetime import timedelta
+
+        from django.utils import timezone
+
+        from apps.ordini.models import Pagamento
+        ieri = timezone.localtime() - timedelta(days=1)
+        url = reverse('ordini:registra-pagamento', args=[self.ordine.pk])
+        r = self.client.post(url, data=json.dumps({'importo': 25, 'metodo_pagamento': 'carta',
+                                                   'pagato_il': ieri.strftime('%Y-%m-%dT%H:%M')}),
+                             content_type='application/json')
+        self.assertTrue(r.json()['success'])
+        p = Pagamento.objects.get()
+        self.assertEqual(timezone.localtime(p.data_pagamento).date(), ieri.date())
+        self.assertIn('Registrato il', p.nota)
+        self.ordine.refresh_from_db()
+        self.assertEqual(self.ordine.stato_pagamento, 'pagato')
+        # nel futuro: rifiutato
+        domani = timezone.localtime() + timedelta(days=1)
+        r = self.client.post(url, data=json.dumps({'importo': 5, 'metodo_pagamento': 'contanti',
+                                                   'pagato_il': domani.strftime('%Y-%m-%dT%H:%M')}),
+                             content_type='application/json')
+        self.assertFalse(r.json()['success'])
+        # senza data: adesso, nessuna traccia aggiunta
+        r = self.client.post(url, data=json.dumps({'importo': 5, 'metodo_pagamento': 'contanti'}),
+                             content_type='application/json')
+        self.assertTrue(r.json()['success'])
+        self.assertEqual(Pagamento.objects.filter(importo=5).get().nota, '')
+
+    def test_sposta_data_pagamento(self):
+        from datetime import timedelta
+
+        from django.utils import timezone
+
+        from apps.ordini.models import Pagamento
+        p = Pagamento.objects.create(ordine=self.ordine, importo=Decimal('25'), metodo='carta', operatore=self.user)
+        ieri = timezone.localtime() - timedelta(days=1)
+        self.client.post(reverse('ordini:pagamento-data', args=[p.pk]),
+                         {'pagato_il': ieri.strftime('%Y-%m-%dT%H:%M')})
+        p.refresh_from_db()
+        self.assertEqual(timezone.localtime(p.data_pagamento).date(), ieri.date())
+        self.assertIn('Data cambiata da', p.nota)
+        # un operatore non staff non puo'
+        from django.contrib.auth.models import User
+        op = User.objects.create_user('op', 'op@x.it', 'x')
+        self.client.force_login(op)
+        self.client.post(reverse('ordini:pagamento-data', args=[p.pk]),
+                         {'pagato_il': timezone.localtime().strftime('%Y-%m-%dT%H:%M')})
+        p.refresh_from_db()
+        self.assertEqual(timezone.localtime(p.data_pagamento).date(), ieri.date())
+
+    def test_form_dettaglio(self):
+        from datetime import timedelta
+
+        from django.utils import timezone
+
+        from apps.ordini.models import Pagamento
+        ieri = timezone.localtime() - timedelta(days=1)
+        self.client.post(reverse('ordini:registra-pagamento', args=[self.ordine.pk]),
+                         {'importo': '25', 'metodo': 'contanti', 'data_pagamento': ieri.strftime('%Y-%m-%dT%H:%M'),
+                          'riferimento': '', 'nota': ''})
+        p = Pagamento.objects.get()
+        self.assertEqual(timezone.localtime(p.data_pagamento).date(), ieri.date())
