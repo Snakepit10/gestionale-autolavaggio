@@ -182,18 +182,21 @@ tr.ufficio td { height:24px; background:#fff; font-size:9.5px; color:#444; }
                 <thead><tr><th style="text-align:right">Taglio &euro;</th><th></th><th>Quantit&agrave;</th><th class="imp">&euro;</th></tr></thead>
                 <tbody>
                 {% for t in tagli_banconote %}<tr><td class="t">{{ t }}</td><td class="x">&times;</td><td></td><td class="imp"></td></tr>{% endfor %}
+                    <tr class="totale"><td colspan="3">Totale banconote</td><td class="imp">{% if s.banconote is not None %}{{ s.banconote|floatformat:2 }}{% endif %}</td></tr>
                 {% for t in tagli_monete %}<tr><td class="t">{{ t }}</td><td class="x">&times;</td><td></td><td class="imp"></td></tr>{% endfor %}
-                    <tr class="totale"><td colspan="3">Contanti totali contati</td><td class="imp">{% if s.contanti is not None %}{{ s.contanti|floatformat:2 }}{% endif %}</td></tr>
+                    <tr class="totale"><td colspan="3">Totale monete</td><td class="imp">{% if s.monete is not None %}{{ s.monete|floatformat:2 }}{% endif %}</td></tr>
+                    <tr class="totale"><td colspan="3">Contanti (banconote + monete)</td><td class="imp">{% if s.contanti is not None %}{{ s.contanti|floatformat:2 }}{% endif %}</td></tr>
                 </tbody>
             </table>
             <table class="conti">
                 <tbody>
-                    <tr><td class="n">1</td><td>Contanti totali contati <span class="aiuto">(dal conteggio a sinistra)</span></td><td class="v">{% if s.contanti is not None %}{{ s.contanti|floatformat:2 }}{% endif %}</td></tr>
-                    <tr><td class="n">2</td><td>+ Lettore carte POS servito <span class="aiuto">(totale scontrino POS)</span></td><td class="v">{% if s.pos is not None %}{{ s.pos|floatformat:2 }}{% endif %}</td></tr>
-                    <tr><td class="n">3</td><td>&minus; Cassa iniziale (fondo)</td><td class="v">{% if s.fondo is not None %}{{ s.fondo|floatformat:2 }}{% elif quadratura.fondo_cassa_iniziale %}{{ quadratura.fondo_cassa_iniziale|floatformat:2 }}{% endif %}</td></tr>
-                    <tr><td class="n">4</td><td>+ Spese pagate dalla cassa <span class="aiuto">(totale spese sul fronte)</span></td><td class="v">{% if s.spese %}{{ s.spese|floatformat:2 }}{% endif %}</td></tr>
-                    <tr><td class="n">5</td><td>+ Ticket di resto pagati <span class="aiuto">(totale sul fronte)</span></td><td class="v">{% if s.ticket %}{{ s.ticket|floatformat:2 }}{% endif %}</td></tr>
-                    <tr class="tot"><td class="n">A</td><td>= Totale reale <span class="aiuto">(1 + 2 &minus; 3 + 4 + 5)</span></td><td class="v">{% if s.reale is not None %}{{ s.reale|floatformat:2 }}{% endif %}</td></tr>
+                    <tr><td class="n">1</td><td>Contanti: banconote + monete <span class="aiuto">(dal conteggio a sinistra)</span></td><td class="v">{% if s.contanti is not None %}{{ s.contanti|floatformat:2 }}{% endif %}</td></tr>
+                    <tr><td class="n">2</td><td>+ POS servito <span class="aiuto">(totale scontrino POS)</span></td><td class="v">{% if s.pos is not None %}{{ s.pos|floatformat:2 }}{% endif %}</td></tr>
+                    <tr><td class="n">3</td><td>+ POS casse automatiche</td><td class="v">{% if s.pos_casse is not None %}{{ s.pos_casse|floatformat:2 }}{% endif %}</td></tr>
+                    <tr><td class="n">4</td><td>&minus; Cassa iniziale (fondo)</td><td class="v">{% if s.fondo is not None %}{{ s.fondo|floatformat:2 }}{% elif quadratura.fondo_cassa_iniziale %}{{ quadratura.fondo_cassa_iniziale|floatformat:2 }}{% endif %}</td></tr>
+                    <tr><td class="n">5</td><td>+ Spese pagate dalla cassa <span class="aiuto">(totale spese sul fronte)</span></td><td class="v">{% if s.spese %}{{ s.spese|floatformat:2 }}{% endif %}</td></tr>
+                    <tr><td class="n">6</td><td>+ Ticket di resto pagati <span class="aiuto">(totale sul fronte)</span></td><td class="v">{% if s.ticket %}{{ s.ticket|floatformat:2 }}{% endif %}</td></tr>
+                    <tr class="tot"><td class="n">A</td><td>= Totale reale <span class="aiuto">(1 + 2 + 3 &minus; 4 + 5 + 6)</span></td><td class="v">{% if s.reale is not None %}{{ s.reale|floatformat:2 }}{% endif %}</td></tr>
                 </tbody>
             </table>
         </div>

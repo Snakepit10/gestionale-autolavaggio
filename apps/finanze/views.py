@@ -769,7 +769,7 @@ def chiusura_automatica_create(request, cassa_id):
                 from django.urls import reverse
                 return redirect(f"{reverse('finanze:report_giornata')}?data={data.strftime('%Y-%m-%d')}")
             return redirect('finanze:chiusura_automatica_detail', pk=chiusura.pk)
-        except (ValueError, TypeError) as e:
+        except (ValueError, TypeError, ArithmeticError) as e:
             messages.error(request, f"Dati non validi: {e}")
 
     context = {
@@ -1350,7 +1350,7 @@ def _quadratura_giornata(data, cassa_servito, vendita_self_service, totale_servi
 
     if quadratura_obj:
         fondo_cassa_iniziale = quadratura_obj.fondo_cassa_iniziale
-        lordo_reale = quadratura_obj.contanti_totali + quadratura_obj.lettore_carte_servito
+        lordo_reale = quadratura_obj.contanti_totali + quadratura_obj.totale_pos
         totale_reale = quadratura_obj.totale_reale + totale_spese_cassa + totale_ticket_resto
         differenza_quadratura = totale_reale - totale_teorico
         if abs(differenza_quadratura) < Decimal('0.50'):
@@ -2140,19 +2140,15 @@ def quadratura_form(request):
 
     if request.method == 'POST':
         try:
-            contanti = Decimal(request.POST.get('contanti_totali') or '0')
-            lettore = Decimal(request.POST.get('lettore_carte_servito') or '0')
-            fondo = Decimal(request.POST.get('fondo_cassa_iniziale') or '0')
-            note = request.POST.get('note', '')
+            from .views_chiusura import CAMPI_CONTEGGIO
+            valori = {campo: Decimal((request.POST.get(campo) or '0').replace(',', '.'))
+                      for campo in CAMPI_CONTEGGIO}
+            if any(v < 0 for v in valori.values()):
+                raise ValueError('gli importi non possono essere negativi')
+            valori['contanti_totali'] = valori['contanti_banconote'] + valori['contanti_monete']
             QuadraturaGiornaliera.objects.update_or_create(
                 data=data,
-                defaults={
-                    'contanti_totali': contanti,
-                    'lettore_carte_servito': lettore,
-                    'fondo_cassa_iniziale': fondo,
-                    'note': note,
-                    'operatore': request.user,
-                },
+                defaults={**valori, 'note': request.POST.get('note', ''), 'operatore': request.user},
             )
             messages.success(request, f"Quadratura del {data.strftime('%d/%m/%Y')} salvata.")
             from django.urls import reverse

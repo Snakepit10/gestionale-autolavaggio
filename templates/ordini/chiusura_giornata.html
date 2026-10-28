@@ -248,26 +248,40 @@
     <div class="section-title"><div class="label"><i class="bi bi-cash-stack"></i> Conteggio cassa <span class="badge bg-dark fw-normal" title="Permesso Conteggio cassa (Configurazione &gt; Permessi)">riservato</span></div>
         {% if quadratura %}<span class="count fw-normal">salvato{% if quadratura.operatore %} da {{ quadratura.operatore.get_full_name|default:quadratura.operatore.username }}{% endif %} &middot; {{ quadratura.aggiornato_il|date:"H:i" }}</span>{% endif %}</div>
     <div class="section-body">
-        <div class="spiega">Tutti i contanti scassettati dalle macchine e dal registratore, contati insieme, più il totale del lettore carte (POS) del servito. Lo vede solo chi ha il permesso <em>Conteggio cassa</em> (Configurazione &rsaquo; Permessi).</div>
-        <form method="post" class="row g-2 align-items-end">
+        <div class="spiega">Conta i contanti scassettati dalle macchine e dal registratore (prima le banconote, poi le monete), poi riporta i totali dei POS e il fondo cassa. Lo vede solo chi ha il permesso <em>Conteggio cassa</em> (Configurazione &rsaquo; Permessi).</div>
+        <form method="post" class="row g-2 align-items-end form-conteggio">
             {% csrf_token %}
             <input type="hidden" name="data" value="{{ data|date:'Y-m-d' }}">
             <input type="hidden" name="azione" value="conteggio">
             <input type="hidden" name="ancora" value="#conteggio">
-            <div class="col-12 col-sm-6">
-                <label class="form-label small mb-1">Contanti totali contati &euro;</label>
-                <input type="number" step="0.01" min="0" name="contanti_totali" class="form-control form-control-lg" inputmode="decimal"
-                       value="{{ quadratura.contanti_totali|default:''|stringformat:'s' }}" required>
+            <div class="col-6">
+                <label class="form-label small mb-1"><i class="bi bi-cash"></i> Banconote &euro;</label>
+                <input type="number" step="0.01" min="0" name="contanti_banconote" class="form-control form-control-lg" inputmode="decimal" data-segno="1"
+                       value="{% if quadratura %}{{ quadratura.contanti_banconote|stringformat:'s' }}{% endif %}">
             </div>
-            <div class="col-6 col-sm-3">
-                <label class="form-label small mb-1">POS &euro;</label>
-                <input type="number" step="0.01" min="0" name="lettore_carte_servito" class="form-control form-control-lg" inputmode="decimal"
-                       value="{{ quadratura.lettore_carte_servito|default:''|stringformat:'s' }}">
+            <div class="col-6">
+                <label class="form-label small mb-1"><i class="bi bi-coin"></i> Monete &euro;</label>
+                <input type="number" step="0.01" min="0" name="contanti_monete" class="form-control form-control-lg" inputmode="decimal" data-segno="1"
+                       value="{% if quadratura %}{{ quadratura.contanti_monete|stringformat:'s' }}{% endif %}">
             </div>
-            <div class="col-6 col-sm-3">
-                <label class="form-label small mb-1">Fondo &euro;</label>
-                <input type="number" step="0.01" min="0" name="fondo_cassa_iniziale" class="form-control form-control-lg" inputmode="decimal"
-                       value="{{ quadratura.fondo_cassa_iniziale|default:''|stringformat:'s' }}">
+            <div class="col-6">
+                <label class="form-label small mb-1"><i class="bi bi-credit-card"></i> POS servito &euro;</label>
+                <input type="number" step="0.01" min="0" name="lettore_carte_servito" class="form-control form-control-lg" inputmode="decimal" data-segno="1"
+                       value="{% if quadratura %}{{ quadratura.lettore_carte_servito|stringformat:'s' }}{% endif %}">
+            </div>
+            <div class="col-6">
+                <label class="form-label small mb-1"><i class="bi bi-credit-card-2-front"></i> POS casse automatiche &euro;</label>
+                <input type="number" step="0.01" min="0" name="pos_casse_automatiche" class="form-control form-control-lg" inputmode="decimal" data-segno="1"
+                       value="{% if quadratura %}{{ quadratura.pos_casse_automatiche|stringformat:'s' }}{% endif %}">
+            </div>
+            <div class="col-6">
+                <label class="form-label small mb-1"><i class="bi bi-safe"></i> Fondo cassa &euro;</label>
+                <input type="number" step="0.01" min="0" name="fondo_cassa_iniziale" class="form-control form-control-lg" inputmode="decimal" data-segno="-1"
+                       value="{% if quadratura %}{{ quadratura.fondo_cassa_iniziale|stringformat:'s' }}{% endif %}">
+            </div>
+            <div class="col-6">
+                <div class="small text-muted">Contanti <strong class="tot-contanti">&euro;0,00</strong></div>
+                <div class="small text-muted">Totale (&minus; fondo) <strong class="tot-conteggio">&euro;0,00</strong></div>
             </div>
             <div class="col-12">
                 <label class="form-label small mb-1">Note</label>
@@ -381,6 +395,24 @@
 {% endblock %}
 
 {% block extra_js %}
+<script>
+// Conteggio cassa: totali mentre si scrive
+document.querySelectorAll('form.form-conteggio').forEach(function (form) {
+  var euro = function (v) { return '\u20ac' + v.toFixed(2).replace('.', ','); };
+  function calcola() {
+    var tot = 0, contanti = 0;
+    form.querySelectorAll('[data-segno]').forEach(function (i) {
+      var v = parseFloat(String(i.value).replace(',', '.')) || 0;
+      tot += v * Number(i.dataset.segno);
+      if (/^contanti_/.test(i.name)) contanti += v;
+    });
+    form.querySelector('.tot-contanti').textContent = euro(contanti);
+    form.querySelector('.tot-conteggio').textContent = euro(tot);
+  }
+  form.addEventListener('input', calcola);
+  calcola();
+});
+</script>
 <script>
 // Sotto-schede: si vede una parte alla volta. La scheda si sceglie
 // dall'indirizzo (#scheda-... o l'ancora di un riquadro dopo un salvataggio).

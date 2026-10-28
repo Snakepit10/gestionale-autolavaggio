@@ -751,22 +751,35 @@ class QuadraturaGiornaliera(models.Model):
     """
     Quadratura a fine giornata.
     L'operatore scassetta tutte le casse automatiche + il registratore e conta
-    TUTTI i contanti insieme + il totale del lettore carte del servito.
+    i contanti (banconote e monete), poi riporta il POS del servito e quello
+    delle casse automatiche e il fondo cassa.
     Il totale viene confrontato con la vendita totale self-service + ordini POS pagati.
     """
     data = models.DateField(unique=True, default=timezone.now)
+
+    contanti_banconote = models.DecimalField(
+        'Banconote', max_digits=10, decimal_places=2, default=Decimal('0.00'),
+        validators=[MinValueValidator(Decimal('0.00'))])
+    contanti_monete = models.DecimalField(
+        'Monete', max_digits=10, decimal_places=2, default=Decimal('0.00'),
+        validators=[MinValueValidator(Decimal('0.00'))])
 
     contanti_totali = models.DecimalField(
         max_digits=10, decimal_places=2, default=Decimal('0.00'),
         validators=[MinValueValidator(Decimal('0.00'))],
         verbose_name='Contanti totali conteggiati',
-        help_text='Somma di tutto il contante scassettato dalle casse automatiche e dal registratore',
+        help_text='Banconote + monete (calcolato al salvataggio)',
     )
     lettore_carte_servito = models.DecimalField(
         max_digits=10, decimal_places=2, default=Decimal('0.00'),
         validators=[MinValueValidator(Decimal('0.00'))],
         verbose_name='Totale lettore carte POS servito',
         help_text='Totale riportato dal terminale POS (lettore carte) del servito',
+    )
+    pos_casse_automatiche = models.DecimalField(
+        'POS casse automatiche', max_digits=10, decimal_places=2, default=Decimal('0.00'),
+        validators=[MinValueValidator(Decimal('0.00'))],
+        help_text='Pagamenti con carta fatti alle casse automatiche',
     )
     fondo_cassa_iniziale = models.DecimalField(
         max_digits=10, decimal_places=2, default=Decimal('0.00'),
@@ -796,10 +809,20 @@ class QuadraturaGiornaliera(models.Model):
     def __str__(self):
         return f"Quadratura {self.data.strftime('%d/%m/%Y')}"
 
+    def save(self, *args, **kwargs):
+        # contanti = banconote + monete (i conteggi vecchi hanno solo il totale)
+        if self.contanti_banconote or self.contanti_monete:
+            self.contanti_totali = (self.contanti_banconote or 0) + (self.contanti_monete or 0)
+        super().save(*args, **kwargs)
+
+    @property
+    def totale_pos(self):
+        return self.lettore_carte_servito + self.pos_casse_automatiche
+
     @property
     def totale_reale(self):
-        """Totale netto rilevato: contanti + carte - fondo cassa iniziale."""
-        return self.contanti_totali + self.lettore_carte_servito - self.fondo_cassa_iniziale
+        """Totale netto rilevato: contanti + POS servito + POS casse automatiche - fondo cassa."""
+        return self.contanti_totali + self.totale_pos - self.fondo_cassa_iniziale
 
 
 class RicaricaCassa(models.Model):

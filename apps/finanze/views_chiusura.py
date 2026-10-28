@@ -73,6 +73,10 @@ def _scontrini_casse(giorno, ricariche):
             for c in Cassa.objects.filter(tipo='automatica', attiva=True).order_by('ordine')]
 
 
+# Campi del conteggio cassa, nell'ordine in cui si compilano
+CAMPI_CONTEGGIO = ('contanti_banconote', 'contanti_monete', 'lettore_carte_servito', 'pos_casse_automatiche', 'fondo_cassa_iniziale')
+
+
 def giornata_confermata(giorno):
     return QuadraturaGiornaliera.objects.filter(data=giorno, confermata_il__isnull=False).exists()
 
@@ -188,7 +192,7 @@ def _azione(request, giorno):
             messages.error(request, 'Non hai il permesso per il conteggio della cassa.')
             return
         valori = {}
-        for campo in ('contanti_totali', 'lettore_carte_servito', 'fondo_cassa_iniziale'):
+        for campo in CAMPI_CONTEGGIO:
             testo = (p.get(campo) or '0').replace(',', '.').strip() or '0'
             try:
                 valori[campo] = Decimal(testo).quantize(Decimal('0.01'))
@@ -198,6 +202,7 @@ def _azione(request, giorno):
             if valori[campo] < 0:
                 messages.error(request, 'Gli importi non possono essere negativi.')
                 return
+        valori['contanti_totali'] = valori['contanti_banconote'] + valori['contanti_monete']
         QuadraturaGiornaliera.objects.update_or_create(
             data=giorno, defaults={**valori, 'note': p.get('note', '').strip(), 'operatore': request.user})
         messages.success(request, 'Conteggio salvato.')
@@ -326,7 +331,10 @@ def _saldo_distinta(giorno, quadratura, con_atteso):
     contato = quadratura is not None
     saldo = {
         'contanti': quadratura.contanti_totali if contato else None,
+        'banconote': quadratura.contanti_banconote if contato else None,
+        'monete': quadratura.contanti_monete if contato else None,
         'pos': quadratura.lettore_carte_servito if contato else None,
+        'pos_casse': quadratura.pos_casse_automatiche if contato else None,
         'fondo': quadratura.fondo_cassa_iniziale if contato else None,
         'spese': q['spese_cassa'] if q['spese_cassa'] else None,
         'ticket': q['ticket_resto'] if q['ticket_resto'] else None,

@@ -58,28 +58,48 @@
         </div>
 
         <div class="form-section">
-          <h6><i class="bi bi-coin"></i> Contanti totali (scassettamento)</h6>
-          <p class="desc">Somma di tutto il contante scassettato da: cambia gettoni, portali, registratore.</p>
+          <h6><i class="bi bi-cash"></i> Contanti: banconote</h6>
+          <p class="desc">Banconote scassettate da cambia gettoni, portali e registratore.</p>
           <div class="input-group input-group-lg">
             <span class="input-group-text">&euro;</span>
-            <input type="number" step="0.01" min="0" class="form-control" name="contanti_totali" id="contanti_totali"
-                   value="{{ quadratura.contanti_totali|default:'0.00' }}" required oninput="calcola()">
+            <input type="number" step="0.01" min="0" class="form-control" name="contanti_banconote" id="contanti_banconote"
+                   value="{{ quadratura.contanti_banconote|default:'0.00' }}" oninput="calcola()">
           </div>
         </div>
 
         <div class="form-section">
-          <h6><i class="bi bi-credit-card"></i> Totale lettore carte POS servito</h6>
-          <p class="desc">Totale riportato dal terminale POS (lettore carte) del servito a fine giornata.</p>
+          <h6><i class="bi bi-coin"></i> Contanti: monete</h6>
+          <p class="desc">Monete scassettate da cambia gettoni, portali e registratore.</p>
+          <div class="input-group input-group-lg">
+            <span class="input-group-text">&euro;</span>
+            <input type="number" step="0.01" min="0" class="form-control" name="contanti_monete" id="contanti_monete"
+                   value="{{ quadratura.contanti_monete|default:'0.00' }}" oninput="calcola()">
+          </div>
+        </div>
+
+        <div class="form-section">
+          <h6><i class="bi bi-credit-card"></i> POS servito</h6>
+          <p class="desc">Totale del terminale POS (lettore carte) del servito a fine giornata.</p>
           <div class="input-group input-group-lg">
             <span class="input-group-text">&euro;</span>
             <input type="number" step="0.01" min="0" class="form-control" name="lettore_carte_servito" id="lettore_carte_servito"
-                   value="{{ quadratura.lettore_carte_servito|default:'0.00' }}" required oninput="calcola()">
+                   value="{{ quadratura.lettore_carte_servito|default:'0.00' }}" oninput="calcola()">
+          </div>
+        </div>
+
+        <div class="form-section">
+          <h6><i class="bi bi-credit-card-2-front"></i> POS casse automatiche</h6>
+          <p class="desc">Pagamenti con carta fatti alle casse automatiche.</p>
+          <div class="input-group input-group-lg">
+            <span class="input-group-text">&euro;</span>
+            <input type="number" step="0.01" min="0" class="form-control" name="pos_casse_automatiche" id="pos_casse_automatiche"
+                   value="{{ quadratura.pos_casse_automatiche|default:'0.00' }}" oninput="calcola()">
           </div>
         </div>
 
         <div class="form-section">
           <h6><i class="bi bi-safe"></i> Fondo cassa iniziale</h6>
-          <p class="desc">Contanti gia presenti in cassa all'inizio della giornata. Verra sottratto dal totale reale per ottenere il netto della giornata.</p>
+          <p class="desc">Contanti gia presenti in cassa all'inizio della giornata: si sottrae dal totale.</p>
           <div class="input-group input-group-lg">
             <span class="input-group-text">&euro;</span>
             <input type="number" step="0.01" min="0" class="form-control" name="fondo_cassa_iniziale" id="fondo_cassa_iniziale"
@@ -99,7 +119,7 @@
           <div class="calc-row mb-3">
             <div class="calc-label">Totale reale rilevato</div>
             <div class="calc-value" id="calc_totale">&euro;0.00</div>
-            <small style="opacity:.85">= Contanti + Lettore carte &minus; Fondo cassa</small>
+            <small style="opacity:.85">= Banconote + monete + POS servito + POS casse automatiche &minus; fondo cassa</small>
           </div>
 
           <button type="submit" class="btn btn-primary btn-lg w-100">
@@ -121,10 +141,10 @@
 
 <script>
 function calcola() {
-  const c = parseFloat(document.getElementById('contanti_totali').value) || 0;
-  const l = parseFloat(document.getElementById('lettore_carte_servito').value) || 0;
-  const f = parseFloat(document.getElementById('fondo_cassa_iniziale').value) || 0;
-  document.getElementById('calc_totale').innerHTML = '&euro;' + (c + l - f).toFixed(2);
+  const v = id => parseFloat(document.getElementById(id).value) || 0;
+  const tot = v('contanti_banconote') + v('contanti_monete') + v('lettore_carte_servito')
+            + v('pos_casse_automatiche') - v('fondo_cassa_iniziale');
+  document.getElementById('calc_totale').innerHTML = '&euro;' + tot.toFixed(2);
 }
 calcola();
 </script>

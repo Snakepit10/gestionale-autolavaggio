@@ -6,9 +6,10 @@ from .models import (ChiusuraCassa, MovimentoCassa, Cassa, ChiusuraCassaAutomati
 
 @admin.register(QuadraturaGiornaliera)
 class QuadraturaGiornalieraAdmin(admin.ModelAdmin):
-    list_display = ['data', 'contanti_totali', 'lettore_carte_servito', 'fondo_cassa_iniziale', 'totale_reale_display', 'operatore', 'aggiornato_il']
+    list_display = ['data', 'contanti_banconote', 'contanti_monete', 'lettore_carte_servito', 'pos_casse_automatiche',
+                    'fondo_cassa_iniziale', 'totale_reale_display', 'operatore', 'aggiornato_il']
+    readonly_fields = ['contanti_totali', 'creato_il', 'aggiornato_il']
     list_filter = ['data']
-    readonly_fields = ['creato_il', 'aggiornato_il']
     date_hierarchy = 'data'
 
     def totale_reale_display(self, obj):
