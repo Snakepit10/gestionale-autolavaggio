@@ -1386,6 +1386,20 @@ class SpazzoleOperatoriTest(TestCase):
         self._post(azione='rettifica_residuo', transazione_id=libera.pk, motivo='omaggio')
         self.assertEqual(RettificaResiduo.objects.get(transazione=libera).motivo, 'omaggio')
 
+    def test_notifica_residui_da_vedere(self):
+        from apps.finanze.models import ResiduoVisto
+        from apps.finanze.templatetags.spazzole import residui_da_vedere
+        libera = TransazionePortale.objects.create(portale='B', numero=7, orario=self.tx.orario,
+                                                   programma=8, origine='unita')
+        self.assertEqual(residui_da_vedere(self.operatore, self.giorno), 2)
+        html = self._distinta()
+        self.assertIn('py-2 avviso-da-vedere', html)
+        self.assertIn('n-da-vedere" title="Lavaggi pagati agli operatori non abbinati e non visti">2<', html)
+        self._post(azione='abbina', item_id=self.item.pk, transazione_id=self.tx.pk)
+        ResiduoVisto.objects.create(transazione=libera)
+        self.assertEqual(residui_da_vedere(self.operatore, self.giorno), 0)
+        self.assertNotIn('py-2 avviso-da-vedere', self._distinta())
+
     def test_senza_permesso(self):
         from apps.auth_system.models import PermessoUtente
         PermessoUtente.objects.create(user=self.operatore, sezione='spazzole_servito', consenti=False)

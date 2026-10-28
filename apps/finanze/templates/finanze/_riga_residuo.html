@@ -1,7 +1,7 @@
 {# Riga del residuo pagato agli operatori (report giornata): x = voce di abbinamento.residuo #}
 <tr data-tx="{{ x.transazione.pk }}" data-ordine="{{ x.transazione.orario|date:'U' }}" class="riga-residuo{% if x.visto %} residuo-visto{% endif %}">
   <td><input type="checkbox" class="form-check-input spunta-visto" value="{{ x.transazione.pk }}"{% if x.visto %} checked{% endif %}
-             title="{% if x.visto %}Vista da {{ x.visto.operatore.get_full_name|default:x.visto.operatore.username|default:'—' }} il {{ x.visto.visto_il|date:'d/m H:i' }}{% else %}Segna come vista{% endif %}"></td>
+             title="{% if x.visto %}Vista da {% if x.visto.operatore %}{{ x.visto.operatore.get_full_name|default:x.visto.operatore.username }}{% else %}—{% endif %} il {{ x.visto.visto_il|date:'d/m H:i' }}{% else %}Segna come vista{% endif %}"></td>
   <td>{{ x.transazione.portale }}</td>
   <td>{{ x.transazione.numero }}</td>
   <td class="text-nowrap">{{ x.transazione.orario|date:"d/m H:i" }}</td>

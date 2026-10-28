@@ -161,6 +161,15 @@ def transazioni_libere(chiusura):
     ).order_by('orario'))
 
 
+def n_residui_da_vedere(chiusura):
+    """Residuo ancora da guardare: transazioni da unita' operativa della
+    finestra non abbinate e non segnate come viste."""
+    return TransazionePortale.objects.filter(
+        chiusura.q_transazioni(), origine='unita',
+        abbinamento__isnull=True, residuo_visto__isnull=True,
+    ).count()
+
+
 def _slot_liberi(item):
     """Transazioni che l'item puo' ancora ricevere: una per pezzo, una
     sola per gli ordini senza programmi (abbinati a mano)."""
@@ -343,6 +352,7 @@ def riepilogo(chiusura, tolleranza=TOLLERANZA_DEFAULT, con_proposte=False):
         'rettifica_residuo': valore_listino - valore_residuo,
         'n_rettificati': len(rettifiche),
         'n_visti': len(visti),
+        'n_da_vedere': len(residuo) - len(visti),
         'residuo_senza_prezzo': senza_prezzo,
         'tolleranza_ore': tolleranza.total_seconds() / 3600,
         'anticipo_min': int(ANTICIPO_PORTALE.total_seconds() / 60),

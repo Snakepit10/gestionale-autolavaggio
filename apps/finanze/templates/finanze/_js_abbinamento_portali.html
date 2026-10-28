@@ -9,6 +9,15 @@
                                        white-space: nowrap; vertical-align: bottom; font-size: .78rem; color: #64748b; }
 </style>
 <script>
+// Notifica dei residui non abbinati e non visti (badge .n-da-vedere nella pagina)
+function aggiornaDaVedere() {
+  var n = document.querySelectorAll('#abbinamento-portali .spunta-visto:not(:checked)').length;
+  document.querySelectorAll('.n-da-vedere').forEach(function (b) {
+    b.textContent = n;
+    if (b.classList.contains('badge')) b.classList.toggle('d-none', n === 0);
+  });
+  document.querySelectorAll('.avviso-da-vedere').forEach(function (a) { a.classList.toggle('d-none', n === 0); });
+}
 // Spunta "vista" sulle righe del residuo: salvata subito, senza ricaricare
 document.querySelectorAll('#abbinamento-portali .spunta-visto').forEach(function (box) {
   box.addEventListener('change', function () {
@@ -35,6 +44,7 @@ document.querySelectorAll('#abbinamento-portali .spunta-visto').forEach(function
         box.title = d.visto ? 'Vista ora' : 'Segna come vista';
         var n = document.getElementById('n-visti');
         if (n) n.textContent = document.querySelectorAll('#abbinamento-portali .spunta-visto:checked').length;
+        aggiornaDaVedere();
       })
       .catch(function () { box.disabled = false; box.checked = !box.checked; alert('Non salvato: riprova.'); });
   });
@@ -69,6 +79,7 @@ document.querySelectorAll('form.form-abbina').forEach(function (form) {
         var nv = document.getElementById('n-visti'), nr = document.getElementById('n-residui');
         if (nv) nv.textContent = document.querySelectorAll('#abbinamento-portali .spunta-visto:checked').length;
         if (nr) nr.textContent = document.querySelectorAll('#abbinamento-portali .spunta-visto').length;
+        aggiornaDaVedere();
         var liberi = parseInt(form.dataset.liberi || '1', 10) - 1;
         form.dataset.liberi = liberi;
         if (liberi <= 0) form.remove();

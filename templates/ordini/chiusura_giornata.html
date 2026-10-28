@@ -77,7 +77,8 @@
     {% endif %}
     {% if abbinamento %}
     <li class="nav-item"><a class="nav-link" href="#scheda-spazzole" data-scheda="spazzole">
-        <i class="bi bi-droplet-half"></i> Spazzole{% if abbinamento.n_scoperti %} <span class="badge rounded-pill bg-warning text-dark" title="Lavaggi del servito senza transazione">{{ abbinamento.n_scoperti }}</span>{% endif %}</a></li>
+        <i class="bi bi-droplet-half"></i> Spazzole{% if abbinamento.n_scoperti %} <span class="badge rounded-pill bg-warning text-dark" title="Lavaggi del servito senza transazione">{{ abbinamento.n_scoperti }}</span>{% endif %}
+        {% if abbinamento.n_da_vedere %}<span class="badge rounded-pill bg-danger n-da-vedere" title="Lavaggi pagati agli operatori non abbinati e non visti">{{ abbinamento.n_da_vedere }}</span>{% endif %}</a></li>
     {% endif %}
     <li class="nav-item"><a class="nav-link" href="#scheda-pagamenti" data-scheda="pagamenti">
         <i class="bi bi-receipt"></i> Pagamenti <span class="badge rounded-pill bg-light text-dark">{{ estratto.pagamenti_estratto|length }}</span></a></li>
@@ -357,6 +358,14 @@
 <div class="row g-3 sotto-scheda" id="scheda-spazzole">
 
 {# ===== Spazzole <-> servito ===== #}
+{% if abbinamento.n_da_vedere %}
+<div class="col-12"><div class="alert alert-danger d-flex align-items-center gap-2 mb-0 py-2 avviso-da-vedere">
+    <i class="bi bi-bell-fill"></i>
+    <div><strong><span class="n-da-vedere">{{ abbinamento.n_da_vedere }}</span> lavagg{{ abbinamento.n_da_vedere|pluralize:"io,i" }} pagat{{ abbinamento.n_da_vedere|pluralize:"o,i" }} agli operatori da controllare</strong>:
+        abbina{{ abbinamento.n_da_vedere|pluralize:",li" }} a un ordine del servito o spunta <em>Vista</em> nel residuo.</div>
+    <a href="#residuo-da-vedere" class="btn btn-sm btn-outline-danger ms-auto">Vai al residuo</a>
+</div></div>
+{% endif %}
 {% if abbinamento %}<div class="col-12">{% include 'finanze/_abbinamento_portali.html' %}</div>{% endif %}
 
 </div>
