@@ -2247,19 +2247,37 @@ def report_periodo(request):
     # i soli Pagamento POS = valore inflato e fuorviante).
     scontrino_medio = totale_ordini_lavaggio / num_ordini if num_ordini > 0 else Decimal('0.00')
 
-    # ==================== RILEVATO REALE (quadrature giornaliere) ====================
-    # Somma delle Quadrature giornaliere nel periodo. Usa la stessa
-    # formula del report giornata: contanti + lettore carte - fondo cassa.
-    quadrature_qs = QuadraturaGiornaliera.objects.filter(
-        data__gte=data_inizio, data__lte=data_fine,
-    )
-    totale_rilevato_reale = Decimal('0.00')
-    num_quadrature = 0
-    for q in quadrature_qs:
-        totale_rilevato_reale += q.totale_reale
+    # ==================== QUADRATURE (stessa formula del report giornata) ====================
+    # Per ogni giorno con quadratura inserita: reale (contanti + POS -
+    # fondo + spese + ticket di resto), atteso (self service incasso -
+    # ricarica - promo macchine + servito incassato + extra), pagati agli
+    # operatori e differenza, come nel report giornata e nei Saldi del mese.
+    date_quadrature = list(QuadraturaGiornaliera.objects.filter(
+        data__gte=data_inizio, data__lte=data_fine).order_by('data').values_list('data', flat=True))
+    totale_rilevato_reale = totale_atteso = totale_pagati_operatori = Decimal('0.00')
+    totale_spese_ticket = Decimal('0.00')
+    differenza_cumulativa = Decimal('0.00')
+    num_quadrature = giorni_ok = giorni_diff = 0
+    giorno_peggiore = None
+    peggiore_abs = Decimal('0.00')
+    for giorno in date_quadrature:
+        q, _ = _saldo_giornata(giorno)
+        if q['differenza'] is None:
+            continue
         num_quadrature += 1
-    # Differenza vs teorico (= fatturato_totale incassato)
-    diff_rilevato_vs_teorico = totale_rilevato_reale - fatturato_totale
+        totale_rilevato_reale += q['totale_reale']
+        totale_atteso += q['totale_teorico']
+        totale_pagati_operatori += q['residuo_operatori']
+        totale_spese_ticket += q['spese_cassa'] + q['ticket_resto']
+        differenza_cumulativa += q['differenza']
+        if q['stato'] == 'ok':
+            giorni_ok += 1
+        else:
+            giorni_diff += 1
+            if abs(q['differenza']) > peggiore_abs:
+                peggiore_abs = abs(q['differenza'])
+                giorno_peggiore = {'data': giorno, 'differenza': q['differenza']}
+    giorni_rilevati = num_quadrature
 
     # Corrispettivi fiscali
     totale_corrispettivi = totale_registratore + vendita_self_service
@@ -2292,40 +2310,7 @@ def report_periodo(request):
     variazione_pct = float((fatturato_totale - fatturato_prev) / fatturato_prev * 100) if fatturato_prev > 0 else None
 
     # ==================== QUADRATURA AGGREGATA ====================
-    quadrature_qs = QuadraturaGiornaliera.objects.filter(
-        data__gte=data_inizio, data__lte=data_fine,
-    )
-    giorni_ok = 0
-    giorni_diff = 0
-    giorni_rilevati = 0
-    differenza_cumulativa = Decimal('0.00')
-    giorno_peggiore = None
-    peggiore_abs = Decimal('0.00')
-
-    # Indice pre-calcolato: teorico per giorno
-    for q in quadrature_qs:
-        # Ricalcola teorico per quel giorno
-        day_ordini = Ordine.objects.filter(
-            data_ora__date=q.data
-        ).exclude(stato='annullato').aggregate(s=Sum('totale_finale'))['s'] or Decimal('0.00')
-        day_pag = Pagamento.objects.filter(
-            data_pagamento__date=q.data
-        ).aggregate(s=Sum('importo'))['s'] or Decimal('0.00')
-        day_self = Decimal('0.00')
-        for c in ChiusuraCassaAutomatica.objects.filter(data=q.data).select_related('cassa'):
-            if not c.cassa.modalita_registratore:
-                day_self += c.vendita_totale
-        day_teorico = day_self + day_pag
-        day_diff = q.totale_reale - day_teorico
-        differenza_cumulativa += day_diff
-        giorni_rilevati += 1
-        if abs(day_diff) < Decimal('0.50'):
-            giorni_ok += 1
-        else:
-            giorni_diff += 1
-            if abs(day_diff) > peggiore_abs:
-                peggiore_abs = abs(day_diff)
-                giorno_peggiore = {'data': q.data, 'differenza': day_diff}
+    # (calcolata sopra, giorno per giorno, con la formula del report giornata)
     giorni_non_rilevati = giorni_periodo - giorni_rilevati
 
     # ==================== TOP SERVIZI E CATEGORIE ====================
@@ -2562,7 +2547,10 @@ def report_periodo(request):
         # Rilevato reale (quadrature giornaliere)
         'totale_rilevato_reale': totale_rilevato_reale,
         'num_quadrature': num_quadrature,
-        'diff_rilevato_vs_teorico': diff_rilevato_vs_teorico,
+        'totale_atteso': totale_atteso,
+        'totale_atteso_cassa': totale_atteso + totale_pagati_operatori,
+        'totale_pagati_operatori': totale_pagati_operatori,
+        'totale_spese_ticket': totale_spese_ticket,
         'giorni_senza_quadratura': giorni_periodo - num_quadrature,
         # Volumi
         'totale_wash_cycles': totale_wash_cycles,

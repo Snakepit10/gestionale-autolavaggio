@@ -1367,3 +1367,30 @@ class SpazzoleOperatoriTest(TestCase):
         QuadraturaGiornaliera.objects.create(data=self.giorno, confermata_il=timezone.now())
         self._post(azione='conferma')
         self.assertFalse(AbbinamentoPortale.objects.exists())
+
+
+class ReportPeriodoQuadratureTest(TestCase):
+    """Il report periodo somma le quadrature con la formula del report giornata."""
+
+    def test_rilevato_con_spese_e_ticket(self):
+        from datetime import date
+
+        from django.contrib.messages.storage.fallback import FallbackStorage
+        from django.test import RequestFactory
+
+        from apps.finanze.models import QuadraturaGiornaliera, SpesaCassa, TicketResto
+        from apps.finanze.views import _saldo_giornata, report_periodo
+        giorno = date(2026, 10, 6)
+        QuadraturaGiornaliera.objects.create(data=giorno, contanti_totali=Decimal('100'))
+        SpesaCassa.objects.create(data=giorno, descrizione='Gasolio', importo=Decimal('10'), riferimento='1')
+        TicketResto.objects.create(data=giorno, importo=Decimal('5'))
+        q, _ = _saldo_giornata(giorno)
+        self.assertEqual((q['totale_reale'], q['differenza']), (Decimal('115'), Decimal('115')))
+        req = RequestFactory().get('/', {'data_inizio': '2026-10-06', 'data_fine': '2026-10-06'})
+        req.user = User.objects.create_superuser('boss2', 'b2@x.it', 'x')
+        req.session = {}
+        req._messages = FallbackStorage(req)
+        html = report_periodo(req).content.decode()
+        self.assertIn('Atteso in cassa', html)
+        self.assertIn('&euro;115,00', html)          # rilevato con spese e ticket
+        self.assertIn('+&euro;115,00', html)         # differenza come nel report giornata
