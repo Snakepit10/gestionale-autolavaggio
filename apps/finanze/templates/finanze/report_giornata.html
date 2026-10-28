@@ -802,7 +802,7 @@ html { scroll-padding-top: 76px; scroll-behavior: smooth; }
     <div class="panel-body">
       <div class="d-flex gap-2 flex-wrap align-items-center mb-2">
         {% include 'finanze/_stato_washtec.html' %}
-        <a href="{% url 'ordini:spazzole-giornata' %}?data={{ data|date:'Y-m-d' }}" class="small ms-auto"><i class="bi bi-phone"></i> Pagina operatori</a>
+        <a href="{% url 'ordini:chiusura-giornata' %}?data={{ data|date:'Y-m-d' }}#spazzole" class="small ms-auto"><i class="bi bi-phone"></i> Distinta operatori</a>
       </div>
       <div class="d-flex gap-3 flex-wrap align-items-center mb-3 small">
         <span><strong>{{ abbinamento.n_servito }}</strong> lavaggi servito</span>

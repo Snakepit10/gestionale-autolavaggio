@@ -1339,20 +1339,53 @@ class SpazzoleOperatoriTest(TestCase):
         self.client.force_login(self.operatore)
         return self.client.post(self.url, {'data': self.giorno.isoformat(), **dati})
 
-    def test_operatore_conferma_e_chiude_senza_portale(self):
+    def _distinta(self, **get):
+        from django.contrib.messages.storage.fallback import FallbackStorage
+        from django.test import RequestFactory
+
+        from apps.finanze.views_chiusura import chiusura_giornata
+        req = RequestFactory().get('/', {'data': self.giorno.isoformat(), **get})
+        req.user = self.operatore
+        req.session = {}
+        req._messages = FallbackStorage(req)
+        return chiusura_giornata(req).content.decode()
+
+    def test_riquadro_nella_distinta_senza_proposte_automatiche(self):
+        html = self._distinta()
+        self.assertIn('id="spazzole"', html)
+        self.assertIn('Proponi abbinamenti', html)
+        self.assertIn('form-spazzole', html)                 # elenco a mano
+        self.assertNotIn('Conferma 1 proposta', html)
+        html = self._distinta(proposte='1')
+        self.assertIn('Conferma 1 proposta', html)
+        self.assertIn('Nascondi proposte', html)
+        # la vecchia pagina porta alla Distinta
         self.client.force_login(self.operatore)
-        r = self.client.get(self.url)
-        self.assertContains(r, 'Conferma tutte le proposte (1)')
-        self.assertContains(r, 'Aggiorna ora')
-        self._post(azione='conferma')
+        r = self.client.get(self.url, {'data': self.giorno.isoformat(), 'proposte': '1'})
+        self.assertRedirects(r, reverse('ordini:chiusura-giornata') + f'?data={self.giorno.isoformat()}&proposte=1#spazzole',
+                             fetch_redirect_response=False)
+
+    def test_operatore_conferma_e_chiude_senza_portale(self):
+        r = self._post(azione='conferma', proposte='1')
+        self.assertEqual(r['Location'],
+                         reverse('ordini:chiusura-giornata') + f'?data={self.giorno.isoformat()}&proposte=1#spazzole')
         self.assertEqual(AbbinamentoPortale.objects.get().transazione_id, self.tx.pk)
         self._post(azione='senza_portale', item_id=self.altro.pk)
         from apps.finanze.views_spazzole import riepilogo_spazzole
         r = riepilogo_spazzole(self.giorno)
         self.assertEqual((r['n_ok'], r['n_proposto'], r['n_da_sistemare']), (2, 0, 0))
-        # riquadro nella Distinta
-        r = self.client.get(reverse('ordini:chiusura-giornata'))
-        self.assertContains(r, 'tutto a posto')
+        self.assertIn('tutto a posto', self._distinta())
+
+    def test_abbina_a_mano_senza_ricaricare(self):
+        self.client.force_login(self.operatore)
+        r = self.client.post(self.url, {'data': self.giorno.isoformat(), 'azione': 'abbina',
+                                        'item_id': self.item.pk, 'transazione_id': self.tx.pk},
+                             HTTP_X_REQUESTED_WITH='fetch')
+        self.assertTrue(r.json()['ok'])
+        self.assertEqual(AbbinamentoPortale.objects.get().item_id, self.item.pk)
+        r = self.client.post(self.url, {'data': self.giorno.isoformat(), 'azione': 'abbina', 'item_id': self.item.pk},
+                             HTTP_X_REQUESTED_WITH='fetch')
+        self.assertFalse(r.json()['ok'])
 
     def test_senza_permesso(self):
         from apps.auth_system.models import PermessoUtente
@@ -1360,7 +1393,7 @@ class SpazzoleOperatoriTest(TestCase):
         self.client.force_login(self.operatore)
         self.assertEqual(self.client.get(self.url).status_code, 403)
         self.assertEqual(self.client.post(reverse('ordini:washtec-aggiorna')).status_code, 403)
-        self.assertNotContains(self.client.get(reverse('ordini:chiusura-giornata')), 'Abbina spazzole')
+        self.assertNotIn('id="spazzole"', self._distinta())
 
     def test_giornata_confermata_non_si_modifica(self):
         from apps.finanze.models import QuadraturaGiornaliera
