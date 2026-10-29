@@ -1,0 +1,92 @@
+{# Ordini del giorno con piu' pagamenti da confermare o pagati piu' del totale (lista ordini). Parametro: pagamenti_da_controllare #}
+{% if pagamenti_da_controllare %}
+<div class="card mb-3 border-danger shadow-sm" id="pagamenti-da-controllare">
+    <div class="card-header bg-danger bg-opacity-10 py-2">
+        <h6 class="mb-0 text-danger fw-bold small">
+            <i class="bi bi-exclamation-triangle-fill"></i> Pagamenti da controllare
+            <span class="badge bg-danger ms-2">{{ pagamenti_da_controllare|length }}</span>
+        </h6>
+    </div>
+    <div class="card-body p-2">
+        {% for o in pagamenti_da_controllare %}
+        <div class="controllo-pagamento {% if not forloop.last %}border-bottom mb-2 pb-2{% endif %}" data-ordine="{{ o.pk }}">
+            <div class="d-flex flex-wrap align-items-baseline gap-2 mb-1">
+                <a href="{% url 'ordini:ordine-detail' o.pk %}" class="fw-bold">#{{ o.numero_progressivo|slice:"-4:" }}</a>
+                <span>{{ o.cliente|default:"—" }}</span>
+                <span class="text-muted small">Totale €{{ o.totale_finale|floatformat:2 }} &middot; pagato €{{ o.importo_pagato|floatformat:2 }}</span>
+                {% if o.in_piu %}
+                <span class="badge bg-danger">Pagato €{{ o.in_piu|floatformat:2 }} in più</span>
+                {% endif %}
+            </div>
+            <div class="small mb-1">
+                {% if o.in_piu and o.pagamenti_doppi %}
+                <strong class="text-danger">C'è un pagamento in più.</strong> Quale pagamento vuoi tenere?
+                {% elif o.in_piu %}
+                <strong class="text-danger">L'importo pagato supera il totale dell'ordine.</strong> Correggi il pagamento.
+                {% else %}
+                L'ordine ha {{ o.pagamenti.all|length }} pagamenti: quale vuoi tenere? Se sono giusti tutti (es. parte contanti e parte carta), confermali.
+                {% endif %}
+            </div>
+            <div class="table-responsive">
+                <table class="table table-sm align-middle mb-1">
+                    <tbody>
+                        {% for p in o.pagamenti.all %}
+                        <tr>
+                            <td class="text-nowrap">{{ p.data_pagamento|date:"d/m H:i" }}</td>
+                            <td>{{ p.get_metodo_display }}</td>
+                            <td class="text-muted small">{% if p.operatore %}{{ p.operatore.get_full_name|default:p.operatore.username }}{% else %}—{% endif %}</td>
+                            <td class="text-end fw-semibold text-nowrap">€{{ p.importo|floatformat:2 }}</td>
+                            <td class="text-end text-nowrap">
+                                {% if o.pagamenti.all|length > 1 %}
+                                <button type="button" class="btn btn-sm btn-success" onclick="controlloPagamenti({{ o.pk }}, 'tieni', {{ p.pk }}, this)">
+                                    <i class="bi bi-check-lg"></i> Tieni solo questo</button>
+                                <button type="button" class="btn btn-sm btn-outline-danger" onclick="controlloPagamenti({{ o.pk }}, 'togli', {{ p.pk }}, this)"
+                                        title="Togli questo pagamento"><i class="bi bi-trash"></i></button>
+                                {% elif o.in_piu and o.totale_finale <= 0 %}
+                                <button type="button" class="btn btn-sm btn-outline-danger" onclick="controlloPagamenti({{ o.pk }}, 'togli', {{ p.pk }}, this)">
+                                    <i class="bi bi-trash"></i> Togli</button>
+                                {% elif o.in_piu %}
+                                <button type="button" class="btn btn-sm btn-warning" onclick="controlloPagamenti({{ o.pk }}, 'correggi', {{ p.pk }}, this)">
+                                    <i class="bi bi-pencil"></i> Correggi a €{{ o.totale_finale|floatformat:2 }}</button>
+                                {% endif %}
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+            {% if not o.in_piu %}
+            <button type="button" class="btn btn-sm btn-outline-secondary" onclick="controlloPagamenti({{ o.pk }}, 'conferma', null, this)">
+                <i class="bi bi-check2-all"></i> Vanno bene tutti</button>
+            {% endif %}
+        </div>
+        {% endfor %}
+    </div>
+</div>
+<script>
+function controlloPagamenti(ordineId, azione, pagamentoId, bottone) {
+    const domande = {
+        tieni: 'Tieni solo questo pagamento e togli gli altri dell\'ordine?',
+        togli: 'Togli questo pagamento dall\'ordine?',
+        correggi: 'Correggi l\'importo di questo pagamento al totale dell\'ordine?',
+        conferma: 'Confermi che i pagamenti dell\'ordine sono tutti giusti?',
+    };
+    if (!confirm(domande[azione])) return;
+    bottone.disabled = true;
+    fetch(`{% url 'ordini:controllo-pagamenti' 0 %}`.replace('0', ordineId), {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+            'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]').value
+        },
+        body: JSON.stringify({azione: azione, pagamento_id: pagamentoId})
+    })
+    .then(r => r.json())
+    .then(d => {
+        if (!d.success) { bottone.disabled = false; alert(d.error); return; }
+        location.reload();
+    })
+    .catch(() => { bottone.disabled = false; alert('Non salvato: riprova.'); });
+}
+</script>
+{% endif %}

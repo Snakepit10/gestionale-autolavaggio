@@ -890,6 +890,12 @@ class OrdiniListView(LoginRequiredMixin, ListView):
             if ordine.saldo_dovuto > 0:
                 totale_non_incassato += ordine.saldo_dovuto
 
+        # Ordini con piu' pagamenti da confermare o pagati piu' del totale
+        from .pagamenti import ordini_da_controllare
+        context['pagamenti_da_controllare'] = ordini_da_controllare(
+            queryset.exclude(stato='annullato').prefetch_related('pagamenti__operatore').order_by('data_ora'))
+        context['ids_pagamenti_da_controllare'] = {o.pk for o in context['pagamenti_da_controllare']}
+
         context['statistiche'] = {
             'totale_ordini': totale_ordini,
             'totale_contanti': totale_contanti,
@@ -1094,10 +1100,16 @@ def registra_pagamento(request, pk):
                     'timestamp': timezone.now().isoformat(),
                 })
 
+                from .pagamenti import pagato_in_piu
+                ordine.refresh_from_db()
+                in_piu = pagato_in_piu(ordine)
                 return JsonResponse({
                     'success': True,
                     'message': f'Pagamento di €{pagamento.importo} registrato',
-                    'ordine_completamente_pagato': ordine.is_pagato
+                    'ordine_completamente_pagato': ordine.is_pagato,
+                    'avviso': (f"Attenzione: l'ordine ora risulta pagato €{ordine.importo_pagato} "
+                               f"su €{ordine.totale_finale} (€{in_piu} in più). Controlla i pagamenti."
+                               if in_piu else ''),
                 })
                 
             except (json.JSONDecodeError, ValueError) as e:
@@ -1119,7 +1131,12 @@ def registra_pagamento(request, pk):
                 messages.success(request, f'Pagamento di €{pagamento.importo} registrato')
                 
                 # Controlla se ordine è completamente pagato
-                if ordine.is_pagato:
+                from .pagamenti import pagato_in_piu
+                ordine.refresh_from_db()
+                if pagato_in_piu(ordine):
+                    messages.warning(request, f"Attenzione: l'ordine risulta pagato €{ordine.importo_pagato} "
+                                              f"su €{ordine.totale_finale} (€{pagato_in_piu(ordine)} in più).")
+                elif ordine.is_pagato:
                     messages.success(request, 'Ordine completamente saldato')
             else:
                 errori = '; '.join(e for lista in form.errors.values() for e in lista)
@@ -1153,6 +1170,66 @@ def modifica_data_pagamento(request, pk):
     messages.success(request, f'Pagamento di €{pagamento.importo} spostato al '
                               f'{timezone.localtime(quando):%d/%m/%Y %H:%M}.')
     return redirect('ordini:ordine-detail', pk=pagamento.ordine_id)
+
+
+@login_required
+@transaction.atomic
+def controllo_pagamenti(request, pk):
+    """Pagamenti da controllare di un ordine (lista ordini). POST JSON
+    {azione, pagamento_id}: 'tieni' tiene solo quel pagamento, 'togli' lo
+    toglie, 'correggi' lo riduce di quanto l'ordine e' pagato in piu',
+    'conferma' segna che i pagamenti vanno bene tutti."""
+    from apps.finanze.views_chiusura import puo_modificare
+    from .pagamenti import correggi_in_piu, pagato_in_piu, tieni_solo, togli
+
+    ordine = get_object_or_404(Ordine.objects.select_for_update(), pk=pk)
+    if request.method != 'POST':
+        return JsonResponse({'success': False, 'error': 'Metodo non consentito'}, status=405)
+    try:
+        data = json.loads(request.body)
+    except json.JSONDecodeError:
+        return JsonResponse({'success': False, 'error': 'Dati non validi'})
+    azione = data.get('azione')
+    pagamenti = list(ordine.pagamenti.select_related('operatore'))
+    giorni = {timezone.localtime(p.data_pagamento).date() for p in pagamenti}
+    if any(not puo_modificare(request.user, g) for g in giorni):
+        return JsonResponse({'success': False, 'error': 'La giornata del pagamento è già confermata: '
+                                                        'chiedi al titolare di sbloccarla.'})
+
+    if azione == 'conferma':
+        if pagato_in_piu(ordine):
+            return JsonResponse({'success': False, 'error': "L'ordine è pagato più del totale: "
+                                                            "togli o correggi il pagamento in più."})
+        ordine.pagamenti_confermati = len(pagamenti)
+        ordine.save(update_fields=['pagamenti_confermati'])
+        messaggio = f'Pagamenti dell\'ordine #{ordine.numero_progressivo} confermati'
+    else:
+        pagamento = next((p for p in pagamenti if str(p.pk) == str(data.get('pagamento_id'))), None)
+        if pagamento is None:
+            return JsonResponse({'success': False, 'error': 'Pagamento non trovato: ricarica la pagina.'})
+        if azione == 'tieni':
+            n = tieni_solo(pagamento, request.user)
+            messaggio = f'Tenuto il pagamento di €{pagamento.importo}, tolt{"o" if n == 1 else "i"} {n}'
+        elif azione == 'togli':
+            togli(pagamento, request.user)
+            messaggio = f'Tolto il pagamento di €{pagamento.importo}'
+        elif azione == 'correggi':
+            importo = correggi_in_piu(pagamento, request.user)
+            if importo is None:
+                return JsonResponse({'success': False, 'error': 'Questo pagamento non si può correggere: '
+                                                                'togli quello in più.'})
+            messaggio = f'Pagamento corretto a €{importo}'
+        else:
+            return JsonResponse({'success': False, 'error': 'Azione non valida'})
+
+    from apps.api.notify import notify_group
+    notify_group('ordini_list', {
+        'type': 'pagamento_aggiunto',
+        'ordine_id': ordine.id,
+        'numero_progressivo': ordine.numero_progressivo,
+        'timestamp': timezone.now().isoformat(),
+    })
+    return JsonResponse({'success': True, 'message': messaggio})
 
 
 @login_required

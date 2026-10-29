@@ -81,7 +81,8 @@
         {% if abbinamento.n_da_vedere %}<span class="badge rounded-pill bg-danger n-da-vedere" title="Lavaggi pagati agli operatori non abbinati e non visti">{{ abbinamento.n_da_vedere }}</span>{% endif %}</a></li>
     {% endif %}
     <li class="nav-item"><a class="nav-link" href="#scheda-pagamenti" data-scheda="pagamenti">
-        <i class="bi bi-receipt"></i> Pagamenti <span class="badge rounded-pill bg-light text-dark">{{ estratto.pagamenti_estratto|length }}</span></a></li>
+        <i class="bi bi-receipt"></i> Pagamenti <span class="badge rounded-pill bg-light text-dark">{{ estratto.pagamenti_estratto|length }}</span>
+        {% if estratto.ordini_pagati_in_piu %}<span class="badge rounded-pill bg-danger" title="Ordini pagati più del totale">{{ estratto.ordini_pagati_in_piu|length }}</span>{% endif %}</a></li>
 </ul>
 
 <div class="row g-3 sotto-scheda" id="scheda-movimenti">

@@ -524,3 +524,96 @@ class PagatoIlTest(TestCase):
                           'riferimento': '', 'nota': ''})
         p = Pagamento.objects.get()
         self.assertEqual(timezone.localtime(p.data_pagamento).date(), ieri.date())
+
+
+class ControlloPagamentiTest(TestCase):
+    """Piu' pagamenti sullo stesso ordine e ordini pagati piu' del totale."""
+
+    def setUp(self):
+        from apps.ordini.models import Pagamento
+        self.user = utente_titolare('tit', 'tit@x.it', 'x', is_staff=True)
+        from django.contrib.auth.models import Group
+        self.operatore = User.objects.create_user('op', password='x')
+        self.operatore.groups.add(Group.objects.get(name='operatore'))
+        self.ordine = Ordine.objects.create(totale=Decimal('15'), totale_finale=Decimal('15'))
+        self.p1 = Pagamento.objects.create(ordine=self.ordine, importo=Decimal('15'), metodo='contanti',
+                                           operatore=self.operatore)
+        self.p2 = Pagamento.objects.create(ordine=self.ordine, importo=Decimal('15'), metodo='carta',
+                                           operatore=self.operatore)
+        self.client.force_login(self.operatore)
+
+    def _post(self, azione, pagamento=None):
+        r = self.client.post(reverse('ordini:controllo-pagamenti', args=[self.ordine.pk]),
+                             data=json.dumps({'azione': azione, 'pagamento_id': pagamento.pk if pagamento else None}),
+                             content_type='application/json')
+        self.ordine.refresh_from_db()
+        return r.json()
+
+    def _da_controllare(self):
+        from apps.ordini.pagamenti import ordini_da_controllare
+        return ordini_da_controllare(Ordine.objects.prefetch_related('pagamenti'))
+
+    def test_pagato_in_piu_e_tieni_solo(self):
+        from apps.ordini.models import Pagamento
+        [o] = self._da_controllare()
+        self.assertEqual(o.in_piu, Decimal('15'))
+        self.assertTrue(o.pagamenti_doppi)
+        # pagato in piu': non si conferma
+        self.assertFalse(self._post('conferma')['success'])
+        self.assertTrue(self._post('tieni', self.p2)['success'])
+        self.assertEqual(list(Pagamento.objects.all()), [self.p2])
+        self.assertEqual(self.ordine.importo_pagato, Decimal('15'))
+        self.assertEqual(self.ordine.stato_pagamento, 'pagato')
+        self.assertIn('Tolti €15.00 contanti', Pagamento.objects.get().nota)
+        self.assertEqual(self._da_controllare(), [])
+
+    def test_pagamenti_divisi_si_confermano(self):
+        self.p1.importo = self.p2.importo = Decimal('7.50')
+        self.p1.save()
+        self.p2.save()
+        [o] = self._da_controllare()
+        self.assertFalse(o.in_piu)
+        self.assertTrue(self._post('conferma')['success'])
+        self.assertEqual(self.ordine.pagamenti_confermati, 2)
+        self.assertEqual(self._da_controllare(), [])
+        # un terzo pagamento lo riporta tra quelli da controllare
+        from apps.ordini.models import Pagamento
+        Pagamento.objects.create(ordine=self.ordine, importo=Decimal('1'), metodo='contanti')
+        self.assertEqual(len(self._da_controllare()), 1)
+
+    def test_togli_e_correggi(self):
+        from apps.ordini.models import Pagamento
+        self.assertTrue(self._post('togli', self.p1)['success'])
+        self.assertEqual(list(Pagamento.objects.all()), [self.p2])
+        self.assertIn('Tolto €15.00 contanti', Pagamento.objects.get().nota)
+        # un solo pagamento ma con importo sbagliato: si corregge al totale
+        self.p2.refresh_from_db()
+        self.p2.importo = Decimal('30')
+        self.p2.save()
+        self.assertTrue(self._post('correggi', self.p2)['success'])
+        self.p2.refresh_from_db()
+        self.assertEqual(self.p2.importo, Decimal('15'))
+        self.assertIn('Importo corretto da €30', self.p2.nota)
+        self.assertEqual(self._da_controllare(), [])
+
+    def test_giornata_confermata(self):
+        from django.utils import timezone
+
+        from apps.finanze.models import QuadraturaGiornaliera
+        from apps.ordini.models import Pagamento
+        QuadraturaGiornaliera.objects.create(data=timezone.localdate(), confermata_il=timezone.now())
+        self.assertFalse(self._post('tieni', self.p1)['success'])
+        self.assertEqual(Pagamento.objects.count(), 2)
+
+    def test_avviso_alla_registrazione_e_estratto(self):
+        from django.utils import timezone
+
+        from apps.finanze.views import estratto_pagamenti
+        self.p2.delete()
+        r = self.client.post(reverse('ordini:registra-pagamento', args=[self.ordine.pk]),
+                             data=json.dumps({'importo': 15, 'metodo_pagamento': 'carta'}),
+                             content_type='application/json')
+        self.assertIn('€15.00 in più', r.json()['avviso'])
+        e = estratto_pagamenti(timezone.localdate())
+        self.assertEqual([x['in_piu'] for x in e['ordini_pagati_in_piu']], [Decimal('15')])
+        self.assertTrue(all(p.in_piu for p in e['pagamenti_estratto']))

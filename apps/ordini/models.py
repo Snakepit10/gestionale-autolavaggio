@@ -80,6 +80,10 @@ class Ordine(models.Model):
     importo_pagato = models.DecimalField(max_digits=10, decimal_places=2, default=0)
     metodo_pagamento = models.CharField(max_length=50, blank=True)
     data_scadenza_pagamento = models.DateField(null=True, blank=True)
+    # Quanti pagamenti l'operatore ha confermato come tutti giusti (es.
+    # parte contanti e parte carta): oltre questo numero l'ordine torna
+    # tra i pagamenti da controllare (apps/ordini/pagamenti.py).
+    pagamenti_confermati = models.PositiveSmallIntegerField(default=0)
 
     # Fatturazione: il flag lo mette l'operatore dalla gestione ordini;
     # targa/matricola/nota sono facoltativi e compaiono nella pagina

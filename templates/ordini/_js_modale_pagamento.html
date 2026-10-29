@@ -65,6 +65,7 @@ document.getElementById('form-pagamento').addEventListener('submit', function(e)
         if (data.success) {
             bootstrap.Modal.getInstance(document.getElementById('modalPagamento')).hide();
             document.getElementById('form-pagamento').reset();
+            if (data.avviso) alert(data.avviso);   // pagato piu' del totale
             const alertDiv = document.createElement('div');
             alertDiv.className = 'alert alert-success alert-dismissible fade show';
             alertDiv.innerHTML = `

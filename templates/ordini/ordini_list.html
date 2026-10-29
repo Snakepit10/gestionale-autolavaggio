@@ -172,6 +172,8 @@
 
 {% include 'ordini/_schede_ordini.html' with attiva='ordini' %}
 
+{% include 'ordini/_pagamenti_da_controllare.html' %}
+
 <!-- Prenotazioni cliente DA CONFERMARE (in attesa) -->
 {% if prenotazioni_da_confermare %}
 <style>
@@ -1227,6 +1229,10 @@ function ckEliminaPrenotazione() {
                                 </div>
                             </td>
                             <td>
+                                {% if ordine.pk in ids_pagamenti_da_controllare %}
+                                    <a href="#pagamenti-da-controllare" class="badge bg-danger text-decoration-none mb-1" title="Più pagamenti o pagato più del totale">
+                                        <i class="bi bi-exclamation-triangle-fill"></i> Da controllare</a><br>
+                                {% endif %}
                                 {% if ordine.stato_pagamento == 'pagato' %}
                                     <span class="badge bg-success cursor-pointer"
                                           onclick="modificaPagamentoOrdine('{{ ordine.pk }}', '{{ ordine.stato_pagamento }}', {{ ordine.totale_finale }}, {{ ordine.importo_pagato }}, {{ ordine.saldo_dovuto }})"
@@ -1499,6 +1505,10 @@ function ckEliminaPrenotazione() {
                                 </div>
                             </td>
                             <td>
+                                {% if ordine.pk in ids_pagamenti_da_controllare %}
+                                    <a href="#pagamenti-da-controllare" class="badge bg-danger text-decoration-none mb-1" title="Più pagamenti o pagato più del totale">
+                                        <i class="bi bi-exclamation-triangle-fill"></i> Da controllare</a><br>
+                                {% endif %}
                                 {% if ordine.stato_pagamento == 'pagato' %}
                                     <span class="badge bg-success cursor-pointer"
                                           onclick="modificaPagamentoOrdine('{{ ordine.pk }}', '{{ ordine.stato_pagamento }}', {{ ordine.totale_finale }}, {{ ordine.importo_pagato }}, {{ ordine.saldo_dovuto }})"
@@ -1746,6 +1756,10 @@ function ckEliminaPrenotazione() {
                                 </div>
                             </td>
                             <td>
+                                {% if ordine.pk in ids_pagamenti_da_controllare %}
+                                    <a href="#pagamenti-da-controllare" class="badge bg-danger text-decoration-none mb-1" title="Più pagamenti o pagato più del totale">
+                                        <i class="bi bi-exclamation-triangle-fill"></i> Da controllare</a><br>
+                                {% endif %}
                                 {% if ordine.stato_pagamento == 'pagato' %}
                                     <span class="badge bg-success cursor-pointer"
                                           onclick="modificaPagamentoOrdine('{{ ordine.pk }}', '{{ ordine.stato_pagamento }}', {{ ordine.totale_finale }}, {{ ordine.importo_pagato }}, {{ ordine.saldo_dovuto }})"

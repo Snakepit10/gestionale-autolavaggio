@@ -7,6 +7,18 @@
     <div class="panel-sub">Tutti i pagamenti registrati con data di questo giorno (campo "Pagato il"), anche di ordini di giorni precedenti.
       Quelli non in cassa (bonifici, assegni, abbonamenti) sono esclusi dal servito atteso.</div>
     <div class="panel-body small">
+      {% if estratto.ordini_pagati_in_piu %}
+      <div class="alert alert-danger py-2 my-2">
+        <i class="bi bi-exclamation-triangle-fill"></i>
+        <strong>{{ estratto.ordini_pagati_in_piu|length }} ordin{{ estratto.ordini_pagati_in_piu|length|pluralize:"e,i" }} pagat{{ estratto.ordini_pagati_in_piu|length|pluralize:"o,i" }} più del totale</strong>
+        (c'è una transazione in più o un importo sbagliato):
+        {% for x in estratto.ordini_pagati_in_piu %}
+        <a href="{% url 'ordini:ordine-detail' x.ordine.pk %}" class="alert-link">{% if x.ordine.vendita_prodotti %}{{ x.ordine.numero_progressivo }}{% else %}#{{ x.ordine.numero_progressivo|slice:"-4:" }}{% endif %}</a>
+        pagato &euro;{{ x.ordine.importo_pagato|floatformat:2 }} su &euro;{{ x.ordine.totale_finale|floatformat:2 }} (+&euro;{{ x.in_piu|floatformat:2 }}){% if not forloop.last %};{% endif %}
+        {% endfor %}
+        <div class="mt-1">Si corregge dalla pagina Ordini, riquadro <em>Pagamenti da controllare</em>.</div>
+      </div>
+      {% endif %}
       <div class="d-flex flex-wrap gap-2 my-2">
                 {% for m in estratto.pagamenti_per_metodo %}
                 <span class="badge {% if m.in_cassa %}bg-light text-dark border{% else %}bg-secondary-subtle text-secondary-emphasis{% endif %}"
@@ -21,7 +33,7 @@
                   </thead>
                   <tbody>
                     {% for p in estratto.pagamenti_estratto %}
-                    <tr{% if not p.in_cassa %} class="text-muted"{% endif %}>
+                    <tr class="{% if p.in_piu %}table-danger{% elif not p.in_cassa %}text-muted{% endif %}">
                       <td class="text-nowrap"><a href="{% url 'ordini:ordine-detail' p.ordine.pk %}">{% if p.ordine.vendita_prodotti %}{{ p.ordine.numero_progressivo }}{% else %}#{{ p.ordine.numero_progressivo|slice:"-4:" }}{% endif %}</a>
                         {% if p.pregresso %}<span class="badge bg-warning-subtle text-warning-emphasis" title="Ordine di un giorno precedente">del {{ p.ordine.data_ora|date:"d/m" }}</span>{% endif %}</td>
                       <td class="text-nowrap">{{ p.data_pagamento|date:"H:i" }}</td>
@@ -30,7 +42,8 @@
                         {% if p.riferimento %}<div class="text-muted">{{ p.riferimento }}</div>{% endif %}</td>
                       <td>{% if p.operatore %}{{ p.operatore.get_full_name|default:p.operatore.username }}{% else %}—{% endif %}
                         {% if p.nota %}<div class="text-muted">{{ p.nota }}</div>{% endif %}</td>
-                      <td class="text-end">&euro;{{ p.importo|floatformat:2 }}</td>
+                      <td class="text-end">&euro;{{ p.importo|floatformat:2 }}
+                        {% if p.in_piu %}<div><span class="badge bg-danger" title="L'ordine (totale &euro;{{ p.ordine.totale_finale|floatformat:2 }}) risulta pagato &euro;{{ p.ordine.importo_pagato|floatformat:2 }}">+&euro;{{ p.in_piu|floatformat:2 }} in più</span></div>{% endif %}</td>
                     </tr>
                     {% endfor %}
                   </tbody>

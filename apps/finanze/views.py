@@ -1260,11 +1260,16 @@ def estratto_pagamenti(data):
     in ordine di numero d'ordine e poi di incasso. Usato dal report
     giornata e dalla Distinta degli operatori."""
     from apps.ordini.models import Pagamento
+    from apps.ordini.pagamenti import pagato_in_piu
     pagamenti = list(Pagamento.objects.filter(data_pagamento__date=data)
                      .select_related('ordine__cliente', 'operatore')
                      .order_by('ordine__numero_progressivo', 'data_pagamento'))
     per_metodo = {}
+    in_piu = {}   # ordini pagati piu' del totale: errore da segnalare
     for p in pagamenti:
+        p.in_piu = pagato_in_piu(p.ordine)
+        if p.in_piu:
+            in_piu[p.ordine_id] = p.ordine
         p.pregresso = timezone.localtime(p.ordine.data_ora).date() < data if p.ordine.data_ora else False
         p.in_cassa = p.metodo not in METODI_NON_IN_CASSA
         voce = per_metodo.setdefault(p.metodo, {'metodo': p.get_metodo_display(), 'in_cassa': p.in_cassa,
@@ -1275,6 +1280,7 @@ def estratto_pagamenti(data):
         'pagamenti_estratto': pagamenti,
         'pagamenti_per_metodo': sorted(per_metodo.values(), key=lambda v: (not v['in_cassa'], -v['totale'])),
         'totale_pagamenti_estratto': sum((p.importo for p in pagamenti), Decimal('0.00')),
+        'ordini_pagati_in_piu': [{'ordine': o, 'in_piu': pagato_in_piu(o)} for o in in_piu.values()],
     }
 
 

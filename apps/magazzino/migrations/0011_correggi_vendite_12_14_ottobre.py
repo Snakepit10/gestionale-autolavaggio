@@ -17,6 +17,11 @@ DA_RICALCOLARE = ['20261014-0010']
 
 
 def correggi(apps, schema_editor):
+    # Senza quegli ordini non c'e' nulla da fare: controllato col modello
+    # storico, perche' quello attuale puo' avere colonne non ancora create
+    # (i test la chiamano con apps=None)
+    if apps is not None and not apps.get_model('ordini', 'Ordine').objects.filter(numero_progressivo__in=ORDINI).exists():
+        return
     # Modelli e servizi attuali: e' l'ultima migrazione, lo schema coincide
     from django.db.models import Sum
 
