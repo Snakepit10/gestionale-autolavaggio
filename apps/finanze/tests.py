@@ -1537,3 +1537,19 @@ class ConteggioCassaTest(TestCase):
         # un conteggio vecchio con il solo totale resta valido
         vecchio = QuadraturaGiornaliera.objects.create(data=giorno - timedelta(days=1), contanti_totali=Decimal('90'))
         self.assertEqual(vecchio.totale_reale, Decimal('90'))
+
+
+class AbbinabiliSenzaVisteTest(TestCase):
+    """Le transazioni del residuo viste o rettificate non si propongono al servito."""
+
+    def test_viste_e_rettificate_escluse(self):
+        from datetime import date, datetime as dt
+
+        from apps.finanze.models import ResiduoVisto, RettificaResiduo
+        ora = timezone.make_aware(dt(2026, 10, 6, 12, 0))
+        nuova = lambda n: TransazionePortale.objects.create(portale='A', numero=n, orario=ora,
+                                                            programma=8, origine='unita')
+        libera, vista, omaggio = nuova(1), nuova(2), nuova(3)
+        ResiduoVisto.objects.create(transazione=vista)
+        RettificaResiduo.objects.create(transazione=omaggio, motivo='omaggio', importo=Decimal('0'))
+        self.assertEqual([t.pk for t in ap.transazioni_abbinabili(date(2026, 10, 6))], [libera.pk])

@@ -35,6 +35,16 @@ document.querySelectorAll('#abbinamento-portali .spunta-visto').forEach(function
         box.disabled = false;
         if (!d.ok) { box.checked = !box.checked; alert(d.msg || 'Riga non trovata: ricarica la pagina.'); return; }
         riga.classList.toggle('residuo-visto', d.visto);
+        // una transazione vista non si propone piu' ai lavaggi del servito
+        if (d.visto) {
+          document.querySelectorAll('select[name=transazione_id] option[value="' + box.value + '"]').forEach(function (o) { o.remove(); });
+          document.querySelectorAll('form.form-abbina').forEach(function (f) {
+            if (f.querySelector('select[name=transazione_id]').options.length <= 1) f.remove();
+          });
+        } else {
+          var ricarica = document.getElementById('abbina-ricarica');
+          if (ricarica) ricarica.classList.remove('d-none');   // torna negli elenchi ricaricando
+        }
         // la riga passa nella tabella delle viste (o torna su), in ordine d'orario
         var dest = document.getElementById(d.visto ? 'residuo-visti' : 'residuo-da-vedere');
         var prima = Array.prototype.find.call(dest.querySelectorAll('tr.riga-residuo'), function (r) {

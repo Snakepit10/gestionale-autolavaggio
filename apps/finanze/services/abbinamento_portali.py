@@ -142,12 +142,16 @@ def lavaggi_servito(chiusura):
 
 def transazioni_abbinabili(giorno):
     """Transazioni da unita' operativa del giorno di calendario non
-    ancora abbinate: i candidati per i lavaggi servito di quel giorno."""
+    ancora abbinate: i candidati per i lavaggi servito di quel giorno.
+    Restano fuori quelle del residuo gia' segnate come viste o rettificate
+    (omaggio, promo, prelavaggio...): sono lavaggi degli operatori."""
     inizio, fine = _limiti_giorno(giorno)
     return list(TransazionePortale.objects.filter(
         orario__gte=inizio, orario__lt=fine,
         origine='unita',
         abbinamento__isnull=True,
+        residuo_visto__isnull=True,
+        rettifica_residuo__isnull=True,
     ).order_by('orario'))
 
 
@@ -381,7 +385,8 @@ def abbina_manuale(chiusura, item_id, transazione_id, operatore=None):
         return False, 'Il lavaggio ha gia\' tutti i suoi abbinamenti.'
     t = next((t for t in transazioni_abbinabili(chiusura.data) if t.pk == transazione_id), None)
     if t is None:
-        return False, 'Transazione non disponibile (gia\' abbinata o di un altro giorno).'
+        return False, ('Transazione non disponibile (gia\' abbinata, vista o rettificata nel residuo, '
+                       'o di un altro giorno).')
     from apps.finanze.models import AbbinamentoScartato
     AbbinamentoScartato.objects.filter(item=item, transazione=t).delete()
     AbbinamentoPortale.objects.create(item=item, transazione=t, operatore=operatore)
