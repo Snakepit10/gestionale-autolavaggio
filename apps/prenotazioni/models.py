@@ -350,9 +350,16 @@ class Prenotazione(models.Model):
         
         return ordine
     
-    def annulla(self, motivo=''):
-        """Annulla la prenotazione"""
-        if self.can_be_cancelled:
+    @property
+    def annullabile_da_operatore(self):
+        # L'operatore la annulla in qualsiasi momento, anche a orario
+        # passato (cliente in ritardo o che non si presenta)
+        return self.stato in ['confermata', 'in_attesa'] and not self.ordine
+
+    def annulla(self, motivo='', da_operatore=False):
+        """Annulla la prenotazione. Il cliente solo se e' ancora futura,
+        l'operatore (da_operatore=True) in qualsiasi momento."""
+        if self.annullabile_da_operatore if da_operatore else self.can_be_cancelled:
             self.stato = 'annullata'
             if motivo:
                 self.nota_interna = f"Annullata: {motivo}"

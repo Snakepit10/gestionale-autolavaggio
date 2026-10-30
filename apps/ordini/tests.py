@@ -617,3 +617,37 @@ class ControlloPagamentiTest(TestCase):
         e = estratto_pagamenti(timezone.localdate())
         self.assertEqual([x['in_piu'] for x in e['ordini_pagati_in_piu']], [Decimal('15')])
         self.assertTrue(all(p.in_piu for p in e['pagamenti_estratto']))
+
+
+class CancellaPrenotazioneInRitardoTest(TestCase):
+    """Dal modale della Gestione ordini l'operatore annulla una prenotazione
+    anche dopo il suo orario (cliente in ritardo); il cliente no."""
+
+    def setUp(self):
+        from datetime import timedelta
+
+        from django.contrib.auth.models import Group
+        from django.utils import timezone
+
+        from apps.clienti.models import Cliente
+        from apps.prenotazioni.models import Prenotazione, SlotPrenotazione
+        cliente = Cliente.objects.create(tipo='privato', nome='Rit', cognome='Ardo', telefono='3390000077')
+        ieri = timezone.localdate() - timedelta(days=1)
+        slot = SlotPrenotazione.objects.create(data=ieri, ora_inizio='09:00', ora_fine='09:30', max_prenotazioni=5)
+        self.p = Prenotazione.objects.create(cliente=cliente, slot=slot, stato='confermata',
+                                             durata_stimata_minuti=30)
+        self.p = Prenotazione.objects.get(pk=self.p.pk)   # orari letti dal db come time
+        self.operatore = User.objects.create_user('op', password='x')
+        self.operatore.groups.add(Group.objects.get(name='operatore'))
+
+    def test_operatore_annulla_dopo_orario(self):
+        self.assertFalse(self.p.can_be_cancelled)   # il cliente non puo' piu'
+        self.assertFalse(self.p.annulla('dal cliente'))
+        self.client.force_login(self.operatore)
+        r = self.client.post(reverse('prenotazioni:cancella-prenotazione', args=[self.p.pk]))
+        self.assertTrue(r.json()['success'])
+        self.p.refresh_from_db()
+        self.assertEqual(self.p.stato, 'annullata')
+        # gia' annullata: non si riannulla
+        r = self.client.post(reverse('prenotazioni:cancella-prenotazione', args=[self.p.pk]))
+        self.assertFalse(r.json()['success'])

@@ -1631,7 +1631,7 @@ def cancella_prenotazione(request, pk):
         
         # Annulla la prenotazione
         motivo = "Cancellata dall'operatore"
-        success = prenotazione.annulla(motivo)
+        success = prenotazione.annulla(motivo, da_operatore=True)
         
         if success:
             return JsonResponse({
