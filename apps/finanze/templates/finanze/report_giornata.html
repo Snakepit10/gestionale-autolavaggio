@@ -358,7 +358,7 @@ html { scroll-padding-top: 76px; scroll-behavior: smooth; }
         {% else %}
           <form method="post" class="form-scontrino"
                 action="{% if entry.chiusura %}{% url 'finanze:chiusura_automatica_edit' entry.chiusura.pk %}{% else %}{% url 'finanze:chiusura_automatica_create' entry.cassa.pk %}?data={{ data|date:'Y-m-d' }}{% endif %}"
-                {% if entry.portale %}data-atteso-cicli="{{ entry.portale.tot.richieste }}" data-atteso-vendita="{{ entry.portale.tot.contanti|stringformat:'s' }}"{% endif %}>
+                {% if entry.portale %}data-atteso-cicli="{{ entry.portale.tot.richieste }}" data-atteso-vendita="{{ entry.portale.tot.contanti|stringformat:'s' }}" data-senza-prezzo="{{ entry.portale.tot.senza_prezzo }}"{% endif %}>
             {% csrf_token %}
             <input type="hidden" name="next" value="report">
             <input type="hidden" name="note" value="{{ entry.chiusura.note|default:'' }}">
@@ -378,6 +378,7 @@ html { scroll-padding-top: 76px; scroll-behavior: smooth; }
                   <label class="form-label">Incasso totale</label>
                   <input type="number" step="0.01" min="0" name="incasso_totale" class="form-control form-control-sm" inputmode="decimal"
                          value="{% if entry.chiusura %}{{ entry.chiusura.incasso_totale|stringformat:'.2f' }}{% endif %}" placeholder="0,00" required>
+                  {% if entry.portale %}<div class="atteso" data-sugg="incasso_totale"></div>{% endif %}
                 </div>
                 <div class="col-6">
                   <label class="form-label">Ricarica</label>
@@ -398,6 +399,7 @@ html { scroll-padding-top: 76px; scroll-behavior: smooth; }
                   <label class="form-label">Vendita contante</label>
                   <input type="number" step="0.01" min="0" name="vendita_contante" class="form-control form-control-sm" inputmode="decimal"
                          value="{% if entry.chiusura %}{{ entry.chiusura.vendita_contante|stringformat:'.2f' }}{% endif %}" placeholder="0,00">
+                  {% if entry.portale %}<div class="atteso" data-sugg="vendita_contante"></div>{% endif %}
                 </div>
                 <div class="col-6">
                   <label class="form-label">Vendita non contante</label>
@@ -411,6 +413,7 @@ html { scroll-padding-top: 76px; scroll-behavior: smooth; }
                   <label class="form-label">Resto erogato reale</label>
                   <input type="number" step="0.01" min="0" name="resto_erogato_reale" class="form-control form-control-sm" inputmode="decimal"
                          value="{% if entry.chiusura %}{{ entry.chiusura.resto_erogato_reale|stringformat:'.2f' }}{% endif %}" placeholder="0,00">
+                  {% if entry.portale %}<div class="atteso" data-sugg="resto_erogato_reale"></div>{% endif %}
                 </div>
                 {% if entry.cassa.tracking_washcycles %}
                 <div class="col-6">
@@ -1612,6 +1615,16 @@ if (ctxCat && categorie.length > 0) {
     var campo = function (n) { return form.elements[n]; };
     var num = function (n) { var c = campo(n); return c ? (parseFloat(String(c.value).replace(',', '.')) || 0) : 0; };
     var out = function (k, v) { var el = form.querySelector('[data-out="' + k + '"]'); if (el) el.textContent = v; };
+    var sugg = function (nome, html) { var el = form.querySelector('[data-sugg="' + nome + '"]'); if (el) el.innerHTML = html; };
+    // Suggerimento sotto un campo: valore, come si ricava, "usa" se diverso
+    var suggerisci = function (nome, valore, come, nota) {
+      var c = campo(nome);
+      var uguale = c.value !== '' && Math.abs(num(nome) - valore) < 0.005;
+      sugg(nome, 'Da WashTec <strong>' + euro(valore) + '</strong>' + (come ? ' <span>(' + come + ')</span>' : '') +
+        (uguale ? ' <span class="pill-check ok"><i class="bi bi-check-circle-fill"></i> torna</span>'
+                : ' <button type="button" class="btn btn-link" data-copia="' + valore.toFixed(2) + '" data-target="' + nome + '">usa</button>') +
+        (nota ? '<br>' + nota : ''));
+    };
     var aggiorna = function () {
       if (!campo('vendita_contante') || campo('vendita_contante').type === 'hidden') return;
       var incassoVendita = num('incasso_totale') - num('incasso_ricarica');
@@ -1634,6 +1647,26 @@ if (ctxCat && categorie.length > 0) {
         var ok = Math.abs(venditaTotale - attesa) < 0.005;
         pill(form.querySelector('[data-check="vendita"]'), vuota ? null : ok,
              ok ? 'torna' : euro(venditaTotale) + ' ≠ ' + euro(attesa));
+        // Valori suggeriti dalle transazioni WashTec: la vendita e' quella
+        // dei lavaggi pagati alla cassa (a listino), incasso e resto
+        // seguono dai conti dello scontrino (incasso = ricarica + vendita + resto)
+        var ricarica = num('incasso_ricarica');
+        var resto = num('incasso_totale') - ricarica - attesa;
+        suggerisci('vendita_contante', Math.max(0, attesa - num('vendita_non_contante')),
+                   num('vendita_non_contante') > 0 ? euro(attesa) + ' − non contante' : '',
+                   parseInt(form.dataset.senzaPrezzo, 10) > 0
+                     ? '+ ' + form.dataset.senzaPrezzo + (form.dataset.senzaPrezzo === '1' ? ' lavaggio' : ' lavaggi') +
+                       ' senza prezzo a listino' : '');
+        suggerisci('incasso_totale', ricarica + attesa + num('resto_erogato_reale'),
+                   'ricarica + vendita + resto');
+        if (campo('incasso_totale').value === '') {
+          sugg('resto_erogato_reale', 'Da WashTec: inserisci prima l\'incasso totale');
+        } else if (resto < -0.005) {
+          sugg('resto_erogato_reale', '<span class="text-danger">Incasso sotto ricarica + vendita WashTec (' +
+               euro(ricarica + attesa) + ')</span>');
+        } else {
+          suggerisci('resto_erogato_reale', resto, 'incasso − ricarica − vendita');
+        }
       }
       if (form.dataset.attesoCicli !== undefined && campo('wash_cycles')) {
         var cicli = campo('wash_cycles').value;
@@ -1645,15 +1678,16 @@ if (ctxCat && categorie.length > 0) {
     aggiorna();
   });
 
-  // Pulsanti "usa": copiano un valore nel campo indicato
-  document.querySelectorAll('[data-copia]').forEach(function (b) {
-    b.addEventListener('click', function () {
-      var t = b.closest('form').elements[b.dataset.target];
-      if (!t) return;
-      t.value = b.dataset.copia;
-      t.dispatchEvent(new Event('input', {bubbles: true}));
-      t.focus();
-    });
+  // Pulsanti "usa": copiano un valore nel campo indicato (anche quelli
+  // ridisegnati dai suggerimenti mentre si scrive)
+  document.addEventListener('click', function (ev) {
+    var b = ev.target.closest('[data-copia]');
+    if (!b || !b.closest('form')) return;
+    var t = b.closest('form').elements[b.dataset.target];
+    if (!t) return;
+    t.value = b.dataset.copia;
+    t.dispatchEvent(new Event('input', {bubbles: true}));
+    t.focus();
   });
 
   // Orari portali: il Blu segue l'Azzurro finche' ha gli stessi orari
