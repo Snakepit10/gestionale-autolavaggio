@@ -1,0 +1,102 @@
+{% extends "base.html" %}
+{% block title %}Movimento {{ mov.data|date:"d/m/Y" }}{% endblock %}
+
+{% block extra_css %}{% include "contabilita/_stile.html" %}{% endblock %}
+
+{% block content %}
+<div class="dash-page">
+  <div class="dash-header">
+    <h4><i class="bi bi-journal-text me-2"></i>{{ mov.conto }} &mdash; {{ mov.data|date:"d/m/Y" }}</h4>
+    <a class="btn btn-sm btn-outline-secondary" href="{% url 'contabilita:prima_nota' %}?mese={{ mov.data|date:'Y-m' }}&conto={{ mov.conto_id }}"><i class="bi bi-arrow-left"></i> Prima nota</a>
+  </div>
+
+  <div class="row g-2 mb-3">
+    <div class="col-6 col-lg-3"><div class="kpi-tile hero"><div class="label">Importo</div><div class="value">&euro;{{ mov.importo|floatformat:"2g" }}</div>
+      <div class="sub">{% if mov.importo < 0 %}uscita{% else %}entrata{% endif %} &middot; {{ mov.get_origine_display }}</div></div></div>
+    <div class="col-6 col-lg-9"><div class="kpi-tile"><div class="label">Descrizione</div>
+      <div class="small mt-1">{% if mov.causale %}<strong>{{ mov.causale }}</strong> &middot; {% endif %}{{ mov.descrizione|default:"—" }}</div>
+      <div class="sub">{% if mov.data_valuta %}valuta {{ mov.data_valuta|date:"d/m/Y" }}{% endif %}{% if mov.saldo_estratto != None %} &middot; saldo estratto &euro;{{ mov.saldo_estratto|floatformat:"2g" }}{% endif %}
+        {% if mov.regola %} &middot; classificato dalla regola "{{ mov.regola.testo }}"{% endif %}</div></div></div>
+  </div>
+
+  <div class="row g-3">
+    <div class="col-lg-6">
+      <form method="post" class="panel">
+        {% csrf_token %}<input type="hidden" name="azione" value="salva">
+        <div class="panel-title"><i class="bi bi-tag"></i> Classificazione</div>
+        <div class="panel-sub">Voci economiche (costi) solo per i movimenti <strong>senza fattura</strong>, es. commissioni o interessi: se c'&egrave; la fattura, abbina il pagamento qui accanto.</div>
+        <div class="panel-body">
+          <label class="form-label small mb-0">Voce</label>
+          <select name="voce" class="form-select form-select-sm mb-2">
+            <option value="">— da classificare —</option>
+            {% for v in voci %}<option value="{{ v.pk }}" {% if mov.voce_id == v.pk %}selected{% endif %}>{{ v.get_sezione_display }} &rsaquo; {{ v }}</option>{% endfor %}
+          </select>
+          <label class="form-label small mb-0">Ripartizione sui centri (vuota = quella della voce)</label>
+          {% include "contabilita/_ripartizione.html" with campi=campi_rip prefisso="rip" %}
+          <label class="form-label small mb-0 mt-2">Note</label>
+          <input type="text" name="note" value="{{ mov.note }}" maxlength="255" class="form-control form-control-sm mb-2">
+          <button class="btn btn-primary btn-sm"><i class="bi bi-save"></i> Salva</button>
+        </div>
+      </form>
+
+      <div class="panel">
+        <div class="panel-title"><i class="bi bi-arrow-left-right"></i> Giroconto</div>
+        <div class="panel-body small">
+          {% if mov.controparte %}
+            Movimento opposto su <a href="{% url 'contabilita:movimento' mov.controparte.pk %}">{{ mov.controparte.conto }}</a> il {{ mov.controparte.data|date:"d/m/Y" }}.
+          {% else %}
+            <div class="text-muted mb-2">Per un passaggio di soldi fra due conti (es. versamento dei contanti in banca): crea il movimento opposto sull'altro conto ed entrambi restano fuori dal rendiconto di cassa.</div>
+            <form method="post" class="d-flex gap-2">{% csrf_token %}<input type="hidden" name="azione" value="giroconto">
+              <select name="conto" class="form-select form-select-sm" required>
+                {% for c in altri_conti %}<option value="{{ c.pk }}">{{ c }}</option>{% endfor %}
+              </select>
+              <button class="btn btn-sm btn-outline-primary text-nowrap">Crea giroconto</button>
+            </form>
+          {% endif %}
+          {% if mov.origine == 'manuale' %}
+          <form method="post" class="mt-3" onsubmit="return confirm('Eliminare il movimento?')">{% csrf_token %}<input type="hidden" name="azione" value="elimina">
+            <button class="btn btn-sm btn-outline-danger"><i class="bi bi-trash"></i> Elimina movimento</button></form>
+          {% endif %}
+        </div>
+      </div>
+    </div>
+
+    <div class="col-lg-6">
+      <div class="panel">
+        <div class="panel-title"><i class="bi bi-link-45deg"></i> Fatture pagate con questo movimento</div>
+        <div class="panel-body tabella-scroll">
+          {% if abbinate %}
+          <table class="table table-sm">
+            <tbody>
+              {% for s in abbinate %}
+              <tr><td><a href="{% url 'contabilita:fattura' s.fattura.pk %}">{{ s.fattura.fornitore }} n. {{ s.fattura.numero }}</a></td>
+                <td class="tab-num">&euro;{{ s.importo|floatformat:"2g" }}</td>
+                <td class="text-end"><form method="post">{% csrf_token %}<input type="hidden" name="azione" value="togli"><input type="hidden" name="scadenza" value="{{ s.pk }}">
+                  <button class="btn btn-sm btn-link text-danger p-0">togli</button></form></td></tr>
+              {% endfor %}
+            </tbody>
+          </table>
+          {% endif %}
+          {% if candidate %}
+          <form method="post">{% csrf_token %}<input type="hidden" name="azione" value="abbina">
+            <div class="small text-muted mb-1">Scadenze aperte, le pi&ugrave; vicine per importo. Puoi sceglierne pi&ugrave; d'una se il bonifico paga pi&ugrave; fatture: la somma deve essere &euro;{{ mov.importo|floatformat:2|cut:"-" }}.</div>
+            <table class="table table-sm">
+              <tbody>
+                {% for s in candidate %}
+                <tr><td><input type="checkbox" name="scadenza" value="{{ s.pk }}" class="form-check-input"></td>
+                  <td>{{ s.fattura.fornitore }} n. {{ s.fattura.numero }}<div class="text-muted" style="font-size:.7rem">scade {{ s.data|date:"d/m/Y"|default:"—" }}</div></td>
+                  <td class="tab-num">&euro;{{ s.importo|floatformat:"2g" }}</td></tr>
+                {% endfor %}
+              </tbody>
+            </table>
+            <button class="btn btn-sm btn-success"><i class="bi bi-link"></i> Abbina</button>
+          </form>
+          {% elif not abbinate %}
+          <div class="text-muted small">{% if mov.importo < 0 %}Nessuna scadenza aperta.{% else %}&Egrave; un'entrata: non paga fatture fornitori.{% endif %}</div>
+          {% endif %}
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}

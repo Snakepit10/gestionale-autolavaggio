@@ -1,0 +1,82 @@
+{% extends "base.html" %}
+{% block title %}Regole dei movimenti{% endblock %}
+
+{% block extra_css %}{% include "contabilita/_stile.html" %}{% endblock %}
+
+{% block content %}
+<div class="dash-page">
+  <div class="dash-header">
+    <h4><i class="bi bi-magic me-2"></i>Regole dei movimenti</h4>
+    <div class="d-flex gap-2 flex-wrap">
+      {% include "contabilita/_nav.html" %}
+      <button class="btn btn-sm btn-primary" data-bs-toggle="modal" data-bs-target="#modale-regola"><i class="bi bi-plus-lg"></i> Nuova regola</button>
+    </div>
+  </div>
+
+  <div class="panel">
+    <div class="panel-title"><i class="bi bi-list-ol"></i> Regole
+      <form method="post" class="ms-auto">{% csrf_token %}<input type="hidden" name="azione" value="applica">
+        <button class="btn btn-sm btn-outline-success" {% if not da_classificare %}disabled{% endif %}><i class="bi bi-play"></i> Applica ai {{ da_classificare }} movimenti da classificare</button></form></div>
+    <div class="panel-sub">Ai movimenti importati si applica la prima regola (in ordine) il cui testo compare nella causale o nella descrizione. Le regole non toccano i movimenti gi&agrave; classificati.</div>
+    <div class="panel-body tabella-scroll">
+      <table class="table table-sm table-hover align-middle">
+        <thead><tr><th class="tab-num">Ordine</th><th>Se contiene</th><th>Movimenti</th><th>Conto</th><th>Voce</th><th class="tab-num">Usata</th><th></th></tr></thead>
+        <tbody>
+          {% for r in regole %}
+          <tr>
+            <td class="tab-num">{{ r.ordine }}</td>
+            <td><code>{{ r.testo }}</code></td>
+            <td>{{ r.get_segno_display }}</td>
+            <td>{{ r.conto|default:"tutti" }}</td>
+            <td><span class="badge badge-voce">{{ r.voce }}</span></td>
+            <td class="tab-num">{{ r.n_movimenti }}</td>
+            <td class="text-end text-nowrap">
+              <button class="btn btn-sm btn-outline-secondary" data-bs-toggle="modal" data-bs-target="#modale-regola"
+                data-id="{{ r.pk }}" data-testo="{{ r.testo }}" data-segno="{{ r.segno }}" data-conto="{{ r.conto_id|default:'' }}"
+                data-voce="{{ r.voce_id }}" data-ordine="{{ r.ordine }}"><i class="bi bi-pencil"></i></button>
+              <form method="post" class="d-inline">{% csrf_token %}<input type="hidden" name="azione" value="elimina"><input type="hidden" name="regola" value="{{ r.pk }}">
+                <button class="btn btn-sm btn-outline-danger"><i class="bi bi-trash"></i></button></form>
+            </td>
+          </tr>
+          {% empty %}
+          <tr><td colspan="7" class="text-muted text-center p-3">Nessuna regola.</td></tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div>
+
+<div class="modal fade" id="modale-regola" tabindex="-1">
+  <div class="modal-dialog"><form method="post" class="modal-content">
+    {% csrf_token %}<input type="hidden" name="azione" value="salva"><input type="hidden" name="id">
+    <div class="modal-header"><h5 class="modal-title">Regola</h5><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div>
+    <div class="modal-body">
+      <label class="form-label">Se la causale o la descrizione contiene</label>
+      <input type="text" name="testo" class="form-control mb-2" required maxlength="100">
+      <div class="row g-2">
+        <div class="col-6"><label class="form-label">Movimenti</label><select name="segno" class="form-select">{% for k, n in segni %}<option value="{{ k }}">{{ n }}</option>{% endfor %}</select></div>
+        <div class="col-6"><label class="form-label">Conto</label><select name="conto" class="form-select"><option value="">Tutti</option>{% for c in conti %}<option value="{{ c.pk }}">{{ c }}</option>{% endfor %}</select></div>
+        <div class="col-9"><label class="form-label">Voce</label><select name="voce" class="form-select" required><option value="">—</option>{% for v in voci %}<option value="{{ v.pk }}">{{ v }}</option>{% endfor %}</select></div>
+        <div class="col-3"><label class="form-label">Ordine</label><input type="number" name="ordine" min="0" class="form-control" placeholder="100"></div>
+      </div>
+    </div>
+    <div class="modal-footer"><button class="btn btn-primary"><i class="bi bi-save"></i> Salva</button></div>
+  </form></div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+document.getElementById('modale-regola').addEventListener('show.bs.modal', function (ev) {
+  var d = (ev.relatedTarget && ev.relatedTarget.dataset) || {}, f = this.querySelector('form');
+  f.elements.id.value = d.id || '';
+  f.elements.testo.value = d.testo || '';
+  f.elements.segno.value = d.segno || '';
+  f.elements.conto.value = d.conto || '';
+  f.elements.voce.value = d.voce || '';
+  f.elements.ordine.value = d.ordine || '';
+  this.querySelector('.modal-title').textContent = d.id ? 'Modifica regola' : 'Nuova regola';
+});
+</script>
+{% endblock %}

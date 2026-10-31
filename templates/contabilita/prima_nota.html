@@ -1,0 +1,199 @@
+{% extends "base.html" %}
+{% block title %}Prima nota{% endblock %}
+
+{% block extra_css %}{% include "contabilita/_stile.html" %}
+<style>
+.mov-desc { max-width: 420px; white-space: normal; font-size: .74rem; }
+.mov-desc .causale { font-weight: 700; color: #334155; }
+.entrata { color: #15803d; } .uscita { color: #b91c1c; }
+.voce-mov { min-width: 210px; }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="dash-page">
+  <div class="dash-header">
+    <h4><i class="bi bi-journal-text me-2"></i>Prima nota</h4>
+    {% include "contabilita/_nav.html" %}
+  </div>
+
+  <div class="row g-2 mb-3">
+    {% for s in saldi %}
+    <div class="col-6 col-lg">
+      <div class="kpi-tile {% if forloop.first %}hero{% endif %}">
+        <div class="label">{{ s.conto }}</div>
+        <div class="value">&euro;{{ s.fine|floatformat:"2g" }}</div>
+        <div class="sub">fine {{ mese|date:"F" }} &middot; inizio &euro;{{ s.inizio|floatformat:"2g" }}</div>
+      </div>
+    </div>
+    {% endfor %}
+    <div class="col-6 col-lg"><div class="kpi-tile"><div class="label">Entrate / uscite</div>
+      <div class="value" style="font-size:1.05rem"><span class="entrata">+&euro;{{ entrate|floatformat:"2g" }}</span> <span class="uscita">&euro;{{ uscite|floatformat:"2g" }}</span></div>
+      <div class="sub">movimenti mostrati</div></div></div>
+    <div class="col-6 col-lg"><a class="text-decoration-none" href="?stato=da_classificare"><div class="kpi-tile">
+      <div class="label">Da classificare</div>
+      <div class="value {% if da_classificare %}text-warning{% else %}text-success{% endif %}">{{ da_classificare }}</div>
+      <div class="sub">movimenti senza voce</div></div></a></div>
+  </div>
+
+  {% if proposte %}
+  <div class="panel">
+    <div class="panel-title"><i class="bi bi-link-45deg"></i> Pagamenti da abbinare alle fatture ({{ proposte|length }})
+      <form method="post" class="ms-auto">{% csrf_token %}<input type="hidden" name="azione" value="abbina_tutte">
+        <button class="btn btn-sm btn-success"><i class="bi bi-check2-all"></i> Abbina tutti</button></form></div>
+    <div class="panel-sub">Uscite con lo stesso importo di una scadenza aperta, entro 45 giorni. Controlla e conferma: il movimento diventa "Pagamento fornitori" (il costo &egrave; gi&agrave; nella fattura).</div>
+    <div class="panel-body tabella-scroll">
+      <table class="table table-sm">
+        <thead><tr><th>Data</th><th>Conto</th><th>Movimento</th><th class="tab-num">Importo</th><th>Fattura</th><th>Scadenza</th><th></th></tr></thead>
+        <tbody>
+          {% for pr in proposte %}
+          <tr>
+            <td>{{ pr.movimento.data|date:"d/m/Y" }}</td>
+            <td>{{ pr.movimento.conto }}</td>
+            <td class="mov-desc">{{ pr.movimento.descrizione|truncatechars:90 }}</td>
+            <td class="tab-num uscita">&euro;{{ pr.movimento.importo|floatformat:"2g" }}</td>
+            <td><a href="{% url 'contabilita:fattura' pr.scadenza.fattura.pk %}">{{ pr.scadenza.fattura.fornitore }} n. {{ pr.scadenza.fattura.numero }}</a>
+              {% if pr.nome %}<span class="badge bg-success">nome trovato</span>{% endif %}</td>
+            <td>{{ pr.scadenza.data|date:"d/m/Y"|default:"—" }} <span class="text-muted small">({{ pr.giorni }} gg)</span></td>
+            <td><form method="post">{% csrf_token %}<input type="hidden" name="azione" value="abbina">
+              <input type="hidden" name="movimento" value="{{ pr.movimento.pk }}"><input type="hidden" name="scadenza" value="{{ pr.scadenza.pk }}">
+              <button class="btn btn-sm btn-outline-success">Abbina</button></form></td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+  {% endif %}
+
+  <div class="row g-3">
+    <div class="col-xl-9">
+      <div class="panel">
+        <div class="panel-title">
+          {% if stato == 'da_classificare' %}
+            <i class="bi bi-exclamation-circle"></i> Da classificare (tutti i mesi)
+            <a class="btn btn-sm btn-link ms-auto" href="?mese={{ mese|date:'Y-m' }}">torna al mese</a>
+          {% else %}
+            <a class="btn btn-sm btn-outline-secondary" href="?mese={{ mese_prec|date:'Y-m' }}{% if conto %}&conto={{ conto.pk }}{% endif %}"><i class="bi bi-chevron-left"></i></a>
+            <span>{{ mese|date:"F Y" }}</span>
+            <a class="btn btn-sm btn-outline-secondary" href="?mese={{ mese_succ|date:'Y-m' }}{% if conto %}&conto={{ conto.pk }}{% endif %}"><i class="bi bi-chevron-right"></i></a>
+          {% endif %}
+        </div>
+        <div class="panel-body">
+          <form method="get" class="d-flex gap-2 flex-wrap mb-2">
+            {% if stato %}<input type="hidden" name="stato" value="{{ stato }}">{% else %}<input type="hidden" name="mese" value="{{ mese|date:'Y-m' }}">{% endif %}
+            <select name="conto" class="form-select form-select-sm" style="max-width:200px">
+              <option value="">Tutti i conti</option>
+              {% for c in conti %}<option value="{{ c.pk }}" {% if conto == c %}selected{% endif %}>{{ c }}</option>{% endfor %}
+            </select>
+            <input type="search" name="q" value="{{ cerca }}" placeholder="Cerca nella descrizione" class="form-control form-control-sm" style="max-width:260px">
+            <button class="btn btn-sm btn-dark"><i class="bi bi-funnel"></i></button>
+          </form>
+          <form method="post">
+            {% csrf_token %}<input type="hidden" name="azione" value="classifica">
+            <div class="tabella-scroll">
+              <table class="table table-sm table-hover">
+                <thead><tr><th>Data</th><th>Conto</th><th>Descrizione</th><th class="tab-num">Importo</th><th>Voce</th><th></th></tr></thead>
+                <tbody>
+                  {% for m in movimenti %}
+                  <tr>
+                    <td class="text-nowrap">{{ m.data|date:"d/m/Y" }}</td>
+                    <td class="text-nowrap small">{{ m.conto }}</td>
+                    <td class="mov-desc">{% if m.causale %}<span class="causale">{{ m.causale }}</span> &middot; {% endif %}{{ m.descrizione|truncatechars:140 }}
+                      {% for s in m.scadenze.all %}<div><span class="badge bg-success">paga {{ s.fattura.fornitore }} n. {{ s.fattura.numero }}</span></div>{% endfor %}
+                      {% if m.note %}<div class="text-muted">{{ m.note }}</div>{% endif %}</td>
+                    <td class="tab-num fw-bold {% if m.importo < 0 %}uscita{% else %}entrata{% endif %}">&euro;{{ m.importo|floatformat:"2g" }}</td>
+                    <td><input type="hidden" name="mov" value="{{ m.pk }}">
+                      <select name="voce_{{ m.pk }}" class="form-select form-select-sm voce-mov {% if not m.voce_id %}border-warning{% endif %}">
+                        <option value="">— da classificare —</option>
+                        {% for v in voci %}<option value="{{ v.pk }}" {% if m.voce_id == v.pk %}selected{% endif %}>{{ v }}</option>{% endfor %}
+                      </select></td>
+                    <td class="text-nowrap">
+                      <a class="btn btn-sm btn-outline-secondary" href="{% url 'contabilita:movimento' m.pk %}" title="Dettaglio, abbinamento, giroconto"><i class="bi bi-three-dots"></i></a>
+                      <button type="button" class="btn btn-sm btn-outline-primary" title="Crea una regola da questo movimento" data-bs-toggle="modal" data-bs-target="#modale-regola"
+                              data-testo="{{ m.causale|default:m.descrizione|truncatechars:40 }}" data-segno="{% if m.importo < 0 %}uscite{% else %}entrate{% endif %}"><i class="bi bi-magic"></i></button>
+                    </td>
+                  </tr>
+                  {% empty %}
+                  <tr><td colspan="6" class="text-center text-muted p-4">Nessun movimento{% if not stato %} in {{ mese|date:"F Y" }}{% endif %}. Importa un estratto conto dal riquadro a destra.</td></tr>
+                  {% endfor %}
+                </tbody>
+              </table>
+            </div>
+            {% if movimenti %}<div class="text-end"><button class="btn btn-primary"><i class="bi bi-save"></i> Salva le voci</button></div>{% endif %}
+          </form>
+        </div>
+      </div>
+    </div>
+
+    <div class="col-xl-3">
+      <div class="panel">
+        <div class="panel-title"><i class="bi bi-upload"></i> Importa estratto conto</div>
+        <div class="panel-sub">Excel (.xlsx), CSV o l'"xls" dell'home banking. Reimportare lo stesso periodo non crea doppioni.</div>
+        <div class="panel-body">
+          <form method="post" enctype="multipart/form-data">{% csrf_token %}<input type="hidden" name="azione" value="importa">
+            <select name="conto" class="form-select form-select-sm mb-2" required>
+              <option value="">— conto —</option>
+              {% for c in conti %}{% if c.tipo != 'cassa' %}<option value="{{ c.pk }}" {% if conto == c %}selected{% endif %}>{{ c }}</option>{% endif %}{% endfor %}
+            </select>
+            <input type="file" name="file" accept=".xlsx,.xls,.csv,.txt,.htm,.html" class="form-control form-control-sm mb-2" required>
+            <button class="btn btn-sm btn-success w-100"><i class="bi bi-upload"></i> Importa</button>
+          </form>
+        </div>
+      </div>
+
+      <div class="panel">
+        <div class="panel-title"><i class="bi bi-pencil-square"></i> Movimento a mano</div>
+        <div class="panel-sub">Es. prelievi o versamenti fatti fuori dall'estratto. Uscite col segno meno.</div>
+        <div class="panel-body">
+          <form method="post" class="small">{% csrf_token %}<input type="hidden" name="azione" value="nuovo">
+            <select name="conto" class="form-select form-select-sm mb-1" required>
+              {% for c in conti %}<option value="{{ c.pk }}">{{ c }}</option>{% endfor %}
+            </select>
+            <div class="d-flex gap-1 mb-1">
+              <input type="date" name="data" value="{{ oggi|date:'Y-m-d' }}" class="form-control form-control-sm" required>
+              <input type="text" name="importo" inputmode="decimal" placeholder="€ (− uscita)" class="form-control form-control-sm" required>
+            </div>
+            <input type="text" name="descrizione" placeholder="Descrizione" class="form-control form-control-sm mb-1">
+            <select name="voce" class="form-select form-select-sm mb-2">
+              <option value="">— voce —</option>
+              {% for v in voci %}<option value="{{ v.pk }}">{{ v }}</option>{% endfor %}
+            </select>
+            <button class="btn btn-sm btn-primary w-100"><i class="bi bi-plus-lg"></i> Inserisci</button>
+          </form>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="modal fade" id="modale-regola" tabindex="-1">
+  <div class="modal-dialog"><form method="post" class="modal-content">
+    {% csrf_token %}<input type="hidden" name="azione" value="regola">
+    <div class="modal-header"><h5 class="modal-title">Nuova regola</h5><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div>
+    <div class="modal-body">
+      <label class="form-label">Quando la descrizione o la causale contiene</label>
+      <input type="text" name="testo" class="form-control mb-2" required maxlength="100">
+      <label class="form-label">Movimenti</label>
+      <select name="segno" class="form-select mb-2">{% for k, n in segni %}<option value="{{ k }}">{{ n }}</option>{% endfor %}</select>
+      <label class="form-label">Voce</label>
+      <select name="voce" class="form-select" required>
+        <option value="">—</option>
+        {% for v in voci %}<option value="{{ v.pk }}">{{ v }}</option>{% endfor %}
+      </select>
+      <div class="text-muted small mt-2">La regola si applica subito ai movimenti da classificare e poi a quelli importati in futuro. Accorcia il testo alla parte che si ripete (es. "Incasso tramite p.o.s").</div>
+    </div>
+    <div class="modal-footer"><button class="btn btn-primary"><i class="bi bi-magic"></i> Crea e applica</button></div>
+  </form></div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+document.getElementById('modale-regola').addEventListener('show.bs.modal', function (ev) {
+  var d = ev.relatedTarget.dataset, f = this.querySelector('form');
+  f.elements.testo.value = (d.testo || '').replace(/…$/, '');
+  f.elements.segno.value = d.segno || '';
+});
+</script>
+{% endblock %}

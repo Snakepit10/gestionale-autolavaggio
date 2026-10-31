@@ -1,0 +1,98 @@
+{% extends "base.html" %}
+{% block title %}Conti{% endblock %}
+
+{% block extra_css %}{% include "contabilita/_stile.html" %}{% endblock %}
+
+{% block content %}
+<div class="dash-page">
+  <div class="dash-header">
+    <h4><i class="bi bi-bank me-2"></i>Conti</h4>
+    <div class="d-flex gap-2 flex-wrap">
+      {% include "contabilita/_nav.html" %}
+      <button class="btn btn-sm btn-primary" data-bs-toggle="modal" data-bs-target="#modale-conto"><i class="bi bi-plus-lg"></i> Nuovo conto</button>
+    </div>
+  </div>
+
+  <div class="row g-2 mb-3">
+    <div class="col-6 col-lg-3"><div class="kpi-tile hero"><div class="label">Liquidit&agrave; oggi</div><div class="value">&euro;{{ totale|floatformat:"2g" }}</div><div class="sub">somma dei conti attivi</div></div></div>
+  </div>
+
+  <div class="panel">
+    <div class="panel-sub pt-3">Il saldo parte dal <strong>saldo iniziale</strong> alla sua data: i movimenti precedenti non contano. Se l'estratto riporta il saldo, qui si controlla che il saldo calcolato coincida.</div>
+    <div class="panel-body tabella-scroll">
+      <table class="table table-sm align-middle">
+        <thead><tr><th>Conto</th><th>Tipo</th><th class="tab-num">Saldo iniziale</th><th class="tab-num">Movimenti</th><th class="tab-num">Saldo oggi</th><th>Controllo con l'estratto</th><th></th></tr></thead>
+        <tbody>
+          {% for c in conti %}
+          <tr class="{% if not c.attivo %}text-muted{% endif %}">
+            <td class="fw-semibold"><a href="{% url 'contabilita:prima_nota' %}?conto={{ c.pk }}">{{ c }}</a>{% if c.iban %}<div class="text-muted" style="font-size:.7rem">{{ c.iban }}</div>{% endif %}</td>
+            <td>{{ c.get_tipo_display }}</td>
+            <td class="tab-num">&euro;{{ c.saldo_iniziale|floatformat:"2g" }}<div class="text-muted" style="font-size:.7rem">al {{ c.data_saldo_iniziale|date:"d/m/Y" }}</div></td>
+            <td class="tab-num">{{ c.n_movimenti }}{% if c.ultimo %}<div class="text-muted" style="font-size:.7rem">ultimo {{ c.ultimo|date:"d/m/Y" }}</div>{% endif %}</td>
+            <td class="tab-num fw-bold">&euro;{{ c.saldo_oggi|floatformat:"2g" }}</td>
+            <td>{% if c.verifica %}
+                {% if c.verifica.quadra %}<span class="badge bg-success">quadra al {{ c.verifica.data|date:"d/m/Y" }}</span>
+                {% else %}<span class="badge bg-danger">al {{ c.verifica.data|date:"d/m/Y" }}: calcolato &euro;{{ c.verifica.calcolato|floatformat:"2g" }}, estratto &euro;{{ c.verifica.estratto|floatformat:"2g" }}</span>
+                  <div class="text-muted" style="font-size:.7rem">controlla saldo iniziale e periodi mancanti</div>{% endif %}
+              {% else %}<span class="text-muted small">l'estratto non riporta il saldo</span>{% endif %}</td>
+            <td class="text-end text-nowrap">
+              <button class="btn btn-sm btn-outline-secondary" data-bs-toggle="modal" data-bs-target="#modale-conto"
+                data-id="{{ c.pk }}" data-nome="{{ c.nome }}" data-tipo="{{ c.tipo }}" data-iban="{{ c.iban }}"
+                data-saldo="{{ c.saldo_iniziale|stringformat:'s' }}" data-data="{{ c.data_saldo_iniziale|date:'Y-m-d' }}" data-attivo="{{ c.attivo|yesno:'1,0' }}"><i class="bi bi-pencil"></i></button>
+            </td>
+          </tr>
+          {% if c.tipo == 'cassa' %}
+          <tr><td colspan="7" class="bg-light">
+            <form method="post" class="d-flex gap-2 align-items-center flex-wrap small">{% csrf_token %}<input type="hidden" name="azione" value="genera_cassa"><input type="hidden" name="conto" value="{{ c.pk }}">
+              <span class="text-muted">Movimenti di {{ c }} dalle quadrature (incassi in contanti), dalle spese di cassa e dai ticket di resto:</span>
+              <input type="month" name="dal" value="{{ oggi|date:'Y-m' }}" class="form-control form-control-sm" style="max-width:160px">
+              <span>&rarr;</span>
+              <input type="month" name="al" value="{{ oggi|date:'Y-m' }}" class="form-control form-control-sm" style="max-width:160px">
+              <button class="btn btn-sm btn-outline-primary"><i class="bi bi-arrow-repeat"></i> Aggiorna</button>
+            </form>
+          </td></tr>
+          {% endif %}
+          {% empty %}
+          <tr><td colspan="7" class="text-muted text-center p-3">Nessun conto.</td></tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div>
+
+<div class="modal fade" id="modale-conto" tabindex="-1">
+  <div class="modal-dialog"><form method="post" class="modal-content">
+    {% csrf_token %}<input type="hidden" name="azione" value="salva_conto"><input type="hidden" name="id">
+    <div class="modal-header"><h5 class="modal-title">Conto</h5><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div>
+    <div class="modal-body">
+      <div class="row g-2">
+        <div class="col-7"><label class="form-label">Nome</label><input type="text" name="nome" class="form-control" required maxlength="60"></div>
+        <div class="col-5"><label class="form-label">Tipo</label><select name="tipo" class="form-select">{% for k, n in tipi %}<option value="{{ k }}">{{ n }}</option>{% endfor %}</select></div>
+        <div class="col-12"><label class="form-label">IBAN</label><input type="text" name="iban" class="form-control" maxlength="34"></div>
+        <div class="col-6"><label class="form-label">Saldo iniziale &euro;</label><input type="text" name="saldo_iniziale" inputmode="decimal" class="form-control" placeholder="0"></div>
+        <div class="col-6"><label class="form-label">Alla data</label><input type="date" name="data_saldo_iniziale" class="form-control" required></div>
+      </div>
+      <div class="form-check mt-2"><input class="form-check-input" type="checkbox" name="attivo" value="1" id="conto-attivo" checked><label class="form-check-label" for="conto-attivo">Attivo</label></div>
+      <div class="text-muted small mt-2">Il saldo iniziale &egrave; quello a inizio giornata della data indicata (es. il saldo al 1/1/2026 preso dall'estratto di dicembre).</div>
+    </div>
+    <div class="modal-footer"><button class="btn btn-primary"><i class="bi bi-save"></i> Salva</button></div>
+  </form></div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+document.getElementById('modale-conto').addEventListener('show.bs.modal', function (ev) {
+  var d = (ev.relatedTarget && ev.relatedTarget.dataset) || {}, f = this.querySelector('form');
+  f.elements.id.value = d.id || '';
+  f.elements.nome.value = d.nome || '';
+  f.elements.tipo.value = d.tipo || 'banca';
+  f.elements.iban.value = d.iban || '';
+  f.elements.saldo_iniziale.value = (d.saldo || '').replace('.', ',');
+  f.elements.data_saldo_iniziale.value = d.data || '';
+  f.elements.attivo.checked = d.id ? d.attivo === '1' : true;
+  this.querySelector('.modal-title').textContent = d.id ? 'Modifica ' + d.nome : 'Nuovo conto';
+});
+</script>
+{% endblock %}

@@ -191,6 +191,9 @@ class ScadenzaFattura(models.Model):
     modalita = models.CharField(max_length=4, blank=True)
     iban = models.CharField(max_length=34, blank=True)
     pagata_il = models.DateField(null=True, blank=True)
+    # Pagamento trovato in prima nota (un bonifico puo' pagare piu' scadenze)
+    movimento = models.ForeignKey('MovimentoFinanziario', on_delete=models.SET_NULL, null=True, blank=True,
+                                  related_name='scadenze')
 
     class Meta:
         verbose_name = 'Scadenza fattura fornitore'
@@ -237,3 +240,111 @@ class MessaggioPec(models.Model):
 
     def __str__(self):
         return self.oggetto or self.message_id
+
+
+# ---------------------------------------------------------------- prima nota
+
+class ContoFinanziario(models.Model):
+    """Conto di banca, carta o cassa contanti. Il saldo parte da
+    saldo_iniziale alla data_saldo_iniziale; i movimenti precedenti non
+    contano."""
+    TIPI = [('banca', 'Banca'), ('cassa', 'Cassa contanti'), ('carta', 'Carta'), ('altro', 'Altro')]
+    nome = models.CharField(max_length=60, unique=True)
+    tipo = models.CharField(max_length=10, choices=TIPI, default='banca')
+    iban = models.CharField(max_length=34, blank=True)
+    saldo_iniziale = models.DecimalField(max_digits=12, decimal_places=2, default=Decimal('0'))
+    data_saldo_iniziale = models.DateField()
+    attivo = models.BooleanField(default=True)
+    ordine = models.PositiveIntegerField(default=0)
+
+    class Meta:
+        verbose_name = 'Conto'
+        verbose_name_plural = 'Conti'
+        ordering = ['ordine', 'nome']
+
+    def __str__(self):
+        return self.nome
+
+    def saldo_al(self, giorno):
+        """Saldo a fine giornata."""
+        somma = (self.movimenti.filter(data__gte=self.data_saldo_iniziale, data__lte=giorno)
+                 .aggregate(s=models.Sum('importo'))['s'])
+        return self.saldo_iniziale + (somma or Decimal('0'))
+
+
+class RegolaMovimento(models.Model):
+    """"La descrizione contiene X" -> voce. Vale la prima regola (per
+    ordine) che corrisponde."""
+    SEGNI = [('', 'Entrate e uscite'), ('entrate', 'Solo entrate'), ('uscite', 'Solo uscite')]
+    testo = models.CharField(max_length=100)
+    segno = models.CharField(max_length=10, choices=SEGNI, blank=True)
+    conto = models.ForeignKey(ContoFinanziario, on_delete=models.CASCADE, null=True, blank=True,
+                              help_text='Vuoto = tutti i conti')
+    voce = models.ForeignKey(VoceConto, on_delete=models.CASCADE)
+    ripartizione = models.JSONField(default=dict, blank=True)
+    ordine = models.PositiveIntegerField(default=100)
+
+    class Meta:
+        verbose_name = 'Regola movimenti'
+        verbose_name_plural = 'Regole movimenti'
+        ordering = ['ordine', 'id']
+
+    def __str__(self):
+        return f'"{self.testo}" -> {self.voce}'
+
+    def corrisponde(self, movimento):
+        if self.conto_id and self.conto_id != movimento.conto_id:
+            return False
+        if self.segno == 'entrate' and movimento.importo < 0 or self.segno == 'uscite' and movimento.importo > 0:
+            return False
+        return self.testo.lower() in f'{movimento.causale} {movimento.descrizione}'.lower()
+
+
+class MovimentoFinanziario(models.Model):
+    ORIGINI = [('estratto', 'Estratto conto'), ('cassa', 'Dalla cassa'), ('manuale', 'Inserito a mano')]
+    conto = models.ForeignKey(ContoFinanziario, on_delete=models.CASCADE, related_name='movimenti')
+    data = models.DateField(db_index=True)
+    data_valuta = models.DateField(null=True, blank=True)
+    # Entrate positive, uscite negative
+    importo = models.DecimalField(max_digits=12, decimal_places=2)
+    descrizione = models.TextField(blank=True)
+    causale = models.CharField(max_length=120, blank=True)
+    # Saldo riportato dall'estratto dopo il movimento, se c'e'
+    saldo_estratto = models.DecimalField(max_digits=12, decimal_places=2, null=True, blank=True)
+    # Stessa riga dello stesso estratto -> stessa impronta: non entra due volte
+    impronta = models.CharField(max_length=64)
+    voce = models.ForeignKey(VoceConto, on_delete=models.PROTECT, null=True, blank=True,
+                             related_name='movimenti')
+    ripartizione = models.JSONField(default=dict, blank=True)
+    regola = models.ForeignKey(RegolaMovimento, on_delete=models.SET_NULL, null=True, blank=True)
+    # Giroconto: il movimento opposto sull'altro conto
+    controparte = models.OneToOneField('self', on_delete=models.SET_NULL, null=True, blank=True)
+    origine = models.CharField(max_length=10, choices=ORIGINI, default='estratto')
+    note = models.CharField(max_length=255, blank=True)
+    creato_il = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        verbose_name = 'Movimento'
+        verbose_name_plural = 'Prima nota'
+        ordering = ['-data', '-id']
+        unique_together = [('conto', 'impronta')]
+
+    def __str__(self):
+        return f'{self.conto} {self.data:%d/%m/%Y} {self.importo}'
+
+    @property
+    def ripartizione_effettiva(self):
+        if self.ripartizione:
+            return self.ripartizione
+        return self.voce.ripartizione if self.voce else {}
+
+    def classifica(self, regole=None):
+        """Voce dalla prima regola che corrisponde (se non ce l'ha gia')."""
+        if self.voce_id:
+            return False
+        regole = regole if regole is not None else RegolaMovimento.objects.select_related('voce')
+        for regola in regole:
+            if regola.corrisponde(self):
+                self.voce, self.ripartizione, self.regola = regola.voce, regola.ripartizione, regola
+                return True
+        return False

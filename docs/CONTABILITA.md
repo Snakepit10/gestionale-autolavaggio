@@ -77,8 +77,51 @@ Le fatture arrivano sulla PEC solo se allo SDI è comunicato l'indirizzo PEC com
 - Quello che non è assegnato va sul **Comune**: è escluso dal direct costing del self-service e viene ripartito nel full costing del servito.
 - Una riga di fattura può avere una ripartizione diversa da quella della voce.
 
+## Fase 2: prima nota
+
+### Conti
+
+- All'inizio ci sono **BAPS**, **MPS** e **Cassa contanti**, con saldo 0 al 1/1/2026.
+- Dalla pagina **Conti** si imposta il saldo vero alla data di partenza.
+- Il saldo calcolato = saldo iniziale + movimenti da quella data in poi.
+- Se l'estratto riporta il saldo (BAPS), la pagina controlla che coincida.
+
+### Import degli estratti
+
+Il formato si riconosce da solo:
+- **Excel o CSV con intestazione:** le colonne si trovano per nome (data, valuta, importo oppure dare/avere, descrizione, causale, saldo).
+- **BAPS senza intestazione:** colonne data, valuta, EUR, importo, descrizione, saldo.
+- **"xls" che sono pagine HTML.**
+- Gli `.xls` del vecchio formato Excel vanno salvati come `.xlsx`.
+
+Reimportare lo stesso periodo, anche con file che si sovrappongono, non crea doppioni. Due movimenti identici nello stesso giorno restano due.
+
+### Classificazione
+
+- **Regole:** "se la causale o la descrizione contiene X, la voce è Y". Si applicano ai movimenti nuovi.
+  - Ci sono già quelle per POS in entrata, commissioni, canoni, bolli, interessi, rate e stipendi.
+  - Una regola si crea anche dal singolo movimento, con la bacchetta.
+- **Voci economiche:** solo per i movimenti **senza fattura**, per esempio commissioni e interessi.
+- **Pagamento di una fattura:**
+  - si **abbina** alla scadenza e diventa "Pagamento fornitori";
+  - così il costo non si conta due volte;
+  - la prima nota propone da sola gli abbinamenti: stesso importo, entro 45 giorni, con preferenza per il nome del fornitore nella descrizione;
+  - un bonifico può pagare più fatture.
+- **Giroconto:** per un passaggio fra conti (per esempio il versamento dei contanti in banca). Crea il movimento opposto sull'altro conto, ed entrambi restano fuori dal rendiconto di cassa.
+
+### Cassa contanti
+
+Dalla pagina Conti, **Aggiorna** scrive i movimenti del mese.
+
+| Movimento | Importo | Voce |
+|---|---|---|
+| Incassi in contanti del giorno | contati − fondo + spese di cassa + ticket di resto | — |
+| Spese di cassa | una per spesa | dalla categoria (carburante, manutenzione, …) |
+| Ticket di resto pagati | uno per ticket | — |
+
+Si può rigenerare quante volte serve: gli importi si aggiornano e le voci cambiate a mano restano.
+
 ## Fasi successive
 
-- **Fase 2: prima nota.** Import degli estratti conto BAPS e MPS, classificazione automatica dei movimenti, abbinamento dei pagamenti alle scadenze e cassa contanti.
 - **Fase 3: conto economico e flussi di cassa.** Più i cespiti e gli ammortamenti.
 - **Fase 4: contabilità analitica.** Direct costing self-service, full costing servito e % del personale per centro.
