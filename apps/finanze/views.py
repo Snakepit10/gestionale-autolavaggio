@@ -2241,6 +2241,12 @@ def report_periodo(request):
     for o in non_pagati_qs:
         totale_non_pagato += o.saldo_dovuto
 
+    # Canale vendita prodotti, scorporato dal servito: i carrelli di soli
+    # prodotti piu' i prodotti aggiunti dentro gli ordini di lavaggio
+    rp = riepilogo_prodotti(data_inizio, data_fine)
+    totale_canale_prodotti = rp['totale_vendite'] + rp['totale_in_ordini']
+    totale_servito_lavaggi = totale_servito_ordinato - totale_canale_prodotti
+
     # ==================== AGGREGATI PAGAMENTI ====================
     pagamenti_qs = Pagamento.objects.filter(
         data_pagamento__date__gte=data_inizio,
@@ -2421,10 +2427,23 @@ def report_periodo(request):
         else:
             auto_by_day[d]['cambia'] += c.vendita_totale
 
+    prod_by_day = {}
+    for row in (ordini_qs.filter(vendita_prodotti=True)
+                .values('data_ora__date').annotate(s=Sum('totale_finale'))):
+        prod_by_day[row['data_ora__date']] = row['s'] or Decimal('0.00')
+    for it in (ItemOrdine.objects
+               .filter(ordine__in=ordini_qs.filter(vendita_prodotti=False),
+                       servizio_prodotto__tipo='prodotto')
+               .select_related('ordine')):
+        giorno = timezone.localtime(it.ordine.data_ora).date()
+        prod_by_day[giorno] = prod_by_day.get(giorno, Decimal('0.00')) + it.subtotale
+    trend_prodotti = []
+
     d = data_inizio
     while d <= data_fine:
         trend_labels.append(d.strftime('%d/%m'))
         trend_servito.append(float(ord_by_day.get(d, Decimal('0.00'))))
+        trend_prodotti.append(float(prod_by_day.get(d, Decimal('0.00'))))
         a = auto_by_day.get(d, {'portali': Decimal('0.00'), 'cambia': Decimal('0.00'), 'washcycles': 0})
         trend_portali.append(float(a['portali']))
         trend_cambia.append(float(a['cambia']))
@@ -2581,12 +2600,14 @@ def report_periodo(request):
         'fatturato_medio_giornaliero': fatturato_medio_giornaliero,
         'num_ordini': num_ordini,
         'scontrino_medio': scontrino_medio,
-        'rp': riepilogo_prodotti(data_inizio, data_fine),
+        'rp': rp,
         'variazione_pct': variazione_pct,
         'fatturato_prev': fatturato_prev,
         # Canali
         'totale_servito_ordinato': totale_servito_ordinato,
         'totale_servito_pagato': totale_servito_pagato,
+        'totale_servito_lavaggi': totale_servito_lavaggi,
+        'totale_canale_prodotti': totale_canale_prodotti,
         'totale_portali': totale_portali,
         'totale_cambia_gettoni': totale_cambia_gettoni,
         'totale_registratore': totale_registratore,
@@ -2623,7 +2644,9 @@ def report_periodo(request):
         'top_categorie': top_categorie,
         # Chart data JSON
         'trend_labels_json': json.dumps(trend_labels),
-        'trend_servito_json': json.dumps(trend_servito),
+        # nel grafico il servito e' senza i prodotti, che hanno la loro serie
+        'trend_servito_json': json.dumps([round(t - p, 2) for t, p in zip(trend_servito, trend_prodotti)]),
+        'trend_prodotti_json': json.dumps(trend_prodotti),
         'trend_portali_json': json.dumps(trend_portali),
         'trend_cambia_json': json.dumps(trend_cambia),
         'trend_washcycles_json': json.dumps(trend_washcycles),

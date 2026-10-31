@@ -1445,6 +1445,37 @@ class ReportPeriodoQuadratureTest(TestCase):
         self.assertIn('&euro;115,00', html)          # rilevato con spese e ticket
         self.assertIn('+&euro;115,00', html)         # differenza come nel report giornata
 
+    def test_canale_vendita_prodotti_scorporato_dal_servito(self):
+        from datetime import datetime as dt
+
+        from django.contrib.messages.storage.fallback import FallbackStorage
+        from django.test import RequestFactory
+
+        from apps.finanze.views import report_periodo
+        cat = Categoria.objects.create(nome='Varie')
+        lavaggio = ServizioProdotto.objects.create(titolo='Esterno', categoria=cat, prezzo=Decimal('20'), descrizione='')
+        profumo = ServizioProdotto.objects.create(titolo='Profumo', categoria=cat, prezzo=Decimal('5'),
+                                                  descrizione='', tipo='prodotto')
+        alle = timezone.make_aware(dt(2026, 10, 6, 10, 0))
+        con_prodotto = Ordine.objects.create(totale=Decimal('25'), totale_finale=Decimal('25'))
+        ItemOrdine.objects.create(ordine=con_prodotto, servizio_prodotto=lavaggio, quantita=1, prezzo_unitario=Decimal('20'))
+        ItemOrdine.objects.create(ordine=con_prodotto, servizio_prodotto=profumo, quantita=1, prezzo_unitario=Decimal('5'))
+        carrello = Ordine.objects.create(totale=Decimal('10'), totale_finale=Decimal('10'), vendita_prodotti=True)
+        ItemOrdine.objects.create(ordine=carrello, servizio_prodotto=profumo, quantita=2, prezzo_unitario=Decimal('5'))
+        Ordine.objects.filter(pk__in=[con_prodotto.pk, carrello.pk]).update(data_ora=alle)
+
+        req = RequestFactory().get('/', {'data_inizio': '2026-10-06', 'data_fine': '2026-10-06'})
+        req.user = User.objects.create_superuser('boss3', 'b3@x.it', 'x')
+        req.session = {}
+        req._messages = FallbackStorage(req)
+        resp = report_periodo(req)
+        html = resp.content.decode()
+        self.assertIn('Vendita prodotti', html)
+        self.assertIn('&euro;20,00', html)                          # servito senza prodotti
+        self.assertIn('&euro;15,00', html)                          # carrello 10 + profumo nel lavaggio 5
+        self.assertIn('const trendServito = [20.0];', html)
+        self.assertIn('const trendProdotti = [15.0];', html)
+
 
 class EstrattoPagamentiTest(TestCase):
     """Report giornata: estratto dei pagamenti del giorno; abbonamenti fuori cassa."""

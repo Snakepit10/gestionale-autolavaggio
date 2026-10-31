@@ -110,28 +110,36 @@
   {# ====== CANALI ====== #}
   <h6 class="text-muted text-uppercase fw-bold mb-2" style="font-size:.72rem; letter-spacing:.5px;">Canali</h6>
   <div class="row g-2 mb-3">
-    <div class="col-6 col-lg-3">
+    <div class="col-6 col-lg">
       <div class="kpi-tile success">
         <div class="label">Servito</div>
-        <div class="value">&euro;{{ totale_servito_ordinato|floatformat:2 }}</div>
-        <div class="sub">ordinato (incl. non pagati)</div>
+        <div class="value">&euro;{{ totale_servito_lavaggi|floatformat:2 }}</div>
+        <div class="sub">ordinato (incl. non pagati), senza i prodotti</div>
       </div>
     </div>
-    <div class="col-6 col-lg-3">
+    <div class="col-6 col-lg">
+      <div class="kpi-tile" style="border-left:4px solid #8b5cf6;">
+        <div class="label">Vendita prodotti</div>
+        <div class="value">&euro;{{ totale_canale_prodotti|floatformat:2 }}</div>
+        <div class="sub">{{ rp.n_vendite }} vendit{{ rp.n_vendite|pluralize:"a,e" }} &euro;{{ rp.totale_vendite|floatformat:2 }}
+          + nei lavaggi &euro;{{ rp.totale_in_ordini|floatformat:2 }}</div>
+      </div>
+    </div>
+    <div class="col-6 col-lg">
       <div class="kpi-tile primary">
         <div class="label">Portali</div>
         <div class="value">&euro;{{ totale_portali|floatformat:2 }}</div>
         <div class="sub">vendita totale</div>
       </div>
     </div>
-    <div class="col-6 col-lg-3">
+    <div class="col-6 col-lg">
       <div class="kpi-tile primary">
         <div class="label">Cambia gettoni</div>
         <div class="value">&euro;{{ totale_cambia_gettoni|floatformat:2 }}</div>
         <div class="sub">vendita totale</div>
       </div>
     </div>
-    <div class="col-6 col-lg-3">
+    <div class="col-12 col-lg">
       <div class="kpi-tile warning">
         <div class="label">Registratore fiscale</div>
         <div class="value">&euro;{{ totale_registratore|floatformat:2 }}</div>
@@ -257,7 +265,7 @@
     <div class="col-12">
       <div class="chart-panel">
         <div class="panel-title"><i class="bi bi-graph-up text-primary"></i> Fatturato per giorno (split canali)</div>
-        <div class="panel-sub">Servito + Portali + Cambia gettoni in stack</div>
+        <div class="panel-sub">Servito + Vendita prodotti + Portali + Cambia gettoni in stack</div>
         <div class="panel-body"><canvas id="chartTrendDaily" height="70"></canvas></div>
       </div>
     </div>
@@ -562,6 +570,7 @@
 const COLORS = ['#3b82f6', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6', '#ec4899', '#14b8a6', '#f97316', '#06b6d4', '#a855f7'];
 const trendLabels = {{ trend_labels_json|safe }};
 const trendServito = {{ trend_servito_json|safe }};
+const trendProdotti = {{ trend_prodotti_json|safe }};
 const trendPortali = {{ trend_portali_json|safe }};
 const trendCambia = {{ trend_cambia_json|safe }};
 const trendWashcycles = {{ trend_washcycles_json|safe }};
@@ -596,6 +605,7 @@ if (ctxTD) {
       labels: trendLabels,
       datasets: [
         { label: 'Servito', data: trendServito, backgroundColor: '#10b981', borderRadius: 3 },
+        { label: 'Vendita prodotti', data: trendProdotti, backgroundColor: '#8b5cf6', borderRadius: 3 },
         { label: 'Portali', data: trendPortali, backgroundColor: '#3b82f6', borderRadius: 3 },
         { label: 'Cambia gettoni', data: trendCambia, backgroundColor: '#f59e0b', borderRadius: 3 },
       ]
