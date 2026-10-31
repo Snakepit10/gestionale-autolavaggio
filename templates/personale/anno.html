@@ -1,0 +1,130 @@
+{% extends "base.html" %}
+{% load personale %}
+{% block title %}Costo del personale {{ anno }}{% endblock %}
+
+{% block extra_css %}
+{% include "personale/_stile.html" %}
+<style>
+.anno td, .anno th { padding: 4px 8px; }
+.anno tfoot td { font-weight: 800; background: #f8fafc; }
+.anno .vuoto, .anno tr.vuoto td, .anno tr.vuoto a { color: #cbd5e1 !important; }
+.su { color: #dc2626; } .giu { color: #16a34a; }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="dash-page">
+  <div class="dash-header">
+    <h4><i class="bi bi-graph-up me-2"></i>Costo del personale &mdash; {{ anno }}</h4>
+    <div class="d-flex gap-2 flex-wrap">
+      <a class="btn btn-sm btn-outline-secondary" href="?anno={{ anno_prec }}"><i class="bi bi-chevron-left"></i> {{ anno_prec }}</a>
+      <a class="btn btn-sm btn-outline-secondary" href="?anno={{ anno_succ }}">{{ anno_succ }} <i class="bi bi-chevron-right"></i></a>
+      <a class="btn btn-sm btn-outline-primary" href="{% url 'personale:mese' %}"><i class="bi bi-people"></i> Costo del mese</a>
+      <a class="btn btn-sm btn-outline-primary" href="{% url 'personale:dipendenti' %}"><i class="bi bi-person-vcard"></i> Dipendenti</a>
+    </div>
+  </div>
+
+  {% if not a.totale.mesi %}
+  <div class="panel"><div class="panel-body p-4 text-center text-muted">Nessun mese calcolato nel {{ anno }}.</div></div>
+  {% else %}
+  <div class="row g-2 mb-3">
+    <div class="col-6 col-md-3"><div class="kpi-tile hero"><div class="label">Costo aziendale {{ anno }}</div><div class="value">&euro;{{ a.totale.costo|floatformat:"2g" }}</div><div class="sub">{{ a.totale.mesi }} mes{{ a.totale.mesi|pluralize:"e,i" }} calcolat{{ a.totale.mesi|pluralize:"o,i" }}</div></div></div>
+    <div class="col-6 col-md-3"><div class="kpi-tile"><div class="label">Costo medio mensile</div><div class="value">&euro;{{ a.totale.costo_medio_mese|floatformat:"2g" }}</div></div></div>
+    <div class="col-6 col-md-3"><div class="kpi-tile"><div class="label">Costo per ora</div><div class="value">&euro;{{ a.totale.costo_ora|floatformat:2 }}</div></div></div>
+    <div class="col-6 col-md-3"><div class="kpi-tile"><div class="label">Ore totali</div><div class="value">{{ a.totale.ore|floatformat:"-2g" }}</div></div></div>
+  </div>
+
+  <div class="panel">
+    <div class="panel-title"><i class="bi bi-bar-chart"></i> Costo aziendale per mese</div>
+    <div class="panel-body" style="height:260px"><canvas id="grafico-anno"></canvas></div>
+  </div>
+
+  <div class="panel">
+    <div class="panel-title"><i class="bi bi-calendar3"></i> Andamento mensile</div>
+    <div class="panel-body tabella-scroll">
+      <table class="table table-sm table-hover anno">
+        <thead><tr><th>Mese</th><th class="tab-num">Ore</th><th class="tab-num">Dipendenti</th><th class="tab-num">Netto</th><th class="tab-num">Lordo</th>
+          <th class="tab-num">Costo aziendale</th><th class="tab-num">Costo/ora</th><th class="tab-num">Costo medio dip.</th><th class="tab-num">Var. % costo</th></tr></thead>
+        <tbody>
+          {% for m in a.mesi %}
+          <tr class="{% if not m.presente %}vuoto{% endif %}">
+            <td><a href="{% url 'personale:mese' %}?mese={{ m.data|date:'Y-m' }}" class="{% if not m.presente %}text-muted{% endif %}">{{ m.nome }}</a></td>
+            <td class="tab-num">{{ m.ore|num }}</td>
+            <td class="tab-num">{{ m.attivi }}</td>
+            <td class="tab-num">&euro;{{ m.netto|floatformat:"2g" }}</td>
+            <td class="tab-num">&euro;{{ m.lordo|floatformat:"2g" }}</td>
+            <td class="tab-num fw-bold">&euro;{{ m.costo|floatformat:"2g" }}</td>
+            <td class="tab-num">&euro;{{ m.costo_ora|floatformat:2 }}</td>
+            <td class="tab-num">&euro;{{ m.costo_medio_dip|floatformat:"2g" }}</td>
+            <td class="tab-num">{% if m.variazione is not None %}<span class="{% if m.variazione > 0 %}su{% else %}giu{% endif %}">{% if m.variazione > 0 %}+{% endif %}{{ m.variazione|floatformat:1 }}%</span>{% endif %}</td>
+          </tr>
+          {% endfor %}
+        </tbody>
+        <tfoot><tr><td>Totale</td><td class="tab-num">{{ a.totale.ore|num }}</td><td></td>
+          <td class="tab-num">&euro;{{ a.totale.netto|floatformat:"2g" }}</td><td class="tab-num">&euro;{{ a.totale.lordo|floatformat:"2g" }}</td>
+          <td class="tab-num">&euro;{{ a.totale.costo|floatformat:"2g" }}</td><td class="tab-num">&euro;{{ a.totale.costo_ora|floatformat:2 }}</td><td></td><td></td></tr></tfoot>
+      </table>
+    </div>
+  </div>
+
+  <div class="row g-3">
+    <div class="col-lg-5">
+      <div class="panel">
+        <div class="panel-title"><i class="bi bi-grid-3x3-gap"></i> Trimestri</div>
+        <div class="panel-body tabella-scroll">
+          <table class="table table-sm anno">
+            <thead><tr><th>Trimestre</th><th class="tab-num">Mesi</th><th class="tab-num">Ore</th><th class="tab-num">Costo</th><th class="tab-num">Costo/ora</th><th class="tab-num">Var. %</th></tr></thead>
+            <tbody>
+              {% for t in a.trimestri %}
+              <tr class="{% if not t.mesi %}vuoto{% endif %}"><td>T{{ t.numero }} {{ anno }}</td><td class="tab-num">{{ t.mesi }}</td><td class="tab-num">{{ t.ore|num }}</td>
+                <td class="tab-num">&euro;{{ t.costo|floatformat:"2g" }}</td><td class="tab-num">&euro;{{ t.costo_ora|floatformat:2 }}</td>
+                <td class="tab-num">{% if t.variazione is not None %}<span class="{% if t.variazione > 0 %}su{% else %}giu{% endif %}">{% if t.variazione > 0 %}+{% endif %}{{ t.variazione|floatformat:1 }}%</span>{% endif %}</td></tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+    <div class="col-lg-7">
+      <div class="panel">
+        <div class="panel-title"><i class="bi bi-person-lines-fill"></i> Per dipendente</div>
+        <div class="panel-body tabella-scroll">
+          <table class="table table-sm anno">
+            <thead><tr><th class="col-nome">Dipendente</th>{% for m in a.mesi %}<th class="tab-num">{{ m.nome|slice:":3" }}</th>{% endfor %}<th class="tab-num">Totale</th><th class="tab-num">Media</th></tr></thead>
+            <tbody>
+              {% for d in a.per_dipendente %}
+              <tr><td class="col-nome">{{ d.dipendente.nome }}<div class="text-muted fw-normal" style="font-size:.68rem">costo &middot; ore</div></td>
+                {% for costo in d.costo %}<td class="tab-num">{% if costo %}&euro;{{ costo|floatformat:0 }}{% else %}<span class="vuoto">—</span>{% endif %}</td>{% endfor %}
+                <td class="tab-num fw-bold">&euro;{{ d.costo_totale|floatformat:"2g" }}<div class="text-muted fw-normal">{{ d.ore_totale|num }} h</div></td>
+                <td class="tab-num">&euro;{{ d.costo_medio|floatformat:"2g" }}</td></tr>
+              {% endfor %}
+            </tbody>
+          </table>
+          <div class="text-muted" style="font-size:.72rem">Costo aziendale del dipendente per mese (netto + 13ª + contributi + bonus). La media considera solo i mesi con costo.</div>
+        </div>
+      </div>
+    </div>
+  </div>
+  {% endif %}
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+(function () {
+  var el = document.getElementById('grafico-anno');
+  if (!el || typeof Chart === 'undefined') return;
+  var g = {{ grafico_json|safe }};
+  new Chart(el, {
+    type: 'bar',
+    data: {labels: g.etichette, datasets: [
+      {label: 'Costo aziendale', data: g.costo, backgroundColor: '#14b8a6', borderRadius: 4},
+      {label: 'Netto', data: g.netto, backgroundColor: '#cbd5e1', borderRadius: 4}
+    ]},
+    options: {responsive: true, maintainAspectRatio: false,
+      plugins: {tooltip: {callbacks: {label: function (c) { return c.dataset.label + ': €' + c.parsed.y.toLocaleString('it-IT', {minimumFractionDigits: 2, maximumFractionDigits: 2}); }}}},
+      scales: {y: {beginAtZero: true, ticks: {callback: function (v) { return '€' + v.toLocaleString('it-IT'); }}}, x: {grid: {display: false}}}}
+  });
+})();
+</script>
+{% endblock %}

@@ -85,6 +85,7 @@ INSTALLED_APPS = [
     'apps.garage',
     'apps.fatture',
     'apps.magazzino',
+    'apps.personale',
     # 'apps.reportistica',  # Temporarily disabled due to pandas dependency
     # 'apps.shop',
 ]

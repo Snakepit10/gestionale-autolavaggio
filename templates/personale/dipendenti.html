@@ -1,0 +1,143 @@
+{% extends "base.html" %}
+{% load personale %}
+{% block title %}Dipendenti{% endblock %}
+
+{% block extra_css %}
+{% include "personale/_stile.html" %}
+{% endblock %}
+
+{% block content %}
+<div class="dash-page">
+  <div class="dash-header">
+    <h4><i class="bi bi-person-vcard me-2"></i>Dipendenti e parametri retributivi</h4>
+    <div class="d-flex gap-2 flex-wrap">
+      <a class="btn btn-sm btn-outline-primary" href="{% url 'personale:mese' %}"><i class="bi bi-people"></i> Costo del mese</a>
+      <a class="btn btn-sm btn-outline-primary" href="{% url 'personale:anno' %}"><i class="bi bi-graph-up"></i> Anno</a>
+      <button class="btn btn-sm btn-primary" data-bs-toggle="modal" data-bs-target="#modale-dipendente" data-dipendente=""><i class="bi bi-plus-lg"></i> Nuovo dipendente</button>
+    </div>
+  </div>
+
+  <div class="panel">
+    <div class="panel-title"><i class="bi bi-people"></i> Dipendenti</div>
+    <div class="panel-sub">Tariffa e coefficiente hanno uno storico: quando cambiano aggiungi una riga con la data da cui valgono, così i mesi passati restano come sono. Il coefficiente lordo serve per il lordo e per i contributi (busta paga × (coeff. − 1)).</div>
+    <div class="panel-body tabella-scroll">
+      <table class="table table-sm align-middle">
+        <thead><tr><th class="col-nome">Nome</th><th>Tipo</th><th>Stato</th><th class="tab-num">Tariffa oggi</th><th class="tab-num">Coeff. oggi</th><th>Account (timbratura)</th><th>Storico parametri</th><th></th></tr></thead>
+        <tbody>
+          {% for d in dipendenti %}
+          <tr class="{% if not d.attivo %}text-muted{% endif %}">
+            <td class="col-nome">{{ d.nome }}{% if d.note %}<div class="fw-normal text-muted" style="font-size:.72rem">{{ d.note }}</div>{% endif %}</td>
+            <td>{{ d.get_tipo_display }}</td>
+            <td>{% if d.attivo %}<span class="badge bg-success">Attivo</span>{% else %}<span class="badge bg-secondary">Non attivo</span>{% endif %}</td>
+            <td class="tab-num">{% if d.in_vigore %}&euro;{{ d.in_vigore.tariffa_oraria|floatformat:2 }}{% else %}<span class="text-danger">—</span>{% endif %}</td>
+            <td class="tab-num">{% if d.in_vigore %}{{ d.in_vigore.coefficiente_lordo|num }}{% else %}—{% endif %}</td>
+            <td>{{ d.utente|default:"—" }}</td>
+            <td style="font-size:.75rem">
+              {% for p in d.parametri.all %}
+              <form method="post" class="d-inline" onsubmit="return confirm('Eliminare i parametri dal {{ p.valido_dal|date:'d/m/Y' }}?')">
+                {% csrf_token %}<input type="hidden" name="azione" value="elimina_parametro"><input type="hidden" name="parametro" value="{{ p.pk }}">
+                <span class="badge bg-light text-dark border">dal {{ p.valido_dal|date:"d/m/Y" }}: &euro;{{ p.tariffa_oraria|floatformat:2 }}/h &times; {{ p.coefficiente_lordo|num }}{% if p.note %} &middot; {{ p.note }}{% endif %}
+                  <button class="btn btn-link btn-sm p-0 text-danger" title="Elimina"><i class="bi bi-x"></i></button></span>
+              </form>
+              {% empty %}<span class="text-danger">nessun parametro</span>{% endfor %}
+            </td>
+            <td class="text-nowrap">
+              <button class="btn btn-sm btn-outline-secondary" data-bs-toggle="modal" data-bs-target="#modale-dipendente"
+                      data-dipendente="{{ d.pk }}" data-nome="{{ d.nome }}" data-tipo="{{ d.tipo }}" data-attivo="{{ d.attivo|yesno:'1,0' }}"
+                      data-note="{{ d.note }}" data-utente="{{ d.utente_id|default:'' }}"><i class="bi bi-pencil"></i></button>
+              <button class="btn btn-sm btn-outline-primary" data-bs-toggle="modal" data-bs-target="#modale-parametro"
+                      data-dipendente="{{ d.pk }}" data-nome="{{ d.nome }}"
+                      data-tariffa="{{ d.in_vigore.tariffa_oraria|default_if_none:''|stringformat:'s' }}"
+                      data-coeff="{{ d.in_vigore.coefficiente_lordo|default_if_none:''|stringformat:'s' }}"><i class="bi bi-plus-lg"></i> Parametri</button>
+            </td>
+          </tr>
+          {% empty %}
+          <tr><td colspan="8" class="text-muted text-center p-3">Nessun dipendente: aggiungili o importa l'elenco dall'Excel qui sotto.</td></tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <div class="panel">
+    <div class="panel-title"><i class="bi bi-file-earmark-excel"></i> Importa da Excel</div>
+    <div class="panel-sub">Il tipo di file si riconosce da solo. Prima l'elenco (file "Retribuzione", foglio <em>Elenco dipendenti</em>: dipendenti, tipo, tariffe e coefficienti), poi un mese (foglio <em>Registrazione mensile</em>: presenze, busta paga, bonus e pagato). Reimportare lo stesso file non crea doppioni.</div>
+    <div class="panel-body">
+      <form method="post" enctype="multipart/form-data" class="d-flex gap-2 flex-wrap" style="max-width:560px">
+        {% csrf_token %}<input type="hidden" name="azione" value="importa">
+        <input type="file" name="file" accept=".xlsx" class="form-control form-control-sm" required style="max-width:360px">
+        <button class="btn btn-sm btn-success"><i class="bi bi-upload"></i> Importa</button>
+      </form>
+    </div>
+  </div>
+</div>
+
+{# ====== Modale dipendente ====== #}
+<div class="modal fade" id="modale-dipendente" tabindex="-1">
+  <div class="modal-dialog"><form method="post" class="modal-content">
+    {% csrf_token %}<input type="hidden" name="azione" value="salva_dipendente"><input type="hidden" name="id">
+    <div class="modal-header"><h5 class="modal-title">Dipendente</h5><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div>
+    <div class="modal-body">
+      <label class="form-label">Nome</label>
+      <input type="text" name="nome" class="form-control mb-2" required maxlength="60">
+      <label class="form-label">Tipo</label>
+      <select name="tipo" class="form-select mb-2">
+        <option value="contrattualizzato">Contrattualizzato (con rateo 13ª e busta paga)</option>
+        <option value="occasionale">Occasionale</option>
+      </select>
+      <div class="form-check mb-2"><input class="form-check-input" type="checkbox" name="attivo" value="1" id="dip-attivo" checked>
+        <label class="form-check-label" for="dip-attivo">Attivo (entra nei mesi nuovi)</label></div>
+      <label class="form-label">Account del gestionale <span class="text-muted small">(servirà per la timbratura)</span></label>
+      <select name="utente" class="form-select mb-2">
+        <option value="">— nessuno —</option>
+        {% for u in utenti %}<option value="{{ u.pk }}">{{ u.get_full_name|default:u.username }}</option>{% endfor %}
+      </select>
+      <label class="form-label">Note</label>
+      <input type="text" name="note" class="form-control" maxlength="200">
+    </div>
+    <div class="modal-footer"><button class="btn btn-primary"><i class="bi bi-save"></i> Salva</button></div>
+  </form></div>
+</div>
+
+{# ====== Modale parametri ====== #}
+<div class="modal fade" id="modale-parametro" tabindex="-1">
+  <div class="modal-dialog"><form method="post" class="modal-content">
+    {% csrf_token %}<input type="hidden" name="azione" value="aggiungi_parametro"><input type="hidden" name="dipendente">
+    <div class="modal-header"><h5 class="modal-title">Nuovi parametri &mdash; <span data-nome></span></h5><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div>
+    <div class="modal-body">
+      <label class="form-label">Valido dal</label>
+      <input type="date" name="valido_dal" class="form-control mb-2" required value="{{ oggi|date:'Y-m' }}-01">
+      <div class="row g-2">
+        <div class="col-6"><label class="form-label">Tariffa oraria &euro;</label><input type="text" name="tariffa_oraria" class="form-control" inputmode="decimal" required></div>
+        <div class="col-6"><label class="form-label">Coefficiente lordo</label><input type="text" name="coefficiente_lordo" class="form-control" inputmode="decimal" placeholder="1"></div>
+      </div>
+      <label class="form-label mt-2">Note</label>
+      <input type="text" name="note" class="form-control" maxlength="200">
+      <div class="text-muted small mt-2">Valgono dal mese della data in poi; i mesi precedenti continuano a usare i parametri vecchi.</div>
+    </div>
+    <div class="modal-footer"><button class="btn btn-primary"><i class="bi bi-save"></i> Aggiungi</button></div>
+  </form></div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+document.getElementById('modale-dipendente').addEventListener('show.bs.modal', function (ev) {
+  var b = ev.relatedTarget, f = this.querySelector('form'), d = b ? b.dataset : {};
+  f.elements.id.value = d.dipendente || '';
+  f.elements.nome.value = d.nome || '';
+  f.elements.tipo.value = d.tipo || 'contrattualizzato';
+  f.elements.attivo.checked = d.dipendente ? d.attivo === '1' : true;
+  f.elements.utente.value = d.utente || '';
+  f.elements.note.value = d.note || '';
+  this.querySelector('.modal-title').textContent = d.dipendente ? 'Modifica ' + d.nome : 'Nuovo dipendente';
+});
+document.getElementById('modale-parametro').addEventListener('show.bs.modal', function (ev) {
+  var d = ev.relatedTarget.dataset, f = this.querySelector('form');
+  f.elements.dipendente.value = d.dipendente;
+  f.elements.tariffa_oraria.value = (d.tariffa || '').replace('.', ',');
+  f.elements.coefficiente_lordo.value = (d.coeff || '').replace(/\.?0+$/, '').replace('.', ',');
+  this.querySelector('[data-nome]').textContent = d.nome;
+});
+</script>
+{% endblock %}

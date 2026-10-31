@@ -209,7 +209,7 @@
                         </li>
                         {% endif %}
 
-                        {% if 'fatture' in sezioni_visibili or 'finanze' in sezioni_visibili %}
+                        {% if 'fatture' in sezioni_visibili or 'finanze' in sezioni_visibili or 'personale' in sezioni_visibili %}
                         <li class="nav-item dropdown">
                             <a class="nav-link dropdown-toggle" href="#" id="ammDropdown" role="button" data-bs-toggle="dropdown">
                                 <i class="bi bi-cash-coin"></i> Amministrazione
@@ -225,6 +225,13 @@
                                 <li><a class="dropdown-item" href="{% url 'finanze:report_periodo' %}"><i class="bi bi-graph-up-arrow"></i> Report Periodo</a></li>
                                 <li><a class="dropdown-item" href="{% url 'finanze:riepilogo_saldi_portali' %}"><i class="bi bi-journal-check"></i> Saldi giornalieri</a></li>
                                 <li><a class="dropdown-item" href="{% url 'finanze:transazioni_washtec' %}"><i class="bi bi-list-columns"></i> Transazioni WashTec</a></li>
+                                {% endif %}
+                                {% if 'personale' in sezioni_visibili %}
+                                {% if 'fatture' in sezioni_visibili or 'finanze' in sezioni_visibili %}<li><hr class="dropdown-divider"></li>{% endif %}
+                                <li><h6 class="dropdown-header">Personale</h6></li>
+                                <li><a class="dropdown-item" href="{% url 'personale:mese' %}"><i class="bi bi-people"></i> Costo del personale</a></li>
+                                <li><a class="dropdown-item" href="{% url 'personale:anno' %}"><i class="bi bi-graph-up"></i> Andamento annuale</a></li>
+                                <li><a class="dropdown-item" href="{% url 'personale:dipendenti' %}"><i class="bi bi-person-vcard"></i> Dipendenti</a></li>
                                 {% endif %}
                             </ul>
                         </li>

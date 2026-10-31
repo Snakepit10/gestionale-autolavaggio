@@ -1,0 +1,323 @@
+{% extends "base.html" %}
+{% load personale %}
+{% block title %}Costo del personale {{ nome_mese }}{% endblock %}
+
+{% block extra_css %}
+{% include "personale/_stile.html" %}
+<style>
+.cal th, .cal td { padding: 2px 3px; text-align: center; vertical-align: middle; }
+.cal .cella { width: 42px; padding: 2px 3px; font-size: .78rem; text-align: center; border: 1px solid #e2e8f0; border-radius: 4px; }
+.cal .cella:focus { outline: 2px solid #14b8a6; border-color: transparent; }
+.cal .dom { background: #fef2f2; }
+.cal th.dom { color: #dc2626; }
+.cal .cella.v-F { background: #dbeafe; color: #1d4ed8; font-weight: 700; }
+.cal .cella.v-M { background: #fde68a; color: #92400e; font-weight: 700; }
+.cal .cella.v-L { background: #e5e7eb; color: #4b5563; font-weight: 700; }
+.cal .cella.errata { background: #fee2e2; outline: 2px solid #dc2626; }
+.cal .tot { font-weight: 700; background: #f8fafc; }
+.calcolo td, .calcolo th { padding: 4px 6px; vertical-align: middle; }
+.calcolo .giallo { background: #fefce8; }
+.calcolo .giallo input { width: 78px; font-size: .78rem; padding: 2px 4px; text-align: right; }
+.calcolo .fuori { color: #b45309; font-weight: 700; }
+.calcolo tfoot td { font-weight: 800; background: #f8fafc; }
+.legenda span { display: inline-block; padding: 0 6px; border-radius: 4px; font-weight: 700; margin-right: 4px; }
+.controllo { display: flex; justify-content: space-between; gap: 8px; padding: 5px 0; border-bottom: 1px solid #f1f5f9; font-size: .82rem; }
+.controllo:last-child { border-bottom: none; }
+.barra-salva { position: sticky; bottom: 0; z-index: 5; background: rgba(240,242,245,.95); padding: 8px 0; display: flex; gap: 8px; align-items: center; justify-content: flex-end; }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="dash-page">
+  <div class="dash-header">
+    <h4><i class="bi bi-people me-2"></i>Costo del personale &mdash; {{ nome_mese }}</h4>
+    <div class="d-flex gap-2 flex-wrap align-items-center">
+      <a class="btn btn-sm btn-outline-secondary" href="?mese={{ mese_prec|date:'Y-m' }}"><i class="bi bi-chevron-left"></i></a>
+      <form method="get" class="d-inline"><input type="month" name="mese" value="{{ mese_data|date:'Y-m' }}" class="form-control form-control-sm" onchange="this.form.submit()"></form>
+      <a class="btn btn-sm btn-outline-secondary" href="?mese={{ mese_succ|date:'Y-m' }}"><i class="bi bi-chevron-right"></i></a>
+      <a class="btn btn-sm btn-outline-primary" href="{% url 'personale:anno' %}?anno={{ mese_data|date:'Y' }}"><i class="bi bi-graph-up"></i> Anno</a>
+      <a class="btn btn-sm btn-outline-primary" href="{% url 'personale:dipendenti' %}"><i class="bi bi-person-vcard"></i> Dipendenti</a>
+    </div>
+  </div>
+
+  {% if not mese_obj %}
+  <div class="panel"><div class="panel-body p-4 text-center">
+    <h5 class="mb-2">{{ nome_mese }} non è ancora iniziato</h5>
+    {% if dipendenti_attivi %}
+    <p class="text-muted mb-3">Parte con i dipendenti attivi: {{ dipendenti_attivi|join:", " }}.</p>
+    <form method="post">{% csrf_token %}
+      <input type="hidden" name="azione" value="crea">
+      <button class="btn btn-primary"><i class="bi bi-plus-lg"></i> Inizia {{ nome_mese }}</button>
+    </form>
+    {% else %}
+    <p class="text-muted mb-3">Non ci sono dipendenti attivi: aggiungili o importa l'Excel dalla pagina Dipendenti.</p>
+    <a class="btn btn-primary" href="{% url 'personale:dipendenti' %}"><i class="bi bi-person-vcard"></i> Dipendenti</a>
+    {% endif %}
+  </div></div>
+  {% else %}
+
+  {# ====== Riepilogo ====== #}
+  <div class="row g-2 mb-3">
+    <div class="col-6 col-md-2"><div class="kpi-tile hero"><div class="label">Costo aziendale</div><div class="value">&euro;{{ c.riepilogo.costo|floatformat:"2g" }}</div><div class="sub">&euro;{{ c.riepilogo.costo_ora|floatformat:2 }} per ora</div></div></div>
+    <div class="col-6 col-md-2"><div class="kpi-tile"><div class="label">Ore totali</div><div class="value">{{ c.riepilogo.ore|num }}</div><div class="sub">lavorate + ferie + malattia</div></div></div>
+    <div class="col-6 col-md-2"><div class="kpi-tile"><div class="label">Retribuzione netta</div><div class="value">&euro;{{ c.riepilogo.netto|floatformat:"2g" }}</div></div></div>
+    <div class="col-6 col-md-2"><div class="kpi-tile"><div class="label">Retribuzione lorda</div><div class="value">&euro;{{ c.riepilogo.lordo|floatformat:"2g" }}</div></div></div>
+    <div class="col-6 col-md-2"><div class="kpi-tile"><div class="label">Dipendenti attivi</div><div class="value">{{ c.riepilogo.attivi }}</div></div></div>
+    <div class="col-6 col-md-2"><div class="kpi-tile"><div class="label">Residuo da pagare</div><div class="value">&euro;{{ c.totali.residuo|floatformat:"2g" }}</div></div></div>
+  </div>
+
+  <form method="post" id="form-mese" novalidate>
+    {% csrf_token %}
+    <input type="hidden" name="azione" value="salva">
+
+    {# ====== Calendario presenze ====== #}
+    <div class="panel">
+      <div class="panel-title"><i class="bi bi-calendar3"></i> Calendario presenze
+        <span class="legenda ms-auto text-none" style="text-transform:none;letter-spacing:0;font-weight:400">
+          ore 0-16 oppure <span class="v-F" style="background:#dbeafe;color:#1d4ed8">F</span>ferie
+          <span style="background:#fde68a;color:#92400e">M</span>malattia
+          <span style="background:#e5e7eb;color:#4b5563">L</span>libero
+        </span>
+      </div>
+      <div class="panel-body tabella-scroll">
+        <table class="table table-sm cal">
+          <thead>
+            <tr>
+              <th class="col-nome text-start">Dipendente</th>
+              {% for g in c.giorni %}<th class="{% if g.domenica %}dom{% endif %}">{{ g.data.day }}<br><span class="fw-normal">{{ g.sett }}</span></th>{% endfor %}
+              <th class="tot">Ore</th><th class="tot">F</th><th class="tot">M</th><th class="tot">L</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for r in c.righe %}
+            <tr data-riga="{{ r.riga.pk }}">
+              <td class="col-nome text-start">{{ r.dipendente.nome }}</td>
+              {% for cella in r.celle %}
+              <td{% if cella.dom %} class="dom"{% endif %}><input type="text" class="cella" inputmode="decimal" autocomplete="off"
+                     name="c_{{ r.riga.pk }}_{{ cella.giorno }}" value="{{ cella.v }}" data-giorno="{{ cella.giorno }}"></td>
+              {% endfor %}
+              <td class="tot tab-num" data-out="ore">{{ r.ore_lavorate|num }}</td>
+              <td class="tot" data-out="F">{{ r.gg_ferie }}</td>
+              <td class="tot" data-out="M">{{ r.gg_malattia }}</td>
+              <td class="tot" data-out="L">{{ r.gg_libero }}</td>
+            </tr>
+            {% endfor %}
+          </tbody>
+          <tfoot>
+            <tr>
+              <td class="col-nome text-start tot">Totale ore giorno</td>
+              {% for g in c.ore_giorno %}<td class="tot tab-num{% if g.dom %} dom{% endif %}" data-out-giorno="{{ g.giorno }}">{{ g.ore|num }}</td>{% endfor %}
+              <td class="tot tab-num" data-out="ore-tot">{{ c.totali.ore_lavorate|num }}</td>
+              <td class="tot" data-out="F-tot">{{ c.totali.gg_ferie }}</td>
+              <td class="tot" data-out="M-tot">{{ c.totali.gg_malattia }}</td>
+              <td class="tot" data-out="L-tot">{{ c.totali.gg_libero }}</td>
+            </tr>
+          </tfoot>
+        </table>
+        <div class="d-flex flex-wrap gap-3 align-items-center mt-2" style="font-size:.8rem">
+          <label class="d-flex align-items-center gap-1">Ore pagate per giorno di ferie
+            <input type="text" name="ore_giorno_ferie" value="{{ ore_ferie_txt }}" class="form-control form-control-sm" style="width:60px" inputmode="decimal"></label>
+          <label class="d-flex align-items-center gap-1">di malattia
+            <input type="text" name="ore_giorno_malattia" value="{{ ore_malattia_txt }}" class="form-control form-control-sm" style="width:60px" inputmode="decimal"></label>
+          <span class="text-muted">L = libero, non pagato. Le domeniche sono in rosso.</span>
+        </div>
+      </div>
+    </div>
+
+    {# ====== Calcolo retribuzione e costo aziendale ====== #}
+    <div class="panel">
+      <div class="panel-title"><i class="bi bi-calculator"></i> Calcolo retribuzione e costo aziendale</div>
+      <div class="panel-sub">In giallo i valori da compilare. Tariffa e coefficiente arrivano dai parametri del dipendente in vigore nel mese; il coefficiente si può cambiare solo per questo mese. I conti si aggiornano al salvataggio.</div>
+      <div class="panel-body tabella-scroll">
+        <table class="table table-sm table-hover calcolo">
+          <thead>
+            <tr>
+              <th class="col-nome">Dipendente</th><th>Tipo</th><th>Parametri dal</th>
+              <th class="tab-num">Ore lavorate</th><th class="tab-num">Ore ferie</th><th class="tab-num">Ore malattia</th><th class="tab-num">Ore totali</th>
+              <th class="tab-num">Tariffa</th><th class="tab-num">Netto</th><th class="tab-num">Rateo 13ª</th>
+              <th class="tab-num giallo">Coeff. lordo</th><th class="tab-num">Lordo</th>
+              <th class="tab-num giallo">Busta paga</th><th class="tab-num">Contributi</th><th class="tab-num giallo">Bonus</th>
+              <th class="tab-num">Differenza fuori busta</th><th class="tab-num">Totale da pagare</th>
+              <th class="tab-num giallo">Pagato</th><th class="tab-num">Residuo</th><th class="tab-num">Costo aziendale</th><th></th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for r in c.righe %}
+            <tr>
+              <td class="col-nome">{{ r.dipendente.nome }}</td>
+              <td>{{ r.dipendente.get_tipo_display }}</td>
+              <td>{% if r.parametro %}{{ r.parametro.valido_dal|date:"d/m/Y" }}{% else %}<span class="text-danger">mancano</span>{% endif %}</td>
+              <td class="tab-num">{{ r.ore_lavorate|num }}</td>
+              <td class="tab-num">{{ r.ore_ferie|num }}</td>
+              <td class="tab-num">{{ r.ore_malattia|num }}</td>
+              <td class="tab-num fw-bold">{{ r.ore_totali|num }}</td>
+              <td class="tab-num">{% if r.tariffa %}&euro;{{ r.tariffa|floatformat:2 }}{% else %}<span class="text-danger">—</span>{% endif %}</td>
+              <td class="tab-num">&euro;{{ r.netto|floatformat:"2g" }}</td>
+              <td class="tab-num">&euro;{{ r.rateo|floatformat:"2g" }}</td>
+              <td class="giallo"><input type="text" name="coeff_{{ r.riga.pk }}" value="{{ r.inp.coeff }}" class="form-control form-control-sm" inputmode="decimal"
+                     placeholder="{{ r.coeff_parametri|num|default:'—' }}" title="Vuoto = {{ r.coeff_parametri|num|default:'nessun parametro' }} dai parametri">
+                {% if r.coeff_sovrascritto %}<div class="fuori" style="font-size:.66rem">solo questo mese</div>{% endif %}</td>
+              <td class="tab-num">&euro;{{ r.lordo|floatformat:"2g" }}</td>
+              <td class="giallo"><input type="text" name="busta_{{ r.riga.pk }}" value="{{ r.inp.busta }}" class="form-control form-control-sm" inputmode="decimal" placeholder="0"></td>
+              <td class="tab-num">&euro;{{ r.contributi|floatformat:"2g" }}</td>
+              <td class="giallo"><input type="text" name="bonus_{{ r.riga.pk }}" value="{{ r.inp.bonus }}" class="form-control form-control-sm" inputmode="decimal" placeholder="0"></td>
+              <td class="tab-num fuori">&euro;{{ r.differenza|floatformat:"2g" }}</td>
+              <td class="tab-num fw-bold">&euro;{{ r.totale_pagare|floatformat:"2g" }}</td>
+              <td class="giallo"><input type="text" name="pagato_{{ r.riga.pk }}" value="{{ r.inp.pagato }}" class="form-control form-control-sm" inputmode="decimal" placeholder="0"></td>
+              <td class="tab-num {% if r.residuo > 0.005 %}text-danger fw-bold{% endif %}">&euro;{{ r.residuo|floatformat:"2g" }}</td>
+              <td class="tab-num fw-bold">&euro;{{ r.costo|floatformat:"2g" }}</td>
+              <td><button type="submit" form="togli-{{ r.riga.pk }}" class="btn btn-sm btn-link text-danger p-0" title="Togli dal mese"><i class="bi bi-x-lg"></i></button></td>
+            </tr>
+            {% empty %}
+            <tr><td colspan="21" class="text-muted text-center">Nessun dipendente nel mese.</td></tr>
+            {% endfor %}
+          </tbody>
+          <tfoot>
+            <tr>
+              <td class="col-nome">Totale</td><td></td><td></td>
+              <td class="tab-num">{{ c.totali.ore_lavorate|num }}</td>
+              <td class="tab-num">{{ c.totali.ore_ferie|num }}</td>
+              <td class="tab-num">{{ c.totali.ore_malattia|num }}</td>
+              <td class="tab-num">{{ c.totali.ore_totali|num }}</td>
+              <td></td>
+              <td class="tab-num">&euro;{{ c.totali.netto|floatformat:"2g" }}</td>
+              <td class="tab-num">&euro;{{ c.totali.rateo|floatformat:"2g" }}</td>
+              <td></td>
+              <td class="tab-num">&euro;{{ c.totali.lordo|floatformat:"2g" }}</td>
+              <td class="tab-num">&euro;{{ c.totali.busta_paga|floatformat:"2g" }}</td>
+              <td class="tab-num">&euro;{{ c.totali.contributi|floatformat:"2g" }}</td>
+              <td class="tab-num">&euro;{{ c.totali.bonus|floatformat:"2g" }}</td>
+              <td class="tab-num">&euro;{{ c.totali.differenza|floatformat:"2g" }}</td>
+              <td class="tab-num">&euro;{{ c.totali.totale_pagare|floatformat:"2g" }}</td>
+              <td class="tab-num">&euro;{{ c.totali.pagato|floatformat:"2g" }}</td>
+              <td class="tab-num">&euro;{{ c.totali.residuo|floatformat:"2g" }}</td>
+              <td class="tab-num">&euro;{{ c.totali.costo|floatformat:"2g" }}</td>
+              <td></td>
+            </tr>
+          </tfoot>
+        </table>
+        <div class="text-muted" style="font-size:.74rem">
+          Netto = ore totali × tariffa · Rateo 13ª = netto / 12 (solo contrattualizzati) · Lordo = netto × coeff. ·
+          Contributi = busta paga × (coeff. − 1) · Differenza fuori busta = netto + 13ª − busta paga ·
+          Costo aziendale = netto + 13ª + contributi + bonus.
+        </div>
+      </div>
+    </div>
+
+    <div class="row g-3">
+      <div class="col-md-6">
+        <div class="panel">
+          <div class="panel-title"><i class="bi bi-check2-square"></i> Controlli
+            {% if c.da_verificare %}<span class="badge bg-warning text-dark">{{ c.da_verificare }} da verificare</span>
+            {% else %}<span class="badge bg-success"><i class="bi bi-check-lg"></i> Tutto OK</span>{% endif %}
+          </div>
+          <div class="panel-body">
+            {% for k in c.controlli %}
+            <div class="controllo"><span>{{ k.nome }}</span>
+              <span class="{% if k.ok %}text-success{% else %}text-danger{% endif %} text-end">{% if k.ok %}<i class="bi bi-check-circle-fill"></i> OK{% else %}<i class="bi bi-exclamation-triangle-fill"></i> {{ k.messaggio }}{% endif %}</span></div>
+            {% endfor %}
+          </div>
+        </div>
+      </div>
+      <div class="col-md-6">
+        <div class="panel">
+          <div class="panel-title"><i class="bi bi-journal-text"></i> Note del mese</div>
+          <div class="panel-body"><textarea name="note" rows="3" class="form-control form-control-sm">{{ mese_obj.note }}</textarea></div>
+        </div>
+      </div>
+    </div>
+
+    <div class="barra-salva">
+      <span class="text-muted small" id="non-salvato" hidden><i class="bi bi-exclamation-circle"></i> Modifiche non salvate</span>
+      {% if mese_obj.aggiornato_da %}<span class="text-muted small">Ultimo salvataggio {{ mese_obj.aggiornato_il|date:"d/m H:i" }} ({{ mese_obj.aggiornato_da }})</span>{% endif %}
+      <button type="submit" class="btn btn-primary"><i class="bi bi-save"></i> Salva il mese</button>
+    </div>
+  </form>
+
+  {# Form fuori dal form principale: aggiungere / togliere un dipendente #}
+  {% for r in c.righe %}
+  <form method="post" id="togli-{{ r.riga.pk }}" hidden onsubmit="return confirm('Togliere {{ r.dipendente.nome|escapejs }} dal mese? Le presenze restano salvate.')">
+    {% csrf_token %}<input type="hidden" name="azione" value="togli"><input type="hidden" name="riga" value="{{ r.riga.pk }}">
+  </form>
+  {% endfor %}
+  {% if da_aggiungere %}
+  <form method="post" class="d-flex gap-2 align-items-center mt-2" style="max-width:420px">
+    {% csrf_token %}<input type="hidden" name="azione" value="aggiungi">
+    <select name="dipendente" class="form-select form-select-sm">
+      {% for d in da_aggiungere %}<option value="{{ d.pk }}">{{ d.nome }}{% if not d.attivo %} (non attivo){% endif %}</option>{% endfor %}
+    </select>
+    <button class="btn btn-sm btn-outline-primary text-nowrap"><i class="bi bi-plus-lg"></i> Aggiungi al mese</button>
+  </form>
+  {% endif %}
+  {% endif %}
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+// Calendario: colori F/M/L, celle non valide e totali mentre si scrive
+(function () {
+  var form = document.getElementById('form-mese');
+  if (!form) return;
+  var leggi = function (v) {
+    var t = String(v).trim().toUpperCase().replace(',', '.');
+    if (t === '') return {ore: 0, codice: ''};
+    if (t === 'F' || t === 'M' || t === 'L') return {ore: 0, codice: t};
+    if (!/^\d+(\.\d+)?$/.test(t) || parseFloat(t) > 16) return null;
+    return {ore: parseFloat(t), codice: ''};
+  };
+  var fmt = function (x) { return (Math.round(x * 100) / 100).toString().replace('.', ','); };
+  var aggiorna = function () {
+    var perGiorno = {}, tot = {ore: 0, F: 0, M: 0, L: 0};
+    form.querySelectorAll('tr[data-riga]').forEach(function (tr) {
+      var riga = {ore: 0, F: 0, M: 0, L: 0};
+      tr.querySelectorAll('.cella').forEach(function (inp) {
+        var v = leggi(inp.value);
+        inp.classList.remove('v-F', 'v-M', 'v-L', 'errata');
+        if (v === null) { inp.classList.add('errata'); return; }
+        if (v.codice) { inp.classList.add('v-' + v.codice); riga[v.codice]++; }
+        riga.ore += v.ore;
+        perGiorno[inp.dataset.giorno] = (perGiorno[inp.dataset.giorno] || 0) + v.ore;
+      });
+      ['ore', 'F', 'M', 'L'].forEach(function (k) {
+        tr.querySelector('[data-out="' + k + '"]').textContent = k === 'ore' ? fmt(riga[k]) : riga[k];
+        tot[k] += riga[k];
+      });
+    });
+    form.querySelectorAll('[data-out-giorno]').forEach(function (td) { td.textContent = fmt(perGiorno[td.dataset.outGiorno] || 0); });
+    ['ore', 'F', 'M', 'L'].forEach(function (k) {
+      form.querySelector('[data-out="' + k + '-tot"]').textContent = k === 'ore' ? fmt(tot[k]) : tot[k];
+    });
+  };
+  // frecce e Invio per muoversi nel calendario come in Excel
+  form.addEventListener('keydown', function (ev) {
+    var inp = ev.target;
+    if (!inp.classList || !inp.classList.contains('cella')) return;
+    var td = inp.parentElement, tr = td.parentElement, i = Array.prototype.indexOf.call(tr.children, td), dest = null;
+    if (ev.key === 'Enter' || ev.key === 'ArrowDown') dest = tr.nextElementSibling;
+    else if (ev.key === 'ArrowUp') dest = tr.previousElementSibling;
+    if (dest) {
+      var c = dest.children[i] && dest.children[i].querySelector('.cella');
+      if (c) { ev.preventDefault(); c.focus(); c.select(); }
+    } else if (ev.key === 'Enter') { ev.preventDefault(); }
+  });
+  var modificato = false;
+  form.addEventListener('input', function (ev) {
+    if (ev.target.classList.contains('cella')) aggiorna();
+    modificato = true;
+    document.getElementById('non-salvato').hidden = false;
+  });
+  form.addEventListener('submit', function (ev) {
+    if (form.querySelector('.cella.errata')) {
+      ev.preventDefault();
+      alert('Ci sono celle non valide (in rosso): ore da 0 a 16 oppure F, M, L.');
+      form.querySelector('.cella.errata').focus();
+      return;
+    }
+    modificato = false;
+  });
+  window.addEventListener('beforeunload', function (ev) { if (modificato) { ev.preventDefault(); ev.returnValue = ''; } });
+  aggiorna();
+})();
+</script>
+{% endblock %}

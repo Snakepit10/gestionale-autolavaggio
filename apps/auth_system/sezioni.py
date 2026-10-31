@@ -35,6 +35,8 @@ SEZIONI = [
     ('magazzino', 'Magazzino', 'Articoli, fornitori, ordini, consegne, assegnazioni a operatori e postazioni',
      ('/magazzino/', '/scorte/')),
     ('finanze', 'Finanze', 'Report giornata/periodo, saldi, quadrature', ('/finanze/',)),
+    ('personale', 'Costo personale', 'Dipendenti, presenze, retribuzioni e costo del personale',
+     ('/personale/',)),
     # Permesso senza pagine proprie (nessun prefisso): abilita una funzione
     ('conteggio_cassa', 'Conteggio cassa',
      'Nella Distinta (Ordini) vede e salva il conteggio di contanti e POS; '

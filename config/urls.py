@@ -160,6 +160,9 @@ urlpatterns = [
     # Fatture: raggruppamento ordini da fatturare (staff)
     path('fatture/', include('apps.fatture.urls', namespace='fatture')),
 
+    # Costo del personale (Amministrazione)
+    path('personale/', include('apps.personale.urls', namespace='personale')),
+
     # Monete virtuali (staff + webhook pagamenti)
     path('monete/', include('apps.monete.urls', namespace='monete')),
 
