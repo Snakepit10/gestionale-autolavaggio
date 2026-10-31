@@ -1,0 +1,4 @@
+{% for s in sezioni %}{% if s.voci %}
+<tr class="riga-titolo"><td>{{ s.nome }}</td><td class="tab-num">&euro;{{ s.totale|floatformat:"0g" }}</td></tr>
+{% for nome, importo in s.voci %}<tr class="riga-voce"><td class="col-nome">{{ nome }}</td><td class="tab-num">{{ importo|floatformat:"0g" }}</td></tr>{% endfor %}
+{% endif %}{% endfor %}

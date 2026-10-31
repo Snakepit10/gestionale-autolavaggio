@@ -1,0 +1,58 @@
+{% extends "base.html" %}
+{% block title %}Impostazioni analitica{% endblock %}
+
+{% block extra_css %}{% include "contabilita/_stile.html" %}{% endblock %}
+
+{% block content %}
+<div class="dash-page">
+  <div class="dash-header">
+    <h4><i class="bi bi-sliders me-2"></i>Ripartizioni per l'analitica</h4>
+    <a class="btn btn-sm btn-outline-secondary" href="{% url 'contabilita:analitica' %}"><i class="bi bi-arrow-left"></i> Analitica</a>
+  </div>
+
+  <form method="post" class="panel">
+    {% csrf_token %}<input type="hidden" name="azione" value="personale">
+    <div class="panel-title"><i class="bi bi-people"></i> Personale: quota del tempo per centro</div>
+    <div class="panel-sub">Per ogni dipendente, quanto del suo tempo va su ogni centro (es. 85 servito, 15 self per pulizia piste e assistenza). In grigio il valore usato se lasci vuoto (tutto servito). Le percentuali devono fare 100.
+      Il cambio vale dal mese indicato: i mesi precedenti restano come sono.</div>
+    <div class="panel-body tabella-scroll">
+      <table class="table table-sm align-middle">
+        <thead><tr><th class="col-nome">Dipendente</th><th>Ripartizione</th><th>Storico</th></tr></thead>
+        <tbody>
+          {% for d in dipendenti %}
+          <tr>
+            <td class="col-nome">{{ d }}</td>
+            <td>{% include "contabilita/_ripartizione.html" with campi=d.campi_rip prefisso=d.prefisso_rip %}</td>
+            <td class="small text-muted">{% for r in d.storico %}<div>dal {{ r.valido_dal|date:"m/Y" }}: {{ r.testo }}</div>{% empty %}&mdash;{% endfor %}</td>
+          </tr>
+          {% empty %}
+          <tr><td colspan="3" class="text-muted">Nessun dipendente attivo.</td></tr>
+          {% endfor %}
+        </tbody>
+      </table>
+      {% if dipendenti %}
+      <div class="d-flex gap-2 align-items-end">
+        <div><label class="form-label small mb-0">Valida dal mese</label><input type="month" name="dal" value="{{ oggi|date:'Y-m' }}" class="form-control form-control-sm"></div>
+        <button class="btn btn-primary btn-sm"><i class="bi bi-save"></i> Salva</button>
+      </div>
+      {% endif %}
+    </div>
+  </form>
+
+  <form method="post" class="panel">
+    {% csrf_token %}<input type="hidden" name="azione" value="parametri">
+    <div class="panel-title"><i class="bi bi-building"></i> Costi comuni nel full costing del servito</div>
+    <div class="panel-sub">I costi rimasti sul centro Comune (voci senza ripartizione) si attribuiscono al servito in proporzione ai suoi ricavi oppure con una percentuale fissa.
+      Per assegnare una voce precisa a un centro usa le percentuali nel piano dei conti.</div>
+    <div class="panel-body d-flex gap-3 align-items-end flex-wrap">
+      {% for k, n in criteri %}
+      <div class="form-check"><input class="form-check-input" type="radio" name="criterio_comuni" value="{{ k }}" id="crit-{{ k }}" {% if parametri.criterio_comuni == k %}checked{% endif %}>
+        <label class="form-check-label" for="crit-{{ k }}">{{ n }}</label></div>
+      {% endfor %}
+      <div><label class="form-label small mb-0">Percentuale fissa al servito</label>
+        <input type="text" name="percentuale_servito" inputmode="decimal" value="{{ parametri.percentuale_servito|floatformat:'-2' }}" class="form-control form-control-sm" style="max-width:100px"></div>
+      <button class="btn btn-primary btn-sm"><i class="bi bi-save"></i> Salva</button>
+    </div>
+  </form>
+</div>
+{% endblock %}

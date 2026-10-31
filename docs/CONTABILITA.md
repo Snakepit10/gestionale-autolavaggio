@@ -167,6 +167,40 @@ Da ogni voce si apre il dettaglio dei documenti. In alto c'è l'elenco di quello
 - L'ammortamento va nel conto economico in quote mensili uguali dal mese di acquisto.
 - Le rate e i pagamenti dell'acquisto restano nei flussi di cassa.
 
-## Fasi successive
+## Fase 4: contabilità analitica
 
-- **Fase 4: contabilità analitica.** Direct costing self-service, full costing servito e % del personale per centro.
+Ogni costo del conto economico, fino all'EBIT, si divide sui centri **Self-service**, **Servito**, **Vendita prodotti** e **Comune**.
+
+**Come si divide ogni costo**
+- **Fatture e movimenti:** con la ripartizione della riga o del movimento, se c'è, altrimenti con quella della voce. Senza nessuna delle due il costo va sul Comune.
+- **Personale:** costo e ore di ogni dipendente si dividono con la sua ripartizione. Si imposta in Analitica › Impostazioni, con lo storico "valida dal mese". Senza ripartizione il dipendente conta 100% servito.
+- **Ammortamenti:** sul centro del cespite.
+
+**Self-service: direct costing**
+
+| Voce | Calcolo |
+|---|---|
+| Margine I | ricavi self (portali, piste, monete online) − costi variabili |
+| Margine II | margine I − costi fissi specifici del self |
+
+- I costi comuni non si ripartiscono sul self.
+- Valori per ciclo dei portali: ricavo, costo variabile, cicli di pareggio.
+
+**Servito: full costing**
+
+| Voce | Calcolo |
+|---|---|
+| Margine diretto | ricavi − costi diretti |
+| Risultato pieno | margine diretto − quota dei costi comuni |
+
+- La quota dei costi comuni è in proporzione ai ricavi del servito, oppure una percentuale fissa (si sceglie nelle impostazioni).
+- Si calcolano anche:
+  - costo pieno per lavaggio;
+  - costo pieno per ora lavorata;
+  - costo pieno per servizio (costo orario × durata dal catalogo), confrontato col ricavo netto medio.
+
+**Vendita prodotti**
+- Margine = ricavi − costi assegnati al centro prodotti (per esempio "Prodotti per la rivendita").
+
+**Quadro per centro**
+- Il totale coincide con l'EBIT del conto economico.

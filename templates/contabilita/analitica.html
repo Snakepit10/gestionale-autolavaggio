@@ -1,0 +1,173 @@
+{% extends "base.html" %}
+{% block title %}Analitica {{ periodo }}{% endblock %}
+
+{% block extra_css %}{% include "contabilita/_stile.html" %}
+<style>
+.prospetto td { padding: 4px 8px; }
+.prospetto .meno td:first-child::before { content: "− "; color: #94a3b8; }
+.prospetto .uguale td { font-weight: 800; border-top: 2px solid #0f766e; color: #0f766e; }
+.prospetto .uguale .neg { color: #b91c1c; }
+.kpi-mini { background: #f8fafc; border-radius: 8px; padding: 8px 10px; height: 100%; }
+.kpi-mini .label { font-size: .64rem; text-transform: uppercase; letter-spacing: .4px; color: #64748b; font-weight: 700; }
+.kpi-mini .value { font-size: 1.05rem; font-weight: 800; color: #1e293b; }
+details summary { cursor: pointer; font-size: .75rem; color: #475569; font-weight: 600; }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="dash-page">
+  <div class="dash-header">
+    <h4><i class="bi bi-pie-chart me-2"></i>Contabilit&agrave; analitica &mdash; {{ periodo }}</h4>
+    {% include "contabilita/_nav.html" %}
+  </div>
+
+  <form method="get" class="d-flex gap-2 flex-wrap mb-3 align-items-center">
+    <a class="btn btn-sm btn-outline-secondary" href="?anno={{ anno|add:'-1' }}&mese={{ mese }}"><i class="bi bi-chevron-left"></i> {{ anno|add:"-1" }}</a>
+    <input type="hidden" name="anno" value="{{ anno }}">
+    <select name="mese" class="form-select form-select-sm" style="max-width:180px" onchange="this.form.submit()">
+      <option value="">Tutto il {{ anno }}</option>
+      {% for n, nome in mesi_nomi %}<option value="{{ n }}" {% if mese == n|stringformat:'s' %}selected{% endif %}>{{ nome }} {{ anno }}</option>{% endfor %}
+    </select>
+    <a class="btn btn-sm btn-outline-secondary" href="?anno={{ anno|add:'1' }}&mese={{ mese }}">{{ anno|add:"1" }} <i class="bi bi-chevron-right"></i></a>
+    <a class="btn btn-sm btn-outline-primary ms-auto" href="{% url 'contabilita:impostazioni_analitica' %}"><i class="bi bi-sliders"></i> Ripartizioni del personale e costi comuni</a>
+  </form>
+
+  {% if a.avvisi %}
+  <div class="alert alert-warning py-2 small mb-3">
+    {% for avviso in a.avvisi %}<div><i class="bi bi-dot"></i>{{ avviso }}</div>{% endfor %}
+    <div class="mt-1">Le percentuali per voce si impostano nel <a href="{% url 'contabilita:piano_conti' %}">piano dei conti</a>; quelle del personale nelle <a href="{% url 'contabilita:impostazioni_analitica' %}">impostazioni</a>.</div>
+  </div>
+  {% endif %}
+
+  <div class="panel">
+    <div class="panel-title"><i class="bi bi-grid-3x3"></i> Quadro per centro (euro, IVA esclusa)</div>
+    <div class="panel-sub">Costi fino all'EBIT divisi sui centri. Il totale coincide con il conto economico prima di oneri finanziari e imposte.</div>
+    <div class="panel-body tabella-scroll">
+      <table class="table table-sm bilancio">
+        <thead><tr><th></th>{% for c in a.centri %}<th class="tab-num">{{ c }}</th>{% endfor %}<th class="tab-num">Totale</th></tr></thead>
+        <tbody>
+          {% for r in a.quadro %}
+          <tr class="{% if forloop.last %}riga-risultato{% elif forloop.first %}riga-totale{% endif %}">
+            <td class="col-nome">{{ r.nome }}</td>
+            {% for v in r.valori %}<td class="tab-num {% if v < 0 %}neg{% endif %}">{{ v|floatformat:"0g" }}</td>{% endfor %}
+            <td class="tab-num col-totale {% if r.totale < 0 %}neg{% endif %}">{{ r.totale|floatformat:"0g" }}</td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <div class="row g-3">
+    {# ====== Self-service: direct costing ====== #}
+    <div class="col-xl-6">
+      <div class="panel h-100">
+        <div class="panel-title"><i class="bi bi-droplet"></i> Self-service &mdash; direct costing</div>
+        <div class="panel-sub">Ai portali e alle piste vanno solo i costi loro: i costi comuni restano fuori. Il margine II &egrave; quanto il self-service contribuisce a pagare la struttura.</div>
+        <div class="panel-body">
+          {% with s=a.self %}
+          <table class="table table-sm prospetto mb-3">
+            <tbody>
+              <tr><td>Ricavi self-service (portali, piste, monete online)</td><td class="tab-num">&euro;{{ s.ricavi|floatformat:"0g" }}</td></tr>
+              <tr class="meno"><td>Costi variabili (acqua, chimici, energia&hellip;)</td><td class="tab-num">&euro;{{ s.variabili|floatformat:"0g" }}</td></tr>
+              <tr class="uguale"><td>Margine di contribuzione I {% if s.mdc1_pct != None %}<span class="fw-normal">({{ s.mdc1_pct|floatformat:1 }}%)</span>{% endif %}</td><td class="tab-num {% if s.mdc1 < 0 %}neg{% endif %}">&euro;{{ s.mdc1|floatformat:"0g" }}</td></tr>
+              <tr class="meno"><td>Costi fissi specifici (manutenzione, personale self, ammortamenti)</td><td class="tab-num">&euro;{{ s.fissi_specifici|floatformat:"0g" }}</td></tr>
+              <tr class="uguale"><td>Margine di contribuzione II {% if s.mdc2_pct != None %}<span class="fw-normal">({{ s.mdc2_pct|floatformat:1 }}%)</span>{% endif %}</td><td class="tab-num {% if s.mdc2 < 0 %}neg{% endif %}">&euro;{{ s.mdc2|floatformat:"0g" }}</td></tr>
+            </tbody>
+          </table>
+          <div class="row g-2 mb-2">
+            <div class="col-6 col-md-3"><div class="kpi-mini"><div class="label">Cicli portali</div><div class="value">{{ s.cicli }}</div></div></div>
+            <div class="col-6 col-md-3"><div class="kpi-mini"><div class="label">Ricavo / ciclo</div><div class="value">{% if s.ricavo_ciclo != None %}&euro;{{ s.ricavo_ciclo|floatformat:2 }}{% else %}&mdash;{% endif %}</div></div></div>
+            <div class="col-6 col-md-3"><div class="kpi-mini"><div class="label">Costo var. / ciclo</div><div class="value">{% if s.variabile_ciclo != None %}&euro;{{ s.variabile_ciclo|floatformat:2 }}{% else %}&mdash;{% endif %}</div></div></div>
+            <div class="col-6 col-md-3"><div class="kpi-mini"><div class="label">Cicli di pareggio</div><div class="value">{{ s.cicli_pareggio|default:"—" }}</div></div></div>
+          </div>
+          <div class="text-muted" style="font-size:.7rem">Valori per ciclo indicativi: i costi variabili comprendono anche le piste. Cicli di pareggio = costi fissi specifici / margine I per ciclo.</div>
+          <details class="mt-2"><summary>Dettaglio dei costi del self-service</summary>
+            <table class="table table-sm bilancio mt-1"><tbody>{% include "contabilita/_sezioni_centro.html" with sezioni=s.sezioni %}</tbody></table>
+          </details>
+          {% endwith %}
+        </div>
+      </div>
+    </div>
+
+    {# ====== Servito: full costing ====== #}
+    <div class="col-xl-6">
+      <div class="panel h-100">
+        <div class="panel-title"><i class="bi bi-person-gear"></i> Servito &mdash; full costing</div>
+        <div class="panel-sub">Al servito vanno i suoi costi diretti e una quota dei costi comuni ({{ a.servito.criterio|lower }}: {{ a.servito.quota_pct|floatformat:1 }}%).</div>
+        <div class="panel-body">
+          {% with s=a.servito %}
+          <table class="table table-sm prospetto mb-3">
+            <tbody>
+              <tr><td>Ricavi servito (lavaggi)</td><td class="tab-num">&euro;{{ s.ricavi|floatformat:"0g" }}</td></tr>
+              <tr class="meno"><td>Costi diretti (personale servito, consumabili&hellip;)</td><td class="tab-num">&euro;{{ s.diretti|floatformat:"0g" }}</td></tr>
+              <tr class="uguale"><td>Margine diretto</td><td class="tab-num {% if s.margine_diretto < 0 %}neg{% endif %}">&euro;{{ s.margine_diretto|floatformat:"0g" }}</td></tr>
+              <tr class="meno"><td>Quota costi comuni ({{ s.quota_pct|floatformat:1 }}% di &euro;{{ s.comuni|floatformat:"0g" }})</td><td class="tab-num">&euro;{{ s.quota_comuni|floatformat:"0g" }}</td></tr>
+              <tr class="uguale"><td>Risultato pieno {% if s.risultato_pct != None %}<span class="fw-normal">({{ s.risultato_pct|floatformat:1 }}%)</span>{% endif %}</td><td class="tab-num {% if s.risultato < 0 %}neg{% endif %}">&euro;{{ s.risultato|floatformat:"0g" }}</td></tr>
+            </tbody>
+          </table>
+          <div class="row g-2 mb-2">
+            <div class="col-6 col-md-3"><div class="kpi-mini"><div class="label">Lavaggi</div><div class="value">{{ s.lavaggi }}</div></div></div>
+            <div class="col-6 col-md-3"><div class="kpi-mini"><div class="label">Costo pieno / lavaggio</div><div class="value">{% if s.costo_lavaggio != None %}&euro;{{ s.costo_lavaggio|floatformat:2 }}{% else %}&mdash;{% endif %}</div>
+              <div class="text-muted" style="font-size:.68rem">ricavo &euro;{{ s.ricavo_lavaggio|floatformat:2|default:"—" }}</div></div></div>
+            <div class="col-6 col-md-3"><div class="kpi-mini"><div class="label">Ore lavorate servito</div><div class="value">{{ s.ore|floatformat:"0g" }}</div></div></div>
+            <div class="col-6 col-md-3"><div class="kpi-mini"><div class="label">Costo pieno / ora</div><div class="value">{% if s.costo_ora != None %}&euro;{{ s.costo_ora|floatformat:2 }}{% else %}&mdash;{% endif %}</div>
+              <div class="text-muted" style="font-size:.68rem">ricavo &euro;{{ s.ricavo_ora|floatformat:2|default:"—" }}</div></div></div>
+          </div>
+          {% if s.servizi %}
+          <div class="tabella-scroll">
+            <table class="table table-sm">
+              <thead><tr><th>Servizio</th><th class="tab-num">Venduti</th><th class="tab-num">Minuti</th><th class="tab-num">Ricavo netto</th><th class="tab-num">Costo pieno</th><th class="tab-num">Margine</th></tr></thead>
+              <tbody>
+                {% for sv in s.servizi %}
+                <tr><td>{{ sv.nome }}</td><td class="tab-num">{{ sv.quantita }}</td><td class="tab-num">{{ sv.durata|default:"—" }}</td>
+                  <td class="tab-num">&euro;{{ sv.ricavo|floatformat:2 }}</td>
+                  <td class="tab-num">{% if sv.costo != None %}&euro;{{ sv.costo|floatformat:2 }}{% else %}&mdash;{% endif %}</td>
+                  <td class="tab-num">{% if sv.margine != None %}<span class="{% if sv.margine < 0 %}giu{% else %}su{% endif %}">&euro;{{ sv.margine|floatformat:2 }} ({{ sv.margine_pct|floatformat:0 }}%)</span>{% endif %}</td></tr>
+                {% endfor %}
+              </tbody>
+            </table>
+            <div class="text-muted" style="font-size:.7rem">Costo pieno del servizio = costo pieno per ora &times; durata del servizio (dal catalogo). Ricavo netto = prezzo medio venduto senza IVA.</div>
+          </div>
+          {% endif %}
+          <details class="mt-2"><summary>Dettaglio dei costi diretti del servito</summary>
+            <table class="table table-sm bilancio mt-1"><tbody>{% include "contabilita/_sezioni_centro.html" with sezioni=s.sezioni %}</tbody></table>
+          </details>
+          {% endwith %}
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="row g-3 mt-0">
+    <div class="col-xl-6">
+      <div class="panel">
+        <div class="panel-title"><i class="bi bi-bag"></i> Vendita prodotti</div>
+        <div class="panel-body">
+          {% with p=a.prodotti %}
+          <table class="table table-sm prospetto">
+            <tbody>
+              <tr><td>Ricavi vendita prodotti</td><td class="tab-num">&euro;{{ p.ricavi|floatformat:"0g" }}</td></tr>
+              <tr class="meno"><td>Costi dei prodotti (acquisti per la rivendita&hellip;)</td><td class="tab-num">&euro;{{ p.costi|floatformat:"0g" }}</td></tr>
+              <tr class="uguale"><td>Margine {% if p.margine_pct != None %}<span class="fw-normal">({{ p.margine_pct|floatformat:1 }}%)</span>{% endif %}</td><td class="tab-num {% if p.margine < 0 %}neg{% endif %}">&euro;{{ p.margine|floatformat:"0g" }}</td></tr>
+            </tbody>
+          </table>
+          {% endwith %}
+        </div>
+      </div>
+    </div>
+    <div class="col-xl-6">
+      <div class="panel">
+        <div class="panel-title"><i class="bi bi-building"></i> Costi comuni (struttura)</div>
+        <div class="panel-sub">Fuori dal direct costing del self-service; nel full costing ne va una quota al servito.</div>
+        <div class="panel-body">
+          <div class="fw-bold mb-1">&euro;{{ a.comune.costi|floatformat:"0g" }}</div>
+          <details><summary>Dettaglio</summary>
+            <table class="table table-sm bilancio mt-1"><tbody>{% include "contabilita/_sezioni_centro.html" with sezioni=a.comune.sezioni %}</tbody></table>
+          </details>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}

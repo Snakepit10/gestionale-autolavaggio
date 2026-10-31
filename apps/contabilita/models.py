@@ -394,3 +394,47 @@ class Cespite(models.Model):
             return self.valore
         return self.quota_mensile * n
 
+
+# ---------------------------------------------------------------- analitica
+
+class RipartizionePersonale(models.Model):
+    """Quota del tempo di un dipendente sui centri (es. 85% servito, 15%
+    self per pulizia piste e assistenza), valida dal mese indicato.
+    Senza ripartizione il dipendente e' tutto sul servito."""
+    dipendente = models.ForeignKey('personale.Dipendente', on_delete=models.CASCADE,
+                                   related_name='ripartizioni_centri')
+    valido_dal = models.DateField()
+    ripartizione = models.JSONField(default=dict)
+
+    class Meta:
+        verbose_name = 'Ripartizione del personale'
+        verbose_name_plural = 'Ripartizioni del personale'
+        ordering = ['dipendente', '-valido_dal']
+        unique_together = [('dipendente', 'valido_dal')]
+
+    def __str__(self):
+        return f'{self.dipendente} dal {self.valido_dal:%m/%Y}: {self.testo}'
+
+    @property
+    def testo(self):
+        return testo_ripartizione(self.ripartizione)
+
+
+class ParametriAnalitica(models.Model):
+    """Come i costi comuni (quello che resta sul centro Comune) si
+    attribuiscono al servito nel full costing. Una sola riga."""
+    CRITERI = [('ricavi', 'In proporzione ai ricavi del servito'), ('percentuale', 'Percentuale fissa')]
+    criterio_comuni = models.CharField(max_length=15, choices=CRITERI, default='ricavi')
+    percentuale_servito = models.DecimalField(max_digits=5, decimal_places=2, default=Decimal('50'))
+
+    class Meta:
+        verbose_name = "Parametri dell'analitica"
+        verbose_name_plural = "Parametri dell'analitica"
+
+    def __str__(self):
+        return self.get_criterio_comuni_display()
+
+    @classmethod
+    def attuali(cls):
+        return cls.objects.first() or cls()
+
