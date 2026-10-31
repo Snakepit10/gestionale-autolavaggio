@@ -30,7 +30,7 @@
   <div class="row g-2 mb-3">
     <div class="col-6 col-md-3"><div class="kpi-tile hero"><div class="label">Costo aziendale {{ anno }}</div><div class="value">&euro;{{ a.totale.costo|floatformat:"2g" }}</div><div class="sub">{{ a.totale.mesi }} mes{{ a.totale.mesi|pluralize:"e,i" }} calcolat{{ a.totale.mesi|pluralize:"o,i" }}</div></div></div>
     <div class="col-6 col-md-3"><div class="kpi-tile"><div class="label">Costo medio mensile</div><div class="value">&euro;{{ a.totale.costo_medio_mese|floatformat:"2g" }}</div></div></div>
-    <div class="col-6 col-md-3"><div class="kpi-tile"><div class="label">Costo per ora</div><div class="value">&euro;{{ a.totale.costo_ora|floatformat:2 }}</div></div></div>
+    <div class="col-6 col-md-3"><div class="kpi-tile"><div class="label">Costo orario</div><div class="value">&euro;{{ a.totale.costo_ora|floatformat:2 }}</div><div class="sub">costo aziendale / ore lavorate</div></div></div>
     <div class="col-6 col-md-3"><div class="kpi-tile"><div class="label">Ore totali</div><div class="value">{{ a.totale.ore|floatformat:"-2g" }}</div></div></div>
   </div>
 
@@ -43,13 +43,14 @@
     <div class="panel-title"><i class="bi bi-calendar3"></i> Andamento mensile</div>
     <div class="panel-body tabella-scroll">
       <table class="table table-sm table-hover anno">
-        <thead><tr><th>Mese</th><th class="tab-num">Ore</th><th class="tab-num">Dipendenti</th><th class="tab-num">Netto</th><th class="tab-num">Lordo</th>
-          <th class="tab-num">Costo aziendale</th><th class="tab-num">Costo/ora</th><th class="tab-num">Costo medio dip.</th><th class="tab-num">Var. % costo</th></tr></thead>
+        <thead><tr><th>Mese</th><th class="tab-num">Ore totali</th><th class="tab-num">Ore lavorate</th><th class="tab-num">Dipendenti</th><th class="tab-num">Netto</th><th class="tab-num">Lordo</th>
+          <th class="tab-num">Costo aziendale</th><th class="tab-num" title="Costo aziendale / ore lavorate">Costo orario</th><th class="tab-num">Costo medio dip.</th><th class="tab-num">Var. % costo</th></tr></thead>
         <tbody>
           {% for m in a.mesi %}
           <tr class="{% if not m.presente %}vuoto{% endif %}">
             <td><a href="{% url 'personale:mese' %}?mese={{ m.data|date:'Y-m' }}" class="{% if not m.presente %}text-muted{% endif %}">{{ m.nome }}</a></td>
             <td class="tab-num">{{ m.ore|num }}</td>
+            <td class="tab-num">{{ m.ore_lavorate|num }}</td>
             <td class="tab-num">{{ m.attivi }}</td>
             <td class="tab-num">&euro;{{ m.netto|floatformat:"2g" }}</td>
             <td class="tab-num">&euro;{{ m.lordo|floatformat:"2g" }}</td>
@@ -60,7 +61,7 @@
           </tr>
           {% endfor %}
         </tbody>
-        <tfoot><tr><td>Totale</td><td class="tab-num">{{ a.totale.ore|num }}</td><td></td>
+        <tfoot><tr><td>Totale</td><td class="tab-num">{{ a.totale.ore|num }}</td><td class="tab-num">{{ a.totale.ore_lavorate|num }}</td><td></td>
           <td class="tab-num">&euro;{{ a.totale.netto|floatformat:"2g" }}</td><td class="tab-num">&euro;{{ a.totale.lordo|floatformat:"2g" }}</td>
           <td class="tab-num">&euro;{{ a.totale.costo|floatformat:"2g" }}</td><td class="tab-num">&euro;{{ a.totale.costo_ora|floatformat:2 }}</td><td></td><td></td></tr></tfoot>
       </table>
@@ -73,10 +74,10 @@
         <div class="panel-title"><i class="bi bi-grid-3x3-gap"></i> Trimestri</div>
         <div class="panel-body tabella-scroll">
           <table class="table table-sm anno">
-            <thead><tr><th>Trimestre</th><th class="tab-num">Mesi</th><th class="tab-num">Ore</th><th class="tab-num">Costo</th><th class="tab-num">Costo/ora</th><th class="tab-num">Var. %</th></tr></thead>
+            <thead><tr><th>Trimestre</th><th class="tab-num">Mesi</th><th class="tab-num">Ore lavorate</th><th class="tab-num">Costo</th><th class="tab-num" title="Costo aziendale / ore lavorate">Costo orario</th><th class="tab-num">Var. %</th></tr></thead>
             <tbody>
               {% for t in a.trimestri %}
-              <tr class="{% if not t.mesi %}vuoto{% endif %}"><td>T{{ t.numero }} {{ anno }}</td><td class="tab-num">{{ t.mesi }}</td><td class="tab-num">{{ t.ore|num }}</td>
+              <tr class="{% if not t.mesi %}vuoto{% endif %}"><td>T{{ t.numero }} {{ anno }}</td><td class="tab-num">{{ t.mesi }}</td><td class="tab-num">{{ t.ore_lavorate|num }}</td>
                 <td class="tab-num">&euro;{{ t.costo|floatformat:"2g" }}</td><td class="tab-num">&euro;{{ t.costo_ora|floatformat:2 }}</td>
                 <td class="tab-num">{% if t.variazione is not None %}<span class="{% if t.variazione > 0 %}su{% else %}giu{% endif %}">{% if t.variazione > 0 %}+{% endif %}{{ t.variazione|floatformat:1 }}%</span>{% endif %}</td></tr>
               {% endfor %}

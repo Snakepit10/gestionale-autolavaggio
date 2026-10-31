@@ -55,6 +55,11 @@ class CalcoloTest(TestCase):
         self.assertEqual(r['differenza'], Decimal('17'))
         self.assertEqual(r['costo'], Decimal('2117'))
         self.assertEqual(c['riepilogo']['attivi'], 1)
+        # netto incassato = netto + 13a + bonus = busta paga + fuori busta
+        self.assertEqual(r['netto_incassato'], Decimal('1417'))
+        self.assertEqual(r['netto_incassato'], r['busta_paga'] + r['totale_pagare'])
+        # indice di costo orario: costo aziendale / ore lavorate (non le ore pagate di ferie)
+        self.assertEqual(c['riepilogo']['costo_ora'], Decimal('2117') / Decimal('170'))
         self.assertEqual(c['da_verificare'], 0)
 
     def test_bonus_pagato_e_occasionale(self):
@@ -64,6 +69,7 @@ class CalcoloTest(TestCase):
         self.assertEqual(r['totale_pagare'], Decimal('67'))
         self.assertEqual(r['residuo'], Decimal('47'))
         self.assertEqual(r['costo'], Decimal('2167'))
+        self.assertEqual(r['netto_incassato'], Decimal('1467'))
         self.mario.tipo = 'occasionale'
         self.mario.save()
         self.assertEqual(calcolo.calcola_mese(self.mese)['righe'][0]['rateo'], 0)
@@ -105,6 +111,7 @@ class CalcoloTest(TestCase):
         a = calcolo.andamento_anno(2026)
         self.assertEqual(a['totale']['mesi'], 1)
         self.assertEqual(a['mesi'][9]['costo'], Decimal('2117'))
+        self.assertEqual(a['totale']['costo_ora'], Decimal('2117') / Decimal('170'))
         self.assertEqual(a['trimestri'][3]['mesi'], 1)
         self.assertEqual(a['per_dipendente'][0]['dipendente'], self.mario)
 

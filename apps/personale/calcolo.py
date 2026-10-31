@@ -108,6 +108,8 @@ def calcola_riga(riga, presenze, giorni, mese_obj, parametro):
     totale_pagare = differenza + bonus
     residuo = totale_pagare - (riga.pagato or ZERO)
     costo = netto + rateo + contributi + bonus
+    # quanto incassa il dipendente: in busta paga + fuori busta (differenza + bonus)
+    netto_incassato = netto + rateo + bonus
     return {
         'riga': riga, 'dipendente': dip, 'celle': celle,
         'ore_lavorate': ore_lavorate, 'gg_ferie': gg['F'], 'gg_malattia': gg['M'], 'gg_libero': gg['L'],
@@ -119,6 +121,7 @@ def calcola_riga(riga, presenze, giorni, mese_obj, parametro):
         'busta_paga': riga.busta_paga, 'contributi': contributi, 'bonus': riga.bonus,
         'differenza': differenza, 'totale_pagare': totale_pagare,
         'pagato': riga.pagato, 'residuo': residuo, 'costo': costo,
+        'netto_incassato': netto_incassato,
         # testo dei campi da compilare
         'inp': {'coeff': testo_numero(riga.coefficiente_lordo), 'busta': testo_numero(riga.busta_paga),
                 'bonus': testo_numero(riga.bonus), 'pagato': testo_numero(riga.pagato)},
@@ -149,7 +152,7 @@ def _controlli(righe):
 
 TOTALI = ['ore_lavorate', 'gg_ferie', 'gg_malattia', 'gg_libero', 'ore_ferie', 'ore_malattia',
           'ore_totali', 'netto', 'rateo', 'lordo', 'contributi', 'differenza', 'totale_pagare',
-          'residuo', 'costo']
+          'residuo', 'costo', 'netto_incassato']
 
 
 def calcola_mese(mese_obj):
@@ -187,11 +190,14 @@ def calcola_mese(mese_obj):
         'da_verificare': sum(1 for c in controlli if not c['ok']),
         'riepilogo': {
             'ore': totali['ore_totali'],
+            'ore_lavorate': totali['ore_lavorate'],
             'netto': totali['netto'],
             'lordo': totali['lordo'],
             'costo': totali['costo'],
+            'netto_incassato': totali['netto_incassato'],
             'attivi': attivi,
-            'costo_ora': totali['costo'] / totali['ore_totali'] if totali['ore_totali'] else ZERO,
+            # indice di costo orario: sulle ore lavorate (ferie e malattia pesano sul costo)
+            'costo_ora': totali['costo'] / totali['ore_lavorate'] if totali['ore_lavorate'] else ZERO,
         },
     }
 
@@ -216,7 +222,8 @@ def andamento_anno(anno):
         riga = {
             'numero': n, 'nome': NOMI_MESI[n - 1], 'data': date(anno, n, 1),
             'trimestre': (n - 1) // 3 + 1, 'presente': bool(calcolo),
-            'ore': r['ore'] if r else ZERO, 'attivi': r['attivi'] if r else 0,
+            'ore': r['ore'] if r else ZERO, 'ore_lavorate': r['ore_lavorate'] if r else ZERO,
+            'attivi': r['attivi'] if r else 0,
             'netto': r['netto'] if r else ZERO, 'lordo': r['lordo'] if r else ZERO,
             'costo': r['costo'] if r else ZERO, 'costo_ora': r['costo_ora'] if r else ZERO,
         }
@@ -232,8 +239,8 @@ def andamento_anno(anno):
             d['costo'][n - 1] = rd['costo']
 
     con_dati = [m for m in mesi if m['costo'] or m['ore']]
-    totale = {k: sum((m[k] for m in mesi), ZERO) for k in ('ore', 'netto', 'lordo', 'costo')}
-    totale['costo_ora'] = totale['costo'] / totale['ore'] if totale['ore'] else ZERO
+    totale = {k: sum((m[k] for m in mesi), ZERO) for k in ('ore', 'ore_lavorate', 'netto', 'lordo', 'costo')}
+    totale['costo_ora'] = totale['costo'] / totale['ore_lavorate'] if totale['ore_lavorate'] else ZERO
     totale['costo_medio_mese'] = totale['costo'] / len(con_dati) if con_dati else ZERO
     totale['mesi'] = len(con_dati)
 
@@ -241,9 +248,9 @@ def andamento_anno(anno):
     for t in range(1, 5):
         dentro = [m for m in mesi if m['trimestre'] == t and (m['costo'] or m['ore'])]
         tr = {'numero': t, 'mesi': len(dentro)}
-        for k in ('ore', 'netto', 'lordo', 'costo'):
+        for k in ('ore', 'ore_lavorate', 'netto', 'lordo', 'costo'):
             tr[k] = sum((m[k] for m in dentro), ZERO)
-        tr['costo_ora'] = tr['costo'] / tr['ore'] if tr['ore'] else ZERO
+        tr['costo_ora'] = tr['costo'] / tr['ore_lavorate'] if tr['ore_lavorate'] else ZERO
         tr['variazione'] = _variazione(tr['costo'], prec_t['costo'] if prec_t else None)
         if tr['costo']:
             prec_t = tr

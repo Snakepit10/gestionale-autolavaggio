@@ -21,6 +21,8 @@
 .calcolo .fuori { color: #b45309; font-weight: 700; }
 .calcolo tfoot td { font-weight: 800; background: #f8fafc; }
 .legenda span { display: inline-block; padding: 0 6px; border-radius: 4px; font-weight: 700; margin-right: 4px; }
+.kpi-tile.indice { border: 2px solid #14b8a6; }
+.kpi-tile.indice .value { color: #0f766e; }
 .controllo { display: flex; justify-content: space-between; gap: 8px; padding: 5px 0; border-bottom: 1px solid #f1f5f9; font-size: .82rem; }
 .controllo:last-child { border-bottom: none; }
 .barra-salva { position: sticky; bottom: 0; z-index: 5; background: rgba(240,242,245,.95); padding: 8px 0; display: flex; gap: 8px; align-items: center; justify-content: flex-end; }
@@ -58,12 +60,13 @@
 
   {# ====== Riepilogo ====== #}
   <div class="row g-2 mb-3">
-    <div class="col-6 col-md-2"><div class="kpi-tile hero"><div class="label">Costo aziendale</div><div class="value">&euro;{{ c.riepilogo.costo|floatformat:"2g" }}</div><div class="sub">&euro;{{ c.riepilogo.costo_ora|floatformat:2 }} per ora</div></div></div>
-    <div class="col-6 col-md-2"><div class="kpi-tile"><div class="label">Ore totali</div><div class="value">{{ c.riepilogo.ore|num }}</div><div class="sub">lavorate + ferie + malattia</div></div></div>
-    <div class="col-6 col-md-2"><div class="kpi-tile"><div class="label">Retribuzione netta</div><div class="value">&euro;{{ c.riepilogo.netto|floatformat:"2g" }}</div></div></div>
-    <div class="col-6 col-md-2"><div class="kpi-tile"><div class="label">Retribuzione lorda</div><div class="value">&euro;{{ c.riepilogo.lordo|floatformat:"2g" }}</div></div></div>
-    <div class="col-6 col-md-2"><div class="kpi-tile"><div class="label">Dipendenti attivi</div><div class="value">{{ c.riepilogo.attivi }}</div></div></div>
-    <div class="col-6 col-md-2"><div class="kpi-tile"><div class="label">Residuo da pagare</div><div class="value">&euro;{{ c.totali.residuo|floatformat:"2g" }}</div></div></div>
+    <div class="col-6 col-md-3 col-xl"><div class="kpi-tile hero"><div class="label">Costo aziendale</div><div class="value">&euro;{{ c.riepilogo.costo|floatformat:"2g" }}</div></div></div>
+    <div class="col-6 col-md-3 col-xl"><div class="kpi-tile indice"><div class="label">Costo orario</div><div class="value">&euro;{{ c.riepilogo.costo_ora|floatformat:2 }}</div><div class="sub">costo aziendale / {{ c.riepilogo.ore_lavorate|num }} ore lavorate</div></div></div>
+    <div class="col-6 col-md-3 col-xl"><div class="kpi-tile"><div class="label">Ore totali</div><div class="value">{{ c.riepilogo.ore|num }}</div><div class="sub">lavorate + ferie + malattia</div></div></div>
+    <div class="col-6 col-md-3 col-xl"><div class="kpi-tile"><div class="label">Retribuzione netta</div><div class="value">&euro;{{ c.riepilogo.netto|floatformat:"2g" }}</div></div></div>
+    <div class="col-6 col-md-3 col-xl"><div class="kpi-tile"><div class="label">Retribuzione lorda</div><div class="value">&euro;{{ c.riepilogo.lordo|floatformat:"2g" }}</div></div></div>
+    <div class="col-6 col-md-3 col-xl"><div class="kpi-tile"><div class="label">Dipendenti attivi</div><div class="value">{{ c.riepilogo.attivi }}</div></div></div>
+    <div class="col-6 col-md-3 col-xl"><div class="kpi-tile"><div class="label">Residuo da pagare</div><div class="value">&euro;{{ c.totali.residuo|floatformat:"2g" }}</div></div></div>
   </div>
 
   <form method="post" id="form-mese" novalidate>
@@ -201,6 +204,58 @@
           Contributi = busta paga × (coeff. − 1) · Differenza fuori busta = netto + 13ª − busta paga ·
           Costo aziendale = netto + 13ª + contributi + bonus.
         </div>
+      </div>
+    </div>
+
+    {# ====== Netto incassato dai dipendenti ====== #}
+    <div class="panel" id="netto-incassato">
+      <div class="panel-title"><i class="bi bi-wallet2"></i> Netto incassato dai dipendenti
+        <span class="badge bg-primary ms-1" style="text-transform:none;letter-spacing:0">Totale &euro;{{ c.totali.netto_incassato|floatformat:"2g" }}</span>
+      </div>
+      <div class="panel-sub">Netto incassato = netto (ore × tariffa) + rateo 13ª + bonus. Arriva in parte con la busta paga e in parte fuori busta.</div>
+      <div class="panel-body tabella-scroll">
+        <table class="table table-sm table-hover calcolo">
+          <thead>
+            <tr>
+              <th class="col-nome">Dipendente</th><th class="tab-num">Ore totali</th>
+              <th class="tab-num">Netto</th><th class="tab-num">Rateo 13ª</th><th class="tab-num">Bonus</th>
+              <th class="tab-num">Netto incassato</th>
+              <th class="tab-num">di cui busta paga</th><th class="tab-num">di cui fuori busta</th>
+              <th class="tab-num">Pagato fuori busta</th><th class="tab-num">Residuo da pagare</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for r in c.righe %}
+            <tr>
+              <td class="col-nome">{{ r.dipendente.nome }}</td>
+              <td class="tab-num">{{ r.ore_totali|num }}</td>
+              <td class="tab-num">&euro;{{ r.netto|floatformat:"2g" }}</td>
+              <td class="tab-num">&euro;{{ r.rateo|floatformat:"2g" }}</td>
+              <td class="tab-num">&euro;{{ r.bonus|default:0|floatformat:"2g" }}</td>
+              <td class="tab-num fw-bold">&euro;{{ r.netto_incassato|floatformat:"2g" }}</td>
+              <td class="tab-num">&euro;{{ r.busta_paga|default:0|floatformat:"2g" }}</td>
+              <td class="tab-num fuori">&euro;{{ r.totale_pagare|floatformat:"2g" }}</td>
+              <td class="tab-num">&euro;{{ r.pagato|default:0|floatformat:"2g" }}</td>
+              <td class="tab-num {% if r.residuo > 0.005 %}text-danger fw-bold{% endif %}">&euro;{{ r.residuo|floatformat:"2g" }}</td>
+            </tr>
+            {% endfor %}
+          </tbody>
+          <tfoot>
+            <tr>
+              <td class="col-nome">Totale</td>
+              <td class="tab-num">{{ c.totali.ore_totali|num }}</td>
+              <td class="tab-num">&euro;{{ c.totali.netto|floatformat:"2g" }}</td>
+              <td class="tab-num">&euro;{{ c.totali.rateo|floatformat:"2g" }}</td>
+              <td class="tab-num">&euro;{{ c.totali.bonus|floatformat:"2g" }}</td>
+              <td class="tab-num">&euro;{{ c.totali.netto_incassato|floatformat:"2g" }}</td>
+              <td class="tab-num">&euro;{{ c.totali.busta_paga|floatformat:"2g" }}</td>
+              <td class="tab-num">&euro;{{ c.totali.totale_pagare|floatformat:"2g" }}</td>
+              <td class="tab-num">&euro;{{ c.totali.pagato|floatformat:"2g" }}</td>
+              <td class="tab-num">&euro;{{ c.totali.residuo|floatformat:"2g" }}</td>
+            </tr>
+          </tfoot>
+        </table>
+        <div class="text-muted" style="font-size:.74rem">Busta paga e bonus si compilano nella tabella del calcolo qui sopra; i valori si aggiornano al salvataggio.</div>
       </div>
     </div>
 
