@@ -1,0 +1,114 @@
+{% extends "base.html" %}
+{% block title %}Piano dei conti{% endblock %}
+
+{% block extra_css %}{% include "contabilita/_stile.html" %}{% endblock %}
+
+{% block content %}
+<div class="dash-page">
+  <div class="dash-header">
+    <h4><i class="bi bi-diagram-3 me-2"></i>Piano dei conti</h4>
+    <div class="d-flex gap-2 flex-wrap">
+      {% include "contabilita/_nav.html" %}
+      <button class="btn btn-sm btn-primary" data-bs-toggle="modal" data-bs-target="#modale-voce"><i class="bi bi-plus-lg"></i> Nuova voce</button>
+    </div>
+  </div>
+
+  <div class="panel">
+    <div class="panel-body small text-muted pt-3">
+      <strong>Sezione</strong>: dove la voce va nel conto economico (le voci <em>non economiche</em> &mdash; giroconti, IVA, rate, prelievi &mdash; contano solo nei flussi di cassa).
+      <strong>Flusso</strong>: in quale parte del rendiconto di cassa finiscono i pagamenti.
+      <strong>Ripartizione</strong>: come il costo si divide fra i centri dell'analitica; quello che non &egrave; assegnato va sul centro <em>Comune</em>
+      (escluso dal direct costing del self-service, ripartito nel full costing del servito).
+    </div>
+  </div>
+
+  {% for s in sezioni %}{% if s.voci %}
+  <div class="panel">
+    <div class="panel-title">{{ s.nome }}</div>
+    <div class="panel-body tabella-scroll">
+      <table class="table table-sm table-hover" style="table-layout:fixed; min-width:760px">
+        <thead><tr><th style="width:150px">Codice</th><th style="width:34%">Voce</th><th style="width:20%">Flusso</th><th>Ripartizione</th><th style="width:56px"></th></tr></thead>
+        <tbody>
+          {% for v in s.voci %}
+          <tr class="{% if not v.attiva %}text-muted{% endif %}">
+            <td><code>{{ v.codice }}</code></td>
+            <td class="fw-semibold">{{ v.nome }}{% if not v.attiva %} <span class="badge bg-secondary">non attiva</span>{% endif %}</td>
+            <td>{{ v.get_flusso_display }}</td>
+            <td>{{ v.testo_ripartizione }}</td>
+            <td class="text-end"><button class="btn btn-sm btn-outline-secondary" data-bs-toggle="modal" data-bs-target="#modale-voce"
+                data-id="{{ v.pk }}" data-codice="{{ v.codice }}" data-nome="{{ v.nome }}" data-sezione="{{ v.sezione }}"
+                data-flusso="{{ v.flusso }}" data-ordine="{{ v.ordine }}" data-attiva="{{ v.attiva|yesno:'1,0' }}"
+                {% for c in v.campi_rip %}data-rip-{{ c.chiave }}="{{ c.valore }}" {% endfor %}><i class="bi bi-pencil"></i></button></td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+  {% endif %}{% endfor %}
+
+  <div class="panel">
+    <div class="panel-title"><i class="bi bi-magic"></i> Regole dei fornitori</div>
+    <div class="panel-sub">Le fatture nuove di questi fornitori prendono da sole voce e ripartizione. Si creano dalla fattura con "Ricorda per il fornitore".</div>
+    <div class="panel-body tabella-scroll">
+      <table class="table table-sm">
+        <thead><tr><th>Fornitore</th><th>Voce</th><th>Ripartizione</th><th></th></tr></thead>
+        <tbody>
+          {% for r in regole %}
+          <tr><td>{{ r.fornitore }}</td><td>{{ r.voce }}</td>
+            <td>{% if r.ripartizione %}{{ r.ripartizione|length }} centri personalizzati{% else %}della voce{% endif %}</td>
+            <td class="text-end"><form method="post">{% csrf_token %}<input type="hidden" name="azione" value="elimina_regola"><input type="hidden" name="regola" value="{{ r.pk }}">
+              <button class="btn btn-sm btn-link text-danger p-0"><i class="bi bi-x-lg"></i></button></form></td></tr>
+          {% empty %}
+          <tr><td colspan="4" class="text-muted">Nessuna regola.</td></tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div>
+
+<div class="modal fade" id="modale-voce" tabindex="-1">
+  <div class="modal-dialog"><form method="post" class="modal-content">
+    {% csrf_token %}<input type="hidden" name="azione" value="salva_voce"><input type="hidden" name="id">
+    <div class="modal-header"><h5 class="modal-title">Voce</h5><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div>
+    <div class="modal-body">
+      <div class="row g-2">
+        <div class="col-4"><label class="form-label">Codice</label><input type="text" name="codice" class="form-control" required maxlength="20"></div>
+        <div class="col-8"><label class="form-label">Nome</label><input type="text" name="nome" class="form-control" required maxlength="80"></div>
+        <div class="col-6"><label class="form-label">Sezione</label>
+          <select name="sezione" class="form-select">{% for k, n in sezioni_choices %}<option value="{{ k }}">{{ n }}</option>{% endfor %}</select></div>
+        <div class="col-6"><label class="form-label">Flusso di cassa</label>
+          <select name="flusso" class="form-select">{% for k, n in flussi %}<option value="{{ k }}">{{ n }}</option>{% endfor %}</select></div>
+      </div>
+      <label class="form-label mt-2">Ripartizione sui centri (vuota = tutto sul Comune)</label>
+      {% include "contabilita/_ripartizione.html" with campi=campi_nuova prefisso="rip" %}
+      <div class="row g-2 mt-1 align-items-end">
+        <div class="col-4"><label class="form-label">Ordine</label><input type="number" name="ordine" min="0" class="form-control"></div>
+        <div class="col-8"><div class="form-check"><input class="form-check-input" type="checkbox" name="attiva" value="1" id="voce-attiva" checked>
+          <label class="form-check-label" for="voce-attiva">Attiva</label></div></div>
+      </div>
+    </div>
+    <div class="modal-footer"><button class="btn btn-primary"><i class="bi bi-save"></i> Salva</button></div>
+  </form></div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+document.getElementById('modale-voce').addEventListener('show.bs.modal', function (ev) {
+  var d = (ev.relatedTarget && ev.relatedTarget.dataset) || {}, f = this.querySelector('form');
+  f.elements.id.value = d.id || '';
+  f.elements.codice.value = d.codice || '';
+  f.elements.nome.value = d.nome || '';
+  f.elements.sezione.value = d.sezione || 'costi_fissi';
+  f.elements.flusso.value = d.flusso || 'operativo';
+  f.elements.ordine.value = d.ordine || '';
+  f.elements.attiva.checked = d.id ? d.attiva === '1' : true;
+  ['self', 'servito', 'prodotti', 'comune'].forEach(function (c) {
+    f.elements['rip_' + c].value = d['rip' + c.charAt(0).toUpperCase() + c.slice(1)] || '';
+  });
+  this.querySelector('.modal-title').textContent = d.id ? 'Modifica ' + d.nome : 'Nuova voce';
+});
+</script>
+{% endblock %}

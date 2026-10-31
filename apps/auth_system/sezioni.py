@@ -37,6 +37,8 @@ SEZIONI = [
     ('finanze', 'Finanze', 'Report giornata/periodo, saldi, quadrature', ('/finanze/',)),
     ('personale', 'Costo personale', 'Dipendenti, presenze, retribuzioni e costo del personale',
      ('/personale/',)),
+    ('contabilita', 'Contabilità', 'Fatture fornitori, prima nota, conto economico, flussi di cassa e analitica',
+     ('/contabilita/',)),
     # Permesso senza pagine proprie (nessun prefisso): abilita una funzione
     ('conteggio_cassa', 'Conteggio cassa',
      'Nella Distinta (Ordini) vede e salva il conteggio di contanti e POS; '

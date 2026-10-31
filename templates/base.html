@@ -209,7 +209,7 @@
                         </li>
                         {% endif %}
 
-                        {% if 'fatture' in sezioni_visibili or 'finanze' in sezioni_visibili or 'personale' in sezioni_visibili %}
+                        {% if 'fatture' in sezioni_visibili or 'finanze' in sezioni_visibili or 'personale' in sezioni_visibili or 'contabilita' in sezioni_visibili %}
                         <li class="nav-item dropdown">
                             <a class="nav-link dropdown-toggle" href="#" id="ammDropdown" role="button" data-bs-toggle="dropdown">
                                 <i class="bi bi-cash-coin"></i> Amministrazione
@@ -232,6 +232,13 @@
                                 <li><a class="dropdown-item" href="{% url 'personale:mese' %}"><i class="bi bi-people"></i> Costo del personale</a></li>
                                 <li><a class="dropdown-item" href="{% url 'personale:anno' %}"><i class="bi bi-graph-up"></i> Andamento annuale</a></li>
                                 <li><a class="dropdown-item" href="{% url 'personale:dipendenti' %}"><i class="bi bi-person-vcard"></i> Dipendenti</a></li>
+                                {% endif %}
+                                {% if 'contabilita' in sezioni_visibili %}
+                                {% if 'fatture' in sezioni_visibili or 'finanze' in sezioni_visibili or 'personale' in sezioni_visibili %}<li><hr class="dropdown-divider"></li>{% endif %}
+                                <li><h6 class="dropdown-header">Contabilit&agrave;</h6></li>
+                                <li><a class="dropdown-item" href="{% url 'contabilita:fatture' %}"><i class="bi bi-receipt"></i> Fatture fornitori</a></li>
+                                <li><a class="dropdown-item" href="{% url 'contabilita:scadenziario' %}"><i class="bi bi-calendar-check"></i> Scadenziario</a></li>
+                                <li><a class="dropdown-item" href="{% url 'contabilita:piano_conti' %}"><i class="bi bi-diagram-3"></i> Piano dei conti</a></li>
                                 {% endif %}
                             </ul>
                         </li>

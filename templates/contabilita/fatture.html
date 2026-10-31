@@ -1,0 +1,154 @@
+{% extends "base.html" %}
+{% block title %}Fatture fornitori{% endblock %}
+
+{% block extra_css %}{% include "contabilita/_stile.html" %}{% endblock %}
+
+{% block content %}
+<div class="dash-page">
+  <div class="dash-header">
+    <h4><i class="bi bi-receipt me-2"></i>Fatture fornitori</h4>
+    {% include "contabilita/_nav.html" %}
+  </div>
+
+  <div class="row g-2 mb-3">
+    <div class="col-6 col-lg-3"><div class="kpi-tile hero">
+      <div class="label">{% if stato == 'da_classificare' %}Da classificare{% else %}Imponibile {{ mese|date:"F Y" }}{% endif %}</div>
+      <div class="value">&euro;{{ totali.imponibile|floatformat:"2g" }}</div>
+      <div class="sub">{{ fatture|length }} document{{ fatture|length|pluralize:"o,i" }} &middot; IVA &euro;{{ totali.iva|floatformat:"2g" }}</div>
+    </div></div>
+    <div class="col-6 col-lg-3"><div class="kpi-tile">
+      <div class="label">Totale documenti</div>
+      <div class="value">&euro;{{ totali.totale|floatformat:"2g" }}</div>
+      <div class="sub">imponibile + IVA</div>
+    </div></div>
+    <div class="col-6 col-lg-3"><a class="text-decoration-none" href="?stato=da_classificare"><div class="kpi-tile">
+      <div class="label">Da classificare</div>
+      <div class="value {% if da_classificare %}text-warning{% else %}text-success{% endif %}">{{ da_classificare }}</div>
+      <div class="sub">fatture con righe senza voce</div>
+    </div></a></div>
+    <div class="col-6 col-lg-3"><a class="text-decoration-none" href="{% url 'contabilita:scadenziario' %}"><div class="kpi-tile">
+      <div class="label">Scadenze scadute</div>
+      <div class="value {% if scadute %}text-danger{% else %}text-success{% endif %}">&euro;{{ scadute|floatformat:"2g" }}</div>
+      <div class="sub">da pagare &middot; scadenziario</div>
+    </div></a></div>
+  </div>
+
+  <div class="row g-3">
+    <div class="col-xl-9">
+      <div class="panel">
+        <div class="panel-title">
+          {% if stato == 'da_classificare' %}
+            <i class="bi bi-exclamation-circle"></i> Da classificare (tutti i mesi)
+            <a class="btn btn-sm btn-link ms-auto" href="?mese={{ mese|date:'Y-m' }}">torna al mese</a>
+          {% else %}
+            <a class="btn btn-sm btn-outline-secondary" href="?mese={{ mese_prec|date:'Y-m' }}"><i class="bi bi-chevron-left"></i></a>
+            <span>{{ mese|date:"F Y" }}</span>
+            <a class="btn btn-sm btn-outline-secondary" href="?mese={{ mese_succ|date:'Y-m' }}"><i class="bi bi-chevron-right"></i></a>
+          {% endif %}
+        </div>
+        <div class="panel-body">
+          <form method="get" class="d-flex gap-2 flex-wrap mb-2">
+            {% if stato %}<input type="hidden" name="stato" value="{{ stato }}">{% else %}<input type="hidden" name="mese" value="{{ mese|date:'Y-m' }}">{% endif %}
+            <input type="search" name="q" value="{{ cerca }}" placeholder="Numero, fornitore, descrizione" class="form-control form-control-sm" style="max-width:240px">
+            <select name="fornitore" class="form-select form-select-sm" style="max-width:220px">
+              <option value="">Tutti i fornitori</option>
+              {% for fo in fornitori %}<option value="{{ fo.pk }}" {% if fornitore_id == fo.pk|stringformat:"s" %}selected{% endif %}>{{ fo }}</option>{% endfor %}
+            </select>
+            <select name="voce" class="form-select form-select-sm" style="max-width:220px">
+              <option value="">Tutte le voci</option>
+              {% for v in voci %}<option value="{{ v.pk }}" {% if voce_id == v.pk|stringformat:"s" %}selected{% endif %}>{{ v }}</option>{% endfor %}
+            </select>
+            <button class="btn btn-sm btn-dark"><i class="bi bi-funnel"></i></button>
+          </form>
+          <div class="tabella-scroll">
+            <table class="table table-sm table-hover">
+              <thead><tr><th>Data</th><th>Fornitore</th><th>Numero</th><th>Descrizione</th><th>Voci</th><th class="tab-num">Imponibile</th><th class="tab-num">IVA</th><th class="tab-num">Totale</th><th></th></tr></thead>
+              <tbody>
+                {% for f in fatture %}
+                <tr>
+                  <td class="text-nowrap">{{ f.data|date:"d/m/Y" }}</td>
+                  <td class="fw-semibold">{{ f.fornitore }}</td>
+                  <td class="text-nowrap"><a href="{% url 'contabilita:fattura' f.pk %}">{{ f.numero }}</a>{% if f.nota_credito %} <span class="badge bg-info">NC</span>{% endif %}</td>
+                  <td class="text-muted" style="max-width:260px">{{ f.descrizione|truncatechars:70 }}</td>
+                  <td>{% for v in f.voci %}<span class="badge badge-voce me-1">{{ v }}</span>{% endfor %}
+                    {% if not f.classificata %}<span class="badge bg-warning text-dark">da classificare</span>{% endif %}</td>
+                  <td class="tab-num {% if f.imponibile < 0 %}importo-neg{% endif %}">&euro;{{ f.imponibile|floatformat:"2g" }}</td>
+                  <td class="tab-num">&euro;{{ f.iva|floatformat:"2g" }}</td>
+                  <td class="tab-num fw-bold">&euro;{{ f.totale|floatformat:"2g" }}</td>
+                  <td class="text-nowrap"><span class="badge bg-light text-dark border">{{ f.get_origine_display }}</span></td>
+                </tr>
+                {% empty %}
+                <tr><td colspan="9" class="text-center text-muted p-4">Nessuna fattura{% if stato %} da classificare{% else %} in {{ mese|date:"F Y" }}{% endif %}.</td></tr>
+                {% endfor %}
+              </tbody>
+              {% if fatture %}
+              <tfoot><tr class="fw-bold"><td colspan="5">Totale</td><td class="tab-num">&euro;{{ totali.imponibile|floatformat:"2g" }}</td><td class="tab-num">&euro;{{ totali.iva|floatformat:"2g" }}</td><td class="tab-num">&euro;{{ totali.totale|floatformat:"2g" }}</td><td></td></tr></tfoot>
+              {% endif %}
+            </table>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="col-xl-3">
+      <div class="panel">
+        <div class="panel-title"><i class="bi bi-envelope-paper"></i> PEC</div>
+        <div class="panel-body small">
+          {% if pec_configurata %}
+            <div class="text-muted mb-2">Le fatture arrivate sulla PEC si importano da sole ogni 15 minuti.
+              {% if ultima_pec %}Ultimo messaggio letto: {{ ultima_pec|date:"d/m/Y H:i" }}.{% endif %}</div>
+            <form method="post">{% csrf_token %}<input type="hidden" name="azione" value="leggi_pec">
+              <button class="btn btn-sm btn-outline-primary w-100"><i class="bi bi-arrow-repeat"></i> Leggi la PEC adesso</button></form>
+          {% else %}
+            <div class="text-muted">La lettura della PEC non &egrave; ancora configurata: servono le variabili <code>PEC_IMAP_HOST</code>, <code>PEC_IMAP_USER</code> e <code>PEC_IMAP_PASSWORD</code> su Railway. Intanto carica i file qui sotto.</div>
+          {% endif %}
+        </div>
+      </div>
+
+      <div class="panel">
+        <div class="panel-title"><i class="bi bi-upload"></i> Carica fatture</div>
+        <div class="panel-sub">XML, XML firmati (.p7m) o ZIP (es. dal cassetto fiscale). Le fatture gi&agrave; presenti non si duplicano.</div>
+        <div class="panel-body">
+          <form method="post" enctype="multipart/form-data">{% csrf_token %}<input type="hidden" name="azione" value="carica">
+            <input type="file" name="file" multiple accept=".xml,.p7m,.zip" class="form-control form-control-sm mb-2" required>
+            <button class="btn btn-sm btn-success w-100"><i class="bi bi-upload"></i> Importa</button>
+          </form>
+        </div>
+      </div>
+
+      <div class="panel">
+        <div class="panel-title"><i class="bi bi-pencil-square"></i> Inserisci a mano</div>
+        <div class="panel-sub">Per i documenti che non sono fatture elettroniche (es. fornitori esteri, ricevute).</div>
+        <div class="panel-body">
+          <form method="post" class="small">{% csrf_token %}<input type="hidden" name="azione" value="nuova">
+            <select name="fornitore" class="form-select form-select-sm mb-1">
+              <option value="">— fornitore nuovo —</option>
+              {% for fo in tutti_fornitori %}<option value="{{ fo.pk }}">{{ fo }}</option>{% endfor %}
+            </select>
+            <div class="d-flex gap-1 mb-1">
+              <input type="text" name="fornitore_nuovo" placeholder="Nome fornitore nuovo" class="form-control form-control-sm">
+              <input type="text" name="partita_iva" placeholder="P.IVA" class="form-control form-control-sm" style="max-width:110px">
+            </div>
+            <div class="d-flex gap-1 mb-1">
+              <input type="text" name="numero" placeholder="Numero" class="form-control form-control-sm" required>
+              <input type="date" name="data" value="{{ oggi|date:'Y-m-d' }}" class="form-control form-control-sm" required>
+            </div>
+            <input type="text" name="descrizione" placeholder="Descrizione" class="form-control form-control-sm mb-1">
+            <div class="d-flex gap-1 mb-1">
+              <input type="text" name="imponibile" inputmode="decimal" placeholder="Imponibile €" class="form-control form-control-sm" required>
+              <input type="text" name="aliquota" inputmode="decimal" placeholder="IVA %" value="22" class="form-control form-control-sm" style="max-width:70px">
+            </div>
+            <select name="voce" class="form-select form-select-sm mb-1">
+              <option value="">— voce di costo —</option>
+              {% for v in voci %}<option value="{{ v.pk }}">{{ v }}</option>{% endfor %}
+            </select>
+            <label class="form-label mb-0 text-muted">Scadenza</label>
+            <input type="date" name="scadenza" class="form-control form-control-sm mb-2">
+            <button class="btn btn-sm btn-primary w-100"><i class="bi bi-plus-lg"></i> Inserisci</button>
+          </form>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}

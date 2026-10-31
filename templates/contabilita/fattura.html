@@ -1,0 +1,147 @@
+{% extends "base.html" %}
+{% block title %}{{ f.fornitore }} n. {{ f.numero }}{% endblock %}
+
+{% block extra_css %}{% include "contabilita/_stile.html" %}{% endblock %}
+
+{% block content %}
+<div class="dash-page">
+  <div class="dash-header">
+    <h4><i class="bi bi-receipt me-2"></i>{{ f.nome_tipo }} n. {{ f.numero }} &mdash; {{ f.fornitore }}</h4>
+    <div class="d-flex gap-2 flex-wrap">
+      <a class="btn btn-sm btn-outline-secondary" href="{% url 'contabilita:fatture' %}?mese={{ f.data|date:'Y-m' }}"><i class="bi bi-arrow-left"></i> Fatture di {{ f.data|date:"F" }}</a>
+      {% if f.file_xml %}<a class="btn btn-sm btn-outline-secondary" href="?xml=1"><i class="bi bi-filetype-xml"></i> Scarica XML</a>{% endif %}
+    </div>
+  </div>
+
+  <div class="row g-2 mb-3">
+    <div class="col-6 col-lg-3"><div class="kpi-tile hero"><div class="label">Imponibile</div><div class="value">&euro;{{ f.imponibile|floatformat:"2g" }}</div><div class="sub">{{ f.data|date:"d/m/Y" }} &middot; {{ f.get_origine_display }}</div></div></div>
+    <div class="col-6 col-lg-3"><div class="kpi-tile"><div class="label">IVA</div><div class="value">&euro;{{ f.iva|floatformat:"2g" }}</div></div></div>
+    <div class="col-6 col-lg-3"><div class="kpi-tile"><div class="label">Totale documento</div><div class="value">&euro;{{ f.totale|floatformat:"2g" }}</div></div></div>
+    <div class="col-6 col-lg-3"><div class="kpi-tile"><div class="label">Fornitore</div><div class="value" style="font-size:1rem">{{ f.fornitore }}</div><div class="sub">P.IVA {{ f.fornitore.partita_iva|default:"—" }}</div></div></div>
+  </div>
+
+  <form method="post">
+    {% csrf_token %}<input type="hidden" name="azione" value="salva">
+    <div class="panel">
+      <div class="panel-title"><i class="bi bi-list-ul"></i> Righe e classificazione
+        {% if f.classificata %}<span class="badge bg-success">classificata</span>{% else %}<span class="badge bg-warning text-dark">da classificare</span>{% endif %}
+      </div>
+      <div class="panel-sub">Scegli la voce di costo di ogni riga. La ripartizione sui centri vuota usa quella della voce (in grigio);
+        compilala solo se per questa fattura &egrave; diversa. Le percentuali devono fare 100.</div>
+      <div class="panel-body">
+        <div class="d-flex gap-2 align-items-center mb-2 flex-wrap">
+          <label class="small text-muted">Voce per tutte le righe</label>
+          <select id="voce-tutte" class="form-select form-select-sm" style="max-width:260px">
+            <option value="">—</option>
+            {% for v in voci %}<option value="{{ v.pk }}">{{ v }}</option>{% endfor %}
+          </select>
+          {% if regola %}<span class="small text-muted">Regola del fornitore: <strong>{{ regola.voce }}</strong></span>{% endif %}
+        </div>
+        <div class="tabella-scroll">
+          <table class="table table-sm">
+            <thead><tr><th>#</th><th>Descrizione</th><th class="tab-num">IVA</th><th class="tab-num">Imponibile</th><th>Voce</th><th>Ripartizione</th></tr></thead>
+            <tbody>
+              {% for r in righe %}
+              <tr>
+                <td class="text-muted">{{ r.numero_linea }}</td>
+                <td style="max-width:340px; white-space:normal">{{ r.descrizione|default:"—" }}</td>
+                <td class="tab-num">{{ r.aliquota_iva|floatformat:"-2" }}%</td>
+                <td class="tab-num fw-bold {% if r.imponibile < 0 %}importo-neg{% endif %}">&euro;{{ r.imponibile|floatformat:"2g" }}</td>
+                <td><select name="voce_{{ r.pk }}" class="form-select form-select-sm voce-riga" style="min-width:200px">
+                  <option value="">— da classificare —</option>
+                  {% for v in voci %}<option value="{{ v.pk }}" data-rip="{{ v.ripartizione_json }}" {% if r.voce_id == v.pk %}selected{% endif %}>{{ v }}</option>{% endfor %}
+                </select></td>
+                <td>{% include "contabilita/_ripartizione.html" with campi=r.campi_rip prefisso=r.prefisso_rip %}</td>
+              </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
+    <div class="panel">
+      <div class="panel-title"><i class="bi bi-calendar-range"></i> Competenza e note</div>
+      <div class="panel-sub">Mesi in cui il costo entra nel conto economico, divisi in parti uguali (es. una bolletta bimestrale).</div>
+      <div class="panel-body d-flex gap-3 flex-wrap align-items-end">
+        <div><label class="form-label small mb-0">Dal mese</label><input type="month" name="competenza_dal" value="{{ f.competenza_dal|date:'Y-m' }}" class="form-control form-control-sm" required></div>
+        <div><label class="form-label small mb-0">Al mese</label><input type="month" name="competenza_al" value="{{ f.competenza_al|date:'Y-m' }}" class="form-control form-control-sm" required></div>
+        <div class="flex-grow-1"><label class="form-label small mb-0">Note</label><input type="text" name="note" value="{{ f.note }}" maxlength="255" class="form-control form-control-sm"></div>
+        <div class="form-check"><input class="form-check-input" type="checkbox" name="ricorda" value="1" id="ricorda">
+          <label class="form-check-label small" for="ricorda">Ricorda per {{ f.fornitore }} (le prossime fatture prendono la voce della riga principale)</label></div>
+        <button class="btn btn-primary"><i class="bi bi-save"></i> Salva</button>
+      </div>
+    </div>
+  </form>
+
+  <div class="row g-3">
+    <div class="col-lg-7">
+      <div class="panel">
+        <div class="panel-title"><i class="bi bi-calendar-check"></i> Scadenze</div>
+        <div class="panel-body tabella-scroll">
+          <table class="table table-sm">
+            <thead><tr><th>Scadenza</th><th>Modalit&agrave;</th><th class="tab-num">Importo</th><th>Stato</th><th></th></tr></thead>
+            <tbody>
+              {% for s in scadenze %}
+              <tr>
+                <td>{{ s.data|date:"d/m/Y"|default:"—" }}</td>
+                <td>{{ s.nome_modalita|default:"—" }}{% if s.iban %}<div class="text-muted" style="font-size:.7rem">{{ s.iban }}</div>{% endif %}</td>
+                <td class="tab-num">&euro;{{ s.importo|floatformat:"2g" }}</td>
+                <td>{% if s.pagata_il %}<span class="badge bg-success">pagata il {{ s.pagata_il|date:"d/m/Y" }}</span>
+                    {% elif s.data and s.data < oggi %}<span class="badge bg-danger">scaduta</span>{% else %}<span class="badge bg-secondary">da pagare</span>{% endif %}</td>
+                <td class="text-nowrap">
+                  <form method="post" class="d-flex gap-1">{% csrf_token %}<input type="hidden" name="scadenza" value="{{ s.pk }}">
+                    {% if s.pagata_il %}<input type="hidden" name="azione" value="non_pagata"><button class="btn btn-sm btn-link p-0">annulla</button>
+                    {% else %}<input type="hidden" name="azione" value="pagata"><input type="date" name="data" value="{{ oggi|date:'Y-m-d' }}" class="form-control form-control-sm" style="max-width:140px">
+                      <button class="btn btn-sm btn-outline-success">Pagata</button>{% endif %}
+                  </form>
+                </td>
+              </tr>
+              {% empty %}
+              <tr><td colspan="5" class="text-muted">Nessuna scadenza.</td></tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+    <div class="col-lg-5">
+      <div class="panel">
+        <div class="panel-title"><i class="bi bi-info-circle"></i> Documento</div>
+        <div class="panel-body small">
+          <div><strong>Tipo:</strong> {{ f.nome_tipo }} ({{ f.tipo_documento }})</div>
+          {% if f.descrizione %}<div><strong>Causale:</strong> {{ f.descrizione }}</div>{% endif %}
+          {% if f.file_nome %}<div><strong>File:</strong> {{ f.file_nome }}</div>{% endif %}
+          <div><strong>Registrata il:</strong> {{ f.creata_il|date:"d/m/Y H:i" }}</div>
+          <form method="post" class="mt-3" onsubmit="return confirm('Eliminare questa fattura? Se arriva di nuovo dalla PEC verr&agrave; reimportata.')">
+            {% csrf_token %}<input type="hidden" name="azione" value="elimina">
+            <button class="btn btn-sm btn-outline-danger"><i class="bi bi-trash"></i> Elimina fattura</button>
+          </form>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+// Nelle caselle vuote della ripartizione si vede (in grigio) quella della voce scelta
+function segnaposto(select) {
+  var opt = select.selectedOptions[0], rip = {};
+  try { rip = JSON.parse((opt && opt.dataset.rip) || '{}'); } catch (e) {}
+  select.closest('tr').querySelectorAll('.ripartizione input').forEach(function (i) {
+    var centro = i.name.split('_').pop();
+    i.placeholder = rip[centro] !== undefined ? rip[centro] : '';
+  });
+}
+document.querySelectorAll('.voce-riga').forEach(function (s) {
+  s.addEventListener('change', function () { segnaposto(s); });
+});
+document.getElementById('voce-tutte').addEventListener('change', function () {
+  var v = this.value;
+  if (!v) return;
+  document.querySelectorAll('.voce-riga').forEach(function (s) { s.value = v; segnaposto(s); });
+});
+</script>
+{% endblock %}

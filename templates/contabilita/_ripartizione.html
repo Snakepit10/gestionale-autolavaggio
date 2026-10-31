@@ -1,0 +1,8 @@
+<div class="ripartizione">
+  {% for c in campi %}
+  <label title="{{ c.nome }}">{{ c.nome }}
+    <input type="text" inputmode="decimal" name="{{ prefisso }}_{{ c.chiave }}" value="{{ c.valore }}" placeholder="{{ c.segnaposto }}" class="form-control form-control-sm">
+  </label>
+  {% endfor %}
+  <span class="text-muted">%</span>
+</div>

@@ -1,0 +1,6 @@
+{% url 'contabilita:fatture' as u_fatture %}{% url 'contabilita:scadenziario' as u_scad %}{% url 'contabilita:piano_conti' as u_piano %}
+<div class="d-flex gap-2 flex-wrap">
+  <a class="btn btn-sm {% if request.path == u_fatture %}btn-primary{% else %}btn-outline-primary{% endif %}" href="{{ u_fatture }}"><i class="bi bi-receipt"></i> Fatture fornitori</a>
+  <a class="btn btn-sm {% if request.path == u_scad %}btn-primary{% else %}btn-outline-primary{% endif %}" href="{{ u_scad }}"><i class="bi bi-calendar-check"></i> Scadenziario</a>
+  <a class="btn btn-sm {% if request.path == u_piano %}btn-primary{% else %}btn-outline-primary{% endif %}" href="{{ u_piano }}"><i class="bi bi-diagram-3"></i> Piano dei conti</a>
+</div>

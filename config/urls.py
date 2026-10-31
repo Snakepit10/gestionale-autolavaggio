@@ -162,6 +162,8 @@ urlpatterns = [
 
     # Costo del personale (Amministrazione)
     path('personale/', include('apps.personale.urls', namespace='personale')),
+    # Contabilita' (Amministrazione): fatture fornitori, prima nota, conto economico
+    path('contabilita/', include('apps.contabilita.urls', namespace='contabilita')),
 
     # Monete virtuali (staff + webhook pagamenti)
     path('monete/', include('apps.monete.urls', namespace='monete')),
