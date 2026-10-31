@@ -1,6 +1,6 @@
 from django.contrib import admin
 
-from .models import (ContoFinanziario, FatturaPassiva, MessaggioPec, MovimentoFinanziario, RegolaFornitore,
+from .models import (Cespite, ContoFinanziario, FatturaPassiva, MessaggioPec, MovimentoFinanziario, RegolaFornitore,
                      RegolaMovimento, RigaFatturaPassiva, ScadenzaFattura, VoceConto)
 
 
@@ -42,6 +42,11 @@ class MovimentoFinanziarioAdmin(admin.ModelAdmin):
     list_display = ['data', 'conto', 'importo', 'causale', 'voce', 'origine']
     list_filter = ['conto', 'origine', 'voce']
     search_fields = ['descrizione', 'causale']
+
+
+@admin.register(Cespite)
+class CespiteAdmin(admin.ModelAdmin):
+    list_display = ['descrizione', 'data_acquisto', 'valore', 'anni', 'centro']
 
 
 @admin.register(RegolaMovimento)

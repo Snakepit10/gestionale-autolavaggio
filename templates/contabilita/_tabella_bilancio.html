@@ -1,0 +1,29 @@
+<div class="tabella-scroll">
+  <table class="table table-sm bilancio">
+    <thead><tr>
+      <th class="col-nome">Voce</th>
+      {% for c in colonne %}<th class="tab-num">{{ c }}</th>{% endfor %}
+      <th class="tab-num">{% if totale_label %}{{ totale_label }}{% else %}Totale {{ anno }}{% endif %}</th>
+      {% if mostra_pct %}<th class="tab-num">% ricavi</th>{% endif %}
+      {% if confronto %}<th class="tab-num">{{ anno|add:"-1" }}</th><th class="tab-num">Var.</th>{% endif %}
+    </tr></thead>
+    <tbody>
+      {% for r in righe %}
+      <tr class="riga-{{ r.tipo }}">
+        <td class="col-nome">{% if r.link %}<a href="{{ r.link }}" class="text-reset">{{ r.nome }}</a>{% else %}{{ r.nome }}{% endif %}</td>
+        {% if r.tipo == 'titolo' %}
+          {% for v in r.valori %}<td></td>{% endfor %}<td></td>{% if mostra_pct %}<td></td>{% endif %}{% if confronto %}<td></td><td></td>{% endif %}
+        {% else %}
+          {% for v in r.valori %}<td class="tab-num {% if v < 0 %}neg{% endif %}">{% if v %}{{ v|floatformat:"0g" }}{% else %}<span class="zero">&ndash;</span>{% endif %}</td>{% endfor %}
+          <td class="tab-num col-totale {% if r.totale < 0 %}neg{% endif %}">{{ r.totale|floatformat:"0g" }}</td>
+          {% if mostra_pct %}<td class="tab-num text-muted">{% if r.pct != None %}{{ r.pct|floatformat:1 }}%{% endif %}</td>{% endif %}
+          {% if confronto %}
+            <td class="tab-num text-muted">{{ r.prec|floatformat:"0g" }}</td>
+            <td class="tab-num">{% if r.var != None %}<span class="{% if r.var >= 0 %}su{% else %}giu{% endif %}">{% if r.var > 0 %}+{% endif %}{{ r.var|floatformat:0 }}%</span>{% endif %}</td>
+          {% endif %}
+        {% endif %}
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>

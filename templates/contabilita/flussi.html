@@ -1,0 +1,71 @@
+{% extends "base.html" %}
+{% block title %}Flussi di cassa {{ anno }}{% endblock %}
+
+{% block extra_css %}{% include "contabilita/_stile.html" %}{% endblock %}
+
+{% block content %}
+<div class="dash-page">
+  <div class="dash-header">
+    <h4><i class="bi bi-water me-2"></i>Flussi di cassa {{ anno }}</h4>
+    {% include "contabilita/_nav.html" %}
+  </div>
+
+  <div class="d-flex gap-2 flex-wrap mb-3">
+    <a class="btn btn-sm btn-outline-secondary" href="?anno={{ anno|add:'-1' }}&vista={{ vista }}"><i class="bi bi-chevron-left"></i> {{ anno|add:"-1" }}</a>
+    <a class="btn btn-sm btn-outline-secondary" href="?anno={{ anno|add:'1' }}&vista={{ vista }}">{{ anno|add:"1" }} <i class="bi bi-chevron-right"></i></a>
+    <div class="btn-group btn-group-sm">
+      <a class="btn {% if vista != 'trimestri' %}btn-dark{% else %}btn-outline-dark{% endif %}" href="?anno={{ anno }}&vista=mesi">Mesi</a>
+      <a class="btn {% if vista == 'trimestri' %}btn-dark{% else %}btn-outline-dark{% endif %}" href="?anno={{ anno }}&vista=trimestri">Trimestri</a>
+    </div>
+    <a class="btn btn-sm btn-outline-primary" href="{% url 'contabilita:conto_economico' %}?anno={{ anno }}"><i class="bi bi-graph-up-arrow"></i> Conto economico</a>
+  </div>
+
+  <div class="row g-2 mb-3">
+    {% for c in per_conto %}
+    <div class="col-6 col-lg">
+      <div class="kpi-tile {% if forloop.first %}hero{% endif %}"><div class="label">{{ c.conto }}</div>
+        <div class="value">&euro;{{ c.finale|floatformat:"0g" }}</div>
+        <div class="sub">fine {{ anno }} &middot; inizio &euro;{{ c.iniziale|floatformat:"0g" }}</div></div>
+    </div>
+    {% endfor %}
+  </div>
+
+  {% if da_classificare %}
+  <div class="alert alert-warning py-2 small"><i class="bi bi-exclamation-triangle"></i>
+    {{ da_classificare }} movimenti del {{ anno }} da classificare: sono in "Movimenti da classificare" nella gestione operativa.
+    <a href="{% url 'contabilita:prima_nota' %}?stato=da_classificare">Classificali</a>.</div>
+  {% endif %}
+
+  <div class="panel">
+    <div class="panel-title"><i class="bi bi-graph-up"></i> Flusso netto e liquidit&agrave;</div>
+    <div class="panel-body" style="height:240px"><canvas id="grafico-fc"></canvas></div>
+  </div>
+
+  <div class="panel">
+    <div class="panel-title"><i class="bi bi-table"></i> Rendiconto (euro, IVA compresa)</div>
+    <div class="panel-sub">Solo movimenti reali dei conti (banche e cassa contanti), raggruppati per flusso della voce. I giroconti tra conti sono esclusi. Saldo iniziale + flusso netto = saldo finale.</div>
+    <div class="panel-body">
+      {% include "contabilita/_tabella_bilancio.html" with mostra_pct=False totale_label="Anno" %}
+    </div>
+  </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+(function () {
+  var el = document.getElementById('grafico-fc');
+  if (!el || typeof Chart === 'undefined') return;
+  var s = {{ serie_json|safe }}, etichette = {{ etichette_json|safe }};
+  new Chart(el, {
+    data: {labels: etichette, datasets: [
+      {type: 'bar', label: 'Flusso netto', data: s.netto, backgroundColor: s.netto.map(function (v) { return v < 0 ? '#fca5a5' : '#5eead4'; }), borderRadius: 4},
+      {type: 'line', label: 'Liquidità a fine mese', data: s.finale, borderColor: '#0f172a', backgroundColor: '#0f172a', tension: .25}
+    ]},
+    options: {responsive: true, maintainAspectRatio: false,
+      plugins: {tooltip: {callbacks: {label: function (c) { return c.dataset.label + ': €' + c.parsed.y.toLocaleString('it-IT', {maximumFractionDigits: 0}); }}}},
+      scales: {y: {ticks: {callback: function (v) { return '€' + v.toLocaleString('it-IT'); }}}, x: {grid: {display: false}}}}
+  });
+})();
+</script>
+{% endblock %}

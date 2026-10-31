@@ -1,0 +1,80 @@
+{% extends "base.html" %}
+{% block title %}Conto economico {{ anno }}{% endblock %}
+
+{% block extra_css %}{% include "contabilita/_stile.html" %}{% endblock %}
+
+{% block content %}
+<div class="dash-page">
+  <div class="dash-header">
+    <h4><i class="bi bi-graph-up-arrow me-2"></i>Conto economico {{ anno }}</h4>
+    {% include "contabilita/_nav.html" %}
+  </div>
+
+  <div class="d-flex gap-2 flex-wrap mb-3">
+    <a class="btn btn-sm btn-outline-secondary" href="?anno={{ anno|add:'-1' }}&vista={{ vista }}"><i class="bi bi-chevron-left"></i> {{ anno|add:"-1" }}</a>
+    <a class="btn btn-sm btn-outline-secondary" href="?anno={{ anno|add:'1' }}&vista={{ vista }}">{{ anno|add:"1" }} <i class="bi bi-chevron-right"></i></a>
+    <div class="btn-group btn-group-sm">
+      <a class="btn {% if vista != 'trimestri' %}btn-dark{% else %}btn-outline-dark{% endif %}" href="?anno={{ anno }}&vista=mesi{% if confronto %}&confronto=1{% endif %}">Mesi</a>
+      <a class="btn {% if vista == 'trimestri' %}btn-dark{% else %}btn-outline-dark{% endif %}" href="?anno={{ anno }}&vista=trimestri{% if confronto %}&confronto=1{% endif %}">Trimestri</a>
+    </div>
+    <a class="btn btn-sm {% if confronto %}btn-primary{% else %}btn-outline-primary{% endif %}" href="?anno={{ anno }}&vista={{ vista }}{% if not confronto %}&confronto=1{% endif %}"><i class="bi bi-arrow-left-right"></i> Confronto con il {{ anno|add:"-1" }}</a>
+    <a class="btn btn-sm btn-outline-primary" href="{% url 'contabilita:flussi' %}?anno={{ anno }}"><i class="bi bi-water"></i> Flussi di cassa</a>
+  </div>
+
+  <div class="row g-2 mb-3">
+    <div class="col-6 col-lg-3"><div class="kpi-tile hero"><div class="label">Ricavi netti {{ anno }}</div><div class="value">&euro;{{ kpi.ricavi|floatformat:"0g" }}</div><div class="sub">IVA esclusa</div></div></div>
+    <div class="col-6 col-lg-3"><div class="kpi-tile"><div class="label">Margine di contribuzione</div><div class="value">&euro;{{ kpi.margine|floatformat:"0g" }}</div><div class="sub">{% if pct.margine != None %}{{ pct.margine|floatformat:1 }}% dei ricavi{% endif %}</div></div></div>
+    <div class="col-6 col-lg-3"><div class="kpi-tile"><div class="label">EBITDA</div><div class="value {% if kpi.ebitda < 0 %}text-danger{% endif %}">&euro;{{ kpi.ebitda|floatformat:"0g" }}</div><div class="sub">{% if pct.ebitda != None %}{{ pct.ebitda|floatformat:1 }}% dei ricavi{% endif %}</div></div></div>
+    <div class="col-6 col-lg-3"><div class="kpi-tile"><div class="label">Risultato netto</div><div class="value {% if kpi.netto < 0 %}text-danger{% else %}text-success{% endif %}">&euro;{{ kpi.netto|floatformat:"0g" }}</div><div class="sub">personale {% if pct.personale != None %}{{ pct.personale|floatformat:1 }}% dei ricavi{% endif %}</div></div></div>
+  </div>
+
+  {% if controlli %}
+  <div class="panel">
+    <div class="panel-title"><i class="bi bi-exclamation-triangle"></i> Da completare per un conto economico esatto</div>
+    <div class="panel-body">
+      {% for livello, testo, tipo in controlli %}
+      <div class="small mb-1 text-{% if livello == 'warning' %}warning-emphasis{% else %}secondary{% endif %}"><i class="bi bi-dot"></i>
+        {% if tipo == 'fatture_dacl' %}<a href="{% url 'contabilita:fatture' %}?stato=da_classificare">{{ testo }}</a>
+        {% elif tipo == 'movimenti_dacl' %}<a href="{% url 'contabilita:prima_nota' %}?stato=da_classificare">{{ testo }}</a>
+        {% elif tipo == 'cassa' %}<a href="{% url 'contabilita:conti' %}">{{ testo }}</a>
+        {% elif tipo == 'personale' %}<a href="{% url 'personale:mese' %}">{{ testo }}</a>
+        {% else %}{{ testo }}{% endif %}</div>
+      {% endfor %}
+    </div>
+  </div>
+  {% endif %}
+
+  <div class="panel">
+    <div class="panel-title"><i class="bi bi-bar-chart"></i> Andamento mensile</div>
+    <div class="panel-body" style="height:240px"><canvas id="grafico-ce"></canvas></div>
+  </div>
+
+  <div class="panel">
+    <div class="panel-title"><i class="bi bi-table"></i> Conto economico (euro, IVA esclusa)</div>
+    <div class="panel-sub">Ricavi dalle chiusure di cassa e dagli ordini; costi dalle fatture (per mese di competenza), dai movimenti senza fattura, dal costo del personale e dagli ammortamenti. Clic su una voce per i documenti.</div>
+    <div class="panel-body">
+      {% include "contabilita/_tabella_bilancio.html" with mostra_pct=True %}
+    </div>
+  </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+(function () {
+  var el = document.getElementById('grafico-ce');
+  if (!el || typeof Chart === 'undefined') return;
+  var s = {{ serie_json|safe }}, etichette = {{ etichette_json|safe }};
+  new Chart(el, {
+    data: {labels: etichette, datasets: [
+      {type: 'bar', label: 'Ricavi', data: s.ricavi, backgroundColor: '#14b8a6', borderRadius: 4},
+      {type: 'bar', label: 'Costi operativi', data: s.costi, backgroundColor: '#cbd5e1', borderRadius: 4},
+      {type: 'line', label: 'EBITDA', data: s.ebitda, borderColor: '#0f172a', backgroundColor: '#0f172a', tension: .25}
+    ]},
+    options: {responsive: true, maintainAspectRatio: false,
+      plugins: {tooltip: {callbacks: {label: function (c) { return c.dataset.label + ': €' + c.parsed.y.toLocaleString('it-IT', {maximumFractionDigits: 0}); }}}},
+      scales: {y: {ticks: {callback: function (v) { return '€' + v.toLocaleString('it-IT'); }}}, x: {grid: {display: false}}}}
+  });
+})();
+</script>
+{% endblock %}

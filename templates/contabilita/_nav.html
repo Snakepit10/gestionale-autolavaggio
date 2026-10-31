@@ -1,9 +1,12 @@
-{% url 'contabilita:fatture' as u_fatture %}{% url 'contabilita:scadenziario' as u_scad %}{% url 'contabilita:prima_nota' as u_pn %}{% url 'contabilita:conti' as u_conti %}{% url 'contabilita:regole' as u_regole %}{% url 'contabilita:piano_conti' as u_piano %}
+{% url 'contabilita:fatture' as u_fatture %}{% url 'contabilita:scadenziario' as u_scad %}{% url 'contabilita:prima_nota' as u_pn %}{% url 'contabilita:conti' as u_conti %}{% url 'contabilita:regole' as u_regole %}{% url 'contabilita:piano_conti' as u_piano %}{% url 'contabilita:conto_economico' as u_ce %}{% url 'contabilita:flussi' as u_fc %}{% url 'contabilita:cespiti' as u_cesp %}
 <div class="d-flex gap-2 flex-wrap">
+  <a class="btn btn-sm {% if request.path == u_ce %}btn-primary{% else %}btn-outline-primary{% endif %}" href="{{ u_ce }}"><i class="bi bi-graph-up-arrow"></i> Conto economico</a>
+  <a class="btn btn-sm {% if request.path == u_fc %}btn-primary{% else %}btn-outline-primary{% endif %}" href="{{ u_fc }}"><i class="bi bi-water"></i> Flussi di cassa</a>
   <a class="btn btn-sm {% if request.path == u_fatture %}btn-primary{% else %}btn-outline-primary{% endif %}" href="{{ u_fatture }}"><i class="bi bi-receipt"></i> Fatture fornitori</a>
   <a class="btn btn-sm {% if request.path == u_scad %}btn-primary{% else %}btn-outline-primary{% endif %}" href="{{ u_scad }}"><i class="bi bi-calendar-check"></i> Scadenziario</a>
   <a class="btn btn-sm {% if request.path == u_pn %}btn-primary{% else %}btn-outline-primary{% endif %}" href="{{ u_pn }}"><i class="bi bi-journal-text"></i> Prima nota</a>
   <a class="btn btn-sm {% if request.path == u_conti %}btn-primary{% else %}btn-outline-primary{% endif %}" href="{{ u_conti }}"><i class="bi bi-bank"></i> Conti</a>
   <a class="btn btn-sm {% if request.path == u_regole %}btn-primary{% else %}btn-outline-primary{% endif %}" href="{{ u_regole }}"><i class="bi bi-magic"></i> Regole</a>
+  <a class="btn btn-sm {% if request.path == u_cesp %}btn-primary{% else %}btn-outline-primary{% endif %}" href="{{ u_cesp }}"><i class="bi bi-buildings"></i> Cespiti</a>
   <a class="btn btn-sm {% if request.path == u_piano %}btn-primary{% else %}btn-outline-primary{% endif %}" href="{{ u_piano }}"><i class="bi bi-diagram-3"></i> Piano dei conti</a>
 </div>

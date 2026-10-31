@@ -121,7 +121,52 @@ Dalla pagina Conti, **Aggiorna** scrive i movimenti del mese.
 
 Si può rigenerare quante volte serve: gli importi si aggiornano e le voci cambiate a mano restano.
 
+## Fase 3: conto economico e flussi di cassa
+
+### Conto economico (per competenza, IVA esclusa)
+
+Si legge per mese o per trimestre, con il confronto con l'anno prima.
+
+**Ricavi**
+- Vengono dalla funzione `ricavi_periodo` (in `apps/finanze/services/ricavi.py`), la stessa del report periodo, divisi per 1,22.
+- Canali:
+  - servito (lavaggi);
+  - vendita prodotti;
+  - portali;
+  - cambia gettoni e piste;
+  - monete online.
+- Si aggiungono i movimenti classificati su voci di ricavo.
+
+**Costi**
+- Righe delle fatture, ripartite sui mesi di competenza. Quelle senza voce vanno in "Fatture da classificare", tra i costi fissi.
+- Movimenti di banca e cassa su voci economiche che **non** pagano una fattura.
+- Costo aziendale del personale (app personale).
+- Ammortamenti dei cespiti.
+
+**Risultati**
+
+| Risultato | Formula |
+|---|---|
+| Margine di contribuzione | ricavi − costi variabili |
+| EBITDA | margine − costi fissi − personale |
+| EBIT | EBITDA − ammortamenti |
+| Risultato prima delle imposte | EBIT − oneri finanziari |
+| Risultato netto | risultato prima delle imposte − imposte |
+
+Da ogni voce si apre il dettaglio dei documenti. In alto c'è l'elenco di quello che manca: fatture e movimenti da classificare, spese di cassa non riportate, mesi senza costo del personale.
+
+### Flussi di cassa (per cassa, IVA compresa)
+
+- Contano solo i movimenti reali dei conti, raggruppati per flusso della voce: gestione operativa, investimenti, finanziamenti e titolare.
+- Saldo iniziale + flusso netto = saldo finale.
+- I giroconti sono esclusi.
+
+### Cespiti
+
+- Valore senza IVA, data di acquisto, anni e centro.
+- L'ammortamento va nel conto economico in quote mensili uguali dal mese di acquisto.
+- Le rate e i pagamenti dell'acquisto restano nei flussi di cassa.
+
 ## Fasi successive
 
-- **Fase 3: conto economico e flussi di cassa.** Più i cespiti e gli ammortamenti.
 - **Fase 4: contabilità analitica.** Direct costing self-service, full costing servito e % del personale per centro.

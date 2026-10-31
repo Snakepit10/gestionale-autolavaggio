@@ -348,3 +348,49 @@ class MovimentoFinanziario(models.Model):
                 self.voce, self.ripartizione, self.regola = regola.voce, regola.ripartizione, regola
                 return True
         return False
+
+
+class Cespite(models.Model):
+    """Impianto o attrezzatura: il costo entra nel conto economico come
+    ammortamento in quote mensili uguali dal mese di acquisto; i
+    pagamenti (anche a rate) restano solo nei flussi di cassa."""
+    descrizione = models.CharField(max_length=120)
+    data_acquisto = models.DateField()
+    valore = models.DecimalField(max_digits=12, decimal_places=2, help_text='Imponibile, IVA esclusa')
+    anni = models.PositiveSmallIntegerField(default=10, help_text="Durata dell'ammortamento")
+    centro = models.CharField(max_length=10, choices=CENTRI, default='comune')
+    note = models.CharField(max_length=255, blank=True)
+
+    class Meta:
+        verbose_name = 'Cespite'
+        verbose_name_plural = 'Cespiti'
+        ordering = ['-data_acquisto']
+
+    def __str__(self):
+        return self.descrizione
+
+    @property
+    def quota_mensile(self):
+        return (self.valore / (self.anni * 12)).quantize(Decimal('0.01'))
+
+    def quota(self, mese):
+        """Ammortamento del mese (primo giorno): l'ultima quota chiude il
+        valore senza resti di arrotondamento."""
+        inizio = self.data_acquisto.replace(day=1)
+        n = (mese.year - inizio.year) * 12 + mese.month - inizio.month
+        mesi = self.anni * 12
+        if n < 0 or n >= mesi:
+            return Decimal('0')
+        if n == mesi - 1:
+            return self.valore - self.quota_mensile * (mesi - 1)
+        return self.quota_mensile
+
+    def ammortizzato_al(self, mese):
+        inizio = self.data_acquisto.replace(day=1)
+        n = (mese.year - inizio.year) * 12 + mese.month - inizio.month + 1
+        if n <= 0:
+            return Decimal('0')
+        if n >= self.anni * 12:
+            return self.valore
+        return self.quota_mensile * n
+

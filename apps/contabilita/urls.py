@@ -1,6 +1,6 @@
 from django.urls import path
 
-from . import views, views_prima_nota
+from . import views, views_bilancio, views_prima_nota
 
 app_name = 'contabilita'
 
@@ -13,4 +13,8 @@ urlpatterns = [
     path('prima-nota/<int:pk>/', views_prima_nota.movimento, name='movimento'),
     path('conti/', views_prima_nota.conti, name='conti'),
     path('regole/', views_prima_nota.regole, name='regole'),
+    path('conto-economico/', views_bilancio.conto_economico, name='conto_economico'),
+    path('conto-economico/dettaglio/', views_bilancio.dettaglio, name='dettaglio'),
+    path('flussi-di-cassa/', views_bilancio.flussi_di_cassa, name='flussi'),
+    path('cespiti/', views_bilancio.cespiti, name='cespiti'),
 ]

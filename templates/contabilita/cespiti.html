@@ -1,0 +1,90 @@
+{% extends "base.html" %}
+{% block title %}Cespiti{% endblock %}
+
+{% block extra_css %}{% include "contabilita/_stile.html" %}{% endblock %}
+
+{% block content %}
+<div class="dash-page">
+  <div class="dash-header">
+    <h4><i class="bi bi-buildings me-2"></i>Cespiti e ammortamenti</h4>
+    <div class="d-flex gap-2 flex-wrap">
+      {% include "contabilita/_nav.html" %}
+      <button class="btn btn-sm btn-primary" data-bs-toggle="modal" data-bs-target="#modale-cespite"><i class="bi bi-plus-lg"></i> Nuovo cespite</button>
+    </div>
+  </div>
+
+  <div class="row g-2 mb-3">
+    <div class="col-6 col-lg-3"><div class="kpi-tile hero"><div class="label">Ammortamenti {{ oggi|date:"Y" }}</div><div class="value">&euro;{{ totali.quota_anno|floatformat:"2g" }}</div><div class="sub">nel conto economico</div></div></div>
+    <div class="col-6 col-lg-3"><div class="kpi-tile"><div class="label">Valore dei cespiti</div><div class="value">&euro;{{ totali.valore|floatformat:"0g" }}</div></div></div>
+    <div class="col-6 col-lg-3"><div class="kpi-tile"><div class="label">Gi&agrave; ammortizzato</div><div class="value">&euro;{{ totali.ammortizzato|floatformat:"0g" }}</div><div class="sub">fino a {{ oggi|date:"F Y" }}</div></div></div>
+    <div class="col-6 col-lg-3"><div class="kpi-tile"><div class="label">Residuo da ammortizzare</div><div class="value">&euro;{{ totali.residuo|floatformat:"0g" }}</div></div></div>
+  </div>
+
+  <div class="panel">
+    <div class="panel-sub pt-3">Impianti e attrezzature: il costo entra nel conto economico in quote mensili uguali per gli anni indicati, dal mese di acquisto.
+      Le rate o i pagamenti dell'acquisto restano solo nei flussi di cassa (voce "Acquisto impianti" o "Finanziamenti"). Il centro serve all'analitica.</div>
+    <div class="panel-body tabella-scroll">
+      <table class="table table-sm align-middle">
+        <thead><tr><th>Cespite</th><th>Acquisto</th><th class="tab-num">Valore</th><th class="tab-num">Anni</th><th class="tab-num">Quota mensile</th><th class="tab-num">Ammortizzato</th><th class="tab-num">Residuo</th><th>Centro</th><th></th></tr></thead>
+        <tbody>
+          {% for c in cespiti %}
+          <tr>
+            <td class="fw-semibold">{{ c }}{% if c.note %}<div class="text-muted fw-normal" style="font-size:.72rem">{{ c.note }}</div>{% endif %}</td>
+            <td>{{ c.data_acquisto|date:"d/m/Y" }}</td>
+            <td class="tab-num">&euro;{{ c.valore|floatformat:"2g" }}</td>
+            <td class="tab-num">{{ c.anni }}</td>
+            <td class="tab-num">&euro;{{ c.quota_mensile|floatformat:"2g" }}</td>
+            <td class="tab-num">&euro;{{ c.ammortizzato|floatformat:"2g" }}</td>
+            <td class="tab-num fw-bold">&euro;{{ c.residuo|floatformat:"2g" }}</td>
+            <td>{{ c.get_centro_display }}</td>
+            <td class="text-end text-nowrap">
+              <button class="btn btn-sm btn-outline-secondary" data-bs-toggle="modal" data-bs-target="#modale-cespite"
+                data-id="{{ c.pk }}" data-descrizione="{{ c.descrizione }}" data-data="{{ c.data_acquisto|date:'Y-m-d' }}"
+                data-valore="{{ c.valore|stringformat:'s' }}" data-anni="{{ c.anni }}" data-centro="{{ c.centro }}" data-note="{{ c.note }}"><i class="bi bi-pencil"></i></button>
+              <form method="post" class="d-inline" onsubmit="return confirm('Eliminare il cespite?')">{% csrf_token %}<input type="hidden" name="azione" value="elimina"><input type="hidden" name="cespite" value="{{ c.pk }}">
+                <button class="btn btn-sm btn-outline-danger"><i class="bi bi-trash"></i></button></form>
+            </td>
+          </tr>
+          {% empty %}
+          <tr><td colspan="9" class="text-center text-muted p-3">Nessun cespite. Aggiungi impianti, portali, ponte, attrezzature&hellip;</td></tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div>
+
+<div class="modal fade" id="modale-cespite" tabindex="-1">
+  <div class="modal-dialog"><form method="post" class="modal-content">
+    {% csrf_token %}<input type="hidden" name="azione" value="salva"><input type="hidden" name="id">
+    <div class="modal-header"><h5 class="modal-title">Cespite</h5><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div>
+    <div class="modal-body">
+      <label class="form-label">Descrizione</label><input type="text" name="descrizione" class="form-control mb-2" required maxlength="120">
+      <div class="row g-2">
+        <div class="col-6"><label class="form-label">Data di acquisto</label><input type="date" name="data_acquisto" class="form-control" required></div>
+        <div class="col-6"><label class="form-label">Valore &euro; (senza IVA)</label><input type="text" name="valore" inputmode="decimal" class="form-control" required></div>
+        <div class="col-6"><label class="form-label">Anni di ammortamento</label><input type="number" name="anni" min="1" max="50" value="10" class="form-control" required></div>
+        <div class="col-6"><label class="form-label">Centro</label><select name="centro" class="form-select">{% for k, n in centri %}<option value="{{ k }}">{{ n }}</option>{% endfor %}</select></div>
+      </div>
+      <label class="form-label mt-2">Note</label><input type="text" name="note" class="form-control" maxlength="255">
+    </div>
+    <div class="modal-footer"><button class="btn btn-primary"><i class="bi bi-save"></i> Salva</button></div>
+  </form></div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+document.getElementById('modale-cespite').addEventListener('show.bs.modal', function (ev) {
+  var d = (ev.relatedTarget && ev.relatedTarget.dataset) || {}, f = this.querySelector('form');
+  f.elements.id.value = d.id || '';
+  f.elements.descrizione.value = d.descrizione || '';
+  f.elements.data_acquisto.value = d.data || '';
+  f.elements.valore.value = (d.valore || '').replace('.', ',');
+  f.elements.anni.value = d.anni || 10;
+  f.elements.centro.value = d.centro || 'comune';
+  f.elements.note.value = d.note || '';
+  this.querySelector('.modal-title').textContent = d.id ? 'Modifica cespite' : 'Nuovo cespite';
+});
+</script>
+{% endblock %}

@@ -2222,7 +2222,8 @@ def report_periodo(request):
     giorni_periodo = (data_fine - data_inizio).days + 1
 
     # ==================== AGGREGATI ORDINI ====================
-    from apps.ordini.vendite import riepilogo_prodotti
+    from .services.ricavi import ricavi_periodo
+    ricavi = ricavi_periodo(data_inizio, data_fine)
     ordini_qs = Ordine.objects.filter(
         data_ora__date__gte=data_inizio,
         data_ora__date__lte=data_fine,
@@ -2230,7 +2231,7 @@ def report_periodo(request):
     # le vendite di soli prodotti non sono ordini: fuori dal conteggio e
     # dallo scontrino medio, ma dentro il fatturato servito
     num_ordini = ordini_qs.filter(vendita_prodotti=False).count()
-    totale_servito_ordinato = ordini_qs.aggregate(s=Sum('totale_finale'))['s'] or Decimal('0.00')
+    totale_servito_ordinato = ricavi['servito_ordinato']
     totale_ordini_lavaggio = (ordini_qs.filter(vendita_prodotti=False)
                               .aggregate(s=Sum('totale_finale'))['s'] or Decimal('0.00'))
 
@@ -2243,9 +2244,9 @@ def report_periodo(request):
 
     # Canale vendita prodotti, scorporato dal servito: i carrelli di soli
     # prodotti piu' i prodotti aggiunti dentro gli ordini di lavaggio
-    rp = riepilogo_prodotti(data_inizio, data_fine)
-    totale_canale_prodotti = rp['totale_vendite'] + rp['totale_in_ordini']
-    totale_servito_lavaggi = totale_servito_ordinato - totale_canale_prodotti
+    rp = ricavi['rp']
+    totale_canale_prodotti = ricavi['prodotti']
+    totale_servito_lavaggi = ricavi['servito']
 
     # ==================== AGGREGATI PAGAMENTI ====================
     pagamenti_qs = Pagamento.objects.filter(
@@ -2275,25 +2276,11 @@ def report_periodo(request):
         data__gte=data_inizio, data__lte=data_fine,
     ).select_related('cassa')
 
-    totale_portali = Decimal('0.00')
-    totale_cambia_gettoni = Decimal('0.00')
-    totale_registratore = Decimal('0.00')
-    totale_wash_cycles = 0
-    vendita_self_service = Decimal('0.00')
-
-    for c in chiusure_qs:
-        if c.cassa.modalita_registratore:
-            totale_registratore += c.incasso_totale
-            continue
-        vendita_self_service += c.vendita_totale
-        if c.cassa.tracking_washcycles:
-            totale_portali += c.vendita_totale
-            if c.wash_cycles:
-                totale_wash_cycles += c.wash_cycles
-        else:
-            totale_cambia_gettoni += c.vendita_totale
-
-    totale_self_service = totale_portali + totale_cambia_gettoni
+    totale_portali = ricavi['portali']
+    totale_cambia_gettoni = ricavi['cambia_gettoni']
+    totale_registratore = ricavi['registratore']
+    totale_wash_cycles = ricavi['washcycles']
+    vendita_self_service = totale_self_service = totale_portali + totale_cambia_gettoni
 
     # ==================== TOTALI E KPI ====================
     fatturato_totale = totale_servito_ordinato + totale_self_service
