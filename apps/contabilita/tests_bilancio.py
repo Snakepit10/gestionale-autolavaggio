@@ -98,6 +98,16 @@ class ContoEconomicoTest(TestCase):
         novembre = per_chiave(conto_economico([date(2026, 11, 1)])['righe'])
         self.assertEqual(novembre[f'voce:{voce("CV.CHIMICI").pk}']['totale'], Decimal('100.00'))
 
+    def test_pagamenti_senza_fattura(self):
+        from .conto_economico import controlli
+        tipi = lambda: {a[2]: a[1] for a in controlli([OTTOBRE])}
+        self.assertNotIn('fornitori_senza_fattura', tipi())            # il bonifico abbinato non conta
+        movimento(self.banca, '-1220.50', 'N.FORNITORI', descrizione='Bonifico Energia')
+        movimento(self.banca, '30', 'N.FORNITORI', descrizione='Rimborso fornitore')
+        self.assertIn('1 pagamenti fornitori', tipi()['fornitori_senza_fattura'])
+        self.assertIn('€1.220,50', tipi()['fornitori_senza_fattura'])
+        self.assertEqual(conto_economico([OTTOBRE])['kpi']['netto'], Decimal('-245.00'))  # resta fuori dal CE
+
     def test_flussi_ottobre(self):
         fc = flussi_di_cassa([OTTOBRE])
         r = {k: v['totale'] for k, v in per_chiave(fc['righe']).items()}
@@ -162,6 +172,7 @@ class VisteBilancioTest(TestCase):
         chimici = voce('CV.CHIMICI')
         for url in ('/contabilita/conto-economico/?anno=2026', '/contabilita/conto-economico/?anno=2026&vista=trimestri&confronto=1',
                     '/contabilita/conto-economico/?anno=2026&ricavi=canali',
+                    '/contabilita/prima-nota/?stato=senza_fattura&anno=2026', '/contabilita/prima-nota/?stato=senza_fattura',
                     '/contabilita/flussi-di-cassa/?anno=2026', '/contabilita/flussi-di-cassa/?anno=2026&vista=trimestri',
                     f'/contabilita/conto-economico/dettaglio/?chiave=voce:{chimici.pk}&anno=2026',
                     '/contabilita/conto-economico/dettaglio/?chiave=dacl&anno=2026', '/contabilita/cespiti/'):

@@ -73,6 +73,9 @@
           {% if stato == 'da_classificare' %}
             <i class="bi bi-exclamation-circle"></i> Da classificare (tutti i mesi)
             <a class="btn btn-sm btn-link ms-auto" href="?mese={{ mese|date:'Y-m' }}">torna al mese</a>
+          {% elif stato == 'senza_fattura' %}
+            <i class="bi bi-receipt-cutoff"></i> Pagamenti fornitori senza fattura abbinata{% if request.GET.anno %} ({{ request.GET.anno }}){% endif %}
+            <a class="btn btn-sm btn-link ms-auto" href="?mese={{ mese|date:'Y-m' }}">torna al mese</a>
           {% else %}
             <a class="btn btn-sm btn-outline-secondary" href="?mese={{ mese_prec|date:'Y-m' }}{% if conto %}&conto={{ conto.pk }}{% endif %}"><i class="bi bi-chevron-left"></i></a>
             <span>{{ mese|date:"F Y" }}</span>

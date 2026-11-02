@@ -41,6 +41,7 @@
       <div class="small mb-1 text-{% if livello == 'warning' %}warning-emphasis{% else %}secondary{% endif %}"><i class="bi bi-dot"></i>
         {% if tipo == 'fatture_dacl' %}<a href="{% url 'contabilita:fatture' %}?stato=da_classificare">{{ testo }}</a>
         {% elif tipo == 'movimenti_dacl' %}<a href="{% url 'contabilita:prima_nota' %}?stato=da_classificare">{{ testo }}</a>
+        {% elif tipo == 'fornitori_senza_fattura' %}<a href="{% url 'contabilita:prima_nota' %}?stato=senza_fattura&anno={{ anno }}">{{ testo }}</a>
         {% elif tipo == 'cassa' %}<a href="{% url 'contabilita:conti' %}">{{ testo }}</a>
         {% elif tipo == 'quadrature' %}<a href="{% url 'finanze:riepilogo_saldi_portali' %}">{{ testo }}</a>
         {% elif tipo == 'personale' %}<a href="{% url 'personale:mese' %}">{{ testo }}</a>

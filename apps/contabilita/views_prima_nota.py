@@ -2,7 +2,7 @@
 import degli estratti, abbinamento dei pagamenti alle fatture, conti e
 regole di classificazione."""
 import uuid
-from datetime import timedelta
+from datetime import date, timedelta
 from decimal import Decimal
 
 from django.contrib import messages
@@ -12,6 +12,7 @@ from django.utils import timezone
 
 from . import estratti
 from . import prima_nota as srv
+from .conto_economico import pagamenti_senza_fattura
 from .models import (ContoFinanziario, ModelloEstratto, MovimentoFinanziario, RegolaMovimento, ScadenzaFattura,
                      VoceConto)
 from .views import _data, _decimale, _mese, accesso, campi_ripartizione, ripartizione_da_post
@@ -41,6 +42,10 @@ def prima_nota(request):
         qs = qs.filter(conto=conto)
     if stato == 'da_classificare':
         qs = qs.filter(voce__isnull=True)
+    elif stato == 'senza_fattura':
+        anno = request.GET.get('anno', '')
+        dal_al = (date(int(anno), 1, 1), date(int(anno), 12, 31)) if anno.isdigit() else (None, None)
+        qs = qs.filter(pk__in=pagamenti_senza_fattura(*dal_al).values('pk'))
     else:
         qs = qs.filter(data__gte=mese, data__lte=fine_mese)
     cerca = request.GET.get('q', '').strip()

@@ -181,7 +181,14 @@ Si legge per mese o per trimestre, con il confronto con l'anno prima.
 | Risultato prima delle imposte | EBIT − oneri finanziari |
 | Risultato netto | risultato prima delle imposte − imposte |
 
-Da ogni voce si apre il dettaglio dei documenti. In alto c'è l'elenco di quello che manca: fatture e movimenti da classificare, spese di cassa non riportate, mesi senza costo del personale.
+Da ogni voce si apre il dettaglio dei documenti. In alto c'è l'elenco di quello che manca: fatture e movimenti da classificare, pagamenti fornitori senza fattura abbinata, spese di cassa non riportate, mesi senza costo del personale.
+
+**Pagamenti fornitori senza fattura**
+- "Pagamento fornitori" non è una voce economica: il costo entra solo dalla fattura.
+- Un'uscita su quella voce senza fattura abbinata quindi non è nel conto economico. L'avviso ne dà numero e totale (IVA compresa) e apre la prima nota filtrata su quei movimenti.
+- Per sistemarli:
+  - si carica la fattura e si abbina il pagamento;
+  - oppure, se la fattura non esiste, si sposta il movimento su una voce di costo (entra IVA compresa, nel mese del pagamento).
 
 ### Flussi di cassa (per cassa, IVA compresa)
 

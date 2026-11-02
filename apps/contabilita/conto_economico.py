@@ -247,6 +247,15 @@ def raggruppa(ce, gruppi):
     return righe
 
 
+def pagamenti_senza_fattura(dal=None, al=None):
+    """Uscite classificate "Pagamento fornitori" ma non abbinate a una
+    fattura: la voce non e' economica, quindi il loro costo manca."""
+    qs = MovimentoFinanziario.objects.filter(voce__codice='N.FORNITORI', importo__lt=0, scadenze__isnull=True)
+    if dal:
+        qs = qs.filter(data__gte=dal, data__lte=al)
+    return qs.distinct()
+
+
 def controlli(mesi, ce=None):
     """Cose da sistemare perche' il conto economico sia completo."""
     from apps.finanze.models import SpesaCassa
@@ -259,7 +268,15 @@ def controlli(mesi, ce=None):
     n = MovimentoFinanziario.objects.filter(voce__isnull=True, data__gte=dal, data__lte=al).count()
     if n:
         avvisi.append(('warning', f'{n} movimenti di prima nota da classificare', 'movimenti_dacl'))
-    spese = SpesaCassa.objects.filter(data__gte=dal, data__lte=al).count()
+    senza_fattura = pagamenti_senza_fattura(dal, al)
+    n = senza_fattura.count()
+    if n:
+        totale = -sum((m.importo for m in senza_fattura), ZERO)
+        importo = f'{totale:,.2f}'.replace(',', ' ').replace('.', ',').replace(' ', '.')
+        avvisi.append(('warning', f'{n} pagamenti fornitori senza fattura abbinata (€{importo} IVA compresa): '
+                                  'il loro costo non e\' nel conto economico. Carica le fatture e abbinale, '
+                                  'oppure sposta il movimento su una voce di costo', 'fornitori_senza_fattura'))
+    spese =SpesaCassa.objects.filter(data__gte=dal, data__lte=al).count()
     in_prima_nota = MovimentoFinanziario.objects.filter(origine='cassa', impronta__startswith='cassa|spesa|',
                                                         data__gte=dal, data__lte=al).count()
     if spese > in_prima_nota:
