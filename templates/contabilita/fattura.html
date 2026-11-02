@@ -39,7 +39,7 @@
         </div>
         <div class="tabella-scroll">
           <table class="table table-sm">
-            <thead><tr><th>#</th><th>Descrizione</th><th class="tab-num">IVA</th><th class="tab-num">Imponibile</th><th>Voce</th><th>Ripartizione</th></tr></thead>
+            <thead><tr><th>#</th><th>Descrizione</th><th class="tab-num">IVA</th><th class="tab-num">Imponibile</th><th>Voce</th><th>Ripartizione</th><th></th></tr></thead>
             <tbody>
               {% for r in righe %}
               <tr>
@@ -52,6 +52,8 @@
                   {% for v in voci %}<option value="{{ v.pk }}" data-rip="{{ v.ripartizione_json }}" {% if r.voce_id == v.pk %}selected{% endif %}>{{ v }}</option>{% endfor %}
                 </select></td>
                 <td>{% include "contabilita/_ripartizione.html" with campi=r.campi_rip prefisso=r.prefisso_rip %}</td>
+                <td><button type="button" class="btn btn-sm btn-link p-0 crea-regola" data-descrizione="{{ r.descrizione }}"
+                            title="Crea una regola per le righe come questa"><i class="bi bi-magic"></i></button></td>
               </tr>
               {% endfor %}
             </tbody>
@@ -73,6 +75,50 @@
       </div>
     </div>
   </form>
+
+  <div class="panel" id="regole-righe">
+    <div class="panel-title"><i class="bi bi-funnel"></i> Regole per riga di {{ f.fornitore }}</div>
+    <div class="panel-sub">Per le fatture con merce di centri diversi: la riga che contiene una delle parole prende voce e ripartizione della regola.
+      Fra pi&ugrave; regole vince la parola pi&ugrave; lunga; le righe senza regola prendono la regola generale{% if regola %} ({{ regola.voce }}){% endif %}.
+      Valgono per le fatture nuove; per quelle gi&agrave; caricate usa <em>Applica le regole</em>.</div>
+    <div class="panel-body">
+      {% if regole_righe %}
+      <div class="tabella-scroll">
+        <table class="table table-sm">
+          <thead><tr><th>La riga contiene</th><th>Voce</th><th>Ripartizione</th><th></th></tr></thead>
+          <tbody>
+            {% for rr in regole_righe %}
+            <tr><td>{{ rr.testo }}</td><td>{{ rr.voce|default:"voce generale" }}</td><td>{{ rr.testo_ripartizione }}</td>
+              <td class="text-end"><form method="post">{% csrf_token %}<input type="hidden" name="azione" value="elimina_regola_riga"><input type="hidden" name="regola" value="{{ rr.pk }}">
+                <button class="btn btn-sm btn-link text-danger p-0" title="Elimina"><i class="bi bi-x-lg"></i></button></form></td></tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+      {% endif %}
+      <form method="post" class="d-flex gap-2 flex-wrap align-items-end mb-3" id="form-regola-riga">
+        {% csrf_token %}<input type="hidden" name="azione" value="regola_riga">
+        <div style="min-width:220px" class="flex-grow-1"><label class="form-label small mb-0">La riga contiene (pi&ugrave; parole separate da virgola)</label>
+          <input type="text" name="testo" maxlength="100" required class="form-control form-control-sm" placeholder="es. cera, schiuma"></div>
+        <div><label class="form-label small mb-0">Voce</label>
+          <select name="voce" class="form-select form-select-sm" style="min-width:200px">
+            <option value="">— voce generale —</option>
+            {% for v in voci %}<option value="{{ v.pk }}">{{ v }}</option>{% endfor %}
+          </select></div>
+        <div><label class="form-label small mb-0">Ripartizione (vuota = quella della voce)</label>
+          {% include "contabilita/_ripartizione.html" with campi=campi_regola prefisso="rrip" %}</div>
+        <button class="btn btn-sm btn-outline-primary"><i class="bi bi-plus-lg"></i> Aggiungi regola</button>
+      </form>
+      <form method="post" class="d-flex gap-2 flex-wrap align-items-center">
+        {% csrf_token %}<input type="hidden" name="azione" value="riapplica">
+        <button class="btn btn-sm btn-primary"><i class="bi bi-magic"></i> Applica le regole a questa fattura</button>
+        {% if altre_da_classificare %}
+        <button class="btn btn-sm btn-outline-primary" name="tutte" value="1"><i class="bi bi-magic"></i> &hellip; e alle altre {{ altre_da_classificare }} da classificare di {{ f.fornitore }}</button>
+        {% endif %}
+        <span class="small text-muted">Le righe che corrispondono a una regola vengono sovrascritte.</span>
+      </form>
+    </div>
+  </div>
 
   <div class="row g-3">
     <div class="col-lg-7">
@@ -142,6 +188,20 @@ document.getElementById('voce-tutte').addEventListener('change', function () {
   var v = this.value;
   if (!v) return;
   document.querySelectorAll('.voce-riga').forEach(function (s) { s.value = v; segnaposto(s); });
+});
+// Bacchetta sulla riga: precompila la nuova regola con descrizione, voce e ripartizione della riga
+document.querySelectorAll('.crea-regola').forEach(function (b) {
+  b.addEventListener('click', function () {
+    var tr = b.closest('tr'), form = document.getElementById('form-regola-riga');
+    form.testo.value = (b.dataset.descrizione || '').split(/\s+/).slice(0, 3).join(' ');
+    form.voce.value = tr.querySelector('.voce-riga').value;
+    tr.querySelectorAll('.ripartizione input').forEach(function (i) {
+      form.querySelector('[name="rrip_' + i.name.split('_').pop() + '"]').value = i.value;
+    });
+    form.scrollIntoView({behavior: 'smooth', block: 'center'});
+    form.testo.focus();
+    form.testo.select();
+  });
 });
 </script>
 {% endblock %}

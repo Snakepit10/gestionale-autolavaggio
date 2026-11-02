@@ -51,6 +51,16 @@ Le fatture arrivano sulla PEC solo se allo SDI è comunicato l'indirizzo PEC com
 **Ricorda per il fornitore**
 - Crea una regola: le fatture nuove di quel fornitore prendono da sole voce e ripartizione.
 
+**Regole per riga (fornitori con merce di centri diversi)**
+- Nella fattura, il pannello **Regole per riga** dice: "se la riga contiene X, voce Y e ripartizione Z". Si possono mettere più parole separate da virgola: basta che la riga ne contenga una.
+- La bacchetta su una riga precompila la regola con le prime parole della descrizione, la voce e la ripartizione della riga.
+- Ordine di applicazione:
+  1. vince la regola per riga con la parola più lunga trovata (per esempio "shampoo lavaggio" prima di "shampoo");
+  2. senza voce nella regola, si usa la voce della regola generale;
+  3. le righe senza parole che corrispondono prendono la regola generale del fornitore.
+- Valgono per le fatture nuove. Per quelle già caricate c'è **Applica le regole**, su questa fattura o anche sulle altre da classificare dello stesso fornitore: sovrascrive le righe che corrispondono a una regola.
+- L'elenco completo è nel Piano dei conti.
+
 **Competenza**
 - Indica i mesi in cui il costo entra nel conto economico, divisi in parti uguali.
 - Serve per esempio per le bollette bimestrali.

@@ -224,6 +224,38 @@ class RegolaFornitore(models.Model):
         return f'{self.fornitore} -> {self.voce}'
 
 
+class RegolaRigaFornitore(models.Model):
+    """Per i fornitori che vendono merce di centri diversi: "se la riga
+    contiene X" -> voce e ripartizione di quella riga. Vince sulla regola
+    generale del fornitore; fra piu' regole vince la parola piu' lunga."""
+    fornitore = models.ForeignKey('magazzino.Fornitore', on_delete=models.CASCADE, related_name='regole_righe')
+    # Una o piu' parole separate da virgola: basta che la riga ne contenga una
+    testo = models.CharField(max_length=100)
+    voce = models.ForeignKey(VoceConto, on_delete=models.CASCADE, null=True, blank=True,
+                             help_text='Vuota = la voce della regola generale o quella gia\' scelta')
+    ripartizione = models.JSONField(default=dict, blank=True)
+
+    class Meta:
+        verbose_name = 'Regola righe fornitore'
+        verbose_name_plural = 'Regole righe fornitori'
+        ordering = ['fornitore', 'testo']
+
+    def __str__(self):
+        return f'{self.fornitore}: "{self.testo}"'
+
+    @property
+    def parole(self):
+        return [p.strip().lower() for p in self.testo.split(',') if p.strip()]
+
+    def corrispondenza(self, descrizione):
+        """La parola piu' lunga trovata nella descrizione ('' = nessuna)."""
+        descrizione = ' '.join((descrizione or '').lower().split())
+        return max((p for p in self.parole if ' '.join(p.split()) in descrizione), key=len, default='')
+
+    def testo_ripartizione(self):
+        return testo_ripartizione(self.ripartizione) if self.ripartizione else 'della voce'
+
+
 class MessaggioPec(models.Model):
     """Messaggio della casella PEC gia' letto: non si rilegge."""
     message_id = models.CharField(max_length=255, unique=True)

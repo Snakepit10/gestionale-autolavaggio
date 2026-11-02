@@ -16,9 +16,9 @@ from apps.magazzino.models import Fornitore
 
 from . import pec
 from .fatturapa import LIMITE_FILE
-from .importa import Esito, importa_file
-from .models import (CENTRI, FatturaPassiva, RegolaFornitore, RigaFatturaPassiva,
-                     ScadenzaFattura, VoceConto, ripartizione_valida)
+from .importa import Esito, importa_file, riclassifica
+from .models import (CENTRI, FatturaPassiva, RegolaFornitore, RegolaRigaFornitore, RigaFatturaPassiva,
+                     ScadenzaFattura, VoceConto, ripartizione_valida, testo_ripartizione)
 
 CENTESIMO = Decimal('0.01')
 
@@ -240,6 +240,20 @@ def fattura(request, pk):
             f.delete()
             messages.success(request, f'Eliminata: {descrizione}.')
             return redirect('contabilita:fatture')
+        elif azione == 'regola_riga':
+            _salva_regola_riga(request, f.fornitore)
+        elif azione == 'elimina_regola_riga':
+            RegolaRigaFornitore.objects.filter(pk=request.POST.get('regola'), fornitore=f.fornitore).delete()
+            messages.success(request, 'Regola eliminata.')
+        elif azione == 'riapplica':
+            fatture = [f]
+            if request.POST.get('tutte'):
+                fatture = list(FatturaPassiva.objects.filter(fornitore=f.fornitore, classificata=False)
+                               .select_related('fornitore')) + fatture
+            with transaction.atomic():
+                righe = sum(riclassifica(x) for x in {x.pk: x for x in fatture}.values())
+            messages.success(request, f'Regole applicate: {righe} righe classificate.' if righe
+                             else f'Nessuna regola di {f.fornitore} corrisponde alle righe.')
         return redirect('contabilita:fattura', pk=f.pk)
 
     righe = list(f.righe.select_related('voce'))
@@ -253,8 +267,31 @@ def fattura(request, pk):
         'voci': _voci(),
         'centri': CENTRI,
         'regola': RegolaFornitore.objects.filter(fornitore=f.fornitore).select_related('voce').first(),
+        'regole_righe': RegolaRigaFornitore.objects.filter(fornitore=f.fornitore).select_related('voce'),
+        'campi_regola': campi_ripartizione({}),
+        'altre_da_classificare': FatturaPassiva.objects.filter(fornitore=f.fornitore, classificata=False)
+                                                       .exclude(pk=f.pk).count(),
         'oggi': timezone.localdate(),
     })
+
+
+def _salva_regola_riga(request, fornitore):
+    p = request.POST
+    testo = ', '.join(x.strip() for x in p.get('testo', '').split(',') if x.strip())[:100]
+    voce = VoceConto.objects.filter(pk=p.get('voce') or 0).first()
+    try:
+        ripartizione = ripartizione_da_post(p, 'rrip')
+    except ValueError as e:
+        messages.error(request, f'Regola non salvata: {e}.')
+        return
+    if not testo or not (voce or ripartizione):
+        messages.error(request, 'Regola non salvata: servono le parole da cercare e una voce o una ripartizione.')
+        return
+    RegolaRigaFornitore.objects.update_or_create(fornitore=fornitore, testo=testo, defaults={
+        'voce': voce, 'ripartizione': ripartizione})
+    messages.success(request, f'Regola salvata: le righe di {fornitore} con "{testo}" andranno su '
+                              f'{voce or "la voce generale"} ({testo_ripartizione(ripartizione) if ripartizione else "ripartizione della voce"}). '
+                              'Usa "Applica le regole" per le fatture gia\' caricate.')
 
 
 def _salva_fattura(request, f):
@@ -335,6 +372,9 @@ def piano_conti(request):
         elif azione == 'elimina_regola':
             RegolaFornitore.objects.filter(pk=request.POST.get('regola')).delete()
             messages.success(request, 'Regola eliminata.')
+        elif azione == 'elimina_regola_riga':
+            RegolaRigaFornitore.objects.filter(pk=request.POST.get('regola')).delete()
+            messages.success(request, 'Regola eliminata.')
         return redirect('contabilita:piano_conti')
     voci = list(VoceConto.objects.all())
     for v in voci:
@@ -347,6 +387,7 @@ def piano_conti(request):
         'sezioni_choices': VoceConto.SEZIONI,
         'flussi': VoceConto.FLUSSI,
         'regole': RegolaFornitore.objects.select_related('fornitore', 'voce'),
+        'regole_righe': RegolaRigaFornitore.objects.select_related('fornitore', 'voce'),
     })
 
 

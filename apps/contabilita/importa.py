@@ -9,7 +9,7 @@ from django.db import IntegrityError, transaction
 from apps.magazzino.models import Fornitore
 
 from .fatturapa import ErroreFattura, estrai_xml, leggi_fattura
-from .models import FatturaPassiva, RegolaFornitore, RigaFatturaPassiva, ScadenzaFattura
+from .models import FatturaPassiva, RegolaFornitore, RegolaRigaFornitore, RigaFatturaPassiva, ScadenzaFattura
 
 
 @dataclass
@@ -62,6 +62,37 @@ def trova_fornitore(dati):
                                     partita_iva=dati['piva'] or dati['codice_fiscale'])
 
 
+def classifica_righe(fornitore, righe):
+    """Voce e ripartizione delle righe dalle regole del fornitore: prima
+    quelle per parola nella descrizione (vince la parola piu' lunga), poi
+    quella generale. Le righe senza nessuna regola restano come sono.
+    Modifica gli oggetti, non salva; restituisce quante righe ha toccato."""
+    generale = RegolaFornitore.objects.filter(fornitore=fornitore).select_related('voce').first()
+    per_parola = list(RegolaRigaFornitore.objects.filter(fornitore=fornitore).select_related('voce'))
+    toccate = 0
+    for riga in righe:
+        trovate = [(len(p), regola) for regola in per_parola if (p := regola.corrispondenza(riga.descrizione))]
+        if trovate:
+            regola = max(trovate, key=lambda t: t[0])[1]
+            riga.voce = regola.voce or (generale.voce if generale else riga.voce)
+            riga.ripartizione = regola.ripartizione
+        elif generale:
+            riga.voce, riga.ripartizione = generale.voce, generale.ripartizione
+        else:
+            continue
+        toccate += 1
+    return toccate
+
+
+def riclassifica(fattura):
+    """Riapplica le regole a una fattura gia' registrata."""
+    righe = list(fattura.righe.all())
+    toccate = classifica_righe(fattura.fornitore, righe)
+    RigaFatturaPassiva.objects.bulk_update(righe, ['voce', 'ripartizione'])
+    fattura.aggiorna_classificata()
+    return toccate
+
+
 def identificativo(doc):
     f = doc['fornitore']
     return f"{f['paese']}{_codice(f['piva'] or f['codice_fiscale'])}|{doc['tipo']}|{doc['numero']}|{doc['data']:%Y-%m-%d}"
@@ -81,14 +112,11 @@ def registra(doc, nome_file, xml, origine):
                 data=doc['data'], descrizione=doc['descrizione'], imponibile=doc['imponibile'],
                 iva=doc['iva'], totale=doc['totale'], competenza_dal=mese, competenza_al=mese,
                 origine=origine, identificativo=chiave, file_nome=nome_file[:200], file_xml=xml)
-            regola = RegolaFornitore.objects.filter(fornitore=fornitore).first()
-            RigaFatturaPassiva.objects.bulk_create([
-                RigaFatturaPassiva(
-                    fattura=fattura, numero_linea=r['numero_linea'], descrizione=r['descrizione'],
-                    imponibile=r['imponibile'], aliquota_iva=r['aliquota'],
-                    voce=regola.voce if regola else None,
-                    ripartizione=regola.ripartizione if regola else {})
-                for r in doc['righe']])
+            righe = [RigaFatturaPassiva(fattura=fattura, numero_linea=r['numero_linea'], descrizione=r['descrizione'],
+                                        imponibile=r['imponibile'], aliquota_iva=r['aliquota'])
+                     for r in doc['righe']]
+            classifica_righe(fornitore, righe)
+            RigaFatturaPassiva.objects.bulk_create(righe)
             scadenze = doc['scadenze'] or ([{'data': doc['data'], 'importo': doc['totale'],
                                              'modalita': '', 'iban': ''}] if doc['totale'] > 0 else [])
             ScadenzaFattura.objects.bulk_create([ScadenzaFattura(fattura=fattura, **s) for s in scadenze])

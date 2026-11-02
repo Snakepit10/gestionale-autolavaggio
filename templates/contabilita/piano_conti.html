@@ -66,6 +66,25 @@
       </table>
     </div>
   </div>
+
+  <div class="panel">
+    <div class="panel-title"><i class="bi bi-funnel"></i> Regole per riga dei fornitori</div>
+    <div class="panel-sub">Per i fornitori che vendono merce del self e del servito nella stessa fattura: la riga che contiene una delle parole prende voce e ripartizione della regola, prima della regola generale. Si creano dalla fattura, con la bacchetta sulla riga.</div>
+    <div class="panel-body tabella-scroll">
+      <table class="table table-sm">
+        <thead><tr><th>Fornitore</th><th>La riga contiene</th><th>Voce</th><th>Ripartizione</th><th></th></tr></thead>
+        <tbody>
+          {% for r in regole_righe %}
+          <tr><td>{{ r.fornitore }}</td><td>{{ r.testo }}</td><td>{{ r.voce|default:"voce generale" }}</td><td>{{ r.testo_ripartizione }}</td>
+            <td class="text-end"><form method="post">{% csrf_token %}<input type="hidden" name="azione" value="elimina_regola_riga"><input type="hidden" name="regola" value="{{ r.pk }}">
+              <button class="btn btn-sm btn-link text-danger p-0"><i class="bi bi-x-lg"></i></button></form></td></tr>
+          {% empty %}
+          <tr><td colspan="5" class="text-muted">Nessuna regola per riga.</td></tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
 </div>
 
 <div class="modal fade" id="modale-voce" tabindex="-1">
