@@ -48,13 +48,17 @@ def _serie_json(serie):
 def conto_economico(request):
     anno = _anno(request)
     vista = request.GET.get('vista', 'mesi')
+    # ricavi: di default il rilevato reale meno l'IVA dei corrispettivi
+    base = request.GET.get('ricavi', 'rilevato')
+    if base not in ce_srv.BASI_RICAVI:
+        base = 'rilevato'
     mesi = [date(anno, m, 1) for m in range(1, 13)]
-    ce = ce_srv.conto_economico(mesi)
+    ce = ce_srv.conto_economico(mesi, base)
     gruppi = _gruppi(vista)
     righe = ce_srv.raggruppa(ce, gruppi)
     precedente = {}
     if request.GET.get('confronto'):
-        prec = ce_srv.conto_economico([date(anno - 1, m, 1) for m in range(1, 13)])
+        prec = ce_srv.conto_economico([date(anno - 1, m, 1) for m in range(1, 13)], base)
         precedente = {r['chiave']: r['totale'] for r in prec['righe'] if r['chiave']}
     for r in righe:
         r['link'] = _link(r['chiave'], anno)
@@ -65,6 +69,8 @@ def conto_economico(request):
     return render(request, 'contabilita/conto_economico.html', {
         'anno': anno,
         'vista': vista,
+        'base': base,
+        'basi': ce_srv.BASI_RICAVI.items(),
         'colonne': [g[0] for g in gruppi],
         'righe': righe,
         'confronto': bool(precedente),

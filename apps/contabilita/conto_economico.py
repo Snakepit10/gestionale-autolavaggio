@@ -90,6 +90,37 @@ def ricavi_canali(mesi):
     return {k: [(r[k] / IVA).quantize(Decimal('0.01')) for r in per_mese] for k, _ in CANALI}, per_mese
 
 
+def ricavi_rilevati(mesi):
+    """Rilevato reale per mese, come nel report periodo: nei giorni con
+    quadratura contanti + POS - fondo + spese di cassa + ticket di resto.
+    Restituisce anche i giorni con quadratura."""
+    from collections import Counter
+
+    from apps.finanze.models import QuadraturaGiornaliera, SpesaCassa, TicketResto
+    dal, al = mesi[0], fine_mese(mesi[-1])
+    indice = {m: i for i, m in enumerate(mesi)}
+    spese, ticket = Counter(), Counter()
+    for s in SpesaCassa.objects.filter(data__gte=dal, data__lte=al).values('data', 'importo'):
+        spese[s['data']] += s['importo']
+    for t in TicketResto.objects.filter(data__gte=dal, data__lte=al).values('data', 'importo'):
+        ticket[t['data']] += t['importo']
+    rilevato, giorni = [ZERO] * len(mesi), [0] * len(mesi)
+    for q in QuadraturaGiornaliera.objects.filter(data__gte=dal, data__lte=al):
+        i = indice[q.data.replace(day=1)]
+        rilevato[i] += q.totale_reale + spese[q.data] + ticket[q.data]
+        giorni[i] += 1
+    return rilevato, giorni
+
+
+def iva_corrispettivi(ricavi):
+    """IVA scorporata dai corrispettivi del periodo (registratore del
+    servito + vendita self service), al 22% come nel report periodo."""
+    corrispettivi = ricavi['registratore'] + ricavi['portali'] + ricavi['cambia_gettoni']
+    if corrispettivi <= 0:
+        return ZERO
+    return corrispettivi - (corrispettivi / IVA).quantize(Decimal('0.01'))
+
+
 def costo_personale(mesi):
     from apps.personale.calcolo import calcola_mese
     from apps.personale.models import MesePersonale
@@ -117,7 +148,16 @@ def _differenza(a, b):
     return [x - y for x, y in zip(a, b)]
 
 
-def conto_economico(mesi):
+BASI_RICAVI = {
+    'rilevato': 'Rilevato reale meno IVA dei corrispettivi',
+    'canali': 'Fatturato per canale, IVA esclusa',
+}
+
+
+def conto_economico(mesi, base='canali'):
+    """base 'canali': ricavi per canale dal fatturato (servito ordinato e
+    vendite self service) / 1,22; base 'rilevato': soldi effettivamente
+    rilevati in cassa (quadrature) meno l'IVA dei corrispettivi."""
     n = len(mesi)
     zeri = [ZERO] * n
     canali, ricavi_lordi = ricavi_canali(mesi)
@@ -133,7 +173,16 @@ def conto_economico(mesi):
     righe = []
     # Ricavi
     righe.append(_riga('titolo', 'Ricavi', zeri))
-    voci_ricavo = [_riga('voce', nome, canali[k], f'ricavi:{k}', 1) for k, nome in CANALI if any(canali[k])]
+    giorni_rilevati = None
+    if base == 'rilevato':
+        rilevato, giorni_rilevati = ricavi_rilevati(mesi)
+        iva = [iva_corrispettivi(r) for r in ricavi_lordi]
+        voci_ricavo = [
+            _riga('voce', 'Rilevato reale (contanti + POS - fondo + spese e ticket)', rilevato, 'ricavi:rilevato', 1),
+            _riga('voce', 'IVA sui corrispettivi (registratore + self service)', [-x for x in iva], 'ricavi:iva', 1),
+        ]
+    else:
+        voci_ricavo = [_riga('voce', nome, canali[k], f'ricavi:{k}', 1) for k, nome in CANALI if any(canali[k])]
     voci_ricavo += righe_sezione('ricavi')
     righe += voci_ricavo
     ricavi = _somma(zeri, *[r['valori'] for r in voci_ricavo])
@@ -172,6 +221,8 @@ def conto_economico(mesi):
         r['pct'] = (r['totale'] / totale_ricavi * 100) if totale_ricavi and r['tipo'] != 'titolo' else None
     return {
         'mesi': mesi,
+        'base': base,
+        'giorni_rilevati': giorni_rilevati,
         'righe': righe,
         'ricavi_lordi': ricavi_lordi,
         'mesi_personale': mesi_personale,
@@ -214,6 +265,11 @@ def controlli(mesi, ce=None):
     if spese > in_prima_nota:
         avvisi.append(('warning', f'{spese - in_prima_nota} spese di cassa non ancora in prima nota (Conti > Cassa contanti > Aggiorna)', 'cassa'))
     oggi = timezone.localdate()
+    if ce and ce.get('giorni_rilevati') is not None and dal <= oggi:
+        trascorsi = (min(al, oggi) - dal).days + 1
+        senza = trascorsi - sum(ce['giorni_rilevati'])
+        if senza > 0:
+            avvisi.append(('warning', f'{senza} giorni senza quadratura: il loro incasso non e\' nel rilevato reale', 'quadrature'))
     presenti = ce['mesi_personale'] if ce else {}
     mancanti = [m for m in mesi if m <= oggi and m not in presenti]
     if mancanti:

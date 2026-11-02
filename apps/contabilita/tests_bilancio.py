@@ -109,6 +109,35 @@ class ContoEconomicoTest(TestCase):
         self.assertEqual(r['finale'], r['iniziale'] + r['netto'])
 
 
+class RicaviRilevatoTest(TestCase):
+    def test_rilevato_reale_meno_iva_corrispettivi(self):
+        from apps.finanze.models import Cassa, ChiusuraCassaAutomatica, QuadraturaGiornaliera, SpesaCassa
+        from apps.ordini.models import Ordine
+        giorno = date(2026, 10, 6)
+        # rilevato: 300 contanti + 50 POS - 100 fondo + 20 spesa di cassa = 270
+        QuadraturaGiornaliera.objects.create(data=giorno, contanti_totali=Decimal('300'), lettore_carte_servito=Decimal('50'),
+                                             fondo_cassa_iniziale=Decimal('100'))
+        SpesaCassa.objects.create(data=giorno, importo=Decimal('20'), descrizione='Prova', categoria='altro')
+        # corrispettivi: self service 122 + registratore 61 = 183 -> IVA 33
+        portale = Cassa.objects.create(nome='Portale prova', tipo='automatica', tracking_washcycles=True)
+        registratore = Cassa.objects.create(nome='Registratore prova', tipo='automatica', modalita_registratore=True)
+        ChiusuraCassaAutomatica.objects.create(cassa=portale, data=giorno, vendita_contante=Decimal('122'), incasso_totale=Decimal('122'))
+        ChiusuraCassaAutomatica.objects.create(cassa=registratore, data=giorno, incasso_totale=Decimal('61'))
+        # un ordine servito non pagato non cambia il rilevato
+        ordine = Ordine.objects.create(totale=Decimal('1000'), totale_finale=Decimal('1000'))
+        Ordine.objects.filter(pk=ordine.pk).update(data_ora=timezone.make_aware(datetime(2026, 10, 6, 10, 0)))
+
+        ce = conto_economico([OTTOBRE], base='rilevato')
+        r = {k: v['totale'] for k, v in per_chiave(ce['righe']).items()}
+        self.assertEqual(r['ricavi:rilevato'], Decimal('270'))
+        self.assertEqual(r['ricavi:iva'], Decimal('-33.00'))
+        self.assertEqual(r['tot:ricavi'], Decimal('237.00'))
+        self.assertNotIn('ricavi:servito', r)
+        self.assertEqual(ce['giorni_rilevati'], [1])
+        canali = {k: v['totale'] for k, v in per_chiave(conto_economico([OTTOBRE])['righe']).items()}
+        self.assertEqual(canali['ricavi:servito'], Decimal('819.67'))         # fatturato: 1000 / 1,22
+
+
 class VisteBilancioTest(TestCase):
     def setUp(self):
         from apps.auth_system.models import PermessoGruppo
@@ -132,6 +161,7 @@ class VisteBilancioTest(TestCase):
         importa_file('a.xml', fattura_xml())
         chimici = voce('CV.CHIMICI')
         for url in ('/contabilita/conto-economico/?anno=2026', '/contabilita/conto-economico/?anno=2026&vista=trimestri&confronto=1',
+                    '/contabilita/conto-economico/?anno=2026&ricavi=canali',
                     '/contabilita/flussi-di-cassa/?anno=2026', '/contabilita/flussi-di-cassa/?anno=2026&vista=trimestri',
                     f'/contabilita/conto-economico/dettaglio/?chiave=voce:{chimici.pk}&anno=2026',
                     '/contabilita/conto-economico/dettaglio/?chiave=dacl&anno=2026', '/contabilita/cespiti/'):
