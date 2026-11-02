@@ -21,7 +21,7 @@
     <div class="panel-sub pt-3">Il saldo parte dal <strong>saldo iniziale</strong> alla sua data: i movimenti precedenti non contano. Se l'estratto riporta il saldo, qui si controlla che il saldo calcolato coincida.</div>
     <div class="panel-body tabella-scroll">
       <table class="table table-sm align-middle">
-        <thead><tr><th>Conto</th><th>Tipo</th><th class="tab-num">Saldo iniziale</th><th class="tab-num">Movimenti</th><th class="tab-num">Saldo oggi</th><th>Controllo con l'estratto</th><th></th></tr></thead>
+        <thead><tr><th>Conto</th><th>Tipo</th><th class="tab-num">Saldo iniziale</th><th class="tab-num">Movimenti</th><th class="tab-num">Saldo oggi</th><th>Controllo con l'estratto</th><th>Modello estratto</th><th></th></tr></thead>
         <tbody>
           {% for c in conti %}
           <tr class="{% if not c.attivo %}text-muted{% endif %}">
@@ -35,14 +35,15 @@
                 {% else %}<span class="badge bg-danger">al {{ c.verifica.data|date:"d/m/Y" }}: calcolato &euro;{{ c.verifica.calcolato|floatformat:"2g" }}, estratto &euro;{{ c.verifica.estratto|floatformat:"2g" }}</span>
                   <div class="text-muted" style="font-size:.7rem">controlla saldo iniziale e periodi mancanti</div>{% endif %}
               {% else %}<span class="text-muted small">l'estratto non riporta il saldo</span>{% endif %}</td>
+            <td class="small">{% if c.tipo == 'cassa' %}&mdash;{% else %}{{ c.nome_modello }}{% endif %}</td>
             <td class="text-end text-nowrap">
               <button class="btn btn-sm btn-outline-secondary" data-bs-toggle="modal" data-bs-target="#modale-conto"
                 data-id="{{ c.pk }}" data-nome="{{ c.nome }}" data-tipo="{{ c.tipo }}" data-iban="{{ c.iban }}"
-                data-saldo="{{ c.saldo_iniziale|stringformat:'s' }}" data-data="{{ c.data_saldo_iniziale|date:'Y-m-d' }}" data-attivo="{{ c.attivo|yesno:'1,0' }}"><i class="bi bi-pencil"></i></button>
+                data-modello="{{ c.modello_estratto }}" data-saldo="{{ c.saldo_iniziale|stringformat:'s' }}" data-data="{{ c.data_saldo_iniziale|date:'Y-m-d' }}" data-attivo="{{ c.attivo|yesno:'1,0' }}"><i class="bi bi-pencil"></i></button>
             </td>
           </tr>
           {% if c.tipo == 'cassa' %}
-          <tr><td colspan="7" class="bg-light">
+          <tr><td colspan="8" class="bg-light">
             <form method="post" class="d-flex gap-2 align-items-center flex-wrap small">{% csrf_token %}<input type="hidden" name="azione" value="genera_cassa"><input type="hidden" name="conto" value="{{ c.pk }}">
               <span class="text-muted">Movimenti di {{ c }} dalle quadrature (incassi in contanti), dalle spese di cassa e dai ticket di resto:</span>
               <input type="month" name="dal" value="{{ oggi|date:'Y-m' }}" class="form-control form-control-sm" style="max-width:160px">
@@ -53,7 +54,7 @@
           </td></tr>
           {% endif %}
           {% empty %}
-          <tr><td colspan="7" class="text-muted text-center p-3">Nessun conto.</td></tr>
+          <tr><td colspan="8" class="text-muted text-center p-3">Nessun conto.</td></tr>
           {% endfor %}
         </tbody>
       </table>
@@ -70,6 +71,12 @@
         <div class="col-7"><label class="form-label">Nome</label><input type="text" name="nome" class="form-control" required maxlength="60"></div>
         <div class="col-5"><label class="form-label">Tipo</label><select name="tipo" class="form-select">{% for k, n in tipi %}<option value="{{ k }}">{{ n }}</option>{% endfor %}</select></div>
         <div class="col-12"><label class="form-label">IBAN</label><input type="text" name="iban" class="form-control" maxlength="34"></div>
+        <div class="col-12"><label class="form-label">Modello dell'estratto conto</label>
+          <select name="modello_estratto" class="form-select">
+            <option value="">Riconoscimento automatico</option>
+            {% for m in modelli %}<option value="{{ m.chiave }}">{{ m.nome }}</option>{% endfor %}
+          </select>
+          <div class="form-text"><a href="{% url 'contabilita:modelli_estratto' %}">Modelli e prova di un file</a></div></div>
         <div class="col-6"><label class="form-label">Saldo iniziale &euro;</label><input type="text" name="saldo_iniziale" inputmode="decimal" class="form-control" placeholder="0"></div>
         <div class="col-6"><label class="form-label">Alla data</label><input type="date" name="data_saldo_iniziale" class="form-control" required></div>
       </div>
@@ -89,6 +96,7 @@ document.getElementById('modale-conto').addEventListener('show.bs.modal', functi
   f.elements.nome.value = d.nome || '';
   f.elements.tipo.value = d.tipo || 'banca';
   f.elements.iban.value = d.iban || '';
+  f.elements.modello_estratto.value = d.modello || '';
   f.elements.saldo_iniziale.value = (d.saldo || '').replace('.', ',');
   f.elements.data_saldo_iniziale.value = d.data || '';
   f.elements.attivo.checked = d.id ? d.attivo === '1' : true;

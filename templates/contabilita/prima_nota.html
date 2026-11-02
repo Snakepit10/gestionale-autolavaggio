@@ -129,7 +129,7 @@
     <div class="col-xl-3">
       <div class="panel">
         <div class="panel-title"><i class="bi bi-upload"></i> Importa estratto conto</div>
-        <div class="panel-sub">Excel (.xlsx), CSV o l'"xls" dell'home banking. Reimportare lo stesso periodo non crea doppioni.</div>
+        <div class="panel-sub">Excel (.xlsx o .xls), CSV o pagina HTML dell'home banking. Reimportare lo stesso periodo non crea doppioni.</div>
         <div class="panel-body">
           <form method="post" enctype="multipart/form-data">{% csrf_token %}<input type="hidden" name="azione" value="importa">
             <select name="conto" class="form-select form-select-sm mb-2" required>
@@ -137,7 +137,12 @@
               {% for c in conti %}{% if c.tipo != 'cassa' %}<option value="{{ c.pk }}" {% if conto == c %}selected{% endif %}>{{ c }}</option>{% endif %}{% endfor %}
             </select>
             <input type="file" name="file" accept=".xlsx,.xls,.csv,.txt,.htm,.html" class="form-control form-control-sm mb-2" required>
+            <select name="modello" class="form-select form-select-sm mb-2" title="Schema delle colonne dell'estratto">
+              <option value="">Modello: quello del conto o automatico</option>
+              {% for m in modelli %}<option value="{{ m.chiave }}">{{ m.nome }}</option>{% endfor %}
+            </select>
             <button class="btn btn-sm btn-success w-100"><i class="bi bi-upload"></i> Importa</button>
+            <div class="small mt-2"><a href="{% url 'contabilita:modelli_estratto' %}"><i class="bi bi-layout-three-columns"></i> Modelli di estratto e prova di un file</a></div>
           </form>
         </div>
       </div>

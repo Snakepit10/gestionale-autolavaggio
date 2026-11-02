@@ -254,6 +254,9 @@ class ContoFinanziario(models.Model):
     iban = models.CharField(max_length=34, blank=True)
     saldo_iniziale = models.DecimalField(max_digits=12, decimal_places=2, default=Decimal('0'))
     data_saldo_iniziale = models.DateField()
+    # Schema dell'estratto: '' = riconoscimento automatico, altrimenti la
+    # chiave di un modello predefinito o 'pers_<id>' (estratti.MODELLI)
+    modello_estratto = models.CharField(max_length=20, blank=True)
     attivo = models.BooleanField(default=True)
     ordine = models.PositiveIntegerField(default=0)
 
@@ -270,6 +273,31 @@ class ContoFinanziario(models.Model):
         somma = (self.movimenti.filter(data__gte=self.data_saldo_iniziale, data__lte=giorno)
                  .aggregate(s=models.Sum('importo'))['s'])
         return self.saldo_iniziale + (somma or Decimal('0'))
+
+
+class ModelloEstratto(models.Model):
+    """Schema di un estratto conto che i modelli predefiniti non
+    riconoscono: in quale colonna (1 = A) stanno i dati. Le righe senza
+    una data valida (intestazioni, totali) si saltano da sole."""
+    nome = models.CharField(max_length=60, unique=True)
+    col_data = models.PositiveSmallIntegerField()
+    col_valuta = models.PositiveSmallIntegerField(null=True, blank=True)
+    # O una colonna importo con segno, o due colonne dare (uscite) e avere (entrate)
+    col_importo = models.PositiveSmallIntegerField(null=True, blank=True)
+    col_dare = models.PositiveSmallIntegerField(null=True, blank=True)
+    col_avere = models.PositiveSmallIntegerField(null=True, blank=True)
+    col_descrizione = models.PositiveSmallIntegerField(null=True, blank=True)
+    col_causale = models.PositiveSmallIntegerField(null=True, blank=True)
+    col_saldo = models.PositiveSmallIntegerField(null=True, blank=True)
+    note = models.CharField(max_length=200, blank=True)
+
+    class Meta:
+        verbose_name = 'Modello di estratto conto'
+        verbose_name_plural = 'Modelli di estratto conto'
+        ordering = ['nome']
+
+    def __str__(self):
+        return self.nome
 
 
 class RegolaMovimento(models.Model):

@@ -85,7 +85,7 @@ class EstrattiTest(TestCase):
                          (Decimal('-9.99'), 'PAGAMENTO POS', 'Pagamento di prova'))
 
     def test_xls_vecchio_e_file_illeggibile(self):
-        self.assertIn('salvalo come .xlsx', importa_estratto(self.banca, 'a.xls', b'\xd0\xcf\x11\xe0' + b'\0' * 20).errori[0])
+        self.assertIn('non si apre', importa_estratto(self.banca, 'a.xls', b'\xd0\xcf\x11\xe0' + b'\0' * 20).errori[0])
         self.assertTrue(importa_estratto(self.banca, 'a.csv', b'niente;da;leggere\n').errori)
 
 

@@ -1,0 +1,166 @@
+{% extends "base.html" %}
+{% block title %}Modelli di estratto conto{% endblock %}
+
+{% block extra_css %}{% include "contabilita/_stile.html" %}
+<style>
+.colonne .badge { font-weight: 600; margin: 0 4px 3px 0; }
+.colonne .badge b { color: #0f766e; }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="dash-page">
+  <div class="dash-header">
+    <h4><i class="bi bi-layout-three-columns me-2"></i>Modelli di estratto conto</h4>
+    <div class="d-flex gap-2 flex-wrap">
+      <a class="btn btn-sm btn-outline-secondary" href="{% url 'contabilita:prima_nota' %}"><i class="bi bi-arrow-left"></i> Prima nota</a>
+      <button class="btn btn-sm btn-primary" data-bs-toggle="modal" data-bs-target="#modale-modello"><i class="bi bi-plus-lg"></i> Nuovo modello</button>
+    </div>
+  </div>
+
+  <div class="panel">
+    <div class="panel-sub pt-3">Un modello dice in quale colonna dell'estratto stanno data, importo, descrizione&hellip; All'import il modello si riconosce da solo:
+      prima si cerca una riga di intestazione (colonne trovate per nome), poi si provano i modelli predefiniti.
+      Se un conto usa sempre lo stesso formato puoi fissarlo nella pagina <a href="{% url 'contabilita:conti' %}">Conti</a>.
+      Per una banca nuova crea un modello personalizzato e provalo qui sotto: la prova <strong>non importa niente</strong>.</div>
+  </div>
+
+  <div class="row g-3">
+    <div class="col-xl-7">
+      <div class="panel">
+        <div class="panel-title"><i class="bi bi-bank"></i> Predefiniti</div>
+        <div class="panel-body tabella-scroll">
+          <table class="table table-sm">
+            <tbody>
+              <tr><td class="fw-semibold">Con intestazione</td>
+                <td class="small">Qualsiasi file con una riga di titoli: data / data contabile / data movimento, valuta, importo oppure dare e avere, descrizione, causale, saldo.</td></tr>
+              {% for m in predefiniti %}
+              <tr><td class="fw-semibold text-nowrap">{{ m.nome }}</td>
+                <td class="small"><div class="colonne">{% for nome, lettera in m.colonne %}<span class="badge bg-light text-dark border"><b>{{ lettera }}</b> {{ nome }}</span>{% endfor %}</div>
+                  <div class="text-muted">{{ m.spiegazione }}</div></td></tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      <div class="panel">
+        <div class="panel-title"><i class="bi bi-pencil-square"></i> Personalizzati</div>
+        <div class="panel-body tabella-scroll">
+          <table class="table table-sm align-middle">
+            <tbody>
+              {% for m in personalizzati %}
+              <tr><td class="fw-semibold">{{ m }}{% for c in m.conti %} <span class="badge bg-info">{{ c }}</span>{% endfor %}</td>
+                <td class="small"><div class="colonne">{% for nome, lettera in m.colonne %}<span class="badge bg-light text-dark border"><b>{{ lettera }}</b> {{ nome }}</span>{% endfor %}</div>
+                  {% if m.note %}<div class="text-muted">{{ m.note }}</div>{% endif %}</td>
+                <td class="text-end text-nowrap">
+                  <button class="btn btn-sm btn-outline-secondary" data-bs-toggle="modal" data-bs-target="#modale-modello"
+                    data-id="{{ m.pk }}" data-nome="{{ m.nome }}" data-note="{{ m.note }}"
+                    {% for campo, lettera in m.lettere.items %}data-{{ campo|cut:'_' }}="{{ lettera }}" {% endfor %}><i class="bi bi-pencil"></i></button>
+                  <form method="post" class="d-inline" onsubmit="return confirm('Eliminare il modello?')">{% csrf_token %}<input type="hidden" name="azione" value="elimina"><input type="hidden" name="modello" value="{{ m.pk }}">
+                    <button class="btn btn-sm btn-outline-danger"><i class="bi bi-trash"></i></button></form>
+                </td></tr>
+              {% empty %}
+              <tr><td class="text-muted">Nessun modello personalizzato: servono solo per banche o formati che i predefiniti non leggono.</td></tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
+    <div class="col-xl-5">
+      <div class="panel">
+        <div class="panel-title"><i class="bi bi-eye"></i> Prova un file (non importa)</div>
+        <div class="panel-sub">Mostra quale modello legge il file, il periodo, i totali e le prime righe. Niente viene salvato.</div>
+        <div class="panel-body">
+          <form method="post" enctype="multipart/form-data">{% csrf_token %}<input type="hidden" name="azione" value="anteprima">
+            <input type="file" name="file" accept=".xlsx,.xls,.csv,.txt,.htm,.html" class="form-control form-control-sm mb-2" required>
+            <select name="modello" class="form-select form-select-sm mb-2">
+              <option value="">Riconoscimento automatico</option>
+              {% for m in modelli %}<option value="{{ m.chiave }}" {% if scelto == m.chiave %}selected{% endif %}>{{ m.nome }}</option>{% endfor %}
+            </select>
+            <button class="btn btn-sm btn-outline-primary w-100"><i class="bi bi-eye"></i> Prova</button>
+          </form>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  {% if risultato %}
+  <div class="panel">
+    <div class="panel-title"><i class="bi bi-check2-circle text-success"></i> {{ risultato.file }}: letto con &laquo;{{ risultato.modello.nome }}&raquo;</div>
+    <div class="panel-body">
+      <div class="row g-2 mb-2">
+        <div class="col-6 col-lg-2"><div class="kpi-tile"><div class="label">Movimenti</div><div class="value">{{ risultato.n }}</div></div></div>
+        <div class="col-6 col-lg-3"><div class="kpi-tile"><div class="label">Periodo</div><div class="value" style="font-size:1rem">{{ risultato.dal|date:"d/m/Y" }} &rarr; {{ risultato.al|date:"d/m/Y" }}</div></div></div>
+        <div class="col-6 col-lg-2"><div class="kpi-tile"><div class="label">Entrate</div><div class="value text-success" style="font-size:1rem">&euro;{{ risultato.entrate|floatformat:"2g" }}</div></div></div>
+        <div class="col-6 col-lg-2"><div class="kpi-tile"><div class="label">Uscite</div><div class="value text-danger" style="font-size:1rem">&euro;{{ risultato.uscite|floatformat:"2g" }}</div></div></div>
+        <div class="col-12 col-lg-3"><div class="kpi-tile"><div class="label">Controlli</div>
+          <div class="small mt-1">
+            {% if risultato.quadra_col_totale == True %}<div class="text-success"><i class="bi bi-check-lg"></i> somma = totale del file</div>
+            {% elif risultato.quadra_col_totale == False %}<div class="text-danger"><i class="bi bi-x-lg"></i> la somma non coincide col totale del file</div>{% endif %}
+            {% if risultato.saldi_coerenti == True %}<div class="text-success"><i class="bi bi-check-lg"></i> saldi riga per riga coerenti</div>
+            {% elif risultato.saldi_coerenti == False %}<div class="text-danger"><i class="bi bi-x-lg"></i> saldi riga per riga non coerenti</div>{% endif %}
+            {% if risultato.saldo_finale != None %}<div>saldo finale &euro;{{ risultato.saldo_finale|floatformat:"2g" }}</div>{% endif %}
+            {% if risultato.scartate %}<div class="text-warning">{{ risultato.scartate }} righe con data ma senza importo</div>{% endif %}
+            {% if risultato.quadra_col_totale == None and risultato.saldi_coerenti == None %}<div class="text-muted">il file non ha totali n&eacute; saldi da confrontare</div>{% endif %}
+          </div></div></div>
+      </div>
+      <div class="tabella-scroll">
+        <table class="table table-sm">
+          <thead><tr><th>Data</th><th>Valuta</th><th>Causale</th><th>Descrizione</th><th class="tab-num">Importo</th><th class="tab-num">Saldo</th></tr></thead>
+          <tbody>
+            {% for m in risultato.esempi %}
+            <tr><td class="text-nowrap">{{ m.data|date:"d/m/Y" }}</td><td class="text-nowrap">{{ m.data_valuta|date:"d/m/Y"|default:"—" }}</td>
+              <td class="small">{{ m.causale|default:"—" }}</td><td class="small">{{ m.descrizione|truncatechars:100 }}</td>
+              <td class="tab-num {% if m.importo < 0 %}text-danger{% else %}text-success{% endif %}">&euro;{{ m.importo|floatformat:"2g" }}</td>
+              <td class="tab-num">{% if m.saldo != None %}&euro;{{ m.saldo|floatformat:"2g" }}{% else %}&mdash;{% endif %}</td></tr>
+            {% endfor %}
+          </tbody>
+        </table>
+        {% if risultato.n > risultato.esempi|length %}<div class="text-muted small">Prime {{ risultato.esempi|length }} righe su {{ risultato.n }}.</div>{% endif %}
+      </div>
+    </div>
+  </div>
+  {% endif %}
+</div>
+
+<div class="modal fade" id="modale-modello" tabindex="-1">
+  <div class="modal-dialog"><form method="post" class="modal-content">
+    {% csrf_token %}<input type="hidden" name="azione" value="salva"><input type="hidden" name="id">
+    <div class="modal-header"><h5 class="modal-title">Modello</h5><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div>
+    <div class="modal-body">
+      <label class="form-label">Nome</label><input type="text" name="nome" class="form-control mb-2" required maxlength="60" placeholder="es. Banca X - CSV">
+      <div class="small text-muted mb-2">Colonna come in Excel (A, B, C&hellip;) o numero (1, 2, 3&hellip;). Le righe senza una data valida si saltano da sole.</div>
+      <div class="row g-2">
+        <div class="col-4"><label class="form-label small mb-0">Data *</label><input type="text" name="col_data" class="form-control form-control-sm" required maxlength="3"></div>
+        <div class="col-4"><label class="form-label small mb-0">Valuta</label><input type="text" name="col_valuta" class="form-control form-control-sm" maxlength="3"></div>
+        <div class="col-4"><label class="form-label small mb-0">Importo (con segno)</label><input type="text" name="col_importo" class="form-control form-control-sm" maxlength="3"></div>
+        <div class="col-4"><label class="form-label small mb-0">oppure Dare (uscite)</label><input type="text" name="col_dare" class="form-control form-control-sm" maxlength="3"></div>
+        <div class="col-4"><label class="form-label small mb-0">e Avere (entrate)</label><input type="text" name="col_avere" class="form-control form-control-sm" maxlength="3"></div>
+        <div class="col-4"><label class="form-label small mb-0">Saldo</label><input type="text" name="col_saldo" class="form-control form-control-sm" maxlength="3"></div>
+        <div class="col-6"><label class="form-label small mb-0">Descrizione</label><input type="text" name="col_descrizione" class="form-control form-control-sm" maxlength="3"></div>
+        <div class="col-6"><label class="form-label small mb-0">Causale</label><input type="text" name="col_causale" class="form-control form-control-sm" maxlength="3"></div>
+      </div>
+      <label class="form-label mt-2">Note</label><input type="text" name="note" class="form-control" maxlength="200">
+    </div>
+    <div class="modal-footer"><button class="btn btn-primary"><i class="bi bi-save"></i> Salva</button></div>
+  </form></div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+document.getElementById('modale-modello').addEventListener('show.bs.modal', function (ev) {
+  var d = (ev.relatedTarget && ev.relatedTarget.dataset) || {}, f = this.querySelector('form');
+  f.elements.id.value = d.id || '';
+  f.elements.nome.value = d.nome || '';
+  f.elements.note.value = d.note || '';
+  ['data', 'valuta', 'importo', 'dare', 'avere', 'descrizione', 'causale', 'saldo'].forEach(function (c) {
+    f.elements['col_' + c].value = d['col' + c] || '';
+  });
+  this.querySelector('.modal-title').textContent = d.id ? 'Modifica ' + d.nome : 'Nuovo modello';
+});
+</script>
+{% endblock %}

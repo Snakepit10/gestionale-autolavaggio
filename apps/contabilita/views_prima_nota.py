@@ -12,7 +12,8 @@ from django.utils import timezone
 
 from . import estratti
 from . import prima_nota as srv
-from .models import ContoFinanziario, MovimentoFinanziario, RegolaMovimento, ScadenzaFattura, VoceConto
+from .models import (ContoFinanziario, ModelloEstratto, MovimentoFinanziario, RegolaMovimento, ScadenzaFattura,
+                     VoceConto)
 from .views import _data, _decimale, _mese, accesso, campi_ripartizione, ripartizione_da_post
 
 
@@ -65,6 +66,7 @@ def prima_nota(request):
         'proposte': srv.proponi_abbinamenti(),
         'voci': VoceConto.objects.filter(attiva=True),
         'segni': RegolaMovimento.SEGNI,
+        'modelli': estratti.modelli_disponibili(),
         'oggi': oggi,
     })
 
@@ -78,11 +80,16 @@ def _azione(request):
         if not conto or not file:
             messages.error(request, 'Scegli il conto e il file dell\'estratto.')
             return
-        esito = estratti.importa_estratto(conto, file.name, file.read())
+        modello = estratti.modello_da_chiave(p.get('modello', ''))   # vuoto: quello del conto
+        esito = estratti.importa_estratto(conto, file.name, file.read(), modello)
         for errore in esito.errori:
             messages.error(request, f'{file.name}: {errore}')
+        if esito.quadra_col_totale is False:
+            messages.warning(request, 'La somma dei movimenti letti non coincide con il totale riportato nel file: '
+                                      'controlla il modello di estratto.')
         if not esito.errori:
-            testo = f'{conto}: {esito.nuovi} movimenti nuovi dal {esito.dal:%d/%m/%Y} al {esito.al:%d/%m/%Y}'
+            testo = (f'{conto} ({esito.modello}): {esito.nuovi} movimenti nuovi '
+                     f'dal {esito.dal:%d/%m/%Y} al {esito.al:%d/%m/%Y}')
             if esito.doppi:
                 testo += f', {esito.doppi} gia\' presenti'
             if esito.classificati:
@@ -217,7 +224,10 @@ def conti(request):
 
     oggi = timezone.localdate()
     elenco = list(ContoFinanziario.objects.all())
+    modelli = estratti.modelli_disponibili()
+    nomi_modelli = {m.chiave: m.nome for m in modelli}
     for c in elenco:
+        c.nome_modello = nomi_modelli.get(c.modello_estratto, 'Riconoscimento automatico')
         c.saldo_oggi = c.saldo_al(oggi)
         c.n_movimenti = c.movimenti.count()
         c.ultimo = c.movimenti.order_by('-data').values_list('data', flat=True).first()
@@ -225,6 +235,7 @@ def conti(request):
     return render(request, 'contabilita/conti.html', {
         'conti': elenco,
         'tipi': ContoFinanziario.TIPI,
+        'modelli': modelli,
         'oggi': oggi,
         'totale': sum((c.saldo_oggi for c in elenco if c.attivo), Decimal('0')),
     })
@@ -258,6 +269,8 @@ def _salva_conto(request):
         return
     conto.nome, conto.tipo, conto.iban = nome, p['tipo'], p.get('iban', '').strip()[:34]
     conto.saldo_iniziale, conto.data_saldo_iniziale, conto.attivo = saldo, data, bool(p.get('attivo'))
+    modello = p.get('modello_estratto', '')
+    conto.modello_estratto = modello if estratti.modello_da_chiave(modello) else ''
     conto.save()
     messages.success(request, f'Conto "{conto}" salvato.')
 
@@ -303,3 +316,82 @@ def regole(request):
         'segni': RegolaMovimento.SEGNI,
         'da_classificare': MovimentoFinanziario.objects.filter(voce__isnull=True).count(),
     })
+
+
+# ---------------------------------------------------------------- modelli di estratto
+
+CAMPI_MODELLO = ['col_data', 'col_valuta', 'col_importo', 'col_dare', 'col_avere', 'col_descrizione',
+                 'col_causale', 'col_saldo']
+
+
+@accesso
+def modelli_estratto(request):
+    risultato = None
+    if request.method == 'POST':
+        p = request.POST
+        azione = p.get('azione')
+        if azione == 'salva':
+            _salva_modello(request)
+        elif azione == 'elimina':
+            modello = ModelloEstratto.objects.filter(pk=p.get('modello')).first()
+            if modello:
+                ContoFinanziario.objects.filter(modello_estratto=f'pers_{modello.pk}').update(modello_estratto='')
+                modello.delete()
+                messages.success(request, 'Modello eliminato.')
+        if azione != 'anteprima':
+            return redirect('contabilita:modelli_estratto')
+        # Anteprima: legge il file e mostra cosa verrebbe importato, senza importare
+        file = request.FILES.get('file')
+        if not file:
+            messages.error(request, 'Scegli il file da provare.')
+        else:
+            try:
+                risultato = estratti.anteprima(file.name, file.read(), estratti.modello_da_chiave(p.get('modello', '')))
+                risultato['file'] = file.name
+            except estratti.ErroreEstratto as e:
+                messages.error(request, f'{file.name}: {e}')
+
+    personalizzati = list(ModelloEstratto.objects.all())
+    for m in personalizzati:
+        m.colonne = estratti.modello_personalizzato(m).colonne()
+        m.lettere = {c: estratti.lettera(getattr(m, c)) for c in CAMPI_MODELLO}
+        m.conti = ContoFinanziario.objects.filter(modello_estratto=f'pers_{m.pk}')
+    return render(request, 'contabilita/modelli_estratto.html', {
+        'predefiniti': estratti.MODELLI_PREDEFINITI,
+        'personalizzati': personalizzati,
+        'modelli': estratti.modelli_disponibili(),
+        'conti': ContoFinanziario.objects.exclude(modello_estratto=''),
+        'risultato': risultato,
+        'scelto': request.POST.get('modello', '') if risultato else '',
+    })
+
+
+def _salva_modello(request):
+    p = request.POST
+    modello = ModelloEstratto.objects.filter(pk=p.get('id') or 0).first() or ModelloEstratto()
+    nome = p.get('nome', '').strip()[:60]
+    errori = []
+    try:
+        colonne = {c: estratti.colonna(p.get(c, '')) for c in CAMPI_MODELLO}
+    except ValueError as e:
+        messages.error(request, f'Modello non salvato: {e}.')
+        return
+    if not nome:
+        errori.append('manca il nome')
+    elif ModelloEstratto.objects.filter(nome=nome).exclude(pk=modello.pk).exists():
+        errori.append(f'esiste gia\' un modello "{nome}"')
+    if not colonne['col_data']:
+        errori.append('manca la colonna della data')
+    if not (colonne['col_importo'] or colonne['col_dare'] or colonne['col_avere']):
+        errori.append('serve la colonna dell\'importo, oppure dare e avere')
+    usate = [v for v in colonne.values() if v]
+    if len(usate) != len(set(usate)):
+        errori.append('la stessa colonna e\' usata per due dati')
+    if errori:
+        messages.error(request, 'Modello non salvato: ' + '; '.join(errori) + '.')
+        return
+    modello.nome, modello.note = nome, p.get('note', '').strip()[:200]
+    for campo, valore in colonne.items():
+        setattr(modello, campo, valore)
+    modello.save()
+    messages.success(request, f'Modello "{modello}" salvato.')
