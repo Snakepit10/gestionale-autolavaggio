@@ -9,7 +9,7 @@ from email.message import EmailMessage
 
 from django.contrib.auth.models import Group, User
 from django.core.files.uploadedfile import SimpleUploadedFile
-from django.test import TestCase
+from django.test import TestCase, override_settings
 
 from apps.magazzino.models import Fornitore
 
@@ -177,6 +177,17 @@ class ImportTest(TestCase):
         self.assertEqual(len(esito.nuove), 1)
         self.assertEqual(len(esito.errori), 1)
 
+    @override_settings(PARTITA_IVA_AZIENDA='11111111111')
+    def test_fatture_emesse_saltate(self):
+        buf = io.BytesIO()
+        with zipfile.ZipFile(buf, 'w') as z:
+            z.writestr('IT11111111111_aa001.xml', fattura_xml('5', piva='11111111111', nome='Autolavaggio di Prova'))
+            z.writestr('IT01234567890_aa002.xml', fattura_xml('6'))
+        esito = importa_file('misto.zip', buf.getvalue())
+        self.assertEqual((len(esito.nuove), esito.emesse), (1, ['5 del 15/10/2026']))
+        self.assertEqual(FatturaPassiva.objects.get().fornitore.partita_iva, '01234567890')
+        self.assertIn('1 emesse da te, saltate', esito.testo())
+
 
 class PecTest(TestCase):
     def _messaggio_pec(self):
@@ -251,6 +262,26 @@ class VisteTest(TestCase):
         file = SimpleUploadedFile('IT01234567890_aa001.xml.p7m', p7m(fattura_xml()))
         self.client.post('/contabilita/', {'azione': 'carica', 'file': [file]})
         self.assertEqual(FatturaPassiva.objects.get().origine, 'upload')
+
+    def test_elimina_fatture_emesse(self):
+        from .models import ContoFinanziario, MovimentoFinanziario
+        # caricate prima del blocco: col cedente "nostro" (P.IVA di prova)
+        a = importa_file('a.xml', fattura_xml('1')).nuove[0]
+        b = importa_file('b.xml', fattura_xml('2')).nuove[0]
+        altra = importa_file('c.xml', fattura_xml('3', piva='09876543210', nome='Energia Spa')).nuove[0]
+        pagamento = MovimentoFinanziario.objects.create(conto=ContoFinanziario.objects.get(nome='BAPS'), data=date(2026, 10, 20),
+                                                        importo=Decimal('-183'), impronta='prova|pagamento')
+        b.scadenze.update(movimento=pagamento)
+        with self.settings(PARTITA_IVA_AZIENDA='01234567890'):
+            self.assertContains(self.apri('/contabilita/'), 'Elimina queste fatture')
+            self.client.post('/contabilita/', {'azione': 'elimina_emesse'})
+            self.assertEqual(set(FatturaPassiva.objects.all()), {b, altra})       # quella pagata resta
+            self.assertTrue(Fornitore.objects.filter(pk=a.fornitore_id).exists())
+            b.scadenze.update(movimento=None)
+            self.client.post('/contabilita/', {'azione': 'elimina_emesse'})
+            self.assertEqual(list(FatturaPassiva.objects.all()), [altra])
+            self.assertFalse(Fornitore.objects.filter(pk=a.fornitore_id).exists())
+            self.assertNotContains(self.apri('/contabilita/'), 'Elimina queste fatture')
 
     def test_classifica_ricorda_e_errori(self):
         f = importa_file('a.xml', fattura_xml()).nuove[0]

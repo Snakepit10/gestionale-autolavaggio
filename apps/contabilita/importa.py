@@ -4,6 +4,7 @@ dalla PEC sia dal caricamento a mano. Idempotente: la stessa fattura
 import re
 from dataclasses import dataclass, field
 
+from django.conf import settings
 from django.db import IntegrityError, transaction
 
 from apps.magazzino.models import Fornitore
@@ -11,17 +12,25 @@ from apps.magazzino.models import Fornitore
 from .fatturapa import ErroreFattura, estrai_xml, leggi_fattura
 from .models import FatturaPassiva, RegolaFornitore, RegolaRigaFornitore, RigaFatturaPassiva, ScadenzaFattura
 
+def partita_iva_azienda():
+    """Le fatture con questo cedente le abbiamo emesse noi: non sono costi
+    (la P.IVA e' quella delle fatture emesse, apps/fatture/pdf.py)."""
+    return getattr(settings, 'PARTITA_IVA_AZIENDA', '02703400842')
+
 
 @dataclass
 class Esito:
     nuove: list = field(default_factory=list)
     doppie: list = field(default_factory=list)
     errori: list = field(default_factory=list)
+    emesse: list = field(default_factory=list)          # "numero del gg/mm/aaaa", non importate
 
     def testo(self):
         parti = [f'{len(self.nuove)} nuov{"a" if len(self.nuove) == 1 else "e"}']
         if self.doppie:
             parti.append(f'{len(self.doppie)} gia\' presenti')
+        if self.emesse:
+            parti.append(f'{len(self.emesse)} emesse da te, saltate')
         if self.errori:
             parti.append(f'{len(self.errori)} con errori')
         return ', '.join(parti)
@@ -41,6 +50,9 @@ def importa_file(nome, dati, origine='upload', esito=None):
             esito.errori.append(f'{nome_xml}: {e}')
             continue
         for doc in documenti:
+            if emessa_da_noi(doc['fornitore']):
+                esito.emesse.append(f"{doc['numero']} del {doc['data']:%d/%m/%Y}")
+                continue
             fattura, nuova = registra(doc, nome_xml, xml, origine)
             (esito.nuove if nuova else esito.doppie).append(fattura)
     return esito
@@ -49,6 +61,15 @@ def importa_file(nome, dati, origine='upload', esito=None):
 def _codice(testo):
     codice = re.sub(r'[^0-9A-Z]', '', (testo or '').upper())
     return codice[2:] if codice.startswith('IT') and len(codice) == 13 else codice
+
+
+def emessa_da_noi(cedente):
+    """Il cedente (dict 'fornitore' del documento, o un Fornitore) siamo noi."""
+    if isinstance(cedente, Fornitore):
+        codici = [cedente.partita_iva]
+    else:
+        codici = [cedente.get('piva'), cedente.get('codice_fiscale')]
+    return _codice(partita_iva_azienda()) in {_codice(c) for c in codici if c}
 
 
 def trova_fornitore(dati):

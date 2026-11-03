@@ -7,7 +7,7 @@ from decimal import Decimal, InvalidOperation
 from django.contrib import messages
 from django.contrib.auth.decorators import login_required, user_passes_test
 from django.db import transaction
-from django.db.models import F, Q, Sum
+from django.db.models import Count, F, ProtectedError, Q, Sum
 from django.http import Http404, HttpResponse
 from django.shortcuts import get_object_or_404, redirect, render
 from django.utils import timezone
@@ -16,7 +16,7 @@ from apps.magazzino.models import Fornitore
 
 from . import pec
 from .fatturapa import LIMITE_FILE
-from .importa import Esito, importa_file, riclassifica
+from .importa import Esito, emessa_da_noi, importa_file, partita_iva_azienda, riclassifica
 from .models import (CENTRI, FatturaPassiva, RegolaFornitore, RegolaRigaFornitore, RigaFatturaPassiva,
                      ScadenzaFattura, VoceConto, ripartizione_valida, testo_ripartizione)
 
@@ -84,9 +84,14 @@ def _messaggi_esito(request, esito):
                          else 'Importata 1 fattura.')
     if esito.doppie:
         messages.info(request, f'{len(esito.doppie)} gia\' presenti: non importate di nuovo.')
+    if esito.emesse:
+        messages.warning(request, f'{len(esito.emesse)} fattur{"a" if len(esito.emesse) == 1 else "e"} emess'
+                                  f'{"a" if len(esito.emesse) == 1 else "e"} da te (P.IVA {partita_iva_azienda()}) '
+                                  'non importat' + ('a' if len(esito.emesse) == 1 else 'e') +
+                                  ': qui vanno solo le fatture dei fornitori.')
     for errore in esito.errori[:10]:
         messages.error(request, errore)
-    if not (esito.nuove or esito.doppie or esito.errori):
+    if not (esito.nuove or esito.doppie or esito.errori or esito.emesse):
         messages.info(request, 'Nessuna fattura trovata.')
 
 
@@ -121,6 +126,8 @@ def fatture(request):
             fattura = _nuova_manuale(request)
             if fattura:
                 return redirect('contabilita:fattura', pk=fattura.pk)
+        elif azione == 'elimina_emesse':
+            _elimina_emesse(request)
         return redirect(request.get_full_path())
 
     oggi = timezone.localdate()
@@ -165,7 +172,37 @@ def fatture(request):
         'pec_configurata': pec.configurata(),
         'ultima_pec': pec.ultima_lettura(),
         'oggi': oggi,
+        'emesse': _fatture_emesse().aggregate(n=Count('id'), totale=Sum('totale')),
     })
+
+
+def _fatture_emesse():
+    """Fatture caricate per errore con noi come cedente (fatture emesse)."""
+    nostri = [f.pk for f in Fornitore.objects.exclude(partita_iva='') if emessa_da_noi(f)]
+    return FatturaPassiva.objects.filter(fornitore_id__in=nostri)
+
+
+def _elimina_emesse(request):
+    """Toglie le fatture emesse caricate come fatture di fornitori; quelle
+    gia' abbinate a un pagamento restano, da guardare una per una."""
+    qs = _fatture_emesse()
+    abbinate = qs.filter(scadenze__movimento__isnull=False).distinct()
+    n_abbinate = abbinate.count()
+    fornitori = set(qs.values_list('fornitore_id', flat=True))
+    da_togliere = FatturaPassiva.objects.filter(pk__in=list(qs.exclude(pk__in=abbinate).values_list('pk', flat=True)))
+    n = da_togliere.count()
+    with transaction.atomic():
+        da_togliere.delete()                                # righe e scadenze vanno con la fattura
+        for fornitore in Fornitore.objects.filter(pk__in=fornitori, fatture_passive__isnull=True,
+                                                  articoli__isnull=True, richieste__isnull=True).distinct():
+            try:
+                with transaction.atomic():
+                    fornitore.delete()
+            except ProtectedError:
+                pass                                        # ordini o consegne del magazzino: resta in anagrafica
+    messages.success(request, f'Eliminate {n} fatture emesse da te caricate per errore.')
+    if n_abbinate:
+        messages.warning(request, f'{n_abbinate} restano perche\' abbinate a un pagamento: togli prima l\'abbinamento.')
 
 
 def _nuova_manuale(request):

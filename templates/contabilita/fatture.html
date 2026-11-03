@@ -10,6 +10,16 @@
     {% include "contabilita/_nav.html" %}
   </div>
 
+  {% if emesse.n %}
+  <div class="alert alert-warning d-flex flex-wrap align-items-center gap-2 py-2">
+    <span><i class="bi bi-exclamation-triangle"></i> Ci sono <b>{{ emesse.n }} fattur{{ emesse.n|pluralize:"a,e" }} emess{{ emesse.n|pluralize:"a,e" }} da te</b> (&euro;{{ emesse.totale|floatformat:"2g" }}) caricat{{ emesse.n|pluralize:"a,e" }} come fatture di fornitori: non sono costi.</span>
+    <form method="post" class="ms-auto" onsubmit="return confirm('Eliminare le {{ emesse.n }} fatture emesse da te? Non si torna indietro.')">{% csrf_token %}
+      <input type="hidden" name="azione" value="elimina_emesse">
+      <button class="btn btn-sm btn-danger"><i class="bi bi-trash"></i> Elimina queste fatture</button>
+    </form>
+  </div>
+  {% endif %}
+
   <div class="row g-2 mb-3">
     <div class="col-6 col-lg-3"><div class="kpi-tile hero">
       <div class="label">{% if stato == 'da_classificare' %}Da classificare{% else %}Imponibile {{ mese|date:"F Y" }}{% endif %}</div>

@@ -14,6 +14,7 @@ Pagine in **Amministrazione › Contabilità** (permesso "Contabilità", all'ini
 
 **A mano**
 - Nella pagina **Fatture fornitori** si caricano XML, p7m o lo ZIP scaricato dal cassetto fiscale.
+- Le fatture **emesse** dall'autolavaggio (cedente con la nostra P.IVA, `PARTITA_IVA_AZIENDA`) si scartano, sia dal caricamento sia dalla PEC. Se ne erano entrate prima del blocco, la pagina le segnala con il pulsante **Elimina queste fatture**: restano solo quelle già abbinate a un pagamento. Il fornitore "noi stessi" si cancella se non è usato altrove.
 - La stessa fattura (P.IVA, tipo, numero, data) non entra mai due volte.
 
 **Senza fattura elettronica**
