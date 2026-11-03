@@ -113,12 +113,14 @@ def _azione(request):
     elif azione == 'abbina':
         mov = get_object_or_404(MovimentoFinanziario, pk=p.get('movimento'))
         scadenza = get_object_or_404(ScadenzaFattura, pk=p.get('scadenza'))
-        srv.abbina(mov, [scadenza])
-        messages.success(request, f'Pagamento abbinato a {scadenza.fattura}.')
+        srv.abbina(mov, [scadenza], srv.voce_commissioni())
+        messages.success(request, f'Pagamento abbinato a {scadenza.fattura}'
+                                  f'{f"; €{-mov.differenza:.2f} di commissione su Spese bancarie" if mov.differenza else ""}.')
     elif azione == 'abbina_tutte':
         proposte = srv.proponi_abbinamenti()
+        commissioni = srv.voce_commissioni()
         for pr in proposte:
-            srv.abbina(pr['movimento'], [pr['scadenza']])
+            srv.abbina(pr['movimento'], [pr['scadenza']], commissioni)
         messages.success(request, f'{len(proposte)} pagamenti abbinati.')
     elif azione == 'nuovo':
         _nuovo_movimento(request)
@@ -152,7 +154,8 @@ def applica_regole():
 
 @accesso
 def movimento(request, pk):
-    mov = get_object_or_404(MovimentoFinanziario.objects.select_related('conto', 'voce', 'controparte__conto'), pk=pk)
+    mov = get_object_or_404(MovimentoFinanziario.objects.select_related('conto', 'voce', 'voce_differenza', 'controparte__conto'),
+                            pk=pk)
     if request.method == 'POST':
         risposta = _azione_movimento(request, mov)
         return risposta or redirect('contabilita:movimento', pk=mov.pk)
@@ -167,6 +170,8 @@ def movimento(request, pk):
         'campi_rip': campi_ripartizione(mov.ripartizione, mov.voce.ripartizione if mov.voce else {}),
         'abbinate': mov.scadenze.select_related('fattura__fornitore'),
         'candidate': candidate,
+        'voci_differenza': [v for v in VoceConto.objects.filter(attiva=True) if v.economica],
+        'voce_commissioni': srv.voce_commissioni(),
         'altri_conti': ContoFinanziario.objects.filter(attivo=True).exclude(pk=mov.conto_id),
     })
 
@@ -187,14 +192,18 @@ def _azione_movimento(request, mov):
         messages.success(request, 'Movimento salvato.')
     elif azione == 'abbina':
         scelte = list(srv.scadenze_aperte().filter(pk__in=p.getlist('scadenza')))
-        totale = sum((s.importo for s in scelte), Decimal('0'))
         if not scelte:
             messages.error(request, 'Scegli almeno una scadenza.')
-        elif abs(totale + mov.importo) > Decimal('0.01'):
-            messages.error(request, f'Le scadenze scelte fanno €{totale:.2f}, il movimento €{-mov.importo:.2f}.')
-        else:
-            srv.abbina(mov, scelte)
-            messages.success(request, f'Abbinato a {len(scelte)} scadenz{"a" if len(scelte) == 1 else "e"}.')
+            return None
+        try:
+            srv.abbina(mov, scelte, VoceConto.objects.filter(pk=p.get('voce_differenza') or 0).first())
+        except ValueError as e:
+            messages.error(request, f'Non abbinato: {e}.')
+            return None
+        testo = f'Abbinato a {len(scelte)} scadenz{"a" if len(scelte) == 1 else "e"}'
+        if mov.differenza:
+            testo += f'; €{abs(mov.differenza):.2f} di differenza su "{mov.voce_differenza}"'
+        messages.success(request, testo + '.')
     elif azione == 'togli':
         srv.togli_abbinamento(get_object_or_404(ScadenzaFattura, pk=p.get('scadenza'), movimento=mov))
     elif azione == 'giroconto':

@@ -377,6 +377,11 @@ class MovimentoFinanziario(models.Model):
                              related_name='movimenti')
     ripartizione = models.JSONField(default=dict, blank=True)
     regola = models.ForeignKey(RegolaMovimento, on_delete=models.SET_NULL, null=True, blank=True)
+    # Pagamento abbinato a fatture con un importo diverso (es. bonifico con la
+    # commissione dentro): la differenza, con segno (-1.50 = 1,50 pagati in
+    # piu'), e' un costo o un abbuono sulla sua voce
+    differenza = models.DecimalField(max_digits=12, decimal_places=2, default=0)
+    voce_differenza = models.ForeignKey(VoceConto, on_delete=models.PROTECT, null=True, blank=True, related_name='+')
     # Giroconto: il movimento opposto sull'altro conto
     controparte = models.OneToOneField('self', on_delete=models.SET_NULL, null=True, blank=True)
     origine = models.CharField(max_length=10, choices=ORIGINI, default='estratto')

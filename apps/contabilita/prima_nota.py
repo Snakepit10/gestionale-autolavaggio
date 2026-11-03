@@ -9,7 +9,12 @@ from django.db.models import Q
 
 from .models import MovimentoFinanziario, ScadenzaFattura, VoceConto
 
+ZERO = Decimal('0')
 GIORNI_ABBINAMENTO = 45
+# Bonifico con la commissione dentro: si propone se paga al massimo questo
+# in piu' della scadenza e la descrizione ha il nome del fornitore
+COMMISSIONE_MAX = Decimal('5.00')
+VOCE_COMMISSIONI = 'CF.BANCA'
 _PAROLE_VUOTE = {'srl', 'spa', 'snc', 'sas', 'srls', 'societa', 'società', 'italia', 'group', 'servizi', 'della', 'delle'}
 
 
@@ -28,41 +33,73 @@ def scadenze_aperte():
 
 
 def proponi_abbinamenti(movimenti=None):
-    """Uscite non ancora abbinate con una scadenza aperta dello stesso
-    importo (al centesimo) entro 45 giorni; a parita' vince quella col
-    nome del fornitore nella descrizione, poi la piu' vicina."""
+    """Uscite non ancora abbinate con una scadenza aperta entro 45 giorni:
+    - dello stesso importo (al centesimo);
+    - oppure piu' alte al massimo di COMMISSIONE_MAX, se la descrizione ha
+      il nome del fornitore: la differenza e' la commissione del bonifico.
+    Vince l'importo esatto, poi il nome del fornitore, poi la piu' vicina."""
     if movimenti is None:
         movimenti = (MovimentoFinanziario.objects.filter(importo__lt=0, scadenze__isnull=True)
                      .filter(Q(voce__isnull=True) | Q(voce__codice='N.FORNITORI'))
                      .select_related('conto').order_by('data', 'id'))
+    movimenti = list(movimenti)
     aperte = list(scadenze_aperte())
-    usate, proposte = set(), []
-    for mov in movimenti:
-        candidati = []
-        for s in aperte:
-            if s.pk in usate or abs(s.importo + mov.importo) > Decimal('0.01'):
+    usate, proposte = set(), {}
+    # prima tutti gli importi esatti, poi quelli con la commissione: un
+    # bonifico esatto non perde la sua scadenza per uno con commissione
+    for con_commissione in (False, True):
+        for mov in movimenti:
+            if mov.pk in proposte:
                 continue
-            giorni = abs((mov.data - (s.data or s.fattura.data)).days)
-            if giorni <= GIORNI_ABBINAMENTO:
+            candidati = []
+            for s in aperte:
+                commissione = -(mov.importo + s.importo)      # pagato in piu' della scadenza
+                if s.pk in usate:
+                    continue
+                if con_commissione:
+                    if not Decimal('0.01') < commissione <= COMMISSIONE_MAX:
+                        continue
+                elif abs(commissione) > Decimal('0.01'):
+                    continue
+                giorni = abs((mov.data - (s.data or s.fattura.data)).days)
+                if giorni > GIORNI_ABBINAMENTO:
+                    continue
                 nome = nome_nel_testo(s.fattura.fornitore.ragione_sociale, f'{mov.causale} {mov.descrizione}')
-                candidati.append((not nome, giorni, s.pk, s, nome))
-        if candidati:
-            _, giorni, _, s, nome = min(candidati)
-            usate.add(s.pk)
-            proposte.append({'movimento': mov, 'scadenza': s, 'giorni': giorni, 'nome': nome})
-    return proposte
+                if nome or not con_commissione:
+                    candidati.append((not nome, giorni, s.pk, s, nome, commissione if con_commissione else ZERO))
+            if candidati:
+                _, giorni, _, s, nome, commissione = min(candidati)
+                usate.add(s.pk)
+                proposte[mov.pk] = {'movimento': mov, 'scadenza': s, 'giorni': giorni, 'nome': nome,
+                                    'commissione': commissione}
+    return sorted(proposte.values(), key=lambda p: (p['movimento'].data, p['movimento'].pk))
 
 
-def abbina(movimento, scadenze):
+def abbina(movimento, scadenze, voce_differenza=None):
     """Il movimento paga queste scadenze: diventa "Pagamento fornitori"
-    (il costo e' gia' nella fattura)."""
+    (il costo e' gia' nella fattura). Se l'importo non coincide, la
+    differenza (es. la commissione del bonifico) va su voce_differenza:
+    senza voce l'abbinamento non si fa (ValueError)."""
+    differenza = movimento.importo + sum((s.importo for s in scadenze), ZERO)
+    if abs(differenza) <= Decimal('0.01'):
+        differenza, voce_differenza = ZERO, None
+    elif voce_differenza is None:
+        raise ValueError(f'il movimento e le scadenze differiscono di €{abs(differenza):.2f}: '
+                         'scegli la voce della differenza')
+    elif not voce_differenza.economica:
+        raise ValueError(f'"{voce_differenza}" non e\' una voce di costo o di ricavo')
     with transaction.atomic():
         for s in scadenze:
             s.movimento, s.pagata_il = movimento, movimento.data
             s.save(update_fields=['movimento', 'pagata_il'])
         movimento.voce = VoceConto.objects.get(codice='N.FORNITORI')
         movimento.ripartizione, movimento.regola = {}, None
-        movimento.save(update_fields=['voce', 'ripartizione', 'regola'])
+        movimento.differenza, movimento.voce_differenza = differenza, voce_differenza
+        movimento.save(update_fields=['voce', 'ripartizione', 'regola', 'differenza', 'voce_differenza'])
+
+
+def voce_commissioni():
+    return VoceConto.objects.filter(codice=VOCE_COMMISSIONI).first()
 
 
 def togli_abbinamento(scadenza):
@@ -70,9 +107,12 @@ def togli_abbinamento(scadenza):
     with transaction.atomic():
         scadenza.movimento, scadenza.pagata_il = None, None
         scadenza.save(update_fields=['movimento', 'pagata_il'])
-        if movimento and not movimento.scadenze.exists() and movimento.voce and movimento.voce.codice == 'N.FORNITORI':
-            movimento.voce = None
-            movimento.save(update_fields=['voce'])
+        if movimento:
+            # senza una scadenza la differenza calcolata non vale piu'
+            movimento.differenza, movimento.voce_differenza = ZERO, None
+            if not movimento.scadenze.exists() and movimento.voce and movimento.voce.codice == 'N.FORNITORI':
+                movimento.voce = None
+            movimento.save(update_fields=['voce', 'differenza', 'voce_differenza'])
 
 
 def giroconto(movimento, conto):

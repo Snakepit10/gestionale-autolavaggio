@@ -41,7 +41,7 @@
     <div class="panel-title"><i class="bi bi-link-45deg"></i> Pagamenti da abbinare alle fatture ({{ proposte|length }})
       <form method="post" class="ms-auto">{% csrf_token %}<input type="hidden" name="azione" value="abbina_tutte">
         <button class="btn btn-sm btn-success"><i class="bi bi-check2-all"></i> Abbina tutti</button></form></div>
-    <div class="panel-sub">Uscite con lo stesso importo di una scadenza aperta, entro 45 giorni. Controlla e conferma: il movimento diventa "Pagamento fornitori" (il costo &egrave; gi&agrave; nella fattura).</div>
+    <div class="panel-sub">Uscite con lo stesso importo di una scadenza aperta, entro 45 giorni, oppure fino a &euro;5 in pi&ugrave; se la descrizione ha il nome del fornitore (la differenza &egrave; la commissione del bonifico e va su Spese bancarie). Controlla e conferma: il movimento diventa "Pagamento fornitori" (il costo &egrave; gi&agrave; nella fattura).</div>
     <div class="panel-body tabella-scroll">
       <table class="table table-sm">
         <thead><tr><th>Data</th><th>Conto</th><th>Movimento</th><th class="tab-num">Importo</th><th>Fattura</th><th>Scadenza</th><th></th></tr></thead>
@@ -53,7 +53,8 @@
             <td class="mov-desc">{{ pr.movimento.descrizione|truncatechars:90 }}</td>
             <td class="tab-num uscita">&euro;{{ pr.movimento.importo|floatformat:"2g" }}</td>
             <td><a href="{% url 'contabilita:fattura' pr.scadenza.fattura.pk %}">{{ pr.scadenza.fattura.fornitore }} n. {{ pr.scadenza.fattura.numero }}</a>
-              {% if pr.nome %}<span class="badge bg-success">nome trovato</span>{% endif %}</td>
+              {% if pr.nome %}<span class="badge bg-success">nome trovato</span>{% endif %}
+              {% if pr.commissione %}<div class="small text-warning-emphasis">fattura &euro;{{ pr.scadenza.importo|floatformat:"2g" }} + &euro;{{ pr.commissione|floatformat:"2g" }} di commissione su Spese bancarie</div>{% endif %}</td>
             <td>{{ pr.scadenza.data|date:"d/m/Y"|default:"—" }} <span class="text-muted small">({{ pr.giorni }} gg)</span></td>
             <td><form method="post">{% csrf_token %}<input type="hidden" name="azione" value="abbina">
               <input type="hidden" name="movimento" value="{{ pr.movimento.pk }}"><input type="hidden" name="scadenza" value="{{ pr.scadenza.pk }}">

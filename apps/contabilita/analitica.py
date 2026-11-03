@@ -18,7 +18,7 @@ risultato pieno; costo pieno per lavaggio, per ora e per servizio."""
 from collections import defaultdict
 from decimal import Decimal
 
-from .conto_economico import IVA, ZERO, fine_mese, quote_competenza, ricavi_canali
+from .conto_economico import IVA, ZERO, differenze_abbinamento, fine_mese, quote_competenza, ricavi_canali
 from .models import (CENTRI, NOMI_CENTRI, Cespite, MovimentoFinanziario, ParametriAnalitica,
                      RigaFatturaPassiva, RipartizionePersonale)
 
@@ -92,6 +92,9 @@ def raccogli(mesi):
     for m in movimenti:
         importo = m.importo if m.voce.sezione == 'ricavi' else -m.importo
         aggiungi(importo, m.ripartizione_effettiva, m.voce.sezione, m.voce.nome)
+    for m in differenze_abbinamento(dal, al):
+        v = m.voce_differenza
+        aggiungi(m.differenza if v.sezione == 'ricavi' else -m.differenza, v.ripartizione, v.sezione, v.nome)
 
     ripartizioni = defaultdict(list)
     for r in RipartizionePersonale.objects.order_by('-valido_dal'):

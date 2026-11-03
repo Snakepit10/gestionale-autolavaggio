@@ -131,6 +131,11 @@ def dettaglio(request):
         documenti.append({'data': m.data, 'tipo': f'Movimento {m.conto}', 'url_movimento': m.pk,
                           'descrizione': m.descrizione, 'importo': (m.importo if voce.sezione in ('ricavi', 'non_economico') else -m.importo),
                           'escluso': not economico})
+    if voce:
+        for m in ce_srv.differenze_abbinamento(dal, al).filter(voce_differenza=voce).select_related('conto'):
+            documenti.append({'data': m.data, 'tipo': f'Movimento {m.conto}', 'url_movimento': m.pk,
+                              'descrizione': f'Differenza sul pagamento di fatture: {m.descrizione}',
+                              'importo': m.differenza if voce.sezione == 'ricavi' else -m.differenza})
     documenti.sort(key=lambda d: d['data'])
     return render(request, 'contabilita/dettaglio.html', {
         'anno': anno,

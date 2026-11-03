@@ -81,7 +81,18 @@ def costi_per_voce(mesi):
         i = indice[m.data.replace(day=1)]
         # un'uscita e' un costo positivo; su una voce di ricavo l'entrata e' ricavo positivo
         valori[m.voce_id][i] += m.importo if m.voce.sezione == 'ricavi' else -m.importo
+    # pagamenti di fatture con una differenza (es. la commissione del bonifico)
+    for m in differenze_abbinamento(mesi[0], fine_mese(mesi[-1])):
+        i = indice[m.data.replace(day=1)]
+        valori[m.voce_differenza_id][i] += m.differenza if m.voce_differenza.sezione == 'ricavi' else -m.differenza
     return valori
+
+
+def differenze_abbinamento(dal, al):
+    """Movimenti abbinati a fatture la cui differenza d'importo e' un costo
+    o un ricavo (la voce del movimento resta "Pagamento fornitori")."""
+    return (MovimentoFinanziario.objects.filter(data__gte=dal, data__lte=al, voce_differenza__isnull=False)
+            .exclude(differenza=0).select_related('voce_differenza'))
 
 
 def ricavi_canali(mesi):
@@ -308,7 +319,7 @@ def flussi_di_cassa(mesi):
     giroconti = [ZERO] * n
     voci = {}
     movimenti = (MovimentoFinanziario.objects.filter(data__gte=mesi[0], data__lte=fine_mese(mesi[-1]))
-                 .select_related('voce', 'conto'))
+                 .select_related('voce', 'voce_differenza', 'conto'))
     for m in movimenti:
         if m.data < m.conto.data_saldo_iniziale:
             continue
@@ -319,6 +330,11 @@ def flussi_di_cassa(mesi):
         chiave = m.voce_id or 'dacl'
         voci[chiave] = m.voce
         per_voce[chiave][i] += m.importo
+        if m.voce_differenza_id and m.differenza:
+            # la commissione dentro il pagamento di una fattura esce sulla sua voce
+            voci[m.voce_differenza_id] = m.voce_differenza
+            per_voce[chiave][i] -= m.differenza
+            per_voce[m.voce_differenza_id][i] += m.differenza
 
     iniziali = [sum((c.saldo_al(m - timedelta(days=1)) for c in conti), ZERO) for m in mesi]
     finali = [sum((c.saldo_al(fine_mese(m)) for c in conti), ZERO) for m in mesi]
