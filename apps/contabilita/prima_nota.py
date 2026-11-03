@@ -2,6 +2,7 @@
 giroconti tra conti e movimenti della cassa contanti ricavati dalle
 quadrature giornaliere."""
 import re
+import uuid
 from decimal import Decimal
 
 from django.db import transaction
@@ -75,12 +76,27 @@ def proponi_abbinamenti(movimenti=None):
     return sorted(proposte.values(), key=lambda p: (p['movimento'].data, p['movimento'].pk))
 
 
-def abbina(movimento, scadenze, voce_differenza=None):
+def abbina(movimento, scadenze, voce_differenza=None, parziale=False):
     """Il movimento paga queste scadenze: diventa "Pagamento fornitori"
-    (il costo e' gia' nella fattura). Se l'importo non coincide, la
-    differenza (es. la commissione del bonifico) va su voce_differenza:
-    senza voce l'abbinamento non si fa (ValueError)."""
+    (il costo e' gia' nella fattura). Se l'importo non coincide:
+    - parziale (il movimento paga meno delle scadenze): l'ultima scadenza
+      si divide e il resto resta aperto, da pagare con un altro mezzo;
+      restituisce la scadenza del resto;
+    - altrimenti la differenza (es. la commissione del bonifico) va su
+      voce_differenza; senza voce l'abbinamento non si fa (ValueError)."""
     differenza = movimento.importo + sum((s.importo for s in scadenze), ZERO)
+    if parziale and differenza > Decimal('0.01'):
+        ultima = max(scadenze, key=lambda s: (s.data or s.fattura.data, s.pk))
+        if differenza >= ultima.importo:
+            raise ValueError(f'il resto (€{differenza:.2f}) e\' piu\' della scadenza di {ultima.fattura}: '
+                             'togli una delle scadenze scelte')
+        with transaction.atomic():
+            resto = ScadenzaFattura.objects.create(fattura=ultima.fattura, data=ultima.data, importo=differenza,
+                                                   modalita=ultima.modalita, iban=ultima.iban)
+            ultima.importo -= differenza
+            ultima.save(update_fields=['importo'])
+            _abbina(movimento, scadenze, ZERO, None)
+        return resto
     if abs(differenza) <= Decimal('0.01'):
         differenza, voce_differenza = ZERO, None
     elif voce_differenza is None:
@@ -88,6 +104,29 @@ def abbina(movimento, scadenze, voce_differenza=None):
                          'scegli la voce della differenza')
     elif not voce_differenza.economica:
         raise ValueError(f'"{voce_differenza}" non e\' una voce di costo o di ricavo')
+    _abbina(movimento, scadenze, differenza, voce_differenza)
+    return None
+
+
+def paga_resto_in_contanti(movimento, scadenze, data=None):
+    """Il movimento paga una parte delle scadenze, il resto e' stato pagato
+    con la cassa: crea l'uscita su Cassa contanti e la abbina al resto."""
+    from .models import ContoFinanziario
+    cassa = ContoFinanziario.objects.filter(tipo='cassa', attivo=True).order_by('ordine', 'id').first()
+    if cassa is None:
+        raise ValueError('non c\'e\' un conto di tipo cassa')
+    with transaction.atomic():
+        resto = abbina(movimento, scadenze, parziale=True)
+        if resto is None:
+            raise ValueError('il movimento non paga meno delle scadenze scelte: non c\'e\' un resto')
+        contanti = MovimentoFinanziario.objects.create(
+            conto=cassa, data=data or movimento.data, importo=-resto.importo, origine='manuale',
+            descrizione=f'Pagamento in contanti: {resto.fattura}'[:500], impronta=f'contanti|{uuid.uuid4().hex}')
+        abbina(contanti, [resto])
+    return contanti
+
+
+def _abbina(movimento, scadenze, differenza, voce_differenza):
     with transaction.atomic():
         for s in scadenze:
             s.movimento, s.pagata_il = movimento, movimento.data
@@ -107,7 +146,18 @@ def togli_abbinamento(scadenza):
     with transaction.atomic():
         scadenza.movimento, scadenza.pagata_il = None, None
         scadenza.save(update_fields=['movimento', 'pagata_il'])
+        # una scadenza divisa da un pagamento parziale si riunisce alle parti ancora aperte
+        aperte = scadenza.fattura.scadenze.filter(movimento__isnull=True, pagata_il__isnull=True, data=scadenza.data,
+                                                  modalita=scadenza.modalita).exclude(pk=scadenza.pk)
+        for altra in aperte:
+            scadenza.importo += altra.importo
+            altra.delete()
+        scadenza.save(update_fields=['importo'])
         if movimento:
+            if movimento.origine == 'manuale' and movimento.impronta.startswith('contanti|') \
+                    and not movimento.scadenze.exists():
+                movimento.delete()                    # uscita di cassa creata col pagamento parziale
+                return
             # senza una scadenza la differenza calcolata non vale piu'
             movimento.differenza, movimento.voce_differenza = ZERO, None
             if not movimento.scadenze.exists() and movimento.voce and movimento.voce.codice == 'N.FORNITORI':

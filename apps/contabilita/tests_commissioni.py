@@ -111,6 +111,51 @@ class CommissioniTest(TestCase):
         self.assertNotIn('n. 12/A', cercata)
         self.assertContains(self.apri(url + '?cerca=nessuno'), 'Nessuna scadenza aperta per')
 
+    def test_pagamento_parziale_e_resto_con_altro_movimento(self):
+        bonifico = self.movimento('-100.00', 'Bonifico a Detergenti')
+        url = f'/contabilita/prima-nota/{bonifico.pk}/'
+        self.client.post(url, {'azione': 'abbina', 'scadenza': [self.scadenza.pk], 'tipo_differenza': 'resto'})
+        fattura = self.scadenza.fattura
+        pagata, resto = fattura.scadenze.order_by('-movimento_id')[0], fattura.scadenze.get(movimento__isnull=True)
+        self.assertEqual((pagata.importo, pagata.movimento, resto.importo), (Decimal('100.00'), bonifico, Decimal('83.00')))
+        bonifico.refresh_from_db()
+        self.assertEqual((bonifico.voce.codice, bonifico.differenza), ('N.FORNITORI', 0))
+        # il resto si abbina a un altro movimento (es. una seconda banca), come una scadenza qualsiasi
+        secondo = self.movimento('-83.00', 'Bonifico da altro conto')
+        abbina(secondo, [resto])
+        self.assertFalse(fattura.scadenze.filter(pagata_il__isnull=True).exists())
+        # togliendo gli abbinamenti la scadenza torna intera
+        togli_abbinamento(fattura.scadenze.get(movimento=secondo))
+        togli_abbinamento(fattura.scadenze.get(movimento=bonifico))
+        self.assertEqual([s.importo for s in fattura.scadenze.all()], [Decimal('183.00')])
+
+    def test_resto_pagato_in_contanti(self):
+        bonifico = self.movimento('-150.00', 'Bonifico a Detergenti')
+        url = f'/contabilita/prima-nota/{bonifico.pk}/'
+        self.assertContains(self.apri(url), 'Pagamento parziale')
+        self.client.post(url, {'azione': 'abbina', 'scadenza': [self.scadenza.pk], 'tipo_differenza': 'contanti',
+                               'data_contanti': '2026-11-18'})
+        cassa = ContoFinanziario.objects.get(nome='Cassa contanti')
+        contanti = cassa.movimenti.get()
+        self.assertEqual((contanti.importo, contanti.data, contanti.voce.codice), (Decimal('-33.00'), date(2026, 11, 18), 'N.FORNITORI'))
+        self.assertEqual(sorted(s.movimento.conto.nome for s in self.scadenza.fattura.scadenze.all()), ['BAPS', 'Cassa contanti'])
+        # nel conto economico niente: il costo e' la fattura; nei flussi le due uscite
+        ce = {r['chiave']: r['totale'] for r in conto_economico([NOVEMBRE])['righe'] if r['chiave']}
+        self.assertNotIn(f'voce:{voce("N.FORNITORI").pk}', ce)
+        fc = {r['chiave']: r['totale'] for r in flussi_di_cassa([NOVEMBRE])['righe'] if r['chiave']}
+        self.assertEqual(fc[f'voce:{voce("N.FORNITORI").pk}'], Decimal('-183.00'))
+        self.assertContains(self.apri(f'/contabilita/prima-nota/{contanti.pk}/'), 'Detergenti Srl n. 12/A')
+        # togliendo la parte in contanti l'uscita di cassa creata sparisce
+        togli_abbinamento(contanti.scadenze.get())
+        self.assertFalse(cassa.movimenti.exists())
+
+    def test_resto_piu_grande_della_scadenza(self):
+        altra = importa_file('b.xml', fattura_xml(numero='13/A')).nuove[0].scadenze.get()
+        bonifico = self.movimento('-150.00', 'Bonifico')                       # 366 di scadenze: resto 216 > 183
+        with self.assertRaises(ValueError):
+            abbina(bonifico, [self.scadenza, altra], parziale=True)
+        self.assertFalse(bonifico.scadenze.exists())
+
     def test_importo_esatto_ignora_la_voce(self):
         bonifico = self.movimento('-183.00', 'Bonifico')
         abbina(bonifico, [self.scadenza], voce('CF.BANCA'))

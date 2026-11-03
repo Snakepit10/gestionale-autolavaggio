@@ -105,10 +105,22 @@
             </table>
             <div class="small mb-2" id="riepilogo-abbina">Movimento &euro;{{ mov.importo|floatformat:2|cut:"-" }}: scegli le scadenze.</div>
             <div class="mb-2" id="riga-differenza" hidden>
-              <label class="form-label small mb-0">La differenza va su</label>
-              <select name="voce_differenza" class="form-select form-select-sm" style="max-width:320px">
-                {% for v in voci_differenza %}<option value="{{ v.pk }}" {% if v == voce_commissioni %}selected{% endif %}>{{ v.get_sezione_display }} &rsaquo; {{ v }}</option>{% endfor %}
-              </select>
+              <div id="scelte-resto" class="small mb-2" hidden>
+                <div class="form-check"><input class="form-check-input" type="radio" name="tipo_differenza" value="resto" id="td-resto" checked>
+                  <label class="form-check-label" for="td-resto"><strong>Pagamento parziale:</strong> il resto resta da pagare (lo abbini poi a un altro movimento, per esempio un'altra banca o una spesa di cassa)</label></div>
+                <div class="form-check"><input class="form-check-input" type="radio" name="tipo_differenza" value="contanti" id="td-contanti">
+                  <label class="form-check-label" for="td-contanti"><strong>Il resto &egrave; stato pagato in contanti:</strong> crea l'uscita su Cassa contanti il
+                    <input type="date" name="data_contanti" value="{{ mov.data|date:'Y-m-d' }}" class="form-control form-control-sm d-inline-block" style="width:150px"></label>
+                  <div class="text-muted" style="font-size:.7rem">Se gli operatori l'hanno gi&agrave; registrata come spesa di cassa, scegli il pagamento parziale e abbina quella: altrimenti l'uscita conta due volte.</div></div>
+                <div class="form-check"><input class="form-check-input" type="radio" name="tipo_differenza" value="voce" id="td-voce">
+                  <label class="form-check-label" for="td-voce"><strong>Sconto o abbuono:</strong> la differenza riduce una voce</label></div>
+              </div>
+              <div id="riga-voce-differenza">
+                <label class="form-label small mb-0">La differenza va su</label>
+                <select name="voce_differenza" class="form-select form-select-sm" style="max-width:320px">
+                  {% for v in voci_differenza %}<option value="{{ v.pk }}" {% if v == voce_commissioni %}selected{% endif %}>{{ v.get_sezione_display }} &rsaquo; {{ v }}</option>{% endfor %}
+                </select>
+              </div>
             </div>
             <button class="btn btn-sm btn-success"><i class="bi bi-link"></i> Abbina</button>
           </form>
@@ -129,19 +141,25 @@
   var form = document.getElementById('form-abbina');
   if (!form) return;
   var importo = -parseFloat(form.dataset.importo), riepilogo = document.getElementById('riepilogo-abbina'),
-      riga = document.getElementById('riga-differenza');
+      riga = document.getElementById('riga-differenza'), scelteResto = document.getElementById('scelte-resto'),
+      rigaVoce = document.getElementById('riga-voce-differenza');
   function euro(x) { return '€' + x.toLocaleString('it-IT', {minimumFractionDigits: 2, maximumFractionDigits: 2}); }
+  function tipo() { var t = form.querySelector('[name="tipo_differenza"]:checked'); return t ? t.value : 'voce'; }
   function aggiorna() {
     var scelte = form.querySelectorAll('.scelta-scadenza:checked'), totale = 0;
     scelte.forEach(function (c) { totale += parseFloat(c.dataset.importo); });
-    var diff = Math.round((importo - totale) * 100) / 100;
+    var diff = Math.round((importo - totale) * 100) / 100, inMeno = diff <= -0.01;
     riga.hidden = !scelte.length || Math.abs(diff) < 0.01;
+    // pagato meno delle fatture: parziale, contanti o abbuono; pagato di piu': solo la voce (commissione)
+    scelteResto.hidden = !inMeno;
+    scelteResto.querySelectorAll('input[type="radio"]').forEach(function (r) { r.disabled = !inMeno; });
+    rigaVoce.hidden = inMeno && tipo() !== 'voce';
     if (!scelte.length) { riepilogo.textContent = 'Movimento ' + euro(importo) + ': scegli le scadenze.'; return; }
     riepilogo.textContent = 'Scadenze ' + euro(totale) + ', movimento ' + euro(importo) +
       (Math.abs(diff) < 0.01 ? ': coincidono.' : diff > 0 ? ': pagati ' + euro(diff) + ' in più (commissione?).'
-                                                        : ': pagati ' + euro(-diff) + ' in meno (abbuono?).');
+                                                        : ': pagati ' + euro(-diff) + ' in meno: scegli come è stato pagato il resto.');
   }
-  form.querySelectorAll('.scelta-scadenza').forEach(function (c) { c.addEventListener('change', aggiorna); });
+  form.querySelectorAll('.scelta-scadenza, [name="tipo_differenza"]').forEach(function (c) { c.addEventListener('change', aggiorna); });
 })();
 </script>
 {% endblock %}

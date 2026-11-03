@@ -207,14 +207,23 @@ def _azione_movimento(request, mov):
         if not scelte:
             messages.error(request, 'Scegli almeno una scadenza.')
             return None
+        tipo = p.get('tipo_differenza', 'voce')
+        testo = f'Abbinato a {len(scelte)} scadenz{"a" if len(scelte) == 1 else "e"}'
         try:
-            srv.abbina(mov, scelte, VoceConto.objects.filter(pk=p.get('voce_differenza') or 0).first())
+            if tipo == 'contanti':
+                contanti = srv.paga_resto_in_contanti(mov, scelte, _data(p.get('data_contanti')))
+                testo += f'; il resto (€{-contanti.importo:.2f}) e\' un\'uscita di {contanti.conto} del {contanti.data:%d/%m/%Y}'
+            elif tipo == 'resto':
+                resto = srv.abbina(mov, scelte, parziale=True)
+                if resto:
+                    testo += f'; restano da pagare €{resto.importo:.2f} di {resto.fattura}'
+            else:
+                srv.abbina(mov, scelte, VoceConto.objects.filter(pk=p.get('voce_differenza') or 0).first())
+                if mov.differenza:
+                    testo += f'; €{abs(mov.differenza):.2f} di differenza su "{mov.voce_differenza}"'
         except ValueError as e:
             messages.error(request, f'Non abbinato: {e}.')
             return None
-        testo = f'Abbinato a {len(scelte)} scadenz{"a" if len(scelte) == 1 else "e"}'
-        if mov.differenza:
-            testo += f'; €{abs(mov.differenza):.2f} di differenza su "{mov.voce_differenza}"'
         messages.success(request, testo + '.')
     elif azione == 'togli':
         srv.togli_abbinamento(get_object_or_404(ScadenzaFattura, pk=p.get('scadenza'), movimento=mov))

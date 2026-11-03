@@ -139,6 +139,12 @@ Reimportare lo stesso periodo, anche con file che si sovrappongono, non crea dop
   - la prima nota propone da sola gli abbinamenti: stesso importo, entro 45 giorni, con preferenza per il nome del fornitore nella descrizione;
   - un bonifico può pagare più fatture;
   - nella pagina del movimento le scadenze aperte sono in quest'ordine: prima quelle con l'importo esatto, poi quelle dei fornitori nominati nella descrizione (con un'etichetta), poi le più vicine come importo. Sono 15; con la ricerca per fornitore o numero di fattura arrivano fino a 50;
+  - **pagamento parziale**: se il movimento paga meno delle scadenze scelte, nella pagina del movimento si sceglie come è stato pagato il resto:
+    - *resta da pagare*: l'ultima scadenza si divide e il resto resta aperto, da abbinare poi a un altro movimento (un'altra banca, una spesa di cassa);
+    - *pagato in contanti*: oltre alla divisione, crea l'uscita su Cassa contanti, nel giorno indicato, già abbinata al resto. Se gli operatori l'hanno già registrata come spesa di cassa, va scelto "resta da pagare" e abbinata quella, altrimenti l'uscita conta due volte;
+    - *sconto o abbuono*: la differenza va su una voce, come sotto.
+
+    Togliendo gli abbinamenti le parti si riuniscono, e l'uscita di cassa creata in automatico si cancella;
   - se l'importo non coincide, per esempio perché il bonifico ha dentro la commissione, la **differenza** va su una voce economica scelta nella pagina del movimento (di default Spese bancarie). Una differenza positiva, cioè pagato meno delle fatture, è un abbuono e riduce il costo della voce scelta;
   - la prima nota propone anche i bonifici fino a €5 più alti della scadenza, ma solo se la descrizione ha il nome del fornitore e prima vengono gli importi esatti. "Abbina tutti" mette la differenza su Spese bancarie;
   - nel conto economico entra solo la differenza; nei flussi di cassa il movimento si divide fra Pagamento fornitori e la voce della differenza.
