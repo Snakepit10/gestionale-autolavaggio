@@ -8,7 +8,8 @@ from django.test import TestCase
 from django.utils import timezone
 
 from .indici import indici, valore_attuale
-from .models import ContoFinanziario, Finanziamento, ParametriFinanziari
+from .models import ContoFinanziario, Finanziamento, MovimentoFinanziario, ParametriFinanziari, VoceConto
+from .prima_nota import conta_cassa
 from .tests_analitica import fattura
 
 OGGI = date(2026, 11, 3)
@@ -86,6 +87,26 @@ class IndiciTest(TestCase):
         self.assertEqual(r['dscr'], Decimal('0.36'))
         self.assertFalse(c['oltre'])                       # come stock il debito ci sta, come rate no
         self.assertEqual(per_nome(r)['DSCR']['stato'], 'critico')
+
+    def test_rate_recenti_e_liquidita_per_conto(self):
+        fin = VoceConto.objects.get(codice='N.FINANZIAMENTI')
+        baps = ContoFinanziario.objects.get(nome='BAPS')
+        for giorno, importo in ((date(2026, 6, 15), '-5000'), (date(2026, 10, 20), '-100')):   # la prima e' finita
+            MovimentoFinanziario.objects.create(conto=baps, data=giorno, importo=Decimal(importo), voce=fin,
+                                                impronta=f'prova|{giorno}')
+        ContoFinanziario.objects.filter(nome='MPS').update(attivo=False, saldo_iniziale=999)
+        cassa = ContoFinanziario.objects.get(nome='Cassa contanti')
+        MovimentoFinanziario.objects.create(conto=cassa, data=date(2026, 10, 6), importo=Decimal('50'),
+                                            impronta='prova|incasso', origine='cassa')
+        c = indici(2026, 'canali', OGGI)['capacita']
+        self.assertEqual((c['servizio'], len(c['rate_movimenti'])), (Decimal('400'), 1))     # 100 x 12 / 3
+        self.assertIn('dal 21/07 al 20/10/2026', c['fonte_servizio'])
+        self.assertEqual({s['conto'].nome: s['saldo'] for s in c['saldi_conti']},
+                         {'BAPS': Decimal('100'), 'Cassa contanti': Decimal('50')})   # MPS disattivato
+        self.assertEqual((c['liquidita'], c['cassa_da_contare']), (Decimal('150'), [cassa]))
+        conta_cassa(cassa, date(2026, 10, 31), Decimal('20'))
+        c = indici(2026, 'canali', OGGI)['capacita']
+        self.assertEqual((c['liquidita'], c['cassa_da_contare']), (Decimal('120'), []))
 
     def test_anno_senza_mesi(self):
         self.assertIsNone(indici(2025, 'canali', OGGI))

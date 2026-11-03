@@ -74,12 +74,16 @@
             <tr><td class="fw-semibold">Nuovo debito ripagabile con la rata disponibile</td><td class="tab-num fw-bold">&euro;{{ c.nuovo_dscr|floatformat:"0g" }}</td></tr>
             <tr><td colspan="2" class="fw-bold pt-3">2. Multiplo dell'EBITDA</td></tr>
             <tr><td>PFN massima ({{ r.parametri.multiplo_ebitda|floatformat:1 }} &times; EBITDA)</td><td class="tab-num">&euro;{{ c.pfn_max|floatformat:"0g" }}</td></tr>
-            <tr class="sottrai"><td>&minus; posizione finanziaria netta attuale (debiti &euro;{{ c.debito|floatformat:"0g" }} &minus; liquidit&agrave; &euro;{{ c.liquidita|floatformat:"0g" }})</td><td class="tab-num">&euro;{{ c.pfn|floatformat:"0g" }}</td></tr>
+            <tr class="sottrai"><td>&minus; posizione finanziaria netta attuale (debiti &euro;{{ c.debito|floatformat:"0g" }} &minus; liquidit&agrave; &euro;{{ c.liquidita|floatformat:"0g" }})
+              <span class="formula">al {{ r.al|date:"d/m/Y" }}: {% for s in c.saldi_conti %}{{ s.conto }} &euro;{{ s.saldo|floatformat:"0g" }}{% if s.conto.tipo == 'cassa' and not s.conta %} (non contata){% endif %}{% if not forloop.last %} &middot; {% endif %}{% endfor %}</span></td><td class="tab-num">&euro;{{ c.pfn|floatformat:"0g" }}</td></tr>
             <tr class="risultato"><td>Spazio per nuovo debito</td><td class="tab-num">&euro;{{ c.spazio_multiplo|floatformat:"0g" }}</td></tr>
             <tr><td colspan="2" class="pt-3"></td></tr>
             <tr class="risultato"><td>Nuovo finanziamento ottenibile (il minore dei due)</td><td class="tab-num text-success">&euro;{{ c.nuovo|floatformat:"0g" }}</td></tr>
           </table>
-          {% if not r.finanziamenti %}<div class="formula">Nessun finanziamento registrato: le rate in corso si stimano dai movimenti di prima nota. Per un calcolo esatto <a href="{% url 'contabilita:finanziamenti' %}">registra i finanziamenti</a> con importo, tasso e durata.</div>{% endif %}
+          {% if not r.finanziamenti %}<div class="formula">Nessun finanziamento registrato: le rate in corso si stimano dalle rate pagate negli ultimi 3 mesi degli estratti
+            {% if c.rate_movimenti %}({% for m in c.rate_movimenti %}<a href="{% url 'contabilita:movimento' m.pk %}">{{ m.data|date:"d/m" }} &euro;{{ m.importo|floatformat:"0g" }}</a>{% if not forloop.last %}, {% endif %}{% endfor %}){% else %}(nessuna){% endif %}.
+            Un acquisto a rate va sulla voce Investimenti, non Finanziamenti. Per un calcolo esatto <a href="{% url 'contabilita:finanziamenti' %}">registra i finanziamenti</a> con importo, tasso e durata.</div>{% endif %}
+          {% if c.cassa_da_contare %}<div class="formula text-warning mt-1"><i class="bi bi-exclamation-triangle"></i> La liquidit&agrave; comprende {{ c.cassa_da_contare|join:", " }} senza una conta dei contanti: il saldo somma gli incassi meno uscite e versamenti registrati, e non vede prelievi e pagamenti in contanti. <a href="{% url 'contabilita:conti' %}">Registra la conta</a> per un valore vero.</div>{% endif %}
         </div>
       </div>
     </div>

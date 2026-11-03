@@ -45,12 +45,21 @@
           {% if c.tipo == 'cassa' %}
           <tr><td colspan="8" class="bg-light">
             <form method="post" class="d-flex gap-2 align-items-center flex-wrap small">{% csrf_token %}<input type="hidden" name="azione" value="genera_cassa"><input type="hidden" name="conto" value="{{ c.pk }}">
-              <span class="text-muted">Movimenti di {{ c }} dalle quadrature (incassi in contanti), dalle spese di cassa e dai ticket di resto:</span>
+              <span class="text-muted">Movimenti di {{ c }} dalle quadrature (incassi in contanti), dalle spese di cassa, dai ticket di resto e dai versamenti in banca:</span>
               <input type="month" name="dal" value="{{ oggi|date:'Y-m' }}" class="form-control form-control-sm" style="max-width:160px">
               <span>&rarr;</span>
               <input type="month" name="al" value="{{ oggi|date:'Y-m' }}" class="form-control form-control-sm" style="max-width:160px">
               <button class="btn btn-sm btn-outline-primary"><i class="bi bi-arrow-repeat"></i> Aggiorna</button>
             </form>
+            <form method="post" class="d-flex gap-2 align-items-center flex-wrap small mt-2">{% csrf_token %}<input type="hidden" name="azione" value="conta_cassa"><input type="hidden" name="conto" value="{{ c.pk }}">
+              <span class="text-muted">Conta dei contanti (cassa, cassaforte, fondo): quanti ce ne sono a fine giornata del</span>
+              <input type="date" name="data" value="{{ oggi|date:'Y-m-d' }}" max="{{ oggi|date:'Y-m-d' }}" class="form-control form-control-sm" style="max-width:160px">
+              <input type="text" name="contati" inputmode="decimal" placeholder="&euro; contati" class="form-control form-control-sm" style="max-width:130px" required>
+              <button class="btn btn-sm btn-outline-primary"><i class="bi bi-cash-stack"></i> Registra la conta</button>
+              {% if c.conta %}<span class="text-muted">ultima: {{ c.conta.data|date:"d/m/Y" }}, contati &euro;{{ c.conta.saldo_estratto|floatformat:"2g" }}{% if c.conta.importo %}, differenza <a href="{% url 'contabilita:movimento' c.conta.pk %}">&euro;{{ c.conta.importo|floatformat:"2g" }}</a>{% endif %}</span>
+              {% else %}<span class="text-warning">nessuna conta: il saldo &egrave; solo calcolato</span>{% endif %}
+            </form>
+            <div class="text-muted mt-1" style="font-size:.72rem">La differenza tra contati e saldo calcolato diventa un movimento da classificare: prelievi del titolare, stipendi o spese pagate in contanti e non registrate. I versamenti in banca si prendono dagli estratti, dalle entrate sulla voce Giroconto.</div>
           </td></tr>
           {% endif %}
           {% empty %}

@@ -159,8 +159,16 @@ Dalla pagina Conti, **Aggiorna** scrive i movimenti del mese.
 | Incassi in contanti del giorno | contati − fondo + spese di cassa + ticket di resto | — |
 | Spese di cassa | una per spesa | dalla categoria (carburante, manutenzione, …) |
 | Ticket di resto pagati | uno per ticket | — |
+| Versamenti in banca | uscita per ogni entrata di un altro conto sulla voce Giroconto, con "vers" nella descrizione e senza un giroconto fatto a mano | Giroconto |
 
 Si può rigenerare quante volte serve: gli importi si aggiornano e le voci cambiate a mano restano.
+
+**Conta dei contanti.** Il saldo calcolato non vede i prelievi del titolare, né gli stipendi o le spese pagati in contanti e non registrati. Dalla pagina Conti si registrano i contanti contati a fine giornata (cassa, cassaforte, fondo):
+- la differenza con il saldo calcolato diventa un movimento da classificare in prima nota, sulla voce giusta: prelievi del titolare, stipendi, fornitori…;
+- la conta resta come controllo del saldo ("quadra al …");
+- si ricalcola quando si aggiorna la cassa, se nel frattempo sono entrati versamenti o spese di giorni precedenti.
+
+Senza una conta, Indici e KPI segnala che la liquidità della cassa è solo calcolata.
 
 ## Fase 3: conto economico e flussi di cassa
 
@@ -292,7 +300,7 @@ Pagina **Indici e KPI**. Gli indici usano i mesi chiusi dell'anno da quando part
 - **Nuovo finanziamento ottenibile** = il minore dei due spazi; c'è anche la tabella per 3, 5, 7 e 10 anni.
 - **Indebitamento massimo sostenibile** = debito di oggi + nuovo ottenibile. Senza spazio è il massimo sostenibile, e se il debito di oggi lo supera la pagina lo segnala.
 - Le imposte sono quelle registrate nel periodo; se non ce ne sono si stimano con un'aliquota sull'utile ante imposte.
-- Le rate in corso vengono dal piano dei finanziamenti registrati (prossimi 12 mesi). Senza finanziamenti si stimano dalle uscite su "Finanziamenti" più gli interessi del conto economico.
+- Le rate in corso vengono dal piano dei finanziamenti registrati (prossimi 12 mesi). Senza finanziamenti si stimano dalle uscite su "Finanziamenti" degli **ultimi 3 mesi** coperti dagli estratti, su base annua, più gli interessi del conto economico: un debito già finito non pesa sul futuro. Un acquisto pagato a rate al fornitore va sulla voce Investimenti, non Finanziamenti. La liquidità è la somma dei conti attivi, mostrata conto per conto.
 
 **Ipotesi** (pulsante Ipotesi): PFN/EBITDA massimo (3), DSCR minimo (1,25), tasso (6%) e durata (5 anni) del nuovo debito, investimenti di mantenimento in % degli ammortamenti (50%), aliquota imposte stimata (28%), multiplo di valutazione EV/EBITDA (4).
 

@@ -13,6 +13,7 @@ from django.utils import timezone
 from . import estratti
 from . import prima_nota as srv
 from .conto_economico import pagamenti_senza_fattura
+from .indici import euro
 from .models import (ContoFinanziario, ModelloEstratto, MovimentoFinanziario, RegolaMovimento, ScadenzaFattura,
                      VoceConto)
 from .views import _data, _decimale, _mese, accesso, campi_ripartizione, ripartizione_da_post
@@ -254,7 +255,20 @@ def conti(request):
                 messages.error(request, 'Mesi non validi.')
             else:
                 n = srv.genera_cassa(conto, dal, mese_successivo(al) - timedelta(days=1))
-                messages.success(request, f'{conto}: {n} movimenti scritti da quadrature, spese e ticket.')
+                messages.success(request, f'{conto}: {n} movimenti scritti da quadrature, spese, ticket e versamenti.')
+        elif p.get('azione') == 'conta_cassa':
+            conto = get_object_or_404(ContoFinanziario, pk=p.get('conto'), tipo='cassa')
+            giorno, contati = _data(p.get('data')), _decimale(p.get('contati'))
+            if not giorno or contati is None or contati < 0 or giorno < conto.data_saldo_iniziale \
+                    or giorno > timezone.localdate():
+                messages.error(request, 'Conta non salvata: servono la data (dal saldo iniziale a oggi) e i contanti contati.')
+            else:
+                m = srv.conta_cassa(conto, giorno, contati)
+                if m.importo:
+                    messages.success(request, f'{conto}: differenza di {euro(m.importo, 2)} al {giorno:%d/%m/%Y}, '
+                                              'registrata da classificare in prima nota (prelievi, stipendi o spese in contanti).')
+                else:
+                    messages.success(request, f'{conto}: la cassa quadra al {giorno:%d/%m/%Y}.')
         return redirect('contabilita:conti')
 
     oggi = timezone.localdate()
@@ -267,6 +281,7 @@ def conti(request):
         c.n_movimenti = c.movimenti.count()
         c.ultimo = c.movimenti.order_by('-data').values_list('data', flat=True).first()
         c.verifica = _verifica_saldo(c)
+        c.conta = c.ultima_conta() if c.tipo == 'cassa' else None
     return render(request, 'contabilita/conti.html', {
         'conti': elenco,
         'tipi': ContoFinanziario.TIPI,

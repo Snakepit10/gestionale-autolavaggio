@@ -30,6 +30,23 @@ from .models import (Cespite, ContoFinanziario, FatturaPassiva, Finanziamento, M
 
 DURATE = (3, 5, 7, 10)
 STRESS_RICAVI = Decimal('10')
+MESI_RATE_RECENTI = 3
+
+
+def rate_recenti(al):
+    """Senza finanziamenti registrati: rate pagate (voce Finanziamenti)
+    negli ultimi 3 mesi coperti dagli estratti, su base annua. Un debito
+    gia' finito, o un acquisto pagato a rate mesi fa, non pesa sul futuro.
+    Restituisce (rata annua, movimenti, dal, al)."""
+    ultimo = (MovimentoFinanziario.objects.filter(origine='estratto', data__lte=al)
+              .order_by('-data').values_list('data', flat=True).first())
+    if not ultimo:
+        return ZERO, [], None, None
+    dal = aggiungi_mesi(ultimo, -MESI_RATE_RECENTI) + timedelta(days=1)
+    movimenti = list(MovimentoFinanziario.objects.filter(voce__codice='N.FINANZIAMENTI', importo__lt=0,
+                                                         data__gte=dal, data__lte=ultimo)
+                     .select_related('conto').order_by('-data'))
+    return -sum((m.importo for m in movimenti), ZERO) * 12 / MESI_RATE_RECENTI, movimenti, dal, ultimo
 
 
 def mesi_del_periodo(anno, oggi):
@@ -115,18 +132,22 @@ def indici(anno, base='rilevato', oggi=None):
         c, i = f.servizio(inizio_12, fine_12)
         capitale_12 += c
         interessi_12 += i
+    rate_movimenti = []
     if finanziamenti:
         servizio = capitale_12 + interessi_12
         fonte_servizio = 'rate dei prossimi 12 mesi dal piano dei finanziamenti'
     else:
-        rate = -sum(MovimentoFinanziario.objects.filter(voce__codice='N.FINANZIAMENTI', importo__lt=0,
-                                                         data__gte=dal, data__lte=al)
-                    .values_list('importo', flat=True), ZERO) * fattore
+        rate, rate_movimenti, rate_dal, rate_al = rate_recenti(al)
         servizio = rate + oneri
-        fonte_servizio = 'rate pagate nel periodo (voce Finanziamenti) + interessi del conto economico, su base annua'
+        fonte_servizio = ('rate pagate (voce Finanziamenti) ' +
+                          (f'dal {rate_dal:%d/%m} al {rate_al:%d/%m/%Y}, ' if rate_dal else 'negli ultimi 3 mesi, ') +
+                          'su base annua, + interessi del conto economico')
     interessi = oneri or interessi_12
-    conti = list(ContoFinanziario.objects.all())
-    liquidita = sum((c.saldo_al(al) for c in conti), ZERO)
+    conti = list(ContoFinanziario.objects.filter(attivo=True))
+    saldi_conti = [{'conto': c, 'saldo': c.saldo_al(al), 'conta': c.ultima_conta(al) if c.tipo == 'cassa' else None}
+                   for c in conti]
+    liquidita = sum((s['saldo'] for s in saldi_conti), ZERO)
+    cassa_da_contare = [s['conto'] for s in saldi_conti if s['conto'].tipo == 'cassa' and s['saldo'] and not s['conta']]
     pfn = debito - liquidita
 
     # capacita' di indebitamento
@@ -150,6 +171,7 @@ def indici(anno, base='rilevato', oggi=None):
         'vincolo': 'multiplo' if spazio_multiplo < nuovo_dscr else 'dscr',
         'massimo': massimo.quantize(Decimal('1')), 'oltre': debito > massimo,
         'debito': debito, 'liquidita': liquidita, 'pfn': pfn,
+        'saldi_conti': saldi_conti, 'cassa_da_contare': cassa_da_contare, 'rate_movimenti': rate_movimenti,
     }
     capacita['durate'] = []
     for n in DURATE:

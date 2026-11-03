@@ -306,6 +306,14 @@ class ContoFinanziario(models.Model):
                  .aggregate(s=models.Sum('importo'))['s'])
         return self.saldo_iniziale + (somma or Decimal('0'))
 
+    def ultima_conta(self, giorno=None):
+        """Ultima conta dei contanti (la rettifica che porta il saldo a
+        quello contato), fino a giorno."""
+        qs = self.movimenti.filter(impronta__startswith='conta|')
+        if giorno:
+            qs = qs.filter(data__lte=giorno)
+        return qs.order_by('-data').first()
+
 
 class ModelloEstratto(models.Model):
     """Schema di un estratto conto che i modelli predefiniti non

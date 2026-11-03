@@ -192,12 +192,16 @@ def genera_cassa(conto, dal, al):
     - incassi in contanti del giorno = contati - fondo + spese + ticket
       (i soldi usati per spese e ticket sono usciti dagli incassi);
     - ogni spesa pagata con la cassa, sulla voce della sua categoria;
-    - ogni ticket di resto ripagato al cliente.
+    - ogni ticket di resto ripagato al cliente;
+    - ogni versamento di contanti in banca (entrata di un altro conto sulla
+      voce Giroconto, con "vers" nella descrizione e senza un giroconto
+      fatto a mano): l'uscita dalla cassa dei soldi finiti in banca.
     Si possono rigenerare: gli importi si aggiornano, le voci cambiate a
     mano restano. Restituisce quanti movimenti sono stati scritti."""
     from apps.finanze.models import QuadraturaGiornaliera, SpesaCassa, TicketResto
 
-    voci = {v.codice: v for v in VoceConto.objects.filter(codice__in=list(VOCI_SPESE_CASSA.values()) + ['N.INCASSI'])}
+    voci = {v.codice: v for v in VoceConto.objects.filter(
+        codice__in=list(VOCI_SPESE_CASSA.values()) + ['N.INCASSI', 'N.GIROCONTO'])}
     spese = list(SpesaCassa.objects.filter(data__gte=dal, data__lte=al))
     ticket = list(TicketResto.objects.filter(data__gte=dal, data__lte=al))
     voluti = {}
@@ -212,6 +216,17 @@ def genera_cassa(conto, dal, al):
     for t in ticket:
         voluti[f'cassa|ticket|{t.pk}'] = (t.data, -t.importo, f'Ticket di resto pagato{": " + t.nota if t.nota else ""}',
                                           voci.get('N.INCASSI'))
+    versamenti = (MovimentoFinanziario.objects.filter(voce__codice='N.GIROCONTO', importo__gt=0, controparte__isnull=True,
+                                                      descrizione__icontains='vers', data__gte=dal, data__lte=al)
+                  .exclude(conto__tipo='cassa').select_related('conto')
+                  .filter(Q(movimentofinanziario__isnull=True)
+                          | Q(movimentofinanziario__conto=conto,
+                              movimentofinanziario__impronta__startswith='cassa|versamento|')))
+    collegati = {}
+    for v in versamenti:
+        impronta = f'cassa|versamento|{v.pk}'
+        voluti[impronta] = (v.data, -v.importo, f'Versamento in banca su {v.conto}', voci.get('N.GIROCONTO'))
+        collegati[impronta] = v
 
     scritti = 0
     with transaction.atomic():
@@ -220,7 +235,8 @@ def genera_cassa(conto, dal, al):
             m = esistenti.pop(impronta, None)
             if m is None:
                 MovimentoFinanziario.objects.create(conto=conto, data=giorno, importo=importo, descrizione=descrizione,
-                                                    impronta=impronta, voce=voce, origine='cassa')
+                                                    impronta=impronta, voce=voce, origine='cassa',
+                                                    controparte=collegati.get(impronta))
                 scritti += 1
             elif (m.data, m.importo, m.descrizione) != (giorno, importo, descrizione):
                 m.data, m.importo, m.descrizione = giorno, importo, descrizione
@@ -230,4 +246,33 @@ def genera_cassa(conto, dal, al):
         for m in esistenti.values():
             m.delete()
         conto.movimenti.filter(origine='cassa', importo=0).delete()
+        ricalcola_conte(conto)
     return scritti
+
+
+def conta_cassa(conto, giorno, contati):
+    """Contanti contati a fine giornata: la differenza col saldo calcolato
+    diventa un movimento da classificare (uscite in contanti non
+    registrate, prelievi, soldi in cassaforte non ancora versati...).
+    Una seconda conta nello stesso giorno sostituisce la prima."""
+    with transaction.atomic():
+        m, _ = MovimentoFinanziario.objects.get_or_create(
+            conto=conto, impronta=f'conta|{giorno:%Y-%m-%d}',
+            defaults={'data': giorno, 'importo': ZERO, 'origine': 'manuale'})
+        m.saldo_estratto = contati
+        m.save(update_fields=['saldo_estratto'])
+        ricalcola_conte(conto)
+    return conto.movimenti.filter(pk=m.pk).first()
+
+
+def ricalcola_conte(conto):
+    """Ogni conta porta il saldo a quello contato: si rifanno in ordine di
+    data, perche' i movimenti aggiunti dopo (versamenti, spese) cambiano la
+    differenza. Una conta che quadra resta come controllo, a zero."""
+    from .indici import euro
+    for m in conto.movimenti.filter(impronta__startswith='conta|').order_by('data'):
+        importo = m.saldo_estratto - (conto.saldo_al(m.data) - m.importo)
+        descrizione = f'Differenza di cassa al {m.data:%d/%m/%Y}: contati {euro(m.saldo_estratto, 2)}'
+        if (m.importo, m.descrizione) != (importo, descrizione):
+            m.importo, m.descrizione = importo, descrizione
+            m.save(update_fields=['importo', 'descrizione'])

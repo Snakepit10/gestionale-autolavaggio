@@ -12,7 +12,7 @@ from django.test import TestCase
 from .estratti import importa_estratto, movimenti_da_righe, righe_file
 from .importa import importa_file
 from .models import ContoFinanziario, MovimentoFinanziario, RegolaMovimento, ScadenzaFattura, VoceConto
-from .prima_nota import abbina, genera_cassa, giroconto, proponi_abbinamenti, togli_abbinamento
+from .prima_nota import abbina, conta_cassa, genera_cassa, giroconto, proponi_abbinamenti, togli_abbinamento
 from .tests import fattura_xml
 
 
@@ -146,6 +146,35 @@ class PrimaNotaTest(TestCase):
         spesa.delete()
         genera_cassa(self.cassa, *ottobre)
         self.assertEqual(self.cassa.movimenti.count(), 2)
+
+    def test_versamenti_in_banca_e_conta(self):
+        from apps.finanze.models import QuadraturaGiornaliera
+        ottobre = (date(2026, 10, 1), date(2026, 10, 31))
+        giroconto_ = VoceConto.objects.get(codice='N.GIROCONTO')
+        QuadraturaGiornaliera.objects.create(data=date(2026, 10, 5), contanti_totali=Decimal('1000'))
+        vers = movimento(self.banca, '600', 'VERS. CONT. ATM prova', data=date(2026, 10, 7))
+        bonifico = movimento(self.banca, '50', 'BONIFICO DA PROVA', data=date(2026, 10, 7))
+        MovimentoFinanziario.objects.filter(pk__in=[vers.pk, bonifico.pk]).update(voce=giroconto_)
+        # un giroconto fatto a mano ha gia' il suo opposto: non si ripete
+        giroconto(movimento(self.cassa, '-100', 'Versato a mano', data=date(2026, 10, 8)), self.banca)
+        self.assertEqual(genera_cassa(self.cassa, *ottobre), 2)                # incasso + versamento da 600
+        uscita = self.cassa.movimenti.get(impronta=f'cassa|versamento|{vers.pk}')
+        self.assertEqual((uscita.importo, uscita.controparte, uscita.voce), (Decimal('-600'), vers, giroconto_))
+        self.assertEqual(self.cassa.saldo_al(date(2026, 10, 31)), Decimal('300'))
+        self.assertEqual(genera_cassa(self.cassa, *ottobre), 0)                # rigenerare non duplica
+
+        # contati 120 il 10/10: 180 usciti senza traccia, da classificare
+        conta = conta_cassa(self.cassa, date(2026, 10, 10), Decimal('120'))
+        self.assertEqual((conta.importo, conta.voce, conta.saldo_estratto), (Decimal('-180'), None, Decimal('120')))
+        self.assertEqual(self.cassa.saldo_al(date(2026, 10, 10)), Decimal('120'))
+        self.assertEqual(self.cassa.ultima_conta(), conta)
+        # un versamento arrivato dopo, prima della conta: la differenza si rifa'
+        vers2 = movimento(self.banca, '100', 'Vers. contante self service', data=date(2026, 10, 9))
+        MovimentoFinanziario.objects.filter(pk=vers2.pk).update(voce=giroconto_)
+        genera_cassa(self.cassa, *ottobre)
+        conta.refresh_from_db()
+        self.assertEqual((conta.importo, self.cassa.saldo_al(date(2026, 10, 10))), (Decimal('-80'), Decimal('120')))
+        self.assertEqual(conta_cassa(self.cassa, date(2026, 10, 10), Decimal('200')).importo, Decimal('0'))
 
 
 class VistePrimaNotaTest(TestCase):
