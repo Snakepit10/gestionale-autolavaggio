@@ -18,7 +18,8 @@ risultato pieno; costo pieno per lavaggio, per ora e per servizio."""
 from collections import defaultdict
 from decimal import Decimal
 
-from .conto_economico import IVA, ZERO, differenze_abbinamento, fine_mese, quote_competenza, ricavi_canali
+from .conto_economico import (IVA, ZERO, differenze_abbinamento, fine_mese, quote_competenza, ricavi_canali,
+                              rilevato_per_canale)
 from .models import (CENTRI, NOMI_CENTRI, Cespite, MovimentoFinanziario, ParametriAnalitica,
                      RigaFatturaPassiva, RipartizionePersonale)
 
@@ -54,14 +55,18 @@ def ripartizione_dipendente(dipendente_id, mese, ripartizioni):
     return {'servito': 100}
 
 
-def raccogli(mesi):
+def raccogli(mesi, base='canali'):
     """Ricavi, costi per (centro, sezione, voce), ore del personale per
-    centro e dati di volume del periodo."""
+    centro e dati di volume del periodo. base come nel conto economico:
+    'canali' = fatturato / 1,22; 'rilevato' = rilevato reale meno IVA,
+    diviso sui canali in proporzione al fatturato di ogni mese."""
     from apps.personale.calcolo import calcola_mese
     from apps.personale.models import MesePersonale
 
     dal, al = mesi[0], fine_mese(mesi[-1])
     canali, lordi = ricavi_canali(mesi)
+    if base == 'rilevato':
+        canali = rilevato_per_canale(mesi, canali, lordi)
     ricavi = defaultdict(lambda: ZERO)
     ricavi['self'] = sum(canali['portali'] + canali['cambia_gettoni'] + canali['monete_online'], ZERO)
     ricavi['servito'] = sum(canali['servito'], ZERO)
@@ -135,8 +140,8 @@ def _div(a, b):
     return a / b if b else None
 
 
-def analitica(mesi):
-    dati = raccogli(mesi)
+def analitica(mesi, base='canali'):
+    dati = raccogli(mesi, base)
     ricavi, costi, ore = dati['ricavi'], dati['costi'], dati['ore']
     centri = {}
     for centro, nome in CENTRI:
@@ -200,6 +205,7 @@ def analitica(mesi):
     righe.append(('Risultato del centro', {c: centri[c]['ricavi'] - centri[c]['costi'] for c, _ in CENTRI}))
     quadro = [{'nome': n, 'valori': [v[c] for c, _ in CENTRI], 'totale': sum(v.values(), ZERO)} for n, v in righe]
     return {
+        'base': base,
         'avvisi': _avvisi(costi),
         'self': self_service, 'servito': servito, 'prodotti': prodotti, 'comune': centri['comune'],
         'quadro': quadro, 'centri': [n for _, n in CENTRI], 'ore': {NOMI_CENTRI[c]: v for c, v in ore.items()},

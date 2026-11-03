@@ -219,6 +219,15 @@ Da ogni voce si apre il dettaglio dei documenti. In alto c'è l'elenco di quello
 
 Ogni costo del conto economico, fino all'EBIT, si divide sui centri **Self-service**, **Servito**, **Vendita prodotti** e **Comune**.
 
+**Ricavi:** le stesse due basi del conto economico, con gli stessi pulsanti.
+
+| Base | Come si dividono i ricavi sui centri |
+|---|---|
+| **Rilevato reale − IVA** (predefinita) | Il rilevato non dice da che canale vengono i soldi. Quello di ogni mese si divide fra servito, vendita prodotti, portali e piste in proporzione al loro fatturato dello stesso mese. Le monete online restano fuori, perché non passano dalla cassa. Un mese con rilevato ma senza fatturato va tutto sul servito. |
+| **Fatturato per canale** | fatturato di ogni canale / 1,22 |
+
+Con tutte e due le basi il totale del quadro per centro coincide con l'EBIT del conto economico calcolato sulla stessa base.
+
 **Come si divide ogni costo**
 - **Fatture e movimenti:** con la ripartizione della riga o del movimento, se c'è, altrimenti con quella della voce. Senza nessuna delle due il costo va sul Comune.
 - **Personale:** costo e ore di ogni dipendente si dividono con la sua ripartizione. Si imposta in Analitica › Impostazioni, con lo storico "valida dal mese". Senza ripartizione il dipendente conta 100% servito.

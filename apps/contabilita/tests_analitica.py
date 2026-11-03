@@ -88,6 +88,18 @@ class AnaliticaTest(TestCase):
         self.assertEqual(a['quadro'][-1]['totale'], ebit)
         self.assertEqual(ebit, Decimal('-330.00'))
 
+    def test_ricavi_dal_rilevato(self):
+        from apps.finanze.models import QuadraturaGiornaliera
+        # rilevato 366 - IVA dei corrispettivi del portale (244 -> 44) = 322, diviso come il fatturato (100 : 200)
+        QuadraturaGiornaliera.objects.create(data=date(2026, 10, 6), contanti_totali=Decimal('366'))
+        a = analitica([OTTOBRE], 'rilevato')
+        self.assertEqual(a['servito']['ricavi'], Decimal('107.33'))
+        self.assertEqual(a['self']['ricavi'], Decimal('214.67'))
+        self.assertEqual(a['quadro'][0]['totale'], Decimal('322.00'))
+        ebit = next(r['totale'] for r in conto_economico([OTTOBRE], 'rilevato')['righe'] if r['chiave'] == 'ebit')
+        self.assertEqual(a['quadro'][-1]['totale'], ebit)
+        self.assertEqual(analitica([OTTOBRE])['self']['ricavi'], Decimal('200.00'))   # fatturato: invariato
+
 
 class VisteAnaliticaTest(TestCase):
     def setUp(self):
@@ -112,6 +124,7 @@ class VisteAnaliticaTest(TestCase):
         from apps.personale.models import Dipendente
         d = Dipendente.objects.create(nome='Prova')
         for url in ('/contabilita/analitica/?anno=2026', '/contabilita/analitica/?anno=2026&mese=10',
+                    '/contabilita/analitica/?anno=2026&ricavi=canali', '/contabilita/analitica/?anno=2026&ricavi=xyz',
                     '/contabilita/analitica/impostazioni/'):
             self.assertEqual(self.apri(url).status_code, 200, url)
         self.assertContains(self.apri('/contabilita/analitica/?anno=2026'), 'senza ripartizione')

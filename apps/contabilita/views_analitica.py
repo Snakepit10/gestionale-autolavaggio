@@ -8,7 +8,7 @@ from django.shortcuts import redirect, render
 from django.utils import timezone
 
 from .analitica import analitica as calcola_analitica
-from .conto_economico import NOMI_MESI
+from .conto_economico import BASI_RICAVI, NOMI_MESI
 from .models import CENTRI, ParametriAnalitica, RipartizionePersonale
 from .views import _decimale, _mese, accesso, campi_ripartizione, ripartizione_da_post
 
@@ -28,8 +28,14 @@ def analitica(request):
         mese = ''
         mesi = [date(anno, m, 1) for m in range(1, 13)]
         periodo = str(anno)
+    # ricavi come nel conto economico: di default il rilevato reale meno IVA
+    base = request.GET.get('ricavi', 'rilevato')
+    if base not in BASI_RICAVI:
+        base = 'rilevato'
     return render(request, 'contabilita/analitica.html', {
-        'a': calcola_analitica(mesi),
+        'a': calcola_analitica(mesi, base),
+        'base': base,
+        'basi': BASI_RICAVI.items(),
         'anno': anno,
         'mese': mese,
         'periodo': periodo,

@@ -132,6 +132,32 @@ def iva_corrispettivi(ricavi):
     return corrispettivi - (corrispettivi / IVA).quantize(Decimal('0.01'))
 
 
+# Canali che passano dalla quadratura (le monete online si pagano nell'app)
+CANALI_RILEVATI = ('servito', 'prodotti', 'portali', 'cambia_gettoni')
+
+
+def rilevato_per_canale(mesi, canali, ricavi_lordi):
+    """Il rilevato reale meno IVA di ogni mese diviso sui canali in
+    proporzione al loro fatturato dello stesso mese (il rilevato non dice
+    da quale canale vengono i soldi). Un mese con rilevato ma senza
+    fatturato va tutto sul servito. Stessa forma di ricavi_canali."""
+    rilevato, _ = ricavi_rilevati(mesi)
+    diviso = {k: [ZERO] * len(mesi) for k, _ in CANALI}
+    for i, lordi in enumerate(ricavi_lordi):
+        netto = rilevato[i] - iva_corrispettivi(lordi)
+        pesi = [(k, canali[k][i]) for k in CANALI_RILEVATI if canali[k][i] > 0]
+        totale = sum((p for _, p in pesi), ZERO)
+        if not totale:
+            diviso['servito'][i] = netto
+            continue
+        assegnato = ZERO
+        for j, (k, peso) in enumerate(pesi):
+            quota = netto - assegnato if j == len(pesi) - 1 else (netto * peso / totale).quantize(Decimal('0.01'))
+            diviso[k][i] = quota
+            assegnato += quota
+    return diviso
+
+
 def costo_personale(mesi):
     from apps.personale.calcolo import calcola_mese
     from apps.personale.models import MesePersonale
