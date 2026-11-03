@@ -147,6 +147,40 @@ class PrimaNotaTest(TestCase):
         genera_cassa(self.cassa, *ottobre)
         self.assertEqual(self.cassa.movimenti.count(), 2)
 
+    def test_pos_nei_contanti_e_stipendi_in_contanti(self):
+        from apps.personale.models import Dipendente, MesePersonale, ParametroRetributivo, Presenza, RigaMese
+        ottobre = (date(2026, 10, 1), date(2026, 10, 31))
+        incassi = VoceConto.objects.get(codice='N.INCASSI')
+        mps = ContoFinanziario.objects.get(nome='MPS')
+        for giorno, importo, testo in ((5, '40', 'Incasso tramite P.O.S. prova'), (6, '100', 'Bonifico a tuo favore'),
+                                       (7, '10', 'DEPOSITO di prova'), (30, '20', 'Accredito Pos prova')):
+            m = movimento(mps, importo, testo, data=date(2026, 10, giorno))
+            MovimentoFinanziario.objects.filter(pk=m.pk).update(voce=incassi)
+        # occasionale: 8 ore a 10 tutte fuori busta; contrattualizzato: pagato 15 scritto a mano
+        mese = MesePersonale.objects.create(mese=date(2026, 10, 1))
+        for nome, tipo, ore, pagato in (('Prova A', 'occasionale', '8', None), ('Prova B', 'contrattualizzato', '10', '15')):
+            d = Dipendente.objects.create(nome=nome, tipo=tipo)
+            ParametroRetributivo.objects.create(dipendente=d, valido_dal=date(2026, 1, 1), tariffa_oraria=Decimal('10'),
+                                                coefficiente_lordo=Decimal('1.3'))
+            RigaMese.objects.create(mese=mese, dipendente=d, busta_paga=Decimal('90') if pagato else None,
+                                    pagato=Decimal(pagato) if pagato else None)
+            Presenza.objects.create(dipendente=d, data=date(2026, 10, 2), ore=Decimal(ore))
+
+        genera_cassa(self.cassa, *ottobre)                  # senza impostazioni: niente
+        self.assertFalse(self.cassa.movimenti.filter(impronta__regex=r'^cassa\|(pos|stipendi)\|').exists())
+        self.cassa.pos_nei_contanti_fino_al, self.cassa.stipendi_in_contanti = date(2026, 10, 28), True
+        self.cassa.save()
+        genera_cassa(self.cassa, *ottobre)
+        pos = self.cassa.movimenti.get(impronta='cassa|pos|2026-10')
+        self.assertEqual((pos.data, pos.importo, pos.voce), (date(2026, 10, 28), Decimal('-40'), incassi))
+        stipendi = self.cassa.movimenti.get(impronta='cassa|stipendi|2026-10')
+        self.assertEqual((stipendi.data, stipendi.importo, stipendi.voce.codice),
+                         (date(2026, 10, 31), Decimal('-95.00'), 'N.STIPENDI'))        # 80 + 15
+        self.cassa.pos_nei_contanti_fino_al, self.cassa.stipendi_in_contanti = None, False
+        self.cassa.save()
+        genera_cassa(self.cassa, *ottobre)                  # tolte le impostazioni, tolti i movimenti
+        self.assertFalse(self.cassa.movimenti.filter(impronta__regex=r'^cassa\|(pos|stipendi)\|').exists())
+
     def test_versamenti_in_banca_e_conta(self):
         from apps.finanze.models import QuadraturaGiornaliera
         ottobre = (date(2026, 10, 1), date(2026, 10, 31))

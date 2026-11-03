@@ -3,6 +3,7 @@ giroconti tra conti e movimenti della cassa contanti ricavati dalle
 quadrature giornaliere."""
 import re
 import uuid
+from datetime import timedelta
 from decimal import Decimal
 
 from django.db import transaction
@@ -195,7 +196,9 @@ def genera_cassa(conto, dal, al):
     - ogni ticket di resto ripagato al cliente;
     - ogni versamento di contanti in banca (entrata di un altro conto sulla
       voce Giroconto, con "vers" nella descrizione e senza un giroconto
-      fatto a mano): l'uscita dalla cassa dei soldi finiti in banca.
+      fatto a mano): l'uscita dalla cassa dei soldi finiti in banca;
+    - se impostato sul conto, il POS contato nei contanti e gli stipendi
+      pagati in contanti (vedi _pos_nei_contanti e _stipendi_fuori_busta).
     Si possono rigenerare: gli importi si aggiornano, le voci cambiate a
     mano restano. Restituisce quanti movimenti sono stati scritti."""
     from apps.finanze.models import QuadraturaGiornaliera, SpesaCassa, TicketResto
@@ -227,6 +230,9 @@ def genera_cassa(conto, dal, al):
         impronta = f'cassa|versamento|{v.pk}'
         voluti[impronta] = (v.data, -v.importo, f'Versamento in banca su {v.conto}', voci.get('N.GIROCONTO'))
         collegati[impronta] = v
+    voluti.update(_pos_nei_contanti(conto, dal, al, voci.get('N.INCASSI')))
+    if conto.stipendi_in_contanti:
+        voluti.update(_stipendi_fuori_busta(dal, al, VoceConto.objects.filter(codice='N.STIPENDI').first()))
 
     scritti = 0
     with transaction.atomic():
@@ -248,6 +254,61 @@ def genera_cassa(conto, dal, al):
         conto.movimenti.filter(origine='cassa', importo=0).delete()
         ricalcola_conte(conto)
     return scritti
+
+
+_POS = re.compile(r'\bp\.?\s?o\.?\s?s\b', re.IGNORECASE)
+
+
+def _mesi(dal, al):
+    mese = dal.replace(day=1)
+    while mese <= al:
+        fine = (mese + timedelta(days=32)).replace(day=1) - timedelta(days=1)
+        yield mese, min(fine, al)
+        mese = fine + timedelta(days=1)
+
+
+def _pos_nei_contanti(conto, dal, al, voce):
+    """Fino a conto.pos_nei_contanti_fino_al le quadrature contano le carte
+    nei contanti: per ogni mese un'uscita pari agli accrediti POS arrivati
+    in banca (entrate sulla voce Incassi con "POS" nella descrizione), che
+    toglie dalla cassa i soldi che li' non sono mai entrati."""
+    limite = conto.pos_nei_contanti_fino_al
+    if not limite or dal > limite:
+        return {}
+    accrediti = (MovimentoFinanziario.objects.filter(voce__codice='N.INCASSI', importo__gt=0, data__gte=dal,
+                                                     data__lte=min(al, limite))
+                 .exclude(conto__tipo='cassa'))
+    per_mese = {}
+    for m in accrediti:
+        if _POS.search(f'{m.causale} {m.descrizione}'):
+            per_mese[m.data.replace(day=1)] = per_mese.get(m.data.replace(day=1), ZERO) + m.importo
+    voluti = {}
+    for mese, fine in _mesi(dal, min(al, limite)):
+        if per_mese.get(mese):
+            voluti[f'cassa|pos|{mese:%Y-%m}'] = (fine, -per_mese[mese],
+                                                 f'Carte di {mese:%m/%Y} contate nei contanti: accreditate in banca col POS',
+                                                 voce)
+    return voluti
+
+
+def _stipendi_fuori_busta(dal, al, voce):
+    """Parte degli stipendi pagata in contanti, dal Costo personale: per
+    ogni dipendente il pagato del mese o, se non e' scritto, il totale da
+    pagare (fuori busta + bonus). Un'uscita per mese, all'ultimo giorno."""
+    from apps.personale.calcolo import calcola_mese
+    from apps.personale.models import MesePersonale
+
+    voluti = {}
+    fine_per_mese = dict(_mesi(dal, al))
+    for mese_obj in MesePersonale.objects.filter(mese__gte=dal.replace(day=1), mese__lte=al):
+        totale = ZERO
+        for r in calcola_mese(mese_obj)['righe']:
+            totale += max(r['pagato'] if r['pagato'] is not None else r['totale_pagare'], ZERO)
+        if totale:
+            voluti[f'cassa|stipendi|{mese_obj.mese:%Y-%m}'] = (
+                fine_per_mese.get(mese_obj.mese, al), -totale.quantize(Decimal('0.01')),
+                f'Stipendi di {mese_obj.mese:%m/%Y} pagati in contanti (fuori busta e bonus)', voce)
+    return voluti
 
 
 def conta_cassa(conto, giorno, contati):

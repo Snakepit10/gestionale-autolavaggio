@@ -319,6 +319,9 @@ def _salva_conto(request):
         return
     conto.nome, conto.tipo, conto.iban = nome, p['tipo'], p.get('iban', '').strip()[:34]
     conto.saldo_iniziale, conto.data_saldo_iniziale, conto.attivo = saldo, data, bool(p.get('attivo'))
+    cassa = p['tipo'] == 'cassa'
+    conto.pos_nei_contanti_fino_al = _data(p.get('pos_nei_contanti_fino_al')) if cassa else None
+    conto.stipendi_in_contanti = cassa and bool(p.get('stipendi_in_contanti'))
     modello = p.get('modello_estratto', '')
     conto.modello_estratto = modello if estratti.modello_da_chiave(modello) else ''
     conto.save()

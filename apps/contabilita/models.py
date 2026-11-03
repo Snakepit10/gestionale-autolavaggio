@@ -289,6 +289,13 @@ class ContoFinanziario(models.Model):
     # Schema dell'estratto: '' = riconoscimento automatico, altrimenti la
     # chiave di un modello predefinito o 'pers_<id>' (estratti.MODELLI)
     modello_estratto = models.CharField(max_length=20, blank=True)
+    # Solo cassa. Fino a questa data le quadrature hanno i pagamenti con
+    # carta dentro i contanti (campo POS vuoto): l'aggiornamento della cassa
+    # toglie ogni mese il POS accreditato in banca
+    pos_nei_contanti_fino_al = models.DateField(null=True, blank=True)
+    # Solo cassa: la parte degli stipendi fuori busta (Costo personale:
+    # pagato, o il totale da pagare se non e' scritto) esce dalla cassa
+    stipendi_in_contanti = models.BooleanField(default=False)
     attivo = models.BooleanField(default=True)
     ordine = models.PositiveIntegerField(default=0)
 

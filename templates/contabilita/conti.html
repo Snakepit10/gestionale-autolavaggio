@@ -39,13 +39,14 @@
             <td class="text-end text-nowrap">
               <button class="btn btn-sm btn-outline-secondary" data-bs-toggle="modal" data-bs-target="#modale-conto"
                 data-id="{{ c.pk }}" data-nome="{{ c.nome }}" data-tipo="{{ c.tipo }}" data-iban="{{ c.iban }}"
-                data-modello="{{ c.modello_estratto }}" data-saldo="{{ c.saldo_iniziale|stringformat:'s' }}" data-data="{{ c.data_saldo_iniziale|date:'Y-m-d' }}" data-attivo="{{ c.attivo|yesno:'1,0' }}"><i class="bi bi-pencil"></i></button>
+                data-modello="{{ c.modello_estratto }}" data-saldo="{{ c.saldo_iniziale|stringformat:'s' }}" data-data="{{ c.data_saldo_iniziale|date:'Y-m-d' }}" data-attivo="{{ c.attivo|yesno:'1,0' }}"
+                data-pos="{{ c.pos_nei_contanti_fino_al|date:'Y-m-d' }}" data-stipendi="{{ c.stipendi_in_contanti|yesno:'1,0' }}"><i class="bi bi-pencil"></i></button>
             </td>
           </tr>
           {% if c.tipo == 'cassa' %}
           <tr><td colspan="8" class="bg-light">
             <form method="post" class="d-flex gap-2 align-items-center flex-wrap small">{% csrf_token %}<input type="hidden" name="azione" value="genera_cassa"><input type="hidden" name="conto" value="{{ c.pk }}">
-              <span class="text-muted">Movimenti di {{ c }} dalle quadrature (incassi in contanti), dalle spese di cassa, dai ticket di resto e dai versamenti in banca:</span>
+              <span class="text-muted">Movimenti di {{ c }} dalle quadrature (incassi in contanti), dalle spese di cassa, dai ticket di resto e dai versamenti in banca{% if c.pos_nei_contanti_fino_al %}, meno le carte contate nei contanti fino al {{ c.pos_nei_contanti_fino_al|date:"d/m/Y" }}{% endif %}{% if c.stipendi_in_contanti %}, meno gli stipendi fuori busta{% endif %}:</span>
               <input type="month" name="dal" value="{{ oggi|date:'Y-m' }}" class="form-control form-control-sm" style="max-width:160px">
               <span>&rarr;</span>
               <input type="month" name="al" value="{{ oggi|date:'Y-m' }}" class="form-control form-control-sm" style="max-width:160px">
@@ -89,6 +90,14 @@
         <div class="col-6"><label class="form-label">Saldo iniziale &euro;</label><input type="text" name="saldo_iniziale" inputmode="decimal" class="form-control" placeholder="0"></div>
         <div class="col-6"><label class="form-label">Alla data</label><input type="date" name="data_saldo_iniziale" class="form-control" required></div>
       </div>
+      <div class="solo-cassa border rounded p-2 mt-2">
+        <div class="small fw-semibold mb-1">Solo per la cassa contanti</div>
+        <label class="form-label small mb-0">Le quadrature hanno le carte dentro i contanti fino al</label>
+        <input type="date" name="pos_nei_contanti_fino_al" class="form-control form-control-sm">
+        <div class="form-text">Quando il campo POS della quadratura restava vuoto: ogni mese la cassa toglie il POS accreditato in banca. Vuoto = POS sempre registrato a parte.</div>
+        <div class="form-check mt-1"><input class="form-check-input" type="checkbox" name="stipendi_in_contanti" value="1" id="conto-stipendi"><label class="form-check-label small" for="conto-stipendi">La parte fuori busta degli stipendi (e i bonus) si paga con la cassa</label></div>
+        <div class="form-text">Dal Costo personale: il "pagato" del mese o, se non c'&egrave;, il totale da pagare.</div>
+      </div>
       <div class="form-check mt-2"><input class="form-check-input" type="checkbox" name="attivo" value="1" id="conto-attivo" checked><label class="form-check-label" for="conto-attivo">Attivo</label></div>
       <div class="text-muted small mt-2">Il saldo iniziale &egrave; quello a inizio giornata della data indicata (es. il saldo al 1/1/2026 preso dall'estratto di dicembre).</div>
     </div>
@@ -109,7 +118,15 @@ document.getElementById('modale-conto').addEventListener('show.bs.modal', functi
   f.elements.saldo_iniziale.value = (d.saldo || '').replace('.', ',');
   f.elements.data_saldo_iniziale.value = d.data || '';
   f.elements.attivo.checked = d.id ? d.attivo === '1' : true;
+  f.elements.pos_nei_contanti_fino_al.value = d.pos || '';
+  f.elements.stipendi_in_contanti.checked = d.stipendi === '1';
   this.querySelector('.modal-title').textContent = d.id ? 'Modifica ' + d.nome : 'Nuovo conto';
+  mostraCassa();
 });
+function mostraCassa() {
+  var f = document.querySelector('#modale-conto form');
+  f.querySelector('.solo-cassa').style.display = f.elements.tipo.value === 'cassa' ? '' : 'none';
+}
+document.querySelector('#modale-conto select[name=tipo]').addEventListener('change', mostraCassa);
 </script>
 {% endblock %}

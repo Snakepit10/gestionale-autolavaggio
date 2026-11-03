@@ -161,6 +161,8 @@ Dalla pagina Conti, **Aggiorna** scrive i movimenti del mese.
 | Spese di cassa | una per spesa | dalla categoria (carburante, manutenzione, …) |
 | Ticket di resto pagati | uno per ticket | — |
 | Versamenti in banca | uscita per ogni entrata di un altro conto sulla voce Giroconto, con "vers" nella descrizione e senza un giroconto fatto a mano | Giroconto |
+| Carte contate nei contanti (se impostato "carte dentro i contanti fino al") | un'uscita al mese pari agli accrediti POS arrivati in banca fino a quella data: le quadrature senza il campo POS avevano le carte nei contanti | Incassi |
+| Stipendi in contanti (se impostato) | un'uscita al mese: per ogni dipendente il "pagato" del Costo personale o, se manca, il totale da pagare (fuori busta + bonus) | Stipendi |
 
 Si può rigenerare quante volte serve: gli importi si aggiornano e le voci cambiate a mano restano.
 
