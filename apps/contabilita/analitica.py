@@ -16,6 +16,7 @@ Servito in **full costing**: ricavi - costi diretti - quota dei costi
 comuni (in proporzione ai ricavi o con una percentuale fissa) =
 risultato pieno; costo pieno per lavaggio, per ora e per servizio."""
 from collections import defaultdict
+from datetime import date
 from decimal import Decimal
 
 from .conto_economico import (IVA, ZERO, differenze_abbinamento, fine_mese, quote_competenza, ricavi_canali,
@@ -205,11 +206,92 @@ def analitica(mesi, base='canali'):
     righe.append(('Risultato del centro', {c: centri[c]['ricavi'] - centri[c]['costi'] for c, _ in CENTRI}))
     quadro = [{'nome': n, 'valori': [v[c] for c, _ in CENTRI], 'totale': sum(v.values(), ZERO)} for n, v in righe]
     return {
+        'rientro': rientro_investimenti(mesi, centri),
         'base': base,
         'avvisi': _avvisi(costi),
         'self': self_service, 'servito': servito, 'prodotti': prodotti, 'comune': centri['comune'],
         'quadro': quadro, 'centri': [n for _, n in CENTRI], 'ore': {NOMI_CENTRI[c]: v for c, v in ore.items()},
     }
+
+
+def _anni_rientro(investito, flusso):
+    return (investito / flusso).quantize(Decimal('0.1')) if investito > 0 and flusso > 0 else None
+
+
+def _data_rientro(data_media, anni):
+    if data_media is None or anni is None:
+        return None
+    from datetime import timedelta
+    try:
+        return data_media + timedelta(days=float(anni) * 365.25)
+    except OverflowError:
+        return None
+
+
+def rientro_investimenti(mesi, centri):
+    """Rientro dei cespiti registrati, per centro e in totale.
+
+    Flusso annuo = flusso del periodo riportato a 12 mesi (sui mesi gia'
+    iniziati):
+    - prima delle imposte: risultato del centro + i suoi ammortamenti (che
+      non sono uscite di cassa); in totale e' l'EBITDA;
+    - dopo imposte e rate: meno oneri finanziari e rate dei finanziamenti
+      (quota capitale, dai movimenti "Rimborso finanziamenti"), divisi sui
+      centri in proporzione al valore dei cespiti, e meno le imposte,
+      divise in proporzione al flusso positivo dei centri.
+    Anni di rientro = valore dei cespiti / flusso annuo; la data stimata
+    parte dalla data media di acquisto (pesata sul valore), supponendo lo
+    stesso flusso anche negli anni passati."""
+    from django.utils import timezone
+
+    from .conto_economico import costi_per_voce
+    from .models import VoceConto
+    oggi = timezone.localdate()
+    dal, al = mesi[0], fine_mese(mesi[-1])
+    trascorsi = [m for m in mesi if m <= oggi]
+    cespiti = [c for c in Cespite.objects.all() if c.data_acquisto <= al]
+    if not trascorsi or not cespiti:
+        return None
+    fattore = Decimal(12) / len(trascorsi)
+
+    investito, ammortizzato, giorni = defaultdict(lambda: ZERO), defaultdict(lambda: ZERO), defaultdict(lambda: ZERO)
+    for c in cespiti:
+        investito[c.centro] += c.valore
+        ammortizzato[c.centro] += c.ammortizzato_al(al.replace(day=1))
+        giorni[c.centro] += c.valore * c.data_acquisto.toordinal()
+
+    per_voce = costi_per_voce(mesi)
+    sezioni = dict(VoceConto.objects.filter(sezione__in=('imposte', 'oneri_finanziari')).values_list('pk', 'sezione'))
+    imposte = sum((sum(per_voce.get(pk, []), ZERO) for pk, s in sezioni.items() if s == 'imposte'), ZERO) * fattore
+    oneri = sum((sum(per_voce.get(pk, []), ZERO) for pk, s in sezioni.items() if s == 'oneri_finanziari'), ZERO) * fattore
+    rate = -sum(MovimentoFinanziario.objects.filter(voce__codice='N.FINANZIAMENTI', importo__lt=0, data__gte=dal,
+                                                     data__lte=al).values_list('importo', flat=True), ZERO) * fattore
+
+    ante = {c: (centri[c]['ricavi'] - centri[c]['costi'] + centri[c]['totali']['ammortamenti']) * fattore
+            for c, _ in CENTRI}
+    tot_investito = sum(investito.values(), ZERO)
+    positivi = sum((v for v in ante.values() if v > 0), ZERO)
+
+    def riga(nome, centro_inv, centro_amm, giorni_pesati, flusso_ante, quota_fin, quota_imp):
+        dopo = flusso_ante - quota_fin - quota_imp
+        anni_ante, anni_dopo = _anni_rientro(centro_inv, flusso_ante), _anni_rientro(centro_inv, dopo)
+        media = date.fromordinal(int(giorni_pesati / centro_inv)) if centro_inv else None
+        return {'nome': nome, 'investito': centro_inv, 'ammortizzato': centro_amm, 'data_media': media,
+                'ante': flusso_ante, 'finanziamenti': quota_fin, 'imposte': quota_imp, 'dopo': dopo,
+                'anni_ante': anni_ante, 'anni_dopo': anni_dopo,
+                'rientro_ante': _data_rientro(media, anni_ante), 'rientro_dopo': _data_rientro(media, anni_dopo),
+                'roi_ante': _div(flusso_ante * 100, centro_inv), 'roi_dopo': _div(dopo * 100, centro_inv)}
+
+    righe = []
+    for c, nome in CENTRI:
+        if not investito[c] and c == 'comune':
+            continue
+        quota_fin = (oneri + rate) * investito[c] / tot_investito if tot_investito else ZERO
+        quota_imp = imposte * ante[c] / positivi if positivi and ante[c] > 0 else ZERO
+        righe.append(riga(nome, investito[c], ammortizzato[c], giorni[c], ante[c], quota_fin, quota_imp))
+    totale = riga('Totale azienda', tot_investito, sum(ammortizzato.values(), ZERO), sum(giorni.values(), ZERO),
+                  sum(ante.values(), ZERO), oneri + rate, imposte)
+    return {'righe': righe, 'totale': totale, 'mesi': len(trascorsi), 'imposte': imposte, 'oneri': oneri, 'rate': rate}
 
 
 def costo_per_servizio(mesi, costo_ora):

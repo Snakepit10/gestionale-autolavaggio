@@ -1,0 +1,11 @@
+<tr class="{% if totale %}riga-risultato{% endif %}">
+  <td class="col-nome">{{ x.nome }}{% if x.data_media %}<div class="text-muted" style="font-size:.7rem">acquisto medio {{ x.data_media|date:"m/Y" }}</div>{% endif %}</td>
+  <td class="tab-num">{{ x.investito|floatformat:"0g" }}</td>
+  <td class="tab-num">{{ x.ammortizzato|floatformat:"0g" }}</td>
+  <td class="tab-num {% if x.ante < 0 %}neg{% endif %}">{{ x.ante|floatformat:"0g" }}{% if x.roi_ante != None %}<div class="text-muted" style="font-size:.7rem">{{ x.roi_ante|floatformat:1 }}% all'anno</div>{% endif %}</td>
+  <td class="tab-num fw-bold">{% if x.anni_ante != None %}{{ x.anni_ante|floatformat:1 }}{% elif x.investito %}non rientra{% else %}&mdash;{% endif %}</td>
+  <td class="tab-num">{{ x.rientro_ante|date:"m/Y"|default:"—" }}</td>
+  <td class="tab-num {% if x.dopo < 0 %}neg{% endif %}">{{ x.dopo|floatformat:"0g" }}{% if x.roi_dopo != None %}<div class="text-muted" style="font-size:.7rem">{{ x.roi_dopo|floatformat:1 }}% all'anno</div>{% endif %}</td>
+  <td class="tab-num fw-bold">{% if x.anni_dopo != None %}{{ x.anni_dopo|floatformat:1 }}{% elif x.investito %}non rientra{% else %}&mdash;{% endif %}</td>
+  <td class="tab-num">{{ x.rientro_dopo|date:"m/Y"|default:"—" }}</td>
+</tr>

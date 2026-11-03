@@ -266,5 +266,14 @@ Con tutte e due le basi il totale del quadro per centro coincide con l'EBIT del 
 **Vendita prodotti**
 - Margine = ricavi − costi assegnati al centro prodotti (per esempio "Prodotti per la rivendita").
 
+**Rientro degli investimenti**
+- Usa i cespiti registrati per centro, più il totale aziendale. Il flusso del periodo è riportato a un anno, contando solo i mesi già iniziati.
+- **Prima delle imposte:** risultato del centro + i suoi ammortamenti, che non sono uscite di cassa. Per i centri non contano i costi comuni; in totale è l'EBITDA.
+- **Dopo imposte e rate:**
+  - si tolgono gli oneri finanziari e le rate dei finanziamenti (uscite su "Rimborso finanziamenti"), divisi sui centri in proporzione al valore dei cespiti;
+  - si tolgono le imposte, divise in proporzione al flusso positivo dei centri.
+- **Anni di rientro** = valore dei cespiti / flusso annuo. Si vede anche il rendimento annuo in %.
+- **Data stimata di rientro:** parte dalla data media di acquisto, pesata sul valore, e suppone lo stesso flusso anche negli anni passati.
+
 **Quadro per centro**
 - Il totale coincide con l'EBIT del conto economico.

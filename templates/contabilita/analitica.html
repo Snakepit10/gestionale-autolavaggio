@@ -176,5 +176,34 @@ details summary { cursor: pointer; font-size: .75rem; color: #475569; font-weigh
       </div>
     </div>
   </div>
+
+  <div class="panel mt-3">
+    <div class="panel-title"><i class="bi bi-arrow-repeat"></i> Rientro degli investimenti</div>
+    {% with r=a.rientro %}
+    {% if r %}
+    <div class="panel-sub">Stima sui <a href="{% url 'contabilita:cespiti' %}">cespiti registrati</a>, con il flusso di {{ periodo }} riportato a un anno ({{ r.mesi }} mes{% if r.mesi == 1 %}e{% else %}i{% endif %} di dati).
+      <strong>Prima delle imposte</strong>: risultato del centro + i suoi ammortamenti (non sono uscite di cassa); per i centri senza i costi comuni, in totale &egrave; l'EBITDA.
+      <strong>Dopo imposte e rate</strong>: meno oneri finanziari e rate dei finanziamenti (divisi sui centri in proporzione ai cespiti) e meno le imposte (in proporzione al flusso dei centri).
+      L'anno di rientro parte dalla data media di acquisto e suppone lo stesso flusso anche negli anni passati.</div>
+    <div class="panel-body tabella-scroll">
+      <table class="table table-sm bilancio">
+        <thead>
+          <tr><th></th><th class="tab-num">Investito</th><th class="tab-num">Gi&agrave; ammortizzato</th>
+            <th class="tab-num">Flusso annuo<br><span class="fw-normal">prima delle imposte</span></th><th class="tab-num">Anni di rientro</th><th class="tab-num">Rientro stimato</th>
+            <th class="tab-num">Flusso annuo<br><span class="fw-normal">dopo imposte e rate</span></th><th class="tab-num">Anni di rientro</th><th class="tab-num">Rientro stimato</th></tr>
+        </thead>
+        <tbody>
+          {% for x in r.righe %}{% include "contabilita/_riga_rientro.html" %}{% endfor %}
+          {% include "contabilita/_riga_rientro.html" with x=r.totale totale=True %}
+        </tbody>
+      </table>
+      <div class="small text-muted">Nel totale: oneri finanziari &euro;{{ r.oneri|floatformat:"0g" }}, rate dei finanziamenti &euro;{{ r.rate|floatformat:"0g" }} e imposte &euro;{{ r.imposte|floatformat:"0g" }} all'anno.
+        &ldquo;Non rientra&rdquo;: con questo flusso l'investimento non si ripaga.</div>
+    </div>
+    {% else %}
+    <div class="panel-body small text-muted">Nessun cespite registrato fino a {{ periodo }}: aggiungili nella pagina <a href="{% url 'contabilita:cespiti' %}">Cespiti</a> (valore senza IVA, data di acquisto, anni e centro).</div>
+    {% endif %}
+    {% endwith %}
+  </div>
 </div>
 {% endblock %}

@@ -88,6 +88,23 @@ class AnaliticaTest(TestCase):
         self.assertEqual(a['quadro'][-1]['totale'], ebit)
         self.assertEqual(ebit, Decimal('-330.00'))
 
+    def test_rientro_investimenti(self):
+        from .models import ContoFinanziario, MovimentoFinanziario
+        MovimentoFinanziario.objects.create(conto=ContoFinanziario.objects.get(nome='BAPS'), data=date(2026, 10, 15),
+                                            importo=Decimal('-50'), voce=VoceConto.objects.get(codice='N.FINANZIAMENTI'),
+                                            impronta='rata')
+        r = analitica([OTTOBRE])['rientro']
+        self_ = next(x for x in r['righe'] if x['nome'] == 'Self-service')
+        # self: ricavi 200 - costi 240 + ammortamento 100 = 60 al mese -> 720 all'anno su 1200 investiti
+        self.assertEqual((self_['investito'], self_['ante'], self_['anni_ante']), (Decimal('1200'), Decimal('720'), Decimal('1.7')))
+        self.assertEqual(self_['rientro_ante'].year, 2028)
+        # rata 50 al mese -> 600 all'anno, tutta sul self (unico centro con cespiti)
+        self.assertEqual((self_['dopo'], self_['anni_dopo']), (Decimal('120'), Decimal('10.0')))
+        # in totale l'EBITDA (-230 al mese) e' negativo: non rientra
+        self.assertEqual((r['totale']['ante'], r['totale']['anni_ante']), (Decimal('-2760'), None))
+        Cespite.objects.all().delete()
+        self.assertIsNone(analitica([OTTOBRE])['rientro'])
+
     def test_ricavi_dal_rilevato(self):
         from apps.finanze.models import QuadraturaGiornaliera
         # rilevato 366 - IVA dei corrispettivi del portale (244 -> 44) = 322: il servito resta al
@@ -130,6 +147,9 @@ class VisteAnaliticaTest(TestCase):
                     '/contabilita/analitica/impostazioni/'):
             self.assertEqual(self.apri(url).status_code, 200, url)
         self.assertContains(self.apri('/contabilita/analitica/?anno=2026'), 'senza ripartizione')
+        self.assertContains(self.apri('/contabilita/analitica/?anno=2026'), 'Nessun cespite registrato')
+        Cespite.objects.create(descrizione='Portale', data_acquisto=date(2026, 1, 10), valore=Decimal('1200'), anni=5, centro='self')
+        self.assertContains(self.apri('/contabilita/analitica/?anno=2026'), 'acquisto medio 01/2026')
         self.client.post('/contabilita/analitica/impostazioni/', {'azione': 'personale', 'dal': '2026-10',
                                                                   f'rip_{d.pk}_servito': '80', f'rip_{d.pk}_self': '20'})
         r = RipartizionePersonale.objects.get()
