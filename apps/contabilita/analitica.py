@@ -67,7 +67,7 @@ def raccogli(mesi, base='canali'):
     dal, al = mesi[0], fine_mese(mesi[-1])
     canali, lordi = ricavi_canali(mesi)
     if base == 'rilevato':
-        canali = rilevato_per_canale(mesi, canali, lordi)
+        canali = rilevato_per_canale(mesi, lordi)
     ricavi = defaultdict(lambda: ZERO)
     ricavi['self'] = sum(canali['portali'] + canali['cambia_gettoni'] + canali['monete_online'], ZERO)
     ricavi['servito'] = sum(canali['servito'], ZERO)

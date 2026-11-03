@@ -172,7 +172,7 @@ Si legge per mese o per trimestre, con il confronto con l'anno prima.
 
 | Base | Calcolo | Note |
 |---|---|---|
-| **Rilevato reale − IVA** (predefinita) | soldi rilevati nelle quadrature (contanti + POS − fondo + spese di cassa + ticket di resto) − IVA sui corrispettivi | IVA = (registratore + vendita self service) − imponibile al 22%, come nel report periodo. I giorni senza quadratura sono segnalati tra i controlli. |
+| **Rilevato reale − IVA** (predefinita) | soldi rilevati nelle quadrature (contanti + POS − fondo + spese di cassa + ticket di resto), divisi per canale | **Servito** e **vendita prodotti** = il loro fatturato (IVA compresa) meno l'IVA del registratore fiscale, divisa fra i due in proporzione al fatturato. **Self-service** = il resto del rilevato meno l'IVA dei corrispettivi del self (portali e piste). Il totale resta rilevato − IVA (registratore + self, al 22%). I giorni senza quadratura sono segnalati tra i controlli. |
 | **Fatturato per canale** | quanto descritto qui sotto | |
 
 **Ricavi**
@@ -230,7 +230,7 @@ Ogni costo del conto economico, fino all'EBIT, si divide sui centri **Self-servi
 
 | Base | Come si dividono i ricavi sui centri |
 |---|---|
-| **Rilevato reale − IVA** (predefinita) | Servito e vendita prodotti restano al loro fatturato (/1,22). La differenza fra il rilevato netto del mese e quel fatturato va al self-service, divisa fra portali e piste in proporzione al loro fatturato (tutta ai portali se nel mese non c'è fatturato self). Le monete online restano fuori, perché non passano dalla cassa. |
+| **Rilevato reale − IVA** (predefinita) | Come nel conto economico, mese per mese. Servito e vendita prodotti: fatturato meno l'IVA del registratore. Self-service: il resto del rilevato meno l'IVA del self, diviso fra portali e piste in proporzione al loro fatturato (tutto ai portali se nel mese non c'è fatturato self). Le monete online restano fuori, perché non passano dalla cassa. |
 | **Fatturato per canale** | fatturato di ogni canale / 1,22 |
 
 Con tutte e due le basi il totale del quadro per centro coincide con l'EBIT del conto economico calcolato sulla stessa base.

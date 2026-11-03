@@ -77,6 +77,7 @@ def conto_economico(request):
         'kpi': kpi,
         'pct': {k: (v / kpi['ricavi'] * 100 if kpi['ricavi'] else None) for k, v in kpi.items()},
         'controlli': ce_srv.controlli(mesi, ce),
+        'dettaglio_rilevato': ce['dettaglio_rilevato'],
         'serie_json': _serie_json(ce['serie']),
         'etichette_json': json.dumps(ce_srv.NOMI_MESI),
     })

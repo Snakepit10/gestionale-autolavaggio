@@ -123,38 +123,47 @@ def ricavi_rilevati(mesi):
     return rilevato, giorni
 
 
-def iva_corrispettivi(ricavi):
-    """IVA scorporata dai corrispettivi del periodo (registratore del
-    servito + vendita self service), al 22% come nel report periodo."""
-    corrispettivi = ricavi['registratore'] + ricavi['portali'] + ricavi['cambia_gettoni']
-    if corrispettivi <= 0:
-        return ZERO
-    return corrispettivi - (corrispettivi / IVA).quantize(Decimal('0.01'))
+def _scorporo(lordo):
+    """IVA al 22% contenuta in un importo lordo."""
+    return lordo - (lordo / IVA).quantize(Decimal('0.01')) if lordo > 0 else ZERO
 
 
-# Canali del self che passano dalla quadratura (le monete online si pagano nell'app)
-CANALI_SELF_RILEVATI = ('portali', 'cambia_gettoni')
+def _dividi_pesi(importo, pesi, predefinito):
+    """{chiave: quota} in proporzione ai pesi positivi; l'ultima prende il
+    resto; senza pesi tutto su predefinito."""
+    pesi = [(k, p) for k, p in pesi if p > 0] or [(predefinito, Decimal('1'))]
+    totale, assegnato, quote = sum((p for _, p in pesi), ZERO), ZERO, {}
+    for j, (k, peso) in enumerate(pesi):
+        quote[k] = importo - assegnato if j == len(pesi) - 1 else (importo * peso / totale).quantize(Decimal('0.01'))
+        assegnato += quote[k]
+    return quote
 
 
-def rilevato_per_canale(mesi, canali, ricavi_lordi):
-    """Il rilevato reale meno IVA di ogni mese sui canali: servito e
-    vendita prodotti restano al loro fatturato (/1,22), la differenza va
-    al self-service, divisa fra portali e piste in proporzione al loro
-    fatturato (tutta ai portali se il self non ha fatturato nel mese).
-    Stessa forma di ricavi_canali."""
+def rilevato_per_canale(mesi, ricavi_lordi):
+    """Il rilevato reale di ogni mese sui canali, IVA esclusa:
+    - servito e vendita prodotti: il loro fatturato (IVA compresa) meno
+      l'IVA del registratore fiscale, divisa fra i due in proporzione al
+      fatturato;
+    - self-service: il resto del rilevato meno l'IVA dei corrispettivi del
+      self (portali e piste), diviso fra portali e piste in proporzione al
+      loro fatturato (tutto ai portali se nel mese non c'e').
+    Le monete online non passano dalla cassa. Stessa forma di
+    ricavi_canali, piu' 'iva_registratore', 'iva_self' e 'rilevato'."""
     rilevato, _ = ricavi_rilevati(mesi)
-    diviso = {k: [ZERO] * len(mesi) for k, _ in CANALI}
+    diviso = {k: [ZERO] * len(mesi) for k in [c for c, _ in CANALI] + ['iva_registratore', 'iva_self', 'rilevato']}
     for i, lordi in enumerate(ricavi_lordi):
-        netto = rilevato[i] - iva_corrispettivi(lordi)
+        iva_reg = _scorporo(lordi['registratore'])
+        iva_self = _scorporo(lordi['portali'] + lordi['cambia_gettoni'])
+        for k, quota in _dividi_pesi(iva_reg, [('servito', lordi['servito']), ('prodotti', lordi['prodotti'])],
+                                     'servito').items():
+            diviso[k][i] -= quota
         for k in ('servito', 'prodotti'):
-            diviso[k][i] = canali[k][i]
-        resto = netto - canali['servito'][i] - canali['prodotti'][i]
-        pesi = [(k, canali[k][i]) for k in CANALI_SELF_RILEVATI if canali[k][i] > 0] or [('portali', Decimal('1'))]
-        totale, assegnato = sum((p for _, p in pesi), ZERO), ZERO
-        for j, (k, peso) in enumerate(pesi):
-            quota = resto - assegnato if j == len(pesi) - 1 else (resto * peso / totale).quantize(Decimal('0.01'))
+            diviso[k][i] += lordi[k]
+        resto = rilevato[i] - lordi['servito'] - lordi['prodotti'] - iva_self
+        for k, quota in _dividi_pesi(resto, [('portali', lordi['portali']), ('cambia_gettoni', lordi['cambia_gettoni'])],
+                                     'portali').items():
             diviso[k][i] = quota
-            assegnato += quota
+        diviso['iva_registratore'][i], diviso['iva_self'][i], diviso['rilevato'][i] = iva_reg, iva_self, rilevato[i]
     return diviso
 
 
@@ -211,13 +220,18 @@ def conto_economico(mesi, base='canali'):
     # Ricavi
     righe.append(_riga('titolo', 'Ricavi', zeri))
     giorni_rilevati = None
+    dettaglio_rilevato = None
     if base == 'rilevato':
-        rilevato, giorni_rilevati = ricavi_rilevati(mesi)
-        iva = [iva_corrispettivi(r) for r in ricavi_lordi]
+        _, giorni_rilevati = ricavi_rilevati(mesi)
+        r = rilevato_per_canale(mesi, ricavi_lordi)
+        self_service = _somma(r['portali'], r['cambia_gettoni'])
         voci_ricavo = [
-            _riga('voce', 'Rilevato reale (contanti + POS - fondo + spese e ticket)', rilevato, 'ricavi:rilevato', 1),
-            _riga('voce', 'IVA sui corrispettivi (registratore + self service)', [-x for x in iva], 'ricavi:iva', 1),
+            _riga('voce', 'Servito (lavaggi) - IVA del registratore', r['servito'], 'ricavi:servito', 1),
+            _riga('voce', 'Vendita prodotti - IVA del registratore', r['prodotti'], 'ricavi:prodotti', 1),
+            _riga('voce', 'Self-service: resto del rilevato - IVA self service', self_service, 'ricavi:self', 1),
         ]
+        voci_ricavo = [v for v in voci_ricavo if any(v['valori'])]
+        dettaglio_rilevato = {k: sum(r[k], ZERO) for k in ('rilevato', 'iva_registratore', 'iva_self')}
     else:
         voci_ricavo = [_riga('voce', nome, canali[k], f'ricavi:{k}', 1) for k, nome in CANALI if any(canali[k])]
     voci_ricavo += righe_sezione('ricavi')
@@ -260,6 +274,7 @@ def conto_economico(mesi, base='canali'):
         'mesi': mesi,
         'base': base,
         'giorni_rilevati': giorni_rilevati,
+        'dettaglio_rilevato': dettaglio_rilevato,
         'righe': righe,
         'ricavi_lordi': ricavi_lordi,
         'mesi_personale': mesi_personale,

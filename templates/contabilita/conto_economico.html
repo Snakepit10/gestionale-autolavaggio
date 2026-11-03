@@ -58,7 +58,9 @@
 
   <div class="panel">
     <div class="panel-title"><i class="bi bi-table"></i> Conto economico (euro, IVA esclusa)</div>
-    <div class="panel-sub">{% if base == 'rilevato' %}Ricavi: rilevato reale delle quadrature (contanti + POS &minus; fondo + spese e ticket di resto) meno l'IVA dei corrispettivi (registratore + self service), come nel report periodo.{% else %}Ricavi: fatturato per canale dalle chiusure di cassa e dagli ordini, diviso 1,22.{% endif %} Costi dalle fatture (per mese di competenza), dai movimenti senza fattura, dal costo del personale e dagli ammortamenti. Clic su una voce per i documenti.</div>
+    <div class="panel-sub">{% if base == 'rilevato' %}Ricavi dal rilevato reale delle quadrature (contanti + POS &minus; fondo + spese e ticket di resto){% if dettaglio_rilevato %}: &euro;{{ dettaglio_rilevato.rilevato|floatformat:"0g" }}{% endif %}.
+      Servito e vendita prodotti = il loro fatturato meno l'IVA del registratore fiscale{% if dettaglio_rilevato %} (&euro;{{ dettaglio_rilevato.iva_registratore|floatformat:"0g" }}){% endif %};
+      self-service = il resto del rilevato meno l'IVA dei corrispettivi del self{% if dettaglio_rilevato %} (&euro;{{ dettaglio_rilevato.iva_self|floatformat:"0g" }}){% endif %}.{% else %}Ricavi: fatturato per canale dalle chiusure di cassa e dagli ordini, diviso 1,22.{% endif %} Costi dalle fatture (per mese di competenza), dai movimenti senza fattura, dal costo del personale e dagli ammortamenti. Clic su una voce per i documenti.</div>
     <div class="panel-body">
       {% include "contabilita/_tabella_bilancio.html" with mostra_pct=True %}
     </div>
