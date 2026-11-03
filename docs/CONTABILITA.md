@@ -277,3 +277,39 @@ Con tutte e due le basi il totale del quadro per centro coincide con l'EBIT del 
 
 **Quadro per centro**
 - Il totale coincide con l'EBIT del conto economico.
+
+## Fase 5: indici e KPI
+
+Pagina **Indici e KPI**. Gli indici usano i mesi chiusi dell'anno da quando parte la contabilità (il primo saldo iniziale dei conti), riportati a 12 mesi. I ricavi seguono la stessa base del conto economico (rilevato reale − IVA o fatturato per canale). Ogni indice ha la formula e un colore: verde in linea con la prassi bancaria per piccole imprese, giallo da tenere d'occhio, rosso critico.
+
+**Indebitamento massimo** (vale il più prudente dei due metodi)
+
+| Metodo | Calcolo |
+|---|---|
+| Capacità di rimborso (DSCR) | flusso al servizio del debito = EBITDA − imposte − investimenti di mantenimento; rata annua sostenibile = flusso / DSCR minimo; meno le rate già in corso = rata disponibile; il nuovo debito è il valore attuale della rata disponibile al tasso e per la durata di un nuovo finanziamento |
+| Multiplo dell'EBITDA | PFN massima = multiplo × EBITDA; meno la PFN attuale = spazio per nuovo debito |
+
+- **Nuovo finanziamento ottenibile** = il minore dei due spazi; c'è anche la tabella per 3, 5, 7 e 10 anni.
+- **Indebitamento massimo sostenibile** = debito di oggi + nuovo ottenibile. Senza spazio è il massimo sostenibile, e se il debito di oggi lo supera la pagina lo segnala.
+- Le imposte sono quelle registrate nel periodo; se non ce ne sono si stimano con un'aliquota sull'utile ante imposte.
+- Le rate in corso vengono dal piano dei finanziamenti registrati (prossimi 12 mesi). Senza finanziamenti si stimano dalle uscite su "Finanziamenti" più gli interessi del conto economico.
+
+**Ipotesi** (pulsante Ipotesi): PFN/EBITDA massimo (3), DSCR minimo (1,25), tasso (6%) e durata (5 anni) del nuovo debito, investimenti di mantenimento in % degli ammortamenti (50%), aliquota imposte stimata (28%), multiplo di valutazione EV/EBITDA (4).
+
+**Indici**
+- **Redditività:** crescita dei ricavi sullo stesso periodo dell'anno prima, margine di contribuzione %, EBITDA margin, ROS, utile netto sui ricavi, ROI sugli impianti (EBIT / valore netto dei cespiti), rotazione degli impianti.
+- **Struttura dei costi e pareggio:** incidenza di personale e costi fissi; pareggio operativo (EBITDA = 0), economico (utile ante imposte = 0) e di cassa (rate e imposte comprese), annui e al mese; margine di sicurezza; leva operativa.
+- **Debito:** PFN (debiti finanziari − liquidità dei conti), PFN/EBITDA, DSCR anche con ricavi −10%, copertura degli interessi, oneri finanziari sui ricavi. DSCR sotto 1 è il segnale d'allerta del Codice della crisi d'impresa.
+- **Liquidità:** saldo dei conti, giorni di cassa, liquidità sugli impegni a breve (fornitori da pagare + rate a 12 mesi), conversione dell'EBITDA in cassa e free cash flow (servono gli estratti conto del periodo), giorni di pagamento dei fornitori, fornitori scaduti.
+- **KPI operativi:** ricavo al giorno, lavaggi del servito al giorno, ricavo e costo pieno per lavaggio e per ora, cicli self al giorno e ricavo per ciclo, ricavi per euro di personale.
+- **Valutazione indicativa:** EBITDA × multiplo − PFN. È un ordine di grandezza, non una perizia.
+
+Non si calcolano ROE e indici patrimoniali: patrimonio netto, crediti e magazzino non sono nel gestionale.
+
+### Finanziamenti
+
+Pagina **Finanziamenti**: mutui, prestiti, leasing e fidi in corso, con importo, tasso annuo, numero di rate mensili e data della prima rata.
+- Il piano è alla francese. Se la rata della banca è diversa, la si scrive e il piano si adegua; l'ultima rata chiude il debito.
+- Un fido o un anticipo a revoca (0 rate) resta uguale e paga solo gli interessi.
+- Il debito conta dal mese prima della prima rata.
+- Servono a PFN, DSCR e indebitamento massimo. I pagamenti veri restano in prima nota, sulla voce Finanziamenti.

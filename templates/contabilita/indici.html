@@ -1,0 +1,172 @@
+{% extends "base.html" %}
+{% block title %}Indici e KPI {{ anno }}{% endblock %}
+
+{% block extra_css %}{% include "contabilita/_stile.html" %}
+<style>
+.indici td { padding: 6px 8px; vertical-align: top; }
+.indici .valore { font-weight: 800; font-variant-numeric: tabular-nums; white-space: nowrap; text-align: right; }
+.indici .formula { font-size: .7rem; color: #94a3b8; }
+.indici .nota { font-size: .72rem; color: #64748b; }
+.pallino { font-size: .55rem; vertical-align: middle; margin-right: 4px; }
+.stato-ok { color: #16a34a; } .stato-attenzione { color: #d97706; } .stato-critico { color: #dc2626; } .stato-none { color: #cbd5e1; }
+.capacita td { padding: 4px 8px; }
+.capacita .tab-num { white-space: nowrap; }
+.capacita .sottrai td:first-child { padding-left: 20px; color: #64748b; }
+.capacita .risultato td { font-weight: 800; border-top: 1px solid #cbd5e1; }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="dash-page">
+  <div class="dash-header">
+    <h4><i class="bi bi-speedometer2 me-2"></i>Indici e KPI {{ anno }}</h4>
+    {% include "contabilita/_nav.html" %}
+  </div>
+
+  <div class="d-flex gap-2 flex-wrap mb-3">
+    <a class="btn btn-sm btn-outline-secondary" href="?anno={{ anno|add:'-1' }}&ricavi={{ base }}"><i class="bi bi-chevron-left"></i> {{ anno|add:"-1" }}</a>
+    <a class="btn btn-sm btn-outline-secondary" href="?anno={{ anno|add:'1' }}&ricavi={{ base }}">{{ anno|add:"1" }} <i class="bi bi-chevron-right"></i></a>
+    <div class="btn-group btn-group-sm" title="Da dove vengono i ricavi">
+      {% for chiave, nome in basi %}
+      <a class="btn {% if base == chiave %}btn-success{% else %}btn-outline-success{% endif %}" href="?anno={{ anno }}&ricavi={{ chiave }}" title="{{ nome }}">Ricavi: {% if chiave == 'rilevato' %}rilevato reale &minus; IVA{% else %}fatturato per canale{% endif %}</a>
+      {% endfor %}
+    </div>
+    <button class="btn btn-sm btn-outline-dark" data-bs-toggle="modal" data-bs-target="#modale-ipotesi"><i class="bi bi-sliders"></i> Ipotesi</button>
+    <a class="btn btn-sm btn-outline-primary" href="{% url 'contabilita:finanziamenti' %}"><i class="bi bi-cash-coin"></i> Finanziamenti{% if r %} ({{ r.finanziamenti }}){% endif %}</a>
+  </div>
+
+  {% if not r %}
+  <div class="panel"><div class="panel-body text-muted p-3">Nessun mese da analizzare nel {{ anno }}: la contabilit&agrave; parte dal primo saldo iniziale dei conti.</div></div>
+  {% else %}
+  {% with c=r.capacita %}
+  <div class="panel">
+    <div class="panel-sub pt-3">Periodo: <b>{{ periodo }}</b> ({{ r.mesi|length }} mes{{ r.mesi|length|pluralize:"e,i" }}{% if r.mesi|length < 12 %}, riportati a 12 mesi &times;{{ r.fattore|floatformat:2 }}{% endif %}). Tutti i valori sono annui, IVA esclusa.
+      Colori: <i class="bi bi-circle-fill pallino stato-ok"></i>in linea con la prassi bancaria <i class="bi bi-circle-fill pallino stato-attenzione"></i>da tenere d'occhio <i class="bi bi-circle-fill pallino stato-critico"></i>critico.</div>
+  </div>
+
+  {% if r.controlli %}
+  <div class="alert alert-warning small py-2"><i class="bi bi-exclamation-triangle"></i> Gli indici dipendono dal conto economico, che ha ancora {{ r.controlli|length }} cos{{ r.controlli|length|pluralize:"a,e" }} da completare:
+    <a href="{% url 'contabilita:conto_economico' %}?anno={{ anno }}&ricavi={{ base }}">apri il conto economico</a>.</div>
+  {% endif %}
+
+  <div class="row g-2 mb-3">
+    <div class="col-6 col-lg-3"><div class="kpi-tile hero"><div class="label">Nuovo finanziamento ottenibile</div><div class="value">&euro;{{ c.nuovo|floatformat:"0g" }}</div><div class="sub">a {{ r.parametri.durata_nuovo_debito }} anni al {{ r.parametri.tasso_nuovo_debito|floatformat:"-2" }}% &middot; limite: {% if c.vincolo == 'multiplo' %}PFN/EBITDA{% else %}rate (DSCR){% endif %}</div></div></div>
+    <div class="col-6 col-lg-3"><div class="kpi-tile"><div class="label">Indebitamento massimo sostenibile</div><div class="value">&euro;{{ c.massimo|floatformat:"0g" }}</div><div class="sub {% if c.oltre %}text-danger fw-bold{% endif %}">{% if c.oltre %}debito di oggi &euro;{{ c.debito|floatformat:"0g" }}: oltre il sostenibile{% else %}debito finanziario totale, di cui oggi &euro;{{ c.debito|floatformat:"0g" }}{% endif %}</div></div></div>
+    <div class="col-6 col-lg-3"><div class="kpi-tile"><div class="label">DSCR</div><div class="value {% if r.dscr != None and r.dscr < 1 %}text-danger{% endif %}">{% if r.dscr != None %}{{ r.dscr|floatformat:2 }}x{% else %}&mdash;{% endif %}</div><div class="sub">flusso / rate &middot; minimo {{ r.parametri.dscr_minimo|floatformat:2 }}x</div></div></div>
+    <div class="col-6 col-lg-3"><div class="kpi-tile"><div class="label">PFN / EBITDA</div><div class="value">{% if c.pfn <= 0 %}cassa netta{% elif r.pfn_ebitda != None %}{{ r.pfn_ebitda|floatformat:2 }}x{% else %}&mdash;{% endif %}</div><div class="sub">PFN &euro;{{ c.pfn|floatformat:"0g" }} &middot; massimo {{ r.parametri.multiplo_ebitda|floatformat:1 }}x</div></div></div>
+  </div>
+
+  <div class="row g-2">
+    <div class="col-lg-7">
+      <div class="panel h-100">
+        <div class="panel-title"><i class="bi bi-calculator"></i> Indebitamento massimo sul conto economico</div>
+        <div class="panel-sub">Due metodi usati dalle banche: vale il pi&ugrave; prudente.</div>
+        <div class="panel-body">
+          <table class="table table-sm capacita mb-2">
+            <tr><td colspan="2" class="fw-bold">1. Capacit&agrave; di rimborso (DSCR)</td></tr>
+            <tr><td>EBITDA annuo</td><td class="tab-num">&euro;{{ r.conto.ebitda|floatformat:"0g" }}</td></tr>
+            <tr class="sottrai"><td>&minus; imposte{% if c.imposte_stimate %} (stimate al {{ r.parametri.aliquota_imposte|floatformat:"-2" }}% dell'utile ante imposte){% endif %}</td><td class="tab-num">&euro;{{ c.imposte|floatformat:"0g" }}</td></tr>
+            <tr class="sottrai"><td>&minus; investimenti di mantenimento ({{ r.parametri.capex_mantenimento|floatformat:"-2" }}% degli ammortamenti)</td><td class="tab-num">&euro;{{ c.capex|floatformat:"0g" }}</td></tr>
+            <tr class="risultato"><td>Flusso al servizio del debito</td><td class="tab-num">&euro;{{ c.cfads|floatformat:"0g" }}</td></tr>
+            <tr><td>Rata annua sostenibile (flusso / DSCR {{ r.parametri.dscr_minimo|floatformat:2 }})</td><td class="tab-num">&euro;{{ c.rata_max|floatformat:"0g" }} <span class="text-muted">(&euro;{{ c.rata_max_mese|floatformat:"0g" }}/mese)</span></td></tr>
+            <tr class="sottrai"><td>&minus; rate gi&agrave; in corso <span class="formula">({{ c.fonte_servizio }})</span></td><td class="tab-num">&euro;{{ c.servizio|floatformat:"0g" }}</td></tr>
+            <tr class="risultato"><td>Rata ancora disponibile</td><td class="tab-num">&euro;{{ c.rata_libera|floatformat:"0g" }} <span class="text-muted">(&euro;{{ c.rata_libera_mese|floatformat:"0g" }}/mese)</span></td></tr>
+            <tr><td class="fw-semibold">Nuovo debito ripagabile con la rata disponibile</td><td class="tab-num fw-bold">&euro;{{ c.nuovo_dscr|floatformat:"0g" }}</td></tr>
+            <tr><td colspan="2" class="fw-bold pt-3">2. Multiplo dell'EBITDA</td></tr>
+            <tr><td>PFN massima ({{ r.parametri.multiplo_ebitda|floatformat:1 }} &times; EBITDA)</td><td class="tab-num">&euro;{{ c.pfn_max|floatformat:"0g" }}</td></tr>
+            <tr class="sottrai"><td>&minus; posizione finanziaria netta attuale (debiti &euro;{{ c.debito|floatformat:"0g" }} &minus; liquidit&agrave; &euro;{{ c.liquidita|floatformat:"0g" }})</td><td class="tab-num">&euro;{{ c.pfn|floatformat:"0g" }}</td></tr>
+            <tr class="risultato"><td>Spazio per nuovo debito</td><td class="tab-num">&euro;{{ c.spazio_multiplo|floatformat:"0g" }}</td></tr>
+            <tr><td colspan="2" class="pt-3"></td></tr>
+            <tr class="risultato"><td>Nuovo finanziamento ottenibile (il minore dei due)</td><td class="tab-num text-success">&euro;{{ c.nuovo|floatformat:"0g" }}</td></tr>
+          </table>
+          {% if not r.finanziamenti %}<div class="formula">Nessun finanziamento registrato: le rate in corso si stimano dai movimenti di prima nota. Per un calcolo esatto <a href="{% url 'contabilita:finanziamenti' %}">registra i finanziamenti</a> con importo, tasso e durata.</div>{% endif %}
+        </div>
+      </div>
+    </div>
+    <div class="col-lg-5">
+      <div class="panel">
+        <div class="panel-title"><i class="bi bi-hourglass-split"></i> Nuovo finanziamento per durata</div>
+        <div class="panel-sub">Al {{ r.parametri.tasso_nuovo_debito|floatformat:"-2" }}%, con la rata disponibile e dentro il multiplo.</div>
+        <div class="panel-body">
+          <table class="table table-sm mb-0">
+            <thead><tr><th>Durata</th><th class="tab-num">Importo</th><th class="tab-num">Rata mensile</th></tr></thead>
+            {% for d in c.durate %}<tr{% if d.anni == r.parametri.durata_nuovo_debito %} class="fw-bold"{% endif %}><td>{{ d.anni }} anni</td><td class="tab-num">&euro;{{ d.nuovo|floatformat:"0g" }}</td><td class="tab-num">&euro;{{ d.rata|floatformat:"0g" }}</td></tr>{% endfor %}
+          </table>
+        </div>
+      </div>
+      <div class="panel">
+        <div class="panel-title"><i class="bi bi-tag"></i> Valutazione indicativa</div>
+        <div class="panel-body">
+          {% if r.valutazione %}
+          <table class="table table-sm mb-1">
+            <tr><td>Valore dell'azienda (EBITDA &times; {{ r.parametri.multiplo_valutazione|floatformat:1 }})</td><td class="tab-num fw-bold">&euro;{{ r.valutazione.ev|floatformat:"0g" }}</td></tr>
+            <tr><td>&minus; posizione finanziaria netta</td><td class="tab-num">&euro;{{ c.pfn|floatformat:"0g" }}</td></tr>
+            <tr class="fw-bold"><td>Valore per il titolare</td><td class="tab-num">&euro;{{ r.valutazione.equity|floatformat:"0g" }}</td></tr>
+          </table>
+          <div class="formula">Metodo dei multipli (EV/EBITDA): un ordine di grandezza, non una perizia. Il multiplo si cambia nelle ipotesi.</div>
+          {% else %}<div class="text-muted small">EBITDA negativo: la valutazione per multipli non ha senso.</div>{% endif %}
+        </div>
+      </div>
+      <div class="panel">
+        <div class="panel-title"><i class="bi bi-receipt-cutoff"></i> Base di calcolo (annua)</div>
+        <div class="panel-body">
+          <table class="table table-sm mb-0">
+            <tr><td>Ricavi</td><td class="tab-num">&euro;{{ r.conto.ricavi|floatformat:"0g" }}</td></tr>
+            <tr><td>Margine di contribuzione</td><td class="tab-num">&euro;{{ r.conto.margine|floatformat:"0g" }}</td></tr>
+            <tr><td>EBITDA</td><td class="tab-num">&euro;{{ r.conto.ebitda|floatformat:"0g" }}</td></tr>
+            <tr><td>EBIT</td><td class="tab-num">&euro;{{ r.conto.ebit|floatformat:"0g" }}</td></tr>
+            <tr><td>Risultato netto</td><td class="tab-num">&euro;{{ r.conto.netto|floatformat:"0g" }}</td></tr>
+          </table>
+        </div>
+      </div>
+    </div>
+  </div>
+  {% endwith %}
+
+  <div class="row g-2 mt-1">
+    {% for s in r.sezioni %}
+    <div class="col-lg-6">
+      <div class="panel h-100">
+        <div class="panel-title"><i class="bi bi-{{ s.icona }}"></i> {{ s.titolo }}</div>
+        <div class="panel-body">
+          <table class="table table-sm indici mb-0">
+            {% for i in s.indici %}
+            <tr>
+              <td><i class="bi bi-circle-fill pallino stato-{{ i.stato|default:'none' }}"></i><span class="fw-semibold">{{ i.nome }}</span>
+                <div class="formula">{{ i.formula }}</div>{% if i.nota %}<div class="nota">{{ i.nota }}</div>{% endif %}</td>
+              <td class="valore">{% include "contabilita/_valore_indice.html" with v=i.valore formato=i.formato %}</td>
+            </tr>
+            {% endfor %}
+          </table>
+        </div>
+      </div>
+    </div>
+    {% endfor %}
+  </div>
+
+  <div class="panel mt-2">
+    <div class="panel-sub pt-3">Non si calcolano ROE e indici di struttura patrimoniale (patrimonio netto, crediti, magazzino non sono nel gestionale).
+      Le soglie sono quelle della prassi bancaria per piccole imprese: indicazioni, non regole. DSCR sotto 1 &egrave; il segnale d'allerta del Codice della crisi d'impresa.</div>
+  </div>
+  {% endif %}
+</div>
+
+<div class="modal fade" id="modale-ipotesi" tabindex="-1">
+  <div class="modal-dialog"><form method="post" class="modal-content">
+    {% csrf_token %}<input type="hidden" name="anno" value="{{ anno }}"><input type="hidden" name="ricavi" value="{{ base }}">
+    <div class="modal-header"><h5 class="modal-title">Ipotesi</h5><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div>
+    <div class="modal-body">
+      <div class="row g-2">
+        <div class="col-6"><label class="form-label">PFN / EBITDA massimo</label><input type="text" inputmode="decimal" name="multiplo_ebitda" class="form-control" value="{{ parametri.multiplo_ebitda|stringformat:'s' }}"><div class="form-text">Di solito 3-4 per una piccola impresa.</div></div>
+        <div class="col-6"><label class="form-label">DSCR minimo</label><input type="text" inputmode="decimal" name="dscr_minimo" class="form-control" value="{{ parametri.dscr_minimo|stringformat:'s' }}"><div class="form-text">Di solito 1,2-1,3.</div></div>
+        <div class="col-6"><label class="form-label">Tasso nuovo debito %</label><input type="text" inputmode="decimal" name="tasso_nuovo_debito" class="form-control" value="{{ parametri.tasso_nuovo_debito|stringformat:'s' }}"></div>
+        <div class="col-6"><label class="form-label">Durata nuovo debito (anni)</label><input type="number" min="1" max="30" name="durata_nuovo_debito" class="form-control" value="{{ parametri.durata_nuovo_debito }}"></div>
+        <div class="col-6"><label class="form-label">Mantenimento impianti, % ammortamenti</label><input type="text" inputmode="decimal" name="capex_mantenimento" class="form-control" value="{{ parametri.capex_mantenimento|stringformat:'s' }}"><div class="form-text">Quanto serve ogni anno per tenere efficienti gli impianti.</div></div>
+        <div class="col-6"><label class="form-label">Aliquota imposte stimata %</label><input type="text" inputmode="decimal" name="aliquota_imposte" class="form-control" value="{{ parametri.aliquota_imposte|stringformat:'s' }}"><div class="form-text">Solo se nel periodo non ci sono imposte registrate.</div></div>
+        <div class="col-6"><label class="form-label">Multiplo di valutazione (EV/EBITDA)</label><input type="text" inputmode="decimal" name="multiplo_valutazione" class="form-control" value="{{ parametri.multiplo_valutazione|stringformat:'s' }}"></div>
+      </div>
+    </div>
+    <div class="modal-footer"><button class="btn btn-primary"><i class="bi bi-save"></i> Salva</button></div>
+  </form></div>
+</div>
+{% endblock %}

@@ -503,3 +503,125 @@ class ParametriAnalitica(models.Model):
     def attuali(cls):
         return cls.objects.first() or cls()
 
+
+
+# ---------------------------------------------------------------- finanziamenti e indici
+
+def aggiungi_mesi(giorno, n):
+    import calendar
+    anno, mese = divmod(giorno.month - 1 + n, 12)
+    anno, mese = giorno.year + anno, mese + 1
+    return giorno.replace(year=anno, month=mese, day=min(giorno.day, calendar.monthrange(anno, mese)[1]))
+
+
+class Finanziamento(models.Model):
+    """Debito finanziario in corso, per la posizione finanziaria netta e
+    il servizio del debito negli indici. Rate mensili a quota capitale
+    crescente (piano alla francese); un fido o un anticipo a revoca
+    (durata 0) resta uguale e paga solo gli interessi."""
+    TIPI = [('mutuo', 'Mutuo o prestito'), ('leasing', 'Leasing'), ('fido', 'Fido, scoperto o anticipo (a revoca)')]
+    descrizione = models.CharField(max_length=120)
+    ente = models.CharField(max_length=80, blank=True)
+    tipo = models.CharField(max_length=10, choices=TIPI, default='mutuo')
+    importo = models.DecimalField(max_digits=12, decimal_places=2, help_text='Capitale erogato (per un fido: utilizzato)')
+    tasso = models.DecimalField(max_digits=5, decimal_places=2, default=Decimal('0'), help_text='Tasso annuo nominale %')
+    durata_mesi = models.PositiveSmallIntegerField(default=60, help_text='Numero di rate mensili; 0 = a revoca')
+    data_prima_rata = models.DateField()
+    rata = models.DecimalField(max_digits=12, decimal_places=2, null=True, blank=True,
+                               help_text='Rata della banca, se diversa da quella calcolata')
+    note = models.CharField(max_length=255, blank=True)
+
+    class Meta:
+        verbose_name = 'Finanziamento'
+        verbose_name_plural = 'Finanziamenti'
+        ordering = ['data_prima_rata']
+
+    def __str__(self):
+        return self.descrizione
+
+    @property
+    def tasso_mensile(self):
+        return self.tasso / 1200
+
+    @property
+    def rata_mensile(self):
+        if self.rata:
+            return self.rata
+        if not self.durata_mesi:
+            return (self.importo * self.tasso_mensile).quantize(Decimal('0.01'))
+        i = self.tasso_mensile
+        if not i:
+            return (self.importo / self.durata_mesi).quantize(Decimal('0.01'))
+        return (self.importo * i / (1 - (1 + i) ** -self.durata_mesi)).quantize(Decimal('0.01'))
+
+    def piano(self):
+        """[(data, rata, interessi, capitale, residuo)]: l'ultima rata
+        chiude il debito."""
+        if not self.durata_mesi:
+            return []
+        righe, residuo, rata = [], self.importo, self.rata_mensile
+        for n in range(self.durata_mesi):
+            interessi = (residuo * self.tasso_mensile).quantize(Decimal('0.01'))
+            capitale = residuo if n == self.durata_mesi - 1 else min(residuo, max(rata - interessi, Decimal('0')))
+            residuo -= capitale
+            righe.append((aggiungi_mesi(self.data_prima_rata, n), capitale + interessi, interessi, capitale, residuo))
+            if residuo <= 0:
+                break
+        return righe
+
+    def residuo_al(self, giorno):
+        if not self.durata_mesi:
+            return self.importo if self.data_prima_rata <= giorno else Decimal('0')
+        # erogato circa un mese prima della prima rata
+        residuo = self.importo if aggiungi_mesi(self.data_prima_rata, -1) <= giorno else Decimal('0')
+        for data, _, _, _, dopo in self.piano():
+            if data > giorno:
+                break
+            residuo = dopo
+        return residuo
+
+    def servizio(self, dal, al):
+        """(quota capitale, interessi) delle rate tra dal e al."""
+        if not self.durata_mesi:
+            if self.data_prima_rata > al:
+                return Decimal('0'), Decimal('0')
+            mesi = (al.year - max(dal, self.data_prima_rata).year) * 12 + al.month - max(dal, self.data_prima_rata).month + 1
+            return Decimal('0'), (self.importo * self.tasso_mensile * mesi).quantize(Decimal('0.01'))
+        capitale = interessi = Decimal('0')
+        for data, _, quota_int, quota_cap, _ in self.piano():
+            if dal <= data <= al:
+                capitale += quota_cap
+                interessi += quota_int
+        return capitale, interessi
+
+    @property
+    def scadenza(self):
+        return aggiungi_mesi(self.data_prima_rata, self.durata_mesi - 1) if self.durata_mesi else None
+
+
+class ParametriFinanziari(models.Model):
+    """Ipotesi per gli indici e per il calcolo dell'indebitamento
+    massimo. Una sola riga."""
+    multiplo_ebitda = models.DecimalField(max_digits=4, decimal_places=2, default=Decimal('3.00'),
+                                          help_text='PFN / EBITDA massimo accettato dalle banche')
+    dscr_minimo = models.DecimalField(max_digits=4, decimal_places=2, default=Decimal('1.25'),
+                                      help_text='Flusso di cassa / rate minimo')
+    tasso_nuovo_debito = models.DecimalField(max_digits=5, decimal_places=2, default=Decimal('6.00'))
+    durata_nuovo_debito = models.PositiveSmallIntegerField(default=5, help_text='Anni')
+    capex_mantenimento = models.DecimalField(max_digits=5, decimal_places=2, default=Decimal('50'),
+                                             help_text='Investimenti di mantenimento, in % degli ammortamenti')
+    aliquota_imposte = models.DecimalField(max_digits=5, decimal_places=2, default=Decimal('28'),
+                                           help_text="Usata solo se nel periodo non ci sono imposte registrate")
+    multiplo_valutazione = models.DecimalField(max_digits=4, decimal_places=2, default=Decimal('4.00'),
+                                               help_text="EV / EBITDA per la valutazione indicativa dell'azienda")
+
+    class Meta:
+        verbose_name = 'Parametri finanziari'
+        verbose_name_plural = 'Parametri finanziari'
+
+    def __str__(self):
+        return 'Parametri finanziari'
+
+    @classmethod
+    def attuali(cls):
+        return cls.objects.first() or cls()

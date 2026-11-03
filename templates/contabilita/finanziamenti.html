@@ -1,0 +1,99 @@
+{% extends "base.html" %}
+{% block title %}Finanziamenti{% endblock %}
+
+{% block extra_css %}{% include "contabilita/_stile.html" %}{% endblock %}
+
+{% block content %}
+<div class="dash-page">
+  <div class="dash-header">
+    <h4><i class="bi bi-cash-coin me-2"></i>Finanziamenti</h4>
+    <div class="d-flex gap-2 flex-wrap">
+      {% include "contabilita/_nav.html" %}
+      <button class="btn btn-sm btn-primary" data-bs-toggle="modal" data-bs-target="#modale-finanziamento"><i class="bi bi-plus-lg"></i> Nuovo finanziamento</button>
+    </div>
+  </div>
+
+  <div class="row g-2 mb-3">
+    <div class="col-6 col-lg-3"><div class="kpi-tile hero"><div class="label">Debito residuo</div><div class="value">&euro;{{ totali.residuo|floatformat:"0g" }}</div><div class="sub">al {{ oggi|date:"d/m/Y" }}</div></div></div>
+    <div class="col-6 col-lg-3"><div class="kpi-tile"><div class="label">Rate al mese</div><div class="value">&euro;{{ rate_mese|floatformat:"0g" }}</div></div></div>
+    <div class="col-6 col-lg-3"><div class="kpi-tile"><div class="label">Capitale nei prossimi 12 mesi</div><div class="value">&euro;{{ totali.capitale_12|floatformat:"0g" }}</div></div></div>
+    <div class="col-6 col-lg-3"><div class="kpi-tile"><div class="label">Interessi nei prossimi 12 mesi</div><div class="value">&euro;{{ totali.interessi_12|floatformat:"0g" }}</div></div></div>
+  </div>
+
+  <div class="panel">
+    <div class="panel-sub pt-3">Mutui, prestiti, leasing e fidi in corso: servono alla posizione finanziaria netta, al DSCR e all'indebitamento massimo in
+      <a href="{% url 'contabilita:indici' %}">Indici e KPI</a>. Le rate sono mensili, a quota capitale crescente (alla francese); se la rata della banca &egrave; diversa scrivila e il piano si adegua.
+      Un fido a revoca (0 rate) resta uguale e paga solo gli interessi. I pagamenti veri restano in prima nota, sulla voce Finanziamenti.</div>
+    <div class="panel-body tabella-scroll">
+      <table class="table table-sm align-middle">
+        <thead><tr><th>Finanziamento</th><th>Tipo</th><th class="tab-num">Importo</th><th class="tab-num">Tasso</th><th class="tab-num">Rate</th><th>Prima rata</th><th>Scadenza</th><th class="tab-num">Rata</th><th class="tab-num">Residuo</th><th></th></tr></thead>
+        <tbody>
+          {% for f in finanziamenti %}
+          <tr>
+            <td class="fw-semibold">{{ f }}{% if f.ente %} <span class="text-muted fw-normal">&middot; {{ f.ente }}</span>{% endif %}{% if f.note %}<div class="text-muted fw-normal" style="font-size:.72rem">{{ f.note }}</div>{% endif %}</td>
+            <td>{{ f.get_tipo_display }}</td>
+            <td class="tab-num">&euro;{{ f.importo|floatformat:"2g" }}</td>
+            <td class="tab-num">{{ f.tasso|floatformat:"-2" }}%</td>
+            <td class="tab-num">{% if f.durata_mesi %}{{ f.durata_mesi }}{% else %}a revoca{% endif %}</td>
+            <td>{{ f.data_prima_rata|date:"d/m/Y" }}</td>
+            <td>{% if f.scadenza %}{{ f.scadenza|date:"m/Y" }}{% else %}&mdash;{% endif %}</td>
+            <td class="tab-num">&euro;{{ f.rata_mensile|floatformat:"2g" }}</td>
+            <td class="tab-num fw-bold">&euro;{{ f.residuo|floatformat:"2g" }}</td>
+            <td class="text-end text-nowrap">
+              <button class="btn btn-sm btn-outline-secondary" data-bs-toggle="modal" data-bs-target="#modale-finanziamento"
+                data-id="{{ f.pk }}" data-descrizione="{{ f.descrizione }}" data-ente="{{ f.ente }}" data-tipo="{{ f.tipo }}"
+                data-importo="{{ f.importo|stringformat:'s' }}" data-tasso="{{ f.tasso|stringformat:'s' }}" data-durata="{{ f.durata_mesi }}"
+                data-data="{{ f.data_prima_rata|date:'Y-m-d' }}" data-rata="{{ f.rata|default_if_none:''|stringformat:'s' }}" data-note="{{ f.note }}"><i class="bi bi-pencil"></i></button>
+              <form method="post" class="d-inline" onsubmit="return confirm('Eliminare il finanziamento?')">{% csrf_token %}<input type="hidden" name="azione" value="elimina"><input type="hidden" name="finanziamento" value="{{ f.pk }}">
+                <button class="btn btn-sm btn-outline-danger"><i class="bi bi-trash"></i></button></form>
+            </td>
+          </tr>
+          {% empty %}
+          <tr><td colspan="10" class="text-center text-muted p-3">Nessun finanziamento registrato.</td></tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div>
+
+<div class="modal fade" id="modale-finanziamento" tabindex="-1">
+  <div class="modal-dialog"><form method="post" class="modal-content">
+    {% csrf_token %}<input type="hidden" name="azione" value="salva"><input type="hidden" name="id">
+    <div class="modal-header"><h5 class="modal-title">Finanziamento</h5><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div>
+    <div class="modal-body">
+      <div class="row g-2">
+        <div class="col-8"><label class="form-label">Descrizione</label><input type="text" name="descrizione" class="form-control" required maxlength="120"></div>
+        <div class="col-4"><label class="form-label">Banca o societ&agrave;</label><input type="text" name="ente" class="form-control" maxlength="80"></div>
+        <div class="col-6"><label class="form-label">Tipo</label><select name="tipo" class="form-select">{% for k, n in tipi %}<option value="{{ k }}">{{ n }}</option>{% endfor %}</select></div>
+        <div class="col-6"><label class="form-label">Importo erogato &euro;</label><input type="text" name="importo" inputmode="decimal" class="form-control" required></div>
+        <div class="col-4"><label class="form-label">Tasso annuo %</label><input type="text" name="tasso" inputmode="decimal" class="form-control" value="0"></div>
+        <div class="col-4"><label class="form-label">Numero di rate</label><input type="number" name="durata_mesi" min="0" max="600" value="60" class="form-control" required></div>
+        <div class="col-4"><label class="form-label">Prima rata</label><input type="date" name="data_prima_rata" class="form-control" required></div>
+        <div class="col-6"><label class="form-label">Rata della banca &euro; (facoltativa)</label><input type="text" name="rata" inputmode="decimal" class="form-control"></div>
+      </div>
+      <label class="form-label mt-2">Note</label><input type="text" name="note" class="form-control" maxlength="255">
+    </div>
+    <div class="modal-footer"><button class="btn btn-primary"><i class="bi bi-save"></i> Salva</button></div>
+  </form></div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+document.getElementById('modale-finanziamento').addEventListener('show.bs.modal', function (ev) {
+  var d = (ev.relatedTarget && ev.relatedTarget.dataset) || {}, f = this.querySelector('form');
+  f.elements.id.value = d.id || '';
+  f.elements.descrizione.value = d.descrizione || '';
+  f.elements.ente.value = d.ente || '';
+  f.elements.tipo.value = d.tipo || 'mutuo';
+  f.elements.importo.value = (d.importo || '').replace('.', ',');
+  f.elements.tasso.value = (d.tasso || '0').replace('.', ',');
+  f.elements.durata_mesi.value = d.durata !== undefined ? d.durata : 60;
+  f.elements.data_prima_rata.value = d.data || '';
+  f.elements.rata.value = (d.rata || '').replace('.', ',');
+  f.elements.note.value = d.note || '';
+  this.querySelector('.modal-title').textContent = d.id ? 'Modifica finanziamento' : 'Nuovo finanziamento';
+});
+</script>
+{% endblock %}

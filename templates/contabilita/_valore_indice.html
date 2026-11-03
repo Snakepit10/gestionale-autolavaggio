@@ -1,0 +1,1 @@
+{% if v == None %}<span class="text-muted">n.d.</span>{% elif formato == 'euro' %}&euro;{{ v|floatformat:"0g" }}{% elif formato == 'euro2' %}&euro;{{ v|floatformat:"2g" }}{% elif formato == 'pct' %}{{ v|floatformat:1 }}%{% elif formato == 'x' %}{{ v|floatformat:2 }}x{% elif formato == 'giorni' %}{{ v|floatformat:0 }} gg{% else %}{{ v|floatformat:1 }}{% endif %}
