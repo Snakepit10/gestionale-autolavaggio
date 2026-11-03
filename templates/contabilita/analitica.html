@@ -48,7 +48,7 @@ details summary { cursor: pointer; font-size: .75rem; color: #475569; font-weigh
   <div class="panel">
     <div class="panel-title"><i class="bi bi-grid-3x3"></i> Quadro per centro (euro, IVA esclusa)</div>
     <div class="panel-sub">Costi fino all'EBIT divisi sui centri. Il totale coincide con il conto economico (stessa base dei ricavi) prima di oneri finanziari e imposte.
-      {% if base == 'rilevato' %}Ricavi: il rilevato reale meno IVA di ogni mese &egrave; diviso fra servito, vendita prodotti, portali e piste in proporzione al loro fatturato dello stesso mese (le monete online non passano dalla cassa).{% else %}Ricavi: fatturato per canale, diviso 1,22.{% endif %}</div>
+      {% if base == 'rilevato' %}Ricavi: servito e vendita prodotti restano al loro fatturato; la differenza fra il rilevato reale meno IVA e il fatturato va al self-service (portali e piste; le monete online non passano dalla cassa).{% else %}Ricavi: fatturato per canale, diviso 1,22.{% endif %}</div>
     <div class="panel-body tabella-scroll">
       <table class="table table-sm bilancio">
         <thead><tr><th></th>{% for c in a.centri %}<th class="tab-num">{{ c }}</th>{% endfor %}<th class="tab-num">Totale</th></tr></thead>

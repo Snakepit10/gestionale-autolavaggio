@@ -90,11 +90,13 @@ class AnaliticaTest(TestCase):
 
     def test_ricavi_dal_rilevato(self):
         from apps.finanze.models import QuadraturaGiornaliera
-        # rilevato 366 - IVA dei corrispettivi del portale (244 -> 44) = 322, diviso come il fatturato (100 : 200)
+        # rilevato 366 - IVA dei corrispettivi del portale (244 -> 44) = 322: il servito resta al
+        # fatturato (100), la differenza va al self
         QuadraturaGiornaliera.objects.create(data=date(2026, 10, 6), contanti_totali=Decimal('366'))
         a = analitica([OTTOBRE], 'rilevato')
-        self.assertEqual(a['servito']['ricavi'], Decimal('107.33'))
-        self.assertEqual(a['self']['ricavi'], Decimal('214.67'))
+        self.assertEqual(a['servito']['ricavi'], Decimal('100.00'))
+        self.assertEqual(a['self']['ricavi'], Decimal('222.00'))
+        self.assertEqual(a['self']['ricavo_ciclo'], Decimal('11.1'))
         self.assertEqual(a['quadro'][0]['totale'], Decimal('322.00'))
         ebit = next(r['totale'] for r in conto_economico([OTTOBRE], 'rilevato')['righe'] if r['chiave'] == 'ebit')
         self.assertEqual(a['quadro'][-1]['totale'], ebit)

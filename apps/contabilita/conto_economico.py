@@ -132,27 +132,27 @@ def iva_corrispettivi(ricavi):
     return corrispettivi - (corrispettivi / IVA).quantize(Decimal('0.01'))
 
 
-# Canali che passano dalla quadratura (le monete online si pagano nell'app)
-CANALI_RILEVATI = ('servito', 'prodotti', 'portali', 'cambia_gettoni')
+# Canali del self che passano dalla quadratura (le monete online si pagano nell'app)
+CANALI_SELF_RILEVATI = ('portali', 'cambia_gettoni')
 
 
 def rilevato_per_canale(mesi, canali, ricavi_lordi):
-    """Il rilevato reale meno IVA di ogni mese diviso sui canali in
-    proporzione al loro fatturato dello stesso mese (il rilevato non dice
-    da quale canale vengono i soldi). Un mese con rilevato ma senza
-    fatturato va tutto sul servito. Stessa forma di ricavi_canali."""
+    """Il rilevato reale meno IVA di ogni mese sui canali: servito e
+    vendita prodotti restano al loro fatturato (/1,22), la differenza va
+    al self-service, divisa fra portali e piste in proporzione al loro
+    fatturato (tutta ai portali se il self non ha fatturato nel mese).
+    Stessa forma di ricavi_canali."""
     rilevato, _ = ricavi_rilevati(mesi)
     diviso = {k: [ZERO] * len(mesi) for k, _ in CANALI}
     for i, lordi in enumerate(ricavi_lordi):
         netto = rilevato[i] - iva_corrispettivi(lordi)
-        pesi = [(k, canali[k][i]) for k in CANALI_RILEVATI if canali[k][i] > 0]
-        totale = sum((p for _, p in pesi), ZERO)
-        if not totale:
-            diviso['servito'][i] = netto
-            continue
-        assegnato = ZERO
+        for k in ('servito', 'prodotti'):
+            diviso[k][i] = canali[k][i]
+        resto = netto - canali['servito'][i] - canali['prodotti'][i]
+        pesi = [(k, canali[k][i]) for k in CANALI_SELF_RILEVATI if canali[k][i] > 0] or [('portali', Decimal('1'))]
+        totale, assegnato = sum((p for _, p in pesi), ZERO), ZERO
         for j, (k, peso) in enumerate(pesi):
-            quota = netto - assegnato if j == len(pesi) - 1 else (netto * peso / totale).quantize(Decimal('0.01'))
+            quota = resto - assegnato if j == len(pesi) - 1 else (resto * peso / totale).quantize(Decimal('0.01'))
             diviso[k][i] = quota
             assegnato += quota
     return diviso

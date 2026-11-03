@@ -223,7 +223,7 @@ Ogni costo del conto economico, fino all'EBIT, si divide sui centri **Self-servi
 
 | Base | Come si dividono i ricavi sui centri |
 |---|---|
-| **Rilevato reale − IVA** (predefinita) | Il rilevato non dice da che canale vengono i soldi. Quello di ogni mese si divide fra servito, vendita prodotti, portali e piste in proporzione al loro fatturato dello stesso mese. Le monete online restano fuori, perché non passano dalla cassa. Un mese con rilevato ma senza fatturato va tutto sul servito. |
+| **Rilevato reale − IVA** (predefinita) | Servito e vendita prodotti restano al loro fatturato (/1,22). La differenza fra il rilevato netto del mese e quel fatturato va al self-service, divisa fra portali e piste in proporzione al loro fatturato (tutta ai portali se nel mese non c'è fatturato self). Le monete online restano fuori, perché non passano dalla cassa. |
 | **Fatturato per canale** | fatturato di ogni canale / 1,22 |
 
 Con tutte e due le basi il totale del quadro per centro coincide con l'EBIT del conto economico calcolato sulla stessa base.
