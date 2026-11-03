@@ -1,6 +1,7 @@
 """Pagamenti di fatture con un importo diverso dalla scadenza (es. la
 commissione dentro il bonifico): la differenza e' un costo sulla sua voce,
 il resto resta "Pagamento fornitori". Dati inventati."""
+import re
 from datetime import date
 from decimal import Decimal
 
@@ -88,6 +89,27 @@ class CommissioniTest(TestCase):
         self.assertEqual((bonifico.differenza, bonifico.voce_differenza.codice), (Decimal('13.00'), 'CV.CHIMICI'))
         ce = {r['chiave']: r['totale'] for r in conto_economico([NOVEMBRE])['righe'] if r['chiave']}
         self.assertEqual(ce[f'voce:{voce("CV.CHIMICI").pk}'], Decimal('-13.00'))     # riduce il costo di novembre
+
+    def test_ricerca_e_ordine_delle_scadenze(self):
+        # 20 fatture di un altro fornitore con importi piu' vicini al bonifico
+        for n in range(20):
+            importa_file(f'e{n}.xml', fattura_xml(numero=f'E{n}', piva='09876543210', nome='Energia Prova Spa',
+                                                  righe=(('Luce', '300.00', '22.00'),), imponibile='300.00',
+                                                  imposta='66.00', totale=f'{366 + n}.00', pagamenti=()))
+        importa_file('b.xml', fattura_xml(numero='13/A'))                       # seconda di Detergenti: 183
+        bonifico = self.movimento('-366.00', 'Bonifico cumulativo a Detergenti')
+        url = f'/contabilita/prima-nota/{bonifico.pk}/'
+        pagina = self.apri(url).content.decode()
+
+        def pos(numero):
+            return re.search(rf'n\. {re.escape(numero)}\s', pagina).start()
+        self.assertEqual(pagina.count('nome nella descrizione'), 2)              # le due di Detergenti
+        self.assertLess(pos('E0'), pos('12/A'))                                 # importo esatto prima
+        self.assertLess(pos('12/A'), pos('E1'))                                 # poi il nome
+        cercata = self.apri(url + '?cerca=13/A').content.decode()
+        self.assertIn('n. 13/A', cercata)
+        self.assertNotIn('n. 12/A', cercata)
+        self.assertContains(self.apri(url + '?cerca=nessuno'), 'Nessuna scadenza aperta per')
 
     def test_importo_esatto_ignora_la_voce(self):
         bonifico = self.movimento('-183.00', 'Bonifico')

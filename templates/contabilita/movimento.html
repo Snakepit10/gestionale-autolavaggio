@@ -82,15 +82,23 @@
             </tbody>
           </table>
           {% endif %}
+          {% if mov.importo < 0 %}
+          <form method="get" class="d-flex gap-2 mb-2">
+            <input type="search" name="cerca" value="{{ cerca }}" class="form-control form-control-sm" placeholder="Cerca fornitore o numero fattura">
+            <button class="btn btn-sm btn-outline-secondary"><i class="bi bi-search"></i></button>
+            {% if cerca %}<a class="btn btn-sm btn-link" href="?">tutte</a>{% endif %}
+          </form>
+          {% endif %}
           {% if candidate %}
           <form method="post" id="form-abbina" data-importo="{{ mov.importo|stringformat:'s' }}">{% csrf_token %}<input type="hidden" name="azione" value="abbina">
-            <div class="small text-muted mb-1">Scadenze aperte, le pi&ugrave; vicine per importo. Puoi sceglierne pi&ugrave; d'una se il bonifico paga pi&ugrave; fatture.
+            <div class="small text-muted mb-1">{% if cerca %}Scadenze aperte per &laquo;{{ cerca }}&raquo;.{% else %}Scadenze aperte: prima l'importo esatto, poi i fornitori nominati nella descrizione, poi le pi&ugrave; vicine per importo (cerca un fornitore se non lo trovi).{% endif %} Puoi sceglierne pi&ugrave; d'una se il bonifico paga pi&ugrave; fatture.
               Se l'importo non coincide (es. commissione dentro il bonifico) la differenza va sulla voce che scegli sotto.</div>
             <table class="table table-sm">
               <tbody>
                 {% for s in candidate %}
                 <tr><td><input type="checkbox" name="scadenza" value="{{ s.pk }}" data-importo="{{ s.importo|stringformat:'s' }}" class="form-check-input scelta-scadenza"></td>
-                  <td>{{ s.fattura.fornitore }} n. {{ s.fattura.numero }}<div class="text-muted" style="font-size:.7rem">scade {{ s.data|date:"d/m/Y"|default:"—" }}</div></td>
+                  <td>{{ s.fattura.fornitore }} n. {{ s.fattura.numero }}{% if s.nome_trovato %} <span class="badge bg-success">nome nella descrizione</span>{% endif %}
+                    <div class="text-muted" style="font-size:.7rem">fattura del {{ s.fattura.data|date:"d/m/Y" }} &middot; scade {{ s.data|date:"d/m/Y"|default:"—" }}</div></td>
                   <td class="tab-num">&euro;{{ s.importo|floatformat:"2g" }}</td></tr>
                 {% endfor %}
               </tbody>
@@ -105,7 +113,7 @@
             <button class="btn btn-sm btn-success"><i class="bi bi-link"></i> Abbina</button>
           </form>
           {% elif not abbinate %}
-          <div class="text-muted small">{% if mov.importo < 0 %}Nessuna scadenza aperta.{% else %}&Egrave; un'entrata: non paga fatture fornitori.{% endif %}</div>
+          <div class="text-muted small">{% if mov.importo < 0 %}{% if cerca %}Nessuna scadenza aperta per &laquo;{{ cerca }}&raquo;: controlla che la fattura sia caricata e non gi&agrave; segnata pagata.{% else %}Nessuna scadenza aperta.{% endif %}{% else %}&Egrave; un'entrata: non paga fatture fornitori.{% endif %}</div>
           {% endif %}
         </div>
       </div>

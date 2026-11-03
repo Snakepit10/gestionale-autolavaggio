@@ -138,6 +138,7 @@ Reimportare lo stesso periodo, anche con file che si sovrappongono, non crea dop
   - così il costo non si conta due volte;
   - la prima nota propone da sola gli abbinamenti: stesso importo, entro 45 giorni, con preferenza per il nome del fornitore nella descrizione;
   - un bonifico può pagare più fatture;
+  - nella pagina del movimento le scadenze aperte sono in quest'ordine: prima quelle con l'importo esatto, poi quelle dei fornitori nominati nella descrizione (con un'etichetta), poi le più vicine come importo. Sono 15; con la ricerca per fornitore o numero di fattura arrivano fino a 50;
   - se l'importo non coincide, per esempio perché il bonifico ha dentro la commissione, la **differenza** va su una voce economica scelta nella pagina del movimento (di default Spese bancarie). Una differenza positiva, cioè pagato meno delle fatture, è un abbuono e riduce il costo della voce scelta;
   - la prima nota propone anche i bonifici fino a €5 più alti della scadenza, ma solo se la descrizione ha il nome del fornitore e prima vengono gli importi esatti. "Abbina tutti" mette la differenza su Spese bancarie;
   - nel conto economico entra solo la differenza; nei flussi di cassa il movimento si divide fra Pagamento fornitori e la voce della differenza.

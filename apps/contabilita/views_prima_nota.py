@@ -161,15 +161,27 @@ def movimento(request, pk):
         return risposta or redirect('contabilita:movimento', pk=mov.pk)
 
     candidate = []
+    cerca = request.GET.get('cerca', '').strip()
     if mov.importo < 0:
-        candidate = sorted(srv.scadenze_aperte(), key=lambda s: (
-            abs(s.importo + mov.importo), abs((mov.data - (s.data or s.fattura.data)).days)))[:15]
+        aperte = srv.scadenze_aperte()
+        if cerca:
+            aperte = aperte.filter(Q(fattura__fornitore__ragione_sociale__icontains=cerca) | Q(fattura__numero__icontains=cerca))
+        aperte = list(aperte)
+        testo = f'{mov.causale} {mov.descrizione}'
+        for s in aperte:
+            s.nome_trovato = srv.nome_nel_testo(s.fattura.fornitore.ragione_sociale, testo)
+        # prima l'importo esatto, poi i fornitori nominati nella descrizione, poi l'importo piu' vicino
+        candidate = sorted(aperte, key=lambda s: (
+            abs(s.importo + mov.importo) > Decimal('0.01'), not s.nome_trovato,
+            abs(s.importo + mov.importo), abs((mov.data - (s.data or s.fattura.data)).days)))
+        candidate = candidate[:50 if cerca else 15]
     return render(request, 'contabilita/movimento.html', {
         'mov': mov,
         'voci': VoceConto.objects.filter(attiva=True),
         'campi_rip': campi_ripartizione(mov.ripartizione, mov.voce.ripartizione if mov.voce else {}),
         'abbinate': mov.scadenze.select_related('fattura__fornitore'),
         'candidate': candidate,
+        'cerca': cerca,
         'voci_differenza': [v for v in VoceConto.objects.filter(attiva=True) if v.economica],
         'voce_commissioni': srv.voce_commissioni(),
         'altri_conti': ContoFinanziario.objects.filter(attivo=True).exclude(pk=mov.conto_id),
