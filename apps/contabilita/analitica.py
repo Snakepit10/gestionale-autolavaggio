@@ -122,19 +122,9 @@ def raccogli(mesi, base='canali'):
         'costi': costi,
         'ore': ore,
         'washcycles': sum((r['washcycles'] for r in lordi), 0),
-        'cicli_servito': cicli_servito(dal, al),
         'ordini_lavaggio': sum((r['ordini_lavaggio'] for r in lordi), 0),
         'ricavi_portali': sum(canali['portali'], ZERO),
     }
-
-
-def cicli_servito(dal, al):
-    """Ordini del servito con un lavaggio completo: ognuno avvia un ciclo
-    al portale, che va tolto dai cicli del self-service."""
-    from apps.ordini.models import Ordine
-    return (Ordine.objects.filter(data_ora__date__gte=dal, data_ora__date__lte=al,
-                                  items__servizio_prodotto__titolo__icontains='lavaggio completo')
-            .exclude(stato='annullato').distinct().count())
 
 
 def _per_sezione(costi, centro):
@@ -166,14 +156,13 @@ def analitica(mesi, base='canali'):
     variabili = s['totali']['costi_variabili']
     fissi_specifici = s['costi'] - variabili
     mdc1 = s['ricavi'] - variabili
-    # i cicli avviati per gli ordini del servito (lavaggio completo) non sono self-service
-    cicli = max(dati['washcycles'] - dati['cicli_servito'], 0)
+    cicli = dati['washcycles']
     mdc_ciclo = _div(mdc1, cicli)
     self_service = {
         'ricavi': s['ricavi'], 'variabili': variabili, 'mdc1': mdc1, 'mdc1_pct': _div(mdc1 * 100, s['ricavi']),
         'fissi_specifici': fissi_specifici, 'mdc2': mdc1 - fissi_specifici,
         'mdc2_pct': _div((mdc1 - fissi_specifici) * 100, s['ricavi']),
-        'cicli': cicli, 'cicli_portali': dati['washcycles'], 'cicli_servito': dati['cicli_servito'],
+        'cicli': cicli,
         'ricavo_ciclo': _div(dati['ricavi_portali'], cicli),
         'variabile_ciclo': _div(variabili, cicli),
         'mdc_ciclo': mdc_ciclo,

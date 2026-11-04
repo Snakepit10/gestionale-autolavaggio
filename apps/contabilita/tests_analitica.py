@@ -70,23 +70,6 @@ class AnaliticaTest(TestCase):
         self.assertEqual((s['cicli'], s['ricavo_ciclo'], s['variabile_ciclo']), (20, Decimal('10'), Decimal('6')))
         self.assertEqual(s['cicli_pareggio'], Decimal('30'))         # 120 / (80 / 20)
 
-    def test_cicli_senza_quelli_del_servito(self):
-        from apps.core.models import Categoria, ServizioProdotto
-        from apps.ordini.models import ItemOrdine, Ordine
-        cat = Categoria.objects.create(nome='Servito')
-        completo = ServizioProdotto.objects.create(titolo='Lavaggio Completo - Media', categoria=cat,
-                                                   prezzo=Decimal('22'), descrizione='')
-        interni = ServizioProdotto.objects.create(titolo='Pulizia interni', categoria=cat,
-                                                  prezzo=Decimal('10'), descrizione='')
-        for servizi, stato in (((completo, interni), 'completato'), ((interni,), 'completato'), ((completo,), 'annullato')):
-            ordine = Ordine.objects.create(totale=Decimal('0'), totale_finale=Decimal('0'), stato=stato)
-            Ordine.objects.filter(pk=ordine.pk).update(data_ora=timezone.make_aware(datetime(2026, 10, 7, 10, 0)))
-            for sp in servizi:
-                ItemOrdine.objects.create(ordine=ordine, servizio_prodotto=sp, prezzo_unitario=sp.prezzo)
-        s = analitica([OTTOBRE])['self']
-        # 20 cicli dei portali meno 1 ordine con lavaggio completo (l'annullato non conta)
-        self.assertEqual((s['cicli_portali'], s['cicli_servito'], s['cicli']), (20, 1, 19))
-
     def test_full_costing_servito(self):
         s = analitica([OTTOBRE])['servito']
         self.assertEqual(s['ricavi'], Decimal('100.00'))
