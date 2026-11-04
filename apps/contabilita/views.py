@@ -19,6 +19,7 @@ from .fatturapa import LIMITE_FILE
 from .importa import Esito, emessa_da_noi, importa_file, partita_iva_azienda, riclassifica
 from .models import (CENTRI, FatturaPassiva, RegolaFornitore, RegolaRigaFornitore, RigaFatturaPassiva,
                      ScadenzaFattura, VoceConto, ripartizione_valida, testo_ripartizione)
+from .prima_nota import paga_in_contanti
 
 CENTESIMO = Decimal('0.01')
 
@@ -368,10 +369,39 @@ def _salva_fattura(request, f):
 
 # ---------------------------------------------------------------- scadenziario
 
+def _segna_pagate(request, azione):
+    """Scadenze scelte, pagate in contanti (uscita dalla cassa, abbinata) o
+    gia' pagate senza un movimento da abbinare. Senza data: quella della
+    scadenza."""
+    scelte = list(ScadenzaFattura.objects.filter(pk__in=request.POST.getlist('scelte'), pagata_il__isnull=True, importo__gt=0)
+                  .select_related('fattura__fornitore'))
+    if not scelte:
+        messages.error(request, 'Scegli almeno una scadenza.')
+        return
+    data = _data(request.POST.get('data'))
+    totale = sum((s.importo for s in scelte), Decimal('0'))
+    if azione == 'contanti':
+        try:
+            paga_in_contanti(scelte, data)
+        except ValueError as e:
+            messages.error(request, f'Non salvate: {e}.')
+            return
+        messages.success(request, f'{len(scelte)} scadenze pagate in contanti (€{totale:.2f}): uscite registrate sulla cassa.')
+    else:
+        for s in scelte:
+            s.pagata_il = data or s.data or s.fattura.data
+        ScadenzaFattura.objects.bulk_update(scelte, ['pagata_il'])
+        messages.success(request, f'{len(scelte)} scadenze segnate pagate (€{totale:.2f}).')
+
+
 @accesso
 def scadenziario(request):
     oggi = timezone.localdate()
     if request.method == 'POST':
+        azione = request.POST.get('azione')
+        if azione in ('contanti', 'gia_pagate'):
+            _segna_pagate(request, azione)
+            return redirect('contabilita:scadenziario')
         scadenza = get_object_or_404(ScadenzaFattura, pk=request.POST.get('scadenza'))
         scadenza.pagata_il = _data(request.POST.get('data')) or oggi
         scadenza.save(update_fields=['pagata_il'])

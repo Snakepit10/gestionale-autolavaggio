@@ -7,6 +7,7 @@ from decimal import Decimal
 
 from django.contrib import messages
 from django.db.models import Q
+from django.http import Http404
 from django.shortcuts import get_object_or_404, redirect, render
 from django.utils import timezone
 
@@ -113,15 +114,18 @@ def _azione(request):
         messages.success(request, f'{len(cambiati)} movimenti aggiornati.')
     elif azione == 'abbina':
         mov = get_object_or_404(MovimentoFinanziario, pk=p.get('movimento'))
-        scadenza = get_object_or_404(ScadenzaFattura, pk=p.get('scadenza'))
-        srv.abbina(mov, [scadenza], srv.voce_commissioni())
-        messages.success(request, f'Pagamento abbinato a {scadenza.fattura}'
+        scadenze = list(ScadenzaFattura.objects.filter(pk__in=p.getlist('scadenza')).select_related('fattura__fornitore'))
+        if not scadenze:
+            raise Http404
+        srv.abbina(mov, scadenze, srv.voce_commissioni())
+        fatture = ', '.join(str(s.fattura) for s in scadenze)
+        messages.success(request, f'Pagamento abbinato a {fatture}'
                                   f'{f"; €{-mov.differenza:.2f} di commissione su Spese bancarie" if mov.differenza else ""}.')
     elif azione == 'abbina_tutte':
         proposte = srv.proponi_abbinamenti()
         commissioni = srv.voce_commissioni()
         for pr in proposte:
-            srv.abbina(pr['movimento'], [pr['scadenza']], commissioni)
+            srv.abbina(pr['movimento'], pr['scadenze'], commissioni)
         messages.success(request, f'{len(proposte)} pagamenti abbinati.')
     elif azione == 'nuovo':
         _nuovo_movimento(request)

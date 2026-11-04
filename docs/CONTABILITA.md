@@ -152,6 +152,10 @@ Reimportare lo stesso periodo, anche con file che si sovrappongono, non crea dop
   - nel conto economico entra solo la differenza; nei flussi di cassa il movimento si divide fra Pagamento fornitori e la voce della differenza.
 - **Giroconto:** per un passaggio fra conti (per esempio il versamento dei contanti in banca). Crea il movimento opposto sull'altro conto, ed entrambi restano fuori dal rendiconto di cassa.
 
+Le proposte di abbinamento comprendono anche le uscite con il nome del fornitore nella descrizione, entro 240 giorni: possono pagare più fatture insieme e possono essere già su una voce di costo. In quel caso il costo contava due volte, con la fattura e col pagamento: abbinando, resta solo in fattura. Le spese bancarie restano fuori.
+
+Nello **Scadenziario** si spuntano più scadenze e la barra in fondo le segna *pagate in contanti* (una uscita abbinata sulla Cassa contanti per ognuna; togliendo l'abbinamento l'uscita sparisce) o *già pagate, nessun movimento*. Senza data vale quella della scadenza.
+
 ### Cassa contanti
 
 Dalla pagina Conti, **Aggiorna** scrive i movimenti del mese.

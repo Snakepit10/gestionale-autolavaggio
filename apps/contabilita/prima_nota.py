@@ -5,6 +5,7 @@ import re
 import uuid
 from datetime import timedelta
 from decimal import Decimal
+from itertools import combinations
 
 from django.db import transaction
 from django.db.models import Q
@@ -13,6 +14,10 @@ from .models import MovimentoFinanziario, ScadenzaFattura, VoceConto
 
 ZERO = Decimal('0')
 GIORNI_ABBINAMENTO = 45
+# Con il nome del fornitore nella descrizione il pagamento puo' essere lontano
+# dalla scadenza e pagare piu' fatture insieme
+GIORNI_COL_NOME = 240
+MAX_SCADENZE_GRUPPO = 12
 # Bonifico con la commissione dentro: si propone se paga al massimo questo
 # in piu' della scadenza e la descrizione ha il nome del fornitore
 COMMISSIONE_MAX = Decimal('5.00')
@@ -39,7 +44,9 @@ def proponi_abbinamenti(movimenti=None):
     - dello stesso importo (al centesimo);
     - oppure piu' alte al massimo di COMMISSIONE_MAX, se la descrizione ha
       il nome del fornitore: la differenza e' la commissione del bonifico.
-    Vince l'importo esatto, poi il nome del fornitore, poi la piu' vicina."""
+    Vince l'importo esatto, poi il nome del fornitore, poi la piu' vicina.
+    Poi le uscite col nome del fornitore (_proposte_col_nome)."""
+    tutti = movimenti is None
     if movimenti is None:
         movimenti = (MovimentoFinanziario.objects.filter(importo__lt=0, scadenze__isnull=True)
                      .filter(Q(voce__isnull=True) | Q(voce__codice='N.FORNITORI'))
@@ -72,9 +79,55 @@ def proponi_abbinamenti(movimenti=None):
             if candidati:
                 _, giorni, _, s, nome, commissione = min(candidati)
                 usate.add(s.pk)
-                proposte[mov.pk] = {'movimento': mov, 'scadenza': s, 'giorni': giorni, 'nome': nome,
-                                    'commissione': commissione}
+                proposte[mov.pk] = {'movimento': mov, 'scadenza': s, 'scadenze': [s], 'giorni': giorni, 'nome': nome,
+                                    'commissione': commissione, 'era_costo': None}
+    if tutti:
+        _proposte_col_nome(proposte, [s for s in aperte if s.pk not in usate])
     return sorted(proposte.values(), key=lambda p: (p['movimento'].data, p['movimento'].pk))
+
+
+def _gruppo(scadenze, uscita):
+    """Le scadenze che sommate fanno l'uscita, meno al massimo la commissione."""
+    prime = scadenze[:MAX_SCADENZE_GRUPPO]
+    for n in range(1, len(prime) + 1):
+        for gruppo in combinations(prime, n):
+            commissione = uscita - sum((s.importo for s in gruppo), ZERO)
+            if -Decimal('0.01') <= commissione <= COMMISSIONE_MAX:
+                return list(gruppo), max(commissione, ZERO)
+    return None
+
+
+def _proposte_col_nome(proposte, aperte):
+    """Uscite col nome del fornitore nella descrizione: possono pagare piu'
+    fatture insieme, anche lontane nel tempo. Si guardano anche quelle
+    classificate su una voce di costo: con la fattura il costo conterebbe
+    due volte, e abbinandole va via. Le commissioni bancarie restano fuori."""
+    movimenti = (MovimentoFinanziario.objects.filter(importo__lt=0, scadenze__isnull=True)
+                 .filter(Q(voce__isnull=True) | Q(voce__codice__in=('N.FORNITORI', 'N.INVESTIMENTI'))
+                         | (~Q(voce__sezione='non_economico') & ~Q(voce__codice=VOCE_COMMISSIONI)))
+                 .exclude(pk__in=list(proposte)).exclude(impronta__startswith='conta|')
+                 .select_related('conto', 'voce').order_by('importo', 'id'))
+    per_fornitore = {}
+    for s in aperte:
+        per_fornitore.setdefault(s.fattura.fornitore_id, []).append(s)
+    for mov in movimenti:
+        testo = f'{mov.causale} {mov.descrizione}'
+        for scadenze in per_fornitore.values():
+            if not scadenze or not nome_nel_testo(scadenze[0].fattura.fornitore.ragione_sociale, testo):
+                continue
+            vicine = sorted((s for s in scadenze if abs((mov.data - (s.data or s.fattura.data)).days) <= GIORNI_COL_NOME),
+                            key=lambda s: abs((mov.data - (s.data or s.fattura.data)).days))
+            trovato = _gruppo(vicine, -mov.importo)
+            if not trovato:
+                continue
+            gruppo, commissione = trovato
+            for s in gruppo:
+                scadenze.remove(s)
+            giorni = abs((mov.data - (gruppo[0].data or gruppo[0].fattura.data)).days)
+            proposte[mov.pk] = {'movimento': mov, 'scadenza': gruppo[0], 'scadenze': gruppo, 'giorni': giorni, 'nome': True,
+                                'commissione': commissione,
+                                'era_costo': mov.voce if mov.voce and mov.voce.economica else None}
+            break
 
 
 def abbina(movimento, scadenze, voce_differenza=None, parziale=False):
@@ -125,6 +178,22 @@ def paga_resto_in_contanti(movimento, scadenze, data=None):
             descrizione=f'Pagamento in contanti: {resto.fattura}'[:500], impronta=f'contanti|{uuid.uuid4().hex}')
         abbina(contanti, [resto])
     return contanti
+
+
+def paga_in_contanti(scadenze, data=None):
+    """Scadenze pagate con la cassa: per ognuna l'uscita su Cassa contanti,
+    gia' abbinata, nel giorno dato o in quello della scadenza."""
+    from .models import ContoFinanziario
+    cassa = ContoFinanziario.objects.filter(tipo='cassa', attivo=True).order_by('ordine', 'id').first()
+    if cassa is None:
+        raise ValueError('non c\'e\' un conto di tipo cassa')
+    with transaction.atomic():
+        for s in scadenze:
+            contanti = MovimentoFinanziario.objects.create(
+                conto=cassa, data=data or s.data or s.fattura.data, importo=-s.importo, origine='manuale',
+                descrizione=f'Pagamento in contanti: {s.fattura}'[:500], impronta=f'contanti|{uuid.uuid4().hex}')
+            abbina(contanti, [s])
+        ricalcola_conte(cassa)
 
 
 def _abbina(movimento, scadenze, differenza, voce_differenza):

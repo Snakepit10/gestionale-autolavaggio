@@ -18,15 +18,21 @@
     {% endfor %}
   </div>
 
+  {% if totale %}
+  <div class="panel-sub mb-2">Hai pagato con la banca? <a href="{% url 'contabilita:prima_nota' %}">Abbina dalla Prima nota</a>: trovi lì i pagamenti proposti. Qui si segnano quelli senza un movimento di banca: spunta le scadenze e usa la barra in fondo.</div>
+  {% endif %}
+
+  <form method="post" id="segna-pagate">{% csrf_token %}</form>
   {% for g in gruppi %}{% if g.scadenze %}
   <div class="panel">
     <div class="panel-title"><span class="badge bg-{{ g.colore }}">&nbsp;</span> {{ g.titolo }}</div>
     <div class="panel-body tabella-scroll">
       <table class="table table-sm table-hover">
-        <thead><tr><th>Scadenza</th><th>Fornitore</th><th>Fattura</th><th>Modalit&agrave;</th><th class="tab-num">Importo</th><th></th></tr></thead>
+        <thead><tr><th><input type="checkbox" class="form-check-input scegli-gruppo" title="Scegli tutte"></th><th>Scadenza</th><th>Fornitore</th><th>Fattura</th><th>Modalit&agrave;</th><th class="tab-num">Importo</th><th></th></tr></thead>
         <tbody>
           {% for s in g.scadenze %}
           <tr>
+            <td><input type="checkbox" class="form-check-input scelta" name="scelte" value="{{ s.pk }}" form="segna-pagate" data-importo="{{ s.importo|stringformat:'s' }}"></td>
             <td class="text-nowrap">{{ s.data|date:"d/m/Y"|default:"—" }}</td>
             <td class="fw-semibold">{{ s.fattura.fornitore }}</td>
             <td><a href="{% url 'contabilita:fattura' s.fattura.pk %}">n. {{ s.fattura.numero }}</a> del {{ s.fattura.data|date:"d/m/Y" }}</td>
@@ -45,12 +51,21 @@
 
   {% if not totale %}
   <div class="panel"><div class="panel-body p-4 text-center text-muted">Nessuna scadenza da pagare.</div></div>
+  {% else %}
+  <div id="barra-scelte" class="panel p-2 d-none" style="position:sticky;bottom:8px;z-index:20;box-shadow:0 2px 12px rgba(0,0,0,.2)">
+    <div class="d-flex flex-wrap gap-2 align-items-center small">
+      <strong><span id="scelte-n">0</span> scelte &middot; &euro;<span id="scelte-totale">0</span></strong>
+      <label class="ms-auto">Pagate il <input type="date" name="data" form="segna-pagate" class="form-control form-control-sm d-inline-block" style="width:150px"></label>
+      <span class="text-muted">vuoto = data della scadenza</span>
+      <button name="azione" value="contanti" form="segna-pagate" class="btn btn-sm btn-success" title="Registra l'uscita sulla Cassa contanti">Pagate in contanti</button>
+      <button name="azione" value="gia_pagate" form="segna-pagate" class="btn btn-sm btn-outline-secondary" title="Solo pagate, senza movimenti: per esempio prima dell'inizio degli estratti">Gi&agrave; pagate, nessun movimento</button>
+    </div>
+  </div>
   {% endif %}
 
   {% if pagate %}
   <div class="panel">
     <div class="panel-title"><i class="bi bi-check2-circle"></i> Ultime pagate</div>
-    <div class="panel-sub">Dalla prima nota (fase successiva) i pagamenti si abbineranno da soli ai movimenti di banca.</div>
     <div class="panel-body tabella-scroll">
       <table class="table table-sm">
         <thead><tr><th>Pagata il</th><th>Fornitore</th><th>Fattura</th><th class="tab-num">Importo</th></tr></thead>
@@ -66,4 +81,27 @@
   </div>
   {% endif %}
 </div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+(function () {
+  var barra = document.getElementById('barra-scelte');
+  if (!barra) return;
+  function aggiorna() {
+    var scelte = document.querySelectorAll('.scelta:checked'), totale = 0;
+    scelte.forEach(function (c) { totale += parseFloat(c.dataset.importo); });
+    document.getElementById('scelte-n').textContent = scelte.length;
+    document.getElementById('scelte-totale').textContent = totale.toLocaleString('it-IT', {minimumFractionDigits: 2, maximumFractionDigits: 2});
+    barra.classList.toggle('d-none', !scelte.length);
+  }
+  document.querySelectorAll('.scelta').forEach(function (c) { c.addEventListener('change', aggiorna); });
+  document.querySelectorAll('.scegli-gruppo').forEach(function (g) {
+    g.addEventListener('change', function () {
+      g.closest('table').querySelectorAll('.scelta').forEach(function (c) { c.checked = g.checked; });
+      aggiorna();
+    });
+  });
+})();
+</script>
 {% endblock %}

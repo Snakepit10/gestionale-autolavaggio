@@ -32,6 +32,15 @@ def movimento(conto, importo, descrizione='', data=date(2026, 11, 20)):
                                                descrizione=descrizione, impronta=f'{importo}|{descrizione}|{data}')
 
 
+def _titolare():
+    from apps.auth_system.models import PermessoGruppo
+    utente = User.objects.create_user('titolare2', password='x')
+    gruppo = Group.objects.get_or_create(name='titolare')[0]
+    utente.groups.add(gruppo)
+    PermessoGruppo.objects.get_or_create(sezione='contabilita', gruppo=gruppo)
+    return utente
+
+
 class EstrattiTest(TestCase):
     def setUp(self):
         self.banca = ContoFinanziario.objects.get(nome='MPS')
@@ -138,6 +147,49 @@ class PrimaNotaTest(TestCase):
         togli_abbinamento(s)
         giusto.refresh_from_db()
         self.assertIsNone(giusto.voce)
+
+    def test_proposte_col_nome_del_fornitore(self):
+        chimici = VoceConto.objects.get(codice='CV.CHIMICI')
+        banca = VoceConto.objects.get(codice='CF.BANCA')
+        for numero in ('1', '2'):                                  # 183 l'una, scadenza 30/11
+            importa_file('a.xml', fattura_xml(numero=numero))
+        importa_file('b.xml', fattura_xml(numero='3', piva='09876543210', nome='Altra Ditta', totale='100.00',
+                                          pagamenti=(('2026-11-30', '100.00'),)))
+        # due fatture con un bonifico, lontano e gia' sul costo: conterebbe due volte
+        insieme = movimento(self.banca, '-367.50', 'BONIFICO A FAVORE DI DETERGENTI SRL', data=date(2026, 7, 10))
+        MovimentoFinanziario.objects.filter(pk=insieme.pk).update(voce=chimici)
+        # la commissione del bonifico ha il nome ma non e' un pagamento; senza nome non si tocca un costo
+        spese = movimento(self.banca, '-366', 'COMMISSIONI DETERGENTI SRL', data=date(2026, 7, 11))
+        senza_nome = movimento(self.banca, '-100.00', 'ADDEBITO VARIO', data=date(2026, 7, 12))
+        MovimentoFinanziario.objects.filter(pk=spese.pk).update(voce=banca)
+        MovimentoFinanziario.objects.filter(pk=senza_nome.pk).update(voce=chimici)
+
+        [p] = proponi_abbinamenti()
+        self.assertEqual((p['movimento'], len(p['scadenze']), p['commissione'], p['era_costo']),
+                         (insieme, 2, Decimal('1.50'), chimici))
+        self.client.force_login(_titolare())
+        self.client.post('/contabilita/prima-nota/', {'azione': 'abbina_tutte'})
+        insieme.refresh_from_db()
+        self.assertEqual((insieme.voce.codice, insieme.scadenze.count(), insieme.differenza),
+                         ('N.FORNITORI', 2, Decimal('-1.50')))             # il costo resta solo in fattura
+
+    def test_scadenziario_pagate_in_gruppo(self):
+        importa_file('a.xml', fattura_xml(numero='1'))
+        importa_file('b.xml', fattura_xml(numero='2'))
+        importa_file('c.xml', fattura_xml(numero='3'))
+        s1, s2, s3 = ScadenzaFattura.objects.order_by('pk')
+        self.client.force_login(_titolare())
+        self.client.post('/contabilita/scadenziario/', {'azione': 'contanti', 'scelte': [s1.pk, s2.pk], 'data': ''})
+        uscite = self.cassa.movimenti.order_by('pk')
+        self.assertEqual([(m.data, m.importo, m.voce.codice) for m in uscite],
+                         [(date(2026, 11, 30), Decimal('-183.00'), 'N.FORNITORI')] * 2)
+        s1.refresh_from_db()
+        self.assertEqual((s1.movimento, s1.pagata_il), (uscite[0], date(2026, 11, 30)))
+        togli_abbinamento(s1)                                       # tolta, l'uscita di cassa sparisce
+        self.assertEqual(self.cassa.movimenti.count(), 1)
+        self.client.post('/contabilita/scadenziario/', {'azione': 'gia_pagate', 'scelte': [s3.pk], 'data': '2026-01-15'})
+        s3.refresh_from_db()
+        self.assertEqual((s3.pagata_il, s3.movimento), (date(2026, 1, 15), None))
 
     def test_giroconto(self):
         versamento = movimento(self.cassa, '-500', 'Versamento in banca')

@@ -52,12 +52,13 @@
             <td>{{ pr.movimento.conto }}</td>
             <td class="mov-desc">{{ pr.movimento.descrizione|truncatechars:90 }}</td>
             <td class="tab-num uscita">&euro;{{ pr.movimento.importo|floatformat:"2g" }}</td>
-            <td><a href="{% url 'contabilita:fattura' pr.scadenza.fattura.pk %}">{{ pr.scadenza.fattura.fornitore }} n. {{ pr.scadenza.fattura.numero }}</a>
+            <td>{% for s in pr.scadenze %}<div><a href="{% url 'contabilita:fattura' s.fattura.pk %}">{{ s.fattura.fornitore }} n. {{ s.fattura.numero }}</a> <span class="text-muted small">&euro;{{ s.importo|floatformat:"2g" }}</span></div>{% endfor %}
               {% if pr.nome %}<span class="badge bg-success">nome trovato</span>{% endif %}
-              {% if pr.commissione %}<div class="small text-warning-emphasis">fattura &euro;{{ pr.scadenza.importo|floatformat:"2g" }} + &euro;{{ pr.commissione|floatformat:"2g" }} di commissione su Spese bancarie</div>{% endif %}</td>
+              {% if pr.commissione %}<div class="small text-warning-emphasis">+ &euro;{{ pr.commissione|floatformat:"2g" }} di commissione su Spese bancarie</div>{% endif %}
+              {% if pr.era_costo %}<div class="small text-warning-emphasis">Era su "{{ pr.era_costo.nome }}": il costo contava due volte, con la fattura e col pagamento</div>{% endif %}</td>
             <td>{{ pr.scadenza.data|date:"d/m/Y"|default:"—" }} <span class="text-muted small">({{ pr.giorni }} gg)</span></td>
             <td><form method="post">{% csrf_token %}<input type="hidden" name="azione" value="abbina">
-              <input type="hidden" name="movimento" value="{{ pr.movimento.pk }}"><input type="hidden" name="scadenza" value="{{ pr.scadenza.pk }}">
+              <input type="hidden" name="movimento" value="{{ pr.movimento.pk }}">{% for s in pr.scadenze %}<input type="hidden" name="scadenza" value="{{ s.pk }}">{% endfor %}
               <button class="btn btn-sm btn-outline-success">Abbina</button></form></td>
           </tr>
           {% endfor %}
