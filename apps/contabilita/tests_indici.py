@@ -10,6 +10,7 @@ from django.utils import timezone
 from .indici import indici, valore_attuale
 from .models import ContoFinanziario, Finanziamento, MovimentoFinanziario, ParametriFinanziari, VoceConto
 from .prima_nota import conta_cassa
+from .spiegazioni import spiegazione
 from .tests_analitica import fattura
 
 OGGI = date(2026, 11, 3)
@@ -108,6 +109,18 @@ class IndiciTest(TestCase):
         c = indici(2026, 'canali', OGGI)['capacita']
         self.assertEqual((c['liquidita'], c['cassa_da_contare']), (Decimal('120'), []))
 
+    def test_ogni_indice_ha_la_sua_spiegazione(self):
+        mancanti = [nome for nome in per_nome(indici(2026, 'canali', OGGI)) if not spiegazione(nome)]
+        self.assertEqual(mancanti, [])
+
+    def test_casella_di_informazioni(self):
+        from .templatetags.contabilita_info import info
+        self.assertEqual(info('Voce senza spiegazione'), '')
+        testo = str(info('Cicli portali'))
+        self.assertIn('data-info-titolo="Cicli portali"', testo)
+        self.assertIn('&lt;b&gt;Come si calcola&lt;/b&gt;', testo)            # l'HTML resta dentro l'attributo
+        self.assertEqual(testo.count('"'), 6)                                 # solo gli apici dei 3 attributi
+
     def test_anno_senza_mesi(self):
         self.assertIsNone(indici(2025, 'canali', OGGI))
 
@@ -145,6 +158,9 @@ class VisteIndiciTest(TestCase):
                     '/contabilita/indici/?anno=xyz'):
             self.assertEqual(self.apri(url).status_code, 200, url)
         self.assertContains(self.apri('/contabilita/indici/?anno=2026'), 'Nuovo finanziamento ottenibile')
+        for url in ('/contabilita/indici/?anno=2026', '/contabilita/analitica/?anno=2026',
+                    '/contabilita/conto-economico/?anno=2026', '/contabilita/conti/'):
+            self.assertContains(self.apri(url), 'info-kpi')
         self.client.post('/contabilita/indici/', {'multiplo_ebitda': '3,5', 'dscr_minimo': '1,3', 'tasso_nuovo_debito': '5',
                                                   'durata_nuovo_debito': '7', 'capex_mantenimento': '40',
                                                   'aliquota_imposte': '24', 'multiplo_valutazione': '4,5'})

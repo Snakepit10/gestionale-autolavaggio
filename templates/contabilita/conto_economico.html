@@ -1,4 +1,5 @@
 {% extends "base.html" %}
+{% load contabilita_info %}
 {% block title %}Conto economico {{ anno }}{% endblock %}
 
 {% block extra_css %}{% include "contabilita/_stile.html" %}{% endblock %}
@@ -27,10 +28,10 @@
   </div>
 
   <div class="row g-2 mb-3">
-    <div class="col-6 col-lg-3"><div class="kpi-tile hero"><div class="label">Ricavi netti {{ anno }}</div><div class="value">&euro;{{ kpi.ricavi|floatformat:"0g" }}</div><div class="sub">{% if base == 'rilevato' %}rilevato reale &minus; IVA corrispettivi{% else %}fatturato, IVA esclusa{% endif %}</div></div></div>
-    <div class="col-6 col-lg-3"><div class="kpi-tile"><div class="label">Margine di contribuzione</div><div class="value">&euro;{{ kpi.margine|floatformat:"0g" }}</div><div class="sub">{% if pct.margine != None %}{{ pct.margine|floatformat:1 }}% dei ricavi{% endif %}</div></div></div>
-    <div class="col-6 col-lg-3"><div class="kpi-tile"><div class="label">EBITDA</div><div class="value {% if kpi.ebitda < 0 %}text-danger{% endif %}">&euro;{{ kpi.ebitda|floatformat:"0g" }}</div><div class="sub">{% if pct.ebitda != None %}{{ pct.ebitda|floatformat:1 }}% dei ricavi{% endif %}</div></div></div>
-    <div class="col-6 col-lg-3"><div class="kpi-tile"><div class="label">Risultato netto</div><div class="value {% if kpi.netto < 0 %}text-danger{% else %}text-success{% endif %}">&euro;{{ kpi.netto|floatformat:"0g" }}</div><div class="sub">{% if pct.netto != None %}{{ pct.netto|floatformat:1 }}% dei ricavi &middot; personale {{ pct.personale|floatformat:1 }}%{% endif %}</div></div></div>
+    <div class="col-6 col-lg-3"><div class="kpi-tile hero"><div class="label">Ricavi netti {{ anno }}{% info "Ricavi netti" %}</div><div class="value">&euro;{{ kpi.ricavi|floatformat:"0g" }}</div><div class="sub">{% if base == 'rilevato' %}rilevato reale &minus; IVA corrispettivi{% else %}fatturato, IVA esclusa{% endif %}</div></div></div>
+    <div class="col-6 col-lg-3"><div class="kpi-tile"><div class="label">Margine di contribuzione{% info "Margine di contribuzione" %}</div><div class="value">&euro;{{ kpi.margine|floatformat:"0g" }}</div><div class="sub">{% if pct.margine != None %}{{ pct.margine|floatformat:1 }}% dei ricavi{% endif %}</div></div></div>
+    <div class="col-6 col-lg-3"><div class="kpi-tile"><div class="label">EBITDA{% info "EBITDA" %}</div><div class="value {% if kpi.ebitda < 0 %}text-danger{% endif %}">&euro;{{ kpi.ebitda|floatformat:"0g" }}</div><div class="sub">{% if pct.ebitda != None %}{{ pct.ebitda|floatformat:1 }}% dei ricavi{% endif %}</div></div></div>
+    <div class="col-6 col-lg-3"><div class="kpi-tile"><div class="label">Risultato netto{% info "Risultato netto" %}</div><div class="value {% if kpi.netto < 0 %}text-danger{% else %}text-success{% endif %}">&euro;{{ kpi.netto|floatformat:"0g" }}</div><div class="sub">{% if pct.netto != None %}{{ pct.netto|floatformat:1 }}% dei ricavi &middot; personale {{ pct.personale|floatformat:1 }}%{% endif %}</div></div></div>
   </div>
 
   {% if controlli %}

@@ -1,4 +1,4 @@
-<div class="tabella-scroll">
+{% load contabilita_info %}<div class="tabella-scroll">
   <table class="table table-sm bilancio">
     <thead><tr>
       <th class="col-nome">Voce</th>
@@ -10,7 +10,7 @@
     <tbody>
       {% for r in righe %}
       <tr class="riga-{{ r.tipo }}">
-        <td class="col-nome">{% if r.link %}<a href="{{ r.link }}" class="text-reset">{{ r.nome }}</a>{% else %}{{ r.nome }}{% endif %}</td>
+        <td class="col-nome">{% if r.link %}<a href="{{ r.link }}" class="text-reset">{{ r.nome }}</a>{% else %}{{ r.nome }}{% endif %}{% info r.nome %}</td>
         {% if r.tipo == 'titolo' %}
           {% for v in r.valori %}<td></td>{% endfor %}<td></td>{% if mostra_pct %}<td></td>{% endif %}{% if confronto %}<td></td><td></td>{% endif %}
         {% else %}

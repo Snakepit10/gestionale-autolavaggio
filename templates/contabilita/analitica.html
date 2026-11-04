@@ -1,4 +1,5 @@
 {% extends "base.html" %}
+{% load contabilita_info %}
 {% block title %}Analitica {{ periodo }}{% endblock %}
 
 {% block extra_css %}{% include "contabilita/_stile.html" %}
@@ -55,7 +56,7 @@ details summary { cursor: pointer; font-size: .75rem; color: #475569; font-weigh
         <tbody>
           {% for r in a.quadro %}
           <tr class="{% if forloop.last %}riga-risultato{% elif forloop.first %}riga-totale{% endif %}">
-            <td class="col-nome">{{ r.nome }}</td>
+            <td class="col-nome">{{ r.nome }}{% info r.nome %}</td>
             {% for v in r.valori %}<td class="tab-num {% if v < 0 %}neg{% endif %}">{{ v|floatformat:"0g" }}</td>{% endfor %}
             <td class="tab-num col-totale {% if r.totale < 0 %}neg{% endif %}">{{ r.totale|floatformat:"0g" }}</td>
           </tr>
@@ -77,16 +78,16 @@ details summary { cursor: pointer; font-size: .75rem; color: #475569; font-weigh
             <tbody>
               <tr><td>Ricavi self-service (portali, piste{% if base != 'rilevato' %}, monete online{% endif %})</td><td class="tab-num">&euro;{{ s.ricavi|floatformat:"0g" }}</td></tr>
               <tr class="meno"><td>Costi variabili (acqua, chimici, energia&hellip;)</td><td class="tab-num">&euro;{{ s.variabili|floatformat:"0g" }}</td></tr>
-              <tr class="uguale"><td>Margine di contribuzione I {% if s.mdc1_pct != None %}<span class="fw-normal">({{ s.mdc1_pct|floatformat:1 }}%)</span>{% endif %}</td><td class="tab-num {% if s.mdc1 < 0 %}neg{% endif %}">&euro;{{ s.mdc1|floatformat:"0g" }}</td></tr>
+              <tr class="uguale"><td>Margine di contribuzione I {% if s.mdc1_pct != None %}<span class="fw-normal">({{ s.mdc1_pct|floatformat:1 }}%)</span>{% endif %}{% info "Margine di contribuzione I" %}</td><td class="tab-num {% if s.mdc1 < 0 %}neg{% endif %}">&euro;{{ s.mdc1|floatformat:"0g" }}</td></tr>
               <tr class="meno"><td>Costi fissi specifici (manutenzione, personale self, ammortamenti)</td><td class="tab-num">&euro;{{ s.fissi_specifici|floatformat:"0g" }}</td></tr>
-              <tr class="uguale"><td>Margine di contribuzione II {% if s.mdc2_pct != None %}<span class="fw-normal">({{ s.mdc2_pct|floatformat:1 }}%)</span>{% endif %}</td><td class="tab-num {% if s.mdc2 < 0 %}neg{% endif %}">&euro;{{ s.mdc2|floatformat:"0g" }}</td></tr>
+              <tr class="uguale"><td>Margine di contribuzione II {% if s.mdc2_pct != None %}<span class="fw-normal">({{ s.mdc2_pct|floatformat:1 }}%)</span>{% endif %}{% info "Margine di contribuzione II" %}</td><td class="tab-num {% if s.mdc2 < 0 %}neg{% endif %}">&euro;{{ s.mdc2|floatformat:"0g" }}</td></tr>
             </tbody>
           </table>
           <div class="row g-2 mb-2">
-            <div class="col-6 col-md-3"><div class="kpi-mini"><div class="label">Cicli portali</div><div class="value">{{ s.cicli }}</div></div></div>
-            <div class="col-6 col-md-3"><div class="kpi-mini"><div class="label">Ricavo / ciclo</div><div class="value">{% if s.ricavo_ciclo != None %}&euro;{{ s.ricavo_ciclo|floatformat:2 }}{% else %}&mdash;{% endif %}</div></div></div>
-            <div class="col-6 col-md-3"><div class="kpi-mini"><div class="label">Costo var. / ciclo</div><div class="value">{% if s.variabile_ciclo != None %}&euro;{{ s.variabile_ciclo|floatformat:2 }}{% else %}&mdash;{% endif %}</div></div></div>
-            <div class="col-6 col-md-3"><div class="kpi-mini"><div class="label">Cicli di pareggio</div><div class="value">{{ s.cicli_pareggio|default:"—" }}</div></div></div>
+            <div class="col-6 col-md-3"><div class="kpi-mini"><div class="label">Cicli portali{% info "Cicli portali" %}</div><div class="value">{{ s.cicli }}</div></div></div>
+            <div class="col-6 col-md-3"><div class="kpi-mini"><div class="label">Ricavo / ciclo{% info "Ricavo / ciclo" %}</div><div class="value">{% if s.ricavo_ciclo != None %}&euro;{{ s.ricavo_ciclo|floatformat:2 }}{% else %}&mdash;{% endif %}</div></div></div>
+            <div class="col-6 col-md-3"><div class="kpi-mini"><div class="label">Costo var. / ciclo{% info "Costo var. / ciclo" %}</div><div class="value">{% if s.variabile_ciclo != None %}&euro;{{ s.variabile_ciclo|floatformat:2 }}{% else %}&mdash;{% endif %}</div></div></div>
+            <div class="col-6 col-md-3"><div class="kpi-mini"><div class="label">Cicli di pareggio{% info "Cicli di pareggio" %}</div><div class="value">{{ s.cicli_pareggio|default:"—" }}</div></div></div>
           </div>
           <div class="text-muted" style="font-size:.7rem">Valori per ciclo indicativi: i costi variabili comprendono anche le piste. Cicli di pareggio = costi fissi specifici / margine I per ciclo.</div>
           <details class="mt-2"><summary>Dettaglio dei costi del self-service</summary>
@@ -108,23 +109,23 @@ details summary { cursor: pointer; font-size: .75rem; color: #475569; font-weigh
             <tbody>
               <tr><td>Ricavi servito (lavaggi)</td><td class="tab-num">&euro;{{ s.ricavi|floatformat:"0g" }}</td></tr>
               <tr class="meno"><td>Costi diretti (personale servito, consumabili&hellip;)</td><td class="tab-num">&euro;{{ s.diretti|floatformat:"0g" }}</td></tr>
-              <tr class="uguale"><td>Margine diretto</td><td class="tab-num {% if s.margine_diretto < 0 %}neg{% endif %}">&euro;{{ s.margine_diretto|floatformat:"0g" }}</td></tr>
+              <tr class="uguale"><td>Margine diretto{% info "Margine diretto" %}</td><td class="tab-num {% if s.margine_diretto < 0 %}neg{% endif %}">&euro;{{ s.margine_diretto|floatformat:"0g" }}</td></tr>
               <tr class="meno"><td>Quota costi comuni ({{ s.quota_pct|floatformat:1 }}% di &euro;{{ s.comuni|floatformat:"0g" }})</td><td class="tab-num">&euro;{{ s.quota_comuni|floatformat:"0g" }}</td></tr>
-              <tr class="uguale"><td>Risultato pieno {% if s.risultato_pct != None %}<span class="fw-normal">({{ s.risultato_pct|floatformat:1 }}%)</span>{% endif %}</td><td class="tab-num {% if s.risultato < 0 %}neg{% endif %}">&euro;{{ s.risultato|floatformat:"0g" }}</td></tr>
+              <tr class="uguale"><td>Risultato pieno {% if s.risultato_pct != None %}<span class="fw-normal">({{ s.risultato_pct|floatformat:1 }}%)</span>{% endif %}{% info "Risultato pieno" %}</td><td class="tab-num {% if s.risultato < 0 %}neg{% endif %}">&euro;{{ s.risultato|floatformat:"0g" }}</td></tr>
             </tbody>
           </table>
           <div class="row g-2 mb-2">
-            <div class="col-6 col-md-3"><div class="kpi-mini"><div class="label">Lavaggi</div><div class="value">{{ s.lavaggi }}</div></div></div>
-            <div class="col-6 col-md-3"><div class="kpi-mini"><div class="label">Costo pieno / lavaggio</div><div class="value">{% if s.costo_lavaggio != None %}&euro;{{ s.costo_lavaggio|floatformat:2 }}{% else %}&mdash;{% endif %}</div>
+            <div class="col-6 col-md-3"><div class="kpi-mini"><div class="label">Lavaggi{% info "Lavaggi" %}</div><div class="value">{{ s.lavaggi }}</div></div></div>
+            <div class="col-6 col-md-3"><div class="kpi-mini"><div class="label">Costo pieno / lavaggio{% info "Costo pieno / lavaggio" %}</div><div class="value">{% if s.costo_lavaggio != None %}&euro;{{ s.costo_lavaggio|floatformat:2 }}{% else %}&mdash;{% endif %}</div>
               <div class="text-muted" style="font-size:.68rem">ricavo &euro;{{ s.ricavo_lavaggio|floatformat:2|default:"—" }}</div></div></div>
-            <div class="col-6 col-md-3"><div class="kpi-mini"><div class="label">Ore lavorate servito</div><div class="value">{{ s.ore|floatformat:"0g" }}</div></div></div>
-            <div class="col-6 col-md-3"><div class="kpi-mini"><div class="label">Costo pieno / ora</div><div class="value">{% if s.costo_ora != None %}&euro;{{ s.costo_ora|floatformat:2 }}{% else %}&mdash;{% endif %}</div>
+            <div class="col-6 col-md-3"><div class="kpi-mini"><div class="label">Ore lavorate servito{% info "Ore lavorate servito" %}</div><div class="value">{{ s.ore|floatformat:"0g" }}</div></div></div>
+            <div class="col-6 col-md-3"><div class="kpi-mini"><div class="label">Costo pieno / ora{% info "Costo pieno / ora" %}</div><div class="value">{% if s.costo_ora != None %}&euro;{{ s.costo_ora|floatformat:2 }}{% else %}&mdash;{% endif %}</div>
               <div class="text-muted" style="font-size:.68rem">ricavo &euro;{{ s.ricavo_ora|floatformat:2|default:"—" }}</div></div></div>
           </div>
           {% if s.servizi %}
           <div class="tabella-scroll">
             <table class="table table-sm">
-              <thead><tr><th>Servizio</th><th class="tab-num">Venduti</th><th class="tab-num">Minuti</th><th class="tab-num">Ricavo netto</th><th class="tab-num">Costo pieno</th><th class="tab-num">Margine</th></tr></thead>
+              <thead><tr><th>Servizio</th><th class="tab-num">Venduti</th><th class="tab-num">Minuti</th><th class="tab-num">Ricavo netto</th><th class="tab-num">Costo pieno{% info "Costo pieno del servizio" %}</th><th class="tab-num">Margine</th></tr></thead>
               <tbody>
                 {% for sv in s.servizi %}
                 <tr><td>{{ sv.nome }}</td><td class="tab-num">{{ sv.quantita }}</td><td class="tab-num">{{ sv.durata|default:"—" }}</td>
