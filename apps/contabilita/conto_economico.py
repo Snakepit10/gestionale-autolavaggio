@@ -129,19 +129,27 @@ def _scorporo(lordo):
 
 
 def rilevato_per_canale(mesi, ricavi_lordi):
-    """Il rilevato reale di ogni mese sui canali, IVA esclusa: servito,
-    vendita prodotti, cambia gettoni e monete online restano il loro
-    fatturato / 1,22 (come in ricavi_canali); i portali sono il resto del
-    rilevato (tolto il fatturato lordo di servito, prodotti e cambia
-    gettoni) meno l'IVA dei corrispettivi dei portali. Stessa forma di
-    ricavi_canali, piu' 'iva_portali' e 'rilevato'."""
+    """Il rilevato reale di ogni mese sui canali, IVA esclusa:
+    - servito e vendita prodotti: il totale degli ordini meno l'IVA del
+      registratore fiscale, divisa fra i due in proporzione al fatturato;
+    - cambia gettoni: il totale delle chiusure di cassa / 1,22;
+    - monete online: il loro fatturato / 1,22 (non passano dalla cassa);
+    - portali (spazzole): il resto del rilevato, tolti gli ordini e il
+      cambia gettoni, meno l'IVA delle chiusure di cassa dei portali.
+    Stessa forma di ricavi_canali, piu' 'iva_registratore', 'iva_portali'
+    e 'rilevato'."""
     rilevato, _ = ricavi_rilevati(mesi)
     diviso = {k: [(lordi[k] / IVA).quantize(Decimal('0.01')) for lordi in ricavi_lordi] for k, _ in CANALI}
-    diviso['iva_portali'], diviso['rilevato'] = [ZERO] * len(mesi), rilevato
+    diviso['iva_registratore'], diviso['iva_portali'], diviso['rilevato'] = [ZERO] * len(mesi), [ZERO] * len(mesi), rilevato
     for i, lordi in enumerate(ricavi_lordi):
+        iva_reg = _scorporo(lordi['registratore'])
+        ordini = lordi['servito'] + lordi['prodotti']
+        quota_prodotti = (iva_reg * lordi['prodotti'] / ordini).quantize(Decimal('0.01')) if ordini > 0 else ZERO
+        diviso['servito'][i] = lordi['servito'] - (iva_reg - quota_prodotti)
+        diviso['prodotti'][i] = lordi['prodotti'] - quota_prodotti
         iva_portali = _scorporo(lordi['portali'])
-        diviso['portali'][i] = rilevato[i] - lordi['servito'] - lordi['prodotti'] - lordi['cambia_gettoni'] - iva_portali
-        diviso['iva_portali'][i] = iva_portali
+        diviso['portali'][i] = rilevato[i] - ordini - lordi['cambia_gettoni'] - iva_portali
+        diviso['iva_registratore'][i], diviso['iva_portali'][i] = iva_reg, iva_portali
     return diviso
 
 
@@ -202,9 +210,11 @@ def conto_economico(mesi, base='canali'):
     if base == 'rilevato':
         _, giorni_rilevati = ricavi_rilevati(mesi)
         r = rilevato_per_canale(mesi, ricavi_lordi)
-        nomi = dict(CANALI, portali='Portali self-service: resto del rilevato - IVA portali')
+        nomi = dict(CANALI, servito='Servito (lavaggi) - IVA del registratore',
+                    prodotti='Vendita prodotti - IVA del registratore',
+                    portali='Portali self-service: resto del rilevato - IVA portali')
         voci_ricavo = [_riga('voce', nomi[k], r[k], f'ricavi:{k}', 1) for k, _ in CANALI if any(r[k])]
-        dettaglio_rilevato = {k: sum(r[k], ZERO) for k in ('rilevato', 'iva_portali')}
+        dettaglio_rilevato = {k: sum(r[k], ZERO) for k in ('rilevato', 'iva_registratore', 'iva_portali')}
     else:
         voci_ricavo = [_riga('voce', nome, canali[k], f'ricavi:{k}', 1) for k, nome in CANALI if any(canali[k])]
     voci_ricavo += righe_sezione('ricavi')

@@ -139,12 +139,13 @@ class RicaviRilevatoTest(TestCase):
 
         ce = conto_economico([OTTOBRE], base='rilevato')
         r = {k: v['totale'] for k, v in per_chiave(ce['righe']).items()}
-        # servito: come il fatturato (1000 / 1,22); portali: il resto 270 - 1000 meno l'IVA dei portali (22)
-        self.assertEqual(r['ricavi:servito'], Decimal('819.67'))
+        # servito: ordini 1000 meno l'IVA del registratore (61 -> 11); portali: il resto 270 - 1000 meno l'IVA dei portali (22)
+        self.assertEqual(r['ricavi:servito'], Decimal('989.00'))
         self.assertEqual(r['ricavi:portali'], Decimal('-752.00'))
         self.assertNotIn('ricavi:prodotti', r)
-        self.assertEqual(r['tot:ricavi'], Decimal('67.67'))
-        self.assertEqual(ce['dettaglio_rilevato'], {'rilevato': Decimal('270'), 'iva_portali': Decimal('22.00')})
+        self.assertEqual(r['tot:ricavi'], Decimal('237.00'))                  # rilevato 270 - IVA 33
+        self.assertEqual(ce['dettaglio_rilevato'], {'rilevato': Decimal('270'), 'iva_registratore': Decimal('11.00'),
+                                                    'iva_portali': Decimal('22.00')})
         self.assertEqual(ce['giorni_rilevati'], [1])
         canali = {k: v['totale'] for k, v in per_chiave(conto_economico([OTTOBRE])['righe']).items()}
         self.assertEqual(canali['ricavi:servito'], Decimal('819.67'))         # fatturato: 1000 / 1,22

@@ -60,8 +60,9 @@
   <div class="panel">
     <div class="panel-title"><i class="bi bi-table"></i> Conto economico (euro, IVA esclusa)</div>
     <div class="panel-sub">{% if base == 'rilevato' %}Ricavi dal rilevato reale delle quadrature (contanti + POS &minus; fondo + spese e ticket di resto){% if dettaglio_rilevato %}: &euro;{{ dettaglio_rilevato.rilevato|floatformat:"0g" }}{% endif %}.
-      Servito, vendita prodotti, cambia gettoni e monete online = il loro fatturato diviso 1,22;
-      portali = il resto del rilevato meno l'IVA dei corrispettivi dei portali{% if dettaglio_rilevato %} (&euro;{{ dettaglio_rilevato.iva_portali|floatformat:"0g" }}){% endif %}.{% else %}Ricavi: fatturato per canale dalle chiusure di cassa e dagli ordini, diviso 1,22.{% endif %} Costi dalle fatture (per mese di competenza), dai movimenti senza fattura, dal costo del personale e dagli ammortamenti. Clic su una voce per i documenti.</div>
+      Servito e vendita prodotti = il totale degli ordini meno l'IVA del registratore fiscale{% if dettaglio_rilevato %} (&euro;{{ dettaglio_rilevato.iva_registratore|floatformat:"0g" }}){% endif %};
+      cambia gettoni = le chiusure di cassa diviso 1,22; monete online = il fatturato diviso 1,22;
+      portali = il resto del rilevato (tolti ordini e cambia gettoni) meno l'IVA delle chiusure dei portali{% if dettaglio_rilevato %} (&euro;{{ dettaglio_rilevato.iva_portali|floatformat:"0g" }}){% endif %}.{% else %}Ricavi: fatturato per canale dalle chiusure di cassa e dagli ordini, diviso 1,22.{% endif %} Costi dalle fatture (per mese di competenza), dai movimenti senza fattura, dal costo del personale e dagli ammortamenti. Clic su una voce per i documenti.</div>
     <div class="panel-body">
       {% include "contabilita/_tabella_bilancio.html" with mostra_pct=True %}
     </div>

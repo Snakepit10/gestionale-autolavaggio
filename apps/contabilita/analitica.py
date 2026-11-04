@@ -59,8 +59,8 @@ def ripartizione_dipendente(dipendente_id, mese, ripartizioni):
 def raccogli(mesi, base='canali'):
     """Ricavi, costi per (centro, sezione, voce), ore del personale per
     centro e dati di volume del periodo. base come nel conto economico:
-    'canali' = fatturato / 1,22; 'rilevato' = come 'canali', ma i portali
-    sono il resto del rilevato reale meno la loro IVA."""
+    'canali' = fatturato / 1,22; 'rilevato' = ordini meno IVA del registratore,
+    cambia gettoni / 1,22, portali = resto del rilevato meno la loro IVA."""
     from apps.personale.calcolo import calcola_mese
     from apps.personale.models import MesePersonale
 
