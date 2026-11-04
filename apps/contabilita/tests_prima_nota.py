@@ -9,10 +9,11 @@ from django.contrib.auth.models import Group, User
 from django.core.files.uploadedfile import SimpleUploadedFile
 from django.test import TestCase
 
-from .estratti import importa_estratto, movimenti_da_righe, righe_file
+from .estratti import PREDEFINITI, importa_estratto, movimenti_da_righe, righe_file
 from .importa import importa_file
 from .models import ContoFinanziario, MovimentoFinanziario, RegolaMovimento, ScadenzaFattura, VoceConto
-from .prima_nota import abbina, conta_cassa, genera_cassa, giroconto, proponi_abbinamenti, togli_abbinamento
+from .prima_nota import (abbina, conta_cassa, correggi_baps_su_mps, genera_cassa, giroconto, movimenti_di_baps_su_mps,
+                         proponi_abbinamenti, togli_abbinamento)
 from .tests import fattura_xml
 
 
@@ -57,7 +58,32 @@ class EstrattiTest(TestCase):
         esito = importa_estratto(self.banca, 'mps.xlsx', dati)
         self.assertEqual((esito.nuovi, esito.doppi), (0, 4))
 
+    def test_file_di_un_altra_banca_non_entra(self):
+        baps = xlsx([['12/02/2026', '11/02/2026', 'EUR', '-1,25', 'PAGAMENTO POS\nNegozio di prova', '998,75']])
+        esito = importa_estratto(self.banca, 'baps.xlsx', baps)
+        self.assertEqual((esito.nuovi, self.banca.movimenti.count()), (0, 0))
+        self.assertIn('formato di BAPS', esito.errori[0])
+        # scelto il modello a mano si puo'
+        self.assertEqual(importa_estratto(self.banca, 'baps.xlsx', baps, PREDEFINITI['baps_xlsx']).nuovi, 1)
+
+    def test_movimenti_gia_su_un_altro_conto(self):
+        altro = ContoFinanziario.objects.get(nome='BAPS')
+        righe = [[f'{g:02d}/02/2026', f'{g:02d}/02/2026', 'Bonifico', f'Prova {g}', ' ', -10 - g] for g in range(1, 7)]
+        for g in range(1, 7):
+            movimento(altro, f'-{10 + g}', f'Stesso movimento {g}', data=date(2026, 2, g))
+        esito = importa_estratto(self.banca, 'mps.xlsx', xlsx(righe))
+        self.assertEqual(esito.nuovi, 0)
+        self.assertIn('6 dei 6 movimenti del file sono gia\' sul conto BAPS', esito.errori[0])
+
+    def test_il_primo_file_fissa_la_banca_del_conto(self):
+        nuovo = ContoFinanziario.objects.create(nome='Conto nuovo', data_saldo_iniziale=date(2026, 1, 1))
+        baps = xlsx([['12/02/2026', '11/02/2026', 'EUR', '-1,25', 'Pagamento di prova', '998,75']])
+        self.assertEqual(importa_estratto(nuovo, 'baps.xlsx', baps).nuovi, 1)
+        nuovo.refresh_from_db()
+        self.assertEqual(nuovo.banca_estratto, 'BAPS')
+
     def test_baps_senza_intestazione_e_saldo(self):
+        self.banca = ContoFinanziario.objects.get(nome='BAPS')
         dati = xlsx([
             ['12/02/2026', '11/02/2026', 'EUR', '-1,25', 'PAGAMENTO POS\nNegozio di prova', '998,75'],
             ['12/02/2026', '12/02/2026', 'EUR', '-48,75', 'ADDEBITO SDD\nUtenza di prova', '950,00'],
@@ -146,6 +172,34 @@ class PrimaNotaTest(TestCase):
         spesa.delete()
         genera_cassa(self.cassa, *ottobre)
         self.assertEqual(self.cassa.movimenti.count(), 2)
+
+    def test_correggi_baps_caricato_su_mps(self):
+        mps = ContoFinanziario.objects.get(nome='MPS')
+        spese = VoceConto.objects.get(codice='CF.BANCA')
+        giusto = movimento(mps, '-7', 'Bonifico', data=date(2026, 7, 1))
+        MovimentoFinanziario.objects.filter(pk=giusto.pk).update(causale='Bonifico')
+        doppio = movimento(mps, '-20', 'Commissione doppia', data=date(2026, 7, 2))
+        MovimentoFinanziario.objects.filter(pk=doppio.pk).update(voce=spese, ripartizione={'self': 100})
+        originale = movimento(self.banca, '-20', 'Commissione doppia', data=date(2026, 7, 2))
+        importa_file('a.xml', fattura_xml())                       # scade il 30/11 per 183
+        pagata = ScadenzaFattura.objects.get()
+        doppio_pagato = movimento(mps, '-183', 'Bonifico a fornitore', data=date(2026, 7, 3))
+        abbina(doppio_pagato, [pagata])
+        originale2 = movimento(self.banca, '-183', 'Bonifico a fornitore', data=date(2026, 7, 3))
+        da_spostare = movimento(mps, '-5', 'Solo qui', data=date(2026, 9, 20))
+
+        r = movimenti_di_baps_su_mps()
+        self.assertEqual((r['n'], len(r['doppi']), r['da_spostare'], r['totale']), (3, 2, [da_spostare], Decimal('-208')))
+        self.assertEqual(correggi_baps_su_mps(), (2, 1))
+        self.assertEqual(list(mps.movimenti.all()), [giusto])
+        originale.refresh_from_db()
+        originale2.refresh_from_db()
+        pagata.refresh_from_db()
+        da_spostare.refresh_from_db()
+        self.assertEqual((originale.voce, originale.ripartizione), (spese, {'self': 100}))    # il lavoro fatto resta
+        self.assertEqual((pagata.movimento, originale2.voce.codice), (originale2, 'N.FORNITORI'))
+        self.assertEqual(da_spostare.conto, self.banca)
+        self.assertIsNone(movimenti_di_baps_su_mps())
 
     def test_pos_nei_contanti_e_stipendi_in_contanti(self):
         from apps.personale.models import Dipendente, MesePersonale, ParametroRetributivo, Presenza, RigaMese

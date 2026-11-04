@@ -14,6 +14,17 @@
     </div>
   </div>
 
+  {% if baps_su_mps %}{% with r=baps_su_mps %}
+  <div class="alert alert-warning d-flex flex-wrap align-items-center gap-2 py-2">
+    <span><i class="bi bi-exclamation-triangle"></i> Sul conto {{ r.da }} ci sono <b>{{ r.n }} movimenti con il formato di {{ r.a }}</b>, dal {{ r.dal|date:"d/m/Y" }} al {{ r.al|date:"d/m/Y" }} (&euro;{{ r.totale|floatformat:"2g" }}):
+      {{ r.doppi|length }} sono gi&agrave; sul conto {{ r.a }} e si tolgono, {{ r.da_spostare|length }} si spostano l&igrave;. Voci e abbinamenti alle fatture non si perdono.</span>
+    <form method="post" class="ms-auto" onsubmit="return confirm('Togliere i {{ r.doppi|length }} doppioni da {{ r.da }} e spostare {{ r.da_spostare|length }} movimenti su {{ r.a }}? Non si torna indietro.')">{% csrf_token %}
+      <input type="hidden" name="azione" value="correggi_baps_su_mps">
+      <button class="btn btn-sm btn-danger"><i class="bi bi-arrow-left-right"></i> Correggi i movimenti</button>
+    </form>
+  </div>
+  {% endwith %}{% endif %}
+
   <div class="row g-2 mb-3">
     <div class="col-6 col-lg-3"><div class="kpi-tile hero"><div class="label">Liquidit&agrave; oggi{% info "Liquidità oggi" %}</div><div class="value">&euro;{{ totale|floatformat:"2g" }}</div><div class="sub">somma dei conti attivi</div></div></div>
   </div>

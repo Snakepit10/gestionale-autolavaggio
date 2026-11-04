@@ -180,6 +180,66 @@ def giroconto(movimento, conto):
     return opposto
 
 
+# ---------------------------------------------------------------- estratto sul conto sbagliato
+
+def movimenti_di_baps_su_mps():
+    """Un estratto BAPS caricato sul conto MPS: gli estratti MPS hanno sempre
+    la causale, quelli BAPS mai. Per ogni riga, se il conto BAPS ha gia' lo
+    stesso giorno e importo e' un doppione, altrimenti va spostata."""
+    from .models import ContoFinanziario
+    mps = ContoFinanziario.objects.filter(banca_estratto='MPS').first()
+    baps = ContoFinanziario.objects.filter(banca_estratto='BAPS').first()
+    if not mps or not baps:
+        return None
+    fuori = list(mps.movimenti.filter(origine='estratto', causale='').order_by('data', 'id'))
+    if not fuori:
+        return None
+    presenti = {}
+    for b in baps.movimenti.filter(origine='estratto', data__gte=fuori[0].data, data__lte=fuori[-1].data):
+        presenti.setdefault((b.data, b.importo), []).append(b)
+    doppi, da_spostare = [], []
+    for m in fuori:
+        uguali = presenti.get((m.data, m.importo))
+        if uguali:
+            doppi.append((m, uguali.pop()))
+        else:
+            da_spostare.append(m)
+    return {'da': mps, 'a': baps, 'doppi': doppi, 'da_spostare': da_spostare, 'n': len(fuori),
+            'totale': sum((m.importo for m in fuori), ZERO), 'dal': fuori[0].data, 'al': fuori[-1].data}
+
+
+def _unisci_doppione(m, b):
+    """Prima di togliere il doppione m, su b va quello che ci si era fatto."""
+    scadenze = list(m.scadenze.all())
+    if scadenze:
+        m.scadenze.update(movimento=b)
+        b.voce, b.ripartizione, b.regola = m.voce, m.ripartizione, m.regola
+        b.differenza, b.voce_differenza = m.differenza, m.voce_differenza
+    elif b.voce_id is None and m.voce_id:
+        b.voce, b.ripartizione, b.regola = m.voce, m.ripartizione, m.regola
+    b.note = b.note or m.note
+    opposto = m.controparte
+    if opposto and not b.controparte_id and not MovimentoFinanziario.objects.filter(controparte=b).exists():
+        MovimentoFinanziario.objects.filter(pk=m.pk).update(controparte=None)
+        b.controparte, opposto.controparte = opposto, b
+        opposto.save(update_fields=['controparte'])
+    b.save()
+    m.delete()
+
+
+def correggi_baps_su_mps():
+    r = movimenti_di_baps_su_mps()
+    if not r:
+        return None
+    with transaction.atomic():
+        for m, b in r['doppi']:
+            _unisci_doppione(m, b)
+        for m in r['da_spostare']:
+            m.conto = r['a']
+            m.save(update_fields=['conto'])
+    return len(r['doppi']), len(r['da_spostare'])
+
+
 # ---------------------------------------------------------------- cassa contanti
 
 VOCI_SPESE_CASSA = {

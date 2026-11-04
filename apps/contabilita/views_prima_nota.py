@@ -269,6 +269,11 @@ def conti(request):
                                               'registrata da classificare in prima nota (prelievi, stipendi o spese in contanti).')
                 else:
                     messages.success(request, f'{conto}: la cassa quadra al {giorno:%d/%m/%Y}.')
+        elif p.get('azione') == 'correggi_baps_su_mps':
+            esito = srv.correggi_baps_su_mps()
+            if esito:
+                messages.success(request, f'Tolti {esito[0]} doppioni da MPS e spostati {esito[1]} movimenti su BAPS. '
+                                          'Ora premi Aggiorna sulla cassa da gennaio a oggi: i versamenti si ricalcolano.')
         return redirect('contabilita:conti')
 
     oggi = timezone.localdate()
@@ -288,6 +293,7 @@ def conti(request):
         'modelli': modelli,
         'oggi': oggi,
         'totale': sum((c.saldo_oggi for c in elenco if c.attivo), Decimal('0')),
+        'baps_su_mps': srv.movimenti_di_baps_su_mps(),
     })
 
 

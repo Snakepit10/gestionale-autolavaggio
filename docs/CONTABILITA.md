@@ -96,6 +96,7 @@ Le fatture arrivano sulla PEC solo se allo SDI è comunicato l'indirizzo PEC com
 - Dalla pagina **Conti** si imposta il saldo vero alla data di partenza.
 - Il saldo calcolato = saldo iniziale + movimenti da quella data in poi.
 - Se l'estratto riporta il saldo (BAPS), la pagina controlla che coincida.
+- Un estratto non entra se sembra di un altro conto: ha il formato di un'altra banca (il conto ricorda la sua dal primo file riconosciuto) o almeno 5 movimenti, e metà del file, sono già su un altro conto. Se il file è davvero di quel conto si sceglie il modello a mano. Per un estratto BAPS finito su MPS la pagina Conti ha il pulsante **Correggi i movimenti**: i doppioni si tolgono, gli altri si spostano, voci e abbinamenti restano; poi va aggiornata la cassa.
 
 ### Import degli estratti: modelli
 

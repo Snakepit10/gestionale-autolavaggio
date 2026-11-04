@@ -238,6 +238,9 @@ MODELLI_PREDEFINITI = [
             spiegazione='Data, valuta, colonna vuota, importo con segno, descrizione, nota personale (ignorata).'),
 ]
 PREDEFINITI = {m.chiave: m for m in MODELLI_PREDEFINITI}
+BANCA_DEL_MODELLO = {'mps': 'MPS', 'baps_xlsx': 'BAPS', 'baps_xls': 'BAPS'}
+# Quanti movimenti del file, gia' su un altro conto, fanno pensare al conto sbagliato
+GIA_ALTROVE_MINIMO = 5
 
 COLONNE_INTESTAZIONE = {
     'data': ('data cont', 'data operazione', 'data movimento', 'data contabile', 'data reg', 'data'),
@@ -424,10 +427,32 @@ class EsitoEstratto:
     errori: list = field(default_factory=list)
 
 
+def conto_sbagliato(conto, lettura):
+    """Perche' il file non sembra di questo conto, o None: ha il formato di
+    un'altra banca, o i suoi movimenti sono gia' su un altro conto."""
+    banca = BANCA_DEL_MODELLO.get(lettura.modello.chiave)
+    if banca and conto.banca_estratto and banca != conto.banca_estratto:
+        return f'il file ha il formato di {banca}, ma il conto {conto} usa estratti {conto.banca_estratto}'
+    giorni = [m['data'] for m in lettura.movimenti]
+    nel_file = {(m['data'], m['importo']) for m in lettura.movimenti}
+    altrove = {}
+    for c, d, i in (MovimentoFinanziario.objects.filter(origine='estratto', data__gte=min(giorni), data__lte=max(giorni))
+                    .exclude(conto=conto).exclude(conto__tipo='cassa').values_list('conto__nome', 'data', 'importo')):
+        if (d, i) in nel_file:
+            altrove[c] = altrove.get(c, 0) + 1
+    if altrove:
+        altro, n = max(altrove.items(), key=lambda x: x[1])
+        if n >= GIA_ALTROVE_MINIMO and n * 2 >= len(lettura.movimenti):
+            return f'{n} dei {len(lettura.movimenti)} movimenti del file sono gia\' sul conto {altro}'
+    return None
+
+
 def importa_estratto(conto, nome, dati, modello=None):
     """Importa l'estratto nel conto. Modello: quello passato, poi quello
-    del conto, altrimenti riconosciuto dal file."""
+    del conto, altrimenti riconosciuto dal file. Un file che non sembra del
+    conto non entra, a meno di scegliere il modello a mano."""
     esito = EsitoEstratto()
+    scelto_a_mano = modello is not None
     if modello is None and conto.modello_estratto:
         modello = modello_da_chiave(conto.modello_estratto)
     try:
@@ -435,6 +460,16 @@ def importa_estratto(conto, nome, dati, modello=None):
     except ErroreEstratto as e:
         esito.errori.append(str(e))
         return esito
+    if not scelto_a_mano:
+        motivo = conto_sbagliato(conto, lettura)
+        if motivo:
+            esito.errori.append(f'non importato: {motivo}. Controlla il conto scelto; se il file e\' davvero di '
+                                f'{conto}, scegli il modello a mano')
+            return esito
+    banca = BANCA_DEL_MODELLO.get(lettura.modello.chiave)
+    if banca and not conto.banca_estratto and not scelto_a_mano:
+        conto.banca_estratto = banca
+        conto.save(update_fields=['banca_estratto'])
     movimenti = impronte(lettura.movimenti)
     esito.modello = lettura.modello.nome
     esito.quadra_col_totale = lettura.quadra_col_totale

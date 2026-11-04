@@ -289,6 +289,9 @@ class ContoFinanziario(models.Model):
     # Schema dell'estratto: '' = riconoscimento automatico, altrimenti la
     # chiave di un modello predefinito o 'pers_<id>' (estratti.MODELLI)
     modello_estratto = models.CharField(max_length=20, blank=True)
+    # Banca degli estratti del conto, dal primo file riconosciuto: un file
+    # di un'altra banca non entra per sbaglio (estratti.BANCA_DEL_MODELLO)
+    banca_estratto = models.CharField(max_length=10, blank=True)
     # Solo cassa. Fino a questa data le quadrature hanno i pagamenti con
     # carta dentro i contanti (campo POS vuoto): l'aggiornamento della cassa
     # toglie ogni mese il POS accreditato in banca
