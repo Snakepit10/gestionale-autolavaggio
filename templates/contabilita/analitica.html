@@ -49,7 +49,7 @@ details summary { cursor: pointer; font-size: .75rem; color: #475569; font-weigh
   <div class="panel">
     <div class="panel-title"><i class="bi bi-grid-3x3"></i> Quadro per centro (euro, IVA esclusa)</div>
     <div class="panel-sub">Costi fino all'EBIT divisi sui centri. Il totale coincide con il conto economico (stessa base dei ricavi) prima di oneri finanziari e imposte.
-      {% if base == 'rilevato' %}Ricavi: servito e vendita prodotti = il loro fatturato meno l'IVA del registratore fiscale; self-service = il resto del rilevato reale meno l'IVA dei corrispettivi del self (portali e piste; le monete online non passano dalla cassa).{% else %}Ricavi: fatturato per canale, diviso 1,22.{% endif %}</div>
+      {% if base == 'rilevato' %}Ricavi: servito, vendita prodotti, cambia gettoni e monete online = il loro fatturato diviso 1,22; portali = il resto del rilevato reale meno l'IVA dei corrispettivi dei portali.{% else %}Ricavi: fatturato per canale, diviso 1,22.{% endif %}</div>
     <div class="panel-body tabella-scroll">
       <table class="table table-sm bilancio">
         <thead><tr><th></th>{% for c in a.centri %}<th class="tab-num">{{ c }}</th>{% endfor %}<th class="tab-num">Totale</th></tr></thead>
@@ -76,7 +76,7 @@ details summary { cursor: pointer; font-size: .75rem; color: #475569; font-weigh
           {% with s=a.self %}
           <table class="table table-sm prospetto mb-3">
             <tbody>
-              <tr><td>Ricavi self-service (portali, piste{% if base != 'rilevato' %}, monete online{% endif %})</td><td class="tab-num">&euro;{{ s.ricavi|floatformat:"0g" }}</td></tr>
+              <tr><td>Ricavi self-service (portali, piste, monete online)</td><td class="tab-num">&euro;{{ s.ricavi|floatformat:"0g" }}</td></tr>
               <tr class="meno"><td>Costi variabili (acqua, chimici, energia&hellip;)</td><td class="tab-num">&euro;{{ s.variabili|floatformat:"0g" }}</td></tr>
               <tr class="uguale"><td>Margine di contribuzione I {% if s.mdc1_pct != None %}<span class="fw-normal">({{ s.mdc1_pct|floatformat:1 }}%)</span>{% endif %}{% info "Margine di contribuzione I" %}</td><td class="tab-num {% if s.mdc1 < 0 %}neg{% endif %}">&euro;{{ s.mdc1|floatformat:"0g" }}</td></tr>
               <tr class="meno"><td>Costi fissi specifici (manutenzione, personale self, ammortamenti)</td><td class="tab-num">&euro;{{ s.fissi_specifici|floatformat:"0g" }}</td></tr>

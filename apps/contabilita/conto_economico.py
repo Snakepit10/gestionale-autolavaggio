@@ -128,42 +128,20 @@ def _scorporo(lordo):
     return lordo - (lordo / IVA).quantize(Decimal('0.01')) if lordo > 0 else ZERO
 
 
-def _dividi_pesi(importo, pesi, predefinito):
-    """{chiave: quota} in proporzione ai pesi positivi; l'ultima prende il
-    resto; senza pesi tutto su predefinito."""
-    pesi = [(k, p) for k, p in pesi if p > 0] or [(predefinito, Decimal('1'))]
-    totale, assegnato, quote = sum((p for _, p in pesi), ZERO), ZERO, {}
-    for j, (k, peso) in enumerate(pesi):
-        quote[k] = importo - assegnato if j == len(pesi) - 1 else (importo * peso / totale).quantize(Decimal('0.01'))
-        assegnato += quote[k]
-    return quote
-
-
 def rilevato_per_canale(mesi, ricavi_lordi):
-    """Il rilevato reale di ogni mese sui canali, IVA esclusa:
-    - servito e vendita prodotti: il loro fatturato (IVA compresa) meno
-      l'IVA del registratore fiscale, divisa fra i due in proporzione al
-      fatturato;
-    - self-service: il resto del rilevato meno l'IVA dei corrispettivi del
-      self (portali e piste), diviso fra portali e piste in proporzione al
-      loro fatturato (tutto ai portali se nel mese non c'e').
-    Le monete online non passano dalla cassa. Stessa forma di
-    ricavi_canali, piu' 'iva_registratore', 'iva_self' e 'rilevato'."""
+    """Il rilevato reale di ogni mese sui canali, IVA esclusa: servito,
+    vendita prodotti, cambia gettoni e monete online restano il loro
+    fatturato / 1,22 (come in ricavi_canali); i portali sono il resto del
+    rilevato (tolto il fatturato lordo di servito, prodotti e cambia
+    gettoni) meno l'IVA dei corrispettivi dei portali. Stessa forma di
+    ricavi_canali, piu' 'iva_portali' e 'rilevato'."""
     rilevato, _ = ricavi_rilevati(mesi)
-    diviso = {k: [ZERO] * len(mesi) for k in [c for c, _ in CANALI] + ['iva_registratore', 'iva_self', 'rilevato']}
+    diviso = {k: [(lordi[k] / IVA).quantize(Decimal('0.01')) for lordi in ricavi_lordi] for k, _ in CANALI}
+    diviso['iva_portali'], diviso['rilevato'] = [ZERO] * len(mesi), rilevato
     for i, lordi in enumerate(ricavi_lordi):
-        iva_reg = _scorporo(lordi['registratore'])
-        iva_self = _scorporo(lordi['portali'] + lordi['cambia_gettoni'])
-        for k, quota in _dividi_pesi(iva_reg, [('servito', lordi['servito']), ('prodotti', lordi['prodotti'])],
-                                     'servito').items():
-            diviso[k][i] -= quota
-        for k in ('servito', 'prodotti'):
-            diviso[k][i] += lordi[k]
-        resto = rilevato[i] - lordi['servito'] - lordi['prodotti'] - iva_self
-        for k, quota in _dividi_pesi(resto, [('portali', lordi['portali']), ('cambia_gettoni', lordi['cambia_gettoni'])],
-                                     'portali').items():
-            diviso[k][i] = quota
-        diviso['iva_registratore'][i], diviso['iva_self'][i], diviso['rilevato'][i] = iva_reg, iva_self, rilevato[i]
+        iva_portali = _scorporo(lordi['portali'])
+        diviso['portali'][i] = rilevato[i] - lordi['servito'] - lordi['prodotti'] - lordi['cambia_gettoni'] - iva_portali
+        diviso['iva_portali'][i] = iva_portali
     return diviso
 
 
@@ -224,14 +202,9 @@ def conto_economico(mesi, base='canali'):
     if base == 'rilevato':
         _, giorni_rilevati = ricavi_rilevati(mesi)
         r = rilevato_per_canale(mesi, ricavi_lordi)
-        self_service = _somma(r['portali'], r['cambia_gettoni'])
-        voci_ricavo = [
-            _riga('voce', 'Servito (lavaggi) - IVA del registratore', r['servito'], 'ricavi:servito', 1),
-            _riga('voce', 'Vendita prodotti - IVA del registratore', r['prodotti'], 'ricavi:prodotti', 1),
-            _riga('voce', 'Self-service: resto del rilevato - IVA self service', self_service, 'ricavi:self', 1),
-        ]
-        voci_ricavo = [v for v in voci_ricavo if any(v['valori'])]
-        dettaglio_rilevato = {k: sum(r[k], ZERO) for k in ('rilevato', 'iva_registratore', 'iva_self')}
+        nomi = dict(CANALI, portali='Portali self-service: resto del rilevato - IVA portali')
+        voci_ricavo = [_riga('voce', nomi[k], r[k], f'ricavi:{k}', 1) for k, _ in CANALI if any(r[k])]
+        dettaglio_rilevato = {k: sum(r[k], ZERO) for k in ('rilevato', 'iva_portali')}
     else:
         voci_ricavo = [_riga('voce', nome, canali[k], f'ricavi:{k}', 1) for k, nome in CANALI if any(canali[k])]
     voci_ricavo += righe_sezione('ricavi')

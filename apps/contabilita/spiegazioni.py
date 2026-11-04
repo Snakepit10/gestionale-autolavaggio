@@ -5,7 +5,7 @@ indica e, se serve, a cosa fare attenzione."""
 SPIEGAZIONI = {
     # ---------------------------------------------------------- conto economico
     'Ricavi netti': (
-        'In base a quanto scelto in alto. Rilevato reale: i soldi delle quadrature meno l\'IVA dei corrispettivi. '
+        'In base a quanto scelto in alto. Rilevato reale: servito, prodotti, cambia gettoni e monete online come nel fatturato; i portali sono il resto dei soldi delle quadrature meno l\'IVA dei loro corrispettivi. '
         'Fatturato per canale: ordini del servito, prodotti e casse automatiche, diviso 1,22.',
         'Quanto ha incassato davvero l\'azienda, IVA esclusa.',
         'Le due basi possono dare numeri diversi: se la differenza è grande, una delle due fonti è incompleta.'),
@@ -59,8 +59,8 @@ SPIEGAZIONI = {
         'Quanti lavaggi hanno fatto i portali a spazzole.',
         'Le piste non contano. I giorni senza chiusura della cassa non entrano nel conteggio.'),
     'Ricavo / ciclo': (
-        'Ricavi dei portali, IVA esclusa, diviso i cicli portali. Con il rilevato reale i ricavi dei portali sono una quota '
-        'del self, in proporzione al fatturato di portali e piste.',
+        'Ricavi dei portali, IVA esclusa, diviso i cicli portali. Con il rilevato reale i ricavi dei portali sono il resto '
+        'del rilevato, tolto il fatturato di servito, prodotti e cambia gettoni, meno l\'IVA dei portali.',
         'Quanto rende in media un passaggio al portale: dice se prezzi e scelta dei programmi funzionano.'),
     'Costo var. / ciclo': (
         'Tutti i costi variabili del self-service diviso i cicli portali.',
