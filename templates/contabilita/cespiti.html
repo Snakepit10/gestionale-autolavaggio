@@ -20,6 +20,44 @@
     <div class="col-6 col-lg-3"><div class="kpi-tile"><div class="label">Residuo da ammortizzare</div><div class="value">&euro;{{ totali.residuo|floatformat:"0g" }}</div></div></div>
   </div>
 
+  {% if proposte %}
+  <div class="panel">
+    <div class="panel-title"><i class="bi bi-lightbulb"></i> Proposte ({{ proposte|length }})</div>
+    <div class="panel-sub">Tutto quello che sta sulla voce "Acquisto impianti e attrezzature" e non &egrave; ancora un cespite. Spunta le righe di uno stesso acquisto (per esempio acconti e saldo) e crea un solo cespite, oppure toglile se il bene &egrave; gi&agrave; fra i cespiti.</div>
+    <form method="post" class="panel-body">{% csrf_token %}
+      <div class="tabella-scroll">
+        <table class="table table-sm align-middle">
+          <thead><tr><th><input type="checkbox" class="form-check-input" id="tutte-proposte" title="Scegli tutte"></th><th>Data</th><th>Da</th><th>Descrizione</th><th class="tab-num">Valore</th></tr></thead>
+          <tbody>
+            {% for p in proposte %}
+            <tr>
+              <td><input type="checkbox" class="form-check-input proposta" name="proposte" value="{{ p.chiave }}" data-valore="{{ p.valore|stringformat:'s' }}" data-data="{{ p.data|date:'Y-m-d' }}" data-nome="{{ p.nome }}" data-testo="{{ p.testo }}"></td>
+              <td class="text-nowrap">{{ p.data|date:"d/m/Y" }}</td>
+              <td class="fw-semibold">{% if p.fattura %}<a href="{% url 'contabilita:fattura' p.fattura.pk %}">{{ p.nome }} n. {{ p.fattura.numero }}</a>{% else %}<a href="{% url 'contabilita:movimento' p.movimento.pk %}">Pagamento su {{ p.nome }}</a>{% endif %}</td>
+              <td class="small">{{ p.testo }}</td>
+              <td class="tab-num fw-bold">&euro;{{ p.valore|floatformat:"2g" }}{% if p.iva_compresa %}<div class="text-warning-emphasis fw-normal" style="font-size:.68rem">importo pagato: togli l'IVA se c'&egrave;</div>{% endif %}</td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+      <div id="barra-proposte" class="d-none border-top pt-2">
+        <div class="row g-2 align-items-end">
+          <div class="col-12 col-lg-4"><label class="form-label small mb-0">Descrizione del cespite</label><input type="text" name="descrizione" maxlength="120" class="form-control form-control-sm"></div>
+          <div class="col-6 col-lg-2"><label class="form-label small mb-0">Data di acquisto</label><input type="date" name="data_acquisto" class="form-control form-control-sm"></div>
+          <div class="col-6 col-lg-2"><label class="form-label small mb-0">Valore &euro; senza IVA</label><input type="text" name="valore" inputmode="decimal" class="form-control form-control-sm"></div>
+          <div class="col-6 col-lg-1"><label class="form-label small mb-0">Anni</label><input type="number" name="anni" min="1" max="50" value="7" class="form-control form-control-sm"></div>
+          <div class="col-6 col-lg-3"><label class="form-label small mb-0">Centro</label><select name="centro" class="form-select form-select-sm">{% for k, n in centri %}<option value="{{ k }}">{{ n }}</option>{% endfor %}</select></div>
+        </div>
+        <div class="d-flex gap-2 mt-2 flex-wrap">
+          <button name="azione" value="crea_da_proposte" class="btn btn-sm btn-primary"><i class="bi bi-plus-lg"></i> Crea un cespite con le righe scelte</button>
+          <button name="azione" value="scarta_proposte" class="btn btn-sm btn-outline-secondary">Gi&agrave; fra i cespiti o non &egrave; un cespite</button>
+        </div>
+      </div>
+    </form>
+  </div>
+  {% endif %}
+
   <div class="panel">
     <div class="panel-sub pt-3">Impianti e attrezzature: il costo entra nel conto economico in quote mensili uguali per gli anni indicati, dal mese di acquisto.
       Le rate o i pagamenti dell'acquisto restano solo nei flussi di cassa (voce "Acquisto impianti" o "Finanziamenti"). Il centro serve all'analitica.</div>
@@ -86,5 +124,26 @@ document.getElementById('modale-cespite').addEventListener('show.bs.modal', func
   f.elements.note.value = d.note || '';
   this.querySelector('.modal-title').textContent = d.id ? 'Modifica cespite' : 'Nuovo cespite';
 });
+
+(function () {
+  var barra = document.getElementById('barra-proposte');
+  if (!barra) return;
+  var form = barra.closest('form'), caselle = form.querySelectorAll('.proposta');
+  function aggiorna() {
+    var scelte = Array.prototype.filter.call(caselle, function (c) { return c.checked; });
+    barra.classList.toggle('d-none', !scelte.length);
+    if (!scelte.length) return;
+    var totale = scelte.reduce(function (s, c) { return s + parseFloat(c.dataset.valore); }, 0);
+    form.elements.valore.value = totale.toFixed(2).replace('.', ',');
+    form.elements.data_acquisto.value = scelte.map(function (c) { return c.dataset.data; }).sort().pop();
+    form.elements.descrizione.value = scelte[0].dataset.nome + ': ' + scelte[0].dataset.testo.slice(0, 80);
+  }
+  caselle.forEach(function (c) { c.addEventListener('change', aggiorna); });
+  document.getElementById('tutte-proposte').addEventListener('change', function () {
+    var tutte = this.checked;
+    caselle.forEach(function (c) { c.checked = tutte; });
+    aggiorna();
+  });
+})();
 </script>
 {% endblock %}

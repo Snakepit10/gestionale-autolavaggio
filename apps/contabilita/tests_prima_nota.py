@@ -13,7 +13,7 @@ from .estratti import PREDEFINITI, importa_estratto, movimenti_da_righe, righe_f
 from .importa import importa_file
 from .models import ContoFinanziario, MovimentoFinanziario, RegolaMovimento, ScadenzaFattura, VoceConto
 from .prima_nota import (abbina, conta_cassa, correggi_baps_su_mps, genera_cassa, giroconto, movimenti_di_baps_su_mps,
-                         proponi_abbinamenti, togli_abbinamento)
+                         nome_nel_testo, proponi_abbinamenti, togli_abbinamento)
 from .tests import fattura_xml
 
 
@@ -172,6 +172,12 @@ class PrimaNotaTest(TestCase):
         insieme.refresh_from_db()
         self.assertEqual((insieme.voce.codice, insieme.scadenze.count(), insieme.differenza),
                          ('N.FORNITORI', 2, Decimal('-1.50')))             # il costo resta solo in fattura
+
+    def test_nomi_corti_dei_fornitori(self):
+        self.assertTrue(nome_nel_testo('ABM Group S.r.l.', 'BONIFICO A ABM GROUP'))
+        self.assertTrue(nome_nel_testo('KSM S.P.A.', 'Bonifico a favore di ksm'))
+        self.assertFalse(nome_nel_testo('KSM S.P.A.', 'Pagamento KSMART'))
+        self.assertFalse(nome_nel_testo('ABM S.P.A.', 'Bonifico spa di prova'))
 
     def test_macchinario_pagato_resta_investimento(self):
         investimenti = VoceConto.objects.get(codice='N.INVESTIMENTI')

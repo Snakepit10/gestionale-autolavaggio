@@ -154,6 +154,10 @@ Reimportare lo stesso periodo, anche con file che si sovrappongono, non crea dop
 
 Le proposte di abbinamento comprendono anche le uscite con il nome del fornitore nella descrizione, entro 240 giorni: possono pagare più fatture insieme e possono essere già su una voce di costo. In quel caso il costo contava due volte, con la fattura e col pagamento: abbinando, resta solo in fattura. Le spese bancarie restano fuori.
 
+I nomi dei fornitori di 3 lettere (ABM, KSM) valgono solo come parola intera.
+
+Nella pagina **Cespiti** le **proposte** elencano tutto quello che sta sulla voce "Acquisto impianti e attrezzature" e non è ancora un cespite: le fatture con l'imponibile delle righe su quella voce e i pagamenti senza fattura con l'importo pagato. Si spuntano le righe dello stesso acquisto (acconti e saldo) per farne un solo cespite, oppure si tolgono se il bene c'è già. Eliminando il cespite, le sue proposte tornano.
+
 Nello **Scadenziario** si spuntano più scadenze e la barra in fondo le segna *pagate in contanti* (una uscita abbinata sulla Cassa contanti per ognuna; togliendo l'abbinamento l'uscita sparisce) o *già pagate, nessun movimento*. Senza data vale quella della scadenza.
 
 ### Cassa contanti

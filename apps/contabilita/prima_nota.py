@@ -22,7 +22,8 @@ MAX_SCADENZE_GRUPPO = 12
 # in piu' della scadenza e la descrizione ha il nome del fornitore
 COMMISSIONE_MAX = Decimal('5.00')
 VOCE_COMMISSIONI = 'CF.BANCA'
-_PAROLE_VUOTE = {'srl', 'spa', 'snc', 'sas', 'srls', 'societa', 'società', 'italia', 'group', 'servizi', 'della', 'delle'}
+_PAROLE_VUOTE = {'srl', 'spa', 'snc', 'sas', 'srls', 'societa', 'società', 'italia', 'group', 'servizi', 'della', 'delle',
+                 'dei', 'per', 'con', 'sui'}
 
 
 def _parole(ragione_sociale):
@@ -31,7 +32,11 @@ def _parole(ragione_sociale):
 
 def nome_nel_testo(ragione_sociale, testo):
     testo = testo.lower()
-    return any(p in testo for p in _parole(ragione_sociale))
+    if any(p in testo for p in _parole(ragione_sociale)):
+        return True
+    # nomi corti (ABM, KSM): solo come parola intera
+    corti = re.findall(r'\b[a-zà-ù0-9]{3}\b', ragione_sociale.lower())
+    return any(re.search(rf'\b{p}\b', testo) for p in corti if p not in _PAROLE_VUOTE)
 
 
 def scadenze_aperte():

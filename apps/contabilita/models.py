@@ -162,6 +162,9 @@ class RigaFatturaPassiva(models.Model):
                              related_name='righe_fatture')
     # Vuota = la ripartizione della voce
     ripartizione = models.JSONField(default=dict, blank=True)
+    # Proposte della pagina Cespiti: il cespite fatto da questa riga, o scartata
+    cespite = models.ForeignKey('Cespite', on_delete=models.SET_NULL, null=True, blank=True, related_name='righe_fattura')
+    non_cespite = models.BooleanField(default=False)
 
     class Meta:
         verbose_name = 'Riga fattura fornitore'
@@ -402,6 +405,9 @@ class MovimentoFinanziario(models.Model):
     voce_differenza = models.ForeignKey(VoceConto, on_delete=models.PROTECT, null=True, blank=True, related_name='+')
     # Giroconto: il movimento opposto sull'altro conto
     controparte = models.OneToOneField('self', on_delete=models.SET_NULL, null=True, blank=True)
+    # Proposte della pagina Cespiti: il cespite fatto da questo movimento, o scartato
+    cespite = models.ForeignKey('Cespite', on_delete=models.SET_NULL, null=True, blank=True, related_name='movimenti')
+    non_cespite = models.BooleanField(default=False)
     origine = models.CharField(max_length=10, choices=ORIGINI, default='estratto')
     note = models.CharField(max_length=255, blank=True)
     creato_il = models.DateTimeField(auto_now_add=True)

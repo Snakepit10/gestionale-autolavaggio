@@ -9,6 +9,7 @@ from django.shortcuts import get_object_or_404, redirect, render
 from django.utils import timezone
 
 from . import conto_economico as ce_srv
+from . import proposte_cespiti
 from .models import CENTRI, Cespite, MovimentoFinanziario, RigaFatturaPassiva, VoceConto
 from .views import _data, _decimale, accesso
 
@@ -146,6 +147,22 @@ def dettaglio(request):
     })
 
 
+def _crea_da_proposte(request):
+    p = request.POST
+    valore, data = _decimale(p.get('valore')), _data(p.get('data_acquisto'))
+    anni = int(p['anni']) if p.get('anni', '').isdigit() else 0
+    if not p.get('descrizione', '').strip() or not valore or valore <= 0 or not data or not 1 <= anni <= 50 \
+            or p.get('centro') not in dict(CENTRI):
+        messages.error(request, 'Cespite non creato: servono descrizione, valore, data e anni (1-50).')
+        return
+    cespite = proposte_cespiti.crea_cespite(p.getlist('proposte'), descrizione=p['descrizione'].strip()[:120], valore=valore,
+                                            data_acquisto=data, anni=anni, centro=p['centro'])
+    if cespite:
+        messages.success(request, f'Cespite "{cespite}" creato: l\'ammortamento parte da {data:%m/%Y}.')
+    else:
+        messages.error(request, 'Scegli almeno una proposta.')
+
+
 @accesso
 def cespiti(request):
     if request.method == 'POST':
@@ -165,6 +182,11 @@ def cespiti(request):
         elif p.get('azione') == 'elimina':
             Cespite.objects.filter(pk=p.get('cespite')).delete()
             messages.success(request, 'Cespite eliminato.')
+        elif p.get('azione') == 'crea_da_proposte':
+            _crea_da_proposte(request)
+        elif p.get('azione') == 'scarta_proposte':
+            n = proposte_cespiti.scarta(p.getlist('proposte'))
+            messages.success(request, f'{n} proposte tolte: non diventano cespiti.')
         return redirect('contabilita:cespiti')
     oggi = timezone.localdate().replace(day=1)
     elenco = list(Cespite.objects.all())
@@ -174,6 +196,7 @@ def cespiti(request):
         c.quota_anno = sum((c.quota(date(oggi.year, m, 1)) for m in range(1, 13)), Decimal('0'))
     return render(request, 'contabilita/cespiti.html', {
         'cespiti': elenco,
+        'proposte': proposte_cespiti.proposte(),
         'centri': CENTRI,
         'oggi': oggi,
         'totali': {k: sum((getattr(c, k) for c in elenco), Decimal('0'))
