@@ -84,7 +84,7 @@ details summary { cursor: pointer; font-size: .75rem; color: #475569; font-weigh
             </tbody>
           </table>
           <div class="row g-2 mb-2">
-            <div class="col-6 col-md-3"><div class="kpi-mini"><div class="label">Cicli portali{% info "Cicli portali" %}</div><div class="value">{{ s.cicli }}</div></div></div>
+            <div class="col-6 col-md-3"><div class="kpi-mini"><div class="label">Cicli self{% info "Cicli portali" %}</div><div class="value">{{ s.cicli }}</div><div class="small text-muted">{{ s.cicli_totali }} totali &minus; {{ s.cicli_servito }} servito</div></div></div>
             <div class="col-6 col-md-3"><div class="kpi-mini"><div class="label">Ricavo / ciclo{% info "Ricavo / ciclo" %}</div><div class="value">{% if s.ricavo_ciclo != None %}&euro;{{ s.ricavo_ciclo|floatformat:2 }}{% else %}&mdash;{% endif %}</div></div></div>
             <div class="col-6 col-md-3"><div class="kpi-mini"><div class="label">Costo var. / ciclo{% info "Costo var. / ciclo" %}</div><div class="value">{% if s.variabile_ciclo != None %}&euro;{{ s.variabile_ciclo|floatformat:2 }}{% else %}&mdash;{% endif %}</div></div></div>
             <div class="col-6 col-md-3"><div class="kpi-mini"><div class="label">Cicli di pareggio{% info "Cicli di pareggio" %}</div><div class="value">{{ s.cicli_pareggio|default:"—" }}</div></div></div>

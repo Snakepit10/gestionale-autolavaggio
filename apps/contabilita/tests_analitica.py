@@ -70,6 +70,18 @@ class AnaliticaTest(TestCase):
         self.assertEqual((s['cicli'], s['ricavo_ciclo'], s['variabile_ciclo']), (20, Decimal('10'), Decimal('6')))
         self.assertEqual(s['cicli_pareggio'], Decimal('30'))         # 120 / (80 / 20)
 
+    def test_cicli_self_tolgono_il_servito(self):
+        """I lavaggi completi degli ordini passano dal portale: non sono cicli self."""
+        from apps.core.models import Categoria, ServizioProdotto
+        from apps.ordini.models import ItemOrdine, Ordine
+        completo = ServizioProdotto.objects.create(titolo='Lavaggio Completo - Media', categoria=Categoria.objects.create(
+            nome='Servito'), prezzo=Decimal('22'), descrizione='')
+        ordine = Ordine.objects.get()
+        ItemOrdine.objects.create(ordine=ordine, servizio_prodotto=completo, quantita=4, prezzo_unitario=completo.prezzo)
+        s = analitica([OTTOBRE])['self']
+        self.assertEqual((s['cicli_totali'], s['cicli_servito'], s['cicli']), (20, 4, 16))
+        self.assertEqual(s['ricavo_ciclo'], Decimal('12.5'))         # 200 / 16
+
     def test_full_costing_servito(self):
         s = analitica([OTTOBRE])['servito']
         self.assertEqual(s['ricavi'], Decimal('100.00'))

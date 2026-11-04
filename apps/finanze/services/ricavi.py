@@ -40,6 +40,12 @@ def ricavi_periodo(dal, al):
         else:
             cambia_gettoni += c.vendita_totale
 
+    # Cicli dei portali fatti per il servito: lavaggi completi degli ordini
+    # (stessa regola del report periodo: aggregato - servito = self)
+    from apps.ordini.models import ItemOrdine
+    cicli_servito = int(ItemOrdine.objects.filter(ordine__in=ordini, servizio_prodotto__titolo__icontains='lavaggio completo')
+                        .aggregate(q=Sum('quantita'))['q'] or 0)
+
     monete_online = (AcquistoMonete.objects
                      .filter(stato__in=('pagato', 'accreditato'), creato_il__date__gte=dal, creato_il__date__lte=al)
                      .aggregate(s=Sum('importo'))['s'] or ZERO)
@@ -52,6 +58,7 @@ def ricavi_periodo(dal, al):
         'servito_ordinato': servito_ordinato,
         'registratore': registratore,
         'washcycles': washcycles,
+        'cicli_servito': cicli_servito,
         'ordini_lavaggio': ordini.filter(vendita_prodotti=False).count(),
         'rp': rp,
     }

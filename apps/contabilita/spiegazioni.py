@@ -54,22 +54,23 @@ SPIEGAZIONI = {
         'Margine diretto − quota dei costi comuni.',
         'L\'utile vero del servito, dopo aver pagato anche energia, acqua, assicurazioni e tutta la struttura per la sua parte.'),
     'Cicli portali': (
-        'Somma dei cicli scritti nelle chiusure delle casse automatiche con il conteggio dei lavaggi attivo (i due portali), '
-        'nel periodo scelto.',
-        'Quanti lavaggi hanno fatto i portali a spazzole.',
-        'Le piste non contano. I giorni senza chiusura della cassa non entrano nel conteggio.'),
+        'Cicli scritti nelle chiusure dei due portali nel periodo, meno i lavaggi completi degli ordini del servito '
+        '(che passano anche loro dal portale). Sotto il valore si vedono i cicli totali e quelli del servito.',
+        'Quanti lavaggi hanno fatto i clienti self ai portali a spazzole.',
+        'Le piste non contano. I giorni senza chiusura della cassa non entrano nel conteggio. Per il servito contano '
+        'i servizi con "lavaggio completo" nel nome, come nel report periodo.'),
     'Ricavo / ciclo': (
-        'Ricavi dei portali, IVA esclusa, diviso i cicli portali. Con il rilevato reale i ricavi dei portali sono il resto '
+        'Ricavi dei portali, IVA esclusa, diviso i cicli self. Con il rilevato reale i ricavi dei portali sono il resto '
         'del rilevato, tolti gli ordini e il cambia gettoni, meno l\'IVA dei portali.',
         'Quanto rende in media un passaggio al portale: dice se prezzi e scelta dei programmi funzionano.'),
     'Costo var. / ciclo': (
-        'Tutti i costi variabili del self-service diviso i cicli portali.',
+        'Tutti i costi variabili del self-service diviso i cicli self.',
         'Quanto costa in consumi un lavaggio al portale.',
         'È indicativo e un po\' più alto del vero: i costi variabili comprendono anche le piste.'),
     'Cicli di pareggio': (
         'Costi fissi specifici del self / margine I per ciclo.',
         'Quanti cicli servono nel periodo per pagare i costi fissi del self-service.',
-        'Indicativo: il margine I comprende anche le piste, ma i cicli sono solo dei portali.'),
+        'Indicativo: il margine I comprende anche le piste, ma i cicli sono solo quelli self dei portali.'),
     'Lavaggi': (
         'Ordini del periodo non annullati, escluse le vendite di soli prodotti. Ogni ordine conta 1, anche con più servizi.',
         'Il volume di lavoro del servito.'),
