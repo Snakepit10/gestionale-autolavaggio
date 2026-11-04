@@ -122,6 +122,7 @@ def raccogli(mesi, base='canali'):
         'costi': costi,
         'ore': ore,
         'washcycles': sum((r['washcycles'] for r in lordi), 0),
+        'cicli_servito': sum((r.get('cicli_servito', 0) for r in lordi), 0),
         'ordini_lavaggio': sum((r['ordini_lavaggio'] for r in lordi), 0),
         'ricavi_portali': sum(canali['portali'], ZERO),
     }
@@ -156,13 +157,17 @@ def analitica(mesi, base='canali'):
     variabili = s['totali']['costi_variabili']
     fissi_specifici = s['costi'] - variabili
     mdc1 = s['ricavi'] - variabili
-    cicli = dati['washcycles']
+    # Il contatore dei portali conta anche i cicli fatti per il servito:
+    # al self restano i cicli totali meno i lavaggi completi degli ordini
+    cicli_totali = dati['washcycles']
+    cicli_servito = min(dati['cicli_servito'], cicli_totali)
+    cicli = cicli_totali - cicli_servito
     mdc_ciclo = _div(mdc1, cicli)
     self_service = {
         'ricavi': s['ricavi'], 'variabili': variabili, 'mdc1': mdc1, 'mdc1_pct': _div(mdc1 * 100, s['ricavi']),
         'fissi_specifici': fissi_specifici, 'mdc2': mdc1 - fissi_specifici,
         'mdc2_pct': _div((mdc1 - fissi_specifici) * 100, s['ricavi']),
-        'cicli': cicli,
+        'cicli': cicli, 'cicli_totali': cicli_totali, 'cicli_servito': cicli_servito,
         'ricavo_ciclo': _div(dati['ricavi_portali'], cicli),
         'variabile_ciclo': _div(variabili, cicli),
         'mdc_ciclo': mdc_ciclo,
