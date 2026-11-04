@@ -55,8 +55,8 @@ SPIEGAZIONI = {
         'L\'utile vero del servito, dopo aver pagato anche energia, acqua, assicurazioni e tutta la struttura per la sua parte.'),
     'Cicli portali': (
         'Somma dei cicli scritti nelle chiusure delle casse automatiche con il conteggio dei lavaggi attivo (i due portali), '
-        'nel periodo scelto.',
-        'Quanti lavaggi hanno fatto i portali a spazzole.',
+        'nel periodo scelto, meno i cicli avviati per il servito: uno per ogni ordine con un lavaggio completo.',
+        'Quanti lavaggi self-service hanno fatto i portali a spazzole.',
         'Le piste non contano. I giorni senza chiusura della cassa non entrano nel conteggio.'),
     'Ricavo / ciclo': (
         'Ricavi dei portali, IVA esclusa, diviso i cicli portali. Con il rilevato reale i ricavi dei portali sono il resto '
