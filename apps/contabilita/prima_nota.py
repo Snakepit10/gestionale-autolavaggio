@@ -10,7 +10,7 @@ from itertools import combinations
 from django.db import transaction
 from django.db.models import Q
 
-from .models import MovimentoFinanziario, ScadenzaFattura, VoceConto
+from .models import MovimentoFinanziario, RigaFatturaPassiva, ScadenzaFattura, VoceConto
 
 ZERO = Decimal('0')
 GIORNI_ABBINAMENTO = 45
@@ -196,12 +196,21 @@ def paga_in_contanti(scadenze, data=None):
         ricalcola_conte(cassa)
 
 
+def _voce_del_pagamento(movimento, scadenze):
+    """Un macchinario pagato resta fra gli investimenti nei flussi di cassa."""
+    if movimento.voce and movimento.voce.codice == 'N.INVESTIMENTI':
+        return 'N.INVESTIMENTI'
+    voci = set(RigaFatturaPassiva.objects.filter(fattura__in={s.fattura_id for s in scadenze})
+               .values_list('voce__codice', flat=True))
+    return 'N.INVESTIMENTI' if voci == {'N.INVESTIMENTI'} else 'N.FORNITORI'
+
+
 def _abbina(movimento, scadenze, differenza, voce_differenza):
     with transaction.atomic():
         for s in scadenze:
             s.movimento, s.pagata_il = movimento, movimento.data
             s.save(update_fields=['movimento', 'pagata_il'])
-        movimento.voce = VoceConto.objects.get(codice='N.FORNITORI')
+        movimento.voce = VoceConto.objects.get(codice=_voce_del_pagamento(movimento, scadenze))
         movimento.ripartizione, movimento.regola = {}, None
         movimento.differenza, movimento.voce_differenza = differenza, voce_differenza
         movimento.save(update_fields=['voce', 'ripartizione', 'regola', 'differenza', 'voce_differenza'])

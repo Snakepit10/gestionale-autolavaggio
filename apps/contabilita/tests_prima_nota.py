@@ -173,6 +173,19 @@ class PrimaNotaTest(TestCase):
         self.assertEqual((insieme.voce.codice, insieme.scadenze.count(), insieme.differenza),
                          ('N.FORNITORI', 2, Decimal('-1.50')))             # il costo resta solo in fattura
 
+    def test_macchinario_pagato_resta_investimento(self):
+        investimenti = VoceConto.objects.get(codice='N.INVESTIMENTI')
+        fattura = importa_file('a.xml', fattura_xml(numero='1')).nuove[0]
+        fattura.righe.update(voce=investimenti)
+        assegno = movimento(self.banca, '-83.00', 'Proprio assegno', data=date(2026, 11, 2))
+        resto = abbina(assegno, list(fattura.scadenze.all()), parziale=True)
+        assegno.refresh_from_db()
+        self.assertEqual((assegno.voce, resto.importo), (investimenti, Decimal('100.00')))
+        contanti = movimento(self.cassa, '-100.00', 'Saldo in contanti', data=date(2026, 11, 3))
+        abbina(contanti, [resto])
+        contanti.refresh_from_db()
+        self.assertEqual(contanti.voce, investimenti)
+
     def test_scadenziario_pagate_in_gruppo(self):
         importa_file('a.xml', fattura_xml(numero='1'))
         importa_file('b.xml', fattura_xml(numero='2'))
