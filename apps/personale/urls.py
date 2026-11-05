@@ -8,4 +8,5 @@ urlpatterns = [
     path('', views.mese, name='mese'),
     path('dipendenti/', views.dipendenti, name='dipendenti'),
     path('anno/', views.anno, name='anno'),
+    path('previsione/', views.previsione, name='previsione'),
 ]

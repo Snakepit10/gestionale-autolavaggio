@@ -289,3 +289,14 @@ def anno(request):
         'anno_prec': anno_n - 1, 'anno_succ': anno_n + 1,
     })
 
+
+
+@accesso
+def previsione(request):
+    from . import previsione as prev
+    risultato = prev.calcola()
+    prev.registra(risultato)
+    return render(request, 'personale/previsione.html', {
+        'r': risultato, 'storico': prev.storico_previsioni(),
+        'ora_decisione': prev.ORA_DECISIONE, 'quantile': int(prev.QUANTILE_MARGINE * 100),
+    })

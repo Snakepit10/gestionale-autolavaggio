@@ -232,6 +232,7 @@
                                 <li><a class="dropdown-item" href="{% url 'personale:mese' %}"><i class="bi bi-people"></i> Costo del personale</a></li>
                                 <li><a class="dropdown-item" href="{% url 'personale:anno' %}"><i class="bi bi-graph-up"></i> Andamento annuale</a></li>
                                 <li><a class="dropdown-item" href="{% url 'personale:dipendenti' %}"><i class="bi bi-person-vcard"></i> Dipendenti</a></li>
+                                <li><a class="dropdown-item" href="{% url 'personale:previsione' %}"><i class="bi bi-cloud-sun"></i> Previsione squadra</a></li>
                                 {% endif %}
                                 {% if 'contabilita' in sezioni_visibili %}
                                 {% if 'fatture' in sezioni_visibili or 'finanze' in sezioni_visibili or 'personale' in sezioni_visibili %}<li><hr class="dropdown-divider"></li>{% endif %}

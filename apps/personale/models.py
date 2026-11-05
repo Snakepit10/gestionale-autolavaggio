@@ -135,3 +135,23 @@ class Presenza(models.Model):
         if self.assenza:
             return self.assenza
         return '' if self.ore is None else self.ore
+
+
+class PrevisioneSquadra(models.Model):
+    """La previsione del giorno, salvata la sera prima (dalle 18), per
+    confrontarla poi con i lavaggi e le presenze reali."""
+    data = models.DateField(unique=True)
+    lavaggi_previsti = models.DecimalField(max_digits=6, decimal_places=1)
+    lavaggi_alti = models.DecimalField(max_digits=6, decimal_places=1)
+    squadra = models.PositiveIntegerField()
+    pioggia_mm = models.DecimalField(max_digits=5, decimal_places=1, default=0)
+    chiuso = models.BooleanField(default=False)
+    aggiornata_il = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        verbose_name = 'Previsione squadra'
+        verbose_name_plural = 'Previsioni squadra'
+        ordering = ['-data']
+
+    def __str__(self):
+        return f'{self.data:%d/%m/%Y}: {self.squadra} persone'
