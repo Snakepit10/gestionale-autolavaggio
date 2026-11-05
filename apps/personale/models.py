@@ -146,6 +146,7 @@ class PrevisioneSquadra(models.Model):
     squadra = models.PositiveIntegerField()
     pioggia_mm = models.DecimalField(max_digits=5, decimal_places=1, default=0)
     chiuso = models.BooleanField(default=False)
+    cicli_self = models.PositiveIntegerField(null=True, blank=True)
     aggiornata_il = models.DateTimeField(auto_now=True)
 
     class Meta:
@@ -155,3 +156,26 @@ class PrevisioneSquadra(models.Model):
 
     def __str__(self):
         return f'{self.data:%d/%m/%Y}: {self.squadra} persone'
+
+
+class ParametriPrevisione(models.Model):
+    """Parametri della previsione squadra (una sola riga)."""
+    lavaggi_per_persona = models.DecimalField(
+        max_digits=4, decimal_places=1, default=Decimal('7'),
+        help_text='Lavaggi del servito che una persona fa in una giornata (20 lavaggi / 3 persone = circa 7)')
+    soglia_cicli_self = models.PositiveIntegerField(
+        null=True, blank=True,
+        help_text='Cicli self delle spazzole da cui serve una persona al self. Vuoto: sempre una persona')
+    aggiornati_il = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        verbose_name = 'Parametri previsione squadra'
+        verbose_name_plural = 'Parametri previsione squadra'
+
+    @classmethod
+    def attuali(cls):
+        return cls.objects.get_or_create(pk=1)[0]
+
+    @property
+    def lavaggi_per_persona_f(self):
+        return float(self.lavaggi_per_persona) if self.lavaggi_per_persona else None
