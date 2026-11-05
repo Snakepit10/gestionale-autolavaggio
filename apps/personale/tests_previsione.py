@@ -56,6 +56,10 @@ class PrevisioneTest(TestCase):
         domenica = next(p for p in r['previsioni'] if p['data'].weekday() == 6)
         self.assertTrue(domenica['chiuso'])
         self.assertIsNone(domenica['squadra'])
+        oggi = r['previsioni'][0]
+        self.assertTrue(oggi['oggi'])
+        self.assertEqual(oggi['data'], OGGI)
+        self.assertTrue(r['previsioni'][1]['domani'])
         aperti = [p for p in per_giorno.values() if not p['chiuso']]
         for p in aperti:
             atteso = (32 if p['data'].weekday() == 5 else 20) * (0.5 if p['pioggia'] else 1)
@@ -94,5 +98,6 @@ class PrevisioneTest(TestCase):
         with mock.patch('django.utils.timezone.localdate', return_value=OGGI):
             risposta = self.client.get('/personale/previsione/')
         self.assertEqual(risposta.status_code, 200)
-        self.assertContains(risposta, 'Squadra consigliata')
+        self.assertContains(risposta, 'Squadra consigliata domani')
+        self.assertContains(risposta, 'Oggi Gio 05/11')
         self.assertContains(risposta, 'Quanto e')

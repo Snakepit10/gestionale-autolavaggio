@@ -307,24 +307,28 @@ def calcola(oggi=None):
     margine = _quantile(residui, QUANTILE_MARGINE)
     previsioni = []
     storico_esteso = dict(storico)
-    for k in range(1, 8):
+    finora = _lavaggi_per_giorno(oggi, oggi).get(oggi, (0, 0))[0]
+    for k in range(0, 8):
         g = oggi + timedelta(days=k)
         if g not in meteo:
             continue
         chiuso = g.weekday() in chiuso_wd or festivi.get(g) in festivi_chiusi
         livello = _livello(storico_esteso, g) or _livello(storico, oggi)
         note = _prenotazioni_ora(g)
-        x = _variabili(g, meteo, festivi, livello, note)
+        # oggi: le prenotazioni note alle 18 di ieri, come nell'addestramento
+        x = _variabili(g, meteo, festivi, livello, prenotazioni.get(g, 0) if k == 0 else note)
         stima = modello.predict(x)
         previsti, alti = max(0.0, math.expm1(stima)), max(0.0, math.expm1(stima + margine))
         previsioni.append({
             'data': g, 'giorno': GIORNI_SETTIMANA[g.weekday()], 'chiuso': chiuso, 'domani': k == 1,
+            'oggi': k == 0, 'finora': finora if k == 0 else None,
             'pioggia': meteo[g]['pioggia'], 'tmax': meteo[g]['tmax'], 'prenotazioni': note,
             'previsti': previsti, 'alti': alti,
             'ore': alti * ore_lavaggio if ore_lavaggio else None,
             'squadra': None if chiuso else squadra_per(alti, ore_lavaggio, ore_persona),
         })
-        storico_esteso[g] = (round(previsti), 0)
+        if k > 0:
+            storico_esteso[g] = (round(previsti), 0)
 
     pesi = sorted(((n, c) for n, c in zip(NOMI_VARIABILI, modello.coef)), key=lambda t: -abs(t[1]))
     return {
