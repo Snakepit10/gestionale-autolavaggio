@@ -15,30 +15,47 @@ METEO_VERO = prev._meteo          # prima dei mock del setUp
 
 def dati_sintetici():
     """Storico da agosto 2025: 20 lavaggi i feriali, 32 il sabato, chiuso
-    la domenica; la pioggia dimezza i lavaggi. Squadra sempre piena:
-    6 persone da 8 ore il sabato, 5 gli altri giorni, anche con la pioggia."""
+    la domenica. I clienti guardano la previsione: se e' prevista pioggia
+    il giorno stesso i lavaggi si dimezzano, se e' prevista il giorno dopo
+    calano di un quarto, anche quando poi non piove (1 previsione su 3 e'
+    un falso allarme). Squadra sempre piena: 6 persone da 8 ore il sabato,
+    5 gli altri giorni."""
     rnd = random.Random(1)
-    meteo, lavaggi, presenze = {}, {}, {}
+    meteo, previsto, lavaggi, presenze = {}, {}, {}, {}
     g = prev.INIZIO_ORDINI - timedelta(days=3)
-    while g <= OGGI + timedelta(days=8):
+    while g <= OGGI + timedelta(days=12):
         pioggia = rnd.choice([0, 0, 0, 0, 0, 0, 5, 15])
         meteo[g] = {'pioggia': float(pioggia), 'ore': 6.0 if pioggia else 0.0, 'tmax': 25.0}
-        meteo[g]['piove'] = prev.piove(meteo[g])
-        if prev.INIZIO_ORDINI <= g < OGGI and g.weekday() != 6:
+        falso_allarme = not pioggia and rnd.random() < 0.12
+        previsto[g] = {'pioggia': 8.0 if pioggia or falso_allarme else 0.0, 'ore': 5.0 if pioggia or falso_allarme else 0.0,
+                       'tmax': 25.0}
+        for m in (meteo[g], previsto[g]):
+            m['piove'] = prev.piove(m)
+        g += timedelta(days=1)
+    g = prev.INIZIO_ORDINI
+    while g < OGGI:
+        if g.weekday() != 6:
             base = 32 if g.weekday() == 5 else 20
-            lavaggi[g] = (max(1, round(base * (0.5 if pioggia else 1) * rnd.uniform(0.9, 1.1))), 0.0)
+            fattore = (0.5 if previsto[g]['piove'] else 1) * (0.75 if previsto[g + timedelta(days=1)]['piove'] else 1)
+            lavaggi[g] = (max(1, round(base * fattore * rnd.uniform(0.95, 1.05))), 0.0)
             if g >= date(2026, 1, 1):
                 presenze[g] = (48.0, 6) if g.weekday() == 5 else (40.0, 5)
         g += timedelta(days=1)
-    return meteo, lavaggi, presenze
+    # da oggi in poi la previsione attuale e' quella "vera"
+    for g in list(meteo):
+        if g >= OGGI:
+            meteo[g] = previsto[g]
+    return meteo, previsto, lavaggi, presenze
 
 
 class PrevisioneTest(TestCase):
     def setUp(self):
-        meteo, lavaggi, presenze = dati_sintetici()
+        meteo, previsto, lavaggi, presenze = dati_sintetici()
         self.meteo = meteo
         patch = [
             mock.patch.object(prev, '_meteo', return_value=meteo),
+            mock.patch.object(prev, '_meteo_previsto_storico',
+                              side_effect=lambda dal, al: {g: v for g, v in previsto.items() if dal <= g <= al}),
             mock.patch.object(prev, '_lavaggi_per_giorno', side_effect=lambda dal, al: {g: v for g, v in lavaggi.items() if dal <= g <= al}),
             mock.patch.object(prev, '_presenze_per_giorno', side_effect=lambda dal, al: {g: v for g, v in presenze.items() if dal <= g <= al}),
             mock.patch.object(prev, '_costo_orario_per_mese', return_value={date(2026, 10, 1): 15.0}),
@@ -53,6 +70,8 @@ class PrevisioneTest(TestCase):
         v = r['verifica']
         self.assertLess(v['errore_pct'], 15)
         self.assertLess(v['errore_pct'], v['errore_base_pct'])        # meglio della sola media per giorno
+        self.assertLess(v['errore_pct'], v['errore_prima_pct'] * 0.7)  # la pioggia prevista conta
+        self.assertTrue(r['previsioni_storiche'])
         self.assertAlmostEqual(r['ore_persona'], 8.0)
         # 20 lavaggi da 60 minuti = 20 ore / 6,8 ore utili a persona -> 3 al servito, + 1 al self
         self.assertEqual(r['esempio_20'], 3)
@@ -69,13 +88,10 @@ class PrevisioneTest(TestCase):
         self.assertTrue(r['previsioni'][1]['domani'])
         aperti = [p for p in per_giorno.values() if not p['chiuso']]
         for p in aperti:
-            atteso = (32 if p['data'].weekday() == 5 else 20) * (0.5 if p['pioggia'] else 1)
+            dopo = self.meteo[p['data'] + timedelta(days=1)]['piove']
+            atteso = (32 if p['data'].weekday() == 5 else 20) * (0.5 if p['piove'] else 1) * (0.75 if dopo else 1)
             self.assertLess(abs(p['previsti'] - atteso) / atteso, 0.2, p)
-        # la pioggia riduce la squadra
-        asciutto = [p['squadra'] for p in aperti if not p['pioggia'] and p['data'].weekday() < 5]
-        bagnato = [p['squadra'] for p in aperti if p['pioggia'] and p['data'].weekday() < 5]
-        if asciutto and bagnato:
-            self.assertLess(max(bagnato), min(asciutto))
+            self.assertEqual(p['in_arrivo'], sum(1 for k in (1, 2, 3) if self.meteo[p['data'] + timedelta(days=k)]['piove']))
         # squadra sempre piena: nei giorni di pioggia si risparmia
         self.assertGreater(v['ore_risparmiate'], 0)
         self.assertGreater(v['risparmio'], 0)

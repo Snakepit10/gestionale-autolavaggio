@@ -80,18 +80,48 @@ def _meteo(dal, al):
             if not dati or 'daily' not in dati:
                 return None
             cache.set(chiave, dati, durata)
-        d = dati['daily']
-        valore = lambda nome, i: (d.get(nome) or [None] * (i + 1))[i]
-        for i, t in enumerate(d.get('time') or []):
-            giorno = date.fromisoformat(t)
-            pioggia = valore('precipitation_sum', i)
-            if pioggia is None and giorno in meteo:
-                continue
-            m = {'pioggia': pioggia or 0.0, 'ore': valore('precipitation_hours', i) or 0.0,
-                 'codice': valore('weather_code', i), 'probabilita': valore('precipitation_probability_max', i),
-                 'tmax': valore('temperature_2m_max', i)}
-            m['piove'] = piove(m)
-            meteo[giorno] = m
+        _giorni_meteo(dati['daily'], meteo)
+    return meteo
+
+
+def _meteo_previsto_storico(dal, al):
+    """Le previsioni di allora (Open-Meteo Historical Forecast): quello che
+    i clienti vedevano sul telefono, anche quando poi non ha piovuto.
+    Stessa forma di _meteo; None se l'API non risponde."""
+    import hashlib
+    from urllib.parse import urlencode
+
+    from apps.finanze.weather import LICATA_LAT, LICATA_LON, _http_get_json
+    base = 'precipitation_sum,precipitation_hours,weather_code,temperature_2m_max'
+    for variabili in (base + ',precipitation_probability_max', base):    # la probabilita' puo' mancare
+        params = {'latitude': LICATA_LAT, 'longitude': LICATA_LON, 'daily': variabili, 'timezone': 'Europe/Rome',
+                  'start_date': dal.isoformat(), 'end_date': al.isoformat()}
+        indirizzo = f'https://historical-forecast-api.open-meteo.com/v1/forecast?{urlencode(params)}'
+        chiave = 'previsione_squadra_storico_' + hashlib.md5(indirizzo.encode()).hexdigest()
+        dati = cache.get(chiave)
+        if dati is None:
+            dati = _http_get_json(indirizzo, timeout=10.0)
+            if dati and 'daily' in dati:
+                cache.set(chiave, dati, 60 * 60 * 12)
+        if dati and 'daily' in dati:
+            return _giorni_meteo(dati['daily'], {})
+    return None
+
+
+def _giorni_meteo(d, meteo):
+    valore = lambda nome, i: (d.get(nome) or [None] * (i + 1))[i]
+    for i, t in enumerate(d.get('time') or []):
+        giorno = date.fromisoformat(t)
+        pioggia = valore('precipitation_sum', i)
+        if pioggia is None and giorno in meteo:
+            continue
+        if pioggia is None and valore('weather_code', i) is None:
+            continue                                   # giorno senza dati
+        m = {'pioggia': pioggia or 0.0, 'ore': valore('precipitation_hours', i) or 0.0,
+             'codice': valore('weather_code', i), 'probabilita': valore('precipitation_probability_max', i),
+             'tmax': valore('temperature_2m_max', i)}
+        m['piove'] = piove(m)
+        meteo[giorno] = m
     return meteo
 
 
@@ -142,9 +172,19 @@ NOMI_VARIABILI = (['Mar', 'Mer', 'Gio', 'Ven', 'Sab', 'Dom'] +
                    'Pioggia oggi (mm)', 'Pioggia oggi (si/no)', 'Ore di pioggia oggi', 'Pioggia ieri', 'Pioggia 2-3 giorni fa',
                    'Giorni dall\'ultima pioggia', 'Temperatura massima', 'Livello ultime 4 settimane',
                    'Prenotazioni gia\' fatte'])
+N_BASE = len(NOMI_VARIABILI)          # il modello di prima: solo la pioggia caduta
+NOMI_VARIABILI += ['Pioggia prevista oggi (si/no)', 'Ore di pioggia previste oggi', 'Pioggia prevista domani (si/no)',
+                   'Giorni di pioggia previsti nei 3 dopo', 'Pioggia prevista nei 3 giorni dopo (mm)',
+                   'Probabilita\' di pioggia nei 3 giorni dopo']
 
 
-def _variabili(giorno, meteo, festivi, livello, prenotazioni):
+def _piove_previsto(m, con_probabilita):
+    if not m:
+        return False
+    return piove(m) if con_probabilita else piove({**m, 'probabilita': None})
+
+
+def _variabili(giorno, meteo, festivi, livello, prenotazioni, previsto=None, con_probabilita=False):
     wd = giorno.weekday()
     m = meteo.get(giorno, {})
     pioggia = lambda d: (meteo.get(giorno - timedelta(days=d)) or {}).get('pioggia', 0.0)
@@ -164,7 +204,23 @@ def _variabili(giorno, meteo, festivi, livello, prenotazioni):
         tmax if tmax is not None else 22.0,
         livello,
         math.log1p(prenotazioni),
-    ])
+    ] + _variabili_previste(giorno, previsto or {}, con_probabilita))
+
+
+def _variabili_previste(giorno, previsto, con_probabilita):
+    """La pioggia prevista per il giorno e per i 3 giorni dopo: chi vede
+    pioggia in arrivo non lava la macchina, anche se poi piove poco."""
+    oggi = previsto.get(giorno) or {}
+    dopo = [previsto.get(giorno + timedelta(days=k)) or {} for k in (1, 2, 3)]
+    probabilita = [m.get('probabilita') or 0 for m in dopo] if con_probabilita else [0]
+    return [
+        1.0 if _piove_previsto(oggi, con_probabilita) else 0.0,
+        math.log1p(oggi.get('ore', 0.0)),
+        1.0 if _piove_previsto(dopo[0], con_probabilita) else 0.0,
+        sum(1 for m in dopo if _piove_previsto(m, con_probabilita)) / 3,
+        math.log1p(sum(m.get('pioggia', 0.0) for m in dopo)),
+        max(probabilita) / 100,
+    ]
 
 
 def _livello(storico, giorno):
@@ -224,13 +280,13 @@ def _quantile(valori, q):
 
 # ---------------------------------------------------------------- calcolo
 
-def _righe(giorni, storico, meteo, festivi, prenotazioni):
+def _righe(giorni, storico, meteo, festivi, prenotazioni, previsto=None, con_probabilita=False):
     xs, ys, usati = [], [], []
     for g in giorni:
         livello = _livello(storico, g)
         if livello is None or g not in meteo:
             continue
-        xs.append(_variabili(g, meteo, festivi, livello, prenotazioni.get(g, 0)))
+        xs.append(_variabili(g, meteo, festivi, livello, prenotazioni.get(g, 0), previsto, con_probabilita))
         ys.append(math.log1p(storico[g][0]) if g in storico else None)
         usati.append(g)
     return xs, ys, usati
@@ -274,13 +330,19 @@ def calcola(oggi=None):
     """Verifica del modello sugli ultimi giorni e previsione dei prossimi 7."""
     oggi = oggi or timezone.localdate()
     ieri = oggi - timedelta(days=1)
-    fine = oggi + timedelta(days=7)
+    fine = oggi + timedelta(days=10)          # 7 giorni di previsione + i 3 dopo per la pioggia in arrivo
     storico = {g: v for g, v in _lavaggi_per_giorno(INIZIO_ORDINI, ieri).items() if v[0] > 0}
     if len(storico) < 90:
         return {'errore': f'Servono almeno 90 giorni con ordini: ce ne sono {len(storico)}.'}
     meteo = _meteo(INIZIO_ORDINI - timedelta(days=3), fine)
     if meteo is None:
         return {'errore': 'Il servizio meteo (Open-Meteo) non risponde: riprova fra qualche minuto.'}
+    storico_previsioni = _meteo_previsto_storico(INIZIO_ORDINI, ieri)
+    # fino a ieri le previsioni di allora, da oggi quelle attuali
+    previsto = {g: m for g, m in (storico_previsioni or meteo).items() if g < oggi}
+    previsto.update({g: m for g, m in meteo.items() if g >= oggi})
+    con_probabilita = bool(storico_previsioni) and (
+        sum(1 for m in storico_previsioni.values() if m.get('probabilita') is not None) >= 0.8 * len(storico_previsioni))
     festivi = italian_holidays_in_range(INIZIO_ORDINI, fine + timedelta(days=1))
     prenotazioni = _prenotazioni_note(INIZIO_ORDINI, fine)
     presenze = _presenze_per_giorno(INIZIO_ORDINI, ieri)
@@ -298,7 +360,7 @@ def calcola(oggi=None):
     festivi_chiusi = {nome for f, nome in festivi.items() if f <= ieri and f not in storico}
 
     aperti = sorted(storico)
-    xs, ys, usati = _righe(aperti, storico, meteo, festivi, prenotazioni)
+    xs, ys, usati = _righe(aperti, storico, meteo, festivi, prenotazioni, previsto, con_probabilita)
 
     # --- verifica: addestro senza gli ultimi giorni e li prevedo
     taglio = max(len(usati) - GIORNI_VERIFICA, 60)
@@ -312,7 +374,8 @@ def calcola(oggi=None):
             previsti = max(0.0, math.expm1(modello_v.predict(x)))
             reali = storico[g][0]
             riga = {'data': g, 'giorno': GIORNI_SETTIMANA[g.weekday()], 'previsti': previsti, 'reali': reali,
-                    'pioggia': meteo[g]['pioggia'], 'piove': meteo[g]['piove'], 'scarto_pct': (previsti - reali) / reali * 100}
+                    'pioggia': meteo[g]['pioggia'], 'piove': meteo[g]['piove'],
+                    'in_arrivo': _giorni_in_arrivo(g, previsto, con_probabilita), 'scarto_pct': (previsti - reali) / reali * 100}
             riga['squadra'] = squadra_per(math.expm1(modello_v.predict(x) + margine_v), ore_lavaggio, ore_persona)
             riga['squadra_ideale'] = squadra_per(reali, ore_lavaggio, ore_persona)
             if g in presenze:
@@ -327,7 +390,13 @@ def calcola(oggi=None):
         con_presenze = [r for r in giorni_v if 'persone' in r]
         media_reali = sum(r['reali'] for r in giorni_v) / len(giorni_v)
         base = [abs(r['reali'] - _media_wd(storico, r['data'], usati[:taglio])) for r in giorni_v]
+        # lo stesso modello senza la pioggia prevista (com'era prima)
+        corto = lambda x: x[:N_BASE]
+        modello_prima = Ridge().fit([corto(x) for x in xs[:taglio]], ys[:taglio])
+        prima = [abs(max(0.0, math.expm1(modello_prima.predict(corto(x)))) - storico[g][0])
+                 for x, g in zip(xs[taglio:], usati[taglio:])]
         verifica = {
+            'errore_prima_pct': sum(prima) / len(prima) / media_reali * 100,
             'giorni': giorni_v, 'dal': giorni_v[0]['data'], 'al': giorni_v[-1]['data'],
             'errore_medio': sum(errori) / len(errori), 'errore_pct': sum(errori) / len(errori) / media_reali * 100,
             'errore_base_pct': sum(base) / len(base) / media_reali * 100,
@@ -356,14 +425,14 @@ def calcola(oggi=None):
         livello = _livello(storico_esteso, g) or _livello(storico, oggi)
         note = _prenotazioni_ora(g)
         # oggi: le prenotazioni note alle 18 di ieri, come nell'addestramento
-        x = _variabili(g, meteo, festivi, livello, prenotazioni.get(g, 0) if k == 0 else note)
+        x = _variabili(g, meteo, festivi, livello, prenotazioni.get(g, 0) if k == 0 else note, previsto, con_probabilita)
         stima = modello.predict(x)
         previsti, alti = max(0.0, math.expm1(stima)), max(0.0, math.expm1(stima + margine))
         previsioni.append({
             'data': g, 'giorno': GIORNI_SETTIMANA[g.weekday()], 'chiuso': chiuso, 'domani': k == 1,
             'oggi': k == 0, 'finora': finora if k == 0 else None,
             'pioggia': meteo[g]['pioggia'], 'piove': meteo[g]['piove'], 'ore_pioggia': meteo[g].get('ore', 0),
-            'probabilita': meteo[g].get('probabilita'), 'tmax': meteo[g]['tmax'], 'prenotazioni': note,
+            'probabilita': meteo[g].get('probabilita'), 'in_arrivo': _giorni_in_arrivo(g, previsto, con_probabilita), 'tmax': meteo[g]['tmax'], 'prenotazioni': note,
             'previsti': previsti, 'alti': alti,
             'ore': alti * ore_lavaggio if ore_lavaggio else None,
             'squadra': None if chiuso else squadra_per(alti, ore_lavaggio, ore_persona),
@@ -374,15 +443,21 @@ def calcola(oggi=None):
 
     pesi = sorted(((n, c) for n, c in zip(NOMI_VARIABILI, modello.coef)), key=lambda t: -abs(t[1]))
     return {
+        'previsioni_storiche': storico_previsioni is not None, 'con_probabilita': con_probabilita,
         'oggi': oggi, 'giorni_storico': len(usati), 'dal': usati[0], 'previsioni': previsioni, 'verifica': verifica,
         'ore_lavaggio': ore_lavaggio, 'minuti_lavaggio': ore_lavaggio * 60 if ore_lavaggio else None,
         'ore_persona': ore_persona, 'ore_produttive': ore_persona * RESA_TURNO if ore_persona else None,
         'resa_turno': RESA_TURNO * 100, 'persone_self': PERSONE_SELF,
         'esempio_20': squadra_servito(20, ore_lavaggio, ore_persona), 'giorni_presenze': len(presenze),
-        'costo_ora': costo_medio, 'pesi': [{'nome': n, 'effetto': (math.exp(c) - 1) * 100} for n, c in pesi[:8]],
+        'costo_ora': costo_medio, 'pesi': [{'nome': n, 'effetto': (math.exp(c) - 1) * 100} for n, c in pesi[:10]],
         'margine_pct': (math.exp(margine) - 1) * 100,
         'chiuso': [GIORNI_SETTIMANA[wd] for wd in sorted(chiuso_wd)],
     }
+
+
+def _giorni_in_arrivo(giorno, previsto, con_probabilita):
+    """Quanti dei 3 giorni dopo erano (o sono) previsti di pioggia."""
+    return sum(1 for k in (1, 2, 3) if _piove_previsto(previsto.get(giorno + timedelta(days=k)), con_probabilita))
 
 
 def _prenotazioni_ora(giorno):

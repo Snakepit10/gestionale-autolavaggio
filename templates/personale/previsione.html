@@ -35,7 +35,7 @@
       {% else %}<div class="squadra-big">{{ d.squadra|default:"—" }} <span style="font-size:1rem">person{{ d.squadra|pluralize:"a,e" }}</span></div>
       {% if d.servito %}<div class="sub">servito {{ d.servito }} + self-service {{ r.persone_self }}</div>{% endif %}{% endif %}
       <div class="sub">{{ d.previsti|floatformat:0 }} lavaggi previsti (fino a {{ d.alti|floatformat:0 }}){% if d.ore %} &middot; {{ d.ore|floatformat:1 }} ore di lavoro{% endif %}{% if d.oggi %} &middot; finora {{ d.finora }}{% endif %}</div>
-      <div class="sub">{% if d.piove %}<i class="bi bi-cloud-rain"></i> pioggia{% if d.ore_pioggia %} {{ d.ore_pioggia|floatformat:0 }} h{% endif %} &middot; {{ d.pioggia|floatformat:1 }} mm{% else %}<i class="bi bi-sun"></i> asciutto{% endif %}{% if d.probabilita != None %} ({{ d.probabilita }}%){% endif %} &middot; max {{ d.tmax|floatformat:0 }}&deg;C &middot; {{ d.prenotazioni }} prenotazion{{ d.prenotazioni|pluralize:"e,i" }}</div>
+      <div class="sub">{% if d.piove %}<i class="bi bi-cloud-rain"></i> pioggia{% if d.ore_pioggia %} {{ d.ore_pioggia|floatformat:0 }} h{% endif %} &middot; {{ d.pioggia|floatformat:1 }} mm{% else %}<i class="bi bi-sun"></i> asciutto{% endif %}{% if d.probabilita != None %} ({{ d.probabilita }}%){% endif %}{% if d.in_arrivo %} &middot; <i class="bi bi-umbrella"></i> pioggia prevista in {{ d.in_arrivo }} dei 3 giorni dopo{% endif %} &middot; max {{ d.tmax|floatformat:0 }}&deg;C &middot; {{ d.prenotazioni }} prenotazion{{ d.prenotazioni|pluralize:"e,i" }}</div>
     </div></div>
     {% endif %}{% endfor %}
     <div class="col-6 col-md-2"><div class="kpi-tile"><div class="label">Minuti per lavaggio</div><div class="value">{{ r.minuti_lavaggio|floatformat:0|default:"—" }}</div><div class="sub">durata dei servizi da catalogo, media ultimi 90 giorni</div></div></div>
@@ -48,12 +48,13 @@
     <div class="panel-sub">La decisione si prende alle {{ ora_decisione|time:"H:i" }} del giorno prima: da quell'ora la previsione di domani viene salvata e poi confrontata con il reale. I giorni successivi sono indicativi (meteo meno sicuro, prenotazioni ancora da arrivare).</div>
     <div class="panel-body tabella-scroll">
       <table class="table table-sm prev">
-        <thead><tr><th>Giorno</th><th class="tab-num">Pioggia</th><th class="tab-num">Max</th><th class="tab-num">Prenot.</th><th class="tab-num">Lavaggi previsti</th><th class="tab-num">Fino a</th><th class="tab-num">Ore</th><th class="tab-num">Squadra</th></tr></thead>
+        <thead><tr><th>Giorno</th><th class="tab-num">Pioggia</th><th class="tab-num">In arrivo</th><th class="tab-num">Max</th><th class="tab-num">Prenot.</th><th class="tab-num">Lavaggi previsti</th><th class="tab-num">Fino a</th><th class="tab-num">Ore</th><th class="tab-num">Squadra</th></tr></thead>
         <tbody>
         {% for p in r.previsioni %}
           <tr class="{% if p.domani %}domani{% endif %}{% if p.oggi %} oggi{% endif %}{% if p.chiuso %} chiuso{% endif %}">
             <td>{{ p.giorno }} {{ p.data|date:"d/m" }}{% if p.oggi %} &middot; oggi{% elif p.domani %} &middot; domani{% endif %}</td>
             <td class="tab-num">{% if p.piove %}<i class="bi bi-cloud-rain"></i> {{ p.ore_pioggia|floatformat:0 }} h &middot; {{ p.pioggia|floatformat:1 }} mm{% else %}&mdash;{% endif %}{% if p.probabilita != None %} <span class="nota">{{ p.probabilita }}%</span>{% endif %}</td>
+            <td class="tab-num">{% if p.in_arrivo %}<i class="bi bi-umbrella"></i> {{ p.in_arrivo }}/3{% else %}&mdash;{% endif %}</td>
             <td class="tab-num">{{ p.tmax|floatformat:0 }}&deg;</td>
             <td class="tab-num">{{ p.prenotazioni }}</td>
             {% if p.chiuso %}<td colspan="4" class="text-center">chiuso</td>{% else %}
@@ -72,10 +73,10 @@
   {% if r.verifica %}{% with v=r.verifica %}
   <div class="panel">
     <div class="panel-title"><i class="bi bi-clipboard-check"></i> Quanto e' affidabile: verifica dal {{ v.dal|date:"d/m/Y" }} al {{ v.al|date:"d/m/Y" }}</div>
-    <div class="panel-sub">Il modello e' stato addestrato senza questi giorni e poi li ha previsti, come se fosse la sera prima. Usa il meteo reale, quindi e' un po' piu' preciso di quanto sara' con le previsioni.</div>
+    <div class="panel-sub">Il modello e' stato addestrato senza questi giorni e poi li ha previsti, come se fosse la sera prima. Usa la pioggia caduta e quella che era prevista allora{% if not r.previsioni_storiche %} (archivio delle previsioni non disponibile: al suo posto la pioggia caduta){% endif %}.</div>
     <div class="panel-body">
       <div class="row g-2 mb-2">
-        <div class="col-6 col-md-3"><div class="kpi-tile"><div class="label">Errore medio</div><div class="value">{{ v.errore_pct|floatformat:0 }}%</div><div class="sub">&plusmn;{{ v.errore_medio|floatformat:1 }} lavaggi al giorno &middot; solo media per giorno della settimana: {{ v.errore_base_pct|floatformat:0 }}%</div></div></div>
+        <div class="col-6 col-md-3"><div class="kpi-tile"><div class="label">Errore medio</div><div class="value">{{ v.errore_pct|floatformat:0 }}%</div><div class="sub">&plusmn;{{ v.errore_medio|floatformat:1 }} lavaggi al giorno &middot; senza la pioggia prevista: {{ v.errore_prima_pct|floatformat:0 }}% &middot; solo media per giorno della settimana: {{ v.errore_base_pct|floatformat:0 }}%</div></div></div>
         <div class="col-6 col-md-3"><div class="kpi-tile"><div class="label">Giorni entro &plusmn;20%</div><div class="value">{{ v.entro_20|floatformat:0 }}%</div></div></div>
         <div class="col-6 col-md-3"><div class="kpi-tile"><div class="label">Squadra giusta</div><div class="value">{% if v.squadra_giusta != None %}{{ v.squadra_giusta|floatformat:0 }}%{% else %}&mdash;{% endif %}</div><div class="sub">{% if v.squadra_scarsa != None %}scoperti nel {{ v.squadra_scarsa|floatformat:0 }}% dei giorni{% endif %}</div></div></div>
         <div class="col-6 col-md-3"><div class="kpi-tile hero"><div class="label">Risparmio possibile</div><div class="value">{% if v.giorni_presenze %}&euro;{{ v.risparmio|floatformat:"0g" }}{% else %}&mdash;{% endif %}</div><div class="sub">{% if v.giorni_presenze %}{{ v.ore_risparmiate|floatformat:0 }} ore in {{ v.giorni_presenze }} giorni con presenze{% else %}servono le presenze{% endif %}</div></div></div>
@@ -84,11 +85,12 @@
         <summary class="nota" style="cursor:pointer">Giorno per giorno</summary>
         <div class="tabella-scroll">
         <table class="table table-sm prev mt-2">
-          <thead><tr><th>Giorno</th><th class="tab-num">Pioggia</th><th class="tab-num">Previsti</th><th class="tab-num">Reali</th><th class="tab-num">Scarto</th><th class="tab-num">Squadra consigliata</th><th class="tab-num">Squadra ideale</th><th class="tab-num">Persone presenti</th><th class="tab-num">Ore risparmiabili</th></tr></thead>
+          <thead><tr><th>Giorno</th><th class="tab-num">Pioggia</th><th class="tab-num">Prevista dopo</th><th class="tab-num">Previsti</th><th class="tab-num">Reali</th><th class="tab-num">Scarto</th><th class="tab-num">Squadra consigliata</th><th class="tab-num">Squadra ideale</th><th class="tab-num">Persone presenti</th><th class="tab-num">Ore risparmiabili</th></tr></thead>
           <tbody>
           {% for g in v.giorni reversed %}
             <tr><td>{{ g.giorno }} {{ g.data|date:"d/m" }}</td>
               <td class="tab-num">{% if g.piove %}{{ g.pioggia|floatformat:1 }} mm{% else %}&mdash;{% endif %}</td>
+              <td class="tab-num">{% if g.in_arrivo %}{{ g.in_arrivo }}/3{% else %}&mdash;{% endif %}</td>
               <td class="tab-num">{{ g.previsti|floatformat:0 }}</td><td class="tab-num">{{ g.reali }}</td>
               <td class="tab-num {% if g.scarto_pct > 20 %}su{% elif g.scarto_pct < -20 %}giu{% endif %}">{{ g.scarto_pct|floatformat:0 }}%</td>
               <td class="tab-num">{{ g.squadra|default:"—" }}</td><td class="tab-num">{{ g.squadra_ideale|default:"—" }}</td>
@@ -124,7 +126,7 @@
 
   <div class="panel">
     <div class="panel-title"><i class="bi bi-sliders"></i> Cosa conta di piu'</div>
-    <div class="panel-sub">Addestrato su {{ r.giorni_storico }} giorni di apertura dal {{ r.dal|date:"d/m/Y" }}{% if r.chiuso %}; chiuso di {{ r.chiuso|join:", " }}{% endif %}. Effetto sui lavaggi di una variazione tipica di ogni variabile, a parita' delle altre.</div>
+    <div class="panel-sub">Addestrato su {{ r.giorni_storico }} giorni di apertura dal {{ r.dal|date:"d/m/Y" }}{% if r.chiuso %}; chiuso di {{ r.chiuso|join:", " }}{% endif %}. Effetto sui lavaggi di una variazione tipica di ogni variabile, a parita' delle altre. Conta sia la pioggia caduta sia quella prevista, per il giorno e per i 3 giorni dopo (chi vede pioggia in arrivo non lava la macchina){% if r.con_probabilita %}, compresa la probabilita'{% endif %}.</div>
     <div class="panel-body">
       <table class="table table-sm prev" style="max-width:480px">
         {% for p in r.pesi %}<tr><td>{{ p.nome }}</td><td class="tab-num {% if p.effetto > 0 %}giu{% else %}su{% endif %}">{% if p.effetto > 0 %}+{% endif %}{{ p.effetto|floatformat:0 }}%</td></tr>{% endfor %}
