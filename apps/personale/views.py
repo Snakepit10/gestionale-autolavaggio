@@ -299,18 +299,23 @@ def previsione(request):
     if request.method == 'POST':
         errori = []
         lpp = _decimale(request.POST.get('lavaggi_per_persona'), 'Lavaggi per persona', errori, Decimal('1'))
+        margine = _decimale(request.POST.get('margine_pct'), 'Margine', errori, Decimal('0'))
+        if margine is not None and margine > 50:
+            errori.append('Margine: non puo\' essere maggiore di 50')
         if errori:
             for e in errori:
                 messages.error(request, e)
         else:
             par.lavaggi_per_persona = lpp or par.lavaggi_per_persona
+            par.margine_pct = margine if margine is not None else par.margine_pct
             par.save()
             messages.success(request, 'Parametri della previsione salvati.')
         return redirect('personale:previsione')
     risultato = prev.calcola(par=par)
     prev.registra(risultato)
+    storico = prev.storico_previsioni()
     return render(request, 'personale/previsione.html', {
-        'r': risultato, 'par': par, 'storico': prev.storico_previsioni(),
+        'r': risultato, 'par': par, 'storico': storico, 'errore_vero': prev.errore_vero(storico),
         'ora_decisione': prev.ORA_DECISIONE,
     })
 
