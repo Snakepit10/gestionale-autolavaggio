@@ -10,6 +10,7 @@ from . import previsione as prev
 from .models import PrevisioneSquadra
 
 OGGI = date(2026, 11, 5)
+METEO_VERO = prev._meteo          # prima dei mock del setUp
 
 
 def dati_sintetici():
@@ -21,7 +22,8 @@ def dati_sintetici():
     g = prev.INIZIO_ORDINI - timedelta(days=3)
     while g <= OGGI + timedelta(days=8):
         pioggia = rnd.choice([0, 0, 0, 0, 0, 0, 5, 15])
-        meteo[g] = {'pioggia': float(pioggia), 'tmax': 25.0}
+        meteo[g] = {'pioggia': float(pioggia), 'ore': 6.0 if pioggia else 0.0, 'tmax': 25.0}
+        meteo[g]['piove'] = prev.piove(meteo[g])
         if prev.INIZIO_ORDINI <= g < OGGI and g.weekday() != 6:
             base = 32 if g.weekday() == 5 else 20
             lavaggi[g] = (max(1, round(base * (0.5 if pioggia else 1) * rnd.uniform(0.9, 1.1))), 0.0)
@@ -77,6 +79,23 @@ class PrevisioneTest(TestCase):
         # squadra sempre piena: nei giorni di pioggia si risparmia
         self.assertGreater(v['ore_risparmiate'], 0)
         self.assertGreater(v['risparmio'], 0)
+
+    def test_pioggia_debole_conta(self):
+        # pomeriggio di pioviggine: pochi millimetri ma e' una giornata di pioggia
+        self.assertTrue(prev.piove({'pioggia': 0.4, 'ore': 5, 'codice': 51}))
+        self.assertTrue(prev.piove({'pioggia': 0.3, 'ore': 1, 'codice': 3, 'probabilita': 75}))
+        self.assertTrue(prev.piove({'pioggia': 0.2, 'ore': 0, 'codice': 61}))
+        self.assertFalse(prev.piove({'pioggia': 0.1, 'ore': 1, 'codice': 3, 'probabilita': 20}))
+        self.assertFalse(prev.piove({}))
+
+    def test_meteo_da_open_meteo(self):
+        risposta = {'daily': {'time': ['2026-11-05'], 'precipitation_sum': [0.6], 'precipitation_hours': [4.0],
+                              'weather_code': [61], 'temperature_2m_max': [19.0], 'precipitation_probability_max': [80]}}
+        with mock.patch('apps.finanze.weather._http_get_json', return_value=risposta), \
+             mock.patch('django.utils.timezone.localdate', return_value=OGGI):
+            meteo = METEO_VERO(OGGI, OGGI)
+        self.assertEqual(meteo[OGGI]['probabilita'], 80)
+        self.assertTrue(meteo[OGGI]['piove'])
 
     def test_registra_solo_dopo_le_18(self):
         r = prev.calcola(OGGI)

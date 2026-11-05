@@ -35,7 +35,7 @@
       {% else %}<div class="squadra-big">{{ d.squadra|default:"—" }} <span style="font-size:1rem">person{{ d.squadra|pluralize:"a,e" }}</span></div>
       {% if d.servito %}<div class="sub">servito {{ d.servito }} + self-service {{ r.persone_self }}</div>{% endif %}{% endif %}
       <div class="sub">{{ d.previsti|floatformat:0 }} lavaggi previsti (fino a {{ d.alti|floatformat:0 }}){% if d.ore %} &middot; {{ d.ore|floatformat:1 }} ore di lavoro{% endif %}{% if d.oggi %} &middot; finora {{ d.finora }}{% endif %}</div>
-      <div class="sub">{% if d.pioggia >= 1 %}<i class="bi bi-cloud-rain"></i> {{ d.pioggia|floatformat:1 }} mm{% else %}<i class="bi bi-sun"></i> asciutto{% endif %} &middot; max {{ d.tmax|floatformat:0 }}&deg;C &middot; {{ d.prenotazioni }} prenotazion{{ d.prenotazioni|pluralize:"e,i" }}</div>
+      <div class="sub">{% if d.piove %}<i class="bi bi-cloud-rain"></i> pioggia{% if d.ore_pioggia %} {{ d.ore_pioggia|floatformat:0 }} h{% endif %} &middot; {{ d.pioggia|floatformat:1 }} mm{% else %}<i class="bi bi-sun"></i> asciutto{% endif %}{% if d.probabilita != None %} ({{ d.probabilita }}%){% endif %} &middot; max {{ d.tmax|floatformat:0 }}&deg;C &middot; {{ d.prenotazioni }} prenotazion{{ d.prenotazioni|pluralize:"e,i" }}</div>
     </div></div>
     {% endif %}{% endfor %}
     <div class="col-6 col-md-2"><div class="kpi-tile"><div class="label">Minuti per lavaggio</div><div class="value">{{ r.minuti_lavaggio|floatformat:0|default:"—" }}</div><div class="sub">durata dei servizi da catalogo, media ultimi 90 giorni</div></div></div>
@@ -53,7 +53,7 @@
         {% for p in r.previsioni %}
           <tr class="{% if p.domani %}domani{% endif %}{% if p.oggi %} oggi{% endif %}{% if p.chiuso %} chiuso{% endif %}">
             <td>{{ p.giorno }} {{ p.data|date:"d/m" }}{% if p.oggi %} &middot; oggi{% elif p.domani %} &middot; domani{% endif %}</td>
-            <td class="tab-num">{% if p.pioggia >= 1 %}{{ p.pioggia|floatformat:1 }} mm{% else %}&mdash;{% endif %}</td>
+            <td class="tab-num">{% if p.piove %}<i class="bi bi-cloud-rain"></i> {{ p.ore_pioggia|floatformat:0 }} h &middot; {{ p.pioggia|floatformat:1 }} mm{% else %}&mdash;{% endif %}{% if p.probabilita != None %} <span class="nota">{{ p.probabilita }}%</span>{% endif %}</td>
             <td class="tab-num">{{ p.tmax|floatformat:0 }}&deg;</td>
             <td class="tab-num">{{ p.prenotazioni }}</td>
             {% if p.chiuso %}<td colspan="4" class="text-center">chiuso</td>{% else %}
@@ -88,7 +88,7 @@
           <tbody>
           {% for g in v.giorni reversed %}
             <tr><td>{{ g.giorno }} {{ g.data|date:"d/m" }}</td>
-              <td class="tab-num">{% if g.pioggia >= 1 %}{{ g.pioggia|floatformat:1 }} mm{% else %}&mdash;{% endif %}</td>
+              <td class="tab-num">{% if g.piove %}{{ g.pioggia|floatformat:1 }} mm{% else %}&mdash;{% endif %}</td>
               <td class="tab-num">{{ g.previsti|floatformat:0 }}</td><td class="tab-num">{{ g.reali }}</td>
               <td class="tab-num {% if g.scarto_pct > 20 %}su{% elif g.scarto_pct < -20 %}giu{% endif %}">{{ g.scarto_pct|floatformat:0 }}%</td>
               <td class="tab-num">{{ g.squadra|default:"—" }}</td><td class="tab-num">{{ g.squadra_ideale|default:"—" }}</td>

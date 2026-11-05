@@ -38,28 +38,42 @@ GIORNI_SETTIMANA = ['Lun', 'Mar', 'Mer', 'Gio', 'Ven', 'Sab', 'Dom']
 
 # ---------------------------------------------------------------- dati
 
+CODICI_PIOGGIA = set(range(51, 68)) | set(range(80, 83)) | set(range(95, 100))   # WMO: pioviggine, pioggia, rovesci, temporali
+
+
+def piove(m):
+    """Giornata di pioggia: almeno 1 mm, oppure 2 ore di pioggia, oppure
+    un codice meteo di pioggia, oppure (nelle previsioni) probabilita'
+    almeno 60%. Anche una pioggia debole per tutto il pomeriggio conta,
+    anche se i millimetri sono pochi."""
+    return bool(m) and (m.get('pioggia', 0) >= 1 or m.get('ore', 0) >= 2 or m.get('codice') in CODICI_PIOGGIA
+                        or (m.get('probabilita') or 0) >= 60)
+
+
 def _meteo(dal, al):
-    """{data: {'pioggia': mm, 'tmax': gradi}} da Open-Meteo: archivio fino a
-    3 giorni fa, previsioni per gli ultimi giorni e i prossimi 7. None se
-    l'API non risponde."""
+    """{data: {'pioggia': mm, 'ore': ore di pioggia, 'codice': codice WMO,
+    'probabilita': % (solo previsioni), 'tmax': gradi, 'piove': bool}} da
+    Open-Meteo: archivio fino a 3 giorni fa, previsioni per gli ultimi
+    giorni e i prossimi 7. None se l'API non risponde."""
+    import hashlib
     from urllib.parse import urlencode
 
     from apps.finanze.weather import LICATA_LAT, LICATA_LON, _http_get_json
     oggi = timezone.localdate()
-    daily = 'precipitation_sum,temperature_2m_max'
+    daily = 'precipitation_sum,precipitation_hours,weather_code,temperature_2m_max'
     richieste = []
     fine_archivio = min(al, oggi - timedelta(days=3))
     if dal <= fine_archivio:
-        richieste.append(('https://archive-api.open-meteo.com/v1/archive',
+        richieste.append(('https://archive-api.open-meteo.com/v1/archive', daily,
                           {'start_date': dal.isoformat(), 'end_date': fine_archivio.isoformat()}, 60 * 60 * 24))
     if al > fine_archivio:
-        richieste.append(('https://api.open-meteo.com/v1/forecast',
-                          {'past_days': 3, 'forecast_days': max(1, min(16, (al - oggi).days + 1))}, 60 * 60))
+        richieste.append(('https://api.open-meteo.com/v1/forecast', daily + ',precipitation_probability_max',
+                          {'past_days': 3, 'forecast_days': max(1, min(16, (al - oggi).days + 1))}, 60 * 30))
     meteo = {}
-    for url, params, durata in richieste:
-        params = {'latitude': LICATA_LAT, 'longitude': LICATA_LON, 'daily': daily, 'timezone': 'Europe/Rome', **params}
+    for url, variabili, params, durata in richieste:
+        params = {'latitude': LICATA_LAT, 'longitude': LICATA_LON, 'daily': variabili, 'timezone': 'Europe/Rome', **params}
         indirizzo = f'{url}?{urlencode(params)}'
-        chiave = 'previsione_squadra_meteo_' + str(abs(hash(indirizzo)))
+        chiave = 'previsione_squadra_meteo_' + hashlib.md5(indirizzo.encode()).hexdigest()
         dati = cache.get(chiave)
         if dati is None:
             dati = _http_get_json(indirizzo, timeout=8.0)
@@ -67,11 +81,17 @@ def _meteo(dal, al):
                 return None
             cache.set(chiave, dati, durata)
         d = dati['daily']
+        valore = lambda nome, i: (d.get(nome) or [None] * (i + 1))[i]
         for i, t in enumerate(d.get('time') or []):
             giorno = date.fromisoformat(t)
-            pioggia, tmax = d['precipitation_sum'][i], d['temperature_2m_max'][i]
-            if pioggia is not None or giorno not in meteo:
-                meteo[giorno] = {'pioggia': pioggia or 0.0, 'tmax': tmax}
+            pioggia = valore('precipitation_sum', i)
+            if pioggia is None and giorno in meteo:
+                continue
+            m = {'pioggia': pioggia or 0.0, 'ore': valore('precipitation_hours', i) or 0.0,
+                 'codice': valore('weather_code', i), 'probabilita': valore('precipitation_probability_max', i),
+                 'tmax': valore('temperature_2m_max', i)}
+            m['piove'] = piove(m)
+            meteo[giorno] = m
     return meteo
 
 
@@ -119,7 +139,7 @@ def _costo_orario_per_mese():
 
 NOMI_VARIABILI = (['Mar', 'Mer', 'Gio', 'Ven', 'Sab', 'Dom'] +
                   ['Festivo', 'Prefestivo', 'Postfestivo', 'Stagione (sen)', 'Stagione (cos)',
-                   'Pioggia oggi (mm)', 'Pioggia oggi (si/no)', 'Pioggia ieri', 'Pioggia 2-3 giorni fa',
+                   'Pioggia oggi (mm)', 'Pioggia oggi (si/no)', 'Ore di pioggia oggi', 'Pioggia ieri', 'Pioggia 2-3 giorni fa',
                    'Giorni dall\'ultima pioggia', 'Temperatura massima', 'Livello ultime 4 settimane',
                    'Prenotazioni gia\' fatte'])
 
@@ -129,7 +149,7 @@ def _variabili(giorno, meteo, festivi, livello, prenotazioni):
     m = meteo.get(giorno, {})
     pioggia = lambda d: (meteo.get(giorno - timedelta(days=d)) or {}).get('pioggia', 0.0)
     asciutto = 0
-    while asciutto < 14 and pioggia(asciutto + 1) < 1:
+    while asciutto < 14 and not piove(meteo.get(giorno - timedelta(days=asciutto + 1))):
         asciutto += 1
     angolo = 2 * math.pi * giorno.timetuple().tm_yday / 365.25
     tmax = m.get('tmax')
@@ -138,7 +158,7 @@ def _variabili(giorno, meteo, festivi, livello, prenotazioni):
         1.0 if giorno + timedelta(days=1) in festivi else 0.0,
         1.0 if giorno - timedelta(days=1) in festivi else 0.0,
         math.sin(angolo), math.cos(angolo),
-        math.log1p(m.get('pioggia', 0.0)), 1.0 if m.get('pioggia', 0.0) >= 1 else 0.0,
+        math.log1p(m.get('pioggia', 0.0)), 1.0 if piove(m) else 0.0, math.log1p(m.get('ore', 0.0)),
         math.log1p(pioggia(1)), math.log1p(pioggia(2) + pioggia(3)),
         asciutto / 14,
         tmax if tmax is not None else 22.0,
@@ -292,7 +312,7 @@ def calcola(oggi=None):
             previsti = max(0.0, math.expm1(modello_v.predict(x)))
             reali = storico[g][0]
             riga = {'data': g, 'giorno': GIORNI_SETTIMANA[g.weekday()], 'previsti': previsti, 'reali': reali,
-                    'pioggia': meteo[g]['pioggia'], 'scarto_pct': (previsti - reali) / reali * 100}
+                    'pioggia': meteo[g]['pioggia'], 'piove': meteo[g]['piove'], 'scarto_pct': (previsti - reali) / reali * 100}
             riga['squadra'] = squadra_per(math.expm1(modello_v.predict(x) + margine_v), ore_lavaggio, ore_persona)
             riga['squadra_ideale'] = squadra_per(reali, ore_lavaggio, ore_persona)
             if g in presenze:
@@ -342,7 +362,8 @@ def calcola(oggi=None):
         previsioni.append({
             'data': g, 'giorno': GIORNI_SETTIMANA[g.weekday()], 'chiuso': chiuso, 'domani': k == 1,
             'oggi': k == 0, 'finora': finora if k == 0 else None,
-            'pioggia': meteo[g]['pioggia'], 'tmax': meteo[g]['tmax'], 'prenotazioni': note,
+            'pioggia': meteo[g]['pioggia'], 'piove': meteo[g]['piove'], 'ore_pioggia': meteo[g].get('ore', 0),
+            'probabilita': meteo[g].get('probabilita'), 'tmax': meteo[g]['tmax'], 'prenotazioni': note,
             'previsti': previsti, 'alti': alti,
             'ore': alti * ore_lavaggio if ore_lavaggio else None,
             'squadra': None if chiuso else squadra_per(alti, ore_lavaggio, ore_persona),
