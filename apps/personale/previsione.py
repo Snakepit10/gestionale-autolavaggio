@@ -6,9 +6,11 @@ Due passi:
    saranno, da: giorno della settimana, festivi e ponti, stagione, meteo
    del giorno e dei giorni prima, livello delle ultime 4 settimane e
    prenotazioni gia' fatte alle 18 del giorno prima;
-2. i lavaggi previsti diventano ore di lavoro con le ore per lavaggio dei
-   giorni pieni (quando c'e' lavoro, la squadra rende cosi'), e le ore
-   diventano persone con le ore medie di una presenza.
+2. i lavaggi previsti diventano minuti di lavoro con la durata media dei
+   lavaggi da catalogo (somma delle durate dei servizi di ogni ordine), e
+   i minuti diventano persone del servito con il tempo produttivo di una
+   presenza (RESA_TURNO delle sue ore medie); il self-service ha sempre
+   PERSONE_SELF persone in piu'.
 
 Il modello si verifica da solo: addestrato senza gli ultimi GIORNI_VERIFICA
 giorni di apertura, prevede quei giorni e confronta con il reale.
@@ -28,7 +30,9 @@ GIORNI_VERIFICA = 60
 ORA_DECISIONE = time(18, 0)
 LAMBDA = 1.0                 # regolarizzazione ridge (sulle variabili standardizzate)
 QUANTILE_MARGINE = 0.75      # la squadra si dimensiona sui lavaggi "alti" (75 giorni su 100 ne bastano)
-SQUADRA_MINIMA = 1
+SQUADRA_MINIMA = 1           # persone minime del servito
+PERSONE_SELF = 1             # addetti al self-service, sempre presenti, fuori dal calcolo
+RESA_TURNO = 0.85            # parte del turno passata davvero sulle auto (il resto: consegne, spostamenti, pulizie)
 GIORNI_SETTIMANA = ['Lun', 'Mar', 'Mer', 'Gio', 'Ven', 'Sab', 'Dom']
 
 
@@ -212,22 +216,38 @@ def _righe(giorni, storico, meteo, festivi, prenotazioni):
     return xs, ys, usati
 
 
-def _resa(storico, presenze):
-    """Ore lavorate per lavaggio nei giorni pieni (il terzo dei giorni con
-    piu' lavaggi) e ore medie di una presenza."""
-    giorni = [g for g in presenze if g in storico and storico[g][0] > 0]
-    if not giorni:
-        return None, None
-    soglia = _quantile([storico[g][0] for g in giorni], 2 / 3)
-    pieni = [presenze[g][0] / storico[g][0] for g in giorni if storico[g][0] >= soglia]
-    ore_persona = sum(presenze[g][0] for g in giorni) / sum(presenze[g][1] for g in giorni)
-    return _quantile(pieni, 0.5), ore_persona
+def _minuti_lavaggio(dal, al):
+    """Minuti di lavoro medi per lavaggio del servito, dal catalogo: per
+    ogni ordine la somma delle durate dei suoi servizi."""
+    from django.db.models import F
+
+    from apps.ordini.models import ItemOrdine
+    righe = (ItemOrdine.objects.filter(ordine__data_ora__date__gte=dal, ordine__data_ora__date__lte=al,
+                                       ordine__vendita_prodotti=False, servizio_prodotto__tipo='servizio')
+             .exclude(ordine__stato='annullato')
+             .aggregate(minuti=Sum(F('quantita') * F('servizio_prodotto__durata_minuti')), ordini=Count('ordine', distinct=True)))
+    return righe['minuti'] / righe['ordini'] if righe['ordini'] else None
+
+
+def _resa(storico, presenze, ieri):
+    """Ore di lavoro per lavaggio (dal catalogo, ultimi 90 giorni) e ore
+    medie di una presenza."""
+    minuti = _minuti_lavaggio(ieri - timedelta(days=90), ieri)
+    giorni = [g for g in presenze if g in storico]
+    ore_persona = (sum(presenze[g][0] for g in giorni) / sum(presenze[g][1] for g in giorni)) if giorni else None
+    return (minuti / 60 if minuti else None), ore_persona
+
+
+def squadra_servito(lavaggi, ore_lavaggio, ore_persona):
+    if not ore_lavaggio or not ore_persona:
+        return None
+    return max(SQUADRA_MINIMA, math.ceil(lavaggi * ore_lavaggio / (ore_persona * RESA_TURNO)))
 
 
 def squadra_per(lavaggi, ore_lavaggio, ore_persona):
-    if not ore_lavaggio or not ore_persona:
-        return None
-    return max(SQUADRA_MINIMA, math.ceil(lavaggi * ore_lavaggio / ore_persona))
+    """Squadra totale: servito + self-service."""
+    servito = squadra_servito(lavaggi, ore_lavaggio, ore_persona)
+    return servito + PERSONE_SELF if servito else None
 
 
 def calcola(oggi=None):
@@ -244,7 +264,7 @@ def calcola(oggi=None):
     festivi = italian_holidays_in_range(INIZIO_ORDINI, fine + timedelta(days=1))
     prenotazioni = _prenotazioni_note(INIZIO_ORDINI, fine)
     presenze = _presenze_per_giorno(INIZIO_ORDINI, ieri)
-    ore_lavaggio, ore_persona = _resa(storico, presenze)
+    ore_lavaggio, ore_persona = _resa(storico, presenze, ieri)
     costo_ora = _costo_orario_per_mese()
     costo_medio = sum(costo_ora.values()) / len(costo_ora) if costo_ora else None
 
@@ -326,6 +346,7 @@ def calcola(oggi=None):
             'previsti': previsti, 'alti': alti,
             'ore': alti * ore_lavaggio if ore_lavaggio else None,
             'squadra': None if chiuso else squadra_per(alti, ore_lavaggio, ore_persona),
+            'servito': None if chiuso else squadra_servito(alti, ore_lavaggio, ore_persona),
         })
         if k > 0:
             storico_esteso[g] = (round(previsti), 0)
@@ -333,7 +354,10 @@ def calcola(oggi=None):
     pesi = sorted(((n, c) for n, c in zip(NOMI_VARIABILI, modello.coef)), key=lambda t: -abs(t[1]))
     return {
         'oggi': oggi, 'giorni_storico': len(usati), 'dal': usati[0], 'previsioni': previsioni, 'verifica': verifica,
-        'ore_lavaggio': ore_lavaggio, 'ore_persona': ore_persona, 'giorni_presenze': len(presenze),
+        'ore_lavaggio': ore_lavaggio, 'minuti_lavaggio': ore_lavaggio * 60 if ore_lavaggio else None,
+        'ore_persona': ore_persona, 'ore_produttive': ore_persona * RESA_TURNO if ore_persona else None,
+        'resa_turno': RESA_TURNO * 100, 'persone_self': PERSONE_SELF,
+        'esempio_20': squadra_servito(20, ore_lavaggio, ore_persona), 'giorni_presenze': len(presenze),
         'costo_ora': costo_medio, 'pesi': [{'nome': n, 'effetto': (math.exp(c) - 1) * 100} for n, c in pesi[:8]],
         'margine_pct': (math.exp(margine) - 1) * 100,
         'chiuso': [GIORNI_SETTIMANA[wd] for wd in sorted(chiuso_wd)],

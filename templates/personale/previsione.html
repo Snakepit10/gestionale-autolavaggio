@@ -32,15 +32,16 @@
     <div class="col-12 col-md-4"><div class="kpi-tile{% if d.domani %} hero{% endif %}">
       <div class="label">{% if d.oggi %}Oggi{% else %}Squadra consigliata domani{% endif %} {{ d.giorno }} {{ d.data|date:"d/m" }}</div>
       {% if d.chiuso %}<div class="squadra-big">Chiuso</div>
-      {% else %}<div class="squadra-big">{{ d.squadra|default:"—" }} <span style="font-size:1rem">person{{ d.squadra|pluralize:"a,e" }}</span></div>{% endif %}
+      {% else %}<div class="squadra-big">{{ d.squadra|default:"—" }} <span style="font-size:1rem">person{{ d.squadra|pluralize:"a,e" }}</span></div>
+      {% if d.servito %}<div class="sub">servito {{ d.servito }} + self-service {{ r.persone_self }}</div>{% endif %}{% endif %}
       <div class="sub">{{ d.previsti|floatformat:0 }} lavaggi previsti (fino a {{ d.alti|floatformat:0 }}){% if d.ore %} &middot; {{ d.ore|floatformat:1 }} ore di lavoro{% endif %}{% if d.oggi %} &middot; finora {{ d.finora }}{% endif %}</div>
       <div class="sub">{% if d.pioggia >= 1 %}<i class="bi bi-cloud-rain"></i> {{ d.pioggia|floatformat:1 }} mm{% else %}<i class="bi bi-sun"></i> asciutto{% endif %} &middot; max {{ d.tmax|floatformat:0 }}&deg;C &middot; {{ d.prenotazioni }} prenotazion{{ d.prenotazioni|pluralize:"e,i" }}</div>
     </div></div>
     {% endif %}{% endfor %}
-    <div class="col-6 col-md-2"><div class="kpi-tile"><div class="label">Ore per lavaggio</div><div class="value">{{ r.ore_lavaggio|floatformat:2|default:"—" }}</div><div class="sub">nei giorni pieni</div></div></div>
-    <div class="col-6 col-md-2"><div class="kpi-tile"><div class="label">Ore per persona</div><div class="value">{{ r.ore_persona|floatformat:1|default:"—" }}</div><div class="sub">media di una presenza</div></div></div>
+    <div class="col-6 col-md-2"><div class="kpi-tile"><div class="label">Minuti per lavaggio</div><div class="value">{{ r.minuti_lavaggio|floatformat:0|default:"—" }}</div><div class="sub">durata dei servizi da catalogo, media ultimi 90 giorni</div></div></div>
+    <div class="col-6 col-md-2"><div class="kpi-tile"><div class="label">Ore utili a persona</div><div class="value">{{ r.ore_produttive|floatformat:1|default:"—" }}</div><div class="sub">{{ r.resa_turno|floatformat:0 }}% di {{ r.ore_persona|floatformat:1 }} ore di presenza{% if r.esempio_20 %} &middot; 20 lavaggi = {{ r.esempio_20 }} al servito{% endif %}</div></div></div>
   </div>
-  {% if not r.ore_lavaggio %}<div class="alert alert-info">Mancano le presenze: senza ore lavorate la previsione dei lavaggi c'e', la squadra no.</div>{% endif %}
+  {% if not r.ore_lavaggio or not r.ore_persona %}<div class="alert alert-info">Mancano {% if not r.ore_persona %}le presenze{% else %}le durate dei servizi{% endif %}: la previsione dei lavaggi c'e', la squadra no.</div>{% endif %}
 
   <div class="panel">
     <div class="panel-title"><i class="bi bi-calendar-week"></i> Prossimi giorni</div>
@@ -59,12 +60,12 @@
             <td class="tab-num">{{ p.previsti|floatformat:0 }}</td>
             <td class="tab-num">{{ p.alti|floatformat:0 }}</td>
             <td class="tab-num">{{ p.ore|floatformat:1|default:"—" }}</td>
-            <td class="tab-num"><strong>{{ p.squadra|default:"—" }}</strong></td>{% endif %}
+            <td class="tab-num"><strong>{{ p.squadra|default:"—" }}</strong>{% if p.servito %} <span class="nota">({{ p.servito }}+{{ r.persone_self }})</span>{% endif %}</td>{% endif %}
           </tr>
         {% endfor %}
         </tbody>
       </table>
-      <div class="nota">La squadra si calcola sui lavaggi "fino a" ({{ quantile }}&deg; percentile: in 3 giorni su 4 il lavoro reale e' sotto), per non restare scoperti. Ore = lavaggi &times; ore per lavaggio; squadra = ore / ore per persona, arrotondato per eccesso.</div>
+      <div class="nota">La squadra si calcola sui lavaggi "fino a" ({{ quantile }}&deg; percentile: in 3 giorni su 4 il lavoro reale e' sotto), per non restare scoperti. Ore = lavaggi &times; minuti per lavaggio; servito = ore / ore utili a persona, arrotondato per eccesso; piu' {{ r.persone_self }} al self-service. Ore utili = la parte del turno passata davvero sulle auto ({{ r.resa_turno|floatformat:0 }}%): il resto va in consegne, spostamenti delle auto, pulizie e pause. Se i minuti per lavaggio non tornano, correggi la durata dei servizi nel catalogo.</div>
     </div>
   </div>
 

@@ -15,7 +15,7 @@ OGGI = date(2026, 11, 5)
 def dati_sintetici():
     """Storico da agosto 2025: 20 lavaggi i feriali, 32 il sabato, chiuso
     la domenica; la pioggia dimezza i lavaggi. Squadra sempre piena:
-    6 persone da 8 ore il sabato, 4 gli altri giorni, anche con la pioggia."""
+    6 persone da 8 ore il sabato, 5 gli altri giorni, anche con la pioggia."""
     rnd = random.Random(1)
     meteo, lavaggi, presenze = {}, {}, {}
     g = prev.INIZIO_ORDINI - timedelta(days=3)
@@ -26,7 +26,7 @@ def dati_sintetici():
             base = 32 if g.weekday() == 5 else 20
             lavaggi[g] = (max(1, round(base * (0.5 if pioggia else 1) * rnd.uniform(0.9, 1.1))), 0.0)
             if g >= date(2026, 1, 1):
-                presenze[g] = (48.0, 6) if g.weekday() == 5 else (32.0, 4)
+                presenze[g] = (48.0, 6) if g.weekday() == 5 else (40.0, 5)
         g += timedelta(days=1)
     return meteo, lavaggi, presenze
 
@@ -40,6 +40,7 @@ class PrevisioneTest(TestCase):
             mock.patch.object(prev, '_lavaggi_per_giorno', side_effect=lambda dal, al: {g: v for g, v in lavaggi.items() if dal <= g <= al}),
             mock.patch.object(prev, '_presenze_per_giorno', side_effect=lambda dal, al: {g: v for g, v in presenze.items() if dal <= g <= al}),
             mock.patch.object(prev, '_costo_orario_per_mese', return_value={date(2026, 10, 1): 15.0}),
+            mock.patch.object(prev, '_minuti_lavaggio', return_value=60.0),
         ]
         for p in patch:
             p.start()
@@ -51,6 +52,10 @@ class PrevisioneTest(TestCase):
         self.assertLess(v['errore_pct'], 15)
         self.assertLess(v['errore_pct'], v['errore_base_pct'])        # meglio della sola media per giorno
         self.assertAlmostEqual(r['ore_persona'], 8.0)
+        # 20 lavaggi da 60 minuti = 20 ore / 6,8 ore utili a persona -> 3 al servito, + 1 al self
+        self.assertEqual(r['esempio_20'], 3)
+        self.assertEqual(prev.squadra_per(20, 1.0, 8.0), 4)
+        self.assertEqual(prev.squadra_per(1, 1.0, 8.0), 2)                 # minimo 1 al servito + self
         self.assertEqual(r['chiuso'], ['Dom'])
         per_giorno = {p['data']: p for p in r['previsioni']}
         domenica = next(p for p in r['previsioni'] if p['data'].weekday() == 6)
