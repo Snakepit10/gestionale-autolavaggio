@@ -28,8 +28,9 @@ from apps.finanze.lag_analysis import italian_holidays_in_range
 INIZIO_ORDINI = date(2025, 8, 1)
 GIORNI_VERIFICA = 60
 ORA_DECISIONE = time(18, 0)
-LAMBDA = 1.0                 # regolarizzazione ridge (sulle variabili standardizzate)
-QUANTILE_MARGINE = 0.75      # la squadra si dimensiona sui lavaggi "alti" (75 giorni su 100 ne bastano)
+LAMBDE = (1, 3, 10, 30, 100)  # regolarizzazione ridge provata: si tiene quella che sbaglia meno
+OBIETTIVO_SCOPERTI = 0.10     # margine piu' piccolo che lascia scoperti al massimo 1 giorno su 10
+GIORNI_TARATURA = 60          # giorni (gli ultimi dell'addestramento) su cui si sceglie regolarizzazione e margine
 SQUADRA_MINIMA = 1           # persone minime del servito
 PERSONE_SELF = 1             # addetti al self-service, sempre presenti, fuori dal calcolo
 RESA_TURNO = 0.85            # parte del turno passata davvero sulle auto (il resto: consegne, spostamenti, pulizie)
@@ -250,13 +251,16 @@ def _risolvi(a, b):
 
 
 class Ridge:
+    def __init__(self, lam=10):
+        self.lam = lam
+
     def fit(self, xs, ys):
         p = len(xs[0])
         self.media = [sum(x[j] for x in xs) / len(xs) for j in range(p)]
         self.scarto = [math.sqrt(sum((x[j] - self.media[j]) ** 2 for x in xs) / len(xs)) or 1.0 for j in range(p)]
         zs = [self._z(x) for x in xs]
         self.y0 = sum(ys) / len(ys)
-        ata = [[sum(z[i] * z[j] for z in zs) + (LAMBDA if i == j else 0) for j in range(p)] for i in range(p)]
+        ata = [[sum(z[i] * z[j] for z in zs) + (self.lam if i == j else 0) for j in range(p)] for i in range(p)]
         atb = [sum(z[i] * (y - self.y0) for z, y in zip(zs, ys)) for i in range(p)]
         self.coef = _risolvi(ata, atb)
         return self
@@ -326,6 +330,97 @@ def squadra_per(lavaggi, ore_lavaggio, ore_persona):
     return servito + PERSONE_SELF if servito else None
 
 
+def _taratura(xs, ys, ore_lavaggio, ore_persona):
+    """Sceglie la regolarizzazione e il margine sugli ultimi giorni
+    dell'addestramento, mai visti dal modello che li prevede: il margine
+    e' il piu' piccolo che lascia scoperti (squadra minore di quella che
+    sarebbe servita) al massimo OBIETTIVO_SCOPERTI dei giorni."""
+    n = min(GIORNI_TARATURA, len(xs) // 4)
+    dentro, fuori = slice(0, len(xs) - n), slice(len(xs) - n, len(xs))
+    migliore = None
+    for lam in LAMBDE:
+        m = Ridge(lam).fit(xs[dentro], ys[dentro])
+        errore = sum(abs(math.expm1(m.predict(x)) - math.expm1(y)) for x, y in zip(xs[fuori], ys[fuori]))
+        if migliore is None or errore < migliore[0]:
+            migliore = (errore, lam, m)
+    _, lam, m = migliore
+    residui = [y - m.predict(x) for x, y in zip(xs[fuori], ys[fuori])]
+    margine = _quantile(residui, 0.75)
+    if ore_lavaggio and ore_persona:
+        for q in [i / 20 for i in range(6, 20)]:                  # 30% ... 95%
+            prova = _quantile(residui, q)
+            scoperti = sum(1 for x, y in zip(xs[fuori], ys[fuori])
+                           if squadra_per(math.expm1(m.predict(x) + prova), ore_lavaggio, ore_persona)
+                           < squadra_per(math.expm1(y), ore_lavaggio, ore_persona))
+            if scoperti <= OBIETTIVO_SCOPERTI * len(residui):
+                margine = prova
+                break
+    return lam, margine
+
+
+def _indice(nome):
+    return NOMI_VARIABILI.index(nome)
+
+
+def _effetti(modello, xs, previsto_piovoso):
+    """Effetto sui lavaggi di situazioni concrete, a parita' del resto:
+    per ogni giorno dello storico si confronta la previsione con e senza la
+    situazione e si fa la media. Piu' leggibile dei pesi delle singole
+    variabili, che si compensano fra loro (es. pioggia si/no e ore)."""
+    def con(x, valori):
+        y = list(x)
+        for nome, v in valori.items():
+            y[_indice(nome)] = v
+        return y
+
+    def rapporto(acceso, spento):
+        a = sum(math.exp(modello.predict(con(x, acceso))) for x in xs)
+        b = sum(math.exp(modello.predict(con(x, spento))) for x in xs)
+        return (a / b - 1) * 100 if b else 0
+
+    giorni = ['Mar', 'Mer', 'Gio', 'Ven', 'Sab', 'Dom']
+    settimana = lambda attivo: {g: 1.0 if g == attivo else 0.0 for g in giorni}
+    feriali = [settimana(None)] + [settimana(g) for g in ('Mar', 'Mer', 'Gio', 'Ven')]
+
+    def contro_feriali(attivo):
+        a = sum(math.exp(modello.predict(con(x, settimana(attivo)))) for x in xs)
+        b = sum(math.exp(modello.predict(con(x, f))) for x in xs for f in feriali) / len(feriali)
+        return (a / b - 1) * 100
+
+    p = previsto_piovoso       # valori tipici di un giorno di pioggia
+    oggi_piove = {'Pioggia oggi (mm)': p['mm'], 'Pioggia oggi (si/no)': 1.0, 'Ore di pioggia oggi': p['ore'],
+                  'Pioggia prevista oggi (si/no)': 1.0, 'Ore di pioggia previste oggi': p['ore']}
+    oggi_asciutto = {k: 0.0 for k in oggi_piove}
+    falso_allarme = {**oggi_asciutto, 'Pioggia prevista oggi (si/no)': 1.0, 'Ore di pioggia previste oggi': p['ore']}
+    domani = {'Pioggia prevista domani (si/no)': 1.0, 'Giorni di pioggia previsti nei 3 dopo': 1 / 3,
+              'Pioggia prevista nei 3 giorni dopo (mm)': p['mm']}
+    domani_no = {k: 0.0 for k in domani}
+    ieri = {'Pioggia ieri': p['mm']}
+    estate = {'Stagione (sen)': math.sin(2 * math.pi * 196 / 365.25), 'Stagione (cos)': math.cos(2 * math.pi * 196 / 365.25)}
+    inverno = {'Stagione (sen)': math.sin(2 * math.pi * 15 / 365.25), 'Stagione (cos)': math.cos(2 * math.pi * 15 / 365.25)}
+    temp = lambda x: x[_indice('Temperatura massima')]
+    effetti = [
+        ('Giornata di pioggia (prevista e caduta)', rapporto(oggi_piove, oggi_asciutto)),
+        ('Pioggia prevista ma non caduta', rapporto(falso_allarme, oggi_asciutto)),
+        ('Pioggia prevista domani', rapporto(domani, domani_no)),
+        ('Ha piovuto ieri', rapporto(ieri, {'Pioggia ieri': 0.0})),
+        ('Sabato, rispetto a un feriale', contro_feriali('Sab')),
+        ('Domenica, rispetto a un feriale', contro_feriali('Dom')),
+        ('Festivo', rapporto({'Festivo': 1.0}, {'Festivo': 0.0})),
+        ('Estate, rispetto all\'inverno', rapporto(estate, inverno)),
+        ('5 gradi in piu\'', (sum(math.exp(modello.predict(con(x, {'Temperatura massima': temp(x) + 5}))) for x in xs)
+                             / sum(math.exp(modello.predict(x)) for x in xs) - 1) * 100),
+        ('3 prenotazioni in piu\'', rapporto({'Prenotazioni gia\' fatte': math.log1p(3)}, {'Prenotazioni gia\' fatte': 0.0})),
+    ]
+    return [{'nome': n, 'effetto': e} for n, e in effetti]
+
+
+def _pioggia_tipica(previsto):
+    piovosi = [m for m in previsto.values() if m.get('piove')]
+    return {'mm': math.log1p(_quantile([m.get('pioggia', 0) for m in piovosi], 0.5)) if piovosi else math.log1p(5),
+            'ore': math.log1p(_quantile([m.get('ore', 0) for m in piovosi], 0.5)) if piovosi else math.log1p(4)}
+
+
 def calcola(oggi=None):
     """Verifica del modello sugli ultimi giorni e previsione dei prossimi 7."""
     oggi = oggi or timezone.localdate()
@@ -366,9 +461,8 @@ def calcola(oggi=None):
     taglio = max(len(usati) - GIORNI_VERIFICA, 60)
     verifica = None
     if len(usati) - taglio >= 20:
-        modello_v = Ridge().fit(xs[:taglio], ys[:taglio])
-        residui_v = [y - modello_v.predict(x) for x, y in zip(xs[:taglio], ys[:taglio])]
-        margine_v = _quantile(residui_v, QUANTILE_MARGINE)
+        lam_v, margine_v = _taratura(xs[:taglio], ys[:taglio], ore_lavaggio, ore_persona)
+        modello_v = Ridge(lam_v).fit(xs[:taglio], ys[:taglio])
         giorni_v = []
         for x, y, g in zip(xs[taglio:], ys[taglio:], usati[taglio:]):
             previsti = max(0.0, math.expm1(modello_v.predict(x)))
@@ -392,7 +486,7 @@ def calcola(oggi=None):
         base = [abs(r['reali'] - _media_wd(storico, r['data'], usati[:taglio])) for r in giorni_v]
         # lo stesso modello senza la pioggia prevista (com'era prima)
         corto = lambda x: x[:N_BASE]
-        modello_prima = Ridge().fit([corto(x) for x in xs[:taglio]], ys[:taglio])
+        modello_prima = Ridge(lam_v).fit([corto(x) for x in xs[:taglio]], ys[:taglio])
         prima = [abs(max(0.0, math.expm1(modello_prima.predict(corto(x)))) - storico[g][0])
                  for x, g in zip(xs[taglio:], usati[taglio:])]
         verifica = {
@@ -403,6 +497,8 @@ def calcola(oggi=None):
             'entro_20': sum(1 for r in giorni_v if abs(r['scarto_pct']) <= 20) / len(giorni_v) * 100,
             'squadra_giusta': (sum(1 for r in con_squadra if r['squadra'] == r['squadra_ideale']) / len(con_squadra) * 100
                                if con_squadra else None),
+            'squadra_quasi': (sum(1 for r in con_squadra if 0 <= r['squadra'] - r['squadra_ideale'] <= 1) / len(con_squadra) * 100
+                              if con_squadra else None),
             'squadra_scarsa': (sum(1 for r in con_squadra if r['squadra'] < r['squadra_ideale']) / len(con_squadra) * 100
                                if con_squadra else None),
             'giorni_presenze': len(con_presenze),
@@ -411,9 +507,8 @@ def calcola(oggi=None):
         }
 
     # --- modello finale su tutto lo storico
-    modello = Ridge().fit(xs, ys)
-    residui = [y - modello.predict(x) for x, y in zip(xs, ys)]
-    margine = _quantile(residui, QUANTILE_MARGINE)
+    lam, margine = _taratura(xs, ys, ore_lavaggio, ore_persona)
+    modello = Ridge(lam).fit(xs, ys)
     previsioni = []
     storico_esteso = dict(storico)
     finora = _lavaggi_per_giorno(oggi, oggi).get(oggi, (0, 0))[0]
@@ -441,7 +536,6 @@ def calcola(oggi=None):
         if k > 0:
             storico_esteso[g] = (round(previsti), 0)
 
-    pesi = sorted(((n, c) for n, c in zip(NOMI_VARIABILI, modello.coef)), key=lambda t: -abs(t[1]))
     return {
         'previsioni_storiche': storico_previsioni is not None, 'con_probabilita': con_probabilita,
         'oggi': oggi, 'giorni_storico': len(usati), 'dal': usati[0], 'previsioni': previsioni, 'verifica': verifica,
@@ -449,7 +543,9 @@ def calcola(oggi=None):
         'ore_persona': ore_persona, 'ore_produttive': ore_persona * RESA_TURNO if ore_persona else None,
         'resa_turno': RESA_TURNO * 100, 'persone_self': PERSONE_SELF,
         'esempio_20': squadra_servito(20, ore_lavaggio, ore_persona), 'giorni_presenze': len(presenze),
-        'costo_ora': costo_medio, 'pesi': [{'nome': n, 'effetto': (math.exp(c) - 1) * 100} for n, c in pesi[:10]],
+        'costo_ora': costo_medio, 'effetti': [e for e in _effetti(modello, xs, _pioggia_tipica(previsto))
+                    if not (e['nome'].startswith('Domenica') and 6 in chiuso_wd)],
+        'obiettivo_scoperti': OBIETTIVO_SCOPERTI * 100,
         'margine_pct': (math.exp(margine) - 1) * 100,
         'chiuso': [GIORNI_SETTIMANA[wd] for wd in sorted(chiuso_wd)],
     }

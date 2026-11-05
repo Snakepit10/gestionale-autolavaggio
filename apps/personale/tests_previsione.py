@@ -72,6 +72,12 @@ class PrevisioneTest(TestCase):
         self.assertLess(v['errore_pct'], v['errore_base_pct'])        # meglio della sola media per giorno
         self.assertLess(v['errore_pct'], v['errore_prima_pct'] * 0.7)  # la pioggia prevista conta
         self.assertTrue(r['previsioni_storiche'])
+        self.assertLessEqual(v['squadra_scarsa'], 15)
+        effetti = {e['nome']: e['effetto'] for e in r['effetti']}
+        self.assertNotIn('Domenica, rispetto a un feriale', effetti)            # chiuso la domenica
+        self.assertLess(abs(effetti['Pioggia prevista ma non caduta'] + 50), 10)  # i clienti guardano la previsione
+        self.assertLess(abs(effetti['Pioggia prevista domani'] + 25), 10)
+        self.assertLess(abs(effetti['Sabato, rispetto a un feriale'] - 60), 10)
         self.assertAlmostEqual(r['ore_persona'], 8.0)
         # 20 lavaggi da 60 minuti = 20 ore / 6,8 ore utili a persona -> 3 al servito, + 1 al self
         self.assertEqual(r['esempio_20'], 3)

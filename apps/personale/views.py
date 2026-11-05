@@ -298,5 +298,5 @@ def previsione(request):
     prev.registra(risultato)
     return render(request, 'personale/previsione.html', {
         'r': risultato, 'storico': prev.storico_previsioni(),
-        'ora_decisione': prev.ORA_DECISIONE, 'quantile': int(prev.QUANTILE_MARGINE * 100),
+        'ora_decisione': prev.ORA_DECISIONE,
     })

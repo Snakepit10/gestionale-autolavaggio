@@ -66,7 +66,7 @@
         {% endfor %}
         </tbody>
       </table>
-      <div class="nota">La squadra si calcola sui lavaggi "fino a" ({{ quantile }}&deg; percentile: in 3 giorni su 4 il lavoro reale e' sotto), per non restare scoperti. Ore = lavaggi &times; minuti per lavaggio; servito = ore / ore utili a persona, arrotondato per eccesso; piu' {{ r.persone_self }} al self-service. Ore utili = la parte del turno passata davvero sulle auto ({{ r.resa_turno|floatformat:0 }}%): il resto va in consegne, spostamenti delle auto, pulizie e pause. Se i minuti per lavaggio non tornano, correggi la durata dei servizi nel catalogo.</div>
+      <div class="nota">La squadra si calcola sui lavaggi "fino a" (+{{ r.margine_pct|floatformat:0 }}% sulla previsione): e' il margine piu' piccolo che, sui giorni passati, avrebbe lasciato la squadra scoperta al massimo {{ r.obiettivo_scoperti|floatformat:0 }} giorni su 100. Ore = lavaggi &times; minuti per lavaggio; servito = ore / ore utili a persona, arrotondato per eccesso; piu' {{ r.persone_self }} al self-service. Ore utili = la parte del turno passata davvero sulle auto ({{ r.resa_turno|floatformat:0 }}%): il resto va in consegne, spostamenti delle auto, pulizie e pause. Se i minuti per lavaggio non tornano, correggi la durata dei servizi nel catalogo.</div>
     </div>
   </div>
 
@@ -78,7 +78,7 @@
       <div class="row g-2 mb-2">
         <div class="col-6 col-md-3"><div class="kpi-tile"><div class="label">Errore medio</div><div class="value">{{ v.errore_pct|floatformat:0 }}%</div><div class="sub">&plusmn;{{ v.errore_medio|floatformat:1 }} lavaggi al giorno &middot; senza la pioggia prevista: {{ v.errore_prima_pct|floatformat:0 }}% &middot; solo media per giorno della settimana: {{ v.errore_base_pct|floatformat:0 }}%</div></div></div>
         <div class="col-6 col-md-3"><div class="kpi-tile"><div class="label">Giorni entro &plusmn;20%</div><div class="value">{{ v.entro_20|floatformat:0 }}%</div></div></div>
-        <div class="col-6 col-md-3"><div class="kpi-tile"><div class="label">Squadra giusta</div><div class="value">{% if v.squadra_giusta != None %}{{ v.squadra_giusta|floatformat:0 }}%{% else %}&mdash;{% endif %}</div><div class="sub">{% if v.squadra_scarsa != None %}scoperti nel {{ v.squadra_scarsa|floatformat:0 }}% dei giorni{% endif %}</div></div></div>
+        <div class="col-6 col-md-3"><div class="kpi-tile"><div class="label">Squadra giusta</div><div class="value">{% if v.squadra_giusta != None %}{{ v.squadra_giusta|floatformat:0 }}%{% else %}&mdash;{% endif %}</div><div class="sub">{% if v.squadra_quasi != None %}giusta o 1 persona in piu': {{ v.squadra_quasi|floatformat:0 }}% &middot; {% endif %}{% if v.squadra_scarsa != None %}scoperti nel {{ v.squadra_scarsa|floatformat:0 }}% dei giorni{% endif %}</div></div></div>
         <div class="col-6 col-md-3"><div class="kpi-tile hero"><div class="label">Risparmio possibile</div><div class="value">{% if v.giorni_presenze %}&euro;{{ v.risparmio|floatformat:"0g" }}{% else %}&mdash;{% endif %}</div><div class="sub">{% if v.giorni_presenze %}{{ v.ore_risparmiate|floatformat:0 }} ore in {{ v.giorni_presenze }} giorni con presenze{% else %}servono le presenze{% endif %}</div></div></div>
       </div>
       <details>
@@ -126,10 +126,10 @@
 
   <div class="panel">
     <div class="panel-title"><i class="bi bi-sliders"></i> Cosa conta di piu'</div>
-    <div class="panel-sub">Addestrato su {{ r.giorni_storico }} giorni di apertura dal {{ r.dal|date:"d/m/Y" }}{% if r.chiuso %}; chiuso di {{ r.chiuso|join:", " }}{% endif %}. Effetto sui lavaggi di una variazione tipica di ogni variabile, a parita' delle altre. Conta sia la pioggia caduta sia quella prevista, per il giorno e per i 3 giorni dopo (chi vede pioggia in arrivo non lava la macchina){% if r.con_probabilita %}, compresa la probabilita'{% endif %}.</div>
+    <div class="panel-sub">Addestrato su {{ r.giorni_storico }} giorni di apertura dal {{ r.dal|date:"d/m/Y" }}{% if r.chiuso %}; chiuso di {{ r.chiuso|join:", " }}{% endif %}. Di quanto cambiano i lavaggi in ogni situazione, a parita' del resto (media su tutti i giorni dello storico). Conta sia la pioggia caduta sia quella prevista, per il giorno e per i 3 giorni dopo (chi vede pioggia in arrivo non lava la macchina){% if r.con_probabilita %}, compresa la probabilita'{% endif %}.</div>
     <div class="panel-body">
       <table class="table table-sm prev" style="max-width:480px">
-        {% for p in r.pesi %}<tr><td>{{ p.nome }}</td><td class="tab-num {% if p.effetto > 0 %}giu{% else %}su{% endif %}">{% if p.effetto > 0 %}+{% endif %}{{ p.effetto|floatformat:0 }}%</td></tr>{% endfor %}
+        {% for p in r.effetti %}<tr><td>{{ p.nome }}</td><td class="tab-num {% if p.effetto > 0 %}giu{% else %}su{% endif %}">{% if p.effetto > 0 %}+{% endif %}{{ p.effetto|floatformat:0 }}%</td></tr>{% endfor %}
       </table>
     </div>
   </div>
