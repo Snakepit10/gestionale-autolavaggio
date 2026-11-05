@@ -12,7 +12,6 @@ from .models import ParametriPrevisione, PrevisioneSquadra
 OGGI = date(2026, 11, 5)
 METEO_VERO = prev._meteo          # prima dei mock del setUp
 POLVERE_VERA = prev._polvere
-CICLI_VERI = prev._cicli_self_per_giorno
 
 
 def dati_sintetici():
@@ -67,8 +66,6 @@ class PrevisioneTest(TestCase):
             mock.patch.object(prev, '_costo_orario_per_mese', return_value={date(2026, 10, 1): 15.0}),
             mock.patch.object(prev, '_polvere', side_effect=lambda dal, al: {g: v for g, v in polvere.items() if dal <= g <= al}),
             mock.patch.object(prev, '_piste_per_giorno', return_value={}),
-            mock.patch.object(prev, '_cicli_self_per_giorno',
-                              side_effect=lambda dal, al: {g: v for g, v in cicli.items() if dal <= g <= al}),
         ]
         for p in patch:
             p.start()
@@ -87,29 +84,26 @@ class PrevisioneTest(TestCase):
         self.assertLess(abs(effetti['Pioggia prevista ma non caduta'] + 50), 10)  # i clienti guardano la previsione
         self.assertLess(abs(effetti['Pioggia prevista domani'] + 25), 10)
         self.assertLess(abs(effetti['Sabato, rispetto a un feriale'] - 60), 10)
-        # cicli self previsti: ~30 asciutto, ~8 con pioggia
-        for p in [p for p in r['previsioni'] if not p['chiuso']]:
-            self.assertLess(abs(p['cicli'] - (8 if p['piove'] else 30)), 6, p)
-        self.assertLess(v['errore_cicli_pct'], 15)
+        # al self sempre una persona, niente previsione dei cicli
+        self.assertTrue(all(p['self'] == 1 and 'cicli' not in p for p in r['previsioni']))
+        self.assertNotIn('errore_cicli_pct', v)
         # la sabbia di ieri fa lavare: il modello la usa e ne vede l'effetto
         self.assertTrue(r['usa_segnali'])
         self.assertLess(v['errore_pct'], v['errore_senza_segnali_pct'])
         self.assertLess(abs(effetti['Sabbia del Sahara ieri'] - 40), 12)
         self.assertAlmostEqual(r['ore_persona'], 8.0)
-        # 7 lavaggi per persona: 20 lavaggi = 3 al servito; senza soglia sempre 1 al self
+        # 7 lavaggi per persona: 20 lavaggi = 3 al servito, piu' sempre 1 al self
         par = ParametriPrevisione.attuali()
         self.assertEqual(r['esempio_20'], 3)
-        self.assertEqual(prev.squadra_per(20, 30, par), 4)
-        self.assertEqual(prev.squadra_per(21, None, par), 4)
-        self.assertEqual(prev.squadra_per(1, 0, par), 2)                   # minimo 1 al servito + self
-        par.soglia_cicli_self = 20
-        self.assertEqual(prev.squadra_per(20, 30, par), 4)
-        self.assertEqual(prev.squadra_per(20, 10, par), 3)                 # pochi cicli: nessuno solo al self
+        self.assertEqual(prev.squadra_per(20, par), 4)
+        self.assertEqual(prev.squadra_per(21, par), 4)
+        self.assertEqual(prev.squadra_per(22, par), 5)
+        self.assertEqual(prev.squadra_per(1, par), 2)                      # minimo 1 al servito + self
         self.assertEqual(r['chiuso'], ['Dom'])
         per_giorno = {p['data']: p for p in r['previsioni']}
         domenica = next(p for p in r['previsioni'] if p['data'].weekday() == 6)
         self.assertTrue(domenica['chiuso'])                                # servito chiuso...
-        self.assertEqual((domenica['servito'], domenica['squadra']), (0, domenica['self']))   # ...il self resta
+        self.assertEqual((domenica['servito'], domenica['squadra']), (0, 1))  # ...al self resta una persona
         oggi = r['previsioni'][0]
         self.assertTrue(oggi['oggi'])
         self.assertEqual(oggi['data'], OGGI)
@@ -165,19 +159,6 @@ class PrevisioneTest(TestCase):
         self.assertEqual(salvata.data, date(2026, 11, 6))
         self.assertEqual(PrevisioneSquadra.objects.count(), 1)
 
-    def test_soglia_cicli_self(self):
-        par = ParametriPrevisione.attuali()
-        par.soglia_cicli_self = 20
-        par.save()
-        r = prev.calcola(OGGI, par)
-        for p in [p for p in r['previsioni'] if not p['chiuso']]:
-            self.assertEqual(p['self'], 0 if p['piove'] else 1, p)
-            self.assertEqual(p['squadra'], p['servito'] + p['self'])
-        v = r['verifica']
-        self.assertLessEqual(v['self_scarso'], 12)
-        self.assertGreaterEqual(v['self_giusto'], 85)
-        self.assertIsNotNone(v['servito_giusto'])
-
     def test_salva_parametri(self):
         from apps.auth_system.models import PermessoGruppo
         utente = User.objects.create_user('titolare2', password='x')
@@ -185,11 +166,10 @@ class PrevisioneTest(TestCase):
         utente.groups.add(gruppo)
         PermessoGruppo.objects.get_or_create(sezione='personale', gruppo=gruppo)
         self.client.force_login(utente)
-        self.client.post('/personale/previsione/', {'lavaggi_per_persona': '6,5', 'soglia_cicli_self': '25'})
-        par = ParametriPrevisione.attuali()
-        self.assertEqual((float(par.lavaggi_per_persona), par.soglia_cicli_self), (6.5, 25))
-        self.client.post('/personale/previsione/', {'lavaggi_per_persona': '7', 'soglia_cicli_self': ''})
-        self.assertIsNone(ParametriPrevisione.attuali().soglia_cicli_self)
+        self.client.post('/personale/previsione/', {'lavaggi_per_persona': '6,5'})
+        self.assertEqual(float(ParametriPrevisione.attuali().lavaggi_per_persona), 6.5)
+        self.client.post('/personale/previsione/', {'lavaggi_per_persona': 'sette'})          # non valido: resta
+        self.assertEqual(float(ParametriPrevisione.attuali().lavaggi_per_persona), 6.5)
 
     def test_segnali_inutili_esclusi(self):
         # sabbia a caso, senza effetto sui lavaggi: non deve peggiorare il modello
@@ -228,32 +208,6 @@ class PrevisioneTest(TestCase):
         self.assertEqual(riga['medie'][pr['ore'].index(9)], 2)
         mattina, pomeriggio, sera = riga['fasce']
         self.assertEqual((mattina['cicli'], pomeriggio['cicli'], sera['cicli']), (3, 1, 0))
-        self.assertEqual(prev._fasce_previste(sabato + timedelta(days=7), 40, pr)[0]['cicli'], 30)   # 3/4 la mattina
-
-    def test_cicli_self(self):
-        from apps.core.models import Categoria, ServizioProdotto
-        from apps.finanze.models import Cassa, ChiusuraCassaAutomatica, TransazionePortale
-        from apps.ordini.models import ItemOrdine, Ordine
-        portale = Cassa.objects.create(nome='Portale', tipo='automatica', tracking_washcycles=True)
-        completo = ServizioProdotto.objects.create(titolo='Lavaggio completo', categoria=Categoria.objects.create(nome='S'),
-                                                   prezzo=22, descrizione='')
-        g1, g2, g3 = date(2026, 10, 1), date(2026, 10, 2), date(2026, 10, 3)
-        # 1/10: solo la chiusura (30 cicli) e 4 completi del servito -> 26
-        ChiusuraCassaAutomatica.objects.create(cassa=portale, data=g1, wash_cycles=30)
-        ordine = Ordine.objects.create(totale=0, totale_finale=0)
-        Ordine.objects.filter(pk=ordine.pk).update(data_ora=timezone.make_aware(datetime(2026, 10, 1, 10, 0)))
-        ItemOrdine.objects.create(ordine=ordine, servizio_prodotto=completo, prezzo_unitario=22, quantita=4)
-        # 2/10: WashTec completo, 3 contanti + 2 unita' operativa (anche il self paga alla cassa automatica)
-        ChiusuraCassaAutomatica.objects.create(cassa=portale, data=g2, wash_cycles=5)
-        for n, origine in enumerate(['contanti', 'contanti', 'contanti', 'unita', 'unita']):
-            TransazionePortale.objects.create(portale='B', numero=n + 1, programma=4, origine=origine,
-                                              orario=timezone.make_aware(datetime(2026, 10, 2, 9 + n, 0)))
-        # 3/10: WashTec importato a meta' (1 transazione su 20 cicli): valgono le chiusure
-        ChiusuraCassaAutomatica.objects.create(cassa=portale, data=g3, wash_cycles=20)
-        TransazionePortale.objects.create(portale='A', numero=99, programma=4, origine='contanti',
-                                          orario=timezone.make_aware(datetime(2026, 10, 3, 9, 0)))
-        self.assertEqual(CICLI_VERI(g1, g3), {g1: (26, 0.0), g2: (5, 0.0), g3: (20, 0.0)})
-        self.assertEqual(prev.fonte_cicli(g1, g3), {'giorni_washtec': 1, 'giorni_chiusure': 2, 'giorni_parziali': 1})
 
     def test_esporta_csv(self):
         from apps.auth_system.models import PermessoGruppo
@@ -294,4 +248,5 @@ class PrevisioneTest(TestCase):
         self.assertContains(risposta, 'Squadra consigliata domani')
         self.assertContains(risposta, 'Oggi Gio 05/11')
         self.assertContains(risposta, 'Quanto e')
-        self.assertContains(risposta, 'giorni da WashTec')
+        self.assertContains(risposta, 'al self sempre 1 persona')
+        self.assertNotContains(risposta, 'soglia_cicli_self')

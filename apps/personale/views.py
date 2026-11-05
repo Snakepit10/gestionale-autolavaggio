@@ -299,15 +299,11 @@ def previsione(request):
     if request.method == 'POST':
         errori = []
         lpp = _decimale(request.POST.get('lavaggi_per_persona'), 'Lavaggi per persona', errori, Decimal('1'))
-        soglia = (request.POST.get('soglia_cicli_self') or '').strip()
-        if soglia and not soglia.isdigit():
-            errori.append(f'Soglia cicli self: "{soglia}" non e\' un numero intero')
         if errori:
             for e in errori:
                 messages.error(request, e)
         else:
             par.lavaggi_per_persona = lpp or par.lavaggi_per_persona
-            par.soglia_cicli_self = int(soglia) if soglia else None
             par.save()
             messages.success(request, 'Parametri della previsione salvati.')
         return redirect('personale:previsione')
