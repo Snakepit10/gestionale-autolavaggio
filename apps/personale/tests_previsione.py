@@ -108,8 +108,8 @@ class PrevisioneTest(TestCase):
         self.assertEqual(r['chiuso'], ['Dom'])
         per_giorno = {p['data']: p for p in r['previsioni']}
         domenica = next(p for p in r['previsioni'] if p['data'].weekday() == 6)
-        self.assertTrue(domenica['chiuso'])
-        self.assertIsNone(domenica['squadra'])
+        self.assertTrue(domenica['chiuso'])                                # servito chiuso...
+        self.assertEqual((domenica['servito'], domenica['squadra']), (0, domenica['self']))   # ...il self resta
         oggi = r['previsioni'][0]
         self.assertTrue(oggi['oggi'])
         self.assertEqual(oggi['data'], OGGI)
@@ -122,8 +122,10 @@ class PrevisioneTest(TestCase):
             self.assertLess(abs(p['previsti'] - atteso) / atteso, 0.2, p)
             self.assertEqual(p['in_arrivo'], sum(1 for k in (1, 2, 3) if self.meteo[p['data'] + timedelta(days=k)]['piove']))
         # squadra sempre piena: nei giorni di pioggia si risparmia
-        self.assertGreater(v['ore_risparmiate'], 0)
-        self.assertGreater(v['risparmio'], 0)
+        c = v['confronto']
+        self.assertGreater(c['risparmiate'], 0)                            # il secondo parere toglie turni...
+        self.assertLessEqual(c['regola']['scoperti'], c['voi']['scoperti'] + 5)   # ...senza scoprire la squadra
+        self.assertEqual(c['voi']['persone'] - c['regola']['persone'], c['risparmiate'])
 
     def test_pioggia_debole_conta(self):
         # pomeriggio di pioviggine: pochi millimetri ma e' una giornata di pioggia
@@ -207,10 +209,19 @@ class PrevisioneTest(TestCase):
     def test_profilo_self(self):
         from apps.finanze.models import TransazionePortale
         sabato = date(2026, 10, 31)
-        for n, (ora, origine) in enumerate([(9, 'contanti'), (9, 'contanti'), (10, 'contanti'), (15, 'contanti'),
-                                            (9, 'unita')]):                    # l'ultima e' del servito
-            TransazionePortale.objects.create(portale='A', numero=n + 1, programma=4, origine=origine,
-                                              orario=timezone.make_aware(datetime.combine(sabato, time(ora, 5))))
+        from apps.core.models import Categoria, ServizioProdotto
+        from apps.finanze.models import AbbinamentoPortale
+        from apps.ordini.models import ItemOrdine, Ordine
+        for n, (ora, origine) in enumerate([(9, 'contanti'), (9, 'unita'), (10, 'contanti'), (15, 'contanti'),
+                                            (9, 'unita')]):
+            t = TransazionePortale.objects.create(portale='A', numero=n + 1, programma=4, origine=origine,
+                                                  orario=timezone.make_aware(datetime.combine(sabato, time(ora, 5))))
+        # l'ultima e' abbinata a un lavaggio del servito: non e' self
+        servizio = ServizioProdotto.objects.create(titolo='Lavaggio completo', categoria=Categoria.objects.create(nome='S'),
+                                                   prezzo=22, descrizione='')
+        item = ItemOrdine.objects.create(ordine=Ordine.objects.create(totale=0, totale_finale=0),
+                                         servizio_prodotto=servizio, prezzo_unitario=22)
+        AbbinamentoPortale.objects.create(transazione=t, item=item)
         pr = prev.profilo_self(OGGI)
         riga = next(x for x in pr['righe'] if x['gruppo'] == 'Sabato')
         self.assertEqual(riga['giorni'], 1)
@@ -219,29 +230,30 @@ class PrevisioneTest(TestCase):
         self.assertEqual((mattina['cicli'], pomeriggio['cicli'], sera['cicli']), (3, 1, 0))
         self.assertEqual(prev._fasce_previste(sabato + timedelta(days=7), 40, pr)[0]['cicli'], 30)   # 3/4 la mattina
 
-    def test_cicli_self_una_sola_fonte(self):
+    def test_cicli_self(self):
         from apps.core.models import Categoria, ServizioProdotto
         from apps.finanze.models import Cassa, ChiusuraCassaAutomatica, TransazionePortale
         from apps.ordini.models import ItemOrdine, Ordine
         portale = Cassa.objects.create(nome='Portale', tipo='automatica', tracking_washcycles=True)
         completo = ServizioProdotto.objects.create(titolo='Lavaggio completo', categoria=Categoria.objects.create(nome='S'),
                                                    prezzo=22, descrizione='')
-        prima, dopo = date(2026, 10, 1), date(2026, 10, 2)
-        ChiusuraCassaAutomatica.objects.create(cassa=portale, data=prima, wash_cycles=30)
+        g1, g2, g3 = date(2026, 10, 1), date(2026, 10, 2), date(2026, 10, 3)
+        # 1/10: solo la chiusura (30 cicli) e 4 completi del servito -> 26
+        ChiusuraCassaAutomatica.objects.create(cassa=portale, data=g1, wash_cycles=30)
         ordine = Ordine.objects.create(totale=0, totale_finale=0)
         Ordine.objects.filter(pk=ordine.pk).update(data_ora=timezone.make_aware(datetime(2026, 10, 1, 10, 0)))
         ItemOrdine.objects.create(ordine=ordine, servizio_prodotto=completo, prezzo_unitario=22, quantita=4)
-        ChiusuraCassaAutomatica.objects.create(cassa=portale, data=dopo, wash_cycles=4)
-        for n, origine in enumerate(['contanti', 'contanti', 'contanti', 'unita']):
+        # 2/10: WashTec completo, 3 contanti + 2 unita' operativa (anche il self paga alla cassa automatica)
+        ChiusuraCassaAutomatica.objects.create(cassa=portale, data=g2, wash_cycles=5)
+        for n, origine in enumerate(['contanti', 'contanti', 'contanti', 'unita', 'unita']):
             TransazionePortale.objects.create(portale='B', numero=n + 1, programma=4, origine=origine,
                                               orario=timezone.make_aware(datetime(2026, 10, 2, 9 + n, 0)))
-        # pochi giorni WashTec: tutto dalle chiusure (meno i completi), niente miscugli
-        self.assertEqual(CICLI_VERI(prima, dopo), {prima: (26, 0.0), dopo: (4, 0.0)})
-        with mock.patch.object(prev, 'MIN_GIORNI_WASHTEC', 1):
-            self.assertEqual(CICLI_VERI(prima, dopo), {dopo: (3, 0.0)})          # solo WashTec
-        # giorno importato a meta' (2 transazioni su 30 cicli della chiusura): scartato
-        self.assertFalse(prev._washtec_completo({'self_washtec': 2, 'servito_washtec': 0, 'chiusure': 30, 'completi': 0}))
-        self.assertTrue(prev._washtec_completo({'self_washtec': 20, 'servito_washtec': 6, 'chiusure': 30, 'completi': 0}))
+        # 3/10: WashTec importato a meta' (1 transazione su 20 cicli): valgono le chiusure
+        ChiusuraCassaAutomatica.objects.create(cassa=portale, data=g3, wash_cycles=20)
+        TransazionePortale.objects.create(portale='A', numero=99, programma=4, origine='contanti',
+                                          orario=timezone.make_aware(datetime(2026, 10, 3, 9, 0)))
+        self.assertEqual(CICLI_VERI(g1, g3), {g1: (26, 0.0), g2: (5, 0.0), g3: (20, 0.0)})
+        self.assertEqual(prev.fonte_cicli(g1, g3), {'giorni_washtec': 1, 'giorni_chiusure': 2, 'giorni_parziali': 1})
 
     def test_esporta_csv(self):
         from apps.auth_system.models import PermessoGruppo

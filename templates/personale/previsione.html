@@ -32,9 +32,10 @@
     {% for d in r.previsioni %}{% if d.oggi or d.domani %}
     <div class="col-12 col-md-4"><div class="kpi-tile{% if d.domani %} hero{% endif %}">
       <div class="label">{% if d.oggi %}Oggi{% else %}Squadra consigliata domani{% endif %} {{ d.giorno }} {{ d.data|date:"d/m" }}</div>
-      {% if d.chiuso %}<div class="squadra-big">Chiuso</div>
-      {% else %}<div class="squadra-big">{{ d.squadra|default:"—" }} <span style="font-size:1rem">person{{ d.squadra|pluralize:"a,e" }}</span></div>
-      {% if d.servito %}<div class="sub">servito {{ d.servito }}{% if d.self %} + self-service {{ d.self }}{% else %}, nessuno solo al self{% endif %}</div>{% endif %}{% endif %}
+      <div class="squadra-big">{{ d.squadra|default:"—" }} <span style="font-size:1rem">person{{ d.squadra|pluralize:"a,e" }}</span></div>
+      {% if d.chiuso %}<div class="sub">servito chiuso{% if d.self %} &middot; self-service {{ d.self }}{% else %} &middot; nessuno al self{% endif %}</div>
+      {% elif d.servito %}<div class="sub">servito {{ d.servito }}{% if d.self %} + self-service {{ d.self }}{% else %}, nessuno solo al self{% endif %}</div>
+      {% if d.domani and d.togli_da %}<div class="sub" style="font-weight:700">Secondo parere: se al servito ne avevi in mente {{ d.togli_da }} o piu', togline una.</div>{% endif %}{% endif %}
       <div class="sub">{{ d.previsti|floatformat:0 }} lavaggi previsti (fino a {{ d.alti|floatformat:0 }}){% if d.cicli != None %} &middot; {{ d.cicli|floatformat:0 }} cicli self{% endif %}{% if d.oggi %} &middot; finora {{ d.finora }} lavaggi{% endif %}</div>
       {% if d.fasce %}<div class="sub">self: {% for f in d.fasce %}{{ f.nome|lower }} {{ f.cicli|floatformat:0 }}{% if not forloop.last %} &middot; {% endif %}{% endfor %} cicli</div>{% endif %}
       <div class="sub">{% if d.piove %}<i class="bi bi-cloud-rain"></i> pioggia{% if d.ore_pioggia %} {{ d.ore_pioggia|floatformat:0 }} h{% endif %} &middot; {{ d.pioggia|floatformat:1 }} mm{% else %}<i class="bi bi-sun"></i> asciutto{% endif %}{% if d.probabilita != None %} ({{ d.probabilita }}%){% endif %}{% if d.fonte %} <span style="opacity:.7">&middot; {{ d.fonte }}</span>{% endif %}{% if d.polvere != None and d.polvere >= 50 %} &middot; <i class="bi bi-wind"></i> sabbia {{ d.polvere|floatformat:0 }} &micro;g/m&sup3;{% endif %}{% if d.in_arrivo %} &middot; <i class="bi bi-umbrella"></i> pioggia prevista in {{ d.in_arrivo }} dei 3 giorni dopo{% endif %} &middot; max {{ d.tmax|floatformat:0 }}&deg;C &middot; {{ d.prenotazioni }} prenotazion{{ d.prenotazioni|pluralize:"e,i" }}</div>
@@ -72,7 +73,8 @@
             <td class="tab-num">{% if p.in_arrivo %}<i class="bi bi-umbrella"></i> {{ p.in_arrivo }}/3{% else %}&mdash;{% endif %}</td>
             <td class="tab-num">{{ p.tmax|floatformat:0 }}&deg;</td>
             <td class="tab-num">{{ p.prenotazioni }}</td>
-            {% if p.chiuso %}<td colspan="4" class="text-center">chiuso</td>{% else %}
+            {% if p.chiuso %}<td colspan="3" class="text-center">servito chiuso</td>
+            <td class="tab-num"><strong>{{ p.squadra }}</strong> <span class="nota">(0+{{ p.self }})</span></td>{% else %}
             <td class="tab-num">{{ p.previsti|floatformat:0 }}</td>
             <td class="tab-num">{{ p.alti|floatformat:0 }}</td>
             <td class="tab-num">{% if p.cicli != None %}{{ p.cicli|floatformat:0 }}{% else %}&mdash;{% endif %}</td>
@@ -95,13 +97,26 @@
         <div class="col-6 col-md-3"><div class="kpi-tile"><div class="label">Giorni entro &plusmn;20%</div><div class="value">{{ v.entro_20|floatformat:0 }}%</div></div></div>
         <div class="col-6 col-md-3"><div class="kpi-tile"><div class="label">Squadra giusta</div><div class="value">{% if v.squadra_giusta != None %}{{ v.squadra_giusta|floatformat:0 }}%{% else %}&mdash;{% endif %}</div><div class="sub">{% if v.squadra_quasi != None %}giusta o 1 persona in piu': {{ v.squadra_quasi|floatformat:0 }}% &middot; {% endif %}{% if v.squadra_scarsa != None %}scoperti nel {{ v.squadra_scarsa|floatformat:0 }}% dei giorni{% endif %}</div>
           {% if v.servito_giusto != None %}<div class="sub">servito giusto {{ v.servito_giusto|floatformat:0 }}% (scoperto {{ v.servito_scarso|floatformat:0 }}%){% if v.self_giusto != None %} &middot; self giusto {{ v.self_giusto|floatformat:0 }}% (scoperto {{ v.self_scarso|floatformat:0 }}%){% endif %}</div>{% endif %}</div></div>
-        <div class="col-6 col-md-3"><div class="kpi-tile hero"><div class="label">Risparmio possibile</div><div class="value">{% if v.giorni_presenze %}&euro;{{ v.risparmio|floatformat:"0g" }}{% else %}&mdash;{% endif %}</div><div class="sub">{% if v.giorni_presenze %}{{ v.ore_risparmiate|floatformat:0 }} ore in {{ v.giorni_presenze }} giorni con presenze{% else %}servono le presenze{% endif %}</div></div></div>
+        <div class="col-6 col-md-3"><div class="kpi-tile hero"><div class="label">Secondo parere</div>{% if v.confronto %}<div class="value">{{ v.confronto.risparmiate }} turni</div><div class="sub">in meno al servito in {{ v.confronto.giorni }} giorni{% if v.confronto.euro %} (&euro;{{ v.confronto.euro|floatformat:"0g" }}){% endif %}, scoperti {{ v.confronto.regola.scoperti|floatformat:0 }}% invece di {{ v.confronto.voi.scoperti|floatformat:0 }}%</div>{% else %}<div class="value">&mdash;</div><div class="sub">servono le presenze</div>{% endif %}</div></div>
       </div>
+      {% if v.confronto %}{% with c=v.confronto %}
+      <div class="tabella-scroll mb-2">
+        <table class="table table-sm prev" style="max-width:720px">
+          <thead><tr><th>Servito, negli stessi {{ c.giorni }} giorni</th><th class="tab-num">Squadra giusta</th><th class="tab-num">Una o piu' in piu'</th><th class="tab-num">Scoperti</th><th class="tab-num">Turni</th></tr></thead>
+          <tbody>
+            <tr><td>Come avete fatto voi</td><td class="tab-num">{{ c.voi.giusta|floatformat:0 }}%</td><td class="tab-num">{{ c.voi.in_piu|floatformat:0 }}%</td><td class="tab-num">{{ c.voi.scoperti|floatformat:0 }}%</td><td class="tab-num">{{ c.voi.persone }}</td></tr>
+            <tr><td>Solo il modello</td><td class="tab-num">{{ c.modello.giusta|floatformat:0 }}%</td><td class="tab-num">{{ c.modello.in_piu|floatformat:0 }}%</td><td class="tab-num">{{ c.modello.scoperti|floatformat:0 }}%</td><td class="tab-num">{{ c.modello.persone }}</td></tr>
+            <tr style="font-weight:700"><td>Voi + secondo parere</td><td class="tab-num">{{ c.regola.giusta|floatformat:0 }}%</td><td class="tab-num">{{ c.regola.in_piu|floatformat:0 }}%</td><td class="tab-num">{{ c.regola.scoperti|floatformat:0 }}%</td><td class="tab-num">{{ c.regola.persone }}</td></tr>
+          </tbody>
+        </table>
+        <div class="nota">Squadra giusta = quella che sarebbe servita con i lavaggi reali ({{ c.ideale }} turni in tutto). Secondo parere: decidete voi come sempre, ma quando il modello indica almeno 2 persone in meno al servito, ne togliete una. Il modello aiuta nei giorni di pioggia e di poco lavoro; nei giorni normali la vostra esperienza conta di piu'.</div>
+      </div>
+      {% endwith %}{% endif %}
       <details>
         <summary class="nota" style="cursor:pointer">Giorno per giorno</summary>
         <div class="tabella-scroll">
         <table class="table table-sm prev mt-2">
-          <thead><tr><th>Giorno</th><th class="tab-num">Pioggia</th><th class="tab-num">Prevista dopo</th><th class="tab-num">Previsti</th><th class="tab-num">Reali</th><th class="tab-num">Scarto</th><th class="tab-num">Cicli self prev.</th><th class="tab-num">Cicli self reali</th><th class="tab-num">Squadra consigliata</th><th class="tab-num">Squadra ideale</th><th class="tab-num">Persone presenti</th><th class="tab-num">Ore risparmiabili</th></tr></thead>
+          <thead><tr><th>Giorno</th><th class="tab-num">Pioggia</th><th class="tab-num">Prevista dopo</th><th class="tab-num">Previsti</th><th class="tab-num">Reali</th><th class="tab-num">Scarto</th><th class="tab-num">Cicli self prev.</th><th class="tab-num">Cicli self reali</th><th class="tab-num">Squadra consigliata</th><th class="tab-num">Squadra ideale</th><th class="tab-num">Persone presenti</th><th class="tab-num">Servito: voi / modello / ideale</th></tr></thead>
           <tbody>
           {% for g in v.giorni reversed %}
             <tr><td>{{ g.giorno }} {{ g.data|date:"d/m" }}</td>
@@ -113,12 +128,12 @@
               <td class="tab-num">{% if g.cicli_reali != None %}{{ g.cicli_reali }}{% else %}&mdash;{% endif %}</td>
               <td class="tab-num">{{ g.squadra|default:"—" }}</td><td class="tab-num">{{ g.squadra_ideale|default:"—" }}</td>
               <td class="tab-num">{{ g.persone|default:"—" }}</td>
-              <td class="tab-num">{% if g.ore_risparmiate != None %}{{ g.ore_risparmiate|floatformat:1 }}{% else %}&mdash;{% endif %}</td></tr>
+              <td class="tab-num">{% if g.servito_voi != None %}{{ g.servito_voi }} / {{ g.servito }} / {{ g.servito_ideale }}{% else %}&mdash;{% endif %}</td></tr>
           {% endfor %}
           </tbody>
         </table>
         </div>
-        <div class="nota">Squadra ideale = quella che sarebbe servita con i lavaggi reali. Ore risparmiabili = ore pagate meno squadra consigliata &times; ore per persona (negative: sarebbe servito qualcuno in piu').</div>
+        <div class="nota">Squadra ideale = quella che sarebbe servita con i lavaggi reali. Servito voi = persone presenti meno una al self.</div>
       </details>
     </div>
   </div>

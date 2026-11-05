@@ -31,8 +31,9 @@ GIORNI_VERIFICA = 60
 ORA_DECISIONE = time(18, 0)
 LAMBDE = (1, 3, 10, 30, 100)  # regolarizzazione ridge provata: si tiene quella che sbaglia meno
 OBIETTIVO_SCOPERTI = 0.10     # margine piu' piccolo che lascia scoperti al massimo 1 giorno su 10
-GIORNI_TARATURA = 60          # giorni (gli ultimi dell'addestramento) su cui si sceglie regolarizzazione e margine
+GIORNI_TARATURA = 90          # giorni (gli ultimi dell'addestramento) su cui si sceglie regolarizzazione e margine
 SQUADRA_MINIMA = 1           # persone minime del servito
+MIN_LAVAGGI_DOMENICA = 3     # sotto, la domenica conta come servito chiuso (ordini isolati)
 # modelli meteo di Open-Meteo, in ordine di preferenza: ItaliaMeteo-ARPAE ICON 2I
 # (2,2 km sull'Italia, ~3 giorni), poi la scelta automatica per i giorni che non copre
 MODELLI_METEO = ('italia_meteo_arpae_icon_2i', 'best_match')
@@ -154,13 +155,10 @@ def _lavaggi_per_giorno(dal, al):
     return {r['data_ora__date']: (r['n'], float(r['incasso'] or 0)) for r in righe}
 
 
-MIN_GIORNI_WASHTEC = 60       # giorni WashTec completi da cui si usa solo WashTec per i cicli self
-
-
 def _cicli_dettaglio(dal, al):
-    """Per giorno: cicli WashTec pagati dal cliente, cicli WashTec avviati
-    dall'unita' operativa, cicli dei portali dalle chiusure, lavaggi
-    completi del servito."""
+    """Per giorno: transazioni WashTec pagate in contanti al portale, quelle
+    da unita' operativa (cassa automatica: clienti del self e lavaggi del
+    servito), cicli dei portali dalle chiusure, lavaggi completi del servito."""
     from apps.finanze.models import ChiusuraCassaAutomatica, TransazionePortale
     from apps.ordini.models import ItemOrdine
     giorni = defaultdict(lambda: {'self_washtec': 0, 'servito_washtec': 0, 'chiusure': None, 'completi': 0})
@@ -191,22 +189,28 @@ def _washtec_completo(d):
 
 
 def _cicli_self_per_giorno(dal, al):
-    """Cicli self delle spazzole per giorno, da UNA sola fonte per non
-    mischiare livelli diversi: le transazioni WashTec pagate al portale dal
-    cliente se ci sono almeno MIN_GIORNI_WASHTEC giorni importati per
-    intero (i giorni importati a meta' si scartano), altrimenti le chiusure
-    meno i lavaggi completi del servito."""
-    giorni = _cicli_dettaglio(dal, al)
-    completi = {g: d for g, d in giorni.items() if _washtec_completo(d)}
-    if len(completi) >= MIN_GIORNI_WASHTEC:
-        return {g: (d['self_washtec'], 0.0) for g, d in completi.items()}
-    return {g: (max(d['chiusure'] - d['completi'], 0), 0.0) for g, d in giorni.items() if d['chiusure']}
+    """Cicli self delle spazzole per giorno = cicli dei portali meno i
+    lavaggi completi del servito. I cicli sono tutte le transazioni WashTec
+    (contanti e unita' operativa: anche i clienti del self pagano alla cassa
+    automatica, la domenica col servito chiuso sono quasi la meta') se il
+    giorno e' importato per intero, altrimenti quelli delle chiusure: le due
+    fonti coincidono (WashTec / chiusure = 1,00 sui giorni con entrambe)."""
+    cicli = {}
+    for g, d in _cicli_dettaglio(dal, al).items():
+        if _washtec_completo(d):
+            totale = d['self_washtec'] + d['servito_washtec']
+        elif d['chiusure']:
+            totale = d['chiusure']
+        else:
+            continue
+        cicli[g] = (max(totale - d['completi'], 0), 0.0)
+    return cicli
 
 
 def fonte_cicli(dal, al):
     giorni = _cicli_dettaglio(dal, al)
-    n = sum(1 for d in giorni.values() if _washtec_completo(d))
-    return {'washtec': n >= MIN_GIORNI_WASHTEC, 'giorni_washtec': n,
+    return {'giorni_washtec': sum(1 for d in giorni.values() if _washtec_completo(d)),
+            'giorni_chiusure': sum(1 for d in giorni.values() if not _washtec_completo(d) and d['chiusure']),
             'giorni_parziali': sum(1 for d in giorni.values() if (d['self_washtec'] + d['servito_washtec'])
                                    and not _washtec_completo(d))}
 
@@ -236,6 +240,8 @@ def dati_giornalieri(oggi=None):
             'cicli_portali_chiusure': c.get('chiusure') if c.get('chiusure') is not None else '',
             'lavaggi_completi_servito': c.get('completi', 0),
             'washtec_completo': 1 if c and _washtec_completo(c) else 0,
+        'cicli_self': '' if not c else (max(c['self_washtec'] + c['servito_washtec'] - c['completi'], 0) if _washtec_completo(c)
+                                        else (max(c['chiusure'] - c['completi'], 0) if c['chiusure'] else '')),
             'piste_euro': round(piste.get(g, (0, 0))[0], 2),
             'persone_presenti': presenze.get(g, (0, 0))[1], 'ore_presenze': presenze.get(g, (0, 0))[0],
             'pioggia_mm': m.get('pioggia', ''), 'pioggia_ore': m.get('ore', ''), 'piove': int(bool(m.get('piove'))) if m else '',
@@ -286,14 +292,15 @@ GRUPPI_GIORNI = [('Lun-Ven', range(0, 5)), ('Sabato', (5,)), ('Domenica', (6,))]
 
 
 def profilo_self(al, giorni=90):
-    """Cicli self (pagati al portale dal cliente, non avviati dal servito)
-    per ora del giorno, in media sui giorni con almeno un ciclo, per
-    Lun-Ven / Sabato / Domenica. Le transazioni vengono da WashTec."""
+    """Cicli dei portali per ora del giorno, in media sui giorni con almeno
+    un ciclo, per Lun-Ven / Sabato / Domenica, dalle transazioni WashTec
+    esclusi i lavaggi abbinati al servito (quelli non abbinati restano: la
+    domenica, col servito chiuso, e' solo self)."""
     from apps.finanze.models import TransazionePortale
     dal = al - timedelta(days=giorni)
     conteggi = defaultdict(lambda: defaultdict(int))     # gruppo -> ora -> cicli
     giorni_gruppo = defaultdict(set)
-    for orario in (TransazionePortale.objects.filter(origine='contanti', orario__date__gte=dal, orario__date__lte=al)
+    for orario in (TransazionePortale.objects.filter(orario__date__gte=dal, orario__date__lte=al, abbinamento__isnull=True)
                    .values_list('orario', flat=True)):
         locale = timezone.localtime(orario)
         gruppo = next(n for n, wd in GRUPPI_GIORNI if locale.weekday() in wd)
@@ -366,7 +373,7 @@ NOMI_VARIABILI = (['Mar', 'Mer', 'Gio', 'Ven', 'Sab', 'Dom'] +
                   ['Festivo', 'Prefestivo', 'Postfestivo', 'Stagione (sen)', 'Stagione (cos)',
                    'Pioggia oggi (mm)', 'Pioggia oggi (si/no)', 'Ore di pioggia oggi', 'Pioggia ieri', 'Pioggia 2-3 giorni fa',
                    'Giorni dall\'ultima pioggia', 'Temperatura massima', 'Livello ultime 4 settimane',
-                   'Prenotazioni gia\' fatte'])
+                   'Prenotazioni gia\' fatte', 'Livello ultima settimana'])
 N_BASE = len(NOMI_VARIABILI)          # il modello di prima: solo la pioggia caduta
 NOMI_VARIABILI += ['Pioggia prevista oggi (si/no)', 'Ore di pioggia previste oggi', 'Pioggia prevista domani (si/no)',
                    'Giorni di pioggia previsti nei 3 dopo', 'Pioggia prevista nei 3 giorni dopo (mm)',
@@ -382,7 +389,8 @@ def _piove_previsto(m, con_probabilita):
     return piove(m) if con_probabilita else piove({**m, 'probabilita': None})
 
 
-def _variabili(giorno, meteo, festivi, livello, prenotazioni, previsto=None, con_probabilita=False, segnali=None):
+def _variabili(giorno, meteo, festivi, livello, prenotazioni, previsto=None, con_probabilita=False, segnali=None,
+               livello_breve=None):
     wd = giorno.weekday()
     m = meteo.get(giorno, {})
     pioggia = lambda d: (meteo.get(giorno - timedelta(days=d)) or {}).get('pioggia', 0.0)
@@ -402,6 +410,7 @@ def _variabili(giorno, meteo, festivi, livello, prenotazioni, previsto=None, con
         tmax if tmax is not None else 22.0,
         livello,
         math.log1p(prenotazioni),
+        livello_breve if livello_breve is not None else livello,
     ] + _variabili_previste(giorno, previsto or {}, con_probabilita) + _variabili_segnali(giorno, segnali or {}))
 
 
@@ -447,10 +456,10 @@ def _variabili_previste(giorno, previsto, con_probabilita):
     ]
 
 
-def _livello(storico, giorno):
-    """Media del log dei lavaggi nei giorni di apertura delle 4 settimane
-    prima di `giorno` (escluso)."""
-    valori = [math.log1p(storico[g][0]) for g in (giorno - timedelta(days=k) for k in range(1, 29)) if g in storico]
+def _livello(storico, giorno, giorni=28):
+    """Media del log dei lavaggi nei giorni di apertura dei `giorni` prima
+    di `giorno` (escluso)."""
+    valori = [math.log1p(storico[g][0]) for g in (giorno - timedelta(days=k) for k in range(1, giorni + 1)) if g in storico]
     return sum(valori) / len(valori) if valori else None
 
 
@@ -513,7 +522,8 @@ def _righe(giorni, storico, meteo, festivi, prenotazioni, previsto=None, con_pro
         livello = _livello(storico, g)
         if livello is None or g not in meteo:
             continue
-        xs.append(_variabili(g, meteo, festivi, livello, prenotazioni.get(g, 0), previsto, con_probabilita, segnali))
+        xs.append(_variabili(g, meteo, festivi, livello, prenotazioni.get(g, 0), previsto, con_probabilita, segnali,
+                             _livello(storico, g, 7)))
         ys.append(math.log1p(storico[g][0]) if g in storico else None)
         usati.append(g)
     return xs, ys, usati
@@ -669,7 +679,9 @@ def calcola(oggi=None, par=None):
     oggi = oggi or timezone.localdate()
     ieri = oggi - timedelta(days=1)
     fine = oggi + timedelta(days=10)          # 7 giorni di previsione + i 3 dopo per la pioggia in arrivo
-    storico = {g: v for g, v in _lavaggi_per_giorno(INIZIO_ORDINI, ieri).items() if v[0] > 0}
+    # le domeniche con 1-2 ordini isolati non sono giornate di servito aperto
+    storico = {g: v for g, v in _lavaggi_per_giorno(INIZIO_ORDINI, ieri).items()
+               if v[0] >= (MIN_LAVAGGI_DOMENICA if g.weekday() == 6 else 1)}
     if len(storico) < 90:
         return {'errore': f'Servono almeno 90 giorni con ordini: ce ne sono {len(storico)}.'}
     meteo = _meteo(INIZIO_ORDINI - timedelta(days=3), fine)
@@ -699,6 +711,10 @@ def calcola(oggi=None, par=None):
     chiuso_wd = {wd for wd in range(7) if aperti_wd[wd] < settimane * 0.2}
     # festivi passati senza ordini: chiusi anche quest'anno
     festivi_chiusi = {nome for f, nome in festivi.items() if f <= ieri and f not in storico}
+    # la domenica il servito apre solo in certi periodi (d'inverno si', d'estate no):
+    # aperto se almeno 2 delle ultime 4 domeniche hanno avuto lavaggi veri
+    ultime_domeniche = [ieri - timedelta(days=(ieri.weekday() - 6) % 7 + 7 * k) for k in range(4)]
+    domenica_aperta = sum(1 for d in ultime_domeniche if d in storico) >= 2
 
     xs, ys, usati = _righe(sorted(storico), storico, meteo, festivi, prenotazioni, previsto, con_probabilita, segnali)
     xs_c, ys_c, usati_c = _righe(sorted(cicli), cicli, meteo, festivi, {}, previsto, con_probabilita, segnali)
@@ -743,10 +759,11 @@ def calcola(oggi=None, par=None):
             riga['squadra_ideale'] = riga['servito_ideale'] + riga['self_ideale'] if riga['servito_ideale'] else None
             if g in presenze:
                 riga['persone'], riga['ore'] = presenze[g][1], presenze[g][0]
-                if riga['squadra'] and ore_persona:
-                    riga['ore_risparmiate'] = riga['ore'] - riga['squadra'] * ore_persona
-                    c = costo_ora.get(g.replace(day=1), costo_medio)
-                    riga['risparmio'] = riga['ore_risparmiate'] * c if c else None
+                # le vostre scelte: al servito le persone presenti meno una al self
+                riga['servito_voi'] = max(riga['persone'] - 1, 0)
+                # secondo parere: se il modello ne indica almeno 2 in meno, una in meno
+                riga['servito_regola'] = (riga['servito_voi'] - 1 if riga['servito'] is not None
+                                          and riga['servito'] <= riga['servito_voi'] - 2 else riga['servito_voi'])
             giorni_v.append(riga)
         errori = [abs(r['previsti'] - r['reali']) for r in giorni_v]
         con_squadra = [r for r in giorni_v if r['squadra'] and r['squadra_ideale']]
@@ -787,8 +804,7 @@ def calcola(oggi=None, par=None):
             'self_scarso': (sum(1 for r in con_cicli if r['self'] < r['self_ideale']) / len(con_cicli) * 100
                             if con_cicli and par.soglia_cicli_self is not None else None),
             'giorni_presenze': len(con_presenze),
-            'ore_risparmiate': sum(r.get('ore_risparmiate', 0) for r in con_presenze),
-            'risparmio': sum(r.get('risparmio') or 0 for r in con_presenze),
+            'confronto': _confronto(con_presenze, ore_persona, costo_medio),
         }
 
     # --- modelli finali su tutto lo storico
@@ -803,22 +819,23 @@ def calcola(oggi=None, par=None):
         g = oggi + timedelta(days=k)
         if g not in meteo:
             continue
-        chiuso = g.weekday() in chiuso_wd or festivi.get(g) in festivi_chiusi
+        chiuso = (g.weekday() in chiuso_wd or festivi.get(g) in festivi_chiusi
+                  or (g.weekday() == 6 and not domenica_aperta))           # chiuso il servito: il self resta
         livello = _livello(storico_esteso, g) or _livello(storico, oggi)
         note = _prenotazioni_ora(g)
         # oggi: le prenotazioni note alle 18 di ieri, come nell'addestramento
         x = _variabili(g, meteo, festivi, livello, prenotazioni.get(g, 0) if k == 0 else note, previsto, con_probabilita,
-                       segnali)[:n_variabili]
+                       segnali, _livello(storico_esteso, g, 7))[:n_variabili]
         stima = modello.predict(x)
         previsti, alti = max(0.0, math.expm1(stima)), max(0.0, math.expm1(stima + margine))
         cicli_previsti = cicli_alti = None
         livello_c = _livello(cicli_esteso, g)
         if modello_c and livello_c is not None:
             stima_c = modello_c.predict(_variabili(g, meteo, festivi, livello_c, 0, previsto, con_probabilita,
-                                                   segnali)[:n_variabili])
+                                                   segnali, _livello(cicli_esteso, g, 7))[:n_variabili])
             cicli_previsti, cicli_alti = max(0.0, math.expm1(stima_c)), max(0.0, math.expm1(stima_c + margine_c))
-        servito = None if chiuso else squadra_servito(alti, lpp)
-        al_self = None if chiuso else persone_self(cicli_alti, par.soglia_cicli_self)
+        servito = 0 if chiuso else squadra_servito(alti, lpp)
+        al_self = persone_self(cicli_alti, par.soglia_cicli_self)
         previsioni.append({
             'data': g, 'giorno': GIORNI_SETTIMANA[g.weekday()], 'chiuso': chiuso, 'domani': k == 1,
             'oggi': k == 0, 'finora': finora if k == 0 else None,
@@ -828,7 +845,8 @@ def calcola(oggi=None, par=None):
             'previsti': previsti, 'alti': alti, 'cicli': cicli_previsti, 'cicli_alti': cicli_alti,
             'fasce': _fasce_previste(g, cicli_previsti, profilo), 'polvere': segnali['polvere'].get(g),
             'servito': servito, 'self': al_self,
-            'squadra': servito + al_self if servito else None,
+            'squadra': servito + al_self if servito is not None else None,
+            'togli_da': servito + 2 if servito else None,      # secondo parere: da quante al servito toglierne una
         })
         if k > 0:
             storico_esteso[g] = (round(previsti), 0)
@@ -849,6 +867,28 @@ def calcola(oggi=None, par=None):
         'margine_pct': (math.exp(margine) - 1) * 100, 'margine_cicli_pct': (math.exp(margine_c) - 1) * 100,
         'chiuso': [GIORNI_SETTIMANA[wd] for wd in sorted(chiuso_wd)],
     }
+
+
+def _confronto(giorni, ore_persona, costo_ora):
+    """Servito: il modello, le vostre scelte (presenti meno una al self) e
+    la regola del secondo parere (le vostre scelte, una in meno quando il
+    modello ne indica almeno 2 in meno), sugli stessi giorni, contro la
+    squadra che sarebbe servita con i lavaggi reali."""
+    giorni = [r for r in giorni if r['servito'] is not None and r['servito_ideale']]
+    if not giorni:
+        return None
+
+    def misura(chiave):
+        d = [r[chiave] - r['servito_ideale'] for r in giorni]
+        return {'giusta': sum(1 for x in d if x == 0) / len(d) * 100,
+                'in_piu': sum(1 for x in d if x > 0) / len(d) * 100,
+                'scoperti': sum(1 for x in d if x < 0) / len(d) * 100,
+                'persone': sum(r[chiave] for r in giorni)}
+    voi, modello, regola = misura('servito_voi'), misura('servito'), misura('servito_regola')
+    risparmiate = voi['persone'] - regola['persone']
+    return {'giorni': len(giorni), 'voi': voi, 'modello': modello, 'regola': regola,
+            'ideale': sum(r['servito_ideale'] for r in giorni), 'risparmiate': risparmiate,
+            'euro': risparmiate * ore_persona * costo_ora if ore_persona and costo_ora else None}
 
 
 def _giorni_in_arrivo(giorno, previsto, con_probabilita):
