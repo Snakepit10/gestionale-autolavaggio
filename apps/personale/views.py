@@ -317,3 +317,22 @@ def previsione(request):
         'r': risultato, 'par': par, 'storico': prev.storico_previsioni(),
         'ora_decisione': prev.ORA_DECISIONE,
     })
+
+
+@accesso
+def previsione_dati(request):
+    """CSV dei dati giornalieri della previsione (nessun nome di dipendente)."""
+    import csv
+
+    from django.http import HttpResponse
+
+    from . import previsione as prev
+    righe = prev.dati_giornalieri()
+    risposta = HttpResponse(content_type='text/csv; charset=utf-8')
+    risposta['Content-Disposition'] = f'attachment; filename="previsione_dati_{timezone.localdate():%Y%m%d}.csv"'
+    risposta.write('\ufeff')
+    if righe:
+        w = csv.DictWriter(risposta, fieldnames=list(righe[0]), delimiter=';')
+        w.writeheader()
+        w.writerows(righe)
+    return risposta

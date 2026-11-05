@@ -154,34 +154,98 @@ def _lavaggi_per_giorno(dal, al):
     return {r['data_ora__date']: (r['n'], float(r['incasso'] or 0)) for r in righe}
 
 
-def _cicli_self_per_giorno(dal, al):
-    """Cicli self delle spazzole per giorno. Dalle transazioni WashTec
-    pagate al portale dal cliente (le altre le avvia l'unita' operativa per
-    il servito), che hanno data e ora esatte; per i giorni prima della
-    prima transazione importata, dalle chiusure: cicli dei portali meno i
-    lavaggi completi del servito."""
+MIN_GIORNI_WASHTEC = 60       # giorni WashTec completi da cui si usa solo WashTec per i cicli self
+
+
+def _cicli_dettaglio(dal, al):
+    """Per giorno: cicli WashTec pagati dal cliente, cicli WashTec avviati
+    dall'unita' operativa, cicli dei portali dalle chiusure, lavaggi
+    completi del servito."""
     from apps.finanze.models import ChiusuraCassaAutomatica, TransazionePortale
     from apps.ordini.models import ItemOrdine
-    da_washtec = defaultdict(int)
-    for orario in (TransazionePortale.objects.filter(origine='contanti', orario__date__gte=dal - timedelta(days=1),
-                                                     orario__date__lte=al + timedelta(days=1))
-                   .values_list('orario', flat=True)):
+    giorni = defaultdict(lambda: {'self_washtec': 0, 'servito_washtec': 0, 'chiusure': None, 'completi': 0})
+    for orario, origine in (TransazionePortale.objects.filter(orario__date__gte=dal - timedelta(days=1),
+                                                              orario__date__lte=al + timedelta(days=1))
+                            .values_list('orario', 'origine')):
         g = timezone.localtime(orario).date()
         if dal <= g <= al:
-            da_washtec[g] += 1
-    prima_washtec = min(da_washtec) if da_washtec else None
-    portali = {r['data']: r['c'] or 0 for r in
-               ChiusuraCassaAutomatica.objects.filter(data__gte=dal, data__lte=al, cassa__tracking_washcycles=True,
-                                                      cassa__modalita_registratore=False)
-               .values('data').annotate(c=Sum('wash_cycles'))}
-    servito = {r['ordine__data_ora__date']: r['q'] or 0 for r in
-               ItemOrdine.objects.filter(ordine__data_ora__date__gte=dal, ordine__data_ora__date__lte=al,
-                                         servizio_prodotto__titolo__icontains='lavaggio completo')
-               .exclude(ordine__stato='annullato').values('ordine__data_ora__date').annotate(q=Sum('quantita'))}
-    cicli = {g: (max(c - servito.get(g, 0), 0), 0.0) for g, c in portali.items()
-             if c and (prima_washtec is None or g < prima_washtec)}
-    cicli.update({g: (n, 0.0) for g, n in da_washtec.items()})
-    return cicli
+            giorni[g]['self_washtec' if origine == 'contanti' else 'servito_washtec'] += 1
+    for r in (ChiusuraCassaAutomatica.objects.filter(data__gte=dal, data__lte=al, cassa__tracking_washcycles=True,
+                                                     cassa__modalita_registratore=False)
+              .values('data').annotate(c=Sum('wash_cycles'))):
+        giorni[r['data']]['chiusure'] = r['c'] or 0
+    for r in (ItemOrdine.objects.filter(ordine__data_ora__date__gte=dal, ordine__data_ora__date__lte=al,
+                                        servizio_prodotto__titolo__icontains='lavaggio completo')
+              .exclude(ordine__stato='annullato').values('ordine__data_ora__date').annotate(q=Sum('quantita'))):
+        giorni[r['ordine__data_ora__date']]['completi'] = r['q'] or 0
+    return giorni
+
+
+def _washtec_completo(d):
+    """Il giorno e' stato importato tutto da WashTec: le transazioni sono
+    almeno l'80% dei cicli della chiusura (se c'e')."""
+    totale = d['self_washtec'] + d['servito_washtec']
+    if not totale:
+        return False
+    return d['chiusure'] is None or not d['chiusure'] or totale >= 0.8 * d['chiusure']
+
+
+def _cicli_self_per_giorno(dal, al):
+    """Cicli self delle spazzole per giorno, da UNA sola fonte per non
+    mischiare livelli diversi: le transazioni WashTec pagate al portale dal
+    cliente se ci sono almeno MIN_GIORNI_WASHTEC giorni importati per
+    intero (i giorni importati a meta' si scartano), altrimenti le chiusure
+    meno i lavaggi completi del servito."""
+    giorni = _cicli_dettaglio(dal, al)
+    completi = {g: d for g, d in giorni.items() if _washtec_completo(d)}
+    if len(completi) >= MIN_GIORNI_WASHTEC:
+        return {g: (d['self_washtec'], 0.0) for g, d in completi.items()}
+    return {g: (max(d['chiusure'] - d['completi'], 0), 0.0) for g, d in giorni.items() if d['chiusure']}
+
+
+def fonte_cicli(dal, al):
+    giorni = _cicli_dettaglio(dal, al)
+    n = sum(1 for d in giorni.values() if _washtec_completo(d))
+    return {'washtec': n >= MIN_GIORNI_WASHTEC, 'giorni_washtec': n,
+            'giorni_parziali': sum(1 for d in giorni.values() if (d['self_washtec'] + d['servito_washtec'])
+                                   and not _washtec_completo(d))}
+
+
+def dati_giornalieri(oggi=None):
+    """Una riga per giorno dall'inizio degli ordini a ieri, con tutto quello
+    che usa la previsione: per l'esportazione e la calibrazione."""
+    oggi = oggi or timezone.localdate()
+    ieri = oggi - timedelta(days=1)
+    lavaggi = _lavaggi_per_giorno(INIZIO_ORDINI, ieri)
+    cicli = _cicli_dettaglio(INIZIO_ORDINI, ieri)
+    presenze = _presenze_per_giorno(INIZIO_ORDINI, ieri)
+    piste = _piste_per_giorno(INIZIO_ORDINI, ieri)
+    prenotazioni = _prenotazioni_note(INIZIO_ORDINI, ieri)
+    meteo = _meteo(INIZIO_ORDINI, ieri) or {}
+    previsto = _meteo_previsto_storico(INIZIO_ORDINI, ieri) or {}
+    polvere = _polvere(INIZIO_ORDINI, ieri)
+    festivi = italian_holidays_in_range(INIZIO_ORDINI, oggi)
+    righe, g = [], INIZIO_ORDINI
+    while g <= ieri:
+        m, p, c = meteo.get(g, {}), previsto.get(g, {}), cicli.get(g, {})
+        righe.append({
+            'data': g.isoformat(), 'giorno': GIORNI_SETTIMANA[g.weekday()], 'festivo': festivi.get(g, ''),
+            'lavaggi_servito': lavaggi.get(g, (0, 0))[0], 'incasso_servito': round(lavaggi.get(g, (0, 0))[1], 2),
+            'prenotazioni_note_18': prenotazioni.get(g, 0),
+            'cicli_self_washtec': c.get('self_washtec', 0), 'cicli_servito_washtec': c.get('servito_washtec', 0),
+            'cicli_portali_chiusure': c.get('chiusure') if c.get('chiusure') is not None else '',
+            'lavaggi_completi_servito': c.get('completi', 0),
+            'washtec_completo': 1 if c and _washtec_completo(c) else 0,
+            'piste_euro': round(piste.get(g, (0, 0))[0], 2),
+            'persone_presenti': presenze.get(g, (0, 0))[1], 'ore_presenze': presenze.get(g, (0, 0))[0],
+            'pioggia_mm': m.get('pioggia', ''), 'pioggia_ore': m.get('ore', ''), 'piove': int(bool(m.get('piove'))) if m else '',
+            'prevista_mm': p.get('pioggia', ''), 'prevista_ore': p.get('ore', ''),
+            'prevista_probabilita': p.get('probabilita') if p.get('probabilita') is not None else '',
+            'prevista_piove': int(bool(p.get('piove'))) if p else '', 'tmax': m.get('tmax', ''),
+            'polvere_max': round(polvere[g], 1) if g in polvere else '',
+        })
+        g += timedelta(days=1)
+    return righe
 
 
 def _polvere(dal, al):
@@ -780,7 +844,7 @@ def calcola(oggi=None, par=None):
         'effetti': [e for e in _effetti(modello, xs, _pioggia_tipica(previsto))
                     if not (e['nome'].startswith('Domenica') and 6 in chiuso_wd)],
         'obiettivo_scoperti': OBIETTIVO_SCOPERTI * 100, 'profilo': profilo,
-        'usa_segnali': usa_segnali, 'polvere_disponibile': bool(segnali['polvere']),
+        'usa_segnali': usa_segnali, 'fonte_cicli': fonte_cicli(INIZIO_ORDINI, ieri), 'polvere_disponibile': bool(segnali['polvere']),
         'piste_disponibili': bool(segnali['piste']),
         'margine_pct': (math.exp(margine) - 1) * 100, 'margine_cicli_pct': (math.exp(margine_c) - 1) * 100,
         'chiuso': [GIORNI_SETTIMANA[wd] for wd in sorted(chiuso_wd)],

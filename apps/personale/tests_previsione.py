@@ -219,7 +219,7 @@ class PrevisioneTest(TestCase):
         self.assertEqual((mattina['cicli'], pomeriggio['cicli'], sera['cicli']), (3, 1, 0))
         self.assertEqual(prev._fasce_previste(sabato + timedelta(days=7), 40, pr)[0]['cicli'], 30)   # 3/4 la mattina
 
-    def test_cicli_self_da_washtec(self):
+    def test_cicli_self_una_sola_fonte(self):
         from apps.core.models import Categoria, ServizioProdotto
         from apps.finanze.models import Cassa, ChiusuraCassaAutomatica, TransazionePortale
         from apps.ordini.models import ItemOrdine, Ordine
@@ -227,17 +227,36 @@ class PrevisioneTest(TestCase):
         completo = ServizioProdotto.objects.create(titolo='Lavaggio completo', categoria=Categoria.objects.create(nome='S'),
                                                    prezzo=22, descrizione='')
         prima, dopo = date(2026, 10, 1), date(2026, 10, 2)
-        # 1/10: solo la chiusura (30 cicli) e 4 completi del servito -> 26
         ChiusuraCassaAutomatica.objects.create(cassa=portale, data=prima, wash_cycles=30)
         ordine = Ordine.objects.create(totale=0, totale_finale=0)
         Ordine.objects.filter(pk=ordine.pk).update(data_ora=timezone.make_aware(datetime(2026, 10, 1, 10, 0)))
         ItemOrdine.objects.create(ordine=ordine, servizio_prodotto=completo, prezzo_unitario=22, quantita=4)
-        # 2/10: la chiusura dice 50 ma WashTec ha 3 self e 1 del servito: valgono le transazioni
-        ChiusuraCassaAutomatica.objects.create(cassa=portale, data=dopo, wash_cycles=50)
+        ChiusuraCassaAutomatica.objects.create(cassa=portale, data=dopo, wash_cycles=4)
         for n, origine in enumerate(['contanti', 'contanti', 'contanti', 'unita']):
             TransazionePortale.objects.create(portale='B', numero=n + 1, programma=4, origine=origine,
                                               orario=timezone.make_aware(datetime(2026, 10, 2, 9 + n, 0)))
-        self.assertEqual(CICLI_VERI(prima, dopo), {prima: (26, 0.0), dopo: (3, 0.0)})
+        # pochi giorni WashTec: tutto dalle chiusure (meno i completi), niente miscugli
+        self.assertEqual(CICLI_VERI(prima, dopo), {prima: (26, 0.0), dopo: (4, 0.0)})
+        with mock.patch.object(prev, 'MIN_GIORNI_WASHTEC', 1):
+            self.assertEqual(CICLI_VERI(prima, dopo), {dopo: (3, 0.0)})          # solo WashTec
+        # giorno importato a meta' (2 transazioni su 30 cicli della chiusura): scartato
+        self.assertFalse(prev._washtec_completo({'self_washtec': 2, 'servito_washtec': 0, 'chiusure': 30, 'completi': 0}))
+        self.assertTrue(prev._washtec_completo({'self_washtec': 20, 'servito_washtec': 6, 'chiusure': 30, 'completi': 0}))
+
+    def test_esporta_csv(self):
+        from apps.auth_system.models import PermessoGruppo
+        utente = User.objects.create_user('titolare3', password='x')
+        gruppo = Group.objects.get_or_create(name='titolare')[0]
+        utente.groups.add(gruppo)
+        PermessoGruppo.objects.get_or_create(sezione='personale', gruppo=gruppo)
+        self.client.force_login(utente)
+        with mock.patch('django.utils.timezone.localdate', return_value=OGGI):
+            risposta = self.client.get('/personale/previsione/dati.csv')
+        testo = risposta.content.decode('utf-8-sig')
+        righe = testo.strip().splitlines()
+        self.assertTrue(righe[0].startswith('data;giorno;festivo;lavaggi_servito'))
+        self.assertEqual(len(righe) - 1, (OGGI - prev.INIZIO_ORDINI).days)
+        self.assertIn('2026-11-04;Mer', testo)
 
     def test_polvere_da_open_meteo(self):
         risposta = {'hourly': {'time': ['2026-11-05T10:00', '2026-11-05T14:00', '2026-11-06T10:00'],
