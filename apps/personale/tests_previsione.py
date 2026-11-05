@@ -1,5 +1,5 @@
 import random
-from datetime import date, datetime, timedelta
+from datetime import date, datetime, time, timedelta
 from unittest import mock
 
 from django.contrib.auth.models import Group, User
@@ -11,6 +11,7 @@ from .models import ParametriPrevisione, PrevisioneSquadra
 
 OGGI = date(2026, 11, 5)
 METEO_VERO = prev._meteo          # prima dei mock del setUp
+POLVERE_VERA = prev._polvere
 
 
 def dati_sintetici():
@@ -19,9 +20,10 @@ def dati_sintetici():
     il giorno stesso i lavaggi si dimezzano, se e' prevista il giorno dopo
     calano di un quarto, anche quando poi non piove (1 previsione su 3 e'
     un falso allarme). Squadra sempre piena: 6 persone da 8 ore il sabato,
-    5 gli altri giorni. Cicli self: 30, 8 con pioggia prevista."""
+    5 gli altri giorni. Cicli self: 30, 8 con pioggia prevista. Dopo una
+    giornata di sabbia del Sahara i lavaggi salgono del 40%."""
     rnd = random.Random(1)
-    meteo, previsto, lavaggi, presenze, cicli = {}, {}, {}, {}, {}
+    meteo, previsto, lavaggi, presenze, cicli, polvere = {}, {}, {}, {}, {}, {}
     g = prev.INIZIO_ORDINI - timedelta(days=3)
     while g <= OGGI + timedelta(days=12):
         pioggia = rnd.choice([0, 0, 0, 0, 0, 0, 5, 15])
@@ -31,12 +33,14 @@ def dati_sintetici():
                        'tmax': 25.0}
         for m in (meteo[g], previsto[g]):
             m['piove'] = prev.piove(m)
+        polvere[g] = 150.0 if rnd.random() < 0.06 else rnd.uniform(0, 15)
         g += timedelta(days=1)
     g = prev.INIZIO_ORDINI
     while g < OGGI:
         if g.weekday() != 6:
             base = 32 if g.weekday() == 5 else 20
             fattore = (0.5 if previsto[g]['piove'] else 1) * (0.75 if previsto[g + timedelta(days=1)]['piove'] else 1)
+            fattore *= 1.4 if polvere[g - timedelta(days=1)] > 100 else 1
             lavaggi[g] = (max(1, round(base * fattore * rnd.uniform(0.95, 1.05))), 0.0)
             cicli[g] = (max(0, round((8 if previsto[g]['piove'] else 30) * rnd.uniform(0.9, 1.1))), 0.0)
             if g >= date(2026, 1, 1):
@@ -46,13 +50,13 @@ def dati_sintetici():
     for g in list(meteo):
         if g >= OGGI:
             meteo[g] = previsto[g]
-    return meteo, previsto, lavaggi, presenze, cicli
+    return meteo, previsto, lavaggi, presenze, cicli, polvere
 
 
 class PrevisioneTest(TestCase):
     def setUp(self):
-        meteo, previsto, lavaggi, presenze, cicli = dati_sintetici()
-        self.meteo = meteo
+        meteo, previsto, lavaggi, presenze, cicli, polvere = dati_sintetici()
+        self.meteo, self.polvere = meteo, polvere
         patch = [
             mock.patch.object(prev, '_meteo', return_value=meteo),
             mock.patch.object(prev, '_meteo_previsto_storico',
@@ -60,6 +64,8 @@ class PrevisioneTest(TestCase):
             mock.patch.object(prev, '_lavaggi_per_giorno', side_effect=lambda dal, al: {g: v for g, v in lavaggi.items() if dal <= g <= al}),
             mock.patch.object(prev, '_presenze_per_giorno', side_effect=lambda dal, al: {g: v for g, v in presenze.items() if dal <= g <= al}),
             mock.patch.object(prev, '_costo_orario_per_mese', return_value={date(2026, 10, 1): 15.0}),
+            mock.patch.object(prev, '_polvere', side_effect=lambda dal, al: {g: v for g, v in polvere.items() if dal <= g <= al}),
+            mock.patch.object(prev, '_piste_per_giorno', return_value={}),
             mock.patch.object(prev, '_cicli_self_per_giorno',
                               side_effect=lambda dal, al: {g: v for g, v in cicli.items() if dal <= g <= al}),
         ]
@@ -84,6 +90,10 @@ class PrevisioneTest(TestCase):
         for p in [p for p in r['previsioni'] if not p['chiuso']]:
             self.assertLess(abs(p['cicli'] - (8 if p['piove'] else 30)), 6, p)
         self.assertLess(v['errore_cicli_pct'], 15)
+        # la sabbia di ieri fa lavare: il modello la usa e ne vede l'effetto
+        self.assertTrue(r['usa_segnali'])
+        self.assertLess(v['errore_pct'], v['errore_senza_segnali_pct'])
+        self.assertLess(abs(effetti['Sabbia del Sahara ieri'] - 40), 12)
         self.assertAlmostEqual(r['ore_persona'], 8.0)
         # 7 lavaggi per persona: 20 lavaggi = 3 al servito; senza soglia sempre 1 al self
         par = ParametriPrevisione.attuali()
@@ -107,6 +117,7 @@ class PrevisioneTest(TestCase):
         for p in aperti:
             dopo = self.meteo[p['data'] + timedelta(days=1)]['piove']
             atteso = (32 if p['data'].weekday() == 5 else 20) * (0.5 if p['piove'] else 1) * (0.75 if dopo else 1)
+            atteso *= 1.4 if self.polvere[p['data'] - timedelta(days=1)] > 100 else 1
             self.assertLess(abs(p['previsti'] - atteso) / atteso, 0.2, p)
             self.assertEqual(p['in_arrivo'], sum(1 for k in (1, 2, 3) if self.meteo[p['data'] + timedelta(days=k)]['piove']))
         # squadra sempre piena: nei giorni di pioggia si risparmia
@@ -172,6 +183,43 @@ class PrevisioneTest(TestCase):
         self.assertEqual((float(par.lavaggi_per_persona), par.soglia_cicli_self), (6.5, 25))
         self.client.post('/personale/previsione/', {'lavaggi_per_persona': '7', 'soglia_cicli_self': ''})
         self.assertIsNone(ParametriPrevisione.attuali().soglia_cicli_self)
+
+    def test_segnali_inutili_esclusi(self):
+        # sabbia a caso, senza effetto sui lavaggi: non deve peggiorare il modello
+        rnd = random.Random(3)
+        with mock.patch.object(prev, '_polvere', side_effect=lambda dal, al: {
+                dal + timedelta(days=k): rnd.uniform(0, 200) for k in range((al - dal).days + 1)}):
+            r = prev.calcola(OGGI)
+        self.assertLess(r['verifica']['errore_pct'], 15)
+
+    def test_andamento(self):
+        serie = {OGGI - timedelta(days=k): (20, 0) for k in range(5, 40)}
+        self.assertEqual(prev._andamento(serie, OGGI), 0.0)                       # mancano i giorni recenti
+        serie.update({OGGI - timedelta(days=k): (26, 0) for k in (2, 3, 4)})
+        self.assertGreater(prev._andamento(serie, OGGI), 0.15)                     # ~ +20% sul solito
+        self.assertEqual(prev._andamento({}, OGGI), 0.0)
+
+    def test_profilo_self(self):
+        from apps.finanze.models import TransazionePortale
+        sabato = date(2026, 10, 31)
+        for n, (ora, origine) in enumerate([(9, 'contanti'), (9, 'contanti'), (10, 'contanti'), (15, 'contanti'),
+                                            (9, 'unita')]):                    # l'ultima e' del servito
+            TransazionePortale.objects.create(portale='A', numero=n + 1, programma=4, origine=origine,
+                                              orario=timezone.make_aware(datetime.combine(sabato, time(ora, 5))))
+        pr = prev.profilo_self(OGGI)
+        riga = next(x for x in pr['righe'] if x['gruppo'] == 'Sabato')
+        self.assertEqual(riga['giorni'], 1)
+        self.assertEqual(riga['medie'][pr['ore'].index(9)], 2)
+        mattina, pomeriggio, sera = riga['fasce']
+        self.assertEqual((mattina['cicli'], pomeriggio['cicli'], sera['cicli']), (3, 1, 0))
+        self.assertEqual(prev._fasce_previste(sabato + timedelta(days=7), 40, pr)[0]['cicli'], 30)   # 3/4 la mattina
+
+    def test_polvere_da_open_meteo(self):
+        risposta = {'hourly': {'time': ['2026-11-05T10:00', '2026-11-05T14:00', '2026-11-06T10:00'],
+                               'dust': [40.0, 180.0, None]}}
+        with mock.patch('apps.finanze.weather._http_get_json', return_value=risposta):
+            polvere = POLVERE_VERA(OGGI, OGGI + timedelta(days=1))
+        self.assertEqual(polvere, {OGGI: 180.0})
 
     def test_pochi_dati(self):
         with mock.patch.object(prev, '_lavaggi_per_giorno', return_value={}):

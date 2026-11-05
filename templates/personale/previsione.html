@@ -35,7 +35,8 @@
       {% else %}<div class="squadra-big">{{ d.squadra|default:"—" }} <span style="font-size:1rem">person{{ d.squadra|pluralize:"a,e" }}</span></div>
       {% if d.servito %}<div class="sub">servito {{ d.servito }}{% if d.self %} + self-service {{ d.self }}{% else %}, nessuno solo al self{% endif %}</div>{% endif %}{% endif %}
       <div class="sub">{{ d.previsti|floatformat:0 }} lavaggi previsti (fino a {{ d.alti|floatformat:0 }}){% if d.cicli != None %} &middot; {{ d.cicli|floatformat:0 }} cicli self{% endif %}{% if d.oggi %} &middot; finora {{ d.finora }} lavaggi{% endif %}</div>
-      <div class="sub">{% if d.piove %}<i class="bi bi-cloud-rain"></i> pioggia{% if d.ore_pioggia %} {{ d.ore_pioggia|floatformat:0 }} h{% endif %} &middot; {{ d.pioggia|floatformat:1 }} mm{% else %}<i class="bi bi-sun"></i> asciutto{% endif %}{% if d.probabilita != None %} ({{ d.probabilita }}%){% endif %}{% if d.fonte %} <span style="opacity:.7">&middot; {{ d.fonte }}</span>{% endif %}{% if d.in_arrivo %} &middot; <i class="bi bi-umbrella"></i> pioggia prevista in {{ d.in_arrivo }} dei 3 giorni dopo{% endif %} &middot; max {{ d.tmax|floatformat:0 }}&deg;C &middot; {{ d.prenotazioni }} prenotazion{{ d.prenotazioni|pluralize:"e,i" }}</div>
+      {% if d.fasce %}<div class="sub">self: {% for f in d.fasce %}{{ f.nome|lower }} {{ f.cicli|floatformat:0 }}{% if not forloop.last %} &middot; {% endif %}{% endfor %} cicli</div>{% endif %}
+      <div class="sub">{% if d.piove %}<i class="bi bi-cloud-rain"></i> pioggia{% if d.ore_pioggia %} {{ d.ore_pioggia|floatformat:0 }} h{% endif %} &middot; {{ d.pioggia|floatformat:1 }} mm{% else %}<i class="bi bi-sun"></i> asciutto{% endif %}{% if d.probabilita != None %} ({{ d.probabilita }}%){% endif %}{% if d.fonte %} <span style="opacity:.7">&middot; {{ d.fonte }}</span>{% endif %}{% if d.polvere != None and d.polvere >= 50 %} &middot; <i class="bi bi-wind"></i> sabbia {{ d.polvere|floatformat:0 }} &micro;g/m&sup3;{% endif %}{% if d.in_arrivo %} &middot; <i class="bi bi-umbrella"></i> pioggia prevista in {{ d.in_arrivo }} dei 3 giorni dopo{% endif %} &middot; max {{ d.tmax|floatformat:0 }}&deg;C &middot; {{ d.prenotazioni }} prenotazion{{ d.prenotazioni|pluralize:"e,i" }}</div>
     </div></div>
     {% endif %}{% endfor %}
     <div class="col-12 col-md-4"><div class="kpi-tile">
@@ -89,7 +90,7 @@
     <div class="panel-sub">Il modello e' stato addestrato senza questi giorni e poi li ha previsti, come se fosse la sera prima. Usa la pioggia caduta e quella che era prevista allora{% if not r.previsioni_storiche %} (archivio delle previsioni non disponibile: al suo posto la pioggia caduta){% endif %}.</div>
     <div class="panel-body">
       <div class="row g-2 mb-2">
-        <div class="col-6 col-md-3"><div class="kpi-tile"><div class="label">Errore medio</div><div class="value">{{ v.errore_pct|floatformat:0 }}%</div><div class="sub">&plusmn;{{ v.errore_medio|floatformat:1 }} lavaggi al giorno &middot; senza la pioggia prevista: {{ v.errore_prima_pct|floatformat:0 }}% &middot; solo media per giorno della settimana: {{ v.errore_base_pct|floatformat:0 }}%{% if v.errore_cicli_pct != None %} &middot; cicli self: {{ v.errore_cicli_pct|floatformat:0 }}%{% endif %}</div></div></div>
+        <div class="col-6 col-md-3"><div class="kpi-tile"><div class="label">Errore medio</div><div class="value">{{ v.errore_pct|floatformat:0 }}%</div><div class="sub">&plusmn;{{ v.errore_medio|floatformat:1 }} lavaggi al giorno &middot; senza la pioggia prevista: {{ v.errore_prima_pct|floatformat:0 }}% &middot; senza sabbia e andamento del self: {{ v.errore_senza_segnali_pct|floatformat:0 }}%{% if not r.usa_segnali %} (non aiutano: esclusi){% endif %} &middot; solo media per giorno della settimana: {{ v.errore_base_pct|floatformat:0 }}%{% if v.errore_cicli_pct != None %} &middot; cicli self: {{ v.errore_cicli_pct|floatformat:0 }}%{% endif %}</div></div></div>
         <div class="col-6 col-md-3"><div class="kpi-tile"><div class="label">Giorni entro &plusmn;20%</div><div class="value">{{ v.entro_20|floatformat:0 }}%</div></div></div>
         <div class="col-6 col-md-3"><div class="kpi-tile"><div class="label">Squadra giusta</div><div class="value">{% if v.squadra_giusta != None %}{{ v.squadra_giusta|floatformat:0 }}%{% else %}&mdash;{% endif %}</div><div class="sub">{% if v.squadra_quasi != None %}giusta o 1 persona in piu': {{ v.squadra_quasi|floatformat:0 }}% &middot; {% endif %}{% if v.squadra_scarsa != None %}scoperti nel {{ v.squadra_scarsa|floatformat:0 }}% dei giorni{% endif %}</div></div></div>
         <div class="col-6 col-md-3"><div class="kpi-tile hero"><div class="label">Risparmio possibile</div><div class="value">{% if v.giorni_presenze %}&euro;{{ v.risparmio|floatformat:"0g" }}{% else %}&mdash;{% endif %}</div><div class="sub">{% if v.giorni_presenze %}{{ v.ore_risparmiate|floatformat:0 }} ore in {{ v.giorni_presenze }} giorni con presenze{% else %}servono le presenze{% endif %}</div></div></div>
@@ -121,6 +122,33 @@
   </div>
   {% endwith %}{% endif %}
 
+  {% if r.profilo.righe %}{% with pr=r.profilo %}
+  <div class="panel">
+    <div class="panel-title"><i class="bi bi-clock"></i> Self per fascia oraria</div>
+    <div class="panel-sub">Cicli self (pagati al portale dal cliente, esclusi quelli del servito) in media per ora, dal {{ pr.dal|date:"d/m" }} al {{ pr.al|date:"d/m/Y" }}. Serve a capire se al self basta una persona solo in certe ore.</div>
+    <div class="panel-body tabella-scroll">
+      <table class="table table-sm prev">
+        <thead><tr><th>Giorni</th>{% for h in pr.ore %}<th class="tab-num">{{ h }}</th>{% endfor %}{% for f in pr.righe.0.fasce %}<th class="tab-num">{{ f.nome }}</th>{% endfor %}</tr></thead>
+        <tbody>
+        {% for riga in pr.righe %}
+          <tr><td>{{ riga.gruppo }} <span class="nota">({{ riga.giorni }} gg)</span></td>
+            {% for m in riga.medie %}<td class="tab-num cella-ora" data-v="{{ m|stringformat:'.3f' }}" data-max="{{ riga.massimo|stringformat:'.3f' }}">{% if m >= 0.05 %}{{ m|floatformat:1 }}{% endif %}</td>{% endfor %}
+            {% for f in riga.fasce %}<td class="tab-num"><strong>{{ f.cicli|floatformat:0 }}</strong> <span class="nota">{% widthratio f.quota 1 100 %}%</span></td>{% endfor %}
+          </tr>
+        {% endfor %}
+        </tbody>
+      </table>
+      <div class="nota">Fasce: mattina 7&ndash;13, pomeriggio 13&ndash;18, sera 18&ndash;23 (cicli medi e quota della giornata). Nei riquadri di oggi e domani i cicli self previsti sono divisi con queste quote.</div>
+    </div>
+  </div>
+  <script>
+  document.querySelectorAll('.cella-ora').forEach(function (c) {
+    var v = parseFloat(c.dataset.v), m = parseFloat(c.dataset.max);
+    if (m > 0 && v > 0) c.style.background = 'rgba(20,184,166,' + (0.08 + 0.6 * v / m).toFixed(2) + ')';
+  });
+  </script>
+  {% endwith %}{% endif %}
+
   {% if storico %}
   <div class="panel">
     <div class="panel-title"><i class="bi bi-clock-history"></i> Previsioni delle sere scorse</div>
@@ -141,7 +169,7 @@
 
   <div class="panel">
     <div class="panel-title"><i class="bi bi-sliders"></i> Cosa conta di piu'</div>
-    <div class="panel-sub">Addestrato su {{ r.giorni_storico }} giorni di apertura dal {{ r.dal|date:"d/m/Y" }}{% if r.chiuso %}; chiuso di {{ r.chiuso|join:", " }}{% endif %}. Di quanto cambiano i lavaggi in ogni situazione, a parita' del resto (media su tutti i giorni dello storico). Conta sia la pioggia caduta sia quella prevista, per il giorno e per i 3 giorni dopo (chi vede pioggia in arrivo non lava la macchina){% if r.con_probabilita %}, compresa la probabilita'{% endif %}.</div>
+    <div class="panel-sub">Addestrato su {{ r.giorni_storico }} giorni di apertura dal {{ r.dal|date:"d/m/Y" }}{% if r.chiuso %}; chiuso di {{ r.chiuso|join:", " }}{% endif %}. Di quanto cambiano i lavaggi in ogni situazione, a parita' del resto (media su tutti i giorni dello storico). {% if r.usa_segnali %}Usa anche la sabbia del Sahara{% if not r.polvere_disponibile %} (non disponibile){% endif %} e l'andamento di self e piste nei giorni prima. {% endif %}Conta sia la pioggia caduta sia quella prevista, per il giorno e per i 3 giorni dopo (chi vede pioggia in arrivo non lava la macchina){% if r.con_probabilita %}, compresa la probabilita'{% endif %}.</div>
     <div class="panel-body">
       <table class="table table-sm prev" style="max-width:480px">
         {% for p in r.effetti %}<tr><td>{{ p.nome }}</td><td class="tab-num {% if p.effetto > 0 %}giu{% else %}su{% endif %}">{% if p.effetto > 0 %}+{% endif %}{{ p.effetto|floatformat:0 }}%</td></tr>{% endfor %}
