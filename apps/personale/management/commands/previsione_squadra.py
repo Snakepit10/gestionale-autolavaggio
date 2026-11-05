@@ -1,6 +1,7 @@
 """Calcola e salva la squadra consigliata per domani. Da lanciare ogni
-sera dopo le 18 (es. cron alle 18:05): la pagina Previsione squadra la
-salva comunque quando viene aperta dopo le 18."""
+sera dopo la fine del turno (19): la pagina Previsione squadra la salva
+comunque quando viene aperta dopo quell'ora. Prima delle 19 non salva,
+cosi' il cron puo' girare a due ore UTC e coprire ora legale e solare."""
 from django.core.management.base import BaseCommand
 
 from apps.personale import previsione
@@ -17,4 +18,4 @@ class Command(BaseCommand):
         salvata = previsione.registra(r)
         domani = next(p for p in r['previsioni'] if p['domani'])
         self.stdout.write(f"{domani['data']:%d/%m/%Y}: {domani['previsti']:.0f} lavaggi previsti, "
-                          f"squadra {domani['squadra'] or 'chiuso'}{'' if salvata else ' (non salvata: prima delle 18)'}")
+                          f"squadra {domani['squadra'] or 'chiuso'}{'' if salvata else ' (non salvata: turno non finito)'}")

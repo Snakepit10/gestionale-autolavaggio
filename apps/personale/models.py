@@ -138,7 +138,7 @@ class Presenza(models.Model):
 
 
 class PrevisioneSquadra(models.Model):
-    """La previsione del giorno, salvata la sera prima (dalle 18), per
+    """La previsione del giorno, salvata la sera prima (dalle 19), per
     confrontarla poi con i lavaggi e le presenze reali."""
     data = models.DateField(unique=True)
     lavaggi_previsti = models.DecimalField(max_digits=6, decimal_places=1)

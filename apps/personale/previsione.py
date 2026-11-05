@@ -6,7 +6,7 @@ Due passi:
    saranno, da: giorno della settimana, festivi e ponti, stagione, pioggia
    prevista il giorno prima, pioggia dei giorni passati, temperatura,
    sabbia del Sahara, livello delle ultime 4 settimane e dell'ultima, e
-   prenotazioni gia' fatte alle 18 del giorno prima;
+   prenotazioni gia' fatte alle 19 del giorno prima;
 2. persone al servito = lavaggi previsti + un margine (parametro, di
    partenza 10%) / lavaggi che una persona fa in una giornata (parametro,
    di partenza 7: 20 lavaggi = 3 persone);
@@ -35,7 +35,7 @@ from apps.finanze.lag_analysis import italian_holidays_in_range
 
 INIZIO_ORDINI = date(2025, 8, 1)
 GIORNI_VERIFICA = 60
-ORA_DECISIONE = time(18, 0)
+ORA_DECISIONE = time(19, 0)   # fine del turno: la giornata e' completa
 LAMBDA = 100                 # regolarizzazione ridge, provata sui dati reali
 SQUADRA_MINIMA = 1           # persone minime del servito
 PERSONE_SELF = 1             # al self sempre una persona
@@ -125,7 +125,7 @@ def _meteo_previsto_storico(dal, al):
 
 def _meteo_giorno_prima(dal, al):
     """La pioggia prevista per ogni giorno dalla previsione emessa il giorno
-    prima (Open-Meteo Previous Runs): quello che si sapeva davvero alle 18
+    prima (Open-Meteo Previous Runs): quello che si sapeva davvero alle 19
     della sera prima. {data: {'pioggia', 'ore', 'piove'}}; None se non risponde."""
     from apps.finanze.weather import LICATA_LAT, LICATA_LON
     params = {'latitude': LICATA_LAT, 'longitude': LICATA_LON, 'hourly': 'precipitation_previous_day1',
@@ -238,7 +238,7 @@ def dati_giornalieri(oggi=None):
         righe.append({
             'data': g.isoformat(), 'giorno': GIORNI_SETTIMANA[g.weekday()], 'festivo': festivi.get(g, ''),
             'lavaggi_servito': lavaggi.get(g, (0, 0))[0], 'incasso_servito': round(lavaggi.get(g, (0, 0))[1], 2),
-            'prenotazioni_note_18': prenotazioni.get(g, 0),
+            'prenotazioni_note_sera': prenotazioni.get(g, 0),
             'cicli_self_washtec': c.get('self_washtec', 0), 'cicli_servito_washtec': c.get('servito_washtec', 0),
             'cicli_portali_chiusure': c.get('chiusure') if c.get('chiusure') is not None else '',
             'lavaggi_completi_servito': c.get('completi', 0),
@@ -649,6 +649,10 @@ def calcola(oggi=None, par=None):
     profilo = profilo_self(ieri)
     storico_esteso = dict(storico)
     finora = _lavaggi_per_giorno(oggi, oggi).get(oggi, (0, 0))[0]
+    # finito il turno oggi e' un giorno completo: il modello impara sapendo
+    # i lavaggi del giorno prima, quindi domani deve vederli
+    if turno_finito(oggi) and finora >= (MIN_LAVAGGI_DOMENICA if oggi.weekday() == 6 else 1):
+        storico_esteso[oggi] = (finora, 0)
     for k in range(0, 8):
         g = oggi + timedelta(days=k)
         if g not in meteo:
@@ -657,7 +661,7 @@ def calcola(oggi=None, par=None):
                   or (g.weekday() == 6 and not domenica_aperta))           # chiuso il servito: il self resta
         livello = _livello(storico_esteso, g) or _livello(storico, oggi)
         note = _prenotazioni_ora(g)
-        # oggi: le prenotazioni note alle 18 di ieri, come nell'addestramento
+        # oggi: le prenotazioni note ieri sera, come nell'addestramento
         x = _variabili(g, meteo, festivi, livello, prenotazioni.get(g, 0) if k == 0 else note, previsto, polvere,
                        _livello(storico_esteso, g, 7))
         previsti = max(0.0, math.expm1(modello.predict(x)))
@@ -724,14 +728,21 @@ def _media_wd(storico, giorno, giorni):
     return sum(valori) / len(valori) if valori else 0
 
 
+def turno_finito(oggi=None):
+    """True da quando il turno di `oggi` e' finito."""
+    adesso = timezone.localtime()
+    return adesso.time() >= ORA_DECISIONE and (oggi is None or adesso.date() == oggi)
+
+
 def registra(risultato):
-    """Salva la previsione di domani (dalle 18 in poi), per confrontarla
-    poi con quanto e' successo."""
+    """Salva la previsione di domani, a turno finito, per confrontarla poi
+    con quanto e' successo. La prima salvata resta: chi riapre la pagina
+    piu' tardi non deve riscriverla con un meteo piu' fresco."""
     from .models import PrevisioneSquadra
     domani = next((p for p in risultato.get('previsioni', []) if p['domani']), None)
-    if not domani or timezone.localtime().time() < ORA_DECISIONE:
+    if not domani or not turno_finito():
         return None
-    return PrevisioneSquadra.objects.update_or_create(data=domani['data'], defaults={
+    return PrevisioneSquadra.objects.get_or_create(data=domani['data'], defaults={
         'lavaggi_previsti': round(domani['previsti'], 1), 'lavaggi_alti': round(domani['alti'], 1),
         'squadra': domani['squadra'] or 0, 'pioggia_mm': round(domani['pioggia'], 1), 'chiuso': domani['chiuso'],
     })[0]

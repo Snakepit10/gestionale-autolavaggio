@@ -157,16 +157,32 @@ class PrevisioneTest(TestCase):
         dopodomani = meteo[OGGI + timedelta(days=2)]
         self.assertEqual((dopodomani['fonte'], dopodomani['piove']), ('Open-Meteo', False))
 
-    def test_registra_solo_dopo_le_18(self):
+    def test_registra_a_turno_finito(self):
         r = prev.calcola(OGGI)
-        sera = timezone.make_aware(datetime(2026, 11, 5, 18, 30))
-        mattina = timezone.make_aware(datetime(2026, 11, 5, 10, 0))
-        with mock.patch('django.utils.timezone.localtime', return_value=mattina):
+        sera = timezone.make_aware(datetime(2026, 11, 5, 19, 10))
+        in_turno = timezone.make_aware(datetime(2026, 11, 5, 18, 30))
+        with mock.patch('django.utils.timezone.localtime', return_value=in_turno):
             self.assertIsNone(prev.registra(r))
         with mock.patch('django.utils.timezone.localtime', return_value=sera):
             salvata = prev.registra(r)
+            previsti = salvata.lavaggi_previsti
+            r['previsioni'][1]['previsti'] += 5                   # riaperta piu' tardi, meteo piu' fresco
+            self.assertEqual(prev.registra(r).lavaggi_previsti, previsti)     # la prima resta
         self.assertEqual(salvata.data, date(2026, 11, 6))
         self.assertEqual(PrevisioneSquadra.objects.count(), 1)
+
+    def test_a_turno_finito_domani_conta_oggi(self):
+        reale = prev._lavaggi_per_giorno
+
+        def con_oggi(dal, al):
+            return {**reale(dal, al), **({OGGI: (200, 0.0)} if dal <= OGGI <= al else {})}
+        with mock.patch.object(prev, '_lavaggi_per_giorno', side_effect=con_oggi):
+            with mock.patch.object(prev, 'turno_finito', return_value=False):
+                in_turno = prev.calcola(OGGI)['previsioni']
+            with mock.patch.object(prev, 'turno_finito', return_value=True):
+                finito = prev.calcola(OGGI)['previsioni']
+        self.assertEqual(finito[0]['previsti'], in_turno[0]['previsti'])      # oggi non cambia
+        self.assertGreater(finito[1]['previsti'], in_turno[1]['previsti'])    # domani si'
 
     def test_salva_parametri(self):
         from apps.auth_system.models import PermessoGruppo
