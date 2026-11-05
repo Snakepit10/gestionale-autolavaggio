@@ -155,11 +155,21 @@ def _lavaggi_per_giorno(dal, al):
 
 
 def _cicli_self_per_giorno(dal, al):
-    """Cicli self delle spazzole per giorno: cicli dei portali dalle
-    chiusure di cassa meno i lavaggi completi del servito (anche loro
-    passano dal portale). Solo i giorni con la chiusura."""
-    from apps.finanze.models import ChiusuraCassaAutomatica
+    """Cicli self delle spazzole per giorno. Dalle transazioni WashTec
+    pagate al portale dal cliente (le altre le avvia l'unita' operativa per
+    il servito), che hanno data e ora esatte; per i giorni prima della
+    prima transazione importata, dalle chiusure: cicli dei portali meno i
+    lavaggi completi del servito."""
+    from apps.finanze.models import ChiusuraCassaAutomatica, TransazionePortale
     from apps.ordini.models import ItemOrdine
+    da_washtec = defaultdict(int)
+    for orario in (TransazionePortale.objects.filter(origine='contanti', orario__date__gte=dal - timedelta(days=1),
+                                                     orario__date__lte=al + timedelta(days=1))
+                   .values_list('orario', flat=True)):
+        g = timezone.localtime(orario).date()
+        if dal <= g <= al:
+            da_washtec[g] += 1
+    prima_washtec = min(da_washtec) if da_washtec else None
     portali = {r['data']: r['c'] or 0 for r in
                ChiusuraCassaAutomatica.objects.filter(data__gte=dal, data__lte=al, cassa__tracking_washcycles=True,
                                                       cassa__modalita_registratore=False)
@@ -168,7 +178,10 @@ def _cicli_self_per_giorno(dal, al):
                ItemOrdine.objects.filter(ordine__data_ora__date__gte=dal, ordine__data_ora__date__lte=al,
                                          servizio_prodotto__titolo__icontains='lavaggio completo')
                .exclude(ordine__stato='annullato').values('ordine__data_ora__date').annotate(q=Sum('quantita'))}
-    return {g: (max(c - servito.get(g, 0), 0), 0.0) for g, c in portali.items() if c}
+    cicli = {g: (max(c - servito.get(g, 0), 0), 0.0) for g, c in portali.items()
+             if c and (prima_washtec is None or g < prima_washtec)}
+    cicli.update({g: (n, 0.0) for g, n in da_washtec.items()})
+    return cicli
 
 
 def _polvere(dal, al):
@@ -570,15 +583,18 @@ def _pioggia_tipica(previsto):
             'ore': math.log1p(_quantile([m.get('ore', 0) for m in piovosi], 0.5)) if piovosi else math.log1p(4)}
 
 
-def _modello_cicli(xs, ys, usati, fino_a=None):
-    """Modello dei cicli self (senza margine), addestrato sui giorni prima
-    di fino_a."""
+def _modello_cicli(xs, ys, usati, soglia, fino_a=None):
+    """Modello dei cicli self addestrato sui giorni prima di fino_a, con il
+    suo margine: come per il servito, il piu' piccolo che lascia il self
+    scoperto (cicli oltre la soglia senza nessuno) al massimo 1 giorno su
+    10. (None, 0) se i giorni sono pochi."""
     dentro = [i for i, g in enumerate(usati) if fino_a is None or g < fino_a]
     if len(dentro) < 60:
-        return None
+        return None, 0.0
     xs_d, ys_d = [xs[i] for i in dentro], [ys[i] for i in dentro]
-    lam, _, _ = _taratura(xs_d, ys_d)
-    return Ridge(lam).fit(xs_d, ys_d)
+    persone = (lambda c: persone_self(c, soglia)) if soglia is not None else None
+    lam, margine, _ = _taratura(xs_d, ys_d, persone)
+    return Ridge(lam).fit(xs_d, ys_d), (margine if soglia is not None else 0.0)
 
 
 def calcola(oggi=None, par=None):
@@ -641,9 +657,9 @@ def calcola(oggi=None, par=None):
         lam_v, margine_v, _ = _taratura(xs[:taglio], ys[:taglio], persone)
         modello_v = Ridge(lam_v).fit(xs[:taglio], ys[:taglio])
         dal_v = usati[taglio]
-        modello_cv = _modello_cicli(xs_c, ys_c, usati_c, dal_v)
-        cicli_v = ({g: max(0.0, math.expm1(modello_cv.predict(x))) for x, g in zip(xs_c, usati_c) if g >= dal_v}
-                   if modello_cv else {})
+        modello_cv, margine_cv = _modello_cicli(xs_c, ys_c, usati_c, par.soglia_cicli_self, dal_v)
+        cicli_v = ({g: (max(0.0, math.expm1(modello_cv.predict(x))), max(0.0, math.expm1(modello_cv.predict(x) + margine_cv)))
+                    for x, g in zip(xs_c, usati_c) if g >= dal_v} if modello_cv else {})
         giorni_v = []
         for x, y, g in zip(xs[taglio:], ys[taglio:], usati[taglio:]):
             previsti = max(0.0, math.expm1(modello_v.predict(x)))
@@ -651,10 +667,16 @@ def calcola(oggi=None, par=None):
             riga = {'data': g, 'giorno': GIORNI_SETTIMANA[g.weekday()], 'previsti': previsti, 'reali': reali,
                     'pioggia': meteo[g]['pioggia'], 'piove': meteo[g]['piove'],
                     'in_arrivo': _giorni_in_arrivo(g, previsto, con_probabilita), 'scarto_pct': (previsti - reali) / reali * 100,
-                    'cicli_previsti': cicli_v.get(g), 'cicli_reali': cicli[g][0] if g in cicli else None}
-            riga['squadra'] = squadra_per(math.expm1(modello_v.predict(x) + margine_v), riga['cicli_previsti'], par)
-            riga['squadra_ideale'] = squadra_per(reali, riga['cicli_reali'] if riga['cicli_reali'] is not None
-                                                 else riga['cicli_previsti'], par)
+                    'cicli_previsti': cicli_v[g][0] if g in cicli_v else None,
+                    'cicli_reali': cicli[g][0] if g in cicli else None}
+            cicli_alti = cicli_v[g][1] if g in cicli_v else None
+            riga['servito'] = squadra_servito(math.expm1(modello_v.predict(x) + margine_v), lpp)
+            riga['servito_ideale'] = squadra_servito(reali, lpp)
+            riga['self'] = persone_self(cicli_alti, par.soglia_cicli_self)
+            riga['self_ideale'] = persone_self(riga['cicli_reali'] if riga['cicli_reali'] is not None else cicli_alti,
+                                               par.soglia_cicli_self)
+            riga['squadra'] = riga['servito'] + riga['self'] if riga['servito'] else None
+            riga['squadra_ideale'] = riga['servito_ideale'] + riga['self_ideale'] if riga['servito_ideale'] else None
             if g in presenze:
                 riga['persone'], riga['ore'] = presenze[g][1], presenze[g][0]
                 if riga['squadra'] and ore_persona:
@@ -692,6 +714,14 @@ def calcola(oggi=None, par=None):
                               if con_squadra else None),
             'squadra_scarsa': (sum(1 for r in con_squadra if r['squadra'] < r['squadra_ideale']) / len(con_squadra) * 100
                                if con_squadra else None),
+            'servito_giusto': (sum(1 for r in con_squadra if r['servito'] == r['servito_ideale']) / len(con_squadra) * 100
+                               if con_squadra else None),
+            'servito_scarso': (sum(1 for r in con_squadra if r['servito'] < r['servito_ideale']) / len(con_squadra) * 100
+                               if con_squadra else None),
+            'self_giusto': (sum(1 for r in con_cicli if r['self'] == r['self_ideale']) / len(con_cicli) * 100
+                            if con_cicli and par.soglia_cicli_self is not None else None),
+            'self_scarso': (sum(1 for r in con_cicli if r['self'] < r['self_ideale']) / len(con_cicli) * 100
+                            if con_cicli and par.soglia_cicli_self is not None else None),
             'giorni_presenze': len(con_presenze),
             'ore_risparmiate': sum(r.get('ore_risparmiate', 0) for r in con_presenze),
             'risparmio': sum(r.get('risparmio') or 0 for r in con_presenze),
@@ -700,7 +730,7 @@ def calcola(oggi=None, par=None):
     # --- modelli finali su tutto lo storico
     lam, margine, _ = _taratura(xs, ys, persone)
     modello = Ridge(lam).fit(xs, ys)
-    modello_c = _modello_cicli(xs_c, ys_c, usati_c)
+    modello_c, margine_c = _modello_cicli(xs_c, ys_c, usati_c, par.soglia_cicli_self)
     previsioni = []
     profilo = profilo_self(ieri)
     storico_esteso, cicli_esteso = dict(storico), dict(cicli)
@@ -717,20 +747,21 @@ def calcola(oggi=None, par=None):
                        segnali)[:n_variabili]
         stima = modello.predict(x)
         previsti, alti = max(0.0, math.expm1(stima)), max(0.0, math.expm1(stima + margine))
-        cicli_previsti = None
+        cicli_previsti = cicli_alti = None
         livello_c = _livello(cicli_esteso, g)
         if modello_c and livello_c is not None:
-            cicli_previsti = max(0.0, math.expm1(modello_c.predict(
-                _variabili(g, meteo, festivi, livello_c, 0, previsto, con_probabilita, segnali)[:n_variabili])))
+            stima_c = modello_c.predict(_variabili(g, meteo, festivi, livello_c, 0, previsto, con_probabilita,
+                                                   segnali)[:n_variabili])
+            cicli_previsti, cicli_alti = max(0.0, math.expm1(stima_c)), max(0.0, math.expm1(stima_c + margine_c))
         servito = None if chiuso else squadra_servito(alti, lpp)
-        al_self = None if chiuso else persone_self(cicli_previsti, par.soglia_cicli_self)
+        al_self = None if chiuso else persone_self(cicli_alti, par.soglia_cicli_self)
         previsioni.append({
             'data': g, 'giorno': GIORNI_SETTIMANA[g.weekday()], 'chiuso': chiuso, 'domani': k == 1,
             'oggi': k == 0, 'finora': finora if k == 0 else None,
             'pioggia': meteo[g]['pioggia'], 'piove': meteo[g]['piove'], 'ore_pioggia': meteo[g].get('ore', 0),
             'probabilita': meteo[g].get('probabilita'), 'fonte': meteo[g].get('fonte'),
             'in_arrivo': _giorni_in_arrivo(g, previsto, con_probabilita), 'tmax': meteo[g]['tmax'], 'prenotazioni': note,
-            'previsti': previsti, 'alti': alti, 'cicli': cicli_previsti,
+            'previsti': previsti, 'alti': alti, 'cicli': cicli_previsti, 'cicli_alti': cicli_alti,
             'fasce': _fasce_previste(g, cicli_previsti, profilo), 'polvere': segnali['polvere'].get(g),
             'servito': servito, 'self': al_self,
             'squadra': servito + al_self if servito else None,
@@ -751,7 +782,7 @@ def calcola(oggi=None, par=None):
         'obiettivo_scoperti': OBIETTIVO_SCOPERTI * 100, 'profilo': profilo,
         'usa_segnali': usa_segnali, 'polvere_disponibile': bool(segnali['polvere']),
         'piste_disponibili': bool(segnali['piste']),
-        'margine_pct': (math.exp(margine) - 1) * 100,
+        'margine_pct': (math.exp(margine) - 1) * 100, 'margine_cicli_pct': (math.exp(margine_c) - 1) * 100,
         'chiuso': [GIORNI_SETTIMANA[wd] for wd in sorted(chiuso_wd)],
     }
 

@@ -12,6 +12,7 @@ from .models import ParametriPrevisione, PrevisioneSquadra
 OGGI = date(2026, 11, 5)
 METEO_VERO = prev._meteo          # prima dei mock del setUp
 POLVERE_VERA = prev._polvere
+CICLI_VERI = prev._cicli_self_per_giorno
 
 
 def dati_sintetici():
@@ -170,6 +171,10 @@ class PrevisioneTest(TestCase):
         for p in [p for p in r['previsioni'] if not p['chiuso']]:
             self.assertEqual(p['self'], 0 if p['piove'] else 1, p)
             self.assertEqual(p['squadra'], p['servito'] + p['self'])
+        v = r['verifica']
+        self.assertLessEqual(v['self_scarso'], 12)
+        self.assertGreaterEqual(v['self_giusto'], 85)
+        self.assertIsNotNone(v['servito_giusto'])
 
     def test_salva_parametri(self):
         from apps.auth_system.models import PermessoGruppo
@@ -213,6 +218,26 @@ class PrevisioneTest(TestCase):
         mattina, pomeriggio, sera = riga['fasce']
         self.assertEqual((mattina['cicli'], pomeriggio['cicli'], sera['cicli']), (3, 1, 0))
         self.assertEqual(prev._fasce_previste(sabato + timedelta(days=7), 40, pr)[0]['cicli'], 30)   # 3/4 la mattina
+
+    def test_cicli_self_da_washtec(self):
+        from apps.core.models import Categoria, ServizioProdotto
+        from apps.finanze.models import Cassa, ChiusuraCassaAutomatica, TransazionePortale
+        from apps.ordini.models import ItemOrdine, Ordine
+        portale = Cassa.objects.create(nome='Portale', tipo='automatica', tracking_washcycles=True)
+        completo = ServizioProdotto.objects.create(titolo='Lavaggio completo', categoria=Categoria.objects.create(nome='S'),
+                                                   prezzo=22, descrizione='')
+        prima, dopo = date(2026, 10, 1), date(2026, 10, 2)
+        # 1/10: solo la chiusura (30 cicli) e 4 completi del servito -> 26
+        ChiusuraCassaAutomatica.objects.create(cassa=portale, data=prima, wash_cycles=30)
+        ordine = Ordine.objects.create(totale=0, totale_finale=0)
+        Ordine.objects.filter(pk=ordine.pk).update(data_ora=timezone.make_aware(datetime(2026, 10, 1, 10, 0)))
+        ItemOrdine.objects.create(ordine=ordine, servizio_prodotto=completo, prezzo_unitario=22, quantita=4)
+        # 2/10: la chiusura dice 50 ma WashTec ha 3 self e 1 del servito: valgono le transazioni
+        ChiusuraCassaAutomatica.objects.create(cassa=portale, data=dopo, wash_cycles=50)
+        for n, origine in enumerate(['contanti', 'contanti', 'contanti', 'unita']):
+            TransazionePortale.objects.create(portale='B', numero=n + 1, programma=4, origine=origine,
+                                              orario=timezone.make_aware(datetime(2026, 10, 2, 9 + n, 0)))
+        self.assertEqual(CICLI_VERI(prima, dopo), {prima: (26, 0.0), dopo: (3, 0.0)})
 
     def test_polvere_da_open_meteo(self):
         risposta = {'hourly': {'time': ['2026-11-05T10:00', '2026-11-05T14:00', '2026-11-06T10:00'],
