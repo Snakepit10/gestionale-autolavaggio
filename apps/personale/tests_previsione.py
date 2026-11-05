@@ -294,3 +294,4 @@ class PrevisioneTest(TestCase):
         self.assertContains(risposta, 'Squadra consigliata domani')
         self.assertContains(risposta, 'Oggi Gio 05/11')
         self.assertContains(risposta, 'Quanto e')
+        self.assertContains(risposta, 'giorni da WashTec')
