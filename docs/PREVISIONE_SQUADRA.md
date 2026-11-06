@@ -21,7 +21,13 @@ Provati sui dati fino a novembre 2026 e non utili: giorni di stipendio, rimbalzo
 
 Il servizio meteo si sceglie nella pagina fra sette modelli di Open-Meteo: ItaliaMeteo ICON-2I (di partenza), Open-Meteo automatico, ECMWF IFS, DWD ICON, Météo-France AROME/ARPEGE, UK Met Office e NOAA GFS. Per i giorni che il modello scelto non copre (ICON-2I arriva a circa 3 giorni) si usa quello automatico.
 
-**Confronta i servizi meteo** riaddestra la previsione dei lavaggi con le previsioni del giorno prima di ciascun servizio e la verifica sugli stessi giorni: errore sui lavaggi, squadra giusta, giorni scoperti, turni risparmiati dal secondo parere. In più mostra quanti giorni di pioggia ogni servizio aveva previsto e quanti falsi allarmi ha dato rispetto all'archivio Open-Meteo, che è anch'esso una stima e non un pluviometro. Il confronto fa poche richieste, una o due per servizio, e resta in memoria 12 ore.
+**Confronta i servizi meteo** riaddestra la previsione dei lavaggi con le previsioni del giorno prima di ciascun servizio e la verifica sugli stessi giorni: errore sui lavaggi, squadra giusta, giorni scoperti, turni risparmiati seguendo il modello. In più mostra quanti giorni di pioggia ogni servizio aveva previsto e quanti falsi allarmi ha dato rispetto all'archivio Open-Meteo, che è anch'esso una stima e non un pluviometro. Il confronto fa poche richieste, una o due per servizio, e resta in memoria 12 ore.
+
+Il 06/11/2026 i servizi sono stati provati anche con riaddestramento settimanale su 265 giorni: nessuno batte ICON-2I, e nemmeno la pioggia caduta dell'archivio migliora la previsione.
+
+**Avviso di pioggia:** se per domani il servizio in uso dà asciutto ma almeno 5 degli altri 9 modelli danno pioggia, la pagina lo segnala. Il numero di lavaggi e la squadra non cambiano. Nel 2026, in 32 giorni così, i lavaggi sono stati 16,2 di media contro 17,9 previsti.
+
+**Risparmio seguendo il modello:** i turni al servito delle vostre scelte meno quelli del modello, negli stessi giorni della verifica, moltiplicati per le ore di un turno e il costo orario medio. La tabella sotto mostra anche i giorni scoperti.
 
 ## Giornata di pioggia
 

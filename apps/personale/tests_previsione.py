@@ -12,6 +12,7 @@ from .models import ParametriPrevisione, PrevisioneSquadra
 OGGI = date(2026, 11, 5)
 METEO_VERO = prev._meteo          # prima dei mock del setUp
 GIORNO_PRIMA_VERO = prev._meteo_giorno_prima
+ALTRI_MODELLI_VERO = prev._pioggia_altri_modelli
 POLVERE_VERA = prev._polvere
 
 
@@ -68,6 +69,7 @@ class PrevisioneTest(TestCase):
             mock.patch.object(prev, '_costo_orario_per_mese', return_value={date(2026, 10, 1): 15.0}),
             mock.patch.object(prev, '_polvere', side_effect=lambda dal, al: {g: v for g, v in polvere.items() if dal <= g <= al}),
             mock.patch.object(prev, '_piste_per_giorno', return_value={}),
+            mock.patch.object(prev, '_pioggia_altri_modelli', return_value=None),
         ]
         for p in patch:
             p.start()
@@ -114,11 +116,11 @@ class PrevisioneTest(TestCase):
             atteso *= 1.4 if self.polvere[p['data'] - timedelta(days=1)] > 100 else 1
             self.assertLess(abs(p['previsti'] - atteso) / atteso, 0.2, p)
             self.assertAlmostEqual(p['alti'], p['previsti'] * 1.1)
-        # squadra sempre piena: nei giorni di pioggia si risparmia
+        # squadra sempre piena: seguendo il modello si risparmia
         c = v['confronto']
-        self.assertGreater(c['risparmiate'], 0)                            # il secondo parere toglie turni...
-        self.assertLessEqual(c['regola']['scoperti'], c['voi']['scoperti'] + 5)   # ...senza scoprire la squadra
-        self.assertEqual(c['voi']['persone'] - c['regola']['persone'], c['risparmiate'])
+        self.assertGreater(c['risparmiate'], 0)
+        self.assertEqual(c['voi']['persone'] - c['modello']['persone'], c['risparmiate'])
+        self.assertAlmostEqual(c['euro'], c['risparmiate'] * r['ore_persona'] * 15.0)
 
     def test_pioggia_debole_conta(self):
         # pomeriggio di pioviggine: pochi millimetri ma e' una giornata di pioggia, debole
@@ -294,12 +296,49 @@ class PrevisioneTest(TestCase):
         self.assertEqual(ParametriPrevisione.attuali().modello_meteo, 'ecmwf_ifs025')
         self.client.post('/personale/previsione/', {'modello_meteo': 'inventato'})            # ignorato
         self.assertEqual(ParametriPrevisione.attuali().modello_meteo, 'ecmwf_ifs025')
+        from django.contrib.messages.storage.fallback import FallbackStorage
+        from django.test import RequestFactory
+
+        from .views import previsione
+        richiesta = RequestFactory().get('/personale/previsione/?confronta=1')   # il client non rende i template su Python 3.14
+        richiesta.user, richiesta.session = utente, {}
+        richiesta._messages = FallbackStorage(richiesta)
         with mock.patch('django.utils.timezone.localdate', return_value=OGGI):
-            risposta = self.client.get('/personale/previsione/?confronta=1')
+            risposta = previsione(richiesta)
         self.assertContains(risposta, 'Confronto dei servizi meteo')
         self.assertContains(risposta, 'NOAA GFS')
+        self.assertContains(risposta, 'Turni risparmiati')
         self.assertEqual(prev.modelli_per('ecmwf_ifs025'), ('ecmwf_ifs025', 'best_match'))
         self.assertEqual(prev.modelli_per('best_match'), ('best_match',))
+
+    def test_avviso_se_gli_altri_modelli_danno_pioggia(self):
+        domani = OGGI + timedelta(days=1)
+        self.meteo[domani] = {'pioggia': 0.0, 'ore': 0.0, 'tmax': 20.0, 'piove': False}
+
+        def avviso():
+            return next(p for p in prev.calcola(OGGI)['previsioni'] if p['domani']).get('avviso_pioggia')
+        with mock.patch.object(prev, '_pioggia_altri_modelli', return_value={'pioggia': 5, 'modelli': 9}) as altri:
+            self.assertEqual(avviso(), {'pioggia': 5, 'modelli': 9})
+        altri.assert_called_once_with(domani, 'italia_meteo_arpae_icon_2i')
+        with mock.patch.object(prev, '_pioggia_altri_modelli', return_value={'pioggia': 4, 'modelli': 9}):
+            self.assertIsNone(avviso())
+        self.meteo[domani] = {'pioggia': 5.0, 'ore': 4.0, 'tmax': 20.0, 'piove': True}      # gia' prevista: niente avviso
+        with mock.patch.object(prev, '_pioggia_altri_modelli', return_value={'pioggia': 9, 'modelli': 9}) as altri:
+            self.assertIsNone(avviso())
+        altri.assert_not_called()
+
+    def test_pioggia_altri_modelli(self):
+        risposta = {'hourly': {'time': ['2026-12-01T10:00', '2026-12-01T11:00'],
+                               'precipitation_ecmwf_ifs025': [0.5, 0.6],             # 1,1 mm: pioggia
+                               'precipitation_gfs_seamless': [0.2, 0.1],             # 2 ore: pioggia
+                               'precipitation_gem_seamless': [0.05, 0.0],            # asciutto
+                               'precipitation_knmi_seamless': [None, None]}}         # non risponde: non conta
+        with mock.patch('apps.finanze.weather._http_get_json', return_value=risposta) as http:
+            altri = ALTRI_MODELLI_VERO(date(2026, 12, 1), 'italia_meteo_arpae_icon_2i')
+        self.assertEqual(altri, {'pioggia': 2, 'modelli': 3})
+        self.assertNotIn('italia_meteo_arpae_icon_2i', http.call_args[0][0])         # il servizio in uso e' escluso
+        with mock.patch('apps.finanze.weather._http_get_json', return_value=None):
+            self.assertIsNone(ALTRI_MODELLI_VERO(date(2026, 12, 2), 'best_match'))
 
     def test_pochi_dati(self):
         with mock.patch.object(prev, '_lavaggi_per_giorno', return_value={}):
@@ -318,9 +357,14 @@ class PrevisioneTest(TestCase):
         richiesta = RequestFactory().get('/personale/previsione/')        # il client non rende i template su Python 3.14
         richiesta.user, richiesta.session = utente, {}
         richiesta._messages = FallbackStorage(richiesta)
-        with mock.patch('django.utils.timezone.localdate', return_value=OGGI):
+        with (mock.patch('django.utils.timezone.localdate', return_value=OGGI),
+              mock.patch.object(prev, '_pioggia_altri_modelli', return_value={'pioggia': 6, 'modelli': 9})):
+            self.meteo[OGGI + timedelta(days=1)] = {'pioggia': 0.0, 'ore': 0.0, 'tmax': 20.0, 'piove': False}
             risposta = previsione(richiesta)
         self.assertEqual(risposta.status_code, 200)
+        self.assertContains(risposta, '6 modelli meteo su 9 danno pioggia')
+        self.assertContains(risposta, 'Risparmio seguendo il modello')
+        self.assertNotContains(risposta, 'econdo parere')
         self.assertContains(risposta, 'Squadra consigliata domani')
         self.assertContains(risposta, 'di margine sui lavaggi previsti')
         self.assertContains(risposta, 'il caso da solo vale circa')

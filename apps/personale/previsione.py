@@ -54,6 +54,11 @@ MODELLI_DISPONIBILI = [
 ]
 NOMI_MODELLI = {m: nome for m, nome, _ in MODELLI_DISPONIBILI}
 MODELLI_METEO = ('italia_meteo_arpae_icon_2i', 'best_match')      # preferenza di partenza
+# avviso: asciutto per il servizio in uso, ma pioggia per almeno 5 di questi. Nel 2026, in
+# 32 giorni cosi', i lavaggi sono stati 16,2 di media contro 17,9 previsti
+MODELLI_AVVISO = ('best_match', 'italia_meteo_arpae_icon_2i', 'icon_seamless', 'ecmwf_ifs025', 'ecmwf_aifs025_single',
+                  'gfs_seamless', 'meteofrance_seamless', 'ukmo_seamless', 'gem_seamless', 'knmi_seamless')
+MIN_MODELLI_AVVISO = 5
 
 
 def modelli_per(modello):
@@ -166,6 +171,22 @@ def _meteo_giorno_prima(dal, al, modelli=('best_match',)):
         m['fonte'] = NOMI_MODELLI.get(max(fonti, key=fonti.get), 'Open-Meteo')
         m['piove'] = piove(m)
     return meteo
+
+
+def _pioggia_altri_modelli(giorno, in_uso):
+    """Quanti degli altri modelli danno pioggia per `giorno`, con la stessa
+    regola di piove(): {'pioggia': n, 'modelli': n}; None se non risponde."""
+    from apps.finanze.weather import LICATA_LAT, LICATA_LON
+    altri = tuple(m for m in MODELLI_AVVISO if m != in_uso)
+    params = {'latitude': LICATA_LAT, 'longitude': LICATA_LON, 'hourly': 'precipitation', 'timezone': 'Europe/Rome',
+              'start_date': giorno.isoformat(), 'end_date': giorno.isoformat()}
+    dati = _scarica('https://api.open-meteo.com/v1/forecast', params, 60 * 30, modelli=altri, chiave_dati='hourly')
+    serie = [[v for v in dati['hourly'].get(f'precipitation_{m}') or [] if v is not None] for m in altri] if dati else []
+    serie = [v for v in serie if v]
+    if not serie:
+        return None
+    return {'modelli': len(serie),
+            'pioggia': sum(1 for v in serie if piove({'pioggia': sum(v), 'ore': sum(1 for mm in v if mm >= 0.1)}))}
 
 
 def _giorni_meteo(d, meteo, modelli=MODELLI_METEO):
@@ -637,9 +658,6 @@ def calcola(oggi=None, par=None, modello_meteo=None, leggero=False):
                 riga['persone'], riga['ore'] = presenze[g][1], presenze[g][0]
                 # le vostre scelte: al servito le persone presenti meno una al self
                 riga['servito_voi'] = max(riga['persone'] - 1, 0)
-                # secondo parere: se il modello ne indica almeno 2 in meno, una in meno
-                riga['servito_regola'] = (riga['servito_voi'] - 1 if riga['servito'] is not None
-                                          and riga['servito'] <= riga['servito_voi'] - 2 else riga['servito_voi'])
             giorni_v.append(riga)
         errori = [abs(r['previsti'] - r['reali']) for r in giorni_v]
         con_squadra = [r for r in giorni_v if r['squadra'] and r['squadra_ideale']]
@@ -709,10 +727,14 @@ def calcola(oggi=None, par=None, modello_meteo=None, leggero=False):
             'tmax': meteo[g]['tmax'], 'prenotazioni': note, 'previsti': previsti, 'alti': alti, 'polvere': polvere.get(g),
             'servito': servito, 'self': al_self,
             'squadra': servito + al_self if servito is not None else None,
-            'togli_da': servito + 2 if servito else None,      # secondo parere: da quante al servito toglierne una
         })
         if k > 0:
             storico_esteso[g] = (round(previsti), 0)
+    domani = next((p for p in previsioni if p['domani']), None)
+    if domani and not domani['chiuso'] and not domani['piove']:
+        altri = _pioggia_altri_modelli(domani['data'], modelli[0])
+        if altri and altri['pioggia'] >= MIN_MODELLI_AVVISO:
+            domani['avviso_pioggia'] = altri
 
     return {
         'previsioni_giorno_prima': giorno_prima is not None,
@@ -736,7 +758,7 @@ def confronto_meteo(oggi=None, par=None):
     from .models import ParametriPrevisione
     par = par or ParametriPrevisione.attuali()
     oggi = oggi or timezone.localdate()
-    chiave = f'previsione_squadra_confronto_meteo_{oggi.isoformat()}_{par.lavaggi_per_persona}_{par.margine_pct}'
+    chiave = f'previsione_squadra_confronto_meteo_v2_{oggi.isoformat()}_{par.lavaggi_per_persona}_{par.margine_pct}'
     salvato = cache.get(chiave)
     if salvato is not None:
         return [dict(r, scelto=r['modello'] == par.modello_meteo) for r in salvato]
@@ -770,10 +792,9 @@ def confronto_meteo(oggi=None, par=None):
 
 
 def _confronto(giorni, ore_persona, costo_ora):
-    """Servito: il modello, le vostre scelte (presenti meno una al self) e
-    la regola del secondo parere (le vostre scelte, una in meno quando il
-    modello ne indica almeno 2 in meno), sugli stessi giorni, contro la
-    squadra che sarebbe servita con i lavaggi reali."""
+    """Servito: il modello e le vostre scelte (presenti meno una al self),
+    sugli stessi giorni, contro la squadra che sarebbe servita con i lavaggi
+    reali, e quanto si risparmia seguendo il modello."""
     giorni = [r for r in giorni if r['servito'] is not None and r['servito_ideale']]
     if not giorni:
         return None
@@ -784,9 +805,9 @@ def _confronto(giorni, ore_persona, costo_ora):
                 'in_piu': sum(1 for x in d if x > 0) / len(d) * 100,
                 'scoperti': sum(1 for x in d if x < 0) / len(d) * 100,
                 'persone': sum(r[chiave] for r in giorni)}
-    voi, modello, regola = misura('servito_voi'), misura('servito'), misura('servito_regola')
-    risparmiate = voi['persone'] - regola['persone']
-    return {'giorni': len(giorni), 'voi': voi, 'modello': modello, 'regola': regola,
+    voi, modello = misura('servito_voi'), misura('servito')
+    risparmiate = voi['persone'] - modello['persone']
+    return {'giorni': len(giorni), 'voi': voi, 'modello': modello,
             'ideale': sum(r['servito_ideale'] for r in giorni), 'risparmiate': risparmiate,
             'euro': risparmiate * ore_persona * costo_ora if ore_persona and costo_ora else None}
 
