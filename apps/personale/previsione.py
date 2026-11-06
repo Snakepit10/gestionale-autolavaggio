@@ -848,6 +848,7 @@ def calcola(oggi=None, par=None, modello_meteo=None, leggero=False):
         })
         if k > 0:
             storico_esteso[g] = (round(previsti), 0)
+    prossimi = [p['cicli_self'] for p in previsioni if not p['oggi']]
     domani = next((p for p in previsioni if p['domani']), None)
     if domani and not domani['chiuso'] and not domani['piove']:
         altri = _pioggia_altri_modelli(domani['data'], modelli[0])
@@ -860,6 +861,7 @@ def calcola(oggi=None, par=None, modello_meteo=None, leggero=False):
         'par': par, 'ore_persona': ore_persona, 'persone_self': PERSONE_SELF,
         'verifica_self': self_m['verifica'] if self_m else None,
         'verifica_operatori': operatori_m['verifica'] if operatori_m else None,
+        'cicli_settimana': sum(prossimi) if prossimi and None not in prossimi else None,
         'esempio_20': squadra_servito(20, lpp), 'giorni_presenze': len(presenze),
         'costo_ora': costo_medio,
         'effetti': [e for e in _effetti(modello, xs, _pioggia_tipica(previsto))

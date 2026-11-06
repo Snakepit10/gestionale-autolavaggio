@@ -19,6 +19,7 @@
   <div class="dash-header">
     <h4><i class="bi bi-cloud-sun me-2"></i>Previsione squadra</h4>
     <div class="d-flex gap-2 flex-wrap">
+      <a class="btn btn-sm btn-outline-primary" href="#cicli-self"><i class="bi bi-droplet"></i> Cicli self</a>
       <a class="btn btn-sm btn-outline-success" href="{% url 'personale:previsione_dati' %}"><i class="bi bi-download"></i> Scarica i dati (CSV)</a>
       <a class="btn btn-sm btn-outline-primary" href="{% url 'personale:mese' %}"><i class="bi bi-people"></i> Costo del mese</a>
       <a class="btn btn-sm btn-outline-primary" href="{% url 'personale:anno' %}"><i class="bi bi-graph-up"></i> Andamento annuale</a>
@@ -30,7 +31,7 @@
   {% else %}
   <div class="row g-2 mb-3">
     {% for d in r.previsioni %}{% if d.oggi or d.domani %}
-    <div class="col-12 col-md-4"><div class="kpi-tile{% if d.domani %} hero{% endif %}">
+    <div class="col-12 col-md-6"><div class="kpi-tile{% if d.domani %} hero{% endif %}">
       <div class="label">{% if d.oggi %}Oggi{% else %}Squadra consigliata domani{% endif %} {{ d.giorno }} {{ d.data|date:"d/m" }}</div>
       <div class="squadra-big">{{ d.squadra|default:"—" }} <span style="font-size:1rem">person{{ d.squadra|pluralize:"a,e" }}</span></div>
       {% if d.chiuso %}<div class="sub">servito chiuso&middot; self-service {{ d.self }}</div>
@@ -38,13 +39,43 @@
       {% endif %}
       {% if d.avviso_pioggia %}<div class="sub" style="font-weight:700"><i class="bi bi-exclamation-triangle"></i> Attenzione: qui risulta asciutto, ma {{ d.avviso_pioggia.pioggia }} modelli meteo su {{ d.avviso_pioggia.modelli }} danno pioggia. In questi giorni di solito arriva qualche lavaggio in meno del previsto: guarda il meteo prima di confermare la squadra.</div>{% endif %}
       <div class="sub">{{ d.previsti|floatformat:0 }} lavaggi previsti (fino a {{ d.alti|floatformat:0 }}){% if d.oggi %} &middot; finora {{ d.finora }} lavaggi{% endif %}</div>
-      {% if d.cicli_self != None %}<div class="sub">{{ d.cicli_self }} cicli self previsti{% if d.oggi %} &middot; finora {{ d.cicli_finora|default_if_none:"&mdash;" }} cicli{% endif %}</div>{% endif %}
       {% if d.cicli_operatori != None %}<div class="sub">{{ d.cicli_operatori }} cicli operatori previsti{% if d.oggi %} &middot; finora {{ d.operatori_finora|default_if_none:"&mdash;" }} cicli{% endif %}</div>{% endif %}
-      <div class="sub">{% if d.debole %}<i class="bi bi-cloud-drizzle"></i> pioggia debole{% if d.ore_pioggia %} {{ d.ore_pioggia|floatformat:0 }} h{% endif %} &middot; {{ d.pioggia|floatformat:1 }} mm{% elif d.piove %}<i class="bi bi-cloud-rain"></i> pioggia{% if d.ore_pioggia %} {{ d.ore_pioggia|floatformat:0 }} h{% endif %} &middot; {{ d.pioggia|floatformat:1 }} mm{% else %}<i class="bi bi-sun"></i> asciutto{% endif %}{% if d.probabilita != None %} ({{ d.probabilita }}%){% endif %}{% if d.fonte %} <span style="opacity:.7">&middot; {{ d.fonte }}</span>{% endif %}{% if d.polvere != None and d.polvere >= 50 %} &middot; <i class="bi bi-wind"></i> sabbia {{ d.polvere|floatformat:0 }} &micro;g/m&sup3;{% endif %} &middot; max {{ d.tmax|floatformat:0 }}&deg;C &middot; {{ d.prenotazioni }} prenotazion{{ d.prenotazioni|pluralize:"e,i" }}</div>
+      <div class="sub">{% if d.debole %}<i class="bi bi-cloud-drizzle"></i> pioggia debole{% if d.ore_pioggia %} {{ d.ore_pioggia|floatformat:0 }} h{% endif %} &middot; {{ d.pioggia|floatformat:1 }} mm{% elif d.piove %}<i class="bi bi-cloud-rain"></i> pioggia{% if d.ore_pioggia %} {{ d.ore_pioggia|floatformat:0 }} h{% endif %} &middot; {{ d.pioggia|floatformat:1 }} mm{% else %}<i class="bi bi-sun"></i> asciutto{% endif %}{% if d.probabilita != None %} &middot; probabilit&agrave; di pioggia {{ d.probabilita }}%{% endif %}{% if d.fonte %} <span style="opacity:.7">&middot; {{ d.fonte }}</span>{% endif %}{% if d.polvere != None and d.polvere >= 50 %} &middot; <i class="bi bi-wind"></i> sabbia {{ d.polvere|floatformat:0 }} &micro;g/m&sup3;{% endif %} &middot; max {{ d.tmax|floatformat:0 }}&deg;C &middot; {{ d.prenotazioni }} prenotazion{{ d.prenotazioni|pluralize:"e,i" }}</div>
     </div></div>
     {% endif %}{% endfor %}
-    <div class="col-12 col-md-4"><div class="kpi-tile">
-      <div class="label">Come si calcola la squadra</div>
+  </div>
+  {% if messages %}{% for m in messages %}<div class="alert alert-{% if m.tags == 'error' %}danger{% else %}success{% endif %} py-2">{{ m }}</div>{% endfor %}{% endif %}
+
+  <div class="panel">
+    <div class="panel-title"><i class="bi bi-calendar-week"></i> Prossimi giorni</div>
+    <div class="panel-sub">La decisione si prende alle {{ ora_decisione|time:"H:i" }} del giorno prima: da quell'ora la previsione di domani viene salvata e poi confrontata con il reale. I giorni successivi sono indicativi (meteo meno sicuro, prenotazioni ancora da arrivare).</div>
+    <div class="panel-body tabella-scroll">
+      <table class="table table-sm prev">
+        <thead><tr><th>Giorno</th><th class="tab-num">Pioggia</th><th class="tab-num">Max</th><th class="tab-num">Prenot.</th><th class="tab-num">Cicli operatori</th><th class="tab-num">Lavaggi previsti</th><th class="tab-num">Fino a</th><th class="tab-num">Squadra</th></tr></thead>
+        <tbody>
+        {% for p in r.previsioni %}
+          <tr class="{% if p.domani %}domani{% endif %}{% if p.oggi %} oggi{% endif %}{% if p.chiuso %} chiuso{% endif %}">
+            <td>{{ p.giorno }} {{ p.data|date:"d/m" }}{% if p.oggi %} &middot; oggi{% elif p.domani %} &middot; domani{% endif %}</td>
+            <td class="tab-num">{% if p.piove %}<i class="bi bi-cloud-{% if p.debole %}drizzle{% else %}rain{% endif %}"></i> {% if p.debole %}debole &middot; {% endif %}{{ p.ore_pioggia|floatformat:0 }} h &middot; {{ p.pioggia|floatformat:1 }} mm{% else %}&mdash;{% endif %}{% if p.probabilita != None %} <span class="nota">prob. {{ p.probabilita }}%</span>{% endif %}</td>
+            <td class="tab-num">{{ p.tmax|floatformat:0 }}&deg;</td>
+            <td class="tab-num">{{ p.prenotazioni }}</td>
+            <td class="tab-num">{{ p.cicli_operatori|default_if_none:"&mdash;" }}</td>
+            {% if p.chiuso %}<td colspan="2" class="text-center">servito chiuso</td>
+            <td class="tab-num"><strong>{{ p.squadra }}</strong> <span class="nota">(0+{{ p.self }})</span></td>{% else %}
+            <td class="tab-num">{{ p.previsti|floatformat:0 }}</td>
+            <td class="tab-num">{{ p.alti|floatformat:0 }}</td>
+            <td class="tab-num"><strong>{{ p.squadra|default:"—" }}</strong>{% if p.servito %} <span class="nota">({{ p.servito }}+{{ p.self }})</span>{% endif %}</td>{% endif %}
+          </tr>
+        {% endfor %}
+        </tbody>
+      </table>
+      <div class="nota">La squadra si calcola sui lavaggi "fino a" (+{{ r.margine_pct|floatformat:'-1' }}% sulla previsione, si cambia qui sotto): piu' margine vuol dire piu' turni e meno giorni scoperti. Servito = lavaggi "fino a" / {{ par.lavaggi_per_persona|floatformat:'-1' }} lavaggi per persona, arrotondato per eccesso. Squadra = servito + {{ r.persone_self }} al self{% if par.cicli_persona_self %} quando i cicli operatori previsti sono almeno {{ par.cicli_persona_self }}, altrimenti il self lo segue il servito{% else %} (sempre){% endif %}.</div>
+    </div>
+  </div>
+
+  <div class="panel" id="come-si-calcola">
+    <div class="panel-title"><i class="bi bi-calculator"></i> Come si calcola la squadra</div>
+    <div class="panel-body">
       <form method="post" class="mt-1">{% csrf_token %}
         <div class="d-flex align-items-center gap-2 mb-1" style="font-size:.8rem">
           <input type="text" inputmode="decimal" name="lavaggi_per_persona" value="{{ par.lavaggi_per_persona|floatformat:'-1' }}" class="form-control form-control-sm" style="width:70px">
@@ -67,9 +98,12 @@
         </select>
         <a href="?confronta=1#confronto-meteo" class="btn btn-sm btn-outline-primary" onclick="this.textContent='Confronto in corso...'">Confronta i servizi meteo</a>
       </form>
-    </div></div>
+      {% if r.verifica_operatori %}
+      <div class="nota mt-3 mb-1">Cicli operatori, quelli della soglia: errore su {{ r.verifica_operatori.giorni }} giorni che il modello non aveva visto</div>
+      {% include "personale/_verifica_cicli.html" with s=r.verifica_operatori %}
+      {% endif %}
+    </div>
   </div>
-  {% if messages %}{% for m in messages %}<div class="alert alert-{% if m.tags == 'error' %}danger{% else %}success{% endif %} py-2">{{ m }}</div>{% endfor %}{% endif %}
 
   {% if confronto_meteo %}
   <div class="panel" id="confronto-meteo">
@@ -99,49 +133,6 @@
     </div>
   </div>
   {% endif %}
-
-  <div class="panel">
-    <div class="panel-title"><i class="bi bi-calendar-week"></i> Prossimi giorni</div>
-    <div class="panel-sub">La decisione si prende alle {{ ora_decisione|time:"H:i" }} del giorno prima: da quell'ora la previsione di domani viene salvata e poi confrontata con il reale. I giorni successivi sono indicativi (meteo meno sicuro, prenotazioni ancora da arrivare).</div>
-    <div class="panel-body tabella-scroll">
-      <table class="table table-sm prev">
-        <thead><tr><th>Giorno</th><th class="tab-num">Pioggia</th><th class="tab-num">Max</th><th class="tab-num">Prenot.</th><th class="tab-num">Cicli self</th><th class="tab-num">Cicli operatori</th><th class="tab-num">Lavaggi previsti</th><th class="tab-num">Fino a</th><th class="tab-num">Squadra</th></tr></thead>
-        <tbody>
-        {% for p in r.previsioni %}
-          <tr class="{% if p.domani %}domani{% endif %}{% if p.oggi %} oggi{% endif %}{% if p.chiuso %} chiuso{% endif %}">
-            <td>{{ p.giorno }} {{ p.data|date:"d/m" }}{% if p.oggi %} &middot; oggi{% elif p.domani %} &middot; domani{% endif %}</td>
-            <td class="tab-num">{% if p.piove %}<i class="bi bi-cloud-{% if p.debole %}drizzle{% else %}rain{% endif %}"></i> {% if p.debole %}debole &middot; {% endif %}{{ p.ore_pioggia|floatformat:0 }} h &middot; {{ p.pioggia|floatformat:1 }} mm{% else %}&mdash;{% endif %}{% if p.probabilita != None %} <span class="nota">{{ p.probabilita }}%</span>{% endif %}</td>
-            <td class="tab-num">{{ p.tmax|floatformat:0 }}&deg;</td>
-            <td class="tab-num">{{ p.prenotazioni }}</td>
-            <td class="tab-num">{{ p.cicli_self|default_if_none:"&mdash;" }}</td>
-            <td class="tab-num">{{ p.cicli_operatori|default_if_none:"&mdash;" }}</td>
-            {% if p.chiuso %}<td colspan="2" class="text-center">servito chiuso</td>
-            <td class="tab-num"><strong>{{ p.squadra }}</strong> <span class="nota">(0+{{ p.self }})</span></td>{% else %}
-            <td class="tab-num">{{ p.previsti|floatformat:0 }}</td>
-            <td class="tab-num">{{ p.alti|floatformat:0 }}</td>
-            <td class="tab-num"><strong>{{ p.squadra|default:"—" }}</strong>{% if p.servito %} <span class="nota">({{ p.servito }}+{{ p.self }})</span>{% endif %}</td>{% endif %}
-          </tr>
-        {% endfor %}
-        </tbody>
-      </table>
-      <div class="nota">La squadra si calcola sui lavaggi "fino a" (+{{ r.margine_pct|floatformat:'-1' }}% sulla previsione, si cambia qui sopra): piu' margine vuol dire piu' turni e meno giorni scoperti. Servito = lavaggi "fino a" / {{ par.lavaggi_per_persona|floatformat:'-1' }} lavaggi per persona, arrotondato per eccesso. Squadra = servito + {{ r.persone_self }} al self{% if par.cicli_persona_self %} quando i cicli operatori previsti sono almeno {{ par.cicli_persona_self }}, altrimenti il self lo segue il servito{% else %} (sempre){% endif %}.</div>
-    </div>
-  </div>
-
-  {% if r.verifica_self %}{% with s=r.verifica_self %}
-  <div class="panel">
-    <div class="panel-title"><i class="bi bi-droplet"></i> Cicli self e operatori: quanto ci si puo' fidare</div>
-    <div class="panel-sub">Verifica dal {{ s.dal|date:"d/m/Y" }} al {{ s.al|date:"d/m/Y" }}, su {{ s.giorni }} giorni che il modello non aveva visto. La stima vale di piu' sui totali, per manutenzione e promozioni. Il singolo giorno e' piu' incerto: eventi, feste e picchi improvvisi non si possono prevedere.</div>
-    <div class="panel-body">
-      <div class="nota mb-1">Tutti i cicli self (contanti + operatori)</div>
-      {% include "personale/_verifica_cicli.html" %}
-      {% if r.verifica_operatori %}
-      <div class="nota mt-3 mb-1">Solo cicli degli operatori: sono quelli della soglia per la persona al self</div>
-      {% include "personale/_verifica_cicli.html" with s=r.verifica_operatori %}
-      {% endif %}
-    </div>
-  </div>
-  {% endwith %}{% endif %}
 
   {% if r.verifica %}{% with v=r.verifica %}
   <div class="panel">
@@ -192,6 +183,45 @@
   </div>
   {% endwith %}{% endif %}
 
+  {% if r.verifica_self %}{% with s=r.verifica_self %}
+  <div class="panel" id="cicli-self">
+    <div class="panel-title"><i class="bi bi-droplet"></i> Cicli self</div>
+    <div class="panel-sub">Contanti al portale piu' cicli degli operatori, senza i lavaggi del servito. Servono per manutenzione e promozioni: la squadra non dipende da questo numero.</div>
+    <div class="panel-body">
+      <div class="row g-3 mb-3">
+        <div class="col-12 col-md-6 tabella-scroll">
+          <table class="table table-sm prev">
+            <thead><tr><th>Giorno</th><th class="tab-num">Cicli previsti</th></tr></thead>
+            <tbody>
+            {% for p in r.previsioni %}
+              <tr class="{% if p.domani %}domani{% endif %}{% if p.oggi %} oggi{% endif %}">
+                <td>{{ p.giorno }} {{ p.data|date:"d/m" }}{% if p.oggi %} &middot; oggi{% elif p.domani %} &middot; domani{% endif %}</td>
+                <td class="tab-num">{{ p.cicli_self|default_if_none:"&mdash;" }}{% if p.oggi %} <span class="nota">finora {{ p.cicli_finora|default_if_none:"&mdash;" }}</span>{% endif %}</td>
+              </tr>
+            {% endfor %}
+            </tbody>
+          </table>
+          {% if r.cicli_settimana != None %}<div class="nota">Totale dei prossimi 7 giorni: <strong>{{ r.cicli_settimana }} cicli</strong></div>{% endif %}
+        </div>
+        {% if storico %}
+        <div class="col-12 col-md-6 tabella-scroll">
+          <table class="table table-sm prev">
+            <thead><tr><th>Sere scorse</th><th class="tab-num">Previsti</th><th class="tab-num">Reali</th></tr></thead>
+            <tbody>
+            {% for g in storico|slice:":8" %}
+              <tr><td>{{ g.p.data|date:"D d/m" }}</td><td class="tab-num">{{ g.p.cicli_self|default_if_none:"&mdash;" }}</td><td class="tab-num">{{ g.cicli_reali|default_if_none:"&mdash;" }}</td></tr>
+            {% endfor %}
+            </tbody>
+          </table>
+        </div>
+        {% endif %}
+      </div>
+      <div class="nota mb-1">Quanto ci si puo' fidare: verifica dal {{ s.dal|date:"d/m/Y" }} al {{ s.al|date:"d/m/Y" }}, su {{ s.giorni }} giorni che il modello non aveva visto. La stima vale di piu' sui totali. Il singolo giorno e' piu' incerto: eventi, feste e picchi improvvisi non si possono prevedere.</div>
+      {% include "personale/_verifica_cicli.html" %}
+    </div>
+  </div>
+  {% endwith %}{% endif %}
+
   {% if r.profilo.righe %}{% with pr=r.profilo %}
   <div class="panel">
     <div class="panel-title"><i class="bi bi-clock"></i> Self per fascia oraria</div>
@@ -225,12 +255,11 @@
     {% if errore_vero %}<div class="panel-sub">Errore vero: <strong>{{ errore_vero.errore_pct|floatformat:0 }}%</strong> su {{ errore_vero.giorni }} giorn{{ errore_vero.giorni|pluralize:"o,i" }} con il servito aperto. Sono le previsioni salvate davvero la sera prima.</div>{% endif %}
     <div class="panel-body tabella-scroll">
       <table class="table table-sm prev">
-        <thead><tr><th>Giorno</th><th class="tab-num">Pioggia prevista</th><th class="tab-num">Lavaggi previsti</th><th class="tab-num">Reali</th><th class="tab-num">Cicli self previsti</th><th class="tab-num">Reali</th><th class="tab-num">Cicli operatori previsti</th><th class="tab-num">Reali</th><th class="tab-num">Squadra consigliata</th><th class="tab-num">Persone presenti</th></tr></thead>
+        <thead><tr><th>Giorno</th><th class="tab-num">Pioggia prevista</th><th class="tab-num">Lavaggi previsti</th><th class="tab-num">Reali</th><th class="tab-num">Cicli operatori previsti</th><th class="tab-num">Reali</th><th class="tab-num">Squadra consigliata</th><th class="tab-num">Persone presenti</th></tr></thead>
         <tbody>
         {% for s in storico %}
           <tr><td>{{ s.p.data|date:"D d/m" }}</td><td class="tab-num">{{ s.p.pioggia_mm|floatformat:1 }} mm</td>
             <td class="tab-num">{{ s.p.lavaggi_previsti|floatformat:0 }}</td><td class="tab-num">{{ s.reali }}</td>
-            <td class="tab-num">{{ s.p.cicli_self|default_if_none:"&mdash;" }}</td><td class="tab-num">{{ s.cicli_reali|default_if_none:"&mdash;" }}</td>
             <td class="tab-num">{{ s.p.cicli_operatori|default_if_none:"&mdash;" }}</td><td class="tab-num">{{ s.operatori_reali|default_if_none:"&mdash;" }}</td>
             <td class="tab-num">{% if s.p.chiuso %}chiuso{% else %}{{ s.p.squadra }}{% endif %}</td><td class="tab-num">{{ s.persone|default:"—" }}</td></tr>
         {% endfor %}

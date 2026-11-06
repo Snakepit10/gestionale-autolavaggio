@@ -9,6 +9,7 @@ La pagina **Personale > Previsione squadra** stima i lavaggi del servito e consi
 - **Cicli self:** lo stesso modello, senza prenotazioni e con il livello dei cicli delle ultime settimane. Sono i contanti al portale più i cicli degli operatori, come nel Report giornata. Una correzione riporta in pari i totali, che altrimenti verrebbero bassi di circa il 13%.
 - **Cicli degli operatori:** le transazioni da unità operativa meno i lavaggi del servito passati dal portale, cioè gli articoli con programmi portale, un ciclo per pezzo, senza quelli chiusi senza portale. Hanno un modello proprio, uguale a quello dei cicli self. Il Report giornata conta invece la finestra di chiusura e le transazioni non abbinate: i due numeri si avvicinano nei giorni abbinati, ma non coincidono sempre.
 - **Persona al self:** al massimo una. Con il parametro "cicli operatori previsti da cui serve la persona al self", sotto quel numero il self lo segue il servito. Vuoto vuol dire sempre. A servito chiuso resta coperto.
+- **Sezione Cicli self:** le card di oggi e domani mostrano solo quello che decide il personale. I cicli self, che servono per manutenzione e promozioni, hanno una sezione a parte con i prossimi giorni, il totale di 7 giorni e il confronto con le sere scorse.
 - **Finora:** oggi la pagina mostra anche i cicli già fatti, aggiornati a ogni import WashTec (ogni 10 minuti in orario). I lavaggi del servito si contano all'ordine: finché l'auto non passa dal portale, i cicli degli operatori di oggi possono risultare un po' bassi.
 
 ## Solo quello che si sa la sera prima

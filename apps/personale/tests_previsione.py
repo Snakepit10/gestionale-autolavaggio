@@ -445,7 +445,11 @@ class PrevisioneTest(TestCase):
         self.assertContains(risposta, 'Oggi Gio 05/11')
         self.assertContains(risposta, 'Quanto e')
         self.assertContains(risposta, 'cicli operatori previsti da cui serve la persona al self')
-        self.assertContains(risposta, 'cicli self previsti &middot; finora 7 cicli')
+        self.assertNotContains(risposta, 'cicli self previsti')               # le card servono solo per il personale
+        self.assertContains(risposta, 'id="cicli-self"')
+        self.assertContains(risposta, 'finora 7</span>')
+        self.assertContains(risposta, 'Totale dei prossimi 7 giorni')
+        self.assertContains(risposta, 'di pioggia')
         self.assertContains(risposta, 'cicli operatori previsti &middot; finora 3 cicli')
         self.assertContains(risposta, 'Errore sulla settimana')
         self.assertNotContains(risposta, 'soglia_cicli_self')
