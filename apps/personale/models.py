@@ -165,6 +165,9 @@ class ParametriPrevisione(models.Model):
     margine_pct = models.DecimalField(
         max_digits=4, decimal_places=1, default=Decimal('10'),
         help_text='Quanto aggiungere ai lavaggi previsti prima di calcolare la squadra')
+    modello_meteo = models.CharField(
+        max_length=40, default='italia_meteo_arpae_icon_2i',
+        help_text='Servizio meteo di Open-Meteo usato per le previsioni (vedi il confronto in pagina)')
     aggiornati_il = models.DateTimeField(auto_now=True)
 
     class Meta:

@@ -17,6 +17,12 @@ Con circa 20 lavaggi al giorno il caso da solo vale circa il 17% di errore (0,8 
 
 Provati sui dati fino a novembre 2026 e non utili: giorni di stipendio, rimbalzo dopo la pioggia, media dello stesso giorno della settimana, pioggia nei giorni dopo, andamento delle piste.
 
+## Servizio meteo
+
+Il servizio meteo si sceglie nella pagina fra sette modelli di Open-Meteo: ItaliaMeteo ICON-2I (di partenza), Open-Meteo automatico, ECMWF IFS, DWD ICON, Météo-France AROME/ARPEGE, UK Met Office e NOAA GFS. Per i giorni che il modello scelto non copre (ICON-2I arriva a circa 3 giorni) si usa quello automatico.
+
+**Confronta i servizi meteo** riaddestra la previsione dei lavaggi con le previsioni del giorno prima di ciascun servizio e la verifica sugli stessi giorni: errore sui lavaggi, squadra giusta, giorni scoperti, turni risparmiati dal secondo parere. In più mostra quanti giorni di pioggia ogni servizio aveva previsto e quanti falsi allarmi ha dato rispetto all'archivio Open-Meteo, che è anch'esso una stima e non un pluviometro. Il confronto fa poche richieste, una o due per servizio, e resta in memoria 12 ore.
+
 ## Giornata di pioggia
 
 È di pioggia con almeno 1 mm oppure 2 ore di pioggia. Sotto 1 mm la pagina scrive "pioggia debole".

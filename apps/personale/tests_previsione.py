@@ -56,13 +56,13 @@ def dati_sintetici():
 class PrevisioneTest(TestCase):
     def setUp(self):
         meteo, previsto, lavaggi, presenze, cicli, polvere = dati_sintetici()
-        self.meteo, self.polvere = meteo, polvere
+        self.meteo, self.polvere, self.previsto = meteo, polvere, previsto
         patch = [
             mock.patch.object(prev, '_meteo', return_value=meteo),
             mock.patch.object(prev, '_meteo_giorno_prima',
-                              side_effect=lambda dal, al: {g: v for g, v in previsto.items() if dal <= g <= al}),
+                              side_effect=lambda dal, al, *modelli: {g: v for g, v in previsto.items() if dal <= g <= al}),
             mock.patch.object(prev, '_meteo_previsto_storico',
-                              side_effect=lambda dal, al: {g: v for g, v in previsto.items() if dal <= g <= al}),
+                              side_effect=lambda dal, al, *modelli: {g: v for g, v in previsto.items() if dal <= g <= al}),
             mock.patch.object(prev, '_lavaggi_per_giorno', side_effect=lambda dal, al: {g: v for g, v in lavaggi.items() if dal <= g <= al}),
             mock.patch.object(prev, '_presenze_per_giorno', side_effect=lambda dal, al: {g: v for g, v in presenze.items() if dal <= g <= al}),
             mock.patch.object(prev, '_costo_orario_per_mese', return_value={date(2026, 10, 1): 15.0}),
@@ -155,7 +155,7 @@ class PrevisioneTest(TestCase):
         self.assertEqual(meteo[OGGI]['fonte'], 'ItaliaMeteo ICON-2I')
         self.assertTrue(meteo[OGGI]['piove'])
         dopodomani = meteo[OGGI + timedelta(days=2)]
-        self.assertEqual((dopodomani['fonte'], dopodomani['piove']), ('Open-Meteo', False))
+        self.assertEqual((dopodomani['fonte'], dopodomani['piove']), ('Open-Meteo automatico', False))
 
     def test_registra_a_turno_finito(self):
         r = prev.calcola(OGGI)
@@ -252,6 +252,54 @@ class PrevisioneTest(TestCase):
         with mock.patch('apps.finanze.weather._http_get_json', return_value=risposta):
             polvere = POLVERE_VERA(OGGI, OGGI + timedelta(days=1))
         self.assertEqual(polvere, {OGGI: 180.0})
+
+    def test_confronto_meteo(self):
+        # i clienti guardano le previsioni di ECMWF: gli altri servizi sbagliano un giorno su tre
+        rnd = random.Random(5)
+        sbagliate = {g: dict(v, piove=(not v['piove']) if rnd.random() < 0.33 else v['piove'])
+                     for g, v in self.previsto.items()}
+        for v in sbagliate.values():
+            v['pioggia'], v['ore'] = (8.0, 5.0) if v['piove'] else (0.0, 0.0)
+
+        def giorno_prima(dal, al, modelli=('best_match',)):
+            fonte = self.previsto if modelli[0] == 'ecmwf_ifs025' else sbagliate
+            nome = prev.NOMI_MODELLI[modelli[0]]
+            return {g: dict(v, fonte=nome) for g, v in fonte.items() if dal <= g <= al}
+        with mock.patch.object(prev, '_meteo_giorno_prima', side_effect=giorno_prima):
+            righe = prev.confronto_meteo(OGGI)
+        self.assertEqual(len(righe), len(prev.MODELLI_DISPONIBILI))
+        self.assertEqual(righe[0]['modello'], 'ecmwf_ifs025')                   # il piu' preciso in cima
+        self.assertLess(righe[0]['errore_pct'], righe[1]['errore_pct'])
+        self.assertEqual(righe[0]['copertura'], 100)
+        self.assertTrue(next(r for r in righe if r['modello'] == 'italia_meteo_arpae_icon_2i')['scelto'])
+
+    def test_giorno_prima_piu_modelli(self):
+        # ICON-2I per le prime ore, poi solo il modello automatico
+        risposta = {'hourly': {'time': ['2026-11-05T10:00', '2026-11-05T11:00', '2026-11-05T12:00'],
+                               'precipitation_previous_day1_italia_meteo_arpae_icon_2i': [1.0, 0.5, None],
+                               'precipitation_previous_day1_best_match': [0.0, 0.0, 0.3]}}
+        with mock.patch('apps.finanze.weather._http_get_json', return_value=risposta):
+            meteo = GIORNO_PRIMA_VERO(OGGI, OGGI, prev.modelli_per('italia_meteo_arpae_icon_2i'))
+        self.assertAlmostEqual(meteo[OGGI]['pioggia'], 1.8)
+        self.assertEqual((meteo[OGGI]['ore'], meteo[OGGI]['fonte']), (3, 'ItaliaMeteo ICON-2I'))
+
+    def test_scegli_modello_meteo(self):
+        from apps.auth_system.models import PermessoGruppo
+        utente = User.objects.create_user('titolare4', password='x')
+        gruppo = Group.objects.get_or_create(name='titolare')[0]
+        utente.groups.add(gruppo)
+        PermessoGruppo.objects.get_or_create(sezione='personale', gruppo=gruppo)
+        self.client.force_login(utente)
+        self.client.post('/personale/previsione/', {'modello_meteo': 'ecmwf_ifs025'})
+        self.assertEqual(ParametriPrevisione.attuali().modello_meteo, 'ecmwf_ifs025')
+        self.client.post('/personale/previsione/', {'modello_meteo': 'inventato'})            # ignorato
+        self.assertEqual(ParametriPrevisione.attuali().modello_meteo, 'ecmwf_ifs025')
+        with mock.patch('django.utils.timezone.localdate', return_value=OGGI):
+            risposta = self.client.get('/personale/previsione/?confronta=1')
+        self.assertContains(risposta, 'Confronto dei servizi meteo')
+        self.assertContains(risposta, 'NOAA GFS')
+        self.assertEqual(prev.modelli_per('ecmwf_ifs025'), ('ecmwf_ifs025', 'best_match'))
+        self.assertEqual(prev.modelli_per('best_match'), ('best_match',))
 
     def test_pochi_dati(self):
         with mock.patch.object(prev, '_lavaggi_per_giorno', return_value={}):

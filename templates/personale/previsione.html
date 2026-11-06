@@ -54,9 +54,45 @@
         <div class="mb-1" style="font-size:.8rem">al self sempre {{ r.persone_self }} persona</div>
         <button class="btn btn-sm btn-outline-success">Salva</button>
       </form>
+      <form method="post" class="mt-2 d-flex align-items-center gap-2 flex-wrap" style="font-size:.8rem">{% csrf_token %}
+        <span>Meteo:</span>
+        <select name="modello_meteo" class="form-select form-select-sm" style="width:auto" onchange="this.form.submit()">
+          {% for m, nome, descr in modelli %}<option value="{{ m }}" {% if m == par.modello_meteo %}selected{% endif %}>{{ nome }}</option>{% endfor %}
+        </select>
+        <a href="?confronta=1#confronto-meteo" class="btn btn-sm btn-outline-primary" onclick="this.textContent='Confronto in corso...'">Confronta i servizi meteo</a>
+      </form>
     </div></div>
   </div>
   {% if messages %}{% for m in messages %}<div class="alert alert-{% if m.tags == 'error' %}danger{% else %}success{% endif %} py-2">{{ m }}</div>{% endfor %}{% endif %}
+
+  {% if confronto_meteo %}
+  <div class="panel" id="confronto-meteo">
+    <div class="panel-title"><i class="bi bi-cloud-sun"></i> Confronto dei servizi meteo</div>
+    <div class="panel-sub">Per ogni servizio la previsione dei lavaggi e' stata riaddestrata con le previsioni di pioggia che quel servizio aveva fatto il giorno prima, e verificata sugli stessi giorni. Conta di piu' l'errore sui lavaggi: e' quello che decide la squadra. "Pioggia vista" e "falsi allarmi" confrontano le sue previsioni con la pioggia caduta dell'archivio Open-Meteo nell'ultimo anno (anche l'archivio e' una stima, non un pluviometro).</div>
+    <div class="panel-body tabella-scroll">
+      <table class="table table-sm prev">
+        <thead><tr><th>Servizio</th><th class="tab-num">Errore lavaggi</th><th class="tab-num">Squadra giusta</th><th class="tab-num">Scoperti</th><th class="tab-num">Secondo parere</th><th class="tab-num">Pioggia vista</th><th class="tab-num">Falsi allarmi</th><th class="tab-num">Giorni coperti</th><th></th></tr></thead>
+        <tbody>
+        {% for m in confronto_meteo %}
+          <tr{% if m.scelto %} class="domani"{% endif %}>
+            <td>{{ m.nome }} <span class="nota">{{ m.descrizione }}</span>{% if forloop.first and not m.errore %} <span class="badge bg-success">il piu' preciso</span>{% endif %}</td>
+            {% if m.errore %}<td colspan="7" class="nota">{{ m.errore }}</td>{% else %}
+            <td class="tab-num"><strong>{{ m.errore_pct|floatformat:1 }}%</strong></td>
+            <td class="tab-num">{{ m.squadra_giusta|floatformat:0 }}%</td>
+            <td class="tab-num">{{ m.scoperti|floatformat:0 }}%</td>
+            <td class="tab-num">{% if m.turni_risparmiati != None %}&minus;{{ m.turni_risparmiati }} turni{% else %}&mdash;{% endif %}</td>
+            <td class="tab-num">{% if m.pioggia_vista != None %}{{ m.pioggia_vista|floatformat:0 }}%{% else %}&mdash;{% endif %}</td>
+            <td class="tab-num">{% if m.falsi_allarmi != None %}{{ m.falsi_allarmi|floatformat:0 }}%{% else %}&mdash;{% endif %}</td>
+            <td class="tab-num">{% if m.copertura != None %}{{ m.copertura|floatformat:0 }}%{% else %}&mdash;{% endif %}</td>{% endif %}
+            <td>{% if m.scelto %}<span class="nota">in uso</span>{% elif not m.errore %}<form method="post" class="m-0">{% csrf_token %}<input type="hidden" name="modello_meteo" value="{{ m.modello }}"><button class="btn btn-sm btn-outline-success py-0">Usa</button></form>{% endif %}</td>
+          </tr>
+        {% endfor %}
+        </tbody>
+      </table>
+      <div class="nota">Pioggia vista = giorni di pioggia che il servizio aveva previsto. Falsi allarmi = giorni asciutti in cui prevedeva pioggia. Giorni coperti = giorni in cui la previsione viene davvero da quel servizio (per gli altri si usa quella automatica). Il confronto resta in memoria 12 ore.</div>
+    </div>
+  </div>
+  {% endif %}
 
   <div class="panel">
     <div class="panel-title"><i class="bi bi-calendar-week"></i> Prossimi giorni</div>
