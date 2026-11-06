@@ -23,6 +23,8 @@ Provati sui dati fino a novembre 2026 e non utili: giorni di stipendio, rimbalzo
 
 Il 06/11/2026 sono state importate da WashTec le transazioni da agosto 2025 a giugno 2026. Provato con riaddestramento settimanale su 292 giorni, da gennaio al 5 novembre 2026: errore del 33% sul giorno, del 20% sulla settimana, dell'11% sul mese, con il totale al 99% del reale. Il caso da solo vale circa il 13% sul giorno: la distanza viene da picchi che il modello non vede, come 116 cicli contro 37 previsti domenica 10 maggio o i 70-80 cicli a fine luglio. La pioggia prevista conta poco.
 
+La correzione dei totali è tarata su tutto lo storico: nei mesi forti riporta in pari la stima, in quelli tranquilli la tiene alta del 15-20%. Provata anche sugli ultimi 30, 60 e 90 giorni: non migliora l'autunno e peggiora l'anno. La pagina mostra il rapporto fra previsto e reale degli ultimi 60 giorni.
+
 Con una soglia di 25, 35 o 45 cicli la decisione persona sì o no è giusta il 74-79% dei giorni.
 
 ## Servizio meteo
