@@ -487,7 +487,7 @@ NOMI_VARIABILI = ['Mar', 'Mer', 'Gio', 'Ven', 'Sab', 'Dom', 'Festivo', 'Prefesti
                   'Stagione (sen)', 'Stagione (cos)', 'Pioggia ieri', 'Pioggia 2-3 giorni fa', 'Temperatura massima',
                   'Livello ultime 4 settimane', 'Livello ultima settimana', "Prenotazioni gia' fatte",
                   'Pioggia prevista (si/no)', 'Ore di pioggia previste', 'Pioggia prevista (mm)',
-                  'Polvere sahariana oggi', 'Polvere sahariana ieri', 'Cielo coperto senza pioggia']
+                  'Polvere sahariana oggi', 'Polvere sahariana ieri']
 
 
 def _variabili(giorno, meteo, festivi, livello, prenotazioni, previsto, polvere, livello_breve=None):
@@ -514,14 +514,6 @@ def _variabili(giorno, meteo, festivi, livello, prenotazioni, previsto, polvere,
         math.log1p(polvere.get(giorno, 0.0)),
         math.log1p(polvere.get(giorno - timedelta(days=1), 0.0)),
     ]
-
-
-def _cielo(giorno, previsto, nuvole):
-    """Quanto il cielo e' piu' coperto del solito nei giorni senza pioggia
-    prevista: quando e' prevista conta gia' lei. E' uno scarto, non la quota,
-    altrimenti farebbe anche da segnale "oggi non piove" e ruberebbe peso
-    alla pioggia."""
-    return 0.0 if piove(previsto.get(giorno) or {}) else nuvole.get(giorno, NUVOLE_TIPICHE) - NUVOLE_TIPICHE
 
 
 def _livello(storico, giorno, giorni=28):
@@ -615,8 +607,8 @@ def _stima_cicli(modello, correzione, x):
 def _modello_cicli(cicli, meteo, festivi, previsto, polvere, nuvole):
     """Modello dei cicli (self o operatori) e sua verifica sugli ultimi
     giorni, come per i lavaggi, in piu' con le nuvole previste: chi lava da
-    solo guarda il cielo piu' del cliente del servito. None se i giorni sono
-    pochi."""
+    solo guarda il cielo. Nei lavaggi del servito si sono provate e peggiorano
+    la squadra. None se i giorni sono pochi."""
     xs, ys, usati = _righe(sorted(cicli), cicli, meteo, festivi, {}, previsto, polvere)
     if len(usati) < 90:
         return None
@@ -712,8 +704,6 @@ def _effetti(modello, xs, previsto_piovoso):
         ("3 prenotazioni in piu'", rapporto({"Prenotazioni gia' fatte": math.log1p(3)}, {"Prenotazioni gia' fatte": 0.0})),
         ('Sabbia del Sahara ieri', rapporto({'Polvere sahariana ieri': sabbia}, {'Polvere sahariana ieri': 0.0})),
         ('Sabbia del Sahara oggi', rapporto({'Polvere sahariana oggi': sabbia}, {'Polvere sahariana oggi': 0.0})),
-        ('Cielo coperto invece che sereno, senza pioggia',
-         rapporto({'Cielo coperto senza pioggia': 1.0 - NUVOLE_TIPICHE}, {'Cielo coperto senza pioggia': 0.1 - NUVOLE_TIPICHE})),
     ]
     return [{'nome': n, 'effetto': e} for n, e in effetti]
 
@@ -755,7 +745,6 @@ def calcola(oggi=None, par=None, modello_meteo=None, leggero=False):
     costo_ora = _costo_orario_per_mese()
     costo_medio = sum(costo_ora.values()) / len(costo_ora) if costo_ora else None
     polvere = _polvere(INIZIO_ORDINI - timedelta(days=3), fine)
-    nuvole = _nuvole(INIZIO_ORDINI, fine)
 
     # giorni di chiusura: giorni della settimana quasi sempre senza ordini
     aperti_wd = defaultdict(int)
@@ -771,7 +760,6 @@ def calcola(oggi=None, par=None, modello_meteo=None, leggero=False):
     domenica_aperta = sum(1 for d in ultime_domeniche if d in storico) >= 2
 
     xs, ys, usati = _righe(sorted(storico), storico, meteo, festivi, prenotazioni, previsto, polvere)
-    xs = [x + [_cielo(g, previsto, nuvole)] for x, g in zip(xs, usati)]
 
     # --- verifica: addestro senza gli ultimi giorni e li prevedo
     taglio = max(len(usati) - GIORNI_VERIFICA, 60)
@@ -785,6 +773,7 @@ def calcola(oggi=None, par=None, modello_meteo=None, leggero=False):
             riga = {'data': g, 'giorno': GIORNI_SETTIMANA[g.weekday()], 'previsti': previsti, 'reali': reali,
                     'pioggia': meteo[g]['pioggia'], 'piove': meteo[g]['piove'],
                     'attesa': (previsto.get(g) or {}).get('pioggia', 0.0), 'scarto_pct': (previsti - reali) / reali * 100}
+            riga['incasso'] = storico[g][1]
             riga['servito'] = squadra_servito(previsti * (1 + margine), lpp)
             riga['servito_ideale'] = squadra_servito(reali, lpp)
             riga['squadra'] = riga['servito'] + PERSONE_SELF if riga['servito'] else None
@@ -799,9 +788,8 @@ def calcola(oggi=None, par=None, modello_meteo=None, leggero=False):
         con_presenze = [r for r in giorni_v if 'persone' in r]
         media_reali = sum(r['reali'] for r in giorni_v) / len(giorni_v)
         base = [abs(r['reali'] - _media_wd(storico, r['data'], usati[:taglio])) for r in giorni_v]
-        # lo stesso modello senza la pioggia prevista: anche il cielo, che con la pioggia vale zero, la lascerebbe intuire
-        senza_pioggia = [i for i in range(len(xs[0]))
-                         if not NOMI_VARIABILI[i].startswith(('Pioggia prevista', 'Ore di pioggia', 'Cielo coperto'))]
+        # lo stesso modello senza la pioggia prevista
+        senza_pioggia = [i for i in range(len(xs[0])) if not NOMI_VARIABILI[i].startswith(('Pioggia prevista', 'Ore di pioggia'))]
         corto = lambda x: [x[i] for i in senza_pioggia]
         modello_senza = Ridge().fit([corto(x) for x in xs[:taglio]], ys[:taglio])
         senza = [abs(max(0.0, math.expm1(modello_senza.predict(corto(x)))) - storico[g][0])
@@ -824,7 +812,7 @@ def calcola(oggi=None, par=None, modello_meteo=None, leggero=False):
             'servito_scarso': (sum(1 for r in con_squadra if r['servito'] < r['servito_ideale']) / len(con_squadra) * 100
                                if con_squadra else None),
             'giorni_presenze': len(con_presenze),
-            'confronto': _confronto(con_presenze, ore_persona, costo_medio),
+            'confronto': _confronto(con_presenze, ore_persona, costo_medio, lpp),
         }
 
     if leggero:
@@ -836,6 +824,7 @@ def calcola(oggi=None, par=None, modello_meteo=None, leggero=False):
     profilo = profilo_self(ieri)
     storico_esteso = dict(storico)
     cicli = _cicli_self(INIZIO_ORDINI, ieri)
+    nuvole = _nuvole(INIZIO_ORDINI, fine)
     self_m = _modello_cicli(cicli, meteo, festivi, previsto, polvere, nuvole)
     cicli_esteso = dict(cicli)
     operatori = _cicli_operatori(INIZIO_ORDINI, ieri)
@@ -869,7 +858,7 @@ def calcola(oggi=None, par=None, modello_meteo=None, leggero=False):
         note = _prenotazioni_ora(g)
         # oggi: le prenotazioni note ieri sera, come nell'addestramento
         x = _variabili(g, meteo, festivi, livello, prenotazioni.get(g, 0) if k == 0 else note, previsto, polvere,
-                       _livello(storico_esteso, g, 7)) + [_cielo(g, previsto, nuvole)]
+                       _livello(storico_esteso, g, 7))
         previsti = max(0.0, math.expm1(modello.predict(x)))
         alti = previsti * (1 + margine)
         servito = 0 if chiuso else squadra_servito(alti, lpp)
@@ -955,19 +944,29 @@ def confronto_meteo(oggi=None, par=None):
     return [dict(r, scelto=r['modello'] == par.modello_meteo) for r in righe]
 
 
-def _confronto(giorni, ore_persona, costo_ora):
+def _confronto(giorni, ore_persona, costo_ora, lavaggi_per_persona):
     """Servito: il modello e le vostre scelte (presenti meno una al self),
     sugli stessi giorni, contro la squadra che sarebbe servita con i lavaggi
-    reali, e quanto si risparmia seguendo il modello."""
+    reali, e quanto si risparmia seguendo il modello. Ordini scoperti: i
+    lavaggi reali oltre quelli che la squadra riesce a fare in un giorno."""
     giorni = [r for r in giorni if r['servito'] is not None and r['servito_ideale']]
     if not giorni:
         return None
 
+    totale = sum(r['reali'] for r in giorni)
+    scontrino = sum(r['incasso'] for r in giorni) / totale
+
     def misura(chiave):
         d = [r[chiave] - r['servito_ideale'] for r in giorni]
+        ordini = sum(max(r['reali'] - r[chiave] * lavaggi_per_persona, 0) for r in giorni)
+        scoperti = [-x for x in d if x < 0]
         return {'giusta': sum(1 for x in d if x == 0) / len(d) * 100,
                 'in_piu': sum(1 for x in d if x > 0) / len(d) * 100,
-                'scoperti': sum(1 for x in d if x < 0) / len(d) * 100,
+                'scoperti': len(scoperti) / len(d) * 100, 'giorni_scoperti': len(scoperti),
+                'turni_mancanti': sum(scoperti),
+                'mancanti_quando_scoperto': sum(scoperti) / len(scoperti) if scoperti else 0.0,
+                'mancanti_al_giorno': sum(scoperti) / len(d),
+                'ordini_scoperti': ordini, 'ordini_pct': ordini / totale * 100, 'incasso_scoperto': ordini * scontrino,
                 'persone': sum(r[chiave] for r in giorni)}
     voi, modello = misura('servito_voi'), misura('servito')
     risparmiate = voi['persone'] - modello['persone']

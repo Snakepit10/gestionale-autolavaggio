@@ -243,13 +243,20 @@ class PrevisioneTest(TestCase):
               mock.patch.object(prev, '_scarica', return_value=None)):                 # servizio giu': si va avanti
             self.assertEqual(NUVOLE_VERE(date(2026, 11, 1), OGGI), {})
 
-    def test_cielo_solo_senza_pioggia(self):
-        asciutto, bagnato, senza_dato = date(2026, 3, 1), date(2026, 3, 2), date(2026, 3, 3)
-        previsto = {asciutto: {'pioggia': 0.0, 'ore': 0.0}, bagnato: {'pioggia': 8.0, 'ore': 5.0}}
-        nuvole = {asciutto: 0.9, bagnato: 1.0}
-        self.assertAlmostEqual(prev._cielo(asciutto, previsto, nuvole), 0.9 - prev.NUVOLE_TIPICHE)
-        self.assertEqual(prev._cielo(bagnato, previsto, nuvole), 0.0)                  # conta gia' la pioggia
-        self.assertEqual(prev._cielo(senza_dato, previsto, nuvole), 0.0)
+    def test_confronto_scoperti(self):
+        giorni = [{'servito': 3, 'servito_voi': 4, 'servito_ideale': 3, 'reali': 20, 'incasso': 400},
+                  {'servito': 2, 'servito_voi': 4, 'servito_ideale': 4, 'reali': 26, 'incasso': 520},      # manca 2: 12 ordini
+                  {'servito': 3, 'servito_voi': 3, 'servito_ideale': 4, 'reali': 25, 'incasso': 500},      # manca 1: 4 ordini
+                  {'servito': 4, 'servito_voi': 4, 'servito_ideale': 3, 'reali': 9, 'incasso': 180}]
+        c = prev._confronto(giorni, 8.0, 15.0, 7)
+        m = c['modello']
+        self.assertEqual((m['giorni_scoperti'], m['turni_mancanti'], m['scoperti']), (2, 3, 50))
+        self.assertEqual((m['mancanti_quando_scoperto'], m['mancanti_al_giorno']), (1.5, 0.75))
+        self.assertEqual((c['voi']['giorni_scoperti'], c['voi']['turni_mancanti']), (1, 1))
+        self.assertEqual((m['ordini_scoperti'], m['ordini_pct'], m['incasso_scoperto']), (16, 20, 320))
+        self.assertEqual(c['voi']['ordini_scoperti'], 4)
+        giusto = prev._confronto([{'servito': 3, 'servito_voi': 3, 'servito_ideale': 3, 'reali': 20, 'incasso': 400}], 8.0, 15.0, 7)
+        self.assertEqual(giusto['modello']['mancanti_quando_scoperto'], 0)    # nessun giorno scoperto
 
     def test_ogni_casella_ha_la_spiegazione(self):
         import re

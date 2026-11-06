@@ -249,7 +249,15 @@ SPIEGAZIONI.update({
     'Risparmio seguendo il modello': (
         'Turni al servito delle vostre scelte meno quelli del modello, per le ore di un turno e il costo orario medio.',
         'Quanto si sarebbe speso in meno seguendo il modello negli stessi giorni.',
-        'Va letto insieme ai giorni scoperti: il risparmio vale se non ne aumentano troppi.'),
+        'Va letto insieme ai giorni scoperti, mostrati sotto: il risparmio vale se non ne aumentano troppi.'),
+    'Ordini scoperti': (
+        'Per ogni giorno, i lavaggi reali oltre quelli che la squadra riesce a fare (persone per lavaggi a persona). L\'incasso è quel numero per lo scontrino medio.',
+        'Quanti ordini sarebbero stati a rischio con quella squadra: auto in coda, attese lunghe o clienti persi.',
+        'È un massimo possibile, non una perdita certa: nei giorni pieni una squadra può fare più della media. L\'incasso è lordo: per confrontarlo col risparmio va guardato il margine, non tutto l\'importo.'),
+    'Turni mancanti': (
+        'Nei giorni scoperti, le persone che sarebbero servite in più. Si sommano su tutto il periodo.',
+        'Quanto è grave essere scoperti: mancare di una persona in pochi giorni pesa meno che mancare di due spesso.',
+        'Conviene confrontarli con i turni risparmiati: se sono vicini, il modello risparmia togliendo persone che servivano.'),
     'Scoperti': (
         'Giorni con meno persone di quelle che sarebbero servite, diviso i giorni provati.',
         'Quanto spesso la squadra sarebbe stata troppo piccola. Più basso è meglio.'),

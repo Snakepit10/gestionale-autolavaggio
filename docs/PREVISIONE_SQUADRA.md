@@ -17,7 +17,7 @@ La pagina **Personale > Previsione squadra** stima i lavaggi del servito e consi
 
 Il turno finisce alle 19: da quell'ora la giornata di oggi è completa ed entra nel livello con cui si prevede domani, come nell'addestramento, dove ogni giorno conosce quello prima. Prima delle 19 la pagina prevede domani senza la giornata di oggi.
 
-Tutti i modelli usano le nuvole previste dalle 8 alle 18. Nei giorni senza pioggia, un cielo tutto coperto vale circa il 16% in meno sui lavaggi e circa il 30% in meno sui cicli self e degli operatori, rispetto a un cielo sereno. Nei lavaggi le nuvole contano solo senza pioggia prevista, come scarto dal cielo tipico. L'effetto si vede ma non migliora la previsione. Provato con riaddestramento settimanale da gennaio al 5 novembre 2026: errore da 21,7% a 21,8%, squadra giusta da 51% a 47%, giorni scoperti da 22% a 23%, in autunno da 17% a 21%. La pagina lo mostra in "Cosa conta di più".
+I cicli self e degli operatori usano anche le nuvole previste dalle 8 alle 18: nei giorni senza pioggia, un cielo tutto coperto vale circa il 30% in meno rispetto a un cielo sereno. Nei lavaggi del servito l'effetto c'è, circa il 16% in meno, ma le nuvole non entrano nel modello perché peggiorano la squadra. Provato con riaddestramento settimanale da gennaio al 5 novembre 2026: errore da 21,7% a 21,8%, squadra giusta da 51% a 47%, giorni scoperti da 22% a 23%, in autunno da 17% a 21%.
 
 Il modello impara e si verifica con la pioggia prevista il giorno prima, presa da Open-Meteo Previous Runs. La pioggia caduta non si usa per il giorno stesso: la sera prima non si conosce e farebbe sembrare l'errore più basso del vero.
 
@@ -45,7 +45,7 @@ Il 06/11/2026 i servizi sono stati provati anche con riaddestramento settimanale
 
 **Avviso di pioggia:** se per domani il servizio in uso dà asciutto ma almeno 5 degli altri 9 modelli danno pioggia, la pagina lo segnala. Il numero di lavaggi e la squadra non cambiano. Nel 2026, in 32 giorni così, i lavaggi sono stati 16,2 di media contro 17,9 previsti.
 
-**Risparmio seguendo il modello:** i turni al servito delle vostre scelte meno quelli del modello, negli stessi giorni della verifica, moltiplicati per le ore di un turno e il costo orario medio. La tabella sotto mostra anche i giorni scoperti.
+**Risparmio seguendo il modello:** i turni al servito delle vostre scelte meno quelli del modello, negli stessi giorni della verifica, moltiplicati per le ore di un turno e il costo orario medio. La card mostra anche i giorni scoperti seguendo il modello, quante persone mancano quando capita e i possibili ordini scoperti: i lavaggi reali oltre persone per lavaggi a persona, con il loro incasso allo scontrino medio. È un massimo, non una perdita certa.
 
 ## Giornata di pioggia
 
