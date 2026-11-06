@@ -27,7 +27,7 @@ Il 06/11/2026 sono state importate da WashTec le transazioni da agosto 2025 a gi
 
 La correzione dei totali è tarata su tutto lo storico: nei mesi forti riporta in pari la stima, in quelli tranquilli la tiene alta del 15-20%. Provata anche sugli ultimi 30, 60 e 90 giorni: non migliora l'autunno e peggiora l'anno. La pagina mostra il rapporto fra previsto e reale degli ultimi 60 giorni.
 
-Con una soglia di 25, 35 o 45 cicli la decisione persona sì o no è giusta il 74-79% dei giorni.
+Questi numeri sono stati misurati quando i cicli self toglievano solo i lavaggi completi. Con la definizione attuale e sui 60 giorni fino al 5 novembre: cicli self 22% di errore sulla settimana, 40% sul giorno, totale 123%; cicli degli operatori 18% sulla settimana, 48% sul giorno (circa 6 cicli), totale 113%. Su 21 giorni abbinati di ottobre e novembre i cicli degli operatori sono 156 contro i 158 del Report giornata.
 
 ## Servizio meteo
 
