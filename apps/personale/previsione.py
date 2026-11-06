@@ -35,25 +35,10 @@ GIORNI_TARATURA = 90          # giorni (gli ultimi dell'addestramento) su cui si
 SQUADRA_MINIMA = 1           # persone minime del servito
 PERSONE_SELF = 1             # al self sempre una persona
 MIN_LAVAGGI_DOMENICA = 3     # sotto, la domenica conta come servito chiuso (ordini isolati)
-# modelli meteo di Open-Meteo che si possono scegliere (e confrontare): per i giorni
-# che il modello scelto non copre (es. ICON-2I arriva a ~3 giorni) si usa la scelta
-# automatica di Open-Meteo
-MODELLI_DISPONIBILI = [
-    ('italia_meteo_arpae_icon_2i', 'ItaliaMeteo ICON-2I', 'Italia, 2,2 km'),
-    ('best_match', 'Open-Meteo automatico', 'il modello migliore per la zona, scelto da Open-Meteo'),
-    ('ecmwf_ifs025', 'ECMWF IFS', 'Centro europeo'),
-    ('icon_seamless', 'DWD ICON', 'Germania'),
-    ('meteofrance_seamless', 'Meteo-France AROME/ARPEGE', 'Francia'),
-    ('ukmo_seamless', 'UK Met Office', 'Regno Unito'),
-    ('gfs_seamless', 'NOAA GFS', 'Stati Uniti'),
-]
-NOMI_MODELLI = {m: nome for m, nome, _ in MODELLI_DISPONIBILI}
-MODELLI_METEO = ('italia_meteo_arpae_icon_2i', 'best_match')      # preferenza di partenza
-
-
-def modelli_per(modello):
-    """Il modello scelto e, per i giorni che non copre, quello automatico."""
-    return (modello, 'best_match') if modello and modello != 'best_match' else ('best_match',)
+# modelli meteo di Open-Meteo, in ordine di preferenza: ItaliaMeteo-ARPAE ICON 2I
+# (2,2 km sull'Italia, ~3 giorni), poi la scelta automatica per i giorni che non copre
+MODELLI_METEO = ('italia_meteo_arpae_icon_2i', 'best_match')
+NOMI_MODELLI = {'italia_meteo_arpae_icon_2i': 'ItaliaMeteo ICON-2I', 'best_match': 'Open-Meteo'}
 GIORNI_SETTIMANA = ['Lun', 'Mar', 'Mer', 'Gio', 'Ven', 'Sab', 'Dom']
 
 
@@ -71,7 +56,7 @@ def piove(m):
                         or (m.get('probabilita') or 0) >= 60)
 
 
-def _meteo(dal, al, modelli=MODELLI_METEO):
+def _meteo(dal, al):
     """{data: {'pioggia': mm, 'ore': ore di pioggia, 'codice': codice WMO,
     'probabilita': % (solo previsioni), 'tmax': gradi, 'piove': bool}} da
     Open-Meteo: archivio fino a 3 giorni fa, previsioni per gli ultimi
@@ -90,21 +75,21 @@ def _meteo(dal, al, modelli=MODELLI_METEO):
     meteo = {}
     for url, variabili, params, durata in richieste:
         params = {'latitude': LICATA_LAT, 'longitude': LICATA_LON, 'daily': variabili, 'timezone': 'Europe/Rome', **params}
-        dati = _scarica(url, params, durata, modelli=modelli if 'forecast' in url else None)
+        dati = _scarica(url, params, durata, modelli='forecast' in url)
         if not dati:
             return None
-        _giorni_meteo(dati['daily'], meteo, modelli)
+        _giorni_meteo(dati['daily'], meteo)
     return meteo
 
 
-def _scarica(url, params, durata, modelli=None, chiave_dati='daily'):
-    """JSON di Open-Meteo (con cache): prima con i modelli indicati, se la
+def _scarica(url, params, durata, modelli=True, chiave_dati='daily'):
+    """JSON di Open-Meteo (con cache): prima con i MODELLI_METEO, se la
     richiesta fallisce senza (modello automatico)."""
     import hashlib
     from urllib.parse import urlencode
 
     from apps.finanze.weather import _http_get_json
-    for extra in (({'models': ','.join(modelli)},) if modelli and modelli != ('best_match',) else ()) + ({},):
+    for extra in (({'models': ','.join(MODELLI_METEO)},) if modelli else ()) + ({},):
         indirizzo = f'{url}?{urlencode({**params, **extra})}'
         chiave = 'previsione_squadra_meteo_' + hashlib.md5(indirizzo.encode()).hexdigest()
         dati = cache.get(chiave)
@@ -117,7 +102,7 @@ def _scarica(url, params, durata, modelli=None, chiave_dati='daily'):
     return None
 
 
-def _meteo_previsto_storico(dal, al, modelli=MODELLI_METEO):
+def _meteo_previsto_storico(dal, al):
     """Le previsioni di allora (Open-Meteo Historical Forecast): quello che
     i clienti vedevano sul telefono, anche quando poi non ha piovuto.
     Stessa forma di _meteo; None se l'API non risponde."""
@@ -126,30 +111,28 @@ def _meteo_previsto_storico(dal, al, modelli=MODELLI_METEO):
     for variabili in (base + ',precipitation_probability_max', base):    # la probabilita' puo' mancare
         params = {'latitude': LICATA_LAT, 'longitude': LICATA_LON, 'daily': variabili, 'timezone': 'Europe/Rome',
                   'start_date': dal.isoformat(), 'end_date': al.isoformat()}
-        dati = _scarica('https://historical-forecast-api.open-meteo.com/v1/forecast', params, 60 * 60 * 12, modelli)
+        dati = _scarica('https://historical-forecast-api.open-meteo.com/v1/forecast', params, 60 * 60 * 12)
         if dati:
-            return _giorni_meteo(dati['daily'], {}, modelli)
+            return _giorni_meteo(dati['daily'], {})
     return None
 
 
-def _giorni_meteo(d, meteo, modelli=MODELLI_METEO):
+def _giorni_meteo(d, meteo):
     """Con piu' modelli le serie hanno il suffisso del modello: per ogni
     variabile si prende il primo modello che ha il dato."""
-    modelli = modelli or ('best_match',)
-
     def valore(nome, i):
-        for chiave in [f'{nome}_{m}' for m in modelli] + [nome]:
+        for chiave in [f'{nome}_{m}' for m in MODELLI_METEO] + [nome]:
             serie = d.get(chiave)
             if serie and i < len(serie) and serie[i] is not None:
                 return serie[i]
         return None
 
     def fonte(i):
-        for m in modelli:
+        for m in MODELLI_METEO:
             serie = d.get(f'precipitation_sum_{m}')
             if serie and i < len(serie) and serie[i] is not None:
-                return NOMI_MODELLI.get(m, m)
-        return NOMI_MODELLI.get(modelli[0], 'Open-Meteo') if len(modelli) == 1 else 'Open-Meteo'
+                return NOMI_MODELLI[m]
+        return 'Open-Meteo'
 
     for i, t in enumerate(d.get('time') or []):
         giorno = date.fromisoformat(t)
@@ -216,10 +199,8 @@ def dati_giornalieri(oggi=None):
     presenze = _presenze_per_giorno(INIZIO_ORDINI, ieri)
     piste = _piste_per_giorno(INIZIO_ORDINI, ieri)
     prenotazioni = _prenotazioni_note(INIZIO_ORDINI, ieri)
-    from .models import ParametriPrevisione
-    modelli = modelli_per(ParametriPrevisione.attuali().modello_meteo)
-    meteo = _meteo(INIZIO_ORDINI, ieri, modelli) or {}
-    previsto = _meteo_previsto_storico(INIZIO_ORDINI, ieri, modelli) or {}
+    meteo = _meteo(INIZIO_ORDINI, ieri) or {}
+    previsto = _meteo_previsto_storico(INIZIO_ORDINI, ieri) or {}
     polvere = _polvere(INIZIO_ORDINI, ieri)
     festivi = italian_holidays_in_range(INIZIO_ORDINI, oggi)
     righe, g = [], INIZIO_ORDINI
@@ -626,13 +607,10 @@ def _pioggia_tipica(previsto):
             'ore': math.log1p(_quantile([m.get('ore', 0) for m in piovosi], 0.5)) if piovosi else math.log1p(4)}
 
 
-def calcola(oggi=None, par=None, modello_meteo=None, leggero=False):
-    """Verifica del modello sugli ultimi giorni e previsione dei prossimi 7.
-    modello_meteo: il servizio meteo da usare (di default quello scelto nei
-    parametri); leggero: solo la verifica, per il confronto dei servizi."""
+def calcola(oggi=None, par=None):
+    """Verifica del modello sugli ultimi giorni e previsione dei prossimi 7."""
     from .models import ParametriPrevisione
     par = par or ParametriPrevisione.attuali()
-    modelli = modelli_per(modello_meteo or par.modello_meteo)
     lpp = par.lavaggi_per_persona_f
     oggi = oggi or timezone.localdate()
     ieri = oggi - timedelta(days=1)
@@ -642,10 +620,10 @@ def calcola(oggi=None, par=None, modello_meteo=None, leggero=False):
                if v[0] >= (MIN_LAVAGGI_DOMENICA if g.weekday() == 6 else 1)}
     if len(storico) < 90:
         return {'errore': f'Servono almeno 90 giorni con ordini: ce ne sono {len(storico)}.'}
-    meteo = _meteo(INIZIO_ORDINI - timedelta(days=3), fine, modelli)
+    meteo = _meteo(INIZIO_ORDINI - timedelta(days=3), fine)
     if meteo is None:
         return {'errore': 'Il servizio meteo (Open-Meteo) non risponde: riprova fra qualche minuto.'}
-    storico_previsioni = _meteo_previsto_storico(INIZIO_ORDINI, ieri, modelli)
+    storico_previsioni = _meteo_previsto_storico(INIZIO_ORDINI, ieri)
     # fino a ieri le previsioni di allora, da oggi quelle attuali
     previsto = {g: m for g, m in (storico_previsioni or meteo).items() if g < oggi}
     previsto.update({g: m for g, m in meteo.items() if g >= oggi})
@@ -745,9 +723,6 @@ def calcola(oggi=None, par=None, modello_meteo=None, leggero=False):
             'confronto': _confronto(con_presenze, ore_persona, costo_medio),
         }
 
-    if leggero:
-        return {'verifica': verifica, 'storico_previsioni': storico_previsioni, 'meteo': meteo, 'oggi': oggi}
-
     # --- modelli finali su tutto lo storico
     lam, margine, _ = _taratura(xs, ys, persone)
     modello = Ridge(lam).fit(xs, ys)
@@ -796,50 +771,8 @@ def calcola(oggi=None, par=None, modello_meteo=None, leggero=False):
         'usa_segnali': usa_segnali, 'polvere_disponibile': bool(segnali['polvere']),
         'piste_disponibili': bool(segnali['piste']),
         'margine_pct': (math.exp(margine) - 1) * 100,
-        'modello_meteo': modelli[0], 'nome_modello_meteo': NOMI_MODELLI.get(modelli[0], modelli[0]),
         'chiuso': [GIORNI_SETTIMANA[wd] for wd in sorted(chiuso_wd)],
     }
-
-
-def confronto_meteo(oggi=None, par=None):
-    """Per ogni servizio meteo: il modello dei lavaggi addestrato con le sue
-    previsioni di allora e verificato sugli stessi giorni, piu' quanto le
-    sue previsioni di pioggia coincidono con la pioggia caduta (archivio
-    Open-Meteo, ERA5) nell'ultimo anno. Ordinati dal piu' preciso."""
-    from .models import ParametriPrevisione
-    par = par or ParametriPrevisione.attuali()
-    oggi = oggi or timezone.localdate()
-    chiave = f'previsione_squadra_confronto_meteo_{oggi.isoformat()}_{par.lavaggi_per_persona}'
-    salvato = cache.get(chiave)
-    if salvato is not None:
-        return salvato
-    righe = []
-    for modello, nome, descrizione in MODELLI_DISPONIBILI:
-        r = calcola(oggi, par, modello, leggero=True)
-        riga = {'modello': modello, 'nome': nome, 'descrizione': descrizione, 'scelto': modello == par.modello_meteo}
-        v = r.get('verifica')
-        previsioni, caduta = r.get('storico_previsioni'), r.get('meteo') or {}
-        if r.get('errore') or not v or not previsioni:
-            riga['errore'] = r.get('errore') or 'previsioni passate non disponibili'
-            righe.append(riga)
-            continue
-        c = v.get('confronto')
-        riga.update({'errore_pct': v['errore_pct'], 'squadra_giusta': v['servito_giusto'], 'scoperti': v['servito_scarso'],
-                     'turni_risparmiati': c['risparmiate'] if c else None})
-        giorni = [g for g in previsioni if g in caduta and oggi - timedelta(days=365) <= g < oggi - timedelta(days=3)]
-        if giorni:
-            pioggia = [g for g in giorni if caduta[g]['piove']]
-            asciutti = [g for g in giorni if not caduta[g]['piove']]
-            riga.update({
-                'giorni': len(giorni),
-                'pioggia_vista': (sum(1 for g in pioggia if previsioni[g]['piove']) / len(pioggia) * 100) if pioggia else None,
-                'falsi_allarmi': (sum(1 for g in asciutti if previsioni[g]['piove']) / len(asciutti) * 100) if asciutti else None,
-                'copertura': sum(1 for g in giorni if previsioni[g].get('fonte') == nome) / len(giorni) * 100,
-            })
-        righe.append(riga)
-    righe.sort(key=lambda x: (x.get('errore_pct') is None, x.get('errore_pct') or 0, -(x.get('squadra_giusta') or 0)))
-    cache.set(chiave, righe, 60 * 60 * 12)
-    return righe
 
 
 def _confronto(giorni, ore_persona, costo_ora):
