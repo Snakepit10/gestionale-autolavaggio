@@ -147,6 +147,7 @@ class PrevisioneSquadra(models.Model):
     pioggia_mm = models.DecimalField(max_digits=5, decimal_places=1, default=0)
     chiuso = models.BooleanField(default=False)
     cicli_self = models.PositiveIntegerField(null=True, blank=True)
+    cicli_operatori = models.PositiveIntegerField(null=True, blank=True)
     aggiornata_il = models.DateTimeField(auto_now=True)
 
     class Meta:
@@ -171,7 +172,7 @@ class ParametriPrevisione(models.Model):
         help_text='Servizio meteo di Open-Meteo usato per le previsioni (vedi il confronto in pagina)')
     cicli_persona_self = models.PositiveIntegerField(
         null=True, blank=True,
-        help_text='Cicli self previsti da cui serve la persona al self; vuoto = sempre')
+        help_text='Cicli degli operatori previsti da cui serve la persona al self; vuoto = sempre')
     aggiornati_il = models.DateTimeField(auto_now=True)
 
     class Meta:

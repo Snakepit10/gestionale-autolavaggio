@@ -13,7 +13,8 @@ Due passi:
 3. i cicli del self si stimano con lo stesso modello (senza prenotazioni e
    col livello dei cicli): buona stima dei totali di settimana e mese,
    meno del singolo giorno. Al self c'e' PERSONE_SELF persona; con il
-   parametro cicli_persona_self, sotto quei cicli ci pensa il servito.
+   parametro cicli_persona_self, sotto quei cicli degli operatori (senza
+   i contanti al portale e senza il servito) ci pensa il servito.
 Parametri in ParametriPrevisione, modificabili dalla pagina.
 
 Il modello si verifica da solo: addestrato senza gli ultimi GIORNI_VERIFICA
@@ -234,11 +235,13 @@ def _lavaggi_per_giorno(dal, al):
 
 def _cicli_dettaglio(dal, al):
     """Per giorno: transazioni WashTec pagate in contanti al portale, quelle
-    da unita' operativa (cassa automatica: clienti del self e lavaggi del
-    servito), cicli dei portali dalle chiusure, lavaggi completi del servito."""
-    from apps.finanze.models import ChiusuraCassaAutomatica, TransazionePortale
+    da unita' operativa (operatori del self e lavaggi del servito), cicli dei
+    portali dalle chiusure, lavaggi completi del servito e lavaggi del servito
+    passati dal portale."""
+    from apps.finanze.models import AbbinamentoPortale, ChiusuraCassaAutomatica, TransazionePortale
     from apps.ordini.models import ItemOrdine
-    giorni = defaultdict(lambda: {'self_washtec': 0, 'servito_washtec': 0, 'chiusure': None, 'completi': 0})
+    giorni = defaultdict(lambda: {'self_washtec': 0, 'servito_washtec': 0, 'chiusure': None, 'completi': 0,
+                                  'servito_portale': 0})
     for orario, origine in (TransazionePortale.objects.filter(orario__date__gte=dal - timedelta(days=1),
                                                               orario__date__lte=al + timedelta(days=1))
                             .values_list('orario', 'origine')):
@@ -253,6 +256,17 @@ def _cicli_dettaglio(dal, al):
                                         servizio_prodotto__titolo__icontains='lavaggio completo')
               .exclude(ordine__stato='annullato').values('ordine__data_ora__date').annotate(q=Sum('quantita'))):
         giorni[r['ordine__data_ora__date']]['completi'] = r['q'] or 0
+    # come l'abbinamento del report giornata: un ciclo per pezzo, tranne i
+    # lavaggi chiusi senza portale, piu' gli abbinati a mano di servizi senza programmi
+    for r in (ItemOrdine.objects.filter(ordine__data_ora__date__gte=dal, ordine__data_ora__date__lte=al,
+                                        senza_portale__isnull=True)
+              .exclude(servizio_prodotto__programmi_portale='').exclude(ordine__stato='annullato')
+              .values('ordine__data_ora__date').annotate(q=Sum('quantita'))):
+        giorni[r['ordine__data_ora__date']]['servito_portale'] += r['q'] or 0
+    for r in (AbbinamentoPortale.objects.filter(item__ordine__data_ora__date__gte=dal, item__ordine__data_ora__date__lte=al,
+                                                item__servizio_prodotto__programmi_portale='')
+              .values('item__ordine__data_ora__date').annotate(q=Count('id'))):
+        giorni[r['item__ordine__data_ora__date']]['servito_portale'] += r['q']
     return giorni
 
 
@@ -265,11 +279,18 @@ def _washtec_completo(d):
     return d['chiusure'] is None or not d['chiusure'] or totale >= 0.8 * d['chiusure']
 
 
+def _cicli_operatori_giorno(c):
+    """Cicli avviati dagli operatori del self: quelli da unita' operativa
+    meno i lavaggi del servito. None se WashTec non e' completo."""
+    return max(c['servito_washtec'] - c['servito_portale'], 0) if _washtec_completo(c) else None
+
+
 def _cicli_self_giorno(c):
-    """Cicli self di un giorno: i cicli meno i lavaggi completi del servito,
-    da WashTec o, se incompleto, dalle chiusure. None se non si sa."""
+    """Cicli self di un giorno, come nel report giornata: contanti al portale
+    piu' operatori. Se WashTec e' incompleto, le chiusure meno i lavaggi
+    completi del servito. None se non si sa."""
     if _washtec_completo(c):
-        return max(c['self_washtec'] + c['servito_washtec'] - c['completi'], 0)
+        return c['self_washtec'] + _cicli_operatori_giorno(c)
     return max(c['chiusure'] - c['completi'], 0) if c['chiusure'] else None
 
 
@@ -277,6 +298,14 @@ def _cicli_self(dal, al):
     """{data: (cicli self, 0)} dei giorni in cui il self ha lavorato."""
     giorni = {g: _cicli_self_giorno(c) for g, c in _cicli_dettaglio(dal, al).items()}
     return {g: (n, 0) for g, n in giorni.items() if n is not None and n >= MIN_CICLI_SELF}
+
+
+def _cicli_operatori(dal, al):
+    """{data: (cicli operatori, 0)} dei giorni in cui il self ha lavorato:
+    qui zero cicli degli operatori e' un dato vero, non un self fermo."""
+    giorni = _cicli_dettaglio(dal, al)
+    return {g: (_cicli_operatori_giorno(c), 0) for g, c in giorni.items()
+            if _washtec_completo(c) and _cicli_self_giorno(c) >= MIN_CICLI_SELF}
 
 
 def dati_giornalieri(oggi=None):
@@ -300,15 +329,17 @@ def dati_giornalieri(oggi=None):
     while g <= ieri:
         m, p, c = meteo.get(g, {}), previsto.get(g, {}), cicli.get(g, {})
         cicli_self = _cicli_self_giorno(c) if c else None
+        cicli_operatori = _cicli_operatori_giorno(c) if c else None
         righe.append({
             'data': g.isoformat(), 'giorno': GIORNI_SETTIMANA[g.weekday()], 'festivo': festivi.get(g, ''),
             'lavaggi_servito': lavaggi.get(g, (0, 0))[0], 'incasso_servito': round(lavaggi.get(g, (0, 0))[1], 2),
             'prenotazioni_note_sera': prenotazioni.get(g, 0),
             'cicli_self_washtec': c.get('self_washtec', 0), 'cicli_servito_washtec': c.get('servito_washtec', 0),
             'cicli_portali_chiusure': c.get('chiusure') if c.get('chiusure') is not None else '',
-            'lavaggi_completi_servito': c.get('completi', 0),
+            'lavaggi_completi_servito': c.get('completi', 0), 'lavaggi_servito_portale': c.get('servito_portale', 0),
             'washtec_completo': 1 if c and _washtec_completo(c) else 0,
             'cicli_self': '' if cicli_self is None else cicli_self,
+            'cicli_operatori': '' if cicli_operatori is None else cicli_operatori,
             'piste_euro': round(piste.get(g, (0, 0))[0], 2),
             'persone_presenti': presenze.get(g, (0, 0))[1], 'ore_presenze': presenze.get(g, (0, 0))[0],
             'pioggia_mm': m.get('pioggia', ''), 'pioggia_ore': m.get('ore', ''), 'piove': int(bool(m.get('piove'))) if m else '',
@@ -547,9 +578,9 @@ def _stima_cicli(modello, correzione, x):
     return max(0.0, math.exp(modello.predict(x)) * correzione - 1)
 
 
-def _modello_self(cicli, meteo, festivi, previsto, polvere):
-    """Modello dei cicli self e sua verifica sugli ultimi giorni, come per
-    i lavaggi. None se i giorni sono pochi."""
+def _modello_cicli(cicli, meteo, festivi, previsto, polvere):
+    """Modello dei cicli (self o operatori) e sua verifica sugli ultimi
+    giorni, come per i lavaggi. None se i giorni sono pochi."""
     xs, ys, usati = _righe(sorted(cicli), cicli, meteo, festivi, {}, previsto, polvere)
     if len(usati) < 90:
         return None
@@ -763,9 +794,25 @@ def calcola(oggi=None, par=None, modello_meteo=None, leggero=False):
     profilo = profilo_self(ieri)
     storico_esteso = dict(storico)
     cicli = _cicli_self(INIZIO_ORDINI, ieri)
-    self_m = _modello_self(cicli, meteo, festivi, previsto, polvere)
+    self_m = _modello_cicli(cicli, meteo, festivi, previsto, polvere)
     cicli_esteso = dict(cicli)
+    operatori = _cicli_operatori(INIZIO_ORDINI, ieri)
+    operatori_m = _modello_cicli(operatori, meteo, festivi, previsto, polvere)
+    operatori_esteso = dict(operatori)
+
+    def stima_cicli(g, m, esteso, base):
+        if not m:
+            return None
+        x = _variabili(g, meteo, festivi, _livello(esteso, g) or _livello(base, oggi), 0, previsto, polvere,
+                       _livello(esteso, g, 7))
+        stima = _stima_cicli(m['modello'], m['correzione'], x)
+        esteso[g] = (stima, 0)
+        return stima
+
     finora = _lavaggi_per_giorno(oggi, oggi).get(oggi, (0, 0))[0]
+    dettaglio_oggi = _cicli_dettaglio(oggi, oggi).get(oggi)
+    cicli_finora = _cicli_self_giorno(dettaglio_oggi) if dettaglio_oggi else 0
+    operatori_finora = _cicli_operatori_giorno(dettaglio_oggi) if dettaglio_oggi else 0
     # finito il turno oggi e' un giorno completo: il modello impara sapendo
     # i lavaggi del giorno prima, quindi domani deve vederli
     if turno_finito(oggi) and finora >= (MIN_LAVAGGI_DOMENICA if oggi.weekday() == 6 else 1):
@@ -784,21 +831,19 @@ def calcola(oggi=None, par=None, modello_meteo=None, leggero=False):
         previsti = max(0.0, math.expm1(modello.predict(x)))
         alti = previsti * (1 + margine)
         servito = 0 if chiuso else squadra_servito(alti, lpp)
-        cicli_self = None
-        if self_m:
-            x_self = _variabili(g, meteo, festivi, _livello(cicli_esteso, g) or _livello(cicli, oggi), 0, previsto, polvere,
-                                _livello(cicli_esteso, g, 7))
-            cicli_self = _stima_cicli(self_m['modello'], self_m['correzione'], x_self)
-            cicli_esteso[g] = (cicli_self, 0)
+        cicli_self = stima_cicli(g, self_m, cicli_esteso, cicli)
+        cicli_operatori = stima_cicli(g, operatori_m, operatori_esteso, operatori)
         # a servito chiuso non c'e' nessun altro: il self resta coperto
-        al_self = PERSONE_SELF if chiuso else persone_self(cicli_self, par.cicli_persona_self)
+        al_self = PERSONE_SELF if chiuso else persone_self(cicli_operatori, par.cicli_persona_self)
         previsioni.append({
             'data': g, 'giorno': GIORNI_SETTIMANA[g.weekday()], 'chiuso': chiuso, 'domani': k == 1,
             'oggi': k == 0, 'finora': finora if k == 0 else None,
+            'cicli_finora': cicli_finora if k == 0 else None, 'operatori_finora': operatori_finora if k == 0 else None,
             'pioggia': meteo[g]['pioggia'], 'piove': meteo[g]['piove'], 'debole': meteo[g].get('debole'),
             'ore_pioggia': meteo[g].get('ore', 0), 'probabilita': meteo[g].get('probabilita'), 'fonte': meteo[g].get('fonte'),
             'tmax': meteo[g]['tmax'], 'prenotazioni': note, 'previsti': previsti, 'alti': alti, 'polvere': polvere.get(g),
             'servito': servito, 'self': al_self, 'cicli_self': round(cicli_self) if cicli_self is not None else None,
+            'cicli_operatori': round(cicli_operatori) if cicli_operatori is not None else None,
             'squadra': servito + al_self if servito is not None else None,
         })
         if k > 0:
@@ -814,6 +859,7 @@ def calcola(oggi=None, par=None, modello_meteo=None, leggero=False):
         'oggi': oggi, 'giorni_storico': len(usati), 'dal': usati[0], 'previsioni': previsioni, 'verifica': verifica,
         'par': par, 'ore_persona': ore_persona, 'persone_self': PERSONE_SELF,
         'verifica_self': self_m['verifica'] if self_m else None,
+        'verifica_operatori': operatori_m['verifica'] if operatori_m else None,
         'esempio_20': squadra_servito(20, lpp), 'giorni_presenze': len(presenze),
         'costo_ora': costo_medio,
         'effetti': [e for e in _effetti(modello, xs, _pioggia_tipica(previsto))
@@ -915,7 +961,7 @@ def registra(risultato):
     return PrevisioneSquadra.objects.get_or_create(data=domani['data'], defaults={
         'lavaggi_previsti': round(domani['previsti'], 1), 'lavaggi_alti': round(domani['alti'], 1),
         'squadra': domani['squadra'] or 0, 'pioggia_mm': round(domani['pioggia'], 1), 'chiuso': domani['chiuso'],
-        'cicli_self': domani.get('cicli_self'),
+        'cicli_self': domani.get('cicli_self'), 'cicli_operatori': domani.get('cicli_operatori'),
     })[0]
 
 
@@ -929,8 +975,10 @@ def storico_previsioni(giorni=30):
     reali = _lavaggi_per_giorno(salvate[-1].data, salvate[0].data)
     presenze = _presenze_per_giorno(salvate[-1].data, salvate[0].data)
     cicli = _cicli_self(salvate[-1].data, salvate[0].data)
+    operatori = _cicli_operatori(salvate[-1].data, salvate[0].data)
     return [{'p': p, 'reali': reali.get(p.data, (0, 0))[0], 'persone': presenze.get(p.data, (0, 0))[1],
-             'cicli_reali': cicli.get(p.data, (None, 0))[0]} for p in salvate]
+             'cicli_reali': cicli.get(p.data, (None, 0))[0], 'operatori_reali': operatori.get(p.data, (None, 0))[0]}
+            for p in salvate]
 
 
 def errore_vero(storico):

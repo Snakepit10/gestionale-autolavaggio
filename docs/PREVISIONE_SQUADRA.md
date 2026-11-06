@@ -6,8 +6,10 @@ La pagina **Personale > Previsione squadra** stima i lavaggi del servito e consi
 
 - **Lavaggi previsti:** una regressione ridge sul logaritmo dei lavaggi, da: giorno della settimana, festivi e ponti, stagione, livello delle ultime 4 settimane e dell'ultima, pioggia prevista, pioggia dei 3 giorni prima, temperatura, sabbia del Sahara, prenotazioni note alle 19 del giorno prima.
 - **Squadra:** lavaggi previsti + margine (parametro, di partenza 10%) / lavaggi per persona (parametro, di partenza 7), arrotondato per eccesso, più la persona al self.
-- **Cicli self:** lo stesso modello, senza prenotazioni e con il livello dei cicli delle ultime settimane. Dai cicli dei portali si tolgono i lavaggi completi del servito. Una correzione riporta in pari i totali, che altrimenti verrebbero bassi di circa il 13%.
-- **Persona al self:** al massimo una. Con il parametro "cicli previsti da cui serve la persona al self", sotto quel numero il self lo segue il servito. Vuoto vuol dire sempre. A servito chiuso resta coperto.
+- **Cicli self:** lo stesso modello, senza prenotazioni e con il livello dei cicli delle ultime settimane. Sono i contanti al portale più i cicli degli operatori, come nel Report giornata. Una correzione riporta in pari i totali, che altrimenti verrebbero bassi di circa il 13%.
+- **Cicli degli operatori:** le transazioni da unità operativa meno i lavaggi del servito passati dal portale, cioè gli articoli con programmi portale, un ciclo per pezzo, senza quelli chiusi senza portale. Hanno un modello proprio, uguale a quello dei cicli self. Il Report giornata conta invece la finestra di chiusura e le transazioni non abbinate: i due numeri si avvicinano nei giorni abbinati, ma non coincidono sempre.
+- **Persona al self:** al massimo una. Con il parametro "cicli operatori previsti da cui serve la persona al self", sotto quel numero il self lo segue il servito. Vuoto vuol dire sempre. A servito chiuso resta coperto.
+- **Finora:** oggi la pagina mostra anche i cicli già fatti, aggiornati a ogni import WashTec (ogni 10 minuti in orario). I lavaggi del servito si contano all'ordine: finché l'auto non passa dal portale, i cicli degli operatori di oggi possono risultare un po' bassi.
 
 ## Solo quello che si sa la sera prima
 
@@ -21,7 +23,7 @@ Provati sui dati fino a novembre 2026 e non utili: giorni di stipendio, rimbalzo
 
 ## Quanto valgono i cicli self
 
-Il 06/11/2026 sono state importate da WashTec le transazioni da agosto 2025 a giugno 2026. Provato con riaddestramento settimanale su 292 giorni, da gennaio al 5 novembre 2026: errore del 33% sul giorno, del 20% sulla settimana, dell'11% sul mese, con il totale al 99% del reale. Il caso da solo vale circa il 13% sul giorno: la distanza viene da picchi che il modello non vede, come 116 cicli contro 37 previsti domenica 10 maggio o i 70-80 cicli a fine luglio. La pioggia prevista conta poco.
+Il 06/11/2026 sono state importate da WashTec le transazioni da agosto 2025 a giugno 2026. Provato con riaddestramento settimanale su 292 giorni, da gennaio al 5 novembre 2026: errore del 33% sul giorno, del 20% sulla settimana, dell'11% sul mese, con il totale al 99% del reale. Il caso da solo vale circa il 13% sul giorno: il modello non vede i picchi, come 116 cicli contro 37 previsti domenica 10 maggio o i 70-80 cicli a fine luglio, ma la distanza non viene da lì: senza i 16 giorni di picco l'errore resta del 31%. La pioggia prevista conta poco.
 
 La correzione dei totali è tarata su tutto lo storico: nei mesi forti riporta in pari la stima, in quelli tranquilli la tiene alta del 15-20%. Provata anche sugli ultimi 30, 60 e 90 giorni: non migliora l'autunno e peggiora l'anno. La pagina mostra il rapporto fra previsto e reale degli ultimi 60 giorni.
 

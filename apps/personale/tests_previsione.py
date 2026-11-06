@@ -13,6 +13,7 @@ OGGI = date(2026, 11, 5)
 METEO_VERO = prev._meteo          # prima dei mock del setUp
 GIORNO_PRIMA_VERO = prev._meteo_giorno_prima
 CICLI_SELF_VERO = prev._cicli_self
+OPERATORI_VERI = prev._cicli_operatori
 ALTRI_MODELLI_VERO = prev._pioggia_altri_modelli
 POLVERE_VERA = prev._polvere
 
@@ -73,6 +74,8 @@ class PrevisioneTest(TestCase):
             mock.patch.object(prev, '_pioggia_altri_modelli', return_value=None),
             mock.patch.object(prev, '_cicli_self', side_effect=lambda dal, al: {
                 g: (v[0], 0) for g, v in cicli.items() if dal <= g <= al and v[0] >= prev.MIN_CICLI_SELF}),
+            mock.patch.object(prev, '_cicli_operatori', side_effect=lambda dal, al: {
+                g: (v[0] // 2, 0) for g, v in cicli.items() if dal <= g <= al and v[0] >= prev.MIN_CICLI_SELF}),
         ]
         for p in patch:
             p.start()
@@ -92,7 +95,9 @@ class PrevisioneTest(TestCase):
         self.assertLess(abs(effetti['Giornata di pioggia prevista'] + 50), 12)  # i clienti guardano la previsione
         self.assertLess(abs(effetti['Sabato, rispetto a un feriale'] - 60), 20)  # la regolarizzazione lo smorza
         # senza soglia al self sempre una persona; i cicli previsti seguono la pioggia
-        self.assertTrue(all(p['self'] == 1 and p['cicli_self'] is not None for p in r['previsioni']))
+        self.assertTrue(all(p['self'] == 1 and p['cicli_self'] is not None and p['cicli_operatori'] is not None
+                            for p in r['previsioni']))
+        self.assertLess(abs(r['verifica_operatori']['totale_pct'] - 100), 8)
         s = r['verifica_self']
         self.assertLess(abs(s['totale_pct'] - 100), 8)                     # totali in pari
         self.assertLess(s['errore_settimana_pct'], s['errore_pct'] + 1)
@@ -174,6 +179,7 @@ class PrevisioneTest(TestCase):
         with mock.patch('django.utils.timezone.localtime', return_value=sera):
             salvata = prev.registra(r)
             self.assertEqual(salvata.cicli_self, r['previsioni'][1]['cicli_self'])
+            self.assertEqual(salvata.cicli_operatori, r['previsioni'][1]['cicli_operatori'])
             previsti = salvata.lavaggi_previsti
             r['previsioni'][1]['previsti'] += 5                   # riaperta piu' tardi, meteo piu' fresco
             self.assertEqual(prev.registra(r).lavaggi_previsti, previsti)     # la prima resta
@@ -195,26 +201,56 @@ class PrevisioneTest(TestCase):
 
     def test_soglia_persona_al_self(self):
         par = ParametriPrevisione.attuali()
-        par.cicli_persona_self = 20
+        par.cicli_persona_self = 10
         for g, pioggia in ((OGGI + timedelta(days=1), True), (OGGI + timedelta(days=2), False)):
             self.meteo[g] = {'pioggia': 8.0 if pioggia else 0.0, 'ore': 5.0 if pioggia else 0.0, 'tmax': 25.0, 'piove': pioggia}
         previsioni = {p['data']: p for p in prev.calcola(OGGI, par)['previsioni']}
         bagnato, asciutto = previsioni[OGGI + timedelta(days=1)], previsioni[OGGI + timedelta(days=2)]
-        self.assertLess(bagnato['cicli_self'], 20)
+        self.assertLess(bagnato['cicli_operatori'], 10)
+        self.assertGreater(bagnato['cicli_self'], bagnato['cicli_operatori'])              # la soglia guarda gli operatori
         self.assertEqual((bagnato['self'], bagnato['squadra']), (0, bagnato['servito']))     # ci pensa il servito
-        self.assertGreaterEqual(asciutto['cicli_self'], 20)
+        self.assertGreaterEqual(asciutto['cicli_operatori'], 10)
         self.assertEqual(asciutto['self'], 1)
         domenica = next(p for p in previsioni.values() if p['chiuso'])                     # servito chiuso: resta coperto
         self.assertEqual(domenica['self'], 1)
         self.assertEqual(prev.persone_self(None, 20), 1)                                   # senza stima resta la persona
 
     def test_cicli_self_dai_dati(self):
-        giorni = {date(2026, 3, 1): {'self_washtec': 20, 'servito_washtec': 30, 'chiusure': 55, 'completi': 10},   # WashTec
-                  date(2026, 3, 2): {'self_washtec': 5, 'servito_washtec': 5, 'chiusure': 40, 'completi': 10},     # incompleto
-                  date(2026, 3, 3): {'self_washtec': 0, 'servito_washtec': 12, 'chiusure': None, 'completi': 10}}  # fermo
+        giorni = {date(2026, 3, 1): {'self_washtec': 20, 'servito_washtec': 30, 'chiusure': 55, 'completi': 10, 'servito_portale': 12},  # WashTec
+                  date(2026, 3, 2): {'self_washtec': 5, 'servito_washtec': 5, 'chiusure': 40, 'completi': 10, 'servito_portale': 12},    # incompleto
+                  date(2026, 3, 3): {'self_washtec': 0, 'servito_washtec': 12, 'chiusure': None, 'completi': 10, 'servito_portale': 12},  # fermo
+                  date(2026, 3, 4): {'self_washtec': 6, 'servito_washtec': 10, 'chiusure': None, 'completi': 10, 'servito_portale': 12}}  # solo contanti
         with mock.patch.object(prev, '_cicli_dettaglio', return_value=giorni):
-            self.assertEqual(CICLI_SELF_VERO(date(2026, 3, 1), date(2026, 3, 3)),
-                             {date(2026, 3, 1): (40, 0), date(2026, 3, 2): (30, 0)})
+            self.assertEqual(CICLI_SELF_VERO(date(2026, 3, 1), date(2026, 3, 4)),
+                             {date(2026, 3, 1): (38, 0), date(2026, 3, 2): (30, 0), date(2026, 3, 4): (6, 0)})
+            self.assertEqual(OPERATORI_VERI(date(2026, 3, 1), date(2026, 3, 4)),
+                             {date(2026, 3, 1): (18, 0), date(2026, 3, 4): (0, 0)})
+
+    def test_servito_al_portale(self):
+        from apps.core.models import Categoria, ServizioProdotto
+        from apps.finanze.models import AbbinamentoPortale, LavaggioSenzaPortale, TransazionePortale
+        from apps.ordini.models import ItemOrdine, Ordine
+        giorno = timezone.make_aware(datetime(2026, 3, 1, 10, 0))
+        categoria = Categoria.objects.create(nome='Lavaggi di prova')
+        portale = ServizioProdotto.objects.create(titolo='Esterno prova', categoria=categoria, prezzo=10, programmi_portale='8,9,7,4')
+        interno = ServizioProdotto.objects.create(titolo='Interno prova', categoria=categoria, prezzo=10)
+
+        def item(servizio, quantita=1, stato='completato'):
+            ordine = Ordine.objects.create(totale=10, totale_finale=10, stato=stato)
+            Ordine.objects.filter(pk=ordine.pk).update(data_ora=giorno)
+            return ItemOrdine.objects.create(ordine=ordine, servizio_prodotto=servizio, quantita=quantita, prezzo_unitario=10)
+
+        item(portale, quantita=2)                                                      # due cicli
+        item(interno)                                                                  # non passa dal portale
+        item(portale, stato='annullato')
+        LavaggioSenzaPortale.objects.create(item=item(portale))                        # chiuso senza portale
+        manuale = item(interno)                                                        # abbinato a mano
+        for numero, origine in enumerate(['unita'] * 5 + ['contanti'], start=1):
+            TransazionePortale.objects.create(portale='A', numero=numero, orario=giorno, programma=4, origine=origine)
+        AbbinamentoPortale.objects.create(transazione=TransazionePortale.objects.get(numero=1), item=manuale)
+        c = prev._cicli_dettaglio(giorno.date(), giorno.date())[giorno.date()]
+        self.assertEqual(c['servito_portale'], 3)
+        self.assertEqual((prev._cicli_operatori_giorno(c), prev._cicli_self_giorno(c)), (2, 3))
 
     def test_salva_parametri(self):
         from apps.auth_system.models import PermessoGruppo
@@ -394,7 +430,9 @@ class PrevisioneTest(TestCase):
         richiesta.user, richiesta.session = utente, {}
         richiesta._messages = FallbackStorage(richiesta)
         with (mock.patch('django.utils.timezone.localdate', return_value=OGGI),
-              mock.patch.object(prev, '_pioggia_altri_modelli', return_value={'pioggia': 6, 'modelli': 9})):
+              mock.patch.object(prev, '_pioggia_altri_modelli', return_value={'pioggia': 6, 'modelli': 9}),
+              mock.patch.object(prev, '_cicli_dettaglio', return_value={OGGI: {
+                  'self_washtec': 4, 'servito_washtec': 5, 'chiusure': None, 'completi': 2, 'servito_portale': 2}})):
             self.meteo[OGGI + timedelta(days=1)] = {'pioggia': 0.0, 'ore': 0.0, 'tmax': 20.0, 'piove': False}
             risposta = previsione(richiesta)
         self.assertEqual(risposta.status_code, 200)
@@ -406,7 +444,8 @@ class PrevisioneTest(TestCase):
         self.assertContains(risposta, 'il caso da solo vale circa')
         self.assertContains(risposta, 'Oggi Gio 05/11')
         self.assertContains(risposta, 'Quanto e')
-        self.assertContains(risposta, 'cicli previsti da cui serve la persona al self')
-        self.assertContains(risposta, 'cicli self previsti')
+        self.assertContains(risposta, 'cicli operatori previsti da cui serve la persona al self')
+        self.assertContains(risposta, 'cicli self previsti &middot; finora 7 cicli')
+        self.assertContains(risposta, 'cicli operatori previsti &middot; finora 3 cicli')
         self.assertContains(risposta, 'Errore sulla settimana')
         self.assertNotContains(risposta, 'soglia_cicli_self')
