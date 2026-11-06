@@ -296,6 +296,13 @@ def previsione(request):
     from . import previsione as prev
     from .models import ParametriPrevisione
     par = ParametriPrevisione.attuali()
+    if request.method == 'POST' and request.POST.get('modello_meteo'):
+        modello = request.POST['modello_meteo']
+        if modello in prev.NOMI_MODELLI:
+            par.modello_meteo = modello
+            par.save()
+            messages.success(request, f'Servizio meteo: {prev.NOMI_MODELLI[modello]}.')
+        return redirect('personale:previsione')
     if request.method == 'POST':
         errori = []
         lpp = _decimale(request.POST.get('lavaggi_per_persona'), 'Lavaggi per persona', errori, Decimal('1'))
@@ -311,7 +318,8 @@ def previsione(request):
     prev.registra(risultato)
     return render(request, 'personale/previsione.html', {
         'r': risultato, 'par': par, 'storico': prev.storico_previsioni(),
-        'ora_decisione': prev.ORA_DECISIONE,
+        'ora_decisione': prev.ORA_DECISIONE, 'modelli': prev.MODELLI_DISPONIBILI,
+        'confronto_meteo': prev.confronto_meteo(par=par) if request.GET.get('confronta') else None,
     })
 
 
