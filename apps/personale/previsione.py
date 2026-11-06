@@ -42,6 +42,7 @@ LAMBDA = 100                 # regolarizzazione ridge, provata sui dati reali
 SQUADRA_MINIMA = 1           # persone minime del servito
 PERSONE_SELF = 1             # al self al massimo una persona
 MIN_CICLI_SELF = 3           # sotto, il self era fermo: il giorno non insegna nulla
+NUVOLE_TIPICHE = 0.6         # quando manca la previsione delle nuvole
 MIN_LAVAGGI_DOMENICA = 3     # sotto, la domenica conta come servito chiuso (ordini isolati)
 # modelli meteo di Open-Meteo che si possono scegliere (e confrontare): per i giorni
 # che il modello scelto non copre (es. ICON-2I arriva a ~3 giorni) si usa la scelta
@@ -174,6 +175,29 @@ def _meteo_giorno_prima(dal, al, modelli=('best_match',)):
         m['fonte'] = NOMI_MODELLI.get(max(fonti, key=fonti.get), 'Open-Meteo')
         m['piove'] = piove(m)
     return meteo
+
+
+def _nuvole(dal, al):
+    """Cielo coperto previsto dalle 8 alle 18, da 0 a 1: fino a ieri con la
+    previsione del giorno prima, da oggi con quella attuale. {data: quota};
+    i giorni senza dato mancano."""
+    from apps.finanze.weather import LICATA_LAT, LICATA_LON
+    oggi = timezone.localdate()
+    richieste = [('https://previous-runs-api.open-meteo.com/v1/forecast', 'cloud_cover_previous_day1', 60 * 60 * 12,
+                  {'start_date': dal.isoformat(), 'end_date': min(al, oggi - timedelta(days=1)).isoformat()})]
+    if al >= oggi:
+        richieste.append(('https://api.open-meteo.com/v1/forecast', 'cloud_cover', 60 * 30,
+                          {'forecast_days': min(16, (al - oggi).days + 1)}))
+    ore = defaultdict(list)
+    for url, variabile, durata, params in richieste:
+        dati = _scarica(url, {'latitude': LICATA_LAT, 'longitude': LICATA_LON, 'hourly': variabile,
+                              'timezone': 'Europe/Rome', **params}, durata, chiave_dati='hourly')
+        if not dati:
+            continue
+        for t, v in zip(dati['hourly'].get('time') or [], dati['hourly'].get(variabile) or []):
+            if v is not None and 8 <= int(t[11:13]) <= 18:
+                ore[date.fromisoformat(t[:10])].append(v)
+    return {g: sum(v) / len(v) / 100 for g, v in ore.items() if len(v) >= 8}
 
 
 def _pioggia_altri_modelli(giorno, in_uso):
@@ -324,6 +348,7 @@ def dati_giornalieri(oggi=None):
     previsto = _meteo_previsto_storico(INIZIO_ORDINI, ieri, modelli) or {}
     giorno_prima = _meteo_giorno_prima(INIZIO_ORDINI, ieri, modelli) or {}
     polvere = _polvere(INIZIO_ORDINI, ieri)
+    nuvole = _nuvole(INIZIO_ORDINI, ieri)
     festivi = italian_holidays_in_range(INIZIO_ORDINI, oggi)
     righe, g = [], INIZIO_ORDINI
     while g <= ieri:
@@ -349,6 +374,7 @@ def dati_giornalieri(oggi=None):
             'giorno_prima_mm': round(giorno_prima[g]['pioggia'], 1) if g in giorno_prima else '',
             'giorno_prima_ore': giorno_prima[g]['ore'] if g in giorno_prima else '',
             'polvere_max': round(polvere[g], 1) if g in polvere else '',
+            'nuvole_previste_pct': round(nuvole[g] * 100) if g in nuvole else '',
         })
         g += timedelta(days=1)
     return righe
@@ -578,12 +604,14 @@ def _stima_cicli(modello, correzione, x):
     return max(0.0, math.exp(modello.predict(x)) * correzione - 1)
 
 
-def _modello_cicli(cicli, meteo, festivi, previsto, polvere):
+def _modello_cicli(cicli, meteo, festivi, previsto, polvere, nuvole):
     """Modello dei cicli (self o operatori) e sua verifica sugli ultimi
-    giorni, come per i lavaggi. None se i giorni sono pochi."""
+    giorni, come per i lavaggi, in piu' con le nuvole previste: chi lava da
+    solo guarda il cielo, il servito no. None se i giorni sono pochi."""
     xs, ys, usati = _righe(sorted(cicli), cicli, meteo, festivi, {}, previsto, polvere)
     if len(usati) < 90:
         return None
+    xs = [x + [nuvole.get(g, NUVOLE_TIPICHE)] for x, g in zip(xs, usati)]
     taglio = max(len(usati) - GIORNI_VERIFICA, 60)
     prova = Ridge().fit(xs[:taglio], ys[:taglio])
     correzione = _correzione(prova, xs[:taglio], ys[:taglio])
@@ -794,17 +822,18 @@ def calcola(oggi=None, par=None, modello_meteo=None, leggero=False):
     profilo = profilo_self(ieri)
     storico_esteso = dict(storico)
     cicli = _cicli_self(INIZIO_ORDINI, ieri)
-    self_m = _modello_cicli(cicli, meteo, festivi, previsto, polvere)
+    nuvole = _nuvole(INIZIO_ORDINI, fine)
+    self_m = _modello_cicli(cicli, meteo, festivi, previsto, polvere, nuvole)
     cicli_esteso = dict(cicli)
     operatori = _cicli_operatori(INIZIO_ORDINI, ieri)
-    operatori_m = _modello_cicli(operatori, meteo, festivi, previsto, polvere)
+    operatori_m = _modello_cicli(operatori, meteo, festivi, previsto, polvere, nuvole)
     operatori_esteso = dict(operatori)
 
     def stima_cicli(g, m, esteso, base):
         if not m:
             return None
         x = _variabili(g, meteo, festivi, _livello(esteso, g) or _livello(base, oggi), 0, previsto, polvere,
-                       _livello(esteso, g, 7))
+                       _livello(esteso, g, 7)) + [nuvole.get(g, NUVOLE_TIPICHE)]
         stima = _stima_cicli(m['modello'], m['correzione'], x)
         esteso[g] = (stima, 0)
         return stima

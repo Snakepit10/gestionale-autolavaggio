@@ -14,6 +14,7 @@ METEO_VERO = prev._meteo          # prima dei mock del setUp
 GIORNO_PRIMA_VERO = prev._meteo_giorno_prima
 CICLI_SELF_VERO = prev._cicli_self
 OPERATORI_VERI = prev._cicli_operatori
+NUVOLE_VERE = prev._nuvole
 ALTRI_MODELLI_VERO = prev._pioggia_altri_modelli
 POLVERE_VERA = prev._polvere
 
@@ -72,6 +73,7 @@ class PrevisioneTest(TestCase):
             mock.patch.object(prev, '_polvere', side_effect=lambda dal, al: {g: v for g, v in polvere.items() if dal <= g <= al}),
             mock.patch.object(prev, '_piste_per_giorno', return_value={}),
             mock.patch.object(prev, '_pioggia_altri_modelli', return_value=None),
+            mock.patch.object(prev, '_nuvole', return_value={}),
             mock.patch.object(prev, '_cicli_self', side_effect=lambda dal, al: {
                 g: (v[0], 0) for g, v in cicli.items() if dal <= g <= al and v[0] >= prev.MIN_CICLI_SELF}),
             mock.patch.object(prev, '_cicli_operatori', side_effect=lambda dal, al: {
@@ -225,6 +227,33 @@ class PrevisioneTest(TestCase):
                              {date(2026, 3, 1): (38, 0), date(2026, 3, 2): (30, 0), date(2026, 3, 4): (6, 0)})
             self.assertEqual(OPERATORI_VERI(date(2026, 3, 1), date(2026, 3, 4)),
                              {date(2026, 3, 1): (18, 0), date(2026, 3, 4): (0, 0)})
+
+    def test_nuvole_previste(self):
+        giorni = ['2026-11-03T%02d:00' % h for h in range(24)]
+        def scarica(url, params, durata, modelli=None, chiave_dati='daily'):
+            if 'previous-runs' in url:
+                self.assertEqual(params['end_date'], '2026-11-04')                     # fino a ieri
+                return {'hourly': {'time': giorni, 'cloud_cover_previous_day1': [100 if 8 <= h <= 18 else 0 for h in range(24)]}}
+            return {'hourly': {'time': ['2026-11-05T%02d:00' % h for h in range(24)], 'cloud_cover': [50] * 24}}
+        with (mock.patch('django.utils.timezone.localdate', return_value=OGGI),
+              mock.patch.object(prev, '_scarica', side_effect=scarica)):
+            self.assertEqual(NUVOLE_VERE(date(2026, 11, 1), OGGI + timedelta(days=1)),
+                             {date(2026, 11, 3): 1.0, OGGI: 0.5})
+        with (mock.patch('django.utils.timezone.localdate', return_value=OGGI),
+              mock.patch.object(prev, '_scarica', return_value=None)):                 # servizio giu': si va avanti
+            self.assertEqual(NUVOLE_VERE(date(2026, 11, 1), OGGI), {})
+
+    def test_il_cielo_coperto_abbassa_i_cicli(self):
+        coperto, sereno = OGGI + timedelta(days=4), OGGI + timedelta(days=5)           # martedi' e mercoledi'
+        for g in (coperto, sereno):
+            self.meteo[g] = {'pioggia': 0.0, 'ore': 0.0, 'tmax': 25.0, 'piove': False}
+        cicli = {g: 30 if not self.previsto[g]['piove'] else 8 for g in self.previsto}
+        nuvole = {g: (1.0 if v == 8 else 0.1) for g, v in cicli.items() if g < OGGI}
+        nuvole.update({coperto: 1.0, sereno: 0.1})
+        with mock.patch.object(prev, '_nuvole', return_value=nuvole):
+            previsioni = {p['data']: p for p in prev.calcola(OGGI)['previsioni']}
+        self.assertLess(previsioni[coperto]['cicli_self'], previsioni[sereno]['cicli_self'])
+        self.assertLess(previsioni[coperto]['cicli_operatori'], previsioni[sereno]['cicli_operatori'])
 
     def test_servito_al_portale(self):
         from apps.core.models import Categoria, ServizioProdotto

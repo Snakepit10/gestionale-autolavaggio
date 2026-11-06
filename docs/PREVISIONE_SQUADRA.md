@@ -16,11 +16,13 @@ La pagina **Personale > Previsione squadra** stima i lavaggi del servito e consi
 
 Il turno finisce alle 19: da quell'ora la giornata di oggi è completa ed entra nel livello con cui si prevede domani, come nell'addestramento, dove ogni giorno conosce quello prima. Prima delle 19 la pagina prevede domani senza la giornata di oggi.
 
+I cicli self e degli operatori usano anche le nuvole previste dalle 8 alle 18: nei giorni asciutti con cielo coperto il self fa circa il 20% in meno che con il sereno. Il servito non cambia, quindi nei lavaggi le nuvole non entrano.
+
 Il modello impara e si verifica con la pioggia prevista il giorno prima, presa da Open-Meteo Previous Runs. La pioggia caduta non si usa per il giorno stesso: la sera prima non si conosce e farebbe sembrare l'errore più basso del vero.
 
 Con circa 20 lavaggi al giorno il caso da solo vale circa il 17% di errore (0,8 × radice dei lavaggi). La pagina lo mostra accanto all'errore del modello: sotto quel valore non si può scendere.
 
-Provati sui dati fino a novembre 2026 e non utili: giorni di stipendio, rimbalzo dopo la pioggia, media dello stesso giorno della settimana, pioggia nei giorni dopo, andamento delle piste.
+Provati sui dati fino a novembre 2026 e non utili: giorni di stipendio, rimbalzo dopo la pioggia, media dello stesso giorno della settimana, pioggia nei giorni dopo, andamento delle piste, conteggi e trend dei segmenti marketing, tempo instabile (giorni di pioggia degli ultimi 7 o 14), servizi meteo in disaccordo. Una stagione più dettagliata abbassa la stima d'autunno ma peggiora l'anno: con una sola stagione di dati impara a memoria.
 
 ## Quanto valgono i cicli self
 
@@ -29,6 +31,8 @@ Il 06/11/2026 sono state importate da WashTec le transazioni da agosto 2025 a gi
 La correzione dei totali è tarata su tutto lo storico: nei mesi forti riporta in pari la stima, in quelli tranquilli la tiene alta del 15-20%. Provata anche sugli ultimi 30, 60 e 90 giorni: non migliora l'autunno e peggiora l'anno. La pagina mostra il rapporto fra previsto e reale degli ultimi 60 giorni.
 
 Questi numeri sono stati misurati quando i cicli self toglievano solo i lavaggi completi. Con la definizione attuale e sui 60 giorni fino al 5 novembre: cicli self 22% di errore sulla settimana, 40% sul giorno, totale 123%; cicli degli operatori 18% sulla settimana, 48% sul giorno (circa 6 cicli), totale 113%. Su 21 giorni abbinati di ottobre e novembre i cicli degli operatori sono 156 contro i 158 del Report giornata.
+
+Con le nuvole, provato con riaddestramento settimanale da gennaio al 5 novembre 2026. Cicli self: errore sul giorno da 33,3% a 32,8%, dal 6 settembre da 36,2% a 32,8%, totale d'autunno da 117% a 112%. Cicli degli operatori: da 38,5% a 37,2%, dal 6 settembre da 50% a 47,6%, totale d'autunno da 110% a 105%. Con la soglia a 15 la decisione sulla persona al self è giusta l'81% dei giorni invece del 77%, in autunno il 79% invece del 74%.
 
 ## Servizio meteo
 
