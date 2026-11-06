@@ -17,7 +17,7 @@ La pagina **Personale > Previsione squadra** stima i lavaggi del servito e consi
 
 Il turno finisce alle 19: da quell'ora la giornata di oggi è completa ed entra nel livello con cui si prevede domani, come nell'addestramento, dove ogni giorno conosce quello prima. Prima delle 19 la pagina prevede domani senza la giornata di oggi.
 
-Tutti i modelli usano le nuvole previste dalle 8 alle 18. Nei giorni senza pioggia, un cielo tutto coperto vale circa il 15% in meno sui lavaggi e circa il 30% in meno sui cicli self e degli operatori, rispetto a un cielo sereno. Nei lavaggi le nuvole contano solo senza pioggia prevista: l'effetto si vede ma non abbassa l'errore (21,7% prima, 21,6% dopo; squadra giusta 51% prima, 49% dopo, differenza compatibile col caso). La pagina lo mostra in "Cosa conta di più".
+Tutti i modelli usano le nuvole previste dalle 8 alle 18. Nei giorni senza pioggia, un cielo tutto coperto vale circa il 16% in meno sui lavaggi e circa il 30% in meno sui cicli self e degli operatori, rispetto a un cielo sereno. Nei lavaggi le nuvole contano solo senza pioggia prevista, come scarto dal cielo tipico. L'effetto si vede ma non migliora la previsione. Provato con riaddestramento settimanale da gennaio al 5 novembre 2026: errore da 21,7% a 21,8%, squadra giusta da 51% a 47%, giorni scoperti da 22% a 23%, in autunno da 17% a 21%. La pagina lo mostra in "Cosa conta di più".
 
 Il modello impara e si verifica con la pioggia prevista il giorno prima, presa da Open-Meteo Previous Runs. La pioggia caduta non si usa per il giorno stesso: la sera prima non si conosce e farebbe sembrare l'errore più basso del vero.
 
