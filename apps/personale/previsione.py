@@ -10,9 +10,10 @@ Due passi:
 2. persone al servito = lavaggi previsti + un margine (parametro, di
    partenza 10%) / lavaggi che una persona fa in una giornata (parametro,
    di partenza 7: 20 lavaggi = 3 persone);
-3. al self c'e' sempre PERSONE_SELF persona: la previsione dei cicli self
-   sbagliava troppo (circa 38%) e peggiorava la squadra, quindi non si fa.
-   Il profilo orario del self resta come informazione (dati storici).
+3. i cicli del self si stimano con lo stesso modello (senza prenotazioni e
+   col livello dei cicli): buona stima dei totali di settimana e mese,
+   meno del singolo giorno. Al self c'e' PERSONE_SELF persona; con il
+   parametro cicli_persona_self, sotto quei cicli ci pensa il servito.
 Parametri in ParametriPrevisione, modificabili dalla pagina.
 
 Il modello si verifica da solo: addestrato senza gli ultimi GIORNI_VERIFICA
@@ -38,7 +39,8 @@ GIORNI_VERIFICA = 60
 ORA_DECISIONE = time(19, 0)   # fine del turno: la giornata e' completa
 LAMBDA = 100                 # regolarizzazione ridge, provata sui dati reali
 SQUADRA_MINIMA = 1           # persone minime del servito
-PERSONE_SELF = 1             # al self sempre una persona
+PERSONE_SELF = 1             # al self al massimo una persona
+MIN_CICLI_SELF = 3           # sotto, il self era fermo: il giorno non insegna nulla
 MIN_LAVAGGI_DOMENICA = 3     # sotto, la domenica conta come servito chiuso (ordini isolati)
 # modelli meteo di Open-Meteo che si possono scegliere (e confrontare): per i giorni
 # che il modello scelto non copre (es. ICON-2I arriva a ~3 giorni) si usa la scelta
@@ -263,6 +265,20 @@ def _washtec_completo(d):
     return d['chiusure'] is None or not d['chiusure'] or totale >= 0.8 * d['chiusure']
 
 
+def _cicli_self_giorno(c):
+    """Cicli self di un giorno: i cicli meno i lavaggi completi del servito,
+    da WashTec o, se incompleto, dalle chiusure. None se non si sa."""
+    if _washtec_completo(c):
+        return max(c['self_washtec'] + c['servito_washtec'] - c['completi'], 0)
+    return max(c['chiusure'] - c['completi'], 0) if c['chiusure'] else None
+
+
+def _cicli_self(dal, al):
+    """{data: (cicli self, 0)} dei giorni in cui il self ha lavorato."""
+    giorni = {g: _cicli_self_giorno(c) for g, c in _cicli_dettaglio(dal, al).items()}
+    return {g: (n, 0) for g, n in giorni.items() if n is not None and n >= MIN_CICLI_SELF}
+
+
 def dati_giornalieri(oggi=None):
     """Una riga per giorno dall'inizio degli ordini a ieri, con tutto quello
     che usa la previsione: per l'esportazione e la calibrazione."""
@@ -283,6 +299,7 @@ def dati_giornalieri(oggi=None):
     righe, g = [], INIZIO_ORDINI
     while g <= ieri:
         m, p, c = meteo.get(g, {}), previsto.get(g, {}), cicli.get(g, {})
+        cicli_self = _cicli_self_giorno(c) if c else None
         righe.append({
             'data': g.isoformat(), 'giorno': GIORNI_SETTIMANA[g.weekday()], 'festivo': festivi.get(g, ''),
             'lavaggi_servito': lavaggi.get(g, (0, 0))[0], 'incasso_servito': round(lavaggi.get(g, (0, 0))[1], 2),
@@ -291,8 +308,7 @@ def dati_giornalieri(oggi=None):
             'cicli_portali_chiusure': c.get('chiusure') if c.get('chiusure') is not None else '',
             'lavaggi_completi_servito': c.get('completi', 0),
             'washtec_completo': 1 if c and _washtec_completo(c) else 0,
-        'cicli_self': '' if not c else (max(c['self_washtec'] + c['servito_washtec'] - c['completi'], 0) if _washtec_completo(c)
-                                        else (max(c['chiusure'] - c['completi'], 0) if c['chiusure'] else '')),
+            'cicli_self': '' if cicli_self is None else cicli_self,
             'piste_euro': round(piste.get(g, (0, 0))[0], 2),
             'persone_presenti': presenze.get(g, (0, 0))[1], 'ore_presenze': presenze.get(g, (0, 0))[0],
             'pioggia_mm': m.get('pioggia', ''), 'pioggia_ore': m.get('ore', ''), 'piove': int(bool(m.get('piove'))) if m else '',
@@ -515,6 +531,53 @@ def _righe(giorni, storico, meteo, festivi, prenotazioni, previsto, polvere):
     return xs, ys, usati
 
 
+def persone_self(cicli, soglia):
+    """La persona al self: sempre, se non c'e' una soglia o non c'e' la stima."""
+    return PERSONE_SELF if soglia is None or cicli is None or cicli >= soglia else 0
+
+
+def _correzione(modello, xs, ys):
+    """Il modello lavora sul logaritmo e cosi' sottostima i giorni forti: i
+    totali verrebbero bassi di circa il 13%. Questo fattore li riporta in
+    pari (sui dati del 2026: 99% del reale)."""
+    return sum(math.exp(y - modello.predict(x)) for x, y in zip(xs, ys)) / len(xs)
+
+
+def _stima_cicli(modello, correzione, x):
+    return max(0.0, math.exp(modello.predict(x)) * correzione - 1)
+
+
+def _modello_self(cicli, meteo, festivi, previsto, polvere):
+    """Modello dei cicli self e sua verifica sugli ultimi giorni, come per
+    i lavaggi. None se i giorni sono pochi."""
+    xs, ys, usati = _righe(sorted(cicli), cicli, meteo, festivi, {}, previsto, polvere)
+    if len(usati) < 90:
+        return None
+    taglio = max(len(usati) - GIORNI_VERIFICA, 60)
+    prova = Ridge().fit(xs[:taglio], ys[:taglio])
+    correzione = _correzione(prova, xs[:taglio], ys[:taglio])
+    giorni = [{'data': g, 'previsti': _stima_cicli(prova, correzione, x), 'reali': cicli[g][0]}
+              for x, g in zip(xs[taglio:], usati[taglio:])]
+    settimane = defaultdict(lambda: [0, 0.0, 0])
+    for r in giorni:
+        s = settimane[r['data'] - timedelta(days=r['data'].weekday())]
+        s[0] += r['reali']
+        s[1] += r['previsti']
+        s[2] += 1
+    intere = [s for s in settimane.values() if s[2] >= 5]
+    reali = sum(r['reali'] for r in giorni)
+    verifica = {
+        'giorni': len(giorni), 'dal': giorni[0]['data'], 'al': giorni[-1]['data'],
+        'errore_pct': sum(abs(r['previsti'] - r['reali']) for r in giorni) / reali * 100,
+        'errore_cicli': sum(abs(r['previsti'] - r['reali']) for r in giorni) / len(giorni),
+        'errore_settimana_pct': (sum(abs(s[0] - s[1]) for s in intere) / sum(s[0] for s in intere) * 100) if intere else None,
+        'limite_pct': sum(0.8 * math.sqrt(r['reali']) for r in giorni) / reali * 100,
+        'totale_pct': sum(r['previsti'] for r in giorni) / reali * 100,
+    }
+    modello = Ridge().fit(xs, ys)
+    return {'modello': modello, 'correzione': _correzione(modello, xs, ys), 'verifica': verifica}
+
+
 def _ore_persona(storico, presenze):
     """Ore medie di una presenza nei giorni di apertura."""
     giorni = [g for g in presenze if g in storico]
@@ -699,6 +762,9 @@ def calcola(oggi=None, par=None, modello_meteo=None, leggero=False):
     previsioni = []
     profilo = profilo_self(ieri)
     storico_esteso = dict(storico)
+    cicli = _cicli_self(INIZIO_ORDINI, ieri)
+    self_m = _modello_self(cicli, meteo, festivi, previsto, polvere)
+    cicli_esteso = dict(cicli)
     finora = _lavaggi_per_giorno(oggi, oggi).get(oggi, (0, 0))[0]
     # finito il turno oggi e' un giorno completo: il modello impara sapendo
     # i lavaggi del giorno prima, quindi domani deve vederli
@@ -718,14 +784,21 @@ def calcola(oggi=None, par=None, modello_meteo=None, leggero=False):
         previsti = max(0.0, math.expm1(modello.predict(x)))
         alti = previsti * (1 + margine)
         servito = 0 if chiuso else squadra_servito(alti, lpp)
-        al_self = PERSONE_SELF
+        cicli_self = None
+        if self_m:
+            x_self = _variabili(g, meteo, festivi, _livello(cicli_esteso, g) or _livello(cicli, oggi), 0, previsto, polvere,
+                                _livello(cicli_esteso, g, 7))
+            cicli_self = _stima_cicli(self_m['modello'], self_m['correzione'], x_self)
+            cicli_esteso[g] = (cicli_self, 0)
+        # a servito chiuso non c'e' nessun altro: il self resta coperto
+        al_self = PERSONE_SELF if chiuso else persone_self(cicli_self, par.cicli_persona_self)
         previsioni.append({
             'data': g, 'giorno': GIORNI_SETTIMANA[g.weekday()], 'chiuso': chiuso, 'domani': k == 1,
             'oggi': k == 0, 'finora': finora if k == 0 else None,
             'pioggia': meteo[g]['pioggia'], 'piove': meteo[g]['piove'], 'debole': meteo[g].get('debole'),
             'ore_pioggia': meteo[g].get('ore', 0), 'probabilita': meteo[g].get('probabilita'), 'fonte': meteo[g].get('fonte'),
             'tmax': meteo[g]['tmax'], 'prenotazioni': note, 'previsti': previsti, 'alti': alti, 'polvere': polvere.get(g),
-            'servito': servito, 'self': al_self,
+            'servito': servito, 'self': al_self, 'cicli_self': round(cicli_self) if cicli_self is not None else None,
             'squadra': servito + al_self if servito is not None else None,
         })
         if k > 0:
@@ -740,6 +813,7 @@ def calcola(oggi=None, par=None, modello_meteo=None, leggero=False):
         'previsioni_giorno_prima': giorno_prima is not None,
         'oggi': oggi, 'giorni_storico': len(usati), 'dal': usati[0], 'previsioni': previsioni, 'verifica': verifica,
         'par': par, 'ore_persona': ore_persona, 'persone_self': PERSONE_SELF,
+        'verifica_self': self_m['verifica'] if self_m else None,
         'esempio_20': squadra_servito(20, lpp), 'giorni_presenze': len(presenze),
         'costo_ora': costo_medio,
         'effetti': [e for e in _effetti(modello, xs, _pioggia_tipica(previsto))
@@ -841,6 +915,7 @@ def registra(risultato):
     return PrevisioneSquadra.objects.get_or_create(data=domani['data'], defaults={
         'lavaggi_previsti': round(domani['previsti'], 1), 'lavaggi_alti': round(domani['alti'], 1),
         'squadra': domani['squadra'] or 0, 'pioggia_mm': round(domani['pioggia'], 1), 'chiuso': domani['chiuso'],
+        'cicli_self': domani.get('cicli_self'),
     })[0]
 
 
@@ -853,7 +928,9 @@ def storico_previsioni(giorni=30):
         return []
     reali = _lavaggi_per_giorno(salvate[-1].data, salvate[0].data)
     presenze = _presenze_per_giorno(salvate[-1].data, salvate[0].data)
-    return [{'p': p, 'reali': reali.get(p.data, (0, 0))[0], 'persone': presenze.get(p.data, (0, 0))[1]} for p in salvate]
+    cicli = _cicli_self(salvate[-1].data, salvate[0].data)
+    return [{'p': p, 'reali': reali.get(p.data, (0, 0))[0], 'persone': presenze.get(p.data, (0, 0))[1],
+             'cicli_reali': cicli.get(p.data, (None, 0))[0]} for p in salvate]
 
 
 def errore_vero(storico):

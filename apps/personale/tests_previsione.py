@@ -12,6 +12,7 @@ from .models import ParametriPrevisione, PrevisioneSquadra
 OGGI = date(2026, 11, 5)
 METEO_VERO = prev._meteo          # prima dei mock del setUp
 GIORNO_PRIMA_VERO = prev._meteo_giorno_prima
+CICLI_SELF_VERO = prev._cicli_self
 ALTRI_MODELLI_VERO = prev._pioggia_altri_modelli
 POLVERE_VERA = prev._polvere
 
@@ -70,6 +71,8 @@ class PrevisioneTest(TestCase):
             mock.patch.object(prev, '_polvere', side_effect=lambda dal, al: {g: v for g, v in polvere.items() if dal <= g <= al}),
             mock.patch.object(prev, '_piste_per_giorno', return_value={}),
             mock.patch.object(prev, '_pioggia_altri_modelli', return_value=None),
+            mock.patch.object(prev, '_cicli_self', side_effect=lambda dal, al: {
+                g: (v[0], 0) for g, v in cicli.items() if dal <= g <= al and v[0] >= prev.MIN_CICLI_SELF}),
         ]
         for p in patch:
             p.start()
@@ -88,9 +91,12 @@ class PrevisioneTest(TestCase):
         self.assertNotIn('Domenica, rispetto a un feriale', effetti)            # chiuso la domenica
         self.assertLess(abs(effetti['Giornata di pioggia prevista'] + 50), 12)  # i clienti guardano la previsione
         self.assertLess(abs(effetti['Sabato, rispetto a un feriale'] - 60), 20)  # la regolarizzazione lo smorza
-        # al self sempre una persona, niente previsione dei cicli
-        self.assertTrue(all(p['self'] == 1 and 'cicli' not in p for p in r['previsioni']))
-        self.assertNotIn('errore_cicli_pct', v)
+        # senza soglia al self sempre una persona; i cicli previsti seguono la pioggia
+        self.assertTrue(all(p['self'] == 1 and p['cicli_self'] is not None for p in r['previsioni']))
+        s = r['verifica_self']
+        self.assertLess(abs(s['totale_pct'] - 100), 8)                     # totali in pari
+        self.assertLess(s['errore_settimana_pct'], s['errore_pct'] + 1)
+        self.assertLess(s['errore_pct'], 25)
         # la sabbia di ieri fa lavare: il modello ne vede l'effetto
         self.assertLess(abs(effetti['Sabbia del Sahara ieri'] - 40), 12)
         self.assertAlmostEqual(r['ore_persona'], 8.0)
@@ -167,6 +173,7 @@ class PrevisioneTest(TestCase):
             self.assertIsNone(prev.registra(r))
         with mock.patch('django.utils.timezone.localtime', return_value=sera):
             salvata = prev.registra(r)
+            self.assertEqual(salvata.cicli_self, r['previsioni'][1]['cicli_self'])
             previsti = salvata.lavaggi_previsti
             r['previsioni'][1]['previsti'] += 5                   # riaperta piu' tardi, meteo piu' fresco
             self.assertEqual(prev.registra(r).lavaggi_previsti, previsti)     # la prima resta
@@ -186,6 +193,29 @@ class PrevisioneTest(TestCase):
         self.assertEqual(finito[0]['previsti'], in_turno[0]['previsti'])      # oggi non cambia
         self.assertGreater(finito[1]['previsti'], in_turno[1]['previsti'])    # domani si'
 
+    def test_soglia_persona_al_self(self):
+        par = ParametriPrevisione.attuali()
+        par.cicli_persona_self = 20
+        for g, pioggia in ((OGGI + timedelta(days=1), True), (OGGI + timedelta(days=2), False)):
+            self.meteo[g] = {'pioggia': 8.0 if pioggia else 0.0, 'ore': 5.0 if pioggia else 0.0, 'tmax': 25.0, 'piove': pioggia}
+        previsioni = {p['data']: p for p in prev.calcola(OGGI, par)['previsioni']}
+        bagnato, asciutto = previsioni[OGGI + timedelta(days=1)], previsioni[OGGI + timedelta(days=2)]
+        self.assertLess(bagnato['cicli_self'], 20)
+        self.assertEqual((bagnato['self'], bagnato['squadra']), (0, bagnato['servito']))     # ci pensa il servito
+        self.assertGreaterEqual(asciutto['cicli_self'], 20)
+        self.assertEqual(asciutto['self'], 1)
+        domenica = next(p for p in previsioni.values() if p['chiuso'])                     # servito chiuso: resta coperto
+        self.assertEqual(domenica['self'], 1)
+        self.assertEqual(prev.persone_self(None, 20), 1)                                   # senza stima resta la persona
+
+    def test_cicli_self_dai_dati(self):
+        giorni = {date(2026, 3, 1): {'self_washtec': 20, 'servito_washtec': 30, 'chiusure': 55, 'completi': 10},   # WashTec
+                  date(2026, 3, 2): {'self_washtec': 5, 'servito_washtec': 5, 'chiusure': 40, 'completi': 10},     # incompleto
+                  date(2026, 3, 3): {'self_washtec': 0, 'servito_washtec': 12, 'chiusure': None, 'completi': 10}}  # fermo
+        with mock.patch.object(prev, '_cicli_dettaglio', return_value=giorni):
+            self.assertEqual(CICLI_SELF_VERO(date(2026, 3, 1), date(2026, 3, 3)),
+                             {date(2026, 3, 1): (40, 0), date(2026, 3, 2): (30, 0)})
+
     def test_salva_parametri(self):
         from apps.auth_system.models import PermessoGruppo
         utente = User.objects.create_user('titolare2', password='x')
@@ -201,6 +231,12 @@ class PrevisioneTest(TestCase):
         self.assertEqual(float(ParametriPrevisione.attuali().margine_pct), 15)
         self.client.post('/personale/previsione/', {'lavaggi_per_persona': '7', 'margine_pct': '90'})   # troppo: resta
         self.assertEqual(float(ParametriPrevisione.attuali().margine_pct), 15)
+        self.client.post('/personale/previsione/', {'lavaggi_per_persona': '7', 'cicli_persona_self': '30'})
+        self.assertEqual(ParametriPrevisione.attuali().cicli_persona_self, 30)
+        self.client.post('/personale/previsione/', {'lavaggi_per_persona': '7', 'cicli_persona_self': 'tanti'})   # resta
+        self.assertEqual(ParametriPrevisione.attuali().cicli_persona_self, 30)
+        self.client.post('/personale/previsione/', {'lavaggi_per_persona': '7', 'cicli_persona_self': ''})        # vuoto: sempre
+        self.assertIsNone(ParametriPrevisione.attuali().cicli_persona_self)
 
     def test_errore_vero(self):
         previsioni = [PrevisioneSquadra(data=OGGI, lavaggi_previsti=20, lavaggi_alti=22, squadra=4),
@@ -370,5 +406,7 @@ class PrevisioneTest(TestCase):
         self.assertContains(risposta, 'il caso da solo vale circa')
         self.assertContains(risposta, 'Oggi Gio 05/11')
         self.assertContains(risposta, 'Quanto e')
-        self.assertContains(risposta, 'al self sempre 1 persona')
+        self.assertContains(risposta, 'cicli previsti da cui serve la persona al self')
+        self.assertContains(risposta, 'cicli self previsti')
+        self.assertContains(risposta, 'Errore sulla settimana')
         self.assertNotContains(risposta, 'soglia_cicli_self')

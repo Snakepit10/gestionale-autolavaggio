@@ -5,7 +5,9 @@ La pagina **Personale > Previsione squadra** stima i lavaggi del servito e consi
 ## Come funziona
 
 - **Lavaggi previsti:** una regressione ridge sul logaritmo dei lavaggi, da: giorno della settimana, festivi e ponti, stagione, livello delle ultime 4 settimane e dell'ultima, pioggia prevista, pioggia dei 3 giorni prima, temperatura, sabbia del Sahara, prenotazioni note alle 19 del giorno prima.
-- **Squadra:** lavaggi previsti + margine (parametro, di partenza 10%) / lavaggi per persona (parametro, di partenza 7), arrotondato per eccesso, più una persona al self.
+- **Squadra:** lavaggi previsti + margine (parametro, di partenza 10%) / lavaggi per persona (parametro, di partenza 7), arrotondato per eccesso, più la persona al self.
+- **Cicli self:** lo stesso modello, senza prenotazioni e con il livello dei cicli delle ultime settimane. Dai cicli dei portali si tolgono i lavaggi completi del servito. Una correzione riporta in pari i totali, che altrimenti verrebbero bassi di circa il 13%.
+- **Persona al self:** al massimo una. Con il parametro "cicli previsti da cui serve la persona al self", sotto quel numero il self lo segue il servito. Vuoto vuol dire sempre. A servito chiuso resta coperto.
 
 ## Solo quello che si sa la sera prima
 
@@ -16,6 +18,12 @@ Il modello impara e si verifica con la pioggia prevista il giorno prima, presa d
 Con circa 20 lavaggi al giorno il caso da solo vale circa il 17% di errore (0,8 × radice dei lavaggi). La pagina lo mostra accanto all'errore del modello: sotto quel valore non si può scendere.
 
 Provati sui dati fino a novembre 2026 e non utili: giorni di stipendio, rimbalzo dopo la pioggia, media dello stesso giorno della settimana, pioggia nei giorni dopo, andamento delle piste.
+
+## Quanto valgono i cicli self
+
+Il 06/11/2026 sono state importate da WashTec le transazioni da agosto 2025 a giugno 2026. Provato con riaddestramento settimanale su 292 giorni, da gennaio al 5 novembre 2026: errore del 33% sul giorno, del 20% sulla settimana, dell'11% sul mese, con il totale al 99% del reale. Il caso da solo vale circa il 13% sul giorno: la distanza viene da picchi che il modello non vede, come 116 cicli contro 37 previsti domenica 10 maggio o i 70-80 cicli a fine luglio. La pioggia prevista conta poco.
+
+Con una soglia di 25, 35 o 45 cicli la decisione persona sì o no è giusta il 74-79% dei giorni.
 
 ## Servizio meteo
 
