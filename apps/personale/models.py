@@ -138,7 +138,7 @@ class Presenza(models.Model):
 
 
 class PrevisioneSquadra(models.Model):
-    """La previsione del giorno, salvata la sera prima (dalle 18), per
+    """La previsione del giorno, salvata la sera prima (dalle 19), per
     confrontarla poi con i lavaggi e le presenze reali."""
     data = models.DateField(unique=True)
     lavaggi_previsti = models.DecimalField(max_digits=6, decimal_places=1)
@@ -162,6 +162,9 @@ class ParametriPrevisione(models.Model):
     lavaggi_per_persona = models.DecimalField(
         max_digits=4, decimal_places=1, default=Decimal('7'),
         help_text='Lavaggi del servito che una persona fa in una giornata (20 lavaggi / 3 persone = circa 7)')
+    margine_pct = models.DecimalField(
+        max_digits=4, decimal_places=1, default=Decimal('10'),
+        help_text='Quanto aggiungere ai lavaggi previsti prima di calcolare la squadra')
     aggiornati_il = models.DateTimeField(auto_now=True)
 
     class Meta:
@@ -175,3 +178,7 @@ class ParametriPrevisione(models.Model):
     @property
     def lavaggi_per_persona_f(self):
         return float(self.lavaggi_per_persona) if self.lavaggi_per_persona else None
+
+    @property
+    def margine_f(self):
+        return float(self.margine_pct) / 100

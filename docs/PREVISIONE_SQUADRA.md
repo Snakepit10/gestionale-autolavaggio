@@ -1,0 +1,31 @@
+# Previsione squadra
+
+La pagina **Personale > Previsione squadra** stima i lavaggi del servito e consiglia quante persone mettere. Il calcolo è in `apps/personale/previsione.py`.
+
+## Come funziona
+
+- **Lavaggi previsti:** una regressione ridge sul logaritmo dei lavaggi, da: giorno della settimana, festivi e ponti, stagione, livello delle ultime 4 settimane e dell'ultima, pioggia prevista, pioggia dei 3 giorni prima, temperatura, sabbia del Sahara, prenotazioni note alle 19 del giorno prima.
+- **Squadra:** lavaggi previsti + margine (parametro, di partenza 10%) / lavaggi per persona (parametro, di partenza 7), arrotondato per eccesso, più una persona al self.
+
+## Solo quello che si sa la sera prima
+
+Il turno finisce alle 19: da quell'ora la giornata di oggi è completa ed entra nel livello con cui si prevede domani, come nell'addestramento, dove ogni giorno conosce quello prima. Prima delle 19 la pagina prevede domani senza la giornata di oggi.
+
+Il modello impara e si verifica con la pioggia prevista il giorno prima, presa da Open-Meteo Previous Runs. La pioggia caduta non si usa per il giorno stesso: la sera prima non si conosce e farebbe sembrare l'errore più basso del vero.
+
+Con circa 20 lavaggi al giorno il caso da solo vale circa il 17% di errore (0,8 × radice dei lavaggi). La pagina lo mostra accanto all'errore del modello: sotto quel valore non si può scendere.
+
+Provati sui dati fino a novembre 2026 e non utili: giorni di stipendio, rimbalzo dopo la pioggia, media dello stesso giorno della settimana, pioggia nei giorni dopo, andamento delle piste.
+
+## Giornata di pioggia
+
+È di pioggia con almeno 1 mm oppure 2 ore di pioggia. Sotto 1 mm la pagina scrive "pioggia debole".
+
+## Salvataggio ogni sera
+
+Il confronto vero è fra la previsione salvata la sera prima e i lavaggi reali, in fondo alla pagina. La pagina salva quando viene aperta dopo le 19, e la prima salvata resta; per non dipendere da questo serve un **cron service** su Railway, come per `esegui_campagne_marketing`:
+
+- Schedule: `10 17,18 * * *`
+- Command: `python manage.py previsione_squadra`
+
+Railway usa l'ora UTC, quindi d'inverno gira alle 18:10 e alle 19:10, d'estate alle 19:10 e alle 20:10. Il giro prima delle 19 non salva e quello dopo non riscrive: la previsione resta quella delle 19:10 tutto l'anno.
