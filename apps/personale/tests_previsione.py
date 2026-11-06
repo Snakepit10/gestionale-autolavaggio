@@ -247,9 +247,9 @@ class PrevisioneTest(TestCase):
         asciutto, bagnato, senza_dato = date(2026, 3, 1), date(2026, 3, 2), date(2026, 3, 3)
         previsto = {asciutto: {'pioggia': 0.0, 'ore': 0.0}, bagnato: {'pioggia': 8.0, 'ore': 5.0}}
         nuvole = {asciutto: 0.9, bagnato: 1.0}
-        self.assertEqual(prev._cielo(asciutto, previsto, nuvole), 0.9)
+        self.assertAlmostEqual(prev._cielo(asciutto, previsto, nuvole), 0.9 - prev.NUVOLE_TIPICHE)
         self.assertEqual(prev._cielo(bagnato, previsto, nuvole), 0.0)                  # conta gia' la pioggia
-        self.assertEqual(prev._cielo(senza_dato, previsto, nuvole), prev.NUVOLE_TIPICHE)
+        self.assertEqual(prev._cielo(senza_dato, previsto, nuvole), 0.0)
 
     def test_ogni_casella_ha_la_spiegazione(self):
         import re

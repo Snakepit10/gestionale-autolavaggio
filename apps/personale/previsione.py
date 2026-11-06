@@ -517,9 +517,11 @@ def _variabili(giorno, meteo, festivi, livello, prenotazioni, previsto, polvere,
 
 
 def _cielo(giorno, previsto, nuvole):
-    """Cielo coperto dei giorni senza pioggia prevista: quando la pioggia e'
-    prevista conta gia' lei, e le nuvole direbbero la stessa cosa due volte."""
-    return 0.0 if piove(previsto.get(giorno) or {}) else nuvole.get(giorno, NUVOLE_TIPICHE)
+    """Quanto il cielo e' piu' coperto del solito nei giorni senza pioggia
+    prevista: quando e' prevista conta gia' lei. E' uno scarto, non la quota,
+    altrimenti farebbe anche da segnale "oggi non piove" e ruberebbe peso
+    alla pioggia."""
+    return 0.0 if piove(previsto.get(giorno) or {}) else nuvole.get(giorno, NUVOLE_TIPICHE) - NUVOLE_TIPICHE
 
 
 def _livello(storico, giorno, giorni=28):
@@ -711,7 +713,7 @@ def _effetti(modello, xs, previsto_piovoso):
         ('Sabbia del Sahara ieri', rapporto({'Polvere sahariana ieri': sabbia}, {'Polvere sahariana ieri': 0.0})),
         ('Sabbia del Sahara oggi', rapporto({'Polvere sahariana oggi': sabbia}, {'Polvere sahariana oggi': 0.0})),
         ('Cielo coperto invece che sereno, senza pioggia',
-         rapporto({'Cielo coperto senza pioggia': 1.0}, {'Cielo coperto senza pioggia': 0.1})),
+         rapporto({'Cielo coperto senza pioggia': 1.0 - NUVOLE_TIPICHE}, {'Cielo coperto senza pioggia': 0.1 - NUVOLE_TIPICHE})),
     ]
     return [{'nome': n, 'effetto': e} for n, e in effetti]
 
@@ -797,7 +799,7 @@ def calcola(oggi=None, par=None, modello_meteo=None, leggero=False):
         con_presenze = [r for r in giorni_v if 'persone' in r]
         media_reali = sum(r['reali'] for r in giorni_v) / len(giorni_v)
         base = [abs(r['reali'] - _media_wd(storico, r['data'], usati[:taglio])) for r in giorni_v]
-        # lo stesso modello senza la pioggia prevista (il cielo coperto la tradirebbe: e' zero quando e' prevista)
+        # lo stesso modello senza la pioggia prevista: anche il cielo, che con la pioggia vale zero, la lascerebbe intuire
         senza_pioggia = [i for i in range(len(xs[0]))
                          if not NOMI_VARIABILI[i].startswith(('Pioggia prevista', 'Ore di pioggia', 'Cielo coperto'))]
         corto = lambda x: [x[i] for i in senza_pioggia]
