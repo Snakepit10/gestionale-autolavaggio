@@ -1,9 +1,12 @@
 {% extends "base.html" %}
+{% load contabilita_info %}
 {% block title %}Previsione squadra{% endblock %}
 
 {% block extra_css %}
 {% include "personale/_stile.html" %}
+{% include "contabilita/_info.html" %}
 <style>
+.kpi-tile.hero .info-kpi, .kpi-tile.hero .info-zona:hover .info-kpi { color: #fff; }
 .prev td, .prev th { padding: 4px 8px; }
 .prev tr.domani td { background: #ecfdf5; font-weight: 700; }
 .prev tr.oggi td { background: #f8fafc; }
@@ -32,15 +35,15 @@
   <div class="row g-2 mb-3">
     {% for d in r.previsioni %}{% if d.oggi or d.domani %}
     <div class="col-12 col-md-6"><div class="kpi-tile{% if d.domani %} hero{% endif %}">
-      <div class="label">{% if d.oggi %}Oggi{% else %}Squadra consigliata domani{% endif %} {{ d.giorno }} {{ d.data|date:"d/m" }}</div>
+      <div class="label info-qui">{% if d.oggi %}Oggi{% else %}Squadra consigliata domani{% endif %} {{ d.giorno }} {{ d.data|date:"d/m" }}{% info "Squadra consigliata" %}</div>
       <div class="squadra-big">{{ d.squadra|default:"—" }} <span style="font-size:1rem">person{{ d.squadra|pluralize:"a,e" }}</span></div>
       {% if d.chiuso %}<div class="sub">servito chiuso&middot; self-service {{ d.self }}</div>
       {% elif d.servito %}<div class="sub">servito {{ d.servito }}{% if d.self %} + self-service {{ d.self }}{% else %}, che segue anche il self{% endif %}</div>
       {% endif %}
       {% if d.avviso_pioggia %}<div class="sub" style="font-weight:700"><i class="bi bi-exclamation-triangle"></i> Attenzione: qui risulta asciutto, ma {{ d.avviso_pioggia.pioggia }} modelli meteo su {{ d.avviso_pioggia.modelli }} danno pioggia. In questi giorni di solito arriva qualche lavaggio in meno del previsto: guarda il meteo prima di confermare la squadra.</div>{% endif %}
-      <div class="sub">{{ d.previsti|floatformat:0 }} lavaggi previsti (fino a {{ d.alti|floatformat:0 }}){% if d.oggi %} &middot; finora {{ d.finora }} lavaggi{% endif %}</div>
-      {% if d.cicli_operatori != None %}<div class="sub">{{ d.cicli_operatori }} cicli operatori previsti{% if d.oggi %} &middot; finora {{ d.operatori_finora|default_if_none:"&mdash;" }} cicli{% endif %}</div>{% endif %}
-      <div class="sub">{% if d.debole %}<i class="bi bi-cloud-drizzle"></i> pioggia debole{% if d.ore_pioggia %} {{ d.ore_pioggia|floatformat:0 }} h{% endif %} &middot; {{ d.pioggia|floatformat:1 }} mm{% elif d.piove %}<i class="bi bi-cloud-rain"></i> pioggia{% if d.ore_pioggia %} {{ d.ore_pioggia|floatformat:0 }} h{% endif %} &middot; {{ d.pioggia|floatformat:1 }} mm{% else %}<i class="bi bi-sun"></i> asciutto{% endif %}{% if d.probabilita != None %} &middot; probabilit&agrave; di pioggia {{ d.probabilita }}%{% endif %}{% if d.fonte %} <span style="opacity:.7">&middot; {{ d.fonte }}</span>{% endif %}{% if d.polvere != None and d.polvere >= 50 %} &middot; <i class="bi bi-wind"></i> sabbia {{ d.polvere|floatformat:0 }} &micro;g/m&sup3;{% endif %} &middot; max {{ d.tmax|floatformat:0 }}&deg;C &middot; {{ d.prenotazioni }} prenotazion{{ d.prenotazioni|pluralize:"e,i" }}</div>
+      <div class="sub info-qui">{{ d.previsti|floatformat:0 }} lavaggi previsti (fino a {{ d.alti|floatformat:0 }}){% if d.oggi %} &middot; finora {{ d.finora }} lavaggi{% endif %}{% info "Lavaggi previsti" %}</div>
+      {% if d.cicli_operatori != None %}<div class="sub info-qui">{{ d.cicli_operatori }} cicli operatori previsti{% if d.oggi %} &middot; finora {{ d.operatori_finora|default_if_none:"&mdash;" }} cicli{% endif %}{% info "Cicli operatori" %}</div>{% endif %}
+      <div class="sub info-qui">{% if d.debole %}<i class="bi bi-cloud-drizzle"></i> pioggia debole{% if d.ore_pioggia %} {{ d.ore_pioggia|floatformat:0 }} h{% endif %} &middot; {{ d.pioggia|floatformat:1 }} mm{% elif d.piove %}<i class="bi bi-cloud-rain"></i> pioggia{% if d.ore_pioggia %} {{ d.ore_pioggia|floatformat:0 }} h{% endif %} &middot; {{ d.pioggia|floatformat:1 }} mm{% else %}<i class="bi bi-sun"></i> asciutto{% endif %}{% if d.probabilita != None %} &middot; probabilit&agrave; di pioggia {{ d.probabilita }}%{% info "Probabilità di pioggia" %}{% endif %}{% if d.fonte %} <span style="opacity:.7">&middot; {{ d.fonte }}</span>{% endif %}{% if d.polvere != None and d.polvere >= 50 %} &middot; <i class="bi bi-wind"></i> sabbia {{ d.polvere|floatformat:0 }} &micro;g/m&sup3;{% endif %} &middot; max {{ d.tmax|floatformat:0 }}&deg;C &middot; {{ d.prenotazioni }} prenotazion{{ d.prenotazioni|pluralize:"e,i" }}</div>
     </div></div>
     {% endif %}{% endfor %}
   </div>
@@ -51,7 +54,7 @@
     <div class="panel-sub">La decisione si prende alle {{ ora_decisione|time:"H:i" }} del giorno prima: da quell'ora la previsione di domani viene salvata e poi confrontata con il reale. I giorni successivi sono indicativi (meteo meno sicuro, prenotazioni ancora da arrivare).</div>
     <div class="panel-body tabella-scroll">
       <table class="table table-sm prev">
-        <thead><tr><th>Giorno</th><th class="tab-num">Pioggia</th><th class="tab-num">Max</th><th class="tab-num">Prenot.</th><th class="tab-num">Cicli operatori</th><th class="tab-num">Lavaggi previsti</th><th class="tab-num">Fino a</th><th class="tab-num">Squadra</th></tr></thead>
+        <thead><tr><th>Giorno</th><th class="tab-num">Pioggia{% info "Probabilità di pioggia" %}</th><th class="tab-num">Max</th><th class="tab-num">Prenot.</th><th class="tab-num">Cicli operatori{% info "Cicli operatori" %}</th><th class="tab-num">Lavaggi previsti{% info "Lavaggi previsti" %}</th><th class="tab-num">Fino a{% info "Margine sui lavaggi" %}</th><th class="tab-num">Squadra{% info "Squadra consigliata" %}</th></tr></thead>
         <tbody>
         {% for p in r.previsioni %}
           <tr class="{% if p.domani %}domani{% endif %}{% if p.oggi %} oggi{% endif %}{% if p.chiuso %} chiuso{% endif %}">
@@ -79,15 +82,15 @@
       <form method="post" class="mt-1">{% csrf_token %}
         <div class="d-flex align-items-center gap-2 mb-1" style="font-size:.8rem">
           <input type="text" inputmode="decimal" name="lavaggi_per_persona" value="{{ par.lavaggi_per_persona|floatformat:'-1' }}" class="form-control form-control-sm" style="width:70px">
-          <span>lavaggi del servito per persona al giorno{% if r.esempio_20 %} (20 lavaggi = {{ r.esempio_20 }} person{{ r.esempio_20|pluralize:"a,e" }}){% endif %}</span>
+          <span class="info-qui">lavaggi del servito per persona al giorno{% if r.esempio_20 %} (20 lavaggi = {{ r.esempio_20 }} person{{ r.esempio_20|pluralize:"a,e" }}){% endif %}{% info "Lavaggi per persona" %}</span>
         </div>
         <div class="d-flex align-items-center gap-2 mb-1" style="font-size:.8rem">
           <input type="text" inputmode="decimal" name="margine_pct" value="{{ par.margine_pct|floatformat:'-1' }}" class="form-control form-control-sm" style="width:70px">
-          <span>% di margine sui lavaggi previsti</span>
+          <span class="info-qui">% di margine sui lavaggi previsti{% info "Margine sui lavaggi" %}</span>
         </div>
         <div class="d-flex align-items-center gap-2 mb-1" style="font-size:.8rem">
           <input type="text" inputmode="numeric" name="cicli_persona_self" value="{{ par.cicli_persona_self|default_if_none:'' }}" class="form-control form-control-sm" style="width:70px">
-          <span>cicli operatori previsti da cui serve la persona al self (vuoto = sempre)</span>
+          <span class="info-qui">cicli operatori previsti da cui serve la persona al self (vuoto = sempre){% info "Soglia persona al self" %}</span>
         </div>
         <button class="btn btn-sm btn-outline-success">Salva</button>
       </form>
@@ -111,7 +114,7 @@
     <div class="panel-sub">Per ogni servizio la previsione dei lavaggi e' stata riaddestrata con le previsioni di pioggia che quel servizio aveva fatto il giorno prima, e verificata sugli stessi giorni. Conta di piu' l'errore sui lavaggi: e' quello che decide la squadra. "Pioggia vista" e "falsi allarmi" confrontano le sue previsioni con la pioggia caduta dell'archivio Open-Meteo nell'ultimo anno (anche l'archivio e' una stima, non un pluviometro).</div>
     <div class="panel-body tabella-scroll">
       <table class="table table-sm prev">
-        <thead><tr><th>Servizio</th><th class="tab-num">Errore lavaggi</th><th class="tab-num">Squadra giusta</th><th class="tab-num">Scoperti</th><th class="tab-num">Turni risparmiati</th><th class="tab-num">Pioggia vista</th><th class="tab-num">Falsi allarmi</th><th class="tab-num">Giorni coperti</th><th></th></tr></thead>
+        <thead><tr><th>Servizio</th><th class="tab-num">Errore lavaggi{% info "Errore lavaggi" %}</th><th class="tab-num">Squadra giusta{% info "Squadra giusta" %}</th><th class="tab-num">Scoperti{% info "Scoperti" %}</th><th class="tab-num">Turni risparmiati{% info "Turni risparmiati" %}</th><th class="tab-num">Pioggia vista{% info "Pioggia vista" %}</th><th class="tab-num">Falsi allarmi{% info "Falsi allarmi" %}</th><th class="tab-num">Giorni coperti{% info "Giorni coperti" %}</th><th></th></tr></thead>
         <tbody>
         {% for m in confronto_meteo %}
           <tr{% if m.scelto %} class="domani"{% endif %}>
@@ -140,16 +143,16 @@
     <div class="panel-sub">Il modello e' stato addestrato senza questi giorni e poi li ha previsti, come se fosse la sera prima: usa solo la pioggia prevista il giorno prima{% if not r.previsioni_giorno_prima %} (archivio delle previsioni non disponibile: al suo posto la pioggia caduta, l'errore vero e' piu' alto){% endif %}.</div>
     <div class="panel-body">
       <div class="row g-2 mb-2">
-        <div class="col-6 col-md-3"><div class="kpi-tile"><div class="label">Errore medio</div><div class="value">{{ v.errore_pct|floatformat:0 }}%</div><div class="sub">&plusmn;{{ v.errore_medio|floatformat:1 }} lavaggi al giorno &middot; il caso da solo vale circa {{ v.limite_pct|floatformat:0 }}%: sotto non si scende &middot; senza la pioggia prevista: {{ v.errore_senza_pioggia_pct|floatformat:0 }}% &middot; solo media per giorno della settimana: {{ v.errore_base_pct|floatformat:0 }}%</div></div></div>
-        <div class="col-6 col-md-3"><div class="kpi-tile"><div class="label">Giorni entro &plusmn;20%</div><div class="value">{{ v.entro_20|floatformat:0 }}%</div></div></div>
-        <div class="col-6 col-md-3"><div class="kpi-tile"><div class="label">Squadra giusta</div><div class="value">{% if v.squadra_giusta != None %}{{ v.squadra_giusta|floatformat:0 }}%{% else %}&mdash;{% endif %}</div><div class="sub">{% if v.squadra_quasi != None %}giusta o 1 persona in piu': {{ v.squadra_quasi|floatformat:0 }}% &middot; {% endif %}{% if v.squadra_scarsa != None %}scoperti nel {{ v.squadra_scarsa|floatformat:0 }}% dei giorni{% endif %}</div>
+        <div class="col-6 col-md-3"><div class="kpi-tile"><div class="label">Errore medio{% info "Errore medio" %}</div><div class="value">{{ v.errore_pct|floatformat:0 }}%</div><div class="sub">&plusmn;{{ v.errore_medio|floatformat:1 }} lavaggi al giorno &middot; il caso da solo vale circa {{ v.limite_pct|floatformat:0 }}%: sotto non si scende &middot; senza la pioggia prevista: {{ v.errore_senza_pioggia_pct|floatformat:0 }}% &middot; solo media per giorno della settimana: {{ v.errore_base_pct|floatformat:0 }}%</div></div></div>
+        <div class="col-6 col-md-3"><div class="kpi-tile"><div class="label">Giorni entro &plusmn;20%{% info "Giorni entro ±20%" %}</div><div class="value">{{ v.entro_20|floatformat:0 }}%</div></div></div>
+        <div class="col-6 col-md-3"><div class="kpi-tile"><div class="label">Squadra giusta{% info "Squadra giusta" %}</div><div class="value">{% if v.squadra_giusta != None %}{{ v.squadra_giusta|floatformat:0 }}%{% else %}&mdash;{% endif %}</div><div class="sub">{% if v.squadra_quasi != None %}giusta o 1 persona in piu': {{ v.squadra_quasi|floatformat:0 }}% &middot; {% endif %}{% if v.squadra_scarsa != None %}scoperti nel {{ v.squadra_scarsa|floatformat:0 }}% dei giorni{% endif %}</div>
           {% if v.servito_giusto != None %}<div class="sub">servito giusto {{ v.servito_giusto|floatformat:0 }}% (scoperto {{ v.servito_scarso|floatformat:0 }}%)</div>{% endif %}</div></div>
-        <div class="col-6 col-md-3"><div class="kpi-tile hero"><div class="label">Risparmio seguendo il modello</div>{% if v.confronto.risparmiate > 0 %}<div class="value">{% if v.confronto.euro %}&euro;{{ v.confronto.euro|floatformat:"0g" }}{% else %}{{ v.confronto.risparmiate }} turni{% endif %}</div><div class="sub">{{ v.confronto.risparmiate }} turni in meno al servito in {{ v.confronto.giorni }} giorni</div>{% elif v.confronto %}<div class="value">Nessuno</div><div class="sub">in {{ v.confronto.giorni }} giorni il modello non usa meno turni dei vostri</div>{% else %}<div class="value">&mdash;</div><div class="sub">servono le presenze</div>{% endif %}</div></div>
+        <div class="col-6 col-md-3"><div class="kpi-tile hero"><div class="label">Risparmio seguendo il modello{% info "Risparmio seguendo il modello" %}</div>{% if v.confronto.risparmiate > 0 %}<div class="value">{% if v.confronto.euro %}&euro;{{ v.confronto.euro|floatformat:"0g" }}{% else %}{{ v.confronto.risparmiate }} turni{% endif %}</div><div class="sub">{{ v.confronto.risparmiate }} turni in meno al servito in {{ v.confronto.giorni }} giorni</div>{% elif v.confronto %}<div class="value">Nessuno</div><div class="sub">in {{ v.confronto.giorni }} giorni il modello non usa meno turni dei vostri</div>{% else %}<div class="value">&mdash;</div><div class="sub">servono le presenze</div>{% endif %}</div></div>
       </div>
       {% if v.confronto %}{% with c=v.confronto %}
       <div class="tabella-scroll mb-2">
         <table class="table table-sm prev" style="max-width:720px">
-          <thead><tr><th>Servito, negli stessi {{ c.giorni }} giorni</th><th class="tab-num">Squadra giusta</th><th class="tab-num">Una o piu' in piu'</th><th class="tab-num">Scoperti</th><th class="tab-num">Turni</th></tr></thead>
+          <thead><tr><th>Servito, negli stessi {{ c.giorni }} giorni</th><th class="tab-num">Squadra giusta{% info "Squadra giusta" %}</th><th class="tab-num">Una o piu' in piu'{% info "Una o più in più" %}</th><th class="tab-num">Scoperti{% info "Scoperti" %}</th><th class="tab-num">Turni{% info "Turni" %}</th></tr></thead>
           <tbody>
             <tr><td>Come avete fatto voi</td><td class="tab-num">{{ c.voi.giusta|floatformat:0 }}%</td><td class="tab-num">{{ c.voi.in_piu|floatformat:0 }}%</td><td class="tab-num">{{ c.voi.scoperti|floatformat:0 }}%</td><td class="tab-num">{{ c.voi.persone }}</td></tr>
             <tr style="font-weight:700"><td>Seguendo il modello</td><td class="tab-num">{{ c.modello.giusta|floatformat:0 }}%</td><td class="tab-num">{{ c.modello.in_piu|floatformat:0 }}%</td><td class="tab-num">{{ c.modello.scoperti|floatformat:0 }}%</td><td class="tab-num">{{ c.modello.persone }}</td></tr>
@@ -185,7 +188,7 @@
 
   {% if r.verifica_self %}{% with s=r.verifica_self %}
   <div class="panel" id="cicli-self">
-    <div class="panel-title"><i class="bi bi-droplet"></i> Cicli self</div>
+    <div class="panel-title info-qui"><i class="bi bi-droplet"></i> Cicli self{% info "Cicli self previsti" %}</div>
     <div class="panel-sub">Contanti al portale piu' cicli degli operatori, senza i lavaggi del servito. Servono per manutenzione e promozioni: la squadra non dipende da questo numero.</div>
     <div class="panel-body">
       <div class="row g-3 mb-3">
@@ -224,8 +227,8 @@
 
   {% if r.profilo.righe %}{% with pr=r.profilo %}
   <div class="panel">
-    <div class="panel-title"><i class="bi bi-clock"></i> Self per fascia oraria</div>
-    <div class="panel-sub">Cicli self (pagati al portale dal cliente, esclusi quelli del servito) in media per ora, dal {{ pr.dal|date:"d/m" }} al {{ pr.al|date:"d/m/Y" }}. Serve a capire se al self basta una persona solo in certe ore.</div>
+    <div class="panel-title info-qui"><i class="bi bi-clock"></i> Self per fascia oraria{% info "Self per fascia oraria" %}</div>
+    <div class="panel-sub">Cicli self (contanti e operatori, esclusi quelli del servito) in media per ora, dal {{ pr.dal|date:"d/m" }} al {{ pr.al|date:"d/m/Y" }}. Serve a capire se al self basta una persona solo in certe ore.</div>
     <div class="panel-body tabella-scroll">
       <table class="table table-sm prev">
         <thead><tr><th>Giorni</th>{% for h in pr.ore %}<th class="tab-num">{{ h }}</th>{% endfor %}{% for f in pr.righe.0.fasce %}<th class="tab-num">{{ f.nome }}</th>{% endfor %}</tr></thead>
@@ -252,7 +255,7 @@
   {% if storico %}
   <div class="panel">
     <div class="panel-title"><i class="bi bi-clock-history"></i> Previsioni delle sere scorse</div>
-    {% if errore_vero %}<div class="panel-sub">Errore vero: <strong>{{ errore_vero.errore_pct|floatformat:0 }}%</strong> su {{ errore_vero.giorni }} giorn{{ errore_vero.giorni|pluralize:"o,i" }} con il servito aperto. Sono le previsioni salvate davvero la sera prima.</div>{% endif %}
+    {% if errore_vero %}<div class="panel-sub info-qui">Errore vero{% info "Errore vero" %}: <strong>{{ errore_vero.errore_pct|floatformat:0 }}%</strong> su {{ errore_vero.giorni }} giorn{{ errore_vero.giorni|pluralize:"o,i" }} con il servito aperto. Sono le previsioni salvate davvero la sera prima.</div>{% endif %}
     <div class="panel-body tabella-scroll">
       <table class="table table-sm prev">
         <thead><tr><th>Giorno</th><th class="tab-num">Pioggia prevista</th><th class="tab-num">Lavaggi previsti</th><th class="tab-num">Reali</th><th class="tab-num">Cicli operatori previsti</th><th class="tab-num">Reali</th><th class="tab-num">Squadra consigliata</th><th class="tab-num">Persone presenti</th></tr></thead>
@@ -270,7 +273,7 @@
   {% endif %}
 
   <div class="panel">
-    <div class="panel-title"><i class="bi bi-sliders"></i> Cosa conta di piu'</div>
+    <div class="panel-title info-qui"><i class="bi bi-sliders"></i> Cosa conta di piu'{% info "Cosa conta di più" %}</div>
     <div class="panel-sub">Addestrato su {{ r.giorni_storico }} giorni di apertura dal {{ r.dal|date:"d/m/Y" }}{% if r.chiuso %}; chiuso di {{ r.chiuso|join:", " }}{% endif %}. Di quanto cambiano i lavaggi in ogni situazione, a parita' del resto (media su tutti i giorni dello storico). Usa la pioggia prevista il giorno prima{% if r.polvere_disponibile %} e la sabbia del Sahara{% endif %}.</div>
     <div class="panel-body">
       <table class="table table-sm prev" style="max-width:480px">

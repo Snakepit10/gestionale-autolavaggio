@@ -202,8 +202,103 @@ SPIEGAZIONI = {
 }
 
 # Stesso indicatore con un nome diverso in pagina
+SPIEGAZIONI.update({
+    # -------------------------------------------------------- previsione squadra
+    'Squadra consigliata': (
+        'Persone al servito più l\'eventuale persona al self.',
+        'Quante persone mettere in turno. Si decide alle 19 del giorno prima, quando la previsione viene salvata.',
+        'È un consiglio: eventi e picchi improvvisi il modello non li vede.'),
+    'Lavaggi previsti': (
+        'Stima fatta da giorno della settimana, festivi, stagione, lavaggi delle ultime settimane, prenotazioni e meteo previsto.',
+        'Quanti lavaggi del servito ci si aspetta. "Fino a" aggiunge il margine ed è il numero usato per la squadra.'),
+    'Cicli operatori': (
+        'Cicli avviati dagli operatori ai portali, meno i lavaggi del servito. Non comprendono i contanti pagati al portale.',
+        'Il lavoro del self che passa da una persona: è il numero confrontato con la soglia.',
+        'Il "finora" di oggi può essere un po\' basso: il lavaggio del servito si conta quando si crea l\'ordine, prima che l\'auto passi dal portale.'),
+    'Cicli self previsti': (
+        'Contanti pagati al portale più cicli degli operatori, senza i lavaggi del servito.',
+        'Quanto lavorano i portali per il self: serve per manutenzione e promozioni.',
+        'La squadra non dipende da questo numero.'),
+    'Probabilità di pioggia': (
+        'La dà il servizio meteo: è il valore più alto fra le ore della giornata.',
+        'Quanto è probabile che cada almeno un po\' di pioggia. 30% vuol dire che, in 10 giornate così, piove in circa 3.',
+        '"Asciutto" significa che non sono previsti almeno 1 mm o 2 ore di pioggia. Con una probabilità alta, la pioggia è possibile ma poca.'),
+    'Lavaggi per persona': (
+        'Lo imposti tu.',
+        'Quanti lavaggi del servito fa una persona in una giornata. Con 7, 20 lavaggi danno 3 persone.',
+        'Troppo alto: squadra scarsa. Troppo basso: più turni del necessario.'),
+    'Margine sui lavaggi': (
+        'Percentuale aggiunta ai lavaggi previsti prima di calcolare la squadra.',
+        'La riserva per i giorni più pieni del previsto.',
+        'Più margine vuol dire più turni e meno giorni scoperti.'),
+    'Soglia persona al self': (
+        'Confronta i cicli operatori previsti con il numero che imposti.',
+        'Da quel numero in su serve la persona al self. Sotto, il self lo segue il servito. Vuoto = sempre.',
+        'Il singolo giorno è incerto: vicino alla soglia conviene decidere anche a occhio. A servito chiuso la persona resta.'),
+    'Errore medio': (
+        'Si sommano le differenze fra previsto e reale, senza segno, e si divide per il totale reale.',
+        'Di quanto sbaglia di solito. Con 20% e 20 lavaggi al giorno, lo scarto tipico è di 4 lavaggi, in più o in meno. Più basso è meglio.',
+        'Una parte è puro caso: "il caso da solo" dice sotto quale valore non si può scendere.'),
+    'Giorni entro ±20%': (
+        'Giorni in cui il reale è rimasto entro il 20% della previsione, diviso i giorni provati.',
+        'Quanto spesso la previsione è stata buona. 70% vuol dire 7 giorni su 10.'),
+    'Squadra giusta': (
+        'Giorni in cui la squadra coincide con quella che sarebbe servita con i lavaggi reali, diviso i giorni provati.',
+        'Quanto spesso il numero di persone era esatto.',
+        'Gli altri giorni non pesano tutti uguale: una persona in più costa un turno, una in meno lascia scoperti.'),
+    'Risparmio seguendo il modello': (
+        'Turni al servito delle vostre scelte meno quelli del modello, per le ore di un turno e il costo orario medio.',
+        'Quanto si sarebbe speso in meno seguendo il modello negli stessi giorni.',
+        'Va letto insieme ai giorni scoperti: il risparmio vale se non ne aumentano troppi.'),
+    'Scoperti': (
+        'Giorni con meno persone di quelle che sarebbero servite, diviso i giorni provati.',
+        'Quanto spesso la squadra sarebbe stata troppo piccola. Più basso è meglio.'),
+    'Una o più in più': (
+        'Giorni con almeno una persona oltre il necessario, diviso i giorni provati.',
+        'Quanto spesso si è speso più del necessario.'),
+    'Turni': (
+        'Somma delle persone in tutti i giorni provati.',
+        'Il costo del personale contato in giornate di lavoro: meno turni, meno spesa.'),
+    'Errore sulla settimana': (
+        'Differenza fra cicli previsti e reali sul totale di ogni settimana, diviso i cicli reali.',
+        'Quanto è affidabile il totale settimanale. È più basso del giorno perché gli sbagli dei singoli giorni in parte si compensano.'),
+    'Errore sul giorno': (
+        'Come l\'errore medio, sui cicli di ogni giorno.',
+        'Quanto sbaglia il singolo giorno. Il numero con ± è lo scarto tipico in cicli.',
+        'Una parte è puro caso: "il caso da solo" dice sotto quale valore non si può scendere.'),
+    'Totale previsto': (
+        'Somma dei cicli previsti diviso somma dei cicli reali.',
+        'Dice se il modello tende a stimare troppo o troppo poco. 100% è in pari, 110% è il 10% in più del reale.',
+        'Guarda solo il totale: può stare a 100% anche con singoli giorni sbagliati.'),
+    'Errore vero': (
+        'Come l\'errore medio, ma sulle previsioni salvate davvero la sera prima.',
+        'È il dato più sincero: non è una prova, è quello che è successo.',
+        'Diventa affidabile dopo alcune settimane di previsioni salvate.'),
+    'Cosa conta di più': (
+        'Per ogni situazione si confronta la previsione con e senza, lasciando uguale tutto il resto, e si fa la media sullo storico.',
+        '-20% vuol dire un quinto dei lavaggi in meno, +20% un quinto in più.',
+        'Sono medie del passato: un singolo giorno può andare diversamente.'),
+    'Self per fascia oraria': (
+        'Media dei cicli per ora. A destra i cicli medi di ogni fascia e la loro percentuale sulla giornata.',
+        'In quali ore il self lavora di più: più il colore è scuro, più cicli ci sono.',
+        'Sono dati storici: non entrano nel calcolo della squadra.'),
+    'Pioggia vista': (
+        'Giorni di pioggia che il servizio aveva previsto, diviso i giorni di pioggia.',
+        'Quante piogge ha visto arrivare. Più alto è meglio.'),
+    'Falsi allarmi': (
+        'Giorni asciutti in cui prevedeva pioggia, diviso i giorni asciutti.',
+        'Quante volte ha dato pioggia a vuoto. Più basso è meglio.'),
+    'Giorni coperti': (
+        'Giorni in cui il dato viene davvero da quel servizio, diviso i giorni provati.',
+        'Per gli altri giorni si usa la previsione automatica: sotto una certa quota il confronto dice poco.'),
+    'Turni risparmiati': (
+        'Turni al servito delle vostre scelte meno quelli del modello con quel servizio.',
+        'Quante giornate di lavoro in meno, negli stessi giorni.'),
+})
+
 ALIAS = {
     'EBITDA (margine operativo lordo)': 'EBITDA',
+    'Errore lavaggi': 'Errore medio',
     'EBIT (risultato operativo)': 'EBIT',
     'Ricavi': 'Ricavi netti',
 }

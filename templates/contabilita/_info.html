@@ -1,0 +1,21 @@
+<style>
+.info-kpi { color: #94a3b8; font-size: .78em; margin-left: 3px; cursor: help; }
+.info-zona:hover .info-kpi { color: #0f766e; }
+.info-zona { cursor: help; }
+.info-zona:focus { outline: none; }
+.popover.info-pop { --bs-popover-max-width: 340px; font-size: .78rem; }
+</style>
+<script>
+document.addEventListener('DOMContentLoaded', function () {
+  document.querySelectorAll('.info-kpi').forEach(function (icona) {
+    /* info-qui: quando un riquadro ha piu' icone, ognuna ha la sua riga */
+    var zona = icona.closest('.info-qui, .kpi-mini, .kpi-tile, td, th') || icona;
+    zona.classList.add('info-zona');
+    zona.tabIndex = 0;
+    new bootstrap.Popover(zona, {
+      trigger: 'hover focus', html: true, placement: 'top', container: 'body', customClass: 'info-pop',
+      delay: {show: 250, hide: 50}, title: icona.dataset.infoTitolo, content: icona.dataset.infoTesto,
+    });
+  });
+});
+</script>

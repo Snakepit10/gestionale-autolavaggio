@@ -184,7 +184,7 @@ class PrevisioneTest(TestCase):
             self.assertEqual(salvata.cicli_operatori, r['previsioni'][1]['cicli_operatori'])
             previsti = salvata.lavaggi_previsti
             r['previsioni'][1]['previsti'] += 5                   # riaperta piu' tardi, meteo piu' fresco
-            self.assertEqual(prev.registra(r).lavaggi_previsti, previsti)     # la prima resta
+            self.assertEqual(float(prev.registra(r).lavaggi_previsti), float(previsti))     # la prima resta
         self.assertEqual(salvata.data, date(2026, 11, 6))
         self.assertEqual(PrevisioneSquadra.objects.count(), 1)
 
@@ -242,6 +242,27 @@ class PrevisioneTest(TestCase):
         with (mock.patch('django.utils.timezone.localdate', return_value=OGGI),
               mock.patch.object(prev, '_scarica', return_value=None)):                 # servizio giu': si va avanti
             self.assertEqual(NUVOLE_VERE(date(2026, 11, 1), OGGI), {})
+
+    def test_cielo_solo_senza_pioggia(self):
+        asciutto, bagnato, senza_dato = date(2026, 3, 1), date(2026, 3, 2), date(2026, 3, 3)
+        previsto = {asciutto: {'pioggia': 0.0, 'ore': 0.0}, bagnato: {'pioggia': 8.0, 'ore': 5.0}}
+        nuvole = {asciutto: 0.9, bagnato: 1.0}
+        self.assertEqual(prev._cielo(asciutto, previsto, nuvole), 0.9)
+        self.assertEqual(prev._cielo(bagnato, previsto, nuvole), 0.0)                  # conta gia' la pioggia
+        self.assertEqual(prev._cielo(senza_dato, previsto, nuvole), prev.NUVOLE_TIPICHE)
+
+    def test_ogni_casella_ha_la_spiegazione(self):
+        import re
+        from pathlib import Path
+
+        from django.conf import settings
+
+        from apps.contabilita.spiegazioni import spiegazione
+        cartella = Path(settings.BASE_DIR) / 'templates' / 'personale'
+        testo = (cartella / 'previsione.html').read_text(encoding='utf-8') + (cartella / '_verifica_cicli.html').read_text(encoding='utf-8')
+        nomi = set(re.findall(r'{% info "([^"]+)" %}', testo))
+        self.assertGreater(len(nomi), 20)
+        self.assertEqual([n for n in nomi if not spiegazione(n)], [])
 
     def test_il_cielo_coperto_abbassa_i_cicli(self):
         coperto, sereno = OGGI + timedelta(days=4), OGGI + timedelta(days=5)           # martedi' e mercoledi'
@@ -479,6 +500,8 @@ class PrevisioneTest(TestCase):
         self.assertContains(risposta, 'finora 7</span>')
         self.assertContains(risposta, 'Totale dei prossimi 7 giorni')
         self.assertContains(risposta, 'di pioggia')
+        self.assertContains(risposta, 'data-info-titolo="Errore medio"')
+        self.assertContains(risposta, 'data-info-titolo="Squadra giusta"')
         self.assertContains(risposta, 'cicli operatori previsti &middot; finora 3 cicli')
         self.assertContains(risposta, 'Errore sulla settimana')
         self.assertNotContains(risposta, 'soglia_cicli_self')

@@ -487,7 +487,7 @@ NOMI_VARIABILI = ['Mar', 'Mer', 'Gio', 'Ven', 'Sab', 'Dom', 'Festivo', 'Prefesti
                   'Stagione (sen)', 'Stagione (cos)', 'Pioggia ieri', 'Pioggia 2-3 giorni fa', 'Temperatura massima',
                   'Livello ultime 4 settimane', 'Livello ultima settimana', "Prenotazioni gia' fatte",
                   'Pioggia prevista (si/no)', 'Ore di pioggia previste', 'Pioggia prevista (mm)',
-                  'Polvere sahariana oggi', 'Polvere sahariana ieri']
+                  'Polvere sahariana oggi', 'Polvere sahariana ieri', 'Cielo coperto senza pioggia']
 
 
 def _variabili(giorno, meteo, festivi, livello, prenotazioni, previsto, polvere, livello_breve=None):
@@ -514,6 +514,12 @@ def _variabili(giorno, meteo, festivi, livello, prenotazioni, previsto, polvere,
         math.log1p(polvere.get(giorno, 0.0)),
         math.log1p(polvere.get(giorno - timedelta(days=1), 0.0)),
     ]
+
+
+def _cielo(giorno, previsto, nuvole):
+    """Cielo coperto dei giorni senza pioggia prevista: quando la pioggia e'
+    prevista conta gia' lei, e le nuvole direbbero la stessa cosa due volte."""
+    return 0.0 if piove(previsto.get(giorno) or {}) else nuvole.get(giorno, NUVOLE_TIPICHE)
 
 
 def _livello(storico, giorno, giorni=28):
@@ -607,7 +613,8 @@ def _stima_cicli(modello, correzione, x):
 def _modello_cicli(cicli, meteo, festivi, previsto, polvere, nuvole):
     """Modello dei cicli (self o operatori) e sua verifica sugli ultimi
     giorni, come per i lavaggi, in piu' con le nuvole previste: chi lava da
-    solo guarda il cielo, il servito no. None se i giorni sono pochi."""
+    solo guarda il cielo piu' del cliente del servito. None se i giorni sono
+    pochi."""
     xs, ys, usati = _righe(sorted(cicli), cicli, meteo, festivi, {}, previsto, polvere)
     if len(usati) < 90:
         return None
@@ -703,6 +710,8 @@ def _effetti(modello, xs, previsto_piovoso):
         ("3 prenotazioni in piu'", rapporto({"Prenotazioni gia' fatte": math.log1p(3)}, {"Prenotazioni gia' fatte": 0.0})),
         ('Sabbia del Sahara ieri', rapporto({'Polvere sahariana ieri': sabbia}, {'Polvere sahariana ieri': 0.0})),
         ('Sabbia del Sahara oggi', rapporto({'Polvere sahariana oggi': sabbia}, {'Polvere sahariana oggi': 0.0})),
+        ('Cielo coperto invece che sereno, senza pioggia',
+         rapporto({'Cielo coperto senza pioggia': 1.0}, {'Cielo coperto senza pioggia': 0.1})),
     ]
     return [{'nome': n, 'effetto': e} for n, e in effetti]
 
@@ -744,6 +753,7 @@ def calcola(oggi=None, par=None, modello_meteo=None, leggero=False):
     costo_ora = _costo_orario_per_mese()
     costo_medio = sum(costo_ora.values()) / len(costo_ora) if costo_ora else None
     polvere = _polvere(INIZIO_ORDINI - timedelta(days=3), fine)
+    nuvole = _nuvole(INIZIO_ORDINI, fine)
 
     # giorni di chiusura: giorni della settimana quasi sempre senza ordini
     aperti_wd = defaultdict(int)
@@ -759,6 +769,7 @@ def calcola(oggi=None, par=None, modello_meteo=None, leggero=False):
     domenica_aperta = sum(1 for d in ultime_domeniche if d in storico) >= 2
 
     xs, ys, usati = _righe(sorted(storico), storico, meteo, festivi, prenotazioni, previsto, polvere)
+    xs = [x + [_cielo(g, previsto, nuvole)] for x, g in zip(xs, usati)]
 
     # --- verifica: addestro senza gli ultimi giorni e li prevedo
     taglio = max(len(usati) - GIORNI_VERIFICA, 60)
@@ -786,8 +797,9 @@ def calcola(oggi=None, par=None, modello_meteo=None, leggero=False):
         con_presenze = [r for r in giorni_v if 'persone' in r]
         media_reali = sum(r['reali'] for r in giorni_v) / len(giorni_v)
         base = [abs(r['reali'] - _media_wd(storico, r['data'], usati[:taglio])) for r in giorni_v]
-        # lo stesso modello senza la pioggia prevista
-        senza_pioggia = [i for i in range(len(xs[0])) if not NOMI_VARIABILI[i].startswith(('Pioggia prevista', 'Ore di pioggia'))]
+        # lo stesso modello senza la pioggia prevista (il cielo coperto la tradirebbe: e' zero quando e' prevista)
+        senza_pioggia = [i for i in range(len(xs[0]))
+                         if not NOMI_VARIABILI[i].startswith(('Pioggia prevista', 'Ore di pioggia', 'Cielo coperto'))]
         corto = lambda x: [x[i] for i in senza_pioggia]
         modello_senza = Ridge().fit([corto(x) for x in xs[:taglio]], ys[:taglio])
         senza = [abs(max(0.0, math.expm1(modello_senza.predict(corto(x)))) - storico[g][0])
@@ -822,7 +834,6 @@ def calcola(oggi=None, par=None, modello_meteo=None, leggero=False):
     profilo = profilo_self(ieri)
     storico_esteso = dict(storico)
     cicli = _cicli_self(INIZIO_ORDINI, ieri)
-    nuvole = _nuvole(INIZIO_ORDINI, fine)
     self_m = _modello_cicli(cicli, meteo, festivi, previsto, polvere, nuvole)
     cicli_esteso = dict(cicli)
     operatori = _cicli_operatori(INIZIO_ORDINI, ieri)
@@ -856,7 +867,7 @@ def calcola(oggi=None, par=None, modello_meteo=None, leggero=False):
         note = _prenotazioni_ora(g)
         # oggi: le prenotazioni note ieri sera, come nell'addestramento
         x = _variabili(g, meteo, festivi, livello, prenotazioni.get(g, 0) if k == 0 else note, previsto, polvere,
-                       _livello(storico_esteso, g, 7))
+                       _livello(storico_esteso, g, 7)) + [_cielo(g, previsto, nuvole)]
         previsti = max(0.0, math.expm1(modello.predict(x)))
         alti = previsti * (1 + margine)
         servito = 0 if chiuso else squadra_servito(alti, lpp)

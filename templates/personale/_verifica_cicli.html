@@ -1,5 +1,5 @@
-<div class="row g-2">
-  <div class="col-6 col-md-4"><div class="kpi-tile"><div class="label">Errore sulla settimana</div><div class="value">{% if s.errore_settimana_pct != None %}{{ s.errore_settimana_pct|floatformat:0 }}%{% else %}&mdash;{% endif %}</div><div class="sub">sul totale dei cicli di una settimana</div></div></div>
-  <div class="col-6 col-md-4"><div class="kpi-tile"><div class="label">Errore sul giorno</div><div class="value">{{ s.errore_pct|floatformat:0 }}%</div><div class="sub">&plusmn;{{ s.errore_cicli|floatformat:0 }} cicli al giorno &middot; il caso da solo vale circa {{ s.limite_pct|floatformat:0 }}%</div></div></div>
-  <div class="col-6 col-md-4"><div class="kpi-tile"><div class="label">Totale previsto</div><div class="value">{{ s.totale_pct|floatformat:0 }}%</div><div class="sub">dei cicli reali: vicino a 100% = nessuno sbilanciamento</div></div></div>
+{% load contabilita_info %}<div class="row g-2">
+  <div class="col-6 col-md-4"><div class="kpi-tile"><div class="label">Errore sulla settimana{% info "Errore sulla settimana" %}</div><div class="value">{% if s.errore_settimana_pct != None %}{{ s.errore_settimana_pct|floatformat:0 }}%{% else %}&mdash;{% endif %}</div><div class="sub">sul totale dei cicli di una settimana</div></div></div>
+  <div class="col-6 col-md-4"><div class="kpi-tile"><div class="label">Errore sul giorno{% info "Errore sul giorno" %}</div><div class="value">{{ s.errore_pct|floatformat:0 }}%</div><div class="sub">&plusmn;{{ s.errore_cicli|floatformat:0 }} cicli al giorno &middot; il caso da solo vale circa {{ s.limite_pct|floatformat:0 }}%</div></div></div>
+  <div class="col-6 col-md-4"><div class="kpi-tile"><div class="label">Totale previsto{% info "Totale previsto" %}</div><div class="value">{{ s.totale_pct|floatformat:0 }}%</div><div class="sub">dei cicli reali: vicino a 100% = nessuno sbilanciamento</div></div></div>
 </div>

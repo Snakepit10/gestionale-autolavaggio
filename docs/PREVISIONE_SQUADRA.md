@@ -10,13 +10,14 @@ La pagina **Personale > Previsione squadra** stima i lavaggi del servito e consi
 - **Cicli degli operatori:** le transazioni da unità operativa meno i lavaggi del servito passati dal portale, cioè gli articoli con programmi portale, un ciclo per pezzo, senza quelli chiusi senza portale. Hanno un modello proprio, uguale a quello dei cicli self. Il Report giornata conta invece la finestra di chiusura e le transazioni non abbinate: i due numeri si avvicinano nei giorni abbinati, ma non coincidono sempre.
 - **Persona al self:** al massimo una. Con il parametro "cicli operatori previsti da cui serve la persona al self", sotto quel numero il self lo segue il servito. Vuoto vuol dire sempre. A servito chiuso resta coperto.
 - **Sezione Cicli self:** le card di oggi e domani mostrano solo quello che decide il personale. I cicli self, che servono per manutenzione e promozioni, hanno una sezione a parte con i prossimi giorni, il totale di 7 giorni e il confronto con le sere scorse.
+- **Spiegazioni:** le icone *i* della pagina usano il tag `{% info %}` della contabilità; i testi sono in `apps/contabilita/spiegazioni.py`.
 - **Finora:** oggi la pagina mostra anche i cicli già fatti, aggiornati a ogni import WashTec (ogni 10 minuti in orario). I lavaggi del servito si contano all'ordine: finché l'auto non passa dal portale, i cicli degli operatori di oggi possono risultare un po' bassi.
 
 ## Solo quello che si sa la sera prima
 
 Il turno finisce alle 19: da quell'ora la giornata di oggi è completa ed entra nel livello con cui si prevede domani, come nell'addestramento, dove ogni giorno conosce quello prima. Prima delle 19 la pagina prevede domani senza la giornata di oggi.
 
-I cicli self e degli operatori usano anche le nuvole previste dalle 8 alle 18: nei giorni asciutti con cielo coperto il self fa circa il 20% in meno che con il sereno. Il servito non cambia, quindi nei lavaggi le nuvole non entrano.
+Tutti i modelli usano le nuvole previste dalle 8 alle 18. Nei giorni senza pioggia, un cielo tutto coperto vale circa il 15% in meno sui lavaggi e circa il 30% in meno sui cicli self e degli operatori, rispetto a un cielo sereno. Nei lavaggi le nuvole contano solo senza pioggia prevista: l'effetto si vede ma non abbassa l'errore (21,7% prima, 21,6% dopo; squadra giusta 51% prima, 49% dopo, differenza compatibile col caso). La pagina lo mostra in "Cosa conta di più".
 
 Il modello impara e si verifica con la pioggia prevista il giorno prima, presa da Open-Meteo Previous Runs. La pioggia caduta non si usa per il giorno stesso: la sera prima non si conosce e farebbe sembrare l'errore più basso del vero.
 
