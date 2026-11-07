@@ -287,6 +287,19 @@ class PrimaNotaTest(TestCase):
         cassa = lambda fc: next(c for c in fc['per_conto'] if c['conto'] == self.cassa)['finale']
         self.assertEqual(cassa(reale) - cassa(scontrini), Decimal('20'))
 
+    def test_spese_dei_giorni_senza_quadratura(self):
+        from apps.finanze.models import QuadraturaGiornaliera, SpesaCassa, TicketResto
+        ottobre = (date(2026, 10, 1), date(2026, 10, 31))
+        QuadraturaGiornaliera.objects.create(data=date(2026, 10, 4), contanti_totali=Decimal('0'))
+        QuadraturaGiornaliera.objects.create(data=date(2026, 10, 6), contanti_totali=Decimal('180'))
+        # domenica 5 senza quadratura: 15 di gasolio e 5 di resto pagati con gli incassi, contati il 6
+        SpesaCassa.objects.create(data=date(2026, 10, 5), importo=Decimal('15'), descrizione='Gasolio', categoria='carburante')
+        TicketResto.objects.create(data=date(2026, 10, 5), importo=Decimal('5'))
+        genera_cassa(self.cassa, *ottobre)
+        incasso = self.cassa.movimenti.get(impronta__startswith='cassa|incassi|')
+        self.assertEqual((incasso.data, incasso.importo), (date(2026, 10, 6), Decimal('200')))   # 180 + 15 + 5
+        self.assertEqual(self.cassa.saldo_al(date(2026, 10, 31)), Decimal('180'))               # quanto contato
+
     def test_correggi_baps_caricato_su_mps(self):
         mps = ContoFinanziario.objects.get(nome='MPS')
         spese = VoceConto.objects.get(codice='CF.BANCA')
@@ -320,8 +333,12 @@ class PrimaNotaTest(TestCase):
         ottobre = (date(2026, 10, 1), date(2026, 10, 31))
         incassi = VoceConto.objects.get(codice='N.INCASSI')
         mps = ContoFinanziario.objects.get(nome='MPS')
+        # conta il giorno della carta ("Data Rif."): quella del 27 accreditata il 30 si toglie, quella di
+        # settembre accreditata il 2 no; senza la data vale il giorno dell'accredito
         for giorno, importo, testo in ((5, '40', 'Incasso tramite P.O.S. prova'), (6, '100', 'Bonifico a tuo favore'),
-                                       (7, '10', 'DEPOSITO di prova'), (30, '20', 'Accredito Pos prova')):
+                                       (7, '10', 'DEPOSITO di prova'), (30, '20', 'Accredito Pos prova'),
+                                       (30, '15', 'Incasso tramite p.o.s. Data Rif.: 27.10.26'),
+                                       (2, '7', 'Incasso tramite p.o.s. Data Rif.: 30.09.26')):
             m = movimento(mps, importo, testo, data=date(2026, 10, giorno))
             MovimentoFinanziario.objects.filter(pk=m.pk).update(voce=incassi)
         # occasionale: 8 ore a 10 tutte fuori busta; contrattualizzato: pagato 15 scritto a mano
@@ -340,7 +357,7 @@ class PrimaNotaTest(TestCase):
         self.cassa.save()
         genera_cassa(self.cassa, *ottobre)
         pos = self.cassa.movimenti.get(impronta='cassa|pos|2026-10')
-        self.assertEqual((pos.data, pos.importo, pos.voce), (date(2026, 10, 28), Decimal('-40'), incassi))
+        self.assertEqual((pos.data, pos.importo, pos.voce), (date(2026, 10, 28), Decimal('-55'), incassi))
         stipendi = self.cassa.movimenti.get(impronta='cassa|stipendi|2026-10')
         self.assertEqual((stipendi.data, stipendi.importo, stipendi.voce.codice),
                          (date(2026, 10, 31), Decimal('-95.00'), 'N.STIPENDI'))        # 80 + 15
@@ -377,6 +394,38 @@ class PrimaNotaTest(TestCase):
         conta.refresh_from_db()
         self.assertEqual((conta.importo, self.cassa.saldo_al(date(2026, 10, 10))), (Decimal('-80'), Decimal('120')))
         self.assertEqual(conta_cassa(self.cassa, date(2026, 10, 10), Decimal('200')).importo, Decimal('0'))
+
+
+class RegoleTest(TestCase):
+    def test_regola_con_eccezione(self):
+        banca = ContoFinanziario.objects.get(nome='BAPS')
+        commissioni = VoceConto.objects.get(codice='CV.COMMISSIONI')
+        regola = RegolaMovimento.objects.create(testo='Nexi prova', escludi='con carta', segno='uscite', voce=commissioni, ordine=1)
+        canone = movimento(banca, '-20', 'NEXI PROVA canone POS')
+        acquisto = movimento(banca, '-30', 'Operazione POS con carta NEXI PROVA *1234 NEGOZIO')
+        self.assertTrue(regola.corrisponde(canone))
+        self.assertFalse(regola.corrisponde(acquisto))                    # acquisto con la carta: non e' una commissione
+
+
+class AvvisiContiTest(TestCase):
+    def test_cassa_mai_contata_ed_estratto_fermo(self):
+        from datetime import timedelta
+
+        from django.utils import timezone
+
+        from .conto_economico import _avvisi_conti
+        oggi = timezone.localdate()
+        baps = ContoFinanziario.objects.get(nome='BAPS')
+        ContoFinanziario.objects.filter(nome='MPS').update(attivo=False)
+        m = movimento(baps, '10', 'prova', data=oggi - timedelta(days=20))
+        MovimentoFinanziario.objects.filter(pk=m.pk).update(origine='estratto')
+        testi = ' '.join(a[1] for a in _avvisi_conti(oggi))
+        self.assertIn('mai contata', testi)
+        self.assertIn('Estratto BAPS fermo', testi)
+        conta_cassa(ContoFinanziario.objects.get(nome='Cassa contanti'), oggi, Decimal('0'))
+        m = movimento(baps, '11', 'prova', data=oggi)
+        MovimentoFinanziario.objects.filter(pk=m.pk).update(origine='estratto')
+        self.assertEqual(_avvisi_conti(oggi), [])
 
 
 class VistePrimaNotaTest(TestCase):

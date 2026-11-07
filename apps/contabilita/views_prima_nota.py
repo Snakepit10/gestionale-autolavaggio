@@ -349,6 +349,7 @@ def salva_regola(request):
         messages.error(request, 'Regola non salvata: servono il testo da cercare e la voce.')
         return None
     regola.testo, regola.voce, regola.segno = testo, voce, p.get('segno', '')
+    regola.escludi = p.get('escludi', '').strip()[:100]
     regola.conto = ContoFinanziario.objects.filter(pk=p.get('conto') or 0).first()
     if p.get('ordine', '').isdigit():
         regola.ordine = int(p['ordine'])

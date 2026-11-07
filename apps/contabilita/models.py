@@ -358,6 +358,8 @@ class RegolaMovimento(models.Model):
     ordine) che corrisponde."""
     SEGNI = [('', 'Entrate e uscite'), ('entrate', 'Solo entrate'), ('uscite', 'Solo uscite')]
     testo = models.CharField(max_length=100)
+    escludi = models.CharField(max_length=100, blank=True,
+                               help_text='Non vale se la causale o la descrizione contiene anche questo testo')
     segno = models.CharField(max_length=10, choices=SEGNI, blank=True)
     conto = models.ForeignKey(ContoFinanziario, on_delete=models.CASCADE, null=True, blank=True,
                               help_text='Vuoto = tutti i conti')
@@ -378,7 +380,10 @@ class RegolaMovimento(models.Model):
             return False
         if self.segno == 'entrate' and movimento.importo < 0 or self.segno == 'uscite' and movimento.importo > 0:
             return False
-        return self.testo.lower() in f'{movimento.causale} {movimento.descrizione}'.lower()
+        testo = f'{movimento.causale} {movimento.descrizione}'.lower()
+        if self.escludi and self.escludi.lower() in testo:
+            return False
+        return self.testo.lower() in testo
 
 
 class MovimentoFinanziario(models.Model):

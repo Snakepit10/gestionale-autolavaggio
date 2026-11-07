@@ -25,14 +25,14 @@
           {% for r in regole %}
           <tr>
             <td class="tab-num">{{ r.ordine }}</td>
-            <td><code>{{ r.testo }}</code></td>
+            <td><code>{{ r.testo }}</code>{% if r.escludi %} <span class="small text-muted">tranne con <code>{{ r.escludi }}</code></span>{% endif %}</td>
             <td>{{ r.get_segno_display }}</td>
             <td>{{ r.conto|default:"tutti" }}</td>
             <td><span class="badge badge-voce">{{ r.voce }}</span></td>
             <td class="tab-num">{{ r.n_movimenti }}</td>
             <td class="text-end text-nowrap">
               <button class="btn btn-sm btn-outline-secondary" data-bs-toggle="modal" data-bs-target="#modale-regola"
-                data-id="{{ r.pk }}" data-testo="{{ r.testo }}" data-segno="{{ r.segno }}" data-conto="{{ r.conto_id|default:'' }}"
+                data-id="{{ r.pk }}" data-testo="{{ r.testo }}" data-escludi="{{ r.escludi }}" data-segno="{{ r.segno }}" data-conto="{{ r.conto_id|default:'' }}"
                 data-voce="{{ r.voce_id }}" data-ordine="{{ r.ordine }}"><i class="bi bi-pencil"></i></button>
               <form method="post" class="d-inline">{% csrf_token %}<input type="hidden" name="azione" value="elimina"><input type="hidden" name="regola" value="{{ r.pk }}">
                 <button class="btn btn-sm btn-outline-danger"><i class="bi bi-trash"></i></button></form>
@@ -54,6 +54,8 @@
     <div class="modal-body">
       <label class="form-label">Se la causale o la descrizione contiene</label>
       <input type="text" name="testo" class="form-control mb-2" required maxlength="100">
+      <label class="form-label">Ma non se contiene anche <span class="text-muted small">(facoltativo)</span></label>
+      <input type="text" name="escludi" class="form-control mb-2" maxlength="100" placeholder="es. con carta">
       <div class="row g-2">
         <div class="col-6"><label class="form-label">Movimenti</label><select name="segno" class="form-select">{% for k, n in segni %}<option value="{{ k }}">{{ n }}</option>{% endfor %}</select></div>
         <div class="col-6"><label class="form-label">Conto</label><select name="conto" class="form-select"><option value="">Tutti</option>{% for c in conti %}<option value="{{ c.pk }}">{{ c }}</option>{% endfor %}</select></div>
@@ -72,6 +74,7 @@ document.getElementById('modale-regola').addEventListener('show.bs.modal', funct
   var d = (ev.relatedTarget && ev.relatedTarget.dataset) || {}, f = this.querySelector('form');
   f.elements.id.value = d.id || '';
   f.elements.testo.value = d.testo || '';
+  f.elements.escludi.value = d.escludi || '';
   f.elements.segno.value = d.segno || '';
   f.elements.conto.value = d.conto || '';
   f.elements.voce.value = d.voce || '';

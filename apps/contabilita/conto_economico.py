@@ -102,23 +102,31 @@ def ricavi_canali(mesi):
 
 
 def ricavi_rilevati(mesi):
-    """Rilevato reale per mese, come nel report periodo: nei giorni con
-    quadratura contanti + POS - fondo + spese di cassa + ticket di resto.
+    """Rilevato reale per mese: nei giorni con quadratura contanti + POS -
+    fondo + spese di cassa (pagate con gli incassi). Le spese di un giorno
+    senza quadratura vanno alla quadratura che ne conta i soldi. I ticket di
+    resto no: il resto ridato al cliente non e' un ricavo (nel report
+    periodo invece si aggiungono, per il confronto con le casse).
     Restituisce anche i giorni con quadratura."""
     from collections import Counter
 
-    from apps.finanze.models import QuadraturaGiornaliera, SpesaCassa, TicketResto
+    from apps.finanze.models import QuadraturaGiornaliera, SpesaCassa
+
+    from .prima_nota import calendario_quadrature
     dal, al = mesi[0], fine_mese(mesi[-1])
     indice = {m: i for i, m in enumerate(mesi)}
-    spese, ticket = Counter(), Counter()
-    for s in SpesaCassa.objects.filter(data__gte=dal, data__lte=al).values('data', 'importo'):
-        spese[s['data']] += s['importo']
-    for t in TicketResto.objects.filter(data__gte=dal, data__lte=al).values('data', 'importo'):
-        ticket[t['data']] += t['importo']
+    quadrature = list(QuadraturaGiornaliera.objects.filter(data__gte=dal, data__lte=al))
+    inizio, a_quadratura = calendario_quadrature(quadrature)
+    spese = Counter()
+    if quadrature:
+        for s in SpesaCassa.objects.filter(data__gte=inizio, data__lte=max(q.data for q in quadrature)).values('data', 'importo'):
+            giorno = a_quadratura(s['data'])
+            if giorno:
+                spese[giorno] += s['importo']
     rilevato, giorni = [ZERO] * len(mesi), [0] * len(mesi)
-    for q in QuadraturaGiornaliera.objects.filter(data__gte=dal, data__lte=al):
+    for q in quadrature:
         i = indice[q.data.replace(day=1)]
-        rilevato[i] += q.totale_reale + spese[q.data] + ticket[q.data]
+        rilevato[i] += q.totale_reale + spese[q.data]
         giorni[i] += 1
     return rilevato, giorni
 
@@ -357,6 +365,8 @@ def controlli(mesi, ce=None):
     if spese > in_prima_nota:
         avvisi.append(('warning', f'{spese - in_prima_nota} spese di cassa non ancora in prima nota (Conti > Cassa contanti > Aggiorna)', 'cassa'))
     oggi = timezone.localdate()
+    if dal <= oggi:
+        avvisi += _avvisi_conti(oggi)
     if ce and ce.get('giorni_rilevati') is not None and dal <= oggi:
         trascorsi = (min(al, oggi) - dal).days + 1
         senza = trascorsi - sum(ce['giorni_rilevati'])
@@ -366,6 +376,34 @@ def controlli(mesi, ce=None):
     mancanti = [m for m in mesi if m <= oggi and m not in presenti]
     if mancanti:
         avvisi.append(('info', 'Costo del personale non calcolato per: ' + ', '.join(f'{NOMI_MESI[m.month - 1]} {m.year}' for m in mancanti), 'personale'))
+    return avvisi
+
+
+CONTA_MAX_GIORNI = 30
+ESTRATTO_MAX_GIORNI = 7
+
+
+def _avvisi_conti(oggi):
+    """Saldi da verificare: la cassa contanti senza una conta recente (il
+    saldo e' solo calcolato) e le banche con l'estratto fermo."""
+    from django.db.models import Max
+
+    from .indici import euro
+    avvisi = []
+    for conto in ContoFinanziario.objects.filter(attivo=True):
+        if conto.tipo == 'cassa':
+            conta = conto.ultima_conta()
+            if conta is None:
+                avvisi.append(('warning', f'{conto}: mai contata, il saldo di {euro(conto.saldo_al(oggi))} e\' solo '
+                                          'calcolato (prelievi e pagamenti in contanti non registrati restano dentro). '
+                                          'Registra una conta', 'cassa'))
+            elif (oggi - conta.data).days > CONTA_MAX_GIORNI:
+                avvisi.append(('warning', f'{conto}: ultima conta il {conta.data:%d/%m/%Y}, '
+                                          f'{(oggi - conta.data).days} giorni fa', 'cassa'))
+        else:
+            ultimo = conto.movimenti.filter(origine='estratto').aggregate(d=Max('data'))['d']
+            if ultimo and (oggi - ultimo).days > ESTRATTO_MAX_GIORNI:
+                avvisi.append(('info', f'Estratto {conto} fermo al {ultimo:%d/%m/%Y}: carica i movimenti successivi', 'cassa'))
     return avvisi
 
 

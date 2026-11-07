@@ -142,15 +142,28 @@ def _div(a, b):
     return a / b if b else None
 
 
-def analitica(mesi, base='rilevato'):
-    dati = raccogli(mesi, base)
-    ricavi, costi, ore = dati['ricavi'], dati['costi'], dati['ore']
+def _centri(ricavi, costi):
     centri = {}
     for centro, nome in CENTRI:
         sezioni = _per_sezione(costi, centro)
         tot = {s['chiave']: s['totale'] for s in sezioni}
         centri[centro] = {'nome': nome, 'ricavi': ricavi[centro], 'sezioni': sezioni, 'totali': tot,
                           'costi': sum(tot.values(), ZERO)}
+    return centri
+
+
+def analitica(mesi, base='rilevato'):
+    from django.utils import timezone
+    dati = raccogli(mesi, base)
+    ricavi, costi, ore = dati['ricavi'], dati['costi'], dati['ore']
+    centri = _centri(ricavi, costi)
+    # il rientro si porta a 12 mesi: solo i mesi gia' iniziati, senza la competenza di quelli futuri
+    trascorsi = [m for m in mesi if m <= timezone.localdate()]
+    if trascorsi and len(trascorsi) < len(mesi):
+        passati = raccogli(trascorsi, base)
+        centri_rientro = _centri(passati['ricavi'], passati['costi'])
+    else:
+        centri_rientro = centri
 
     # Self-service: direct costing
     s = centri['self']
@@ -211,7 +224,7 @@ def analitica(mesi, base='rilevato'):
     righe.append(('Risultato del centro', {c: centri[c]['ricavi'] - centri[c]['costi'] for c, _ in CENTRI}))
     quadro = [{'nome': n, 'valori': [v[c] for c, _ in CENTRI], 'totale': sum(v.values(), ZERO)} for n, v in righe]
     return {
-        'rientro': rientro_investimenti(mesi, centri),
+        'rientro': rientro_investimenti(trascorsi or mesi, centri_rientro),
         'base': base,
         'avvisi': _avvisi(costi),
         'self': self_service, 'servito': servito, 'prodotti': prodotti, 'comune': centri['comune'],

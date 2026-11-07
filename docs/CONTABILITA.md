@@ -131,7 +131,7 @@ Reimportare lo stesso periodo, anche con file che si sovrappongono, non crea dop
 
 ### Classificazione
 
-- **Regole:** "se la causale o la descrizione contiene X, la voce è Y". Si applicano ai movimenti nuovi.
+- **Regole:** "se la causale o la descrizione contiene X, la voce è Y". Si applicano ai movimenti nuovi. Una regola può avere un'eccezione: "ma non se contiene anche Z". La regola Nexi esclude "con carta", così gli acquisti fatti con la carta Nexi aziendale (Amazon, PayPal, negozi) non finiscono tra le commissioni POS: restano da classificare.
   - Ci sono già quelle per POS in entrata, commissioni, canoni, bolli, interessi, rate e stipendi.
   - Una regola si crea anche dal singolo movimento, con la bacchetta.
 - **Voci economiche:** solo per i movimenti **senza fattura**, per esempio commissioni e interessi.
@@ -180,7 +180,7 @@ Si può rigenerare quante volte serve: gli importi si aggiornano e le voci cambi
 - *dalle casse automatiche*: la vendita totale delle chiusure del cambia gettoni e dei portali (contanti e carte, senza ricarica e resto erogato) meno il POS delle casse automatiche della quadratura;
 - *senza scontrino*: il resto, cioè lavaggi pagati agli operatori, lavaggi extra, ricariche, resti e differenze di cassa. Può essere negativo quando in cassa c'è meno di quanto dicono gli scontrini.
 
-Fino al 27/10/2026 il POS del servito e delle casse automatiche era scritto nelle banconote e i due campi POS della quadratura sono a zero: le carte le toglie l'uscita mensile "carte contate nei contanti", pari agli accrediti POS in banca, uguale nelle due versioni. Dal 28/10 si tolgono i POS scritti in quadratura. Il fondo cassa si toglie prima di scrivere le banconote, quindi di solito il campo è a zero. Spese di cassa e ticket di resto non si tolgono dagli incassi: restano uscite separate, con la loro voce. Ogni quadratura comprende anche gli scontrini dei giorni senza quadratura subito prima: quei soldi si contano il giorno dopo. Nei flussi di cassa le tre fonti sono righe separate.
+Fino al 27/10/2026 il POS del servito e delle casse automatiche era scritto nelle banconote e i due campi POS della quadratura sono a zero: le carte le toglie l'uscita mensile "carte contate nei contanti", pari agli accrediti POS in banca, uguale nelle due versioni. Dal 28/10 si tolgono i POS scritti in quadratura. Il fondo cassa si toglie prima di scrivere le banconote, quindi di solito il campo è a zero. Spese di cassa e ticket di resto non si tolgono dagli incassi: restano uscite separate, con la loro voce. Ogni quadratura comprende anche gli scontrini, le spese e i ticket dei giorni senza quadratura subito prima: quei soldi si contano il giorno dopo. Le carte contate nei contanti si prendono per il giorno del pagamento (la "Data Rif." dell'accredito POS, altrimenti il giorno dell'accredito): le carte degli ultimi giorni prima del 27/10 accreditate dopo si tolgono, quelle di fine dicembre 2025 (prima dell'avvio della cassa) no. Nei flussi di cassa le tre fonti sono righe separate.
 
 **Conta dei contanti.** Il saldo calcolato non vede i prelievi del titolare, né gli stipendi o le spese pagati in contanti e non registrati. Dalla pagina Conti si registrano i contanti contati a fine giornata (cassa, cassaforte, fondo):
 - la differenza con il saldo calcolato diventa un movimento da classificare in prima nota, sulla voce giusta: prelievi del titolare, stipendi, fornitori…;
@@ -199,7 +199,7 @@ Si legge per mese o per trimestre, con il confronto con l'anno prima.
 
 | Base | Calcolo | Note |
 |---|---|---|
-| **Rilevato reale − IVA** (predefinita) | soldi rilevati nelle quadrature (contanti + POS − fondo + spese di cassa + ticket di resto), divisi per canale | **Servito** e **vendita prodotti** = il loro fatturato (IVA compresa) meno l'IVA del registratore fiscale, divisa fra i due in proporzione al fatturato. **Self-service** = il resto del rilevato meno l'IVA dei corrispettivi del self (portali e piste). Il totale resta rilevato − IVA (registratore + self, al 22%). I giorni senza quadratura sono segnalati tra i controlli. |
+| **Rilevato reale − IVA** (predefinita) | soldi rilevati nelle quadrature (contanti + POS − fondo + spese di cassa, anche quelle dei giorni senza quadratura subito prima), divisi per canale. I ticket di resto no: il resto ridato al cliente non è un ricavo | **Servito** e **vendita prodotti** = il loro fatturato (IVA compresa) meno l'IVA del registratore fiscale, divisa fra i due in proporzione al fatturato. **Self-service** = il resto del rilevato meno l'IVA dei corrispettivi del self (portali e piste). Il totale resta rilevato − IVA (registratore + self, al 22%). I giorni senza quadratura sono segnalati tra i controlli. |
 | **Scontrini fiscali** | il punto di vista fiscale: i corrispettivi, IVA esclusa | **Servito** e **vendita prodotti** = il totale del registratore fiscale / 1,22, diviso fra i due in proporzione agli ordini. **Portali** e **cambia gettoni** = le chiusure di cassa / 1,22; **monete online** = il loro fatturato / 1,22. Sono i ricavi dei flussi di cassa "dagli scontrini", senza IVA: il servito ordinato ma non battuto al registratore resta fuori. Il **personale** conta solo busta paga (13ª compresa, pagata ogni mese in busta) e contributi: la differenza fuori busta e i bonus non hanno riscontro fiscale. Gli altri costi restano uguali. |
 
 **Ricavi**
@@ -228,7 +228,7 @@ Si legge per mese o per trimestre, con il confronto con l'anno prima.
 | Risultato prima delle imposte | EBIT − oneri finanziari |
 | Risultato netto | risultato prima delle imposte − imposte |
 
-Da ogni voce si apre il dettaglio dei documenti. In alto c'è l'elenco di quello che manca: fatture e movimenti da classificare, pagamenti fornitori senza fattura abbinata, spese di cassa non riportate, mesi senza costo del personale.
+Da ogni voce si apre il dettaglio dei documenti. In alto c'è l'elenco di quello che manca: fatture e movimenti da classificare, pagamenti fornitori senza fattura abbinata, spese di cassa non riportate, mesi senza costo del personale, cassa contanti mai contata o con l'ultima conta di oltre 30 giorni, estratti conto fermi da più di 7 giorni.
 
 **Pagamenti fornitori senza fattura**
 - "Pagamento fornitori" non è una voce economica: il costo entra solo dalla fattura.

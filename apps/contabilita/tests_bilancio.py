@@ -129,6 +129,17 @@ class ContoEconomicoTest(TestCase):
 
 
 class RicaviRilevatoTest(TestCase):
+    def test_ticket_fuori_e_spese_dei_giorni_senza_quadratura(self):
+        from apps.finanze.models import QuadraturaGiornaliera, SpesaCassa, TicketResto
+
+        from .conto_economico import ricavi_rilevati
+        QuadraturaGiornaliera.objects.create(data=date(2026, 10, 4), contanti_totali=Decimal('100'))
+        QuadraturaGiornaliera.objects.create(data=date(2026, 10, 6), contanti_totali=Decimal('300'))
+        # spesa del 5, giorno senza quadratura: i suoi soldi mancano dalla conta del 6
+        SpesaCassa.objects.create(data=date(2026, 10, 5), importo=Decimal('20'), descrizione='Prova', categoria='altro')
+        TicketResto.objects.create(data=date(2026, 10, 6), importo=Decimal('5'))      # resto ridato: non e' ricavo
+        self.assertEqual(ricavi_rilevati([OTTOBRE]), ([Decimal('420')], [2]))        # 100 + 300 + 20
+
     def test_rilevato_reale_meno_iva_corrispettivi(self):
         from apps.finanze.models import Cassa, ChiusuraCassaAutomatica, QuadraturaGiornaliera, SpesaCassa
         from apps.ordini.models import Ordine

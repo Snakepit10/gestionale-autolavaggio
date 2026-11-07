@@ -5,7 +5,7 @@ import re
 import uuid
 from bisect import bisect_left
 from collections import defaultdict
-from datetime import timedelta
+from datetime import date, timedelta
 from decimal import Decimal
 from itertools import combinations
 
@@ -184,6 +184,7 @@ def paga_resto_in_contanti(movimento, scadenze, data=None):
             conto=cassa, data=data or movimento.data, importo=-resto.importo, origine='manuale',
             descrizione=f'Pagamento in contanti: {resto.fattura}'[:500], impronta=f'contanti|{uuid.uuid4().hex}')
         abbina(contanti, [resto])
+        ricalcola_conte(cassa)
     return contanti
 
 
@@ -242,7 +243,9 @@ def togli_abbinamento(scadenza):
         if movimento:
             if movimento.origine == 'manuale' and movimento.impronta.startswith('contanti|') \
                     and not movimento.scadenze.exists():
+                conto = movimento.conto
                 movimento.delete()                    # uscita di cassa creata col pagamento parziale
+                ricalcola_conte(conto)
                 return
             # senza una scadenza la differenza calcolata non vale piu'
             movimento.differenza, movimento.voce_differenza = ZERO, None
@@ -341,6 +344,28 @@ FONTI_INCASSI = [
 ]
 
 
+def calendario_quadrature(quadrature):
+    """Quale quadratura conta i soldi di un giorno: quella del giorno o, se
+    quel giorno non c'e' quadratura, la prima successiva. Restituisce
+    (inizio, a_quadratura): inizio e' il giorno dopo la quadratura che
+    precede la prima delle date, a_quadratura(giorno) la data della
+    quadratura che lo conta (None prima di inizio e dopo l'ultima)."""
+    from apps.finanze.models import QuadraturaGiornaliera
+    giorni = sorted(q.data for q in quadrature)
+    if not giorni:
+        return None, lambda giorno: None
+    prima = (QuadraturaGiornaliera.objects.filter(data__lt=giorni[0]).order_by('-data')
+             .values_list('data', flat=True).first())
+    inizio = prima + timedelta(days=1) if prima else giorni[0]
+
+    def a_quadratura(giorno):
+        if giorno < inizio:
+            return None
+        i = bisect_left(giorni, giorno)
+        return giorni[i] if i < len(giorni) else None
+    return inizio, a_quadratura
+
+
 def _contanti_da_scontrino(quadrature):
     """{giorno di quadratura: (contanti del servito, contanti delle casse
     automatiche)}. Ogni quadratura conta anche i giorni senza quadratura
@@ -354,19 +379,12 @@ def _contanti_da_scontrino(quadrature):
     quadratura sono a zero: le toglie l'uscita mensile degli accrediti POS
     (_pos_nei_contanti), uguale nelle due versioni. Spese di cassa e ticket
     di resto non si tolgono: sono uscite a parte."""
-    from apps.finanze.models import ChiusuraCassaAutomatica, QuadraturaGiornaliera
+    from apps.finanze.models import ChiusuraCassaAutomatica
     if not quadrature:
         return {}
     giorni = sorted(q.data for q in quadrature)
-    prima = (QuadraturaGiornaliera.objects.filter(data__lt=giorni[0]).order_by('-data')
-             .values_list('data', flat=True).first())
-    inizio = prima + timedelta(days=1) if prima else giorni[0]
+    inizio, a_quadratura = calendario_quadrature(quadrature)
     servito, casse = defaultdict(lambda: ZERO), defaultdict(lambda: ZERO)
-
-    def a_quadratura(giorno):
-        i = bisect_left(giorni, giorno)
-        return giorni[i] if i < len(giorni) else None
-
     for r in (ChiusuraCassaAutomatica.objects.filter(data__gte=inizio, data__lte=giorni[-1])
               .values('data', 'cassa__modalita_registratore')
               .annotate(registratore=Sum('incasso_totale'),
@@ -388,13 +406,19 @@ def incassi_contanti(dal, al):
     """{giorno di quadratura: {'reale', 'servito', 'self'}} dal dal al al:
     i contanti contati (contati - fondo + spese + ticket: i soldi usati per
     spese e ticket sono usciti dagli incassi) e quelli che risultano dagli
-    scontrini (vedi _contanti_da_scontrino)."""
+    scontrini (vedi _contanti_da_scontrino). Spese e ticket di un giorno
+    senza quadratura si riaggiungono alla quadratura che ne conta i soldi."""
     from apps.finanze.models import QuadraturaGiornaliera, SpesaCassa, TicketResto
-    usciti = defaultdict(lambda: ZERO)
-    for modello in (SpesaCassa, TicketResto):
-        for r in modello.objects.filter(data__gte=dal, data__lte=al).values('data', 'importo'):
-            usciti[r['data']] += r['importo']
     quadrature = list(QuadraturaGiornaliera.objects.filter(data__gte=dal, data__lte=al))
+    inizio, a_quadratura = calendario_quadrature(quadrature)
+    usciti = defaultdict(lambda: ZERO)
+    if quadrature:
+        ultima = max(q.data for q in quadrature)
+        for modello in (SpesaCassa, TicketResto):
+            for r in modello.objects.filter(data__gte=inizio, data__lte=ultima).values('data', 'importo'):
+                giorno = a_quadratura(r['data'])
+                if giorno:
+                    usciti[giorno] += r['importo']
     da_scontrino = _contanti_da_scontrino(quadrature)
     return {q.data: {'reale': q.contanti_totali - q.fondo_cassa_iniziale + usciti[q.data],
                      'servito': da_scontrino[q.data][0], 'self': da_scontrino[q.data][1]} for q in quadrature}
@@ -482,23 +506,48 @@ def _mesi(dal, al):
         mese = fine + timedelta(days=1)
 
 
+_DATA_RIF = re.compile(r'data\s*rif\.?\s*:?\s*(\d{1,2})[./-](\d{1,2})[./-](\d{2,4})', re.IGNORECASE)
+GIORNI_ACCREDITO = 10       # le carte arrivano in banca qualche giorno dopo
+
+
+def giorno_carta(movimento):
+    """Il giorno del pagamento con carta dietro un accredito POS: la "Data
+    Rif." dell'estratto, altrimenti il giorno dell'accredito."""
+    trovato = _DATA_RIF.search(f'{movimento.causale} {movimento.descrizione}')
+    if trovato:
+        giorno, mese, anno = (int(x) for x in trovato.groups())
+        try:
+            return date(anno + 2000 if anno < 100 else anno, mese, giorno)
+        except ValueError:
+            pass
+    return movimento.data
+
+
 def _pos_nei_contanti(conto, dal, al, voce):
     """Fino a conto.pos_nei_contanti_fino_al le quadrature contano le carte
     nei contanti: per ogni mese un'uscita pari agli accrediti POS arrivati
     in banca (entrate sulla voce Incassi con "POS" nella descrizione), che
-    toglie dalla cassa i soldi che li' non sono mai entrati."""
+    toglie dalla cassa i soldi che li' non sono mai entrati. Conta il giorno
+    del pagamento con carta (giorno_carta), non quello dell'accredito: le
+    carte degli ultimi giorni prima del limite arrivano dopo, quelle di
+    prima dell'avvio della cassa non c'erano."""
     limite = conto.pos_nei_contanti_fino_al
     if not limite or dal > limite:
         return {}
-    accrediti = (MovimentoFinanziario.objects.filter(voce__codice='N.INCASSI', importo__gt=0, data__gte=dal,
-                                                     data__lte=min(al, limite))
+    fino = min(al, limite)
+    da = max(dal, conto.data_saldo_iniziale)
+    accrediti = (MovimentoFinanziario.objects.filter(voce__codice='N.INCASSI', importo__gt=0, data__gte=da,
+                                                     data__lte=fino + timedelta(days=GIORNI_ACCREDITO))
                  .exclude(conto__tipo='cassa'))
     per_mese = {}
     for m in accrediti:
-        if _POS.search(f'{m.causale} {m.descrizione}'):
-            per_mese[m.data.replace(day=1)] = per_mese.get(m.data.replace(day=1), ZERO) + m.importo
+        if not _POS.search(f'{m.causale} {m.descrizione}'):
+            continue
+        giorno = giorno_carta(m)
+        if da <= giorno <= fino:
+            per_mese[giorno.replace(day=1)] = per_mese.get(giorno.replace(day=1), ZERO) + m.importo
     voluti = {}
-    for mese, fine in _mesi(dal, min(al, limite)):
+    for mese, fine in _mesi(dal, fino):
         if per_mese.get(mese):
             voluti[f'cassa|pos|{mese:%Y-%m}'] = (fine, -per_mese[mese],
                                                  f'Carte di {mese:%m/%Y} contate nei contanti: accreditate in banca col POS',

@@ -191,7 +191,7 @@ def indici(anno, base='rilevato', oggi=None):
     debiti_fornitori = sum((i for _, i in aperte), ZERO)
     scaduti = sum((i for d, i in aperte if d and d < oggi), ZERO)
     acquisti = sum(FatturaPassiva.objects.filter(data__gte=dal, data__lte=al).values_list('totale', flat=True), ZERO) * fattore
-    fc = flussi_di_cassa(mesi)
+    fc = flussi_di_cassa(mesi, 'scontrini' if base == 'scontrini' else 'reale')
     flussi = {r['chiave']: r['totale'] for r in fc['righe'] if r['chiave'].startswith('flusso:')}
     operativo = flussi.get('flusso:operativo', ZERO) * fattore
     investimenti = flussi.get('flusso:investimenti', ZERO) * fattore
