@@ -25,7 +25,7 @@
           {% for r in regole %}
           <tr>
             <td class="tab-num">{{ r.ordine }}</td>
-            <td><code>{{ r.testo }}</code>{% if r.escludi %} <span class="small text-muted">tranne con <code>{{ r.escludi }}</code></span>{% endif %}</td>
+            <td><code>{{ r.testo }}</code>{% if r.escludi %} <span class="small text-muted">tranne se contiene <code>{{ r.escludi }}</code></span>{% endif %}</td>
             <td>{{ r.get_segno_display }}</td>
             <td>{{ r.conto|default:"tutti" }}</td>
             <td><span class="badge badge-voce">{{ r.voce }}</span></td>
