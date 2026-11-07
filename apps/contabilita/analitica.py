@@ -20,7 +20,7 @@ from datetime import date
 from decimal import Decimal
 
 from .conto_economico import (IVA, ZERO, differenze_abbinamento, fine_mese, quote_competenza, ricavi_canali,
-                              rilevato_per_canale)
+                              rilevato_per_canale, scontrini_per_canale)
 from .models import (CENTRI, NOMI_CENTRI, Cespite, MovimentoFinanziario, ParametriAnalitica,
                      RigaFatturaPassiva, RipartizionePersonale)
 
@@ -60,7 +60,8 @@ def raccogli(mesi, base='canali'):
     """Ricavi, costi per (centro, sezione, voce), ore del personale per
     centro e dati di volume del periodo. base come nel conto economico:
     'canali' = fatturato / 1,22; 'rilevato' = ordini meno IVA del registratore,
-    cambia gettoni / 1,22, portali = resto del rilevato meno la loro IVA."""
+    cambia gettoni / 1,22, portali = resto del rilevato meno la loro IVA;
+    'scontrini' = registratore e casse automatiche / 1,22."""
     from apps.personale.calcolo import calcola_mese
     from apps.personale.models import MesePersonale
 
@@ -68,6 +69,8 @@ def raccogli(mesi, base='canali'):
     canali, lordi = ricavi_canali(mesi)
     if base == 'rilevato':
         canali = rilevato_per_canale(mesi, lordi)
+    elif base == 'scontrini':
+        canali = scontrini_per_canale(lordi)
     ricavi = defaultdict(lambda: ZERO)
     ricavi['self'] = sum(canali['portali'] + canali['cambia_gettoni'] + canali['monete_online'], ZERO)
     ricavi['servito'] = sum(canali['servito'], ZERO)

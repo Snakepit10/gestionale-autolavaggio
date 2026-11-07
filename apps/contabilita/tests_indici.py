@@ -154,7 +154,7 @@ class VisteIndiciTest(TestCase):
                                                          'importo': '-5', 'durata_mesi': '10', 'data_prima_rata': '2026-01-31'})
         self.assertEqual(Finanziamento.objects.count(), 1)
         self.assertContains(self.apri('/contabilita/finanziamenti/'), 'Mutuo prova')
-        for url in ('/contabilita/indici/', '/contabilita/indici/?anno=2026&ricavi=canali', '/contabilita/indici/?anno=2020',
+        for url in ('/contabilita/indici/', '/contabilita/indici/?anno=2026&ricavi=canali', '/contabilita/indici/?anno=2026&ricavi=scontrini', '/contabilita/indici/?anno=2020',
                     '/contabilita/indici/?anno=xyz'):
             self.assertEqual(self.apri(url).status_code, 200, url)
         self.assertContains(self.apri('/contabilita/indici/?anno=2026'), 'Nuovo finanziamento ottenibile')

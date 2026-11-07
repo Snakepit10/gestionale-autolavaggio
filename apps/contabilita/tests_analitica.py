@@ -156,6 +156,7 @@ class VisteAnaliticaTest(TestCase):
         d = Dipendente.objects.create(nome='Prova')
         for url in ('/contabilita/analitica/?anno=2026', '/contabilita/analitica/?anno=2026&mese=10',
                     '/contabilita/analitica/?anno=2026&ricavi=canali', '/contabilita/analitica/?anno=2026&ricavi=xyz',
+                    '/contabilita/analitica/?anno=2026&ricavi=scontrini',
                     '/contabilita/analitica/impostazioni/'):
             self.assertEqual(self.apri(url).status_code, 200, url)
         self.assertContains(self.apri('/contabilita/analitica/?anno=2026'), 'senza ripartizione')

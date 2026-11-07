@@ -153,6 +153,24 @@ def rilevato_per_canale(mesi, ricavi_lordi):
     return diviso
 
 
+def scontrini_per_canale(ricavi_lordi):
+    """I ricavi dal punto di vista fiscale, IVA esclusa: quello che e' passato
+    dagli scontrini (corrispettivi).
+    - servito e vendita prodotti: il totale del registratore fiscale / 1,22,
+      diviso fra i due in proporzione agli ordini;
+    - portali e cambia gettoni: la vendita delle chiusure di cassa / 1,22
+      (come nel fatturato per canale);
+    - monete online: il loro fatturato / 1,22.
+    Stessa forma di ricavi_canali."""
+    diviso = {k: [(lordi[k] / IVA).quantize(Decimal('0.01')) for lordi in ricavi_lordi] for k, _ in CANALI}
+    for i, lordi in enumerate(ricavi_lordi):
+        registratore = (lordi['registratore'] / IVA).quantize(Decimal('0.01'))
+        ordini = lordi['servito'] + lordi['prodotti']
+        prodotti = (registratore * lordi['prodotti'] / ordini).quantize(Decimal('0.01')) if ordini > 0 else ZERO
+        diviso['prodotti'][i], diviso['servito'][i] = prodotti, registratore - prodotti
+    return diviso
+
+
 def costo_personale(mesi):
     from apps.personale.calcolo import calcola_mese
     from apps.personale.models import MesePersonale
@@ -183,13 +201,16 @@ def _differenza(a, b):
 BASI_RICAVI = {
     'rilevato': 'Rilevato reale meno IVA dei corrispettivi',
     'canali': 'Fatturato per canale, IVA esclusa',
+    'scontrini': 'Scontrini fiscali (corrispettivi), IVA esclusa',
 }
 
 
 def conto_economico(mesi, base='canali'):
     """base 'canali': ricavi per canale dal fatturato (servito ordinato e
     vendite self service) / 1,22; base 'rilevato': soldi effettivamente
-    rilevati in cassa (quadrature) meno l'IVA dei corrispettivi."""
+    rilevati in cassa (quadrature) meno l'IVA dei corrispettivi; base
+    'scontrini': il punto di vista fiscale, registratore e casse
+    automatiche / 1,22 (lo specchio dei flussi di cassa dagli scontrini)."""
     n = len(mesi)
     zeri = [ZERO] * n
     canali, ricavi_lordi = ricavi_canali(mesi)
@@ -215,6 +236,10 @@ def conto_economico(mesi, base='canali'):
                     portali='Portali self-service: resto del rilevato - IVA portali')
         voci_ricavo = [_riga('voce', nomi[k], r[k], f'ricavi:{k}', 1) for k, _ in CANALI if any(r[k])]
         dettaglio_rilevato = {k: sum(r[k], ZERO) for k in ('rilevato', 'iva_registratore', 'iva_portali')}
+    elif base == 'scontrini':
+        r = scontrini_per_canale(ricavi_lordi)
+        nomi = dict(CANALI, servito='Servito (lavaggi): registratore fiscale', prodotti='Vendita prodotti: registratore fiscale')
+        voci_ricavo = [_riga('voce', nomi[k], r[k], f'ricavi:{k}', 1) for k, _ in CANALI if any(r[k])]
     else:
         voci_ricavo = [_riga('voce', nome, canali[k], f'ricavi:{k}', 1) for k, nome in CANALI if any(canali[k])]
     voci_ricavo += righe_sezione('ricavi')

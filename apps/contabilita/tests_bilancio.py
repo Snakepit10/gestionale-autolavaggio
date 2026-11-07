@@ -149,6 +149,10 @@ class RicaviRilevatoTest(TestCase):
         self.assertEqual(ce['giorni_rilevati'], [1])
         canali = {k: v['totale'] for k, v in per_chiave(conto_economico([OTTOBRE])['righe']).items()}
         self.assertEqual(canali['ricavi:servito'], Decimal('819.67'))         # fatturato: 1000 / 1,22
+        fiscale = {k: v['totale'] for k, v in per_chiave(conto_economico([OTTOBRE], base='scontrini')['righe']).items()}
+        self.assertEqual(fiscale['ricavi:servito'], Decimal('50.00'))         # registratore: 61 / 1,22
+        self.assertEqual(fiscale['ricavi:portali'], canali['ricavi:portali'])  # casse automatiche come nel fatturato
+        self.assertEqual(fiscale['tot:ricavi'], canali['tot:ricavi'] - Decimal('769.67'))
 
 
 class VisteBilancioTest(TestCase):
@@ -175,6 +179,7 @@ class VisteBilancioTest(TestCase):
         chimici = voce('CV.CHIMICI')
         for url in ('/contabilita/conto-economico/?anno=2026', '/contabilita/conto-economico/?anno=2026&vista=trimestri&confronto=1',
                     '/contabilita/conto-economico/?anno=2026&ricavi=canali',
+                    '/contabilita/conto-economico/?anno=2026&ricavi=scontrini&vista=trimestri',
                     '/contabilita/prima-nota/?stato=senza_fattura&anno=2026', '/contabilita/prima-nota/?stato=senza_fattura',
                     '/contabilita/flussi-di-cassa/?anno=2026', '/contabilita/flussi-di-cassa/?anno=2026&vista=trimestri',
                     '/contabilita/flussi-di-cassa/?anno=2026&contanti=scontrini',
