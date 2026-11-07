@@ -49,7 +49,7 @@
   <div class="panel">
     <div class="panel-title"><i class="bi bi-table"></i> Rendiconto (euro, IVA compresa)</div>
     <div class="panel-sub">Solo movimenti reali dei conti (banche e cassa contanti), raggruppati per flusso della voce. I giroconti tra conti sono esclusi. Saldo iniziale + flusso netto = saldo finale.
-      {% if base == 'scontrini' %}Contanti incassati dagli scontrini: ordini pagati in contanti e vendite in contanti delle casse automatiche, al posto di quelli contati nelle quadrature. Spese, ticket, versamenti e conte della cassa restano.{% else %}Contanti incassati dalla quadratura reale: quelli contati a fine giornata.{% endif %}
+      {% if base == 'scontrini' %}Contanti incassati dagli scontrini: registratore del servito meno il suo POS, pi&ugrave; le vendite in contanti delle casse automatiche, al posto di quelli contati nelle quadrature. Spese, ticket, versamenti e conte della cassa restano.{% else %}Contanti incassati dalla quadratura reale: quelli contati a fine giornata.{% endif %}
       Il POS entra dalla banca ed &egrave; uguale nelle due versioni.
       {% if senza_scontrino %}Nel {{ anno }} i contanti contati sono &euro;{{ senza_scontrino|floatformat:"0g" }} {% if senza_scontrino > 0 %}in pi&ugrave;{% else %}in meno{% endif %} di quelli degli scontrini.{% endif %}</div>
     <div class="panel-body">

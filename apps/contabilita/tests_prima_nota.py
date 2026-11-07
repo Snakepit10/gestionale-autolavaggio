@@ -246,33 +246,28 @@ class PrimaNotaTest(TestCase):
         self.assertEqual(self.cassa.movimenti.count(), 2)
 
     def test_cassa_divisa_per_fonte(self):
-        from django.utils import timezone
-
-        from apps.finanze.models import Cassa, ChiusuraCassaAutomatica, QuadraturaGiornaliera
-        from apps.ordini.models import Ordine, Pagamento
+        from apps.finanze.models import Cassa, ChiusuraCassaAutomatica, QuadraturaGiornaliera, SpesaCassa
         ottobre = (date(2026, 10, 1), date(2026, 10, 31))
         gettoni = Cassa.objects.create(nome='Gettoni prova', tipo='automatica')
         registratore = Cassa.objects.create(nome='Registratore prova', tipo='automatica', modalita_registratore=True)
-        ordine = Ordine.objects.create(totale=Decimal('60'), totale_finale=Decimal('60'))
-
-        def pagato(giorno, importo, metodo='contanti'):
-            Pagamento.objects.create(ordine=ordine, importo=Decimal(importo), metodo=metodo,
-                                     data_pagamento=timezone.make_aware(datetime(2026, 10, giorno, 11)))
-
-        pagato(5, '40')                              # il 5 non c'e' quadratura: si conta il 6
-        pagato(6, '20')
-        pagato(6, '30', 'carta')                     # le carte non sono contanti
-        for giorno, contante in ((5, '50'), (6, '70')):
-            ChiusuraCassaAutomatica.objects.create(cassa=gettoni, data=date(2026, 10, giorno), vendita_contante=Decimal(contante))
-        ChiusuraCassaAutomatica.objects.create(cassa=registratore, data=date(2026, 10, 6), incasso_totale=Decimal('90'))
+        # il 5 non c'e' quadratura: si conta il 6. Le casse automatiche contano la vendita in contanti
+        for giorno, contante, incasso in ((5, '50', '70'), (6, '70', '95')):
+            ChiusuraCassaAutomatica.objects.create(cassa=gettoni, data=date(2026, 10, giorno), vendita_contante=Decimal(contante),
+                                                   incasso_totale=Decimal(incasso))
+        for giorno, totale in ((5, '40'), (6, '50')):                # registratore: contanti e carte insieme
+            ChiusuraCassaAutomatica.objects.create(cassa=registratore, data=date(2026, 10, giorno), incasso_totale=Decimal(totale))
         QuadraturaGiornaliera.objects.create(data=date(2026, 10, 4), contanti_totali=Decimal('100'), fondo_cassa_iniziale=Decimal('100'))
-        QuadraturaGiornaliera.objects.create(data=date(2026, 10, 6), contanti_totali=Decimal('300'), fondo_cassa_iniziale=Decimal('100'))
+        QuadraturaGiornaliera.objects.create(data=date(2026, 10, 6), contanti_totali=Decimal('290'), fondo_cassa_iniziale=Decimal('100'),
+                                             lettore_carte_servito=Decimal('30'))     # 40 + 50 - 30 = 60 in contanti
+        SpesaCassa.objects.create(data=date(2026, 10, 6), importo=Decimal('10'), descrizione='Gasolio', categoria='carburante')
         QuadraturaGiornaliera.objects.create(data=date(2026, 10, 7), contanti_totali=Decimal('100'), fondo_cassa_iniziale=Decimal('100'))
         genera_cassa(self.cassa, *ottobre)
         parti = {m.voce.codice: m.importo for m in self.cassa.movimenti.filter(data=date(2026, 10, 6))}
-        self.assertEqual(parti, {'N.INC.SERVITO': Decimal('60'), 'N.INC.SELF': Decimal('120'), 'N.INC.ALTRO': Decimal('20')})
+        # contati 290 - 100 + 10 di spesa = 200; la spesa resta un'uscita a parte
+        self.assertEqual(parti, {'N.INC.SERVITO': Decimal('60'), 'N.INC.SELF': Decimal('120'), 'N.INC.ALTRO': Decimal('20'),
+                                 'CF.CARBURANTE': Decimal('-10')})
         self.assertEqual(self.cassa.movimenti.filter(data=date(2026, 10, 7)).count(), 0)   # niente contanti, niente righe
-        self.assertEqual(self.cassa.saldo_al(date(2026, 10, 31)), Decimal('200'))         # il totale non cambia
+        self.assertEqual(self.cassa.saldo_al(date(2026, 10, 31)), Decimal('190'))         # il totale non cambia
         # flussi di cassa: dalla quadratura reale o dagli scontrini (60 + 120 = 180)
         from .conto_economico import flussi_di_cassa
         reale, scontrini = (flussi_di_cassa([date(2026, 10, 1)], base) for base in ('reale', 'scontrini'))

@@ -335,23 +335,25 @@ VOCI_SPESE_CASSA = {
 
 # Gli incassi in contanti di ogni quadratura, divisi per fonte: (chiave, voce, descrizione)
 FONTI_INCASSI = [
-    ('servito', 'N.INC.SERVITO', 'Contanti del servito (ordini pagati in contanti)'),
+    ('servito', 'N.INC.SERVITO', 'Contanti del servito (registratore meno POS del servito)'),
     ('self', 'N.INC.SELF', 'Contanti delle casse automatiche (vendite in contanti)'),
     ('altro', 'N.INC.ALTRO', 'Contanti senza scontrino (operatori, extra, resti e differenze)'),
 ]
 
 
-def _contanti_da_scontrino(giorni_quadratura):
+def _contanti_da_scontrino(quadrature):
     """{giorno di quadratura: (contanti del servito, contanti delle casse
     automatiche)}. Ogni quadratura conta anche i giorni senza quadratura
-    subito prima: quei soldi si contano il giorno dopo. Servito: pagamenti
-    in contanti degli ordini; casse automatiche: vendite in contanti dalle
-    chiusure (cambia gettoni e portali, non il registratore del servito)."""
+    subito prima: quei soldi si contano il giorno dopo.
+    - servito: il totale del registratore meno il POS del servito della
+      quadratura;
+    - casse automatiche (cambia gettoni e portali): la vendita in contanti
+      delle chiusure, cioe' incasso meno ricarica, resto erogato e carte.
+    Spese di cassa e ticket di resto non si tolgono: sono uscite a parte."""
     from apps.finanze.models import ChiusuraCassaAutomatica, QuadraturaGiornaliera
-    from apps.ordini.models import Pagamento
-    if not giorni_quadratura:
+    if not quadrature:
         return {}
-    giorni = sorted(giorni_quadratura)
+    giorni = sorted(q.data for q in quadrature)
     prima = (QuadraturaGiornaliera.objects.filter(data__lt=giorni[0]).order_by('-data')
              .values_list('data', flat=True).first())
     inizio = prima + timedelta(days=1) if prima else giorni[0]
@@ -361,18 +363,18 @@ def _contanti_da_scontrino(giorni_quadratura):
         i = bisect_left(giorni, giorno)
         return giorni[i] if i < len(giorni) else None
 
-    for r in (Pagamento.objects.filter(metodo='contanti', data_pagamento__date__gte=inizio,
-                                       data_pagamento__date__lte=giorni[-1])
-              .values('data_pagamento__date').annotate(s=Sum('importo'))):
-        g = a_quadratura(r['data_pagamento__date'])
-        if g:
-            servito[g] += r['s'] or ZERO
-    for r in (ChiusuraCassaAutomatica.objects.filter(data__gte=inizio, data__lte=giorni[-1],
-                                                     cassa__modalita_registratore=False)
-              .values('data').annotate(s=Sum('vendita_contante'))):
+    for r in (ChiusuraCassaAutomatica.objects.filter(data__gte=inizio, data__lte=giorni[-1])
+              .values('data', 'cassa__modalita_registratore')
+              .annotate(registratore=Sum('incasso_totale'), contante=Sum('vendita_contante'))):
         g = a_quadratura(r['data'])
-        if g:
-            casse[g] += r['s'] or ZERO
+        if not g:
+            continue
+        if r['cassa__modalita_registratore']:
+            servito[g] += r['registratore'] or ZERO
+        else:
+            casse[g] += r['contante'] or ZERO
+    for q in quadrature:
+        servito[q.data] -= q.lettore_carte_servito
     return {g: (servito[g], casse[g]) for g in giorni}
 
 
@@ -387,7 +389,7 @@ def incassi_contanti(dal, al):
         for r in modello.objects.filter(data__gte=dal, data__lte=al).values('data', 'importo'):
             usciti[r['data']] += r['importo']
     quadrature = list(QuadraturaGiornaliera.objects.filter(data__gte=dal, data__lte=al))
-    da_scontrino = _contanti_da_scontrino([q.data for q in quadrature])
+    da_scontrino = _contanti_da_scontrino(quadrature)
     return {q.data: {'reale': q.contanti_totali - q.fondo_cassa_iniziale + usciti[q.data],
                      'servito': da_scontrino[q.data][0], 'self': da_scontrino[q.data][1]} for q in quadrature}
 
