@@ -10,7 +10,7 @@ from decimal import Decimal
 from itertools import combinations
 
 from django.db import transaction
-from django.db.models import Q, Sum
+from django.db.models import F, Q, Sum
 
 from .models import MovimentoFinanziario, RigaFatturaPassiva, ScadenzaFattura, VoceConto
 
@@ -336,7 +336,7 @@ VOCI_SPESE_CASSA = {
 # Gli incassi in contanti di ogni quadratura, divisi per fonte: (chiave, voce, descrizione)
 FONTI_INCASSI = [
     ('servito', 'N.INC.SERVITO', 'Contanti del servito (registratore meno POS del servito)'),
-    ('self', 'N.INC.SELF', 'Contanti delle casse automatiche (vendite in contanti)'),
+    ('self', 'N.INC.SELF', 'Contanti delle casse automatiche (vendita totale meno POS)'),
     ('altro', 'N.INC.ALTRO', 'Contanti senza scontrino (operatori, extra, resti e differenze)'),
 ]
 
@@ -347,9 +347,13 @@ def _contanti_da_scontrino(quadrature):
     subito prima: quei soldi si contano il giorno dopo.
     - servito: il totale del registratore meno il POS del servito della
       quadratura;
-    - casse automatiche (cambia gettoni e portali): la vendita in contanti
-      delle chiusure, cioe' incasso meno ricarica, resto erogato e carte.
-    Spese di cassa e ticket di resto non si tolgono: sono uscite a parte."""
+    - casse automatiche (cambia gettoni e portali): la vendita totale delle
+      chiusure (contanti e carte, senza ricarica e resto erogato) meno il POS
+      delle casse automatiche della quadratura.
+    Fino al 27/10/2026 le carte erano scritte nelle banconote e i POS della
+    quadratura sono a zero: le toglie l'uscita mensile degli accrediti POS
+    (_pos_nei_contanti), uguale nelle due versioni. Spese di cassa e ticket
+    di resto non si tolgono: sono uscite a parte."""
     from apps.finanze.models import ChiusuraCassaAutomatica, QuadraturaGiornaliera
     if not quadrature:
         return {}
@@ -365,16 +369,18 @@ def _contanti_da_scontrino(quadrature):
 
     for r in (ChiusuraCassaAutomatica.objects.filter(data__gte=inizio, data__lte=giorni[-1])
               .values('data', 'cassa__modalita_registratore')
-              .annotate(registratore=Sum('incasso_totale'), contante=Sum('vendita_contante'))):
+              .annotate(registratore=Sum('incasso_totale'),
+                        vendita=Sum(F('vendita_contante') + F('vendita_non_contante')))):
         g = a_quadratura(r['data'])
         if not g:
             continue
         if r['cassa__modalita_registratore']:
             servito[g] += r['registratore'] or ZERO
         else:
-            casse[g] += r['contante'] or ZERO
+            casse[g] += r['vendita'] or ZERO
     for q in quadrature:
         servito[q.data] -= q.lettore_carte_servito
+        casse[q.data] -= q.pos_casse_automatiche
     return {g: (servito[g], casse[g]) for g in giorni}
 
 

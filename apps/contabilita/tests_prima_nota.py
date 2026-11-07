@@ -250,15 +250,16 @@ class PrimaNotaTest(TestCase):
         ottobre = (date(2026, 10, 1), date(2026, 10, 31))
         gettoni = Cassa.objects.create(nome='Gettoni prova', tipo='automatica')
         registratore = Cassa.objects.create(nome='Registratore prova', tipo='automatica', modalita_registratore=True)
-        # il 5 non c'e' quadratura: si conta il 6. Le casse automatiche contano la vendita in contanti
-        for giorno, contante, incasso in ((5, '50', '70'), (6, '70', '95')):
+        # il 5 non c'e' quadratura: si conta il 6. Casse automatiche: vendita totale (contanti e carte), non l'incasso
+        for giorno, contante, carte, incasso in ((5, '45', '5', '70'), (6, '70', '30', '120')):
             ChiusuraCassaAutomatica.objects.create(cassa=gettoni, data=date(2026, 10, giorno), vendita_contante=Decimal(contante),
-                                                   incasso_totale=Decimal(incasso))
+                                                   vendita_non_contante=Decimal(carte), incasso_totale=Decimal(incasso))
         for giorno, totale in ((5, '40'), (6, '50')):                # registratore: contanti e carte insieme
             ChiusuraCassaAutomatica.objects.create(cassa=registratore, data=date(2026, 10, giorno), incasso_totale=Decimal(totale))
         QuadraturaGiornaliera.objects.create(data=date(2026, 10, 4), contanti_totali=Decimal('100'), fondo_cassa_iniziale=Decimal('100'))
         QuadraturaGiornaliera.objects.create(data=date(2026, 10, 6), contanti_totali=Decimal('290'), fondo_cassa_iniziale=Decimal('100'),
-                                             lettore_carte_servito=Decimal('30'))     # 40 + 50 - 30 = 60 in contanti
+                                             lettore_carte_servito=Decimal('30'),     # 40 + 50 - 30 = 60 in contanti
+                                             pos_casse_automatiche=Decimal('30'))     # 45 + 5 + 70 + 30 - 30 = 120
         SpesaCassa.objects.create(data=date(2026, 10, 6), importo=Decimal('10'), descrizione='Gasolio', categoria='carburante')
         QuadraturaGiornaliera.objects.create(data=date(2026, 10, 7), contanti_totali=Decimal('100'), fondo_cassa_iniziale=Decimal('100'))
         genera_cassa(self.cassa, *ottobre)
@@ -268,6 +269,7 @@ class PrimaNotaTest(TestCase):
                                  'CF.CARBURANTE': Decimal('-10')})
         self.assertEqual(self.cassa.movimenti.filter(data=date(2026, 10, 7)).count(), 0)   # niente contanti, niente righe
         self.assertEqual(self.cassa.saldo_al(date(2026, 10, 31)), Decimal('190'))         # il totale non cambia
+        self.assertEqual(self.cassa.saldo_al(date(2026, 10, 6)), Decimal('190'))
         # flussi di cassa: dalla quadratura reale o dagli scontrini (60 + 120 = 180)
         from .conto_economico import flussi_di_cassa
         reale, scontrini = (flussi_di_cassa([date(2026, 10, 1)], base) for base in ('reale', 'scontrini'))

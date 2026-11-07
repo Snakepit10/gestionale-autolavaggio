@@ -177,10 +177,10 @@ Si può rigenerare quante volte serve: gli importi si aggiornano e le voci cambi
 
 **Incassi in contanti per fonte.** I contanti si contano tutti insieme, quindi la divisione è una stima fatta con gli scontrini:
 - *dal servito*: il totale del registratore meno il POS del servito della quadratura;
-- *dalle casse automatiche*: le vendite in contanti delle chiusure del cambia gettoni e dei portali, cioè incasso meno ricarica, resto erogato e carte;
+- *dalle casse automatiche*: la vendita totale delle chiusure del cambia gettoni e dei portali (contanti e carte, senza ricarica e resto erogato) meno il POS delle casse automatiche della quadratura;
 - *senza scontrino*: il resto, cioè lavaggi pagati agli operatori, lavaggi extra, ricariche, resti e differenze di cassa. Può essere negativo quando in cassa c'è meno di quanto dicono gli scontrini.
 
-Spese di cassa e ticket di resto non si tolgono dagli incassi: restano uscite separate, con la loro voce. Ogni quadratura comprende anche gli scontrini dei giorni senza quadratura subito prima: quei soldi si contano il giorno dopo. Nei flussi di cassa le tre fonti sono righe separate.
+Fino al 27/10/2026 il POS del servito e delle casse automatiche era scritto nelle banconote e i due campi POS della quadratura sono a zero: le carte le toglie l'uscita mensile "carte contate nei contanti", pari agli accrediti POS in banca, uguale nelle due versioni. Dal 28/10 si tolgono i POS scritti in quadratura. Il fondo cassa si toglie prima di scrivere le banconote, quindi di solito il campo è a zero. Spese di cassa e ticket di resto non si tolgono dagli incassi: restano uscite separate, con la loro voce. Ogni quadratura comprende anche gli scontrini dei giorni senza quadratura subito prima: quei soldi si contano il giorno dopo. Nei flussi di cassa le tre fonti sono righe separate.
 
 **Conta dei contanti.** Il saldo calcolato non vede i prelievi del titolare, né gli stipendi o le spese pagati in contanti e non registrati. Dalla pagina Conti si registrano i contanti contati a fine giornata (cassa, cassaforte, fondo):
 - la differenza con il saldo calcolato diventa un movimento da classificare in prima nota, sulla voce giusta: prelievi del titolare, stipendi, fornitori…;
@@ -244,7 +244,7 @@ Da ogni voce si apre il dettaglio dei documenti. In alto c'è l'elenco di quello
 - I giroconti sono esclusi.
 - Due versioni dei contanti incassati, come le due basi dei ricavi del conto economico:
   - *dalla quadratura reale* (predefinita): i contanti contati, cioè i movimenti della cassa;
-  - *dagli scontrini*: al posto degli incassi della cassa, il registratore del servito meno il suo POS e le vendite in contanti delle casse automatiche. Spese, ticket, versamenti e conte della cassa restano, e anche i saldi della cassa si spostano della differenza.
+  - *dagli scontrini*: al posto degli incassi della cassa, il registratore del servito meno il suo POS e la vendita totale delle casse automatiche meno il loro POS. Spese, ticket, versamenti e conte della cassa restano, e anche i saldi della cassa si spostano della differenza.
 - Il POS entra dalla banca ed è uguale nelle due versioni. Sotto il rendiconto c'è la differenza dell'anno fra contanti contati e contanti degli scontrini.
 
 ### Cespiti
