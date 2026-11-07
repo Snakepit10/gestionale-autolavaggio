@@ -225,9 +225,10 @@ class PrimaNotaTest(TestCase):
         spesa = SpesaCassa.objects.create(data=giorno, importo=Decimal('20'), descrizione='Gasolio', categoria='carburante')
         TicketResto.objects.create(data=giorno, importo=Decimal('5'))
         self.assertEqual(genera_cassa(self.cassa, *ottobre), 3)
-        incasso = self.cassa.movimenti.get(descrizione__startswith='Incassi')
+        incasso = self.cassa.movimenti.get(descrizione__startswith='Contanti')
         uscita = self.cassa.movimenti.get(descrizione__startswith='Spesa')
         self.assertEqual(incasso.importo, Decimal('225'))                   # 300 - 100 + 20 + 5
+        self.assertEqual(incasso.voce.codice, 'N.INC.ALTRO')                # nessuno scontrino: tutto senza
         self.assertEqual((uscita.importo, uscita.voce.codice), (Decimal('-20'), 'CF.CARBURANTE'))
         self.assertEqual(self.cassa.saldo_al(giorno), Decimal('200'))
         # rigenerare non duplica; la voce cambiata a mano resta, l'importo si aggiorna
@@ -243,6 +244,35 @@ class PrimaNotaTest(TestCase):
         spesa.delete()
         genera_cassa(self.cassa, *ottobre)
         self.assertEqual(self.cassa.movimenti.count(), 2)
+
+    def test_cassa_divisa_per_fonte(self):
+        from django.utils import timezone
+
+        from apps.finanze.models import Cassa, ChiusuraCassaAutomatica, QuadraturaGiornaliera
+        from apps.ordini.models import Ordine, Pagamento
+        ottobre = (date(2026, 10, 1), date(2026, 10, 31))
+        gettoni = Cassa.objects.create(nome='Gettoni prova', tipo='automatica')
+        registratore = Cassa.objects.create(nome='Registratore prova', tipo='automatica', modalita_registratore=True)
+        ordine = Ordine.objects.create(totale=Decimal('60'), totale_finale=Decimal('60'))
+
+        def pagato(giorno, importo, metodo='contanti'):
+            Pagamento.objects.create(ordine=ordine, importo=Decimal(importo), metodo=metodo,
+                                     data_pagamento=timezone.make_aware(datetime(2026, 10, giorno, 11)))
+
+        pagato(5, '40')                              # il 5 non c'e' quadratura: si conta il 6
+        pagato(6, '20')
+        pagato(6, '30', 'carta')                     # le carte non sono contanti
+        for giorno, contante in ((5, '50'), (6, '70')):
+            ChiusuraCassaAutomatica.objects.create(cassa=gettoni, data=date(2026, 10, giorno), vendita_contante=Decimal(contante))
+        ChiusuraCassaAutomatica.objects.create(cassa=registratore, data=date(2026, 10, 6), incasso_totale=Decimal('90'))
+        QuadraturaGiornaliera.objects.create(data=date(2026, 10, 4), contanti_totali=Decimal('100'), fondo_cassa_iniziale=Decimal('100'))
+        QuadraturaGiornaliera.objects.create(data=date(2026, 10, 6), contanti_totali=Decimal('300'), fondo_cassa_iniziale=Decimal('100'))
+        QuadraturaGiornaliera.objects.create(data=date(2026, 10, 7), contanti_totali=Decimal('100'), fondo_cassa_iniziale=Decimal('100'))
+        genera_cassa(self.cassa, *ottobre)
+        parti = {m.voce.codice: m.importo for m in self.cassa.movimenti.filter(data=date(2026, 10, 6))}
+        self.assertEqual(parti, {'N.INC.SERVITO': Decimal('60'), 'N.INC.SELF': Decimal('120'), 'N.INC.ALTRO': Decimal('20')})
+        self.assertEqual(self.cassa.movimenti.filter(data=date(2026, 10, 7)).count(), 0)   # niente contanti, niente righe
+        self.assertEqual(self.cassa.saldo_al(date(2026, 10, 31)), Decimal('200'))         # il totale non cambia
 
     def test_correggi_baps_caricato_su_mps(self):
         mps = ContoFinanziario.objects.get(nome='MPS')

@@ -3,12 +3,14 @@ giroconti tra conti e movimenti della cassa contanti ricavati dalle
 quadrature giornaliere."""
 import re
 import uuid
+from bisect import bisect_left
+from collections import defaultdict
 from datetime import timedelta
 from decimal import Decimal
 from itertools import combinations
 
 from django.db import transaction
-from django.db.models import Q
+from django.db.models import Q, Sum
 
 from .models import MovimentoFinanziario, RigaFatturaPassiva, ScadenzaFattura, VoceConto
 
@@ -331,10 +333,55 @@ VOCI_SPESE_CASSA = {
 }
 
 
+# Gli incassi in contanti di ogni quadratura, divisi per fonte: (chiave, voce, descrizione)
+FONTI_INCASSI = [
+    ('servito', 'N.INC.SERVITO', 'Contanti del servito (ordini pagati in contanti)'),
+    ('self', 'N.INC.SELF', 'Contanti delle casse automatiche (vendite in contanti)'),
+    ('altro', 'N.INC.ALTRO', 'Contanti senza scontrino (operatori, extra, resti e differenze)'),
+]
+
+
+def _contanti_da_scontrino(giorni_quadratura):
+    """{giorno di quadratura: (contanti del servito, contanti delle casse
+    automatiche)}. Ogni quadratura conta anche i giorni senza quadratura
+    subito prima: quei soldi si contano il giorno dopo. Servito: pagamenti
+    in contanti degli ordini; casse automatiche: vendite in contanti dalle
+    chiusure (cambia gettoni e portali, non il registratore del servito)."""
+    from apps.finanze.models import ChiusuraCassaAutomatica, QuadraturaGiornaliera
+    from apps.ordini.models import Pagamento
+    if not giorni_quadratura:
+        return {}
+    giorni = sorted(giorni_quadratura)
+    prima = (QuadraturaGiornaliera.objects.filter(data__lt=giorni[0]).order_by('-data')
+             .values_list('data', flat=True).first())
+    inizio = prima + timedelta(days=1) if prima else giorni[0]
+    servito, casse = defaultdict(lambda: ZERO), defaultdict(lambda: ZERO)
+
+    def a_quadratura(giorno):
+        i = bisect_left(giorni, giorno)
+        return giorni[i] if i < len(giorni) else None
+
+    for r in (Pagamento.objects.filter(metodo='contanti', data_pagamento__date__gte=inizio,
+                                       data_pagamento__date__lte=giorni[-1])
+              .values('data_pagamento__date').annotate(s=Sum('importo'))):
+        g = a_quadratura(r['data_pagamento__date'])
+        if g:
+            servito[g] += r['s'] or ZERO
+    for r in (ChiusuraCassaAutomatica.objects.filter(data__gte=inizio, data__lte=giorni[-1],
+                                                     cassa__modalita_registratore=False)
+              .values('data').annotate(s=Sum('vendita_contante'))):
+        g = a_quadratura(r['data'])
+        if g:
+            casse[g] += r['s'] or ZERO
+    return {g: (servito[g], casse[g]) for g in giorni}
+
+
 def genera_cassa(conto, dal, al):
     """Movimenti della cassa contanti dal dal al al (compresi):
     - incassi in contanti del giorno = contati - fondo + spese + ticket
-      (i soldi usati per spese e ticket sono usciti dagli incassi);
+      (i soldi usati per spese e ticket sono usciti dagli incassi), divisi
+      per fonte (FONTI_INCASSI): servito, casse automatiche e, per
+      differenza, contanti senza scontrino;
     - ogni spesa pagata con la cassa, sulla voce della sua categoria;
     - ogni ticket di resto ripagato al cliente;
     - ogni versamento di contanti in banca (entrata di un altro conto sulla
@@ -347,15 +394,22 @@ def genera_cassa(conto, dal, al):
     from apps.finanze.models import QuadraturaGiornaliera, SpesaCassa, TicketResto
 
     voci = {v.codice: v for v in VoceConto.objects.filter(
-        codice__in=list(VOCI_SPESE_CASSA.values()) + ['N.INCASSI', 'N.GIROCONTO'])}
+        codice__in=list(VOCI_SPESE_CASSA.values()) + ['N.INCASSI', 'N.GIROCONTO'] + [f[1] for f in FONTI_INCASSI])}
     spese = list(SpesaCassa.objects.filter(data__gte=dal, data__lte=al))
     ticket = list(TicketResto.objects.filter(data__gte=dal, data__lte=al))
     voluti = {}
-    for q in QuadraturaGiornaliera.objects.filter(data__gte=dal, data__lte=al):
+    quadrature = list(QuadraturaGiornaliera.objects.filter(data__gte=dal, data__lte=al))
+    da_scontrino = _contanti_da_scontrino([q.data for q in quadrature])
+    for q in quadrature:
         lordo = (q.contanti_totali - q.fondo_cassa_iniziale
                  + sum((s.importo for s in spese if s.data == q.data), Decimal('0'))
                  + sum((t.importo for t in ticket if t.data == q.data), Decimal('0')))
-        voluti[f'cassa|incassi|{q.data:%Y-%m-%d}'] = (q.data, lordo, 'Incassi in contanti del giorno', voci.get('N.INCASSI'))
+        servito, casse = da_scontrino[q.data]
+        parti = {'servito': servito, 'self': casse, 'altro': lordo - servito - casse}
+        for chiave, codice, descrizione in FONTI_INCASSI:
+            if parti[chiave]:
+                voluti[f'cassa|incassi|{chiave}|{q.data:%Y-%m-%d}'] = (q.data, parti[chiave], descrizione,
+                                                                     voci.get(codice) or voci.get('N.INCASSI'))
     for s in spese:
         voluti[f'cassa|spesa|{s.pk}'] = (s.data, -s.importo, f'Spesa di cassa: {s.descrizione}',
                                          voci.get(VOCI_SPESE_CASSA.get(s.categoria, 'CF.ALTRI')))

@@ -166,7 +166,7 @@ Dalla pagina Conti, **Aggiorna** scrive i movimenti del mese.
 
 | Movimento | Importo | Voce |
 |---|---|---|
-| Incassi in contanti del giorno | contati − fondo + spese di cassa + ticket di resto | — |
+| Incassi in contanti del giorno | contati − fondo + spese di cassa + ticket di resto, divisi in tre righe | vedi sotto |
 | Spese di cassa | una per spesa | dalla categoria (carburante, manutenzione, …) |
 | Ticket di resto pagati | uno per ticket | — |
 | Versamenti in banca | uscita per ogni entrata di un altro conto sulla voce Giroconto, con "vers" nella descrizione e senza un giroconto fatto a mano | Giroconto |
@@ -174,6 +174,13 @@ Dalla pagina Conti, **Aggiorna** scrive i movimenti del mese.
 | Stipendi in contanti (se impostato) | un'uscita al mese: per ogni dipendente il "pagato" del Costo personale o, se manca, il totale da pagare (fuori busta + bonus) | Stipendi |
 
 Si può rigenerare quante volte serve: gli importi si aggiornano e le voci cambiate a mano restano.
+
+**Incassi in contanti per fonte.** I contanti si contano tutti insieme, quindi la divisione è una stima fatta con gli scontrini:
+- *dal servito*: i pagamenti in contanti degli ordini;
+- *dalle casse automatiche*: le vendite in contanti delle chiusure del cambia gettoni e dei portali (non il registratore del servito);
+- *senza scontrino*: il resto, cioè lavaggi pagati agli operatori, lavaggi extra, ricariche, resti e differenze di cassa. Può essere negativo quando in cassa c'è meno di quanto dicono gli scontrini.
+
+Ogni quadratura comprende anche gli scontrini dei giorni senza quadratura subito prima: quei soldi si contano il giorno dopo. Nei flussi di cassa le tre fonti sono righe separate.
 
 **Conta dei contanti.** Il saldo calcolato non vede i prelievi del titolare, né gli stipendi o le spese pagati in contanti e non registrati. Dalla pagina Conti si registrano i contanti contati a fine giornata (cassa, cassaforte, fondo):
 - la differenza con il saldo calcolato diventa un movimento da classificare in prima nota, sulla voce giusta: prelievi del titolare, stipendi, fornitori…;
