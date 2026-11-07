@@ -200,7 +200,7 @@ Si legge per mese o per trimestre, con il confronto con l'anno prima.
 | Base | Calcolo | Note |
 |---|---|---|
 | **Rilevato reale − IVA** (predefinita) | soldi rilevati nelle quadrature (contanti + POS − fondo + spese di cassa + ticket di resto), divisi per canale | **Servito** e **vendita prodotti** = il loro fatturato (IVA compresa) meno l'IVA del registratore fiscale, divisa fra i due in proporzione al fatturato. **Self-service** = il resto del rilevato meno l'IVA dei corrispettivi del self (portali e piste). Il totale resta rilevato − IVA (registratore + self, al 22%). I giorni senza quadratura sono segnalati tra i controlli. |
-| **Scontrini fiscali** | il punto di vista fiscale: i corrispettivi, IVA esclusa | **Servito** e **vendita prodotti** = il totale del registratore fiscale / 1,22, diviso fra i due in proporzione agli ordini. **Portali** e **cambia gettoni** = le chiusure di cassa / 1,22; **monete online** = il loro fatturato / 1,22. Sono i ricavi dei flussi di cassa "dagli scontrini", senza IVA: il servito ordinato ma non battuto al registratore resta fuori. |
+| **Scontrini fiscali** | il punto di vista fiscale: i corrispettivi, IVA esclusa | **Servito** e **vendita prodotti** = il totale del registratore fiscale / 1,22, diviso fra i due in proporzione agli ordini. **Portali** e **cambia gettoni** = le chiusure di cassa / 1,22; **monete online** = il loro fatturato / 1,22. Sono i ricavi dei flussi di cassa "dagli scontrini", senza IVA: il servito ordinato ma non battuto al registratore resta fuori. Il **personale** conta solo busta paga (13ª compresa, pagata ogni mese in busta) e contributi: la differenza fuori busta e i bonus non hanno riscontro fiscale. Gli altri costi restano uguali. |
 
 **Ricavi**
 - Partono dalla funzione `ricavi_periodo` (in `apps/finanze/services/ricavi.py`), la stessa del report periodo, e si calcolano secondo la base scelta.
@@ -215,7 +215,7 @@ Si legge per mese o per trimestre, con il confronto con l'anno prima.
 **Costi**
 - Righe delle fatture, ripartite sui mesi di competenza. Quelle senza voce vanno in "Fatture da classificare", tra i costi fissi.
 - Movimenti di banca e cassa su voci economiche che **non** pagano una fattura.
-- Costo aziendale del personale (app personale).
+- Costo aziendale del personale (app personale). Con la base scontrini fiscali solo busta paga e contributi.
 - Ammortamenti dei cespiti.
 
 **Risultati**

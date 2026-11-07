@@ -20,7 +20,7 @@ from datetime import date
 from decimal import Decimal
 
 from .conto_economico import (IVA, ZERO, differenze_abbinamento, fine_mese, quote_competenza, ricavi_canali,
-                              rilevato_per_canale, scontrini_per_canale)
+                              rilevato_per_canale, scontrini_per_canale, costo_dipendente, NOMI_PERSONALE)
 from .models import (CENTRI, NOMI_CENTRI, Cespite, MovimentoFinanziario, ParametriAnalitica,
                      RigaFatturaPassiva, RipartizionePersonale)
 
@@ -109,7 +109,7 @@ def raccogli(mesi, base='rilevato'):
     for mese_obj in MesePersonale.objects.filter(mese__in=mesi):
         for riga in calcola_mese(mese_obj)['righe']:
             rip = ripartizione_dipendente(riga['dipendente'].pk, mese_obj.mese, ripartizioni)
-            aggiungi(riga['costo'], rip, 'personale', 'Costo aziendale dei dipendenti')
+            aggiungi(costo_dipendente(riga, base), rip, 'personale', NOMI_PERSONALE.get(base, NOMI_PERSONALE['rilevato']))
             for centro, quota in dividi(riga['ore_lavorate'], rip).items():
                 ore[centro] += quota
     for c in Cespite.objects.all():

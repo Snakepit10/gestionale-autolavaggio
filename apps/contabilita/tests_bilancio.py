@@ -77,12 +77,14 @@ class ContoEconomicoTest(TestCase):
         giroconto(versamento, self.banca)
         # cespite da 1200 in 1 anno da ottobre: 100 al mese
         Cespite.objects.create(descrizione='Aspirapolvere', data_acquisto=date(2026, 10, 3), valore=Decimal('1200'), anni=1)
-        # personale: 8 ore a 10 euro, occasionale -> 80
+        # personale: 8 ore a 10 euro, occasionale -> netto 80;
+        # in busta 50 con coefficiente 1,3 -> contributi 15; fuori busta 30 e bonus 5 senza riscontro fiscale
         from apps.personale.models import Dipendente, MesePersonale, ParametroRetributivo, Presenza, RigaMese
         d = Dipendente.objects.create(nome='Prova', tipo='occasionale')
         ParametroRetributivo.objects.create(dipendente=d, valido_dal=date(2026, 1, 1), tariffa_oraria=Decimal('10'),
                                             coefficiente_lordo=Decimal('1'))
-        RigaMese.objects.create(mese=MesePersonale.objects.create(mese=OTTOBRE), dipendente=d)
+        RigaMese.objects.create(mese=MesePersonale.objects.create(mese=OTTOBRE), dipendente=d, busta_paga=Decimal('50'),
+                                coefficiente_lordo=Decimal('1.3'), bonus=Decimal('5'))
         Presenza.objects.create(dipendente=d, data=date(2026, 10, 2), ore=Decimal('8'))
 
     def test_conto_economico_ottobre(self):
@@ -94,12 +96,14 @@ class ContoEconomicoTest(TestCase):
         self.assertEqual(r['margine'], Decimal('0.00'))
         self.assertEqual(r['dacl'], Decimal('50.00'))
         self.assertEqual(r['tot:costi_fissi'], Decimal('60.00'))            # 50 da classificare + 10 commissioni
-        self.assertEqual(r['personale'], Decimal('80'))
-        self.assertEqual(r['ebitda'], Decimal('-140.00'))
+        self.assertEqual(r['personale'], Decimal('65.00'))                  # busta 50 + contributi 15, senza fuori busta e bonus
+        self.assertEqual(r['ebitda'], Decimal('-125.00'))
         self.assertEqual(r['ammortamenti'], Decimal('100.00'))
-        self.assertEqual(r['ebit'], Decimal('-240.00'))
+        self.assertEqual(r['ebit'], Decimal('-225.00'))
         self.assertEqual(r['tot:oneri_finanziari'], Decimal('5'))
-        self.assertEqual(r['netto'], Decimal('-245.00'))                    # il bonifico della fattura non conta
+        self.assertEqual(r['netto'], Decimal('-230.00'))                    # il bonifico della fattura non conta
+        reale = {k: v['totale'] for k, v in per_chiave(conto_economico([OTTOBRE])['righe']).items()}
+        self.assertEqual(reale['personale'], Decimal('100.0'))              # col rilevato il costo aziendale: 80 + 15 + 5
         novembre = per_chiave(conto_economico([date(2026, 11, 1)], 'scontrini')['righe'])
         self.assertEqual(novembre[f'voce:{voce("CV.CHIMICI").pk}']['totale'], Decimal('100.00'))
 
@@ -111,7 +115,7 @@ class ContoEconomicoTest(TestCase):
         movimento(self.banca, '30', 'N.FORNITORI', descrizione='Rimborso fornitore')
         self.assertIn('1 pagamenti fornitori', tipi()['fornitori_senza_fattura'])
         self.assertIn('€1.220,50', tipi()['fornitori_senza_fattura'])
-        self.assertEqual(conto_economico([OTTOBRE], 'scontrini')['kpi']['netto'], Decimal('-245.00'))  # resta fuori dal CE
+        self.assertEqual(conto_economico([OTTOBRE], 'scontrini')['kpi']['netto'], Decimal('-230.00'))  # resta fuori dal CE
 
     def test_flussi_ottobre(self):
         fc = flussi_di_cassa([OTTOBRE])

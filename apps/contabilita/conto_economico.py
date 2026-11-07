@@ -170,11 +170,32 @@ def scontrini_per_canale(ricavi_lordi):
     return diviso
 
 
-def costo_personale(mesi):
+NOMI_PERSONALE = {
+    'rilevato': 'Costo aziendale dei dipendenti',
+    'scontrini': 'Dipendenti in busta paga (busta + contributi)',
+}
+
+
+def costo_dipendente(riga, base='rilevato'):
+    """Costo di un dipendente nel mese (riga di calcola_mese). Base
+    'scontrini', il punto di vista fiscale: solo la busta paga (13a compresa,
+    pagata ogni mese) e i contributi; fuori busta e bonus non hanno riscontro
+    fiscale. Altrimenti il costo aziendale intero."""
+    if base == 'scontrini':
+        return (riga['busta_paga'] or ZERO) + riga['contributi']
+    return riga['costo']
+
+
+def costo_personale(mesi, base='rilevato'):
     from apps.personale.calcolo import calcola_mese
     from apps.personale.models import MesePersonale
     presenti = {m.mese: m for m in MesePersonale.objects.filter(mese__in=mesi)}
-    return [calcola_mese(presenti[m])['riepilogo']['costo'] if m in presenti else ZERO for m in mesi], presenti
+
+    def del_mese(m):
+        if m not in presenti:
+            return ZERO
+        return sum((costo_dipendente(r, base) for r in calcola_mese(presenti[m])['righe']), ZERO)
+    return [del_mese(m) for m in mesi], presenti
 
 
 def ammortamenti(mesi):
@@ -212,7 +233,7 @@ def conto_economico(mesi, base='rilevato'):
     _, ricavi_lordi = ricavi_canali(mesi)
     per_voce = costi_per_voce(mesi)
     voci = {v.pk: v for v in VoceConto.objects.all()}
-    personale, mesi_personale = costo_personale(mesi)
+    personale, mesi_personale = costo_personale(mesi, base)
     quote_amm = ammortamenti(mesi)
 
     def righe_sezione(sezione):
@@ -255,7 +276,7 @@ def conto_economico(mesi, base='rilevato'):
     righe.append(_riga('risultato', 'Margine di contribuzione', margine, 'margine'))
     da_classificare = [_riga('voce', 'Fatture da classificare', per_voce['dacl'], 'dacl', 1)] if any(per_voce.get('dacl', zeri)) else []
     fissi = sezione('Costi fissi', 'costi_fissi', da_classificare)
-    dipendenti = [_riga('voce', 'Costo aziendale dei dipendenti', personale, 'personale', 1)] if any(personale) else []
+    dipendenti = [_riga('voce', NOMI_PERSONALE.get(base, NOMI_PERSONALE['rilevato']), personale, 'personale', 1)] if any(personale) else []
     costo_pers = sezione('Personale', 'personale', dipendenti)
     ebitda = _differenza(_differenza(margine, fissi), costo_pers)
     righe.append(_riga('risultato', 'EBITDA (margine operativo lordo)', ebitda, 'ebitda'))

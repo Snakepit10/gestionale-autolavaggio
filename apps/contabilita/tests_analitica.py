@@ -56,7 +56,7 @@ class AnaliticaTest(TestCase):
         d = Dipendente.objects.create(nome='Prova', tipo='occasionale')
         ParametroRetributivo.objects.create(dipendente=d, valido_dal=date(2026, 1, 1), tariffa_oraria=Decimal('10'),
                                             coefficiente_lordo=Decimal('1'))
-        RigaMese.objects.create(mese=MesePersonale.objects.create(mese=OTTOBRE), dipendente=d)
+        RigaMese.objects.create(mese=MesePersonale.objects.create(mese=OTTOBRE), dipendente=d, busta_paga=Decimal('80'))  # tutto in busta
         Presenza.objects.create(dipendente=d, data=date(2026, 10, 2), ore=Decimal('8'))
         RipartizionePersonale.objects.create(dipendente=d, valido_dal=date(2026, 1, 1), ripartizione={'servito': 75, 'self': 25})
         # portale da 1200 in un anno: 100 al mese sul self
