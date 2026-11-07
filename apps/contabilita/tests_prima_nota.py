@@ -230,6 +230,8 @@ class PrimaNotaTest(TestCase):
         self.assertEqual(incasso.importo, Decimal('225'))                   # 300 - 100 + 20 + 5
         self.assertEqual(incasso.voce.codice, 'N.INC.ALTRO')                # nessuno scontrino: tutto senza
         self.assertEqual((uscita.importo, uscita.voce.codice), (Decimal('-20'), 'CF.CARBURANTE'))
+        resto = self.cassa.movimenti.get(descrizione__startswith='Ticket')
+        self.assertEqual((resto.importo, resto.voce.codice), (Decimal('-5'), 'N.TICKET'))   # non sugli incassi POS
         self.assertEqual(self.cassa.saldo_al(giorno), Decimal('200'))
         # rigenerare non duplica; la voce cambiata a mano resta, l'importo si aggiorna
         altri = VoceConto.objects.get(codice='CF.ALTRI')

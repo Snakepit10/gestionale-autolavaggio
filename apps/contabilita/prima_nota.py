@@ -418,7 +418,7 @@ def genera_cassa(conto, dal, al):
     from apps.finanze.models import SpesaCassa, TicketResto
 
     voci = {v.codice: v for v in VoceConto.objects.filter(
-        codice__in=list(VOCI_SPESE_CASSA.values()) + ['N.INCASSI', 'N.GIROCONTO'] + [f[1] for f in FONTI_INCASSI])}
+        codice__in=list(VOCI_SPESE_CASSA.values()) + ['N.INCASSI', 'N.GIROCONTO', 'N.TICKET'] + [f[1] for f in FONTI_INCASSI])}
     spese = list(SpesaCassa.objects.filter(data__gte=dal, data__lte=al))
     ticket = list(TicketResto.objects.filter(data__gte=dal, data__lte=al))
     voluti = {}
@@ -433,7 +433,7 @@ def genera_cassa(conto, dal, al):
                                          voci.get(VOCI_SPESE_CASSA.get(s.categoria, 'CF.ALTRI')))
     for t in ticket:
         voluti[f'cassa|ticket|{t.pk}'] = (t.data, -t.importo, f'Ticket di resto pagato{": " + t.nota if t.nota else ""}',
-                                          voci.get('N.INCASSI'))
+                                          voci.get('N.TICKET') or voci.get('N.INCASSI'))
     versamenti = (MovimentoFinanziario.objects.filter(voce__codice='N.GIROCONTO', importo__gt=0, controparte__isnull=True,
                                                       descrizione__icontains='vers', data__gte=dal, data__lte=al)
                   .exclude(conto__tipo='cassa').select_related('conto')
