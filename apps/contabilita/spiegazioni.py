@@ -6,7 +6,6 @@ SPIEGAZIONI = {
     # ---------------------------------------------------------- conto economico
     'Ricavi netti': (
         'In base a quanto scelto in alto. Rilevato reale: servito e prodotti = totale ordini meno l\'IVA del registratore; cambia gettoni e monete online = fatturato diviso 1,22; i portali sono il resto dei soldi delle quadrature meno l\'IVA delle loro chiusure di cassa. '
-        'Fatturato per canale: ordini del servito, prodotti e casse automatiche, diviso 1,22. '
         'Scontrini fiscali: registratore fiscale (servito e prodotti) e casse automatiche, diviso 1,22: il punto di vista fiscale.',
         'Quanto ha incassato davvero l\'azienda, IVA esclusa.',
         'Le due basi possono dare numeri diversi: se la differenza è grande, una delle due fonti è incompleta.'),

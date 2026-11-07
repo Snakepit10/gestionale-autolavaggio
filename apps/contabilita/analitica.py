@@ -56,21 +56,18 @@ def ripartizione_dipendente(dipendente_id, mese, ripartizioni):
     return {'servito': 100}
 
 
-def raccogli(mesi, base='canali'):
+def raccogli(mesi, base='rilevato'):
     """Ricavi, costi per (centro, sezione, voce), ore del personale per
     centro e dati di volume del periodo. base come nel conto economico:
-    'canali' = fatturato / 1,22; 'rilevato' = ordini meno IVA del registratore,
+    'rilevato' = ordini meno IVA del registratore,
     cambia gettoni / 1,22, portali = resto del rilevato meno la loro IVA;
     'scontrini' = registratore e casse automatiche / 1,22."""
     from apps.personale.calcolo import calcola_mese
     from apps.personale.models import MesePersonale
 
     dal, al = mesi[0], fine_mese(mesi[-1])
-    canali, lordi = ricavi_canali(mesi)
-    if base == 'rilevato':
-        canali = rilevato_per_canale(mesi, lordi)
-    elif base == 'scontrini':
-        canali = scontrini_per_canale(lordi)
+    _, lordi = ricavi_canali(mesi)
+    canali = scontrini_per_canale(lordi) if base == 'scontrini' else rilevato_per_canale(mesi, lordi)
     ricavi = defaultdict(lambda: ZERO)
     ricavi['self'] = sum(canali['portali'] + canali['cambia_gettoni'] + canali['monete_online'], ZERO)
     ricavi['servito'] = sum(canali['servito'], ZERO)
@@ -145,7 +142,7 @@ def _div(a, b):
     return a / b if b else None
 
 
-def analitica(mesi, base='canali'):
+def analitica(mesi, base='rilevato'):
     dati = raccogli(mesi, base)
     ricavi, costi, ore = dati['ricavi'], dati['costi'], dati['ore']
     centri = {}

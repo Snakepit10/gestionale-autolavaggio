@@ -54,6 +54,11 @@ class ContoEconomicoTest(TestCase):
         # ricavi: un ordine servito da 122 (100 + IVA)
         ordine = Ordine.objects.create(totale=Decimal('122'), totale_finale=Decimal('122'))
         Ordine.objects.filter(pk=ordine.pk).update(data_ora=timezone.make_aware(datetime(2026, 10, 6, 10, 0)))
+        # lo scontrino dell'ordine al registratore fiscale: 122 -> 100 netti
+        from apps.finanze.models import Cassa, ChiusuraCassaAutomatica
+        ChiusuraCassaAutomatica.objects.create(cassa=Cassa.objects.create(nome='Registratore prova', tipo='automatica',
+                                                                          modalita_registratore=True),
+                                               data=date(2026, 10, 6), incasso_totale=Decimal('122'))
         # fattura di chimici da 200 su ottobre e novembre, pagata con un bonifico
         f = importa_file('a.xml', fattura_xml(righe=(('Shampoo', '200.00', '22.00'),), imponibile='200.00',
                                               imposta='44.00', totale='244.00', pagamenti=(('2026-10-20', '244.00'),))).nuove[0]
@@ -81,7 +86,7 @@ class ContoEconomicoTest(TestCase):
         Presenza.objects.create(dipendente=d, data=date(2026, 10, 2), ore=Decimal('8'))
 
     def test_conto_economico_ottobre(self):
-        ce = conto_economico([OTTOBRE])
+        ce = conto_economico([OTTOBRE], 'scontrini')
         r = {k: v['totale'] for k, v in per_chiave(ce['righe']).items()}
         self.assertEqual(r['ricavi:servito'], Decimal('100.00'))
         self.assertEqual(r['tot:ricavi'], Decimal('100.00'))                # gli incassi POS non sono ricavi
@@ -95,7 +100,7 @@ class ContoEconomicoTest(TestCase):
         self.assertEqual(r['ebit'], Decimal('-240.00'))
         self.assertEqual(r['tot:oneri_finanziari'], Decimal('5'))
         self.assertEqual(r['netto'], Decimal('-245.00'))                    # il bonifico della fattura non conta
-        novembre = per_chiave(conto_economico([date(2026, 11, 1)])['righe'])
+        novembre = per_chiave(conto_economico([date(2026, 11, 1)], 'scontrini')['righe'])
         self.assertEqual(novembre[f'voce:{voce("CV.CHIMICI").pk}']['totale'], Decimal('100.00'))
 
     def test_pagamenti_senza_fattura(self):
@@ -106,7 +111,7 @@ class ContoEconomicoTest(TestCase):
         movimento(self.banca, '30', 'N.FORNITORI', descrizione='Rimborso fornitore')
         self.assertIn('1 pagamenti fornitori', tipi()['fornitori_senza_fattura'])
         self.assertIn('€1.220,50', tipi()['fornitori_senza_fattura'])
-        self.assertEqual(conto_economico([OTTOBRE])['kpi']['netto'], Decimal('-245.00'))  # resta fuori dal CE
+        self.assertEqual(conto_economico([OTTOBRE], 'scontrini')['kpi']['netto'], Decimal('-245.00'))  # resta fuori dal CE
 
     def test_flussi_ottobre(self):
         fc = flussi_di_cassa([OTTOBRE])
@@ -147,12 +152,10 @@ class RicaviRilevatoTest(TestCase):
         self.assertEqual(ce['dettaglio_rilevato'], {'rilevato': Decimal('270'), 'iva_registratore': Decimal('11.00'),
                                                     'iva_portali': Decimal('22.00')})
         self.assertEqual(ce['giorni_rilevati'], [1])
-        canali = {k: v['totale'] for k, v in per_chiave(conto_economico([OTTOBRE])['righe']).items()}
-        self.assertEqual(canali['ricavi:servito'], Decimal('819.67'))         # fatturato: 1000 / 1,22
         fiscale = {k: v['totale'] for k, v in per_chiave(conto_economico([OTTOBRE], base='scontrini')['righe']).items()}
-        self.assertEqual(fiscale['ricavi:servito'], Decimal('50.00'))         # registratore: 61 / 1,22
-        self.assertEqual(fiscale['ricavi:portali'], canali['ricavi:portali'])  # casse automatiche come nel fatturato
-        self.assertEqual(fiscale['tot:ricavi'], canali['tot:ricavi'] - Decimal('769.67'))
+        self.assertEqual(fiscale['ricavi:servito'], Decimal('50.00'))         # registratore: 61 / 1,22, non gli ordini
+        self.assertEqual(fiscale['ricavi:portali'], Decimal('100.00'))        # chiusura del portale: 122 / 1,22
+        self.assertEqual(fiscale['tot:ricavi'], Decimal('150.00'))
 
 
 class VisteBilancioTest(TestCase):
@@ -178,7 +181,6 @@ class VisteBilancioTest(TestCase):
         importa_file('a.xml', fattura_xml())
         chimici = voce('CV.CHIMICI')
         for url in ('/contabilita/conto-economico/?anno=2026', '/contabilita/conto-economico/?anno=2026&vista=trimestri&confronto=1',
-                    '/contabilita/conto-economico/?anno=2026&ricavi=canali',
                     '/contabilita/conto-economico/?anno=2026&ricavi=scontrini&vista=trimestri',
                     '/contabilita/prima-nota/?stato=senza_fattura&anno=2026', '/contabilita/prima-nota/?stato=senza_fattura',
                     '/contabilita/flussi-di-cassa/?anno=2026', '/contabilita/flussi-di-cassa/?anno=2026&vista=trimestri',

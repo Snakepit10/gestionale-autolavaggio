@@ -56,11 +56,16 @@ class IndiciTest(TestCase):
         # servito 100 netti, acqua 20 (variabile), affitto 30 (fisso): EBITDA 50 al mese
         ordine = Ordine.objects.create(totale=Decimal('122'), totale_finale=Decimal('122'))
         Ordine.objects.filter(pk=ordine.pk).update(data_ora=timezone.make_aware(datetime(2026, 10, 6, 10, 0)))
+        # lo scontrino dell'ordine al registratore fiscale: 122 -> 100 netti
+        from apps.finanze.models import Cassa, ChiusuraCassaAutomatica
+        ChiusuraCassaAutomatica.objects.create(cassa=Cassa.objects.create(nome='Registratore prova', tipo='automatica',
+                                                                          modalita_registratore=True),
+                                               data=date(2026, 10, 6), incasso_totale=Decimal('122'))
         fattura('1', '20.00', 'CV.ACQUA')
         fattura('2', '30.00', 'CF.AFFITTO')
 
     def test_senza_debito(self):
-        r = indici(2026, 'canali', OGGI)
+        r = indici(2026, 'scontrini', OGGI)
         self.assertEqual((r['mesi'], r['fattore']), ([date(2026, 10, 1)], Decimal('12')))
         c = r['capacita']
         self.assertEqual((r['conto']['ricavi'], r['conto']['ebitda']), (Decimal('1200.00'), Decimal('600.00')))
@@ -81,7 +86,7 @@ class IndiciTest(TestCase):
         Finanziamento.objects.create(descrizione='Prestito', importo=Decimal('1200'), durata_mesi=12,
                                      data_prima_rata=date(2026, 11, 15))
         ParametriFinanziari.objects.create(multiplo_ebitda=Decimal('3'), capex_mantenimento=Decimal('0'))
-        r = indici(2026, 'canali', OGGI)
+        r = indici(2026, 'scontrini', OGGI)
         c = r['capacita']
         self.assertEqual((c['debito'], c['servizio'], c['pfn']), (Decimal('1200'), Decimal('1200'), Decimal('1000')))
         self.assertEqual((c['rata_libera'], c['nuovo'], c['spazio_multiplo']), (Decimal('0'), Decimal('0'), Decimal('800')))
@@ -99,18 +104,18 @@ class IndiciTest(TestCase):
         cassa = ContoFinanziario.objects.get(nome='Cassa contanti')
         MovimentoFinanziario.objects.create(conto=cassa, data=date(2026, 10, 6), importo=Decimal('50'),
                                             impronta='prova|incasso', origine='cassa')
-        c = indici(2026, 'canali', OGGI)['capacita']
+        c = indici(2026, 'scontrini', OGGI)['capacita']
         self.assertEqual((c['servizio'], len(c['rate_movimenti'])), (Decimal('400'), 1))     # 100 x 12 / 3
         self.assertIn('dal 21/07 al 20/10/2026', c['fonte_servizio'])
         self.assertEqual({s['conto'].nome: s['saldo'] for s in c['saldi_conti']},
                          {'BAPS': Decimal('100'), 'Cassa contanti': Decimal('50')})   # MPS disattivato
         self.assertEqual((c['liquidita'], c['cassa_da_contare']), (Decimal('150'), [cassa]))
         conta_cassa(cassa, date(2026, 10, 31), Decimal('20'))
-        c = indici(2026, 'canali', OGGI)['capacita']
+        c = indici(2026, 'scontrini', OGGI)['capacita']
         self.assertEqual((c['liquidita'], c['cassa_da_contare']), (Decimal('120'), []))
 
     def test_ogni_indice_ha_la_sua_spiegazione(self):
-        mancanti = [nome for nome in per_nome(indici(2026, 'canali', OGGI)) if not spiegazione(nome)]
+        mancanti = [nome for nome in per_nome(indici(2026, 'scontrini', OGGI)) if not spiegazione(nome)]
         self.assertEqual(mancanti, [])
 
     def test_casella_di_informazioni(self):
@@ -122,7 +127,7 @@ class IndiciTest(TestCase):
         self.assertEqual(testo.count('"'), 6)                                 # solo gli apici dei 3 attributi
 
     def test_anno_senza_mesi(self):
-        self.assertIsNone(indici(2025, 'canali', OGGI))
+        self.assertIsNone(indici(2025, 'scontrini', OGGI))
 
 
 class VisteIndiciTest(TestCase):
@@ -154,7 +159,7 @@ class VisteIndiciTest(TestCase):
                                                          'importo': '-5', 'durata_mesi': '10', 'data_prima_rata': '2026-01-31'})
         self.assertEqual(Finanziamento.objects.count(), 1)
         self.assertContains(self.apri('/contabilita/finanziamenti/'), 'Mutuo prova')
-        for url in ('/contabilita/indici/', '/contabilita/indici/?anno=2026&ricavi=canali', '/contabilita/indici/?anno=2026&ricavi=scontrini', '/contabilita/indici/?anno=2020',
+        for url in ('/contabilita/indici/', '/contabilita/indici/?anno=2026&ricavi=scontrini', '/contabilita/indici/?anno=2020',
                     '/contabilita/indici/?anno=xyz'):
             self.assertEqual(self.apri(url).status_code, 200, url)
         self.assertContains(self.apri('/contabilita/indici/?anno=2026'), 'Nuovo finanziamento ottenibile')

@@ -195,16 +195,15 @@ Senza una conta, Indici e KPI segnala che la liquidità della cassa è solo calc
 
 Si legge per mese o per trimestre, con il confronto con l'anno prima.
 
-**Ricavi:** tre basi, che si scelgono con i pulsanti in alto.
+**Ricavi:** due basi, che si scelgono con i pulsanti in alto.
 
 | Base | Calcolo | Note |
 |---|---|---|
 | **Rilevato reale − IVA** (predefinita) | soldi rilevati nelle quadrature (contanti + POS − fondo + spese di cassa + ticket di resto), divisi per canale | **Servito** e **vendita prodotti** = il loro fatturato (IVA compresa) meno l'IVA del registratore fiscale, divisa fra i due in proporzione al fatturato. **Self-service** = il resto del rilevato meno l'IVA dei corrispettivi del self (portali e piste). Il totale resta rilevato − IVA (registratore + self, al 22%). I giorni senza quadratura sono segnalati tra i controlli. |
-| **Fatturato per canale** | quanto descritto qui sotto | |
-| **Scontrini fiscali** | il punto di vista fiscale: i corrispettivi, IVA esclusa | **Servito** e **vendita prodotti** = il totale del registratore fiscale / 1,22, diviso fra i due in proporzione agli ordini. **Portali** e **cambia gettoni** = le chiusure di cassa / 1,22, come nel fatturato per canale; **monete online** = il loro fatturato / 1,22. Sono i ricavi dei flussi di cassa "dagli scontrini", senza IVA: il servito ordinato ma non battuto al registratore resta fuori. |
+| **Scontrini fiscali** | il punto di vista fiscale: i corrispettivi, IVA esclusa | **Servito** e **vendita prodotti** = il totale del registratore fiscale / 1,22, diviso fra i due in proporzione agli ordini. **Portali** e **cambia gettoni** = le chiusure di cassa / 1,22; **monete online** = il loro fatturato / 1,22. Sono i ricavi dei flussi di cassa "dagli scontrini", senza IVA: il servito ordinato ma non battuto al registratore resta fuori. |
 
 **Ricavi**
-- Vengono dalla funzione `ricavi_periodo` (in `apps/finanze/services/ricavi.py`), la stessa del report periodo, divisi per 1,22.
+- Partono dalla funzione `ricavi_periodo` (in `apps/finanze/services/ricavi.py`), la stessa del report periodo, e si calcolano secondo la base scelta.
 - Canali:
   - servito (lavaggi);
   - vendita prodotti;
@@ -258,12 +257,11 @@ Da ogni voce si apre il dettaglio dei documenti. In alto c'è l'elenco di quello
 
 Ogni costo del conto economico, fino all'EBIT, si divide sui centri **Self-service**, **Servito**, **Vendita prodotti** e **Comune**.
 
-**Ricavi:** le stesse tre basi del conto economico, con gli stessi pulsanti.
+**Ricavi:** le stesse due basi del conto economico, con gli stessi pulsanti.
 
 | Base | Come si dividono i ricavi sui centri |
 |---|---|
 | **Rilevato reale − IVA** (predefinita) | Come nel conto economico, mese per mese. Servito e vendita prodotti: fatturato meno l'IVA del registratore. Self-service: il resto del rilevato meno l'IVA del self, diviso fra portali e piste in proporzione al loro fatturato (tutto ai portali se nel mese non c'è fatturato self). Le monete online restano fuori, perché non passano dalla cassa. |
-| **Fatturato per canale** | fatturato di ogni canale / 1,22 |
 | **Scontrini fiscali** | servito e vendita prodotti: registratore fiscale / 1,22; self-service: chiusure di cassa e monete online / 1,22 |
 
 Con tutte le basi il totale del quadro per centro coincide con l'EBIT del conto economico calcolato sulla stessa base.
@@ -313,7 +311,7 @@ Con tutte le basi il totale del quadro per centro coincide con l'EBIT del conto 
 
 ## Fase 5: indici e KPI
 
-Pagina **Indici e KPI**. Gli indici usano i mesi chiusi dell'anno da quando parte la contabilità (il primo saldo iniziale dei conti), riportati a 12 mesi. I ricavi seguono la stessa base del conto economico (rilevato reale − IVA, fatturato per canale o scontrini fiscali). Ogni indice ha la formula e un colore: verde in linea con la prassi bancaria per piccole imprese, giallo da tenere d'occhio, rosso critico.
+Pagina **Indici e KPI**. Gli indici usano i mesi chiusi dell'anno da quando parte la contabilità (il primo saldo iniziale dei conti), riportati a 12 mesi. I ricavi seguono la stessa base del conto economico (rilevato reale − IVA o scontrini fiscali). Ogni indice ha la formula e un colore: verde in linea con la prassi bancaria per piccole imprese, giallo da tenere d'occhio, rosso critico.
 
 **Indebitamento massimo** (vale il più prudente dei due metodi)
 

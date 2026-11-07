@@ -40,6 +40,8 @@ class AnaliticaTest(TestCase):
         # ricavi: servito 100 netti, portali 200 netti con 20 cicli
         ordine = Ordine.objects.create(totale=Decimal('122'), totale_finale=Decimal('122'))
         Ordine.objects.filter(pk=ordine.pk).update(data_ora=timezone.make_aware(datetime(2026, 10, 6, 10, 0)))
+        registratore = Cassa.objects.create(nome='Registratore prova', tipo='automatica', modalita_registratore=True)
+        ChiusuraCassaAutomatica.objects.create(cassa=registratore, data=date(2026, 10, 6), incasso_totale=Decimal('122'))
         portale = Cassa.objects.create(nome='Portale prova', tipo='automatica', tracking_washcycles=True)
         ChiusuraCassaAutomatica.objects.create(cassa=portale, data=date(2026, 10, 6), vendita_contante=Decimal('244'),
                                                incasso_totale=Decimal('244'), wash_cycles=20)
@@ -61,7 +63,7 @@ class AnaliticaTest(TestCase):
         Cespite.objects.create(descrizione='Portale', data_acquisto=date(2026, 10, 1), valore=Decimal('1200'), anni=1, centro='self')
 
     def test_direct_costing_self(self):
-        s = analitica([OTTOBRE])['self']
+        s = analitica([OTTOBRE], 'scontrini')['self']
         self.assertEqual(s['ricavi'], Decimal('200.00'))
         self.assertEqual(s['variabili'], Decimal('120.00'))          # acqua 70 + chimici 50
         self.assertEqual(s['mdc1'], Decimal('80.00'))
@@ -78,12 +80,12 @@ class AnaliticaTest(TestCase):
             nome='Servito'), prezzo=Decimal('22'), descrizione='')
         ordine = Ordine.objects.get()
         ItemOrdine.objects.create(ordine=ordine, servizio_prodotto=completo, quantita=4, prezzo_unitario=completo.prezzo)
-        s = analitica([OTTOBRE])['self']
+        s = analitica([OTTOBRE], 'scontrini')['self']
         self.assertEqual((s['cicli_totali'], s['cicli_servito'], s['cicli']), (20, 4, 16))
         self.assertEqual(s['ricavo_ciclo'], Decimal('12.5'))         # 200 / 16
 
     def test_full_costing_servito(self):
-        s = analitica([OTTOBRE])['servito']
+        s = analitica([OTTOBRE], 'scontrini')['servito']
         self.assertEqual(s['ricavi'], Decimal('100.00'))
         self.assertEqual(s['diretti'], Decimal('90.00'))             # acqua 30 + personale 60
         self.assertEqual(s['comuni'], Decimal('300.00'))
@@ -92,11 +94,11 @@ class AnaliticaTest(TestCase):
         self.assertEqual((s['lavaggi'], s['costo_lavaggio']), (1, Decimal('190.00')))
         self.assertEqual(s['ore'], Decimal('6'))
         ParametriAnalitica.objects.create(criterio_comuni='percentuale', percentuale_servito=Decimal('50'))
-        self.assertEqual(analitica([OTTOBRE])['servito']['quota_comuni'], Decimal('150.00'))
+        self.assertEqual(analitica([OTTOBRE], 'scontrini')['servito']['quota_comuni'], Decimal('150.00'))
 
     def test_quadra_col_conto_economico(self):
-        a = analitica([OTTOBRE])
-        ebit = next(r['totale'] for r in conto_economico([OTTOBRE])['righe'] if r['chiave'] == 'ebit')
+        a = analitica([OTTOBRE], 'scontrini')
+        ebit = next(r['totale'] for r in conto_economico([OTTOBRE], 'scontrini')['righe'] if r['chiave'] == 'ebit')
         self.assertEqual(a['quadro'][-1]['totale'], ebit)
         self.assertEqual(ebit, Decimal('-330.00'))
 
@@ -105,7 +107,7 @@ class AnaliticaTest(TestCase):
         MovimentoFinanziario.objects.create(conto=ContoFinanziario.objects.get(nome='BAPS'), data=date(2026, 10, 15),
                                             importo=Decimal('-50'), voce=VoceConto.objects.get(codice='N.FINANZIAMENTI'),
                                             impronta='rata')
-        r = analitica([OTTOBRE])['rientro']
+        r = analitica([OTTOBRE], 'scontrini')['rientro']
         self_ = next(x for x in r['righe'] if x['nome'] == 'Self-service')
         # self: ricavi 200 - costi 240 + ammortamento 100 = 60 al mese -> 720 all'anno su 1200 investiti
         self.assertEqual((self_['investito'], self_['ante'], self_['anni_ante']), (Decimal('1200'), Decimal('720'), Decimal('1.7')))
@@ -115,21 +117,21 @@ class AnaliticaTest(TestCase):
         # in totale l'EBITDA (-230 al mese) e' negativo: non rientra
         self.assertEqual((r['totale']['ante'], r['totale']['anni_ante']), (Decimal('-2760'), None))
         Cespite.objects.all().delete()
-        self.assertIsNone(analitica([OTTOBRE])['rientro'])
+        self.assertIsNone(analitica([OTTOBRE], 'scontrini')['rientro'])
 
     def test_ricavi_dal_rilevato(self):
         from apps.finanze.models import QuadraturaGiornaliera
-        # rilevato 366: il servito e' il totale ordini (122) meno l'IVA del registratore (qui nessuno);
+        # rilevato 366: il servito e' il totale ordini (122) meno l'IVA del registratore (22);
         # i portali sono il resto (366 - 122 = 244) meno l'IVA dei corrispettivi del portale (44)
         QuadraturaGiornaliera.objects.create(data=date(2026, 10, 6), contanti_totali=Decimal('366'))
         a = analitica([OTTOBRE], 'rilevato')
-        self.assertEqual(a['servito']['ricavi'], Decimal('122'))
+        self.assertEqual(a['servito']['ricavi'], Decimal('100.00'))
         self.assertEqual(a['self']['ricavi'], Decimal('200.00'))
         self.assertEqual(a['self']['ricavo_ciclo'], Decimal('10'))
-        self.assertEqual(a['quadro'][0]['totale'], Decimal('322.00'))
+        self.assertEqual(a['quadro'][0]['totale'], Decimal('300.00'))
         ebit = next(r['totale'] for r in conto_economico([OTTOBRE], 'rilevato')['righe'] if r['chiave'] == 'ebit')
         self.assertEqual(a['quadro'][-1]['totale'], ebit)
-        self.assertEqual(analitica([OTTOBRE])['self']['ricavi'], Decimal('200.00'))   # fatturato: invariato
+        self.assertEqual(analitica([OTTOBRE], 'scontrini')['self']['ricavi'], Decimal('200.00'))   # scontrini: invariato
 
 
 class VisteAnaliticaTest(TestCase):
@@ -155,7 +157,7 @@ class VisteAnaliticaTest(TestCase):
         from apps.personale.models import Dipendente
         d = Dipendente.objects.create(nome='Prova')
         for url in ('/contabilita/analitica/?anno=2026', '/contabilita/analitica/?anno=2026&mese=10',
-                    '/contabilita/analitica/?anno=2026&ricavi=canali', '/contabilita/analitica/?anno=2026&ricavi=xyz',
+                    '/contabilita/analitica/?anno=2026&ricavi=xyz',
                     '/contabilita/analitica/?anno=2026&ricavi=scontrini',
                     '/contabilita/analitica/impostazioni/'):
             self.assertEqual(self.apri(url).status_code, 200, url)
