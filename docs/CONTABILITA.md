@@ -242,6 +242,10 @@ Da ogni voce si apre il dettaglio dei documenti. In alto c'è l'elenco di quello
 - Contano solo i movimenti reali dei conti, raggruppati per flusso della voce: gestione operativa, investimenti, finanziamenti e titolare.
 - Saldo iniziale + flusso netto = saldo finale.
 - I giroconti sono esclusi.
+- Due versioni dei contanti incassati, come le due basi dei ricavi del conto economico:
+  - *dalla quadratura reale* (predefinita): i contanti contati, cioè i movimenti della cassa;
+  - *dagli scontrini*: al posto degli incassi della cassa, i pagamenti in contanti degli ordini e le vendite in contanti delle casse automatiche. Spese, ticket, versamenti e conte della cassa restano, e anche i saldi della cassa si spostano della differenza.
+- Il POS entra dalla banca ed è uguale nelle due versioni. Sotto il rendiconto c'è la differenza dell'anno fra contanti contati e contanti degli scontrini.
 
 ### Cespiti
 

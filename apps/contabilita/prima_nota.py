@@ -376,6 +376,22 @@ def _contanti_da_scontrino(giorni_quadratura):
     return {g: (servito[g], casse[g]) for g in giorni}
 
 
+def incassi_contanti(dal, al):
+    """{giorno di quadratura: {'reale', 'servito', 'self'}} dal dal al al:
+    i contanti contati (contati - fondo + spese + ticket: i soldi usati per
+    spese e ticket sono usciti dagli incassi) e quelli che risultano dagli
+    scontrini (vedi _contanti_da_scontrino)."""
+    from apps.finanze.models import QuadraturaGiornaliera, SpesaCassa, TicketResto
+    usciti = defaultdict(lambda: ZERO)
+    for modello in (SpesaCassa, TicketResto):
+        for r in modello.objects.filter(data__gte=dal, data__lte=al).values('data', 'importo'):
+            usciti[r['data']] += r['importo']
+    quadrature = list(QuadraturaGiornaliera.objects.filter(data__gte=dal, data__lte=al))
+    da_scontrino = _contanti_da_scontrino([q.data for q in quadrature])
+    return {q.data: {'reale': q.contanti_totali - q.fondo_cassa_iniziale + usciti[q.data],
+                     'servito': da_scontrino[q.data][0], 'self': da_scontrino[q.data][1]} for q in quadrature}
+
+
 def genera_cassa(conto, dal, al):
     """Movimenti della cassa contanti dal dal al al (compresi):
     - incassi in contanti del giorno = contati - fondo + spese + ticket
@@ -391,24 +407,18 @@ def genera_cassa(conto, dal, al):
       pagati in contanti (vedi _pos_nei_contanti e _stipendi_fuori_busta).
     Si possono rigenerare: gli importi si aggiornano, le voci cambiate a
     mano restano. Restituisce quanti movimenti sono stati scritti."""
-    from apps.finanze.models import QuadraturaGiornaliera, SpesaCassa, TicketResto
+    from apps.finanze.models import SpesaCassa, TicketResto
 
     voci = {v.codice: v for v in VoceConto.objects.filter(
         codice__in=list(VOCI_SPESE_CASSA.values()) + ['N.INCASSI', 'N.GIROCONTO'] + [f[1] for f in FONTI_INCASSI])}
     spese = list(SpesaCassa.objects.filter(data__gte=dal, data__lte=al))
     ticket = list(TicketResto.objects.filter(data__gte=dal, data__lte=al))
     voluti = {}
-    quadrature = list(QuadraturaGiornaliera.objects.filter(data__gte=dal, data__lte=al))
-    da_scontrino = _contanti_da_scontrino([q.data for q in quadrature])
-    for q in quadrature:
-        lordo = (q.contanti_totali - q.fondo_cassa_iniziale
-                 + sum((s.importo for s in spese if s.data == q.data), Decimal('0'))
-                 + sum((t.importo for t in ticket if t.data == q.data), Decimal('0')))
-        servito, casse = da_scontrino[q.data]
-        parti = {'servito': servito, 'self': casse, 'altro': lordo - servito - casse}
+    for giorno, v in incassi_contanti(dal, al).items():
+        parti = {'servito': v['servito'], 'self': v['self'], 'altro': v['reale'] - v['servito'] - v['self']}
         for chiave, codice, descrizione in FONTI_INCASSI:
             if parti[chiave]:
-                voluti[f'cassa|incassi|{chiave}|{q.data:%Y-%m-%d}'] = (q.data, parti[chiave], descrizione,
+                voluti[f'cassa|incassi|{chiave}|{giorno:%Y-%m-%d}'] = (giorno, parti[chiave], descrizione,
                                                                      voci.get(codice) or voci.get('N.INCASSI'))
     for s in spese:
         voluti[f'cassa|spesa|{s.pk}'] = (s.data, -s.importo, f'Spesa di cassa: {s.descrizione}',

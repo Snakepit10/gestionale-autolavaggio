@@ -273,6 +273,20 @@ class PrimaNotaTest(TestCase):
         self.assertEqual(parti, {'N.INC.SERVITO': Decimal('60'), 'N.INC.SELF': Decimal('120'), 'N.INC.ALTRO': Decimal('20')})
         self.assertEqual(self.cassa.movimenti.filter(data=date(2026, 10, 7)).count(), 0)   # niente contanti, niente righe
         self.assertEqual(self.cassa.saldo_al(date(2026, 10, 31)), Decimal('200'))         # il totale non cambia
+        # flussi di cassa: dalla quadratura reale o dagli scontrini (60 + 120 = 180)
+        from .conto_economico import flussi_di_cassa
+        reale, scontrini = (flussi_di_cassa([date(2026, 10, 1)], base) for base in ('reale', 'scontrini'))
+        voci_reale = {r['nome']: r['totale'] for r in reale['righe'] if r['tipo'] == 'voce'}
+        voci_scontrini = {r['nome']: r['totale'] for r in scontrini['righe'] if r['tipo'] == 'voce'}
+        self.assertEqual(voci_reale['Incassi in contanti senza scontrino'], Decimal('20'))
+        self.assertNotIn('Incassi in contanti senza scontrino', voci_scontrini)
+        self.assertEqual((voci_scontrini['Incassi in contanti dal servito'], voci_scontrini['Incassi in contanti dalle casse automatiche']),
+                         (Decimal('60'), Decimal('120')))
+        finale = lambda fc: next(r['totale'] for r in fc['righe'] if r['chiave'] == 'finale')
+        self.assertEqual(finale(reale) - finale(scontrini), Decimal('20'))
+        self.assertEqual((reale['senza_scontrino'], scontrini['senza_scontrino']), (Decimal('20'), Decimal('20')))
+        cassa = lambda fc: next(c for c in fc['per_conto'] if c['conto'] == self.cassa)['finale']
+        self.assertEqual(cassa(reale) - cassa(scontrini), Decimal('20'))
 
     def test_correggi_baps_caricato_su_mps(self):
         mps = ContoFinanziario.objects.get(nome='MPS')

@@ -334,7 +334,34 @@ def controlli(mesi, ce=None):
 FLUSSI = [('operativo', 'Gestione operativa'), ('investimenti', 'Investimenti'), ('finanziario', 'Finanziamenti e titolare')]
 
 
-def flussi_di_cassa(mesi):
+# I contanti incassati nei flussi di cassa: come la base dei ricavi del conto economico
+BASI_CONTANTI = {
+    'reale': 'Contanti dalla quadratura reale',
+    'scontrini': 'Contanti dagli scontrini',
+}
+IMPRONTA_INCASSI = 'cassa|incassi|'
+
+
+def _contanti_scontrini(conti, fine):
+    """(cassa, {giorno: {'servito', 'self'}} dagli scontrini, {giorno: incassi
+    della cassa dalla quadratura}) dall'inizio della cassa contanti a fine."""
+    from .prima_nota import incassi_contanti
+    cassa = next((c for c in conti if c.tipo == 'cassa'), None)
+    if not cassa:
+        return None, {}, {}
+    scontrini = incassi_contanti(cassa.data_saldo_iniziale, fine)
+    quadratura = defaultdict(lambda: ZERO)
+    for m in MovimentoFinanziario.objects.filter(conto=cassa, impronta__startswith=IMPRONTA_INCASSI,
+                                                 data__gte=cassa.data_saldo_iniziale, data__lte=fine):
+        quadratura[m.data] += m.importo
+    return cassa, scontrini, quadratura
+
+
+def flussi_di_cassa(mesi, base='reale'):
+    """base 'reale': gli incassi in contanti sono quelli contati nelle
+    quadrature (i movimenti della cassa); base 'scontrini': al loro posto
+    i contanti degli scontrini, servito e casse automatiche. Il POS entra
+    dalla banca ed e' uguale nelle due basi."""
     n = len(mesi)
     zeri = [ZERO] * n
     indice = {m: i for i, m in enumerate(mesi)}
@@ -346,6 +373,8 @@ def flussi_di_cassa(mesi):
                  .select_related('voce', 'voce_differenza', 'conto'))
     for m in movimenti:
         if m.data < m.conto.data_saldo_iniziale:
+            continue
+        if base == 'scontrini' and m.conto.tipo == 'cassa' and (m.impronta or '').startswith(IMPRONTA_INCASSI):
             continue
         i = indice[m.data.replace(day=1)]
         if m.voce and m.voce.flusso == 'giroconto':
@@ -360,8 +389,27 @@ def flussi_di_cassa(mesi):
             per_voce[chiave][i] -= m.differenza
             per_voce[m.voce_differenza_id][i] += m.differenza
 
-    iniziali = [sum((c.saldo_al(m - timedelta(days=1)) for c in conti), ZERO) for m in mesi]
-    finali = [sum((c.saldo_al(fine_mese(m)) for c in conti), ZERO) for m in mesi]
+    fine = fine_mese(mesi[-1])
+    cassa, scontrini, quadratura = _contanti_scontrini(conti, fine)
+
+    def scarto(giorno):
+        """Contanti contati meno quelli degli scontrini, dall'inizio della cassa al giorno."""
+        return (sum((v for g, v in quadratura.items() if g <= giorno), ZERO)
+                - sum((v['servito'] + v['self'] for g, v in scontrini.items() if g <= giorno), ZERO))
+
+    if base == 'scontrini' and cassa:
+        for codice, chiave_fonte in (('N.INC.SERVITO', 'servito'), ('N.INC.SELF', 'self')):
+            v = VoceConto.objects.filter(codice=codice).first()
+            if not v:
+                continue
+            voci[v.pk] = v
+            for g, parti in scontrini.items():
+                if g >= mesi[0]:
+                    per_voce[v.pk][indice[g.replace(day=1)]] += parti[chiave_fonte]
+    correzione = (lambda giorno: scarto(giorno)) if base == 'scontrini' and cassa else (lambda giorno: ZERO)
+    iniziali = [sum((c.saldo_al(m - timedelta(days=1)) for c in conti), ZERO) - correzione(m - timedelta(days=1))
+                for m in mesi]
+    finali = [sum((c.saldo_al(fine_mese(m)) for c in conti), ZERO) - correzione(fine_mese(m)) for m in mesi]
     righe = [_riga('risultato', 'Saldo iniziale (tutti i conti)', iniziali, 'iniziale')]
     righe[0]['totale'] = iniziali[0] if iniziali else ZERO
     netti = []
@@ -385,7 +433,10 @@ def flussi_di_cassa(mesi):
     righe.append(finale)
     for r in righe:
         r['pct'] = None
-    per_conto = [{'conto': c, 'iniziale': c.saldo_al(mesi[0] - timedelta(days=1)), 'finale': c.saldo_al(fine_mese(mesi[-1]))}
-                 for c in conti]
-    return {'mesi': mesi, 'righe': righe, 'per_conto': per_conto,
+    def saldo(c, giorno):
+        return c.saldo_al(giorno) - (correzione(giorno) if c == cassa else ZERO)
+    per_conto = [{'conto': c, 'iniziale': saldo(c, mesi[0] - timedelta(days=1)), 'finale': saldo(c, fine)} for c in conti]
+    # contanti contati in piu' di quelli degli scontrini nel periodo (stessa cifra nelle due basi)
+    senza_scontrino = scarto(fine) - scarto(mesi[0] - timedelta(days=1)) if cassa else ZERO
+    return {'mesi': mesi, 'righe': righe, 'per_conto': per_conto, 'senza_scontrino': senza_scontrino,
             'serie': {'netto': netto, 'finale': finali, 'operativo': netti[0]}}

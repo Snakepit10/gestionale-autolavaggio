@@ -177,6 +177,7 @@ class VisteBilancioTest(TestCase):
                     '/contabilita/conto-economico/?anno=2026&ricavi=canali',
                     '/contabilita/prima-nota/?stato=senza_fattura&anno=2026', '/contabilita/prima-nota/?stato=senza_fattura',
                     '/contabilita/flussi-di-cassa/?anno=2026', '/contabilita/flussi-di-cassa/?anno=2026&vista=trimestri',
+                    '/contabilita/flussi-di-cassa/?anno=2026&contanti=scontrini',
                     f'/contabilita/conto-economico/dettaglio/?chiave=voce:{chimici.pk}&anno=2026',
                     '/contabilita/conto-economico/dettaglio/?chiave=dacl&anno=2026', '/contabilita/cespiti/'):
             self.assertEqual(self.apri(url).status_code, 200, url)

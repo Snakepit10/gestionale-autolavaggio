@@ -88,8 +88,11 @@ def conto_economico(request):
 def flussi_di_cassa(request):
     anno = _anno(request)
     vista = request.GET.get('vista', 'mesi')
+    base = request.GET.get('contanti', 'reale')
+    if base not in ce_srv.BASI_CONTANTI:
+        base = 'reale'
     mesi = [date(anno, m, 1) for m in range(1, 13)]
-    fc = ce_srv.flussi_di_cassa(mesi)
+    fc = ce_srv.flussi_di_cassa(mesi, base)
     gruppi = _gruppi(vista)
     righe = ce_srv.raggruppa(fc, gruppi)
     for r in righe:
@@ -97,6 +100,9 @@ def flussi_di_cassa(request):
     return render(request, 'contabilita/flussi.html', {
         'anno': anno,
         'vista': vista,
+        'base': base,
+        'basi': list(ce_srv.BASI_CONTANTI.items()),
+        'senza_scontrino': fc['senza_scontrino'],
         'colonne': [g[0] for g in gruppi],
         'righe': righe,
         'per_conto': fc['per_conto'],
