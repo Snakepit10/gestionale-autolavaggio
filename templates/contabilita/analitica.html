@@ -22,22 +22,7 @@ details summary { cursor: pointer; font-size: .75rem; color: #475569; font-weigh
     {% include "contabilita/_nav.html" %}
   </div>
 
-  <form method="get" class="d-flex gap-2 flex-wrap mb-3 align-items-center">
-    <a class="btn btn-sm btn-outline-secondary" href="?anno={{ anno|add:'-1' }}&mese={{ mese }}&ricavi={{ base }}"><i class="bi bi-chevron-left"></i> {{ anno|add:"-1" }}</a>
-    <input type="hidden" name="anno" value="{{ anno }}">
-    <input type="hidden" name="ricavi" value="{{ base }}">
-    <select name="mese" class="form-select form-select-sm" style="max-width:180px" onchange="this.form.submit()">
-      <option value="">Tutto il {{ anno }}</option>
-      {% for n, nome in mesi_nomi %}<option value="{{ n }}" {% if mese == n|stringformat:'s' %}selected{% endif %}>{{ nome }} {{ anno }}</option>{% endfor %}
-    </select>
-    <a class="btn btn-sm btn-outline-secondary" href="?anno={{ anno|add:'1' }}&mese={{ mese }}&ricavi={{ base }}">{{ anno|add:"1" }} <i class="bi bi-chevron-right"></i></a>
-    <div class="btn-group btn-group-sm" title="Da dove vengono i ricavi">
-      {% for chiave, nome in basi %}
-      <a class="btn {% if base == chiave %}btn-success{% else %}btn-outline-success{% endif %}" href="?anno={{ anno }}&mese={{ mese }}&ricavi={{ chiave }}" title="{{ nome }}">Ricavi: {% if chiave == 'rilevato' %}rilevato reale &minus; IVA{% else %}scontrini fiscali{% endif %}</a>
-      {% endfor %}
-    </div>
-    <a class="btn btn-sm btn-outline-primary ms-auto" href="{% url 'contabilita:impostazioni_analitica' %}"><i class="bi bi-sliders"></i> Ripartizioni del personale e costi comuni</a>
-  </form>
+  {% include "contabilita/_schede_analitica.html" %}
 
   {% if a.avvisi %}
   <div class="alert alert-warning py-2 small mb-3">

@@ -228,3 +228,70 @@ class VisteAnaliticaTest(TestCase):
         affitto.refresh_from_db()
         self.assertEqual(affitto.driver_comuni, 'cicli')
         self.assertEqual(Cespite.objects.get().driver_comuni, 'ricavi')      # cespite del self: non si tocca
+
+
+class ProduttivitaTest(TestCase):
+    """Stesso mese di prova di AnaliticaTest: un lavaggio il 6/10 (martedi'),
+    8 ore di presenza il 2/10 al 75% servito."""
+    def setUp(self):
+        from django.core.cache import cache
+        cache.clear()
+        AnaliticaTest.setUp(self)
+
+    def test_kpi_del_mese(self):
+        from .produttivita import derivati, kpi_mese
+        k = kpi_mese(OTTOBRE, 'scontrini')
+        self.assertEqual((k['lavaggi'], k['giorni_aperti']), (1, 1))
+        self.assertEqual((k['ore'], k['giorni_persona']), (Decimal('6'), Decimal('0.75')))
+        self.assertEqual((k['ricavi'], k['personale'], k['variabili'], k['pieno']),
+                         (Decimal('100.00'), Decimal('60.00'), Decimal('30.00'), Decimal('190.00')))
+        d = derivati(k)
+        self.assertEqual(d['persone_giorno'], Decimal('0.75'))
+        self.assertEqual(d['lavoro_ricavi'], Decimal('60'))
+        self.assertEqual((d['consumi_lavaggio'], d['costo_lavaggio'], d['risultato_lavaggio']),
+                         (Decimal('30'), Decimal('190'), Decimal('-90')))
+        self.assertEqual(round(d['auto_ora'], 4), Decimal('0.1667'))
+        self.assertIsNone(kpi_mese(date(2099, 1, 1), 'scontrini'))
+
+    def test_andamento_e_anno_prima(self):
+        from .produttivita import andamento
+        t = andamento(2026, 'scontrini')
+        lavaggi = next(r for r in t['righe'] if r['chiave'] == 'lavaggi')
+        self.assertEqual(lavaggi['celle'][9]['v'], 1)          # ottobre
+        self.assertIsNone(lavaggi['celle'][9]['var'])         # nel 2025 nessun dato
+        self.assertEqual(lavaggi['celle'][12]['v'], 1)         # totale
+        self.assertEqual(len(t['mesi']), 13)
+
+    def test_giorni_settimana_meteo_e_mix(self):
+        from unittest import mock
+
+        from apps.core.models import ServizioProdotto
+        from apps.ordini.models import ItemOrdine, Ordine
+
+        from .produttivita import giorni_del_periodo, mix_ed_extra, per_giorno_settimana, per_meteo
+        fine = date(2026, 10, 31)
+        giorni = giorni_del_periodo(OTTOBRE, fine)
+        self.assertEqual([(g['data'], g['lavaggi'], g['ricavo']) for g in giorni], [(date(2026, 10, 6), 1, Decimal('100'))])
+        settimana = per_giorno_settimana(giorni)
+        self.assertEqual((settimana[0]['nome'], settimana[0]['lavaggi'], settimana[0]['lavaggi_persona']),
+                         ('Martedì', Decimal('1'), None))         # nessuna presenza quel giorno
+        with mock.patch('apps.personale.previsione._meteo', return_value={date(2026, 10, 6): {'pioggia': 3, 'ore': 4}}):
+            self.assertEqual([m['nome'] for m in per_meteo(giorni, OTTOBRE, fine)], ['Pioggia'])
+        with mock.patch('apps.personale.previsione._meteo', return_value=None):
+            self.assertIsNone(per_meteo(giorni, OTTOBRE, fine))
+        cera = ServizioProdotto.objects.create(titolo='Cera', categoria=self.categoria, prezzo=Decimal('12.20'), descrizione='')
+        ordine = Ordine.objects.get()
+        ItemOrdine.objects.create(ordine=ordine, servizio_prodotto=cera, quantita=1, prezzo_unitario=cera.prezzo)
+        m = mix_ed_extra(OTTOBRE, fine)
+        self.assertEqual((m['lavaggi'], m['con_extra'], m['pct_extra'], m['ricavo_extra']),
+                         (1, 1, Decimal('100'), Decimal('10')))
+        self.assertEqual((m['mix'][0]['nome'], m['mix'][0]['ricavo']), ('Lavaggio a mano', Decimal('100')))
+
+    def test_pagina(self):
+        from unittest import mock
+        VisteAnaliticaTest.setUp(self)
+        with mock.patch('apps.personale.previsione._meteo', return_value={}):
+            for url in ('/contabilita/analitica/produttivita/?anno=2026', '/contabilita/analitica/produttivita/?anno=2026&mese=10'):
+                r = VisteAnaliticaTest.apri(self, url)
+                self.assertEqual(r.status_code, 200, url)
+                self.assertContains(r, 'Auto per ora-persona')

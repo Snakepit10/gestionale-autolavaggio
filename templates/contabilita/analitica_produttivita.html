@@ -1,0 +1,110 @@
+{% extends "base.html" %}
+{% load contabilita_info %}
+{% block title %}Produttivit&agrave; {{ periodo }}{% endblock %}
+
+{% block extra_css %}{% include "contabilita/_stile.html" %}
+<style>
+.andamento td, .andamento th { white-space: nowrap; }
+.andamento .var { display: block; font-size: .64rem; font-weight: 600; }
+.andamento .var.buono { color: #047857; }
+.andamento .var.cattivo { color: #b91c1c; }
+.andamento .var.neutro { color: #94a3b8; }
+.kpi-mini { background: #f8fafc; border-radius: 8px; padding: 8px 10px; height: 100%; }
+.kpi-mini .label { font-size: .64rem; text-transform: uppercase; letter-spacing: .4px; color: #64748b; font-weight: 700; }
+.kpi-mini .value { font-size: 1.05rem; font-weight: 800; color: #1e293b; }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="dash-page">
+  <div class="dash-header">
+    <h4><i class="bi bi-pie-chart me-2"></i>Contabilit&agrave; analitica &mdash; {{ periodo }}</h4>
+    {% include "contabilita/_nav.html" %}
+  </div>
+
+  {% include "contabilita/_schede_analitica.html" %}
+
+  {% with t=p.andamento %}
+  <div class="panel">
+    <div class="panel-title"><i class="bi bi-calendar3"></i> Servito mese per mese &mdash; {{ anno }}</div>
+    <div class="panel-sub">Sotto ogni valore la variazione rispetto allo stesso mese del {{ t.anno_prima }} (passa sopra per vedere il valore): verde se migliora, rosso se peggiora.
+      Il totale dell'anno prima conta solo i mesi gi&agrave; passati di quest'anno. Costi e ricavi come nella scheda Centri; ore e persone dalle presenze, per la quota servito di ogni dipendente.</div>
+    <div class="panel-body tabella-scroll">
+      <table class="table table-sm bilancio andamento">
+        <thead><tr><th></th>{% for m in t.mesi %}<th class="tab-num">{{ m }}</th>{% endfor %}</tr></thead>
+        <tbody>
+          {% for r in t.righe %}
+          <tr class="{% if r.chiave == 'risultato' or r.chiave == 'risultato_lavaggio' %}riga-totale{% endif %}">
+            <td class="col-nome">{{ r.nome }}{% info r.nome %}</td>
+            {% for c in r.celle %}
+            <td class="tab-num {% if forloop.last %}col-totale{% endif %}" title="{{ t.anno_prima }}: {% include 'contabilita/_valore.html' with v=c.prima formato=r.formato %}">
+              {% include "contabilita/_valore.html" with v=c.v formato=r.formato %}
+              {% if c.var != None %}<span class="var {% if c.buono == True %}buono{% elif c.buono == False %}cattivo{% else %}neutro{% endif %}">{% if c.var > 0 %}+{% endif %}{{ c.var|floatformat:0 }}%</span>{% endif %}
+            </td>
+            {% endfor %}
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+  {% endwith %}
+
+  <div class="row g-3">
+    <div class="col-xl-6">
+      <div class="panel h-100">
+        <div class="panel-title"><i class="bi bi-calendar-week"></i> Per giorno della settimana &mdash; {{ periodo }}</div>
+        <div class="panel-sub">Medie dei giorni aperti (almeno un lavaggio) fino a ieri: {{ p.giorni_aperti }} giorni. Persone = presenze per la quota servito. Ricavo = totale degli ordini di lavaggio senza IVA.</div>
+        <div class="panel-body tabella-scroll">
+          {% if p.settimana %}
+          <table class="table table-sm bilancio">
+            <thead><tr><th>Giorno</th><th class="tab-num">Giorni</th><th class="tab-num">Lavaggi</th><th class="tab-num">Persone</th><th class="tab-num">Lavaggi per persona{% info "Lavaggi per persona al giorno" %}</th><th class="tab-num">Ricavo</th></tr></thead>
+            <tbody>{% for g in p.settimana %}{% include "contabilita/_riga_giorni.html" %}{% endfor %}</tbody>
+          </table>
+          {% else %}<div class="small text-muted">Nessun giorno con lavaggi nel periodo.</div>{% endif %}
+        </div>
+      </div>
+    </div>
+    <div class="col-xl-6">
+      <div class="panel h-100">
+        <div class="panel-title"><i class="bi bi-cloud-rain"></i> Pioggia e asciutto &mdash; {{ periodo }}</div>
+        <div class="panel-sub">Stesse medie, divise fra giorni di pioggia (almeno 1 mm o 2 ore di pioggia, dall'archivio Open-Meteo per Licata) e asciutti.</div>
+        <div class="panel-body tabella-scroll">
+          {% if p.meteo == None %}<div class="small text-muted">Il servizio meteo non risponde: riprova pi&ugrave; tardi.</div>
+          {% elif p.meteo %}
+          <table class="table table-sm bilancio">
+            <thead><tr><th>Giorni</th><th class="tab-num">Giorni</th><th class="tab-num">Lavaggi</th><th class="tab-num">Persone</th><th class="tab-num">Lavaggi per persona</th><th class="tab-num">Ricavo</th></tr></thead>
+            <tbody>{% for g in p.meteo %}{% include "contabilita/_riga_giorni.html" %}{% endfor %}</tbody>
+          </table>
+          {% else %}<div class="small text-muted">Nessun giorno con lavaggi nel periodo.</div>{% endif %}
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="panel mt-3">
+    <div class="panel-title"><i class="bi bi-stars"></i> Mix dei servizi ed extra &mdash; {{ periodo }}</div>
+    <div class="panel-sub">Servizio principale = la riga di servizio con il prezzo pi&ugrave; alto dell'ordine; extra = le altre righe di servizio (supplementi compresi). Prezzi senza IVA.</div>
+    <div class="panel-body">
+      {% with m=p.mix %}
+      {% if m %}
+      <div class="row g-2 mb-3">
+        <div class="col-6 col-md-3"><div class="kpi-mini"><div class="label">Lavaggi</div><div class="value">{{ m.lavaggi }}</div></div></div>
+        <div class="col-6 col-md-3"><div class="kpi-mini"><div class="label">Lavaggi con extra{% info "Lavaggi con extra" %}</div><div class="value">{{ m.pct_extra|floatformat:1 }}%</div><div class="small text-muted">{{ m.con_extra }} ordini</div></div></div>
+        <div class="col-6 col-md-3"><div class="kpi-mini"><div class="label">Ricavo extra per lavaggio{% info "Ricavo extra per lavaggio" %}</div><div class="value">&euro;{{ m.ricavo_extra|floatformat:2 }}</div></div></div>
+      </div>
+      <div class="tabella-scroll">
+        <table class="table table-sm bilancio">
+          <thead><tr><th>Servizio principale</th><th class="tab-num">Lavaggi</th><th class="tab-num">Quota</th><th class="tab-num">Prezzo medio</th></tr></thead>
+          <tbody>
+            {% for s in m.mix %}<tr class="riga-voce"><td class="col-nome">{{ s.nome }}</td><td class="tab-num">{{ s.n }}</td><td class="tab-num">{{ s.quota|floatformat:1 }}%</td><td class="tab-num">&euro;{{ s.ricavo|floatformat:2 }}</td></tr>{% endfor %}
+          </tbody>
+        </table>
+        {% if m.altri %}<div class="small text-muted">e altri {{ m.altri }} servizi.</div>{% endif %}
+      </div>
+      {% else %}<div class="small text-muted">Nessun lavaggio nel periodo.</div>{% endif %}
+      {% endwith %}
+    </div>
+  </div>
+</div>
+{% endblock %}

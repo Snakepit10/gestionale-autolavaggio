@@ -106,6 +106,48 @@ SPIEGAZIONI = {
         'Una stima di quanto costa quel servizio, da confrontare con il prezzo.',
         'Vale un\'ora-persona per ogni ora di catalogo: se un\'auto la lavorano più persone insieme, il costo vero è più alto.'),
 
+    # ------------------------------------------------------- analitica: produttivita'
+    'Ore pagate servito': (
+        'Ore lavorate del calendario presenze × quota sul servito di ogni dipendente. Ferie e malattia non contano.',
+        'Le ore che si pagano per il servito, lavorate o di attesa.'),
+    'Auto per ora-persona': (
+        'Lavaggi / ore pagate servito.',
+        'La misura principale della produttività di un autolavaggio con servito: quante auto escono per ogni ora pagata.',
+        'Scende quando c\'è più gente in turno di quanta ne serva per le auto che arrivano.'),
+    'Persone medie al giorno': (
+        'Giorni-persona del servito / giorni con almeno un lavaggio. Un giorno-persona è una presenza con ore, per la '
+        'quota servito del dipendente.',
+        'Quante persone c\'erano in media al servito nei giorni aperti.'),
+    'Lavaggi per persona al giorno': (
+        'Lavaggi / giorni-persona del servito.',
+        'Quante auto ha lavato in media ogni persona in una giornata. Si confronta con il pareggio qui sotto.'),
+    'Ricavo per lavaggio': (
+        'Ricavi del servito (IVA esclusa, stessa base della scheda Centri) / lavaggi.',
+        'Lo scontrino medio del servito. Gli accessi in abbonamento contano come lavaggi a zero euro.'),
+    'Consumi per lavaggio': (
+        'Costi variabili del servito (chimici, materiale, energia…) / lavaggi.',
+        'Quanto si spende in consumi per ogni auto.'),
+    'Costo pieno per lavaggio': (
+        'Costi del servito + sua quota dei costi comuni / lavaggi.',
+        'Quanto costa in media un lavaggio, struttura compresa.'),
+    'Risultato per lavaggio': (
+        'Ricavo per lavaggio − costo pieno per lavaggio.',
+        'Quanto guadagna (o perde) in media il servito su ogni auto.'),
+    'Costo del lavoro sui ricavi': (
+        'Costo del personale del servito / ricavi del servito × 100.',
+        'Quanta parte di ogni euro incassato va in stipendi e contributi.',
+        'Come ordine di grandezza indicativo, i lavaggi con servito puntano di solito sul 35-45%.'),
+    'Ricavi servito': ('Ricavi del servito, IVA esclusa, con la base scelta.', 'Il fatturato del servito nel mese.'),
+    'Risultato pieno servito': (
+        'Ricavi del servito − costi del servito − sua quota dei costi comuni.',
+        'L\'utile del servito nel mese, struttura compresa.'),
+    'Lavaggi con extra': (
+        'Ordini di lavaggio con almeno due righe di servizio / lavaggi. Il principale è la riga col prezzo più alto.',
+        'Quanto spesso il cliente aggiunge qualcosa al lavaggio: misura le vendite aggiuntive.'),
+    'Ricavo extra per lavaggio': (
+        'Somma delle righe di servizio diverse dalla principale, IVA esclusa / lavaggi.',
+        'Quanto portano in media gli extra su ogni auto.'),
+
     # -------------------------------------------------------- indebitamento massimo
     'Nuovo finanziamento ottenibile': (
         'Il più basso fra il debito ripagabile con la rata ancora disponibile (DSCR) e lo spazio del multiplo dell\'EBITDA.',

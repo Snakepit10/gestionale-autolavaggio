@@ -341,6 +341,31 @@ Tutti i centri hanno gli stessi livelli:
 - Righe: ricavi, costi variabili, margine di contribuzione, costi fissi, personale, ammortamenti, margine del centro, quota costi comuni, risultato pieno.
 - Il totale coincide con l'EBIT del conto economico.
 
+**Scheda Produttività** (Analitica › Produttività)
+
+*Servito mese per mese.* Una colonna per mese più il totale. Sotto ogni valore c'è la variazione rispetto allo stesso mese dell'anno prima: verde se migliora, rosso se peggiora. Il totale dell'anno prima conta solo i mesi già passati di quest'anno.
+
+| Riga | Calcolo |
+|---|---|
+| Lavaggi, di cui in abbonamento | come nella scheda Centri |
+| Ore pagate servito | ore lavorate × quota servito della ripartizione |
+| Auto per ora-persona | lavaggi / ore pagate servito |
+| Persone medie al giorno | giorni-persona del servito / giorni con lavaggi. Un giorno-persona è una presenza con ore, per la quota servito |
+| Lavaggi per persona al giorno | lavaggi / giorni-persona |
+| Ricavo, consumi, costo pieno e risultato per lavaggio | ricavi, costi variabili, costo pieno (con la quota comuni) e risultato del servito / lavaggi |
+| Costo del lavoro sui ricavi | personale del servito / ricavi del servito |
+
+- I mesi già chiusi si tengono in memoria per un'ora: una fattura appena caricata compare al più tardi dopo un'ora.
+
+*Per giorno della settimana* e *pioggia e asciutto*:
+- medie dei giorni aperti, cioè con almeno un lavaggio, fino a ieri: lavaggi, persone (presenze per la quota servito), lavaggi per persona e ricavo (totale degli ordini di lavaggio senza IVA);
+- giorno di pioggia = almeno 1 mm o 2 ore di pioggia, dall'archivio Open-Meteo, come nella previsione della squadra;
+- l'ora di creazione degli ordini non è affidabile, quindi niente analisi per fascia oraria.
+
+*Mix ed extra:*
+- servizio principale = la riga di servizio dell'ordine col prezzo più alto; extra = le altre righe di servizio;
+- si vedono la percentuale di lavaggi con extra, il ricavo extra per lavaggio e la quota e il prezzo medio dei servizi principali.
+
 ## Fase 5: indici e KPI
 
 Pagina **Indici e KPI**. Gli indici usano i mesi chiusi dell'anno da quando parte la contabilità (il primo saldo iniziale dei conti), riportati a 12 mesi. I ricavi seguono la stessa base del conto economico (rilevato reale − IVA o scontrini fiscali). Ogni indice ha la formula e un colore: verde in linea con la prassi bancaria per piccole imprese, giallo da tenere d'occhio, rosso critico.

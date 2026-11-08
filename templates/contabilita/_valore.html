@@ -1,0 +1,1 @@
+{% if v == None %}&mdash;{% elif formato == 'intero' %}{{ v|floatformat:"0g" }}{% elif formato == 'uno' %}{{ v|floatformat:1 }}{% elif formato == 'due' %}{{ v|floatformat:2 }}{% elif formato == 'euro2' %}&euro;{{ v|floatformat:2 }}{% elif formato == 'euro' %}&euro;{{ v|floatformat:"0g" }}{% elif formato == 'pct' %}{{ v|floatformat:1 }}%{% else %}{{ v }}{% endif %}

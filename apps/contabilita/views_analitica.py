@@ -36,8 +36,9 @@ def voci_e_cespiti_comuni():
     return voci, cespiti
 
 
-@accesso
-def analitica(request):
+def _periodo(request):
+    """Anno, mese (o tutto l'anno) e base dei ricavi dai parametri GET,
+    comuni a tutte le schede dell'analitica."""
     oggi = timezone.localdate()
     try:
         anno = int(request.GET.get('anno', oggi.year))
@@ -55,15 +56,29 @@ def analitica(request):
     base = request.GET.get('ricavi', 'rilevato')
     if base not in BASI_RICAVI:
         base = 'rilevato'
-    return render(request, 'contabilita/analitica.html', {
-        'a': calcola_analitica(mesi, base),
+    return mesi, {
         'base': base,
         'basi': BASI_RICAVI.items(),
         'anno': anno,
         'mese': mese,
         'periodo': periodo,
         'mesi_nomi': list(enumerate(NOMI_MESI, 1)),
-    })
+    }
+
+
+@accesso
+def analitica(request):
+    mesi, contesto = _periodo(request)
+    return render(request, 'contabilita/analitica.html', {
+        'a': calcola_analitica(mesi, contesto['base']), 'scheda': 'centri', **contesto})
+
+
+@accesso
+def produttivita(request):
+    from .produttivita import produttivita as calcola
+    mesi, contesto = _periodo(request)
+    return render(request, 'contabilita/analitica_produttivita.html', {
+        'p': calcola(mesi, contesto['anno'], contesto['base']), 'scheda': 'produttivita', **contesto})
 
 
 @accesso

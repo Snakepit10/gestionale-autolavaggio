@@ -2,7 +2,7 @@
 <div class="d-flex gap-2 flex-wrap">
   <a class="btn btn-sm {% if request.path == u_ce %}btn-primary{% else %}btn-outline-primary{% endif %}" href="{{ u_ce }}"><i class="bi bi-graph-up-arrow"></i> Conto economico</a>
   <a class="btn btn-sm {% if request.path == u_fc %}btn-primary{% else %}btn-outline-primary{% endif %}" href="{{ u_fc }}"><i class="bi bi-water"></i> Flussi di cassa</a>
-  <a class="btn btn-sm {% if request.path == u_an %}btn-primary{% else %}btn-outline-primary{% endif %}" href="{{ u_an }}"><i class="bi bi-pie-chart"></i> Analitica</a>
+  <a class="btn btn-sm {% if u_an in request.path %}btn-primary{% else %}btn-outline-primary{% endif %}" href="{{ u_an }}"><i class="bi bi-pie-chart"></i> Analitica</a>
   <a class="btn btn-sm {% if request.path == u_ind %}btn-primary{% else %}btn-outline-primary{% endif %}" href="{{ u_ind }}"><i class="bi bi-speedometer2"></i> Indici e KPI</a>
   <a class="btn btn-sm {% if request.path == u_fatture %}btn-primary{% else %}btn-outline-primary{% endif %}" href="{{ u_fatture }}"><i class="bi bi-receipt"></i> Fatture fornitori</a>
   <a class="btn btn-sm {% if request.path == u_scad %}btn-primary{% else %}btn-outline-primary{% endif %}" href="{{ u_scad }}"><i class="bi bi-calendar-check"></i> Scadenziario</a>

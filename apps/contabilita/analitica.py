@@ -208,11 +208,33 @@ def _centri(ricavi, costi):
     return centri
 
 
+def calcola_centri(mesi, base='rilevato'):
+    """Raccolta del periodo, centri con i loro margini e costi comuni divisi
+    con i driver. Lo usano la scheda Centri e la Produttivita'."""
+    dati = raccogli(mesi, base)
+    centri = _centri(dati['ricavi'], dati['costi'])
+    # Il contatore dei portali conta anche i cicli fatti per il servito:
+    # al self restano i cicli totali meno quelli del servito
+    cicli_totali = dati['washcycles']
+    cicli_servito = min(dati['cicli_servito'], cicli_totali)
+    cicli = cicli_totali - cicli_servito
+    quote, dettaglio = dividi_comuni(dati['costi'], dati['driver'], dati['ricavi'], dati['ore'],
+                                     {'self': cicli, 'servito': cicli_servito})
+    for c, centro in centri.items():
+        centro['mdc'] = centro['ricavi'] - centro['totali']['costi_variabili']
+        centro['margine'] = centro['ricavi'] - centro['costi']
+        centro['quota_comuni'] = quote[c] if c != 'comune' else -sum(quote.values(), ZERO)
+        centro['pieno'] = centro['margine'] - centro['quota_comuni']
+    return {'dati': dati, 'centri': centri, 'quote': quote, 'dettaglio_comuni': dettaglio,
+            'cicli': cicli, 'cicli_servito': cicli_servito, 'cicli_totali': cicli_totali}
+
+
 def analitica(mesi, base='rilevato'):
     from django.utils import timezone
-    dati = raccogli(mesi, base)
-    ricavi, costi, ore = dati['ricavi'], dati['costi'], dati['ore']
-    centri = _centri(ricavi, costi)
+    calcolo = calcola_centri(mesi, base)
+    dati, centri, quote, dettaglio_comuni = calcolo['dati'], calcolo['centri'], calcolo['quote'], calcolo['dettaglio_comuni']
+    ore = dati['ore']
+    cicli, cicli_servito, cicli_totali = calcolo['cicli'], calcolo['cicli_servito'], calcolo['cicli_totali']
     # il rientro si porta a 12 mesi: solo i mesi gia' iniziati, senza la competenza di quelli futuri
     trascorsi = [m for m in mesi if m <= timezone.localdate()]
     if trascorsi and len(trascorsi) < len(mesi):
@@ -220,22 +242,7 @@ def analitica(mesi, base='rilevato'):
         centri_rientro = _centri(passati['ricavi'], passati['costi'])
     else:
         centri_rientro = centri
-
-    # Il contatore dei portali conta anche i cicli fatti per il servito:
-    # al self restano i cicli totali meno quelli del servito
-    cicli_totali = dati['washcycles']
-    cicli_servito = min(dati['cicli_servito'], cicli_totali)
-    cicli = cicli_totali - cicli_servito
-
-    # Costi comuni sui centri, ognuno con il suo driver
-    quote, dettaglio_comuni = dividi_comuni(costi, dati['driver'], ricavi, ore,
-                                            {'self': cicli, 'servito': cicli_servito})
     comuni = centri['comune']['costi']
-    for c, centro in centri.items():
-        centro['mdc'] = centro['ricavi'] - centro['totali']['costi_variabili']
-        centro['margine'] = centro['ricavi'] - centro['costi']
-        centro['quota_comuni'] = quote[c] if c != 'comune' else -sum(quote.values(), ZERO)
-        centro['pieno'] = centro['margine'] - centro['quota_comuni']
     costi_cicli = sum((d['importo'] for d in dettaglio_comuni if d['driver'] == 'cicli'), ZERO)
     costo_ciclo_portale = _div(costi_cicli, cicli_totali)
 
