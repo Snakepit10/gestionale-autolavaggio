@@ -1,7 +1,7 @@
 """Test della contabilita' analitica su un mese inventato: ripartizioni
 delle voci, delle righe e del personale, direct costing del self-service,
 full costing del servito, quadratura col conto economico."""
-from datetime import date, datetime
+from datetime import date, datetime, timedelta
 from decimal import Decimal
 
 from django.contrib.auth.models import Group, User
@@ -295,3 +295,70 @@ class ProduttivitaTest(TestCase):
                 r = VisteAnaliticaTest.apri(self, url)
                 self.assertEqual(r.status_code, 200, url)
                 self.assertContains(r, 'Auto per ora-persona')
+
+
+class CapacitaTest(TestCase):
+    """Servito di prova: costo pieno 190, consumi 30, 6 ore pagate, un
+    lavaggio a mano da 100 netti."""
+    def setUp(self):
+        from apps.core.models import ServizioProdotto
+        AnaliticaTest.setUp(self)
+        self.a_mano = ServizioProdotto.objects.get(titolo='Lavaggio a mano')
+
+    def test_capacita_e_costo_del_servizio(self):
+        self.a_mano.minuti_persona_standard = 120
+        self.a_mano.save()
+        c = analitica([OTTOBRE], 'scontrini')['servito']['capacita']
+        self.assertEqual((c['ore_pagate'], c['ore_utili'], c['copertura']), (Decimal('6'), Decimal('2'), Decimal('100')))
+        self.assertEqual(round(c['saturazione'], 2), Decimal('33.33'))
+        self.assertEqual(round(c['costo_ora'], 4), Decimal('26.6667'))         # (190 - 30) / 6
+        s = c['servizi'][0]
+        self.assertEqual((s['ricavo'], s['consumi']), (Decimal('100'), Decimal('30')))
+        self.assertEqual(round(s['costo'], 2), Decimal('83.33'))               # 30 + 2 ore x 26,67
+        # costo dei servizi venduti + capacita' non usata = costo pieno
+        self.assertEqual(round(s['costo'] * s['pezzi'] + c['non_usata'], 2), Decimal('190.00'))
+        self.assertEqual(round(s['prezzo_obiettivo'], 2), Decimal('145.24'))   # 83,33 / 0,7 x 1,22
+
+    def test_copertura_parziale(self):
+        from apps.core.models import ServizioProdotto
+        from apps.ordini.models import ItemOrdine, Ordine
+        self.a_mano.minuti_persona_standard = 60
+        self.a_mano.save()
+        cera = ServizioProdotto.objects.create(titolo='Cera', categoria=self.categoria, prezzo=Decimal('12.20'), descrizione='')
+        ItemOrdine.objects.create(ordine=Ordine.objects.get(), servizio_prodotto=cera, quantita=1, prezzo_unitario=cera.prezzo)
+        c = analitica([OTTOBRE], 'scontrini')['servito']['capacita']
+        self.assertEqual((c['pezzi'], c['pezzi_std'], c['copertura'], c['consumi']), (2, 1, Decimal('50'), Decimal('15')))
+        senza = next(s for s in c['servizi'] if s['nome'] == 'Cera')
+        self.assertEqual((senza['lavoro'], senza['costo'], senza['prezzo_obiettivo']), (None, None, None))
+
+    def test_unione_degli_intervalli(self):
+        from .capacita import _unisci
+        ora = timezone.make_aware(datetime(2026, 10, 6, 10, 0))
+        minuti = lambda m: ora + timedelta(minutes=m)
+        # due righe uguali (due postazioni scelte) e una che si sovrappone: 0-20 e 15-30 -> 30 minuti
+        self.assertEqual(_unisci([(minuti(0), minuti(20)), (minuti(0), minuti(20)), (minuti(15), minuti(30))]), 1800)
+        self.assertEqual(_unisci([(minuti(0), minuti(10)), (minuti(20), minuti(25))]), 900)
+
+    def test_minuti_rilevati_solo_ordini_con_un_servizio(self):
+        from unittest import mock
+
+        from apps.ordini.models import Ordine
+
+        from .capacita import minuti_rilevati
+        ordine = Ordine.objects.get()
+        with mock.patch('apps.contabilita.capacita.minuti_per_ordine', return_value={ordine.pk: 42.0}):
+            self.assertEqual(minuti_rilevati(), {self.a_mano.pk: (42, 1)})
+
+    def test_impostazioni_minuti_e_obiettivo(self):
+        from .models import ParametriAnalitica
+        VisteAnaliticaTest.setUp(self)
+        self.assertContains(VisteAnaliticaTest.apri(self, '/contabilita/analitica/impostazioni/'), f'min_{self.a_mano.pk}')
+        self.client.post('/contabilita/analitica/impostazioni/', {'azione': 'minuti', f'min_{self.a_mano.pk}': '35'})
+        self.a_mano.refresh_from_db()
+        self.assertEqual(self.a_mano.minuti_persona_standard, 35)
+        self.client.post('/contabilita/analitica/impostazioni/', {'azione': 'minuti', f'min_{self.a_mano.pk}': ''})
+        self.a_mano.refresh_from_db()
+        self.assertIsNone(self.a_mano.minuti_persona_standard)
+        self.client.post('/contabilita/analitica/impostazioni/', {'azione': 'obiettivo', 'margine_obiettivo': '25'})
+        self.assertEqual(ParametriAnalitica.attuali().margine_obiettivo, Decimal('25'))
+        self.assertEqual(VisteAnaliticaTest.apri(self, '/contabilita/analitica/?anno=2026&mese=10').status_code, 200)

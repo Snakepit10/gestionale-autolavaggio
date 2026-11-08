@@ -112,22 +112,6 @@ details summary { cursor: pointer; font-size: .75rem; color: #475569; font-weigh
             <div class="col-6 col-md-3"><div class="kpi-mini"><div class="label">Costo pieno / ora{% info "Costo pieno / ora" %}</div><div class="value">{% if s.costo_ora != None %}&euro;{{ s.costo_ora|floatformat:2 }}{% else %}&mdash;{% endif %}</div>
               <div class="text-muted" style="font-size:.68rem">ricavo &euro;{{ s.ricavo_ora|floatformat:2|default:"—" }}</div></div></div>
           </div>
-          {% if s.servizi %}
-          <div class="tabella-scroll">
-            <table class="table table-sm">
-              <thead><tr><th>Servizio</th><th class="tab-num">Venduti</th><th class="tab-num">Minuti</th><th class="tab-num">Ricavo netto</th><th class="tab-num">Costo pieno{% info "Costo pieno del servizio" %}</th><th class="tab-num">Margine</th></tr></thead>
-              <tbody>
-                {% for sv in s.servizi %}
-                <tr><td>{{ sv.nome }}</td><td class="tab-num">{{ sv.quantita }}</td><td class="tab-num">{{ sv.durata|default:"—" }}</td>
-                  <td class="tab-num">&euro;{{ sv.ricavo|floatformat:2 }}</td>
-                  <td class="tab-num">{% if sv.costo != None %}&euro;{{ sv.costo|floatformat:2 }}{% else %}&mdash;{% endif %}</td>
-                  <td class="tab-num">{% if sv.margine != None %}<span class="{% if sv.margine < 0 %}giu{% else %}su{% endif %}">&euro;{{ sv.margine|floatformat:2 }} ({{ sv.margine_pct|floatformat:0 }}%)</span>{% endif %}</td></tr>
-                {% endfor %}
-              </tbody>
-            </table>
-            <div class="text-muted" style="font-size:.7rem">Costo pieno del servizio = costo pieno per ora &times; durata del servizio (dal catalogo). Ricavo netto = prezzo medio venduto senza IVA.</div>
-          </div>
-          {% endif %}
           <details class="mt-2"><summary>Dettaglio dei costi diretti del servito</summary>
             <table class="table table-sm bilancio mt-1"><tbody>{% include "contabilita/_sezioni_centro.html" with sezioni=s.sezioni %}</tbody></table>
           </details>
@@ -136,6 +120,53 @@ details summary { cursor: pointer; font-size: .75rem; color: #475569; font-weigh
       </div>
     </div>
   </div>
+
+  {% with c=a.servito.capacita %}
+  <div class="panel mt-3">
+    <div class="panel-title"><i class="bi bi-hourglass-split"></i> Servito &mdash; capacit&agrave; e costo dei servizi</div>
+    <div class="panel-sub">Ogni servizio paga i minuti di lavoro che gli servono (minuti-persona standard, impostati nelle <a href="{% url 'contabilita:impostazioni_analitica' %}#minuti">impostazioni</a>) al costo orario della capacit&agrave;; le ore pagate in pi&ugrave; sono la <strong>capacit&agrave; non usata</strong>, a parte.
+      Costo dei servizi venduti + capacit&agrave; non usata = costo pieno del servito.</div>
+    <div class="panel-body">
+      {% if c.copertura != None and c.copertura < 100 %}
+      <div class="alert alert-warning py-2 small">Minuti standard impostati per il {{ c.copertura|floatformat:0 }}% dei servizi venduti ({{ c.pezzi_std }} su {{ c.pezzi }}): le ore utili sono sottostimate e la capacit&agrave; non usata sovrastimata. I servizi senza minuti mostrano &mdash;.</div>
+      {% endif %}
+      {% if c.non_usata != None and c.non_usata < 0 %}
+      <div class="alert alert-warning py-2 small">Le ore utili superano le ore pagate: i minuti standard sono troppo alti.</div>
+      {% endif %}
+      <div class="row g-2 mb-3">
+        <div class="col-6 col-md"><div class="kpi-mini"><div class="label">Ore pagate{% info "Ore pagate servito" %}</div><div class="value">{{ c.ore_pagate|floatformat:"0g" }}</div></div></div>
+        <div class="col-6 col-md"><div class="kpi-mini"><div class="label">Ore utili{% info "Ore utili" %}</div><div class="value">{{ c.ore_utili|floatformat:"0g" }}</div></div></div>
+        <div class="col-6 col-md"><div class="kpi-mini"><div class="label">Saturazione{% info "Saturazione" %}</div><div class="value">{% if c.saturazione != None %}{{ c.saturazione|floatformat:0 }}%{% else %}&mdash;{% endif %}</div></div></div>
+        <div class="col-6 col-md"><div class="kpi-mini"><div class="label">Costo orario capacit&agrave;{% info "Costo orario della capacità" %}</div><div class="value">{% if c.costo_ora != None %}&euro;{{ c.costo_ora|floatformat:2 }}{% else %}&mdash;{% endif %}</div></div></div>
+        <div class="col-12 col-md"><div class="kpi-mini"><div class="label">Capacit&agrave; non usata{% info "Capacità non usata" %}</div><div class="value {% if c.non_usata > 0 %}text-danger{% endif %}">{% if c.non_usata != None %}&euro;{{ c.non_usata|floatformat:"0g" }}{% else %}&mdash;{% endif %}</div></div></div>
+      </div>
+      {% if c.servizi %}
+      <div class="tabella-scroll">
+        <table class="table table-sm bilancio">
+          <thead><tr><th>Servizio</th><th class="tab-num">Venduti</th><th class="tab-num">Minuti-persona</th><th class="tab-num">Ricavo netto</th>
+            <th class="tab-num">Consumi</th><th class="tab-num">Lavoro e struttura</th><th class="tab-num">Costo{% info "Costo del servizio" %}</th><th class="tab-num">Margine</th>
+            <th class="tab-num">Prezzo per il {{ c.margine_obiettivo|floatformat:0 }}%{% info "Prezzo per il margine obiettivo" %}</th><th class="tab-num">Listino</th></tr></thead>
+          <tbody>
+            {% for sv in c.servizi %}
+            <tr class="riga-voce"><td class="col-nome">{{ sv.nome }}</td>
+              <td class="tab-num">{{ sv.pezzi }}{% if sv.gratis %}<div class="text-muted" style="font-size:.64rem">{{ sv.gratis }} a 0 &euro;</div>{% endif %}</td>
+              <td class="tab-num">{{ sv.std|default:"—" }}</td>
+              <td class="tab-num">{% if sv.ricavo != None %}&euro;{{ sv.ricavo|floatformat:2 }}{% else %}&mdash;{% endif %}</td>
+              <td class="tab-num">{% if sv.consumi != None %}&euro;{{ sv.consumi|floatformat:2 }}{% else %}&mdash;{% endif %}</td>
+              <td class="tab-num">{% if sv.lavoro != None %}&euro;{{ sv.lavoro|floatformat:2 }}{% else %}&mdash;{% endif %}</td>
+              <td class="tab-num">{% if sv.costo != None %}&euro;{{ sv.costo|floatformat:2 }}{% else %}&mdash;{% endif %}</td>
+              <td class="tab-num">{% if sv.margine != None %}<span class="{% if sv.margine < 0 %}giu{% else %}su{% endif %}">&euro;{{ sv.margine|floatformat:2 }} ({{ sv.margine_pct|floatformat:0 }}%)</span>{% else %}&mdash;{% endif %}</td>
+              <td class="tab-num fw-semibold">{% if sv.prezzo_obiettivo != None %}&euro;{{ sv.prezzo_obiettivo|floatformat:2 }}{% else %}&mdash;{% endif %}</td>
+              <td class="tab-num text-muted">&euro;{{ sv.listino|floatformat:2 }}</td></tr>
+            {% endfor %}
+          </tbody>
+        </table>
+        <div class="text-muted" style="font-size:.7rem">Ricavo netto = prezzo medio pagato senza IVA (senza i pezzi a 0 &euro; degli abbonamenti). Consumi = costi variabili del servito diviso tutti i servizi venduti. Prezzo per il margine obiettivo e listino sono IVA inclusa; il margine obiettivo si cambia nelle impostazioni.</div>
+      </div>
+      {% else %}<div class="small text-muted">Nessun servizio venduto nel periodo.</div>{% endif %}
+    </div>
+  </div>
+  {% endwith %}
 
   <div class="row g-3 mt-0">
     <div class="col-xl-6">

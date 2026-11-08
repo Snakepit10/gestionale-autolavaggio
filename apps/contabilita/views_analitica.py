@@ -9,8 +9,8 @@ from django.utils import timezone
 
 from .analitica import analitica as calcola_analitica
 from .conto_economico import BASI_RICAVI, NOMI_MESI
-from .models import CENTRI, DRIVER_COMUNI, Cespite, RipartizionePersonale, VoceConto
-from .views import _mese, accesso, campi_ripartizione, ripartizione_da_post
+from .models import CENTRI, DRIVER_COMUNI, Cespite, ParametriAnalitica, RipartizionePersonale, VoceConto
+from .views import _decimale, _mese, accesso, campi_ripartizione, ripartizione_da_post
 
 SEZIONI_SENZA_DRIVER = ('ricavi', 'non_economico', 'oneri_finanziari', 'imposte')
 
@@ -114,6 +114,34 @@ def impostazioni_analitica(request):
                         x.save(update_fields=['driver_comuni'])
                         cambiati += 1
             messages.success(request, f'Criteri dei costi comuni salvati ({cambiati} cambiati).')
+        elif p.get('azione') == 'minuti':
+            from apps.core.models import ServizioProdotto
+            cambiati, errori = 0, []
+            for s in ServizioProdotto.objects.filter(tipo='servizio', attivo=True):
+                testo = (p.get(f'min_{s.pk}') or '').strip()
+                if not testo:
+                    valore = None
+                elif testo.isdigit() and 0 < int(testo) <= 600:
+                    valore = int(testo)
+                else:
+                    errori.append(s.titolo)
+                    continue
+                if valore != s.minuti_persona_standard:
+                    s.minuti_persona_standard = valore
+                    s.save(update_fields=['minuti_persona_standard'])
+                    cambiati += 1
+            if errori:
+                messages.error(request, 'Minuti non validi (da 1 a 600): ' + ', '.join(errori))
+            messages.success(request, f'Minuti standard salvati ({cambiati} cambiati).')
+        elif p.get('azione') == 'obiettivo':
+            valore = _decimale(p.get('margine_obiettivo'))
+            if valore is None or not 0 <= valore < 100:
+                messages.error(request, 'Margine obiettivo non valido (da 0 a 99).')
+            else:
+                parametri = ParametriAnalitica.attuali()
+                parametri.margine_obiettivo = valore
+                parametri.save()
+                messages.success(request, f'Margine obiettivo: {valore}%.')
         return redirect('contabilita:impostazioni_analitica')
 
     oggi = timezone.localdate().replace(day=1)
@@ -124,7 +152,16 @@ def impostazioni_analitica(request):
         d.storico = list(d.ripartizioni_centri.all())
         d.prefisso_rip = f'rip_{d.pk}'
     voci, cespiti = voci_e_cespiti_comuni()
+    from apps.core.models import ServizioProdotto
+
+    from .capacita import minuti_rilevati
+    rilevati = minuti_rilevati()
+    servizi = list(ServizioProdotto.objects.filter(tipo='servizio', attivo=True).order_by('categoria__nome', 'titolo'))
+    for s in servizi:
+        s.rilevati = rilevati.get(s.pk)
     return render(request, 'contabilita/impostazioni_analitica.html', {
+        'servizi': servizi,
+        'parametri': ParametriAnalitica.attuali(),
         'dipendenti': dipendenti,
         'centri': CENTRI,
         'voci_comuni': voci,

@@ -1,4 +1,5 @@
 {% extends "base.html" %}
+{% load contabilita_info %}
 {% block title %}Impostazioni analitica{% endblock %}
 
 {% block extra_css %}{% include "contabilita/_stile.html" %}{% endblock %}
@@ -66,6 +67,41 @@
         </tbody>
       </table>
       <div class="small text-muted mb-2">Il consigliato viene dal nome (manutenzione, chimici, acqua, impianti &rarr; cicli; software, divise, formazione &rarr; ore): controllalo, poi salva.</div>
+      <button class="btn btn-primary btn-sm"><i class="bi bi-save"></i> Salva</button>
+    </div>
+  </form>
+
+  <form method="post" class="panel" id="minuti">
+    {% csrf_token %}<input type="hidden" name="azione" value="minuti">
+    <div class="panel-title"><i class="bi bi-stopwatch"></i> Minuti-persona standard dei servizi</div>
+    <div class="panel-sub">Quanti minuti di lavoro servono per ogni servizio, <strong>sommando tutte le persone</strong> (2 persone per 15 minuti = 30). Servono per la capacit&agrave; del servito e per il costo di ogni servizio nell'analitica.
+      Si misurano a campione (cronometrando 20-30 lavaggi per servizio, in giorni con poca e tanta gente) o con le rilevazioni degli operatori: i <strong>rilevati</strong> sono la mediana degli ultimi 180 giorni, solo dagli ordini con un servizio e con le lavorazioni chiuse.
+      La durata del catalogo &egrave; il tempo trascorso per l'auto, non i minuti-persona. Vuoto = non ancora misurato.</div>
+    <div class="panel-body tabella-scroll">
+      <table class="table table-sm align-middle">
+        <thead><tr><th class="col-nome">Servizio</th><th class="tab-num">Durata catalogo</th><th class="tab-num">Rilevati{% info "Minuti rilevati" %}</th><th>Minuti-persona standard</th></tr></thead>
+        <tbody>
+          {% for s in servizi %}
+          <tr><td class="col-nome">{{ s.titolo }} <span class="small text-muted">{{ s.categoria }}</span></td>
+            <td class="tab-num text-muted">{{ s.durata_minuti }}'</td>
+            <td class="tab-num">{% if s.rilevati %}{{ s.rilevati.0 }}' <span class="small text-muted">({{ s.rilevati.1 }} casi)</span>{% else %}<span class="text-muted">&mdash;</span>{% endif %}</td>
+            <td><input type="text" inputmode="numeric" name="min_{{ s.pk }}" value="{{ s.minuti_persona_standard|default_if_none:'' }}" class="form-control form-control-sm" style="max-width:90px"></td></tr>
+          {% empty %}
+          <tr><td colspan="4" class="text-muted">Nessun servizio attivo.</td></tr>
+          {% endfor %}
+        </tbody>
+      </table>
+      <button class="btn btn-primary btn-sm"><i class="bi bi-save"></i> Salva</button>
+    </div>
+  </form>
+
+  <form method="post" class="panel">
+    {% csrf_token %}<input type="hidden" name="azione" value="obiettivo">
+    <div class="panel-title"><i class="bi bi-bullseye"></i> Margine obiettivo</div>
+    <div class="panel-sub">Il margine sui ricavi netti che si vuole ottenere: lo usano il prezzo consigliato dei servizi e il pareggio del servito.</div>
+    <div class="panel-body d-flex gap-2 align-items-end">
+      <div><label class="form-label small mb-0">Margine obiettivo (%)</label>
+        <input type="text" inputmode="decimal" name="margine_obiettivo" value="{{ parametri.margine_obiettivo|floatformat:'-2' }}" class="form-control form-control-sm" style="max-width:100px"></div>
       <button class="btn btn-primary btn-sm"><i class="bi bi-save"></i> Salva</button>
     </div>
   </form>

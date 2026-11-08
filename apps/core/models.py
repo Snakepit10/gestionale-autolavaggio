@@ -125,6 +125,12 @@ class ServizioProdotto(models.Model):
     
     # Campi per servizi
     durata_minuti = models.IntegerField(default=30, help_text="Durata stimata in minuti (solo per servizi)")
+    # minuti di lavoro di tutte le persone insieme (2 persone per 15 minuti =
+    # 30): li usa la contabilita' analitica per la capacita' e il costo del
+    # servizio. Vuoto = non ancora misurato.
+    minuti_persona_standard = models.PositiveSmallIntegerField(
+        null=True, blank=True,
+        help_text="Minuti-persona per servizio (somma di tutti gli operatori), per l'analitica")
     postazioni = models.ManyToManyField(Postazione, blank=True, help_text="Postazioni che possono erogare questo servizio")
     
     # Campi per prodotti

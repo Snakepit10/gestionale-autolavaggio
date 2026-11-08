@@ -106,6 +106,36 @@ SPIEGAZIONI = {
         'Una stima di quanto costa quel servizio, da confrontare con il prezzo.',
         'Vale un\'ora-persona per ogni ora di catalogo: se un\'auto la lavorano più persone insieme, il costo vero è più alto.'),
 
+    # ------------------------------------------------------- analitica: capacita'
+    'Ore utili': (
+        'Somma dei minuti-persona standard × pezzi venduti di ogni servizio, diviso 60. Contano anche gli accessi in '
+        'abbonamento.',
+        'Le ore di lavoro che sarebbero bastate per le auto lavorate, se si lavorasse sempre senza attese.',
+        'I servizi senza minuti standard contano zero: finché non sono tutti impostati, le ore utili sono sottostimate.'),
+    'Saturazione': (
+        'Ore utili / ore pagate del servito × 100.',
+        'Quanta parte del tempo pagato è servita davvero a lavare auto. Il resto è attesa fra un\'auto e l\'altra.'),
+    'Costo orario della capacità': (
+        '(Costo pieno del servito − costi variabili) / ore pagate.',
+        'Quanto costa un\'ora di capacità del servito: personale più la sua parte di struttura, senza i consumi.'),
+    'Capacità non usata': (
+        '(Ore pagate − ore utili) × costo orario della capacità.',
+        'Quanto costano le ore pagate senza auto da lavare. È la parte di costo che si recupera con i turni, non con i prezzi.',
+        'Negativa vuol dire minuti standard troppo alti.'),
+    'Costo del servizio': (
+        'Consumi medi per servizio venduto + minuti-persona standard / 60 × costo orario della capacità.',
+        'Quanto costa davvero quel servizio se il personale lavora senza attese. La somma sui servizi venduti più la '
+        'capacità non usata dà il costo pieno del servito.'),
+    'Prezzo per il margine obiettivo': (
+        'Costo del servizio / (1 − margine obiettivo) × 1,22.',
+        'Il prezzo IVA inclusa che dà il margine obiettivo su quel servizio, da confrontare con il listino.'),
+    'Minuti rilevati': (
+        'Dalle lavorazioni chiuse degli ultimi 180 giorni: per ogni operatore gli intervalli dell\'ordine si uniscono, si '
+        'tolgono le pause e si somma su tutti gli operatori. Contano solo gli ordini con un solo servizio. Si mostra la '
+        'mediana e il numero di casi.',
+        'Una misura dei minuti-persona per decidere lo standard.',
+        'Con pochi casi o rilevazioni lasciate aperte il valore non è affidabile.'),
+
     # ------------------------------------------------------- analitica: produttivita'
     'Ore pagate servito': (
         'Ore lavorate del calendario presenze × quota sul servito di ogni dipendente. Ferie e malattia non contano.',

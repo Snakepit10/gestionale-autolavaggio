@@ -323,7 +323,26 @@ Tutti i centri hanno gli stessi livelli:
 - Si calcolano anche:
   - costo pieno per lavaggio;
   - costo pieno per ora lavorata;
-  - costo pieno per servizio (costo orario × durata dal catalogo), confrontato col ricavo netto medio.
+  - capacità e costo dei servizi (vedi sotto).
+
+**Servito: capacità e costo dei servizi**
+
+Ogni servizio ha i suoi **minuti-persona standard**: i minuti di lavoro di tutte le persone insieme (2 persone per 15 minuti = 30). Si impostano in Analitica › Impostazioni.
+- Accanto c'è la mediana dei **minuti rilevati** negli ultimi 180 giorni, presi dalle lavorazioni chiuse degli operatori.
+- Per ogni ordine e operatore gli intervalli si uniscono (chi sceglie più postazioni ha righe uguali), poi si tolgono le pause e si somma sugli operatori.
+- Contano solo gli ordini con un solo servizio.
+
+| Grandezza | Calcolo |
+|---|---|
+| Ore utili | Σ minuti standard × pezzi venduti / 60, accessi in abbonamento compresi |
+| Saturazione | ore utili / ore pagate del servito |
+| Costo orario della capacità | (costo pieno − costi variabili) / ore pagate |
+| Capacità non usata | (ore pagate − ore utili) × costo orario della capacità |
+| Costo di un servizio | consumi medi per servizio venduto + minuti standard / 60 × costo orario della capacità |
+| Prezzo per il margine obiettivo | costo / (1 − margine obiettivo) × 1,22. Il margine obiettivo si imposta nelle impostazioni (predefinito 30%) |
+
+- Costo dei servizi venduti + capacità non usata = costo pieno del servito.
+- Senza minuti standard il servizio mostra "—" e un avviso indica la copertura. Non si usa la durata del catalogo, perché è tempo trascorso e non minuti-persona.
 
 **Vendita prodotti**
 - Margine = ricavi − costi assegnati al centro prodotti (per esempio "Prodotti per la rivendita"), poi quota dei costi comuni e risultato pieno.

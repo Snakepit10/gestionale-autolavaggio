@@ -24,10 +24,11 @@ from collections import defaultdict
 from datetime import date
 from decimal import Decimal
 
+from .capacita import capacita
 from .conto_economico import (IVA, ZERO, differenze_abbinamento, fine_mese, quote_competenza, ricavi_canali,
                               rilevato_per_canale, scontrini_per_canale, costo_dipendente, NOMI_PERSONALE)
-from .models import (CENTRI, DRIVER_COMUNI, NOMI_CENTRI, Cespite, MovimentoFinanziario, RigaFatturaPassiva,
-                     RipartizionePersonale)
+from .models import (CENTRI, DRIVER_COMUNI, NOMI_CENTRI, Cespite, MovimentoFinanziario, ParametriAnalitica,
+                     RigaFatturaPassiva, RipartizionePersonale)
 
 SEZIONI_ANALITICA = [
     ('costi_variabili', 'Costi variabili'),
@@ -284,7 +285,8 @@ def analitica(mesi, base='rilevato'):
         'ore': ore_servito, 'costo_ora': costo_ora, 'ricavo_ora': _div(sv['ricavi'], ore_servito),
         'cicli_portale': cicli_servito, 'costo_cicli_portale': quote_driver(dettaglio_comuni, 'cicli', 'servito'),
         'sezioni': sv['sezioni'],
-        'servizi': costo_per_servizio(mesi, costo_ora),
+        'capacita': capacita(mesi, ore_servito, pieno, sv['totali']['costi_variabili'],
+                             ParametriAnalitica.attuali().margine_obiettivo),
     }
 
     p = centri['prodotti']
@@ -404,36 +406,6 @@ def rientro_investimenti(mesi, centri):
     totale = riga('Totale azienda', tot_investito, sum(ammortizzato.values(), ZERO), sum(giorni.values(), ZERO),
                   sum(ante.values(), ZERO), oneri + rate, imposte)
     return {'righe': righe, 'totale': totale, 'mesi': len(trascorsi), 'imposte': imposte, 'oneri': oneri, 'rate': rate}
-
-
-def costo_per_servizio(mesi, costo_ora):
-    """Servizi venduti nel periodo: ricavo netto medio contro costo pieno
-    stimato (costo orario pieno x durata del servizio)."""
-    from django.db.models import F, Sum
-
-    from apps.ordini.models import ItemOrdine
-    if not costo_ora:
-        return []
-    righe = (ItemOrdine.objects
-             .filter(ordine__data_ora__date__gte=mesi[0], ordine__data_ora__date__lte=fine_mese(mesi[-1]),
-                     servizio_prodotto__tipo='servizio')
-             .exclude(ordine__stato='annullato')
-             .values('servizio_prodotto__titolo', 'servizio_prodotto__durata_minuti')
-             .annotate(pezzi=Sum('quantita'), incasso=Sum(F('prezzo_unitario') * F('quantita')))
-             .order_by('-incasso'))
-    servizi = []
-    for r in righe[:20]:
-        quantita = r['pezzi'] or 0
-        if not quantita:
-            continue
-        ricavo = (Decimal(r['incasso'] or 0) / IVA / quantita).quantize(CENTESIMO)
-        durata = r['servizio_prodotto__durata_minuti'] or 0
-        costo = (costo_ora * durata / 60).quantize(CENTESIMO) if durata else None
-        servizi.append({'nome': r['servizio_prodotto__titolo'], 'quantita': quantita, 'durata': durata,
-                        'ricavo': ricavo, 'costo': costo,
-                        'margine': ricavo - costo if costo is not None else None,
-                        'margine_pct': _div((ricavo - costo) * 100, ricavo) if costo is not None else None})
-    return servizi
 
 
 def _avvisi():
