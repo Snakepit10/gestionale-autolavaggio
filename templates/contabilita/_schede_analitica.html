@@ -1,7 +1,8 @@
-{% url 'contabilita:analitica' as u_centri %}{% url 'contabilita:analitica_produttivita' as u_prod %}
+{% url 'contabilita:analitica' as u_centri %}{% url 'contabilita:analitica_produttivita' as u_prod %}{% url 'contabilita:analitica_clienti' as u_cli %}
 <ul class="nav nav-tabs mb-3">
   <li class="nav-item"><a class="nav-link {% if scheda == 'centri' %}active{% endif %}" href="{{ u_centri }}?anno={{ anno }}&mese={{ mese }}&ricavi={{ base }}"><i class="bi bi-grid-3x3"></i> Centri</a></li>
   <li class="nav-item"><a class="nav-link {% if scheda == 'produttivita' %}active{% endif %}" href="{{ u_prod }}?anno={{ anno }}&mese={{ mese }}&ricavi={{ base }}"><i class="bi bi-speedometer"></i> Produttivit&agrave;</a></li>
+  <li class="nav-item"><a class="nav-link {% if scheda == 'clienti' %}active{% endif %}" href="{{ u_cli }}?anno={{ anno }}&mese={{ mese }}&ricavi={{ base }}"><i class="bi bi-people"></i> Clienti e abbonamenti</a></li>
 </ul>
 
 <form method="get" class="d-flex gap-2 flex-wrap mb-3 align-items-center">

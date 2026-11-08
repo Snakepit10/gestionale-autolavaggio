@@ -84,6 +84,7 @@ def capacita(mesi, ore_pagate, pieno, variabili, margine_obiettivo):
         'costo_ora': costo_ora, 'non_usata': non_usata, 'consumi': consumi,
         'pezzi': pezzi, 'pezzi_std': pezzi_std, 'copertura': _div(Decimal(pezzi_std) * 100, Decimal(pezzi)),
         'margine_obiettivo': margine_obiettivo, 'servizi': righe[:25],
+        'costi_servizi': {r['id']: r['costo'] for r in righe if r['costo'] is not None},
     }
 
 

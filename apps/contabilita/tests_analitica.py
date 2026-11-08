@@ -375,3 +375,69 @@ class CapacitaTest(TestCase):
         self.client.post('/contabilita/analitica/impostazioni/', {'azione': 'obiettivo', 'margine_obiettivo': '25'})
         self.assertEqual(ParametriAnalitica.attuali().margine_obiettivo, Decimal('25'))
         self.assertEqual(VisteAnaliticaTest.apri(self, '/contabilita/analitica/?anno=2026&mese=10').status_code, 200)
+
+
+class ClientiAbbonamentiTest(TestCase):
+    """Mese di prova di AnaliticaTest (costo pieno del servito 190 su un
+    lavaggio) con un cliente e un abbonamento mensile."""
+    def setUp(self):
+        from apps.clienti.models import Cliente
+        from apps.core.models import ServizioProdotto
+        from apps.ordini.models import ItemOrdine, Ordine
+        AnaliticaTest.setUp(self)
+        self.a_mano = ServizioProdotto.objects.get(titolo='Lavaggio a mano')
+        self.cliente = Cliente.objects.create(tipo='privato', nome='Cliente', cognome='Inventato', telefono='3330000000')
+        Ordine.objects.update(cliente=self.cliente)
+        # un lavaggio precedente dello stesso cliente, ad agosto
+        agosto = Ordine.objects.create(cliente=self.cliente, totale=Decimal('61'), totale_finale=Decimal('61'))
+        ItemOrdine.objects.create(ordine=agosto, servizio_prodotto=self.a_mano, quantita=1, prezzo_unitario=Decimal('61'))
+        Ordine.objects.filter(pk=agosto.pk).update(data_ora=timezone.make_aware(datetime(2026, 8, 6, 10, 0)),
+                                                   totale=Decimal('61'), totale_finale=Decimal('61'))
+
+    def abbonamento(self):
+        from apps.abbonamenti.models import AccessoAbbonamento, Abbonamento, ConfigurazioneAbbonamento
+        conf = ConfigurazioneAbbonamento.objects.create(titolo='Mensile prova', descrizione='', prezzo=Decimal('30.50'),
+                                                        modalita_targa='libera', periodicita_reset='mensile',
+                                                        durata='1_mese', giorni_durata=30)
+        abb = Abbonamento.objects.create(cliente=self.cliente, configurazione=conf, data_scadenza=date(2026, 10, 15))
+        Abbonamento.objects.filter(pk=abb.pk).update(data_attivazione=date(2026, 9, 16))
+        for giorno in (3, 10):
+            a = AccessoAbbonamento.objects.create(abbonamento=abb, servizio=self.a_mano, metodo_verifica='qr', autorizzato=True)
+            AccessoAbbonamento.objects.filter(pk=a.pk).update(data_ora=timezone.make_aware(datetime(2026, 10, giorno, 9, 0)))
+        rifiutato = AccessoAbbonamento.objects.create(abbonamento=abb, servizio=self.a_mano, metodo_verifica='qr')
+        AccessoAbbonamento.objects.filter(pk=rifiutato.pk).update(data_ora=timezone.make_aware(datetime(2026, 10, 11, 9, 0)))
+
+    def test_abbonamenti_competenza_e_costo(self):
+        from .clienti_abbonamenti import clienti_e_abbonamenti
+        self.abbonamento()
+        self.a_mano.minuti_persona_standard = 120
+        self.a_mano.save()
+        ab = clienti_e_abbonamenti([OTTOBRE], 'scontrini')['abbonamenti']
+        g = ab['righe'][0]
+        # 25 netti su 30 giorni, 15 giorni in ottobre
+        self.assertEqual((g['abbonamenti'], g['venduti'], g['ricavo'], g['accessi']), (1, 0, Decimal('12.5'), 2))
+        self.assertEqual(round(g['costo'], 2), Decimal('166.67'))          # 2 accessi x 83,33
+        self.assertEqual(g['in_perdita'], 1)
+        self.assertEqual(ab['totale']['ricavo_accesso'], Decimal('6.25'))
+        # senza minuti standard: costo pieno medio per lavaggio (190)
+        self.a_mano.minuti_persona_standard = None
+        self.a_mano.save()
+        g = clienti_e_abbonamenti([OTTOBRE], 'scontrini')['abbonamenti']['righe'][0]
+        self.assertEqual(g['costo'], Decimal('380'))
+
+    def test_clienti(self):
+        from .clienti_abbonamenti import clienti
+        k = clienti(OTTOBRE, date(2026, 10, 31))
+        self.assertEqual((k['lavaggi'], k['con_cliente'], k['copertura'], k['attivi'], k['nuovi']),
+                         (1, 1, Decimal('100'), 1, 0))                     # primo lavaggio ad agosto
+        self.assertEqual((k['ritorno'], k['intervallo'], k['ricavo_cliente']), (Decimal('100'), 61, Decimal('100')))
+        self.assertEqual(k['fasce'][0]['clienti'], 1)
+        self.assertEqual(clienti(date(2026, 8, 1), date(2026, 8, 31))['nuovi'], 1)
+
+    def test_pagina(self):
+        VisteAnaliticaTest.setUp(self)
+        self.abbonamento()
+        for url in ('/contabilita/analitica/clienti/?anno=2026', '/contabilita/analitica/clienti/?anno=2026&mese=10',
+                    '/contabilita/analitica/clienti/?anno=2099'):
+            self.assertEqual(VisteAnaliticaTest.apri(self, url).status_code, 200, url)
+        self.assertContains(VisteAnaliticaTest.apri(self, '/contabilita/analitica/clienti/?anno=2026&mese=10'), 'Mensile prova')

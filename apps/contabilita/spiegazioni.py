@@ -136,6 +136,31 @@ SPIEGAZIONI = {
         'Una misura dei minuti-persona per decidere lo standard.',
         'Con pochi casi o rilevazioni lasciate aperte il valore non è affidabile.'),
 
+    # ------------------------------------------------------- analitica: clienti e abbonamenti
+    'Ricavo di competenza degli abbonamenti': (
+        'Prezzo pagato (totale dell\'ordine di acquisto, o prezzo della configurazione) / 1,22 × giorni di validità nel '
+        'periodo / giorni di validità totali.',
+        'La parte del prezzo che "appartiene" al periodo: un annuale venduto a dicembre conta quasi tutto sull\'anno dopo.',
+        'Il conto economico invece mette tutto il prezzo nel giorno della vendita.'),
+    'Abbonati in perdita': (
+        'Abbonamenti in cui gli accessi del periodo × il costo del servizio usato superano il ricavo di competenza.',
+        'Chi usa l\'abbonamento così tanto che lavargli l\'auto costa più di quanto paga.'),
+    'Clienti nuovi': (
+        'Clienti attivi nel periodo il cui primo lavaggio di sempre cade nel periodo.',
+        'Quanti clienti registrati sono arrivati per la prima volta.'),
+    'Lavaggi per cliente': (
+        'Lavaggi con cliente / clienti attivi nel periodo.',
+        'Quanto spesso torna in media un cliente registrato.'),
+    'Tasso di ritorno': (
+        'Clienti attivi con almeno 2 lavaggi negli ultimi 12 mesi (fino alla fine del periodo) / clienti attivi.',
+        'La fedeltà: quanti clienti non sono venuti una volta sola.'),
+    'Giorni fra due lavaggi': (
+        'Mediana dei giorni fra due lavaggi consecutivi dello stesso cliente negli ultimi 12 mesi.',
+        'Ogni quanto torna un cliente abituale: utile per i promemoria e per dimensionare gli abbonamenti.'),
+    'Ricavo per cliente': (
+        'Totale dei loro ordini di lavaggio nel periodo / 1,22 / clienti attivi.',
+        'Quanto vale in media un cliente registrato nel periodo.'),
+
     # ------------------------------------------------------- analitica: produttivita'
     'Ore pagate servito': (
         'Ore lavorate del calendario presenze × quota sul servito di ogni dipendente. Ferie e malattia non contano.',

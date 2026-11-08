@@ -82,6 +82,14 @@ def produttivita(request):
 
 
 @accesso
+def clienti_abbonamenti(request):
+    from .clienti_abbonamenti import clienti_e_abbonamenti
+    mesi, contesto = _periodo(request)
+    return render(request, 'contabilita/analitica_clienti.html', {
+        'c': clienti_e_abbonamenti(mesi, contesto['base']), 'scheda': 'clienti', **contesto})
+
+
+@accesso
 def impostazioni_analitica(request):
     from apps.personale.models import Dipendente
     if request.method == 'POST':

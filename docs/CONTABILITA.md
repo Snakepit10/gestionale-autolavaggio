@@ -398,6 +398,31 @@ Ogni servizio ha i suoi **minuti-persona standard**: i minuti di lavoro di tutte
 - servizio principale = la riga di servizio dell'ordine col prezzo più alto; extra = le altre righe di servizio;
 - si vedono la percentuale di lavaggi con extra, il ricavo extra per lavaggio e la quota e il prezzo medio dei servizi principali.
 
+**Scheda Clienti e abbonamenti**
+
+*Abbonamenti* validi nel periodo (non annullati), per configurazione e in totale:
+
+| Grandezza | Calcolo |
+|---|---|
+| Ricavo di competenza | prezzo / 1,22 × giorni di validità nel periodo / giorni di validità totali. Il prezzo è il totale dell'ordine di acquisto, altrimenti quello della configurazione |
+| Accessi | accessi autorizzati nel periodo |
+| Ricavo e costo per accesso | ricavo di competenza / accessi; costo del servizio usato (capacità del servito), oppure il costo pieno medio per lavaggio se il servizio non ha minuti standard |
+| Abbonati in perdita | abbonamenti con costo degli accessi > ricavo di competenza |
+
+Il conto economico invece mette il prezzo nel giorno della vendita.
+
+*Clienti* (solo lavaggi con un cliente registrato; la copertura è mostrata):
+
+| Grandezza | Calcolo |
+|---|---|
+| Clienti attivi, nuovi | nuovi = primo lavaggio di sempre nel periodo |
+| Lavaggi per cliente | lavaggi con cliente / clienti attivi |
+| Tasso di ritorno | clienti attivi con almeno 2 lavaggi negli ultimi 12 mesi / clienti attivi |
+| Giorni fra due lavaggi | mediana degli intervalli negli ultimi 12 mesi |
+| Ricavo per cliente | loro ordini di lavaggio / 1,22 / clienti attivi |
+
+- C'è anche la distribuzione dei clienti per numero di lavaggi nel periodo.
+
 ## Fase 5: indici e KPI
 
 Pagina **Indici e KPI**. Gli indici usano i mesi chiusi dell'anno da quando parte la contabilità (il primo saldo iniziale dei conti), riportati a 12 mesi. I ricavi seguono la stessa base del conto economico (rilevato reale − IVA o scontrini fiscali). Ogni indice ha la formula e un colore: verde in linea con la prassi bancaria per piccole imprese, giallo da tenere d'occhio, rosso critico.

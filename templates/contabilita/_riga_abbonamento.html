@@ -1,0 +1,13 @@
+<tr class="{% if totale %}riga-totale{% else %}riga-voce{% endif %}">
+  <td class="col-nome">{{ g.nome }}</td>
+  <td class="tab-num">{% if g.prezzo != None %}&euro;{{ g.prezzo|floatformat:2 }}{% endif %}</td>
+  <td class="tab-num">{{ g.abbonamenti }}</td>
+  <td class="tab-num">{{ g.venduti }}</td>
+  <td class="tab-num">&euro;{{ g.ricavo|floatformat:"0g" }}</td>
+  <td class="tab-num">{{ g.accessi }}</td>
+  <td class="tab-num">{% if g.accessi_abbonamento != None %}{{ g.accessi_abbonamento|floatformat:1 }}{% else %}&mdash;{% endif %}</td>
+  <td class="tab-num">{% if g.ricavo_accesso != None %}&euro;{{ g.ricavo_accesso|floatformat:2 }}{% else %}&mdash;{% endif %}</td>
+  <td class="tab-num">{% if g.costo_accesso != None %}&euro;{{ g.costo_accesso|floatformat:2 }}{% else %}&mdash;{% endif %}</td>
+  <td class="tab-num {% if g.margine < 0 %}neg{% endif %}">&euro;{{ g.margine|floatformat:"0g" }}</td>
+  <td class="tab-num {% if g.in_perdita %}text-danger fw-semibold{% endif %}">{{ g.in_perdita }}</td>
+</tr>

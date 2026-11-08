@@ -1,0 +1,70 @@
+{% extends "base.html" %}
+{% load contabilita_info %}
+{% block title %}Clienti e abbonamenti {{ periodo }}{% endblock %}
+
+{% block extra_css %}{% include "contabilita/_stile.html" %}
+<style>
+.kpi-mini { background: #f8fafc; border-radius: 8px; padding: 8px 10px; height: 100%; }
+.kpi-mini .label { font-size: .64rem; text-transform: uppercase; letter-spacing: .4px; color: #64748b; font-weight: 700; }
+.kpi-mini .value { font-size: 1.05rem; font-weight: 800; color: #1e293b; }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="dash-page">
+  <div class="dash-header">
+    <h4><i class="bi bi-pie-chart me-2"></i>Contabilit&agrave; analitica &mdash; {{ periodo }}</h4>
+    {% include "contabilita/_nav.html" %}
+  </div>
+
+  {% include "contabilita/_schede_analitica.html" %}
+
+  <div class="panel">
+    <div class="panel-title"><i class="bi bi-card-checklist"></i> Abbonamenti &mdash; {{ periodo }}</div>
+    <div class="panel-sub">Abbonamenti validi anche solo per una parte del periodo (non annullati). Il ricavo &egrave; di competenza: il prezzo senza IVA diviso sui giorni di validit&agrave;, solo quelli del periodo.
+      Ogni accesso costa quanto il servizio usato (scheda Centri, capacit&agrave; e costo dei servizi) o, se il servizio non ha minuti standard, il costo pieno medio per lavaggio{% if c.costo_lavaggio %} (&euro;{{ c.costo_lavaggio|floatformat:2 }}){% endif %}.</div>
+    <div class="panel-body tabella-scroll">
+      {% with ab=c.abbonamenti %}
+      {% if ab %}
+      <table class="table table-sm bilancio">
+        <thead><tr><th>Abbonamento</th><th class="tab-num">Prezzo</th><th class="tab-num">Validi</th><th class="tab-num">Venduti</th><th class="tab-num">Ricavo di competenza{% info "Ricavo di competenza degli abbonamenti" %}</th>
+          <th class="tab-num">Accessi</th><th class="tab-num">Accessi per abbonamento</th><th class="tab-num">Ricavo per accesso</th><th class="tab-num">Costo per accesso</th><th class="tab-num">Margine</th><th class="tab-num">In perdita{% info "Abbonati in perdita" %}</th></tr></thead>
+        <tbody>
+          {% for g in ab.righe %}{% include "contabilita/_riga_abbonamento.html" %}{% endfor %}
+          {% include "contabilita/_riga_abbonamento.html" with g=ab.totale totale=True %}
+        </tbody>
+      </table>
+      {% else %}<div class="small text-muted">Nessun abbonamento valido nel periodo.</div>{% endif %}
+      {% endwith %}
+    </div>
+  </div>
+
+  <div class="panel">
+    <div class="panel-title"><i class="bi bi-people"></i> Clienti &mdash; {{ periodo }}</div>
+    {% with k=c.clienti %}
+    {% if k and k.attivi %}
+    <div class="panel-sub">Solo i lavaggi con un cliente registrato: {{ k.con_cliente }} su {{ k.lavaggi }} ({{ k.copertura|floatformat:0 }}%). Gli altri sono anonimi e non entrano.
+      Ritorno e intervalli guardano gli ultimi 12 mesi fino alla fine del periodo.</div>
+    <div class="panel-body">
+      <div class="row g-2 mb-3">
+        <div class="col-6 col-md"><div class="kpi-mini"><div class="label">Clienti attivi</div><div class="value">{{ k.attivi }}</div></div></div>
+        <div class="col-6 col-md"><div class="kpi-mini"><div class="label">Nuovi{% info "Clienti nuovi" %}</div><div class="value">{{ k.nuovi }}</div></div></div>
+        <div class="col-6 col-md"><div class="kpi-mini"><div class="label">Lavaggi per cliente{% info "Lavaggi per cliente" %}</div><div class="value">{{ k.frequenza|floatformat:1 }}</div></div></div>
+        <div class="col-6 col-md"><div class="kpi-mini"><div class="label">Tasso di ritorno{% info "Tasso di ritorno" %}</div><div class="value">{{ k.ritorno|floatformat:0 }}%</div></div></div>
+        <div class="col-6 col-md"><div class="kpi-mini"><div class="label">Giorni fra due lavaggi{% info "Giorni fra due lavaggi" %}</div><div class="value">{% if k.intervallo != None %}{{ k.intervallo|floatformat:0 }}{% else %}&mdash;{% endif %}</div></div></div>
+        <div class="col-6 col-md"><div class="kpi-mini"><div class="label">Ricavo per cliente{% info "Ricavo per cliente" %}</div><div class="value">&euro;{{ k.ricavo_cliente|floatformat:2 }}</div></div></div>
+      </div>
+      <table class="table table-sm bilancio" style="max-width:420px">
+        <thead><tr><th>Lavaggi nel periodo</th><th class="tab-num">Clienti</th><th class="tab-num">Quota</th></tr></thead>
+        <tbody>{% for f in k.fasce %}<tr class="riga-voce"><td class="col-nome">{{ f.nome }}</td><td class="tab-num">{{ f.clienti }}</td><td class="tab-num">{{ f.quota|floatformat:0 }}%</td></tr>{% endfor %}</tbody>
+      </table>
+    </div>
+    {% elif k %}
+    <div class="panel-body small text-muted">Nessuno dei {{ k.lavaggi }} lavaggi del periodo ha un cliente registrato.</div>
+    {% else %}
+    <div class="panel-body small text-muted">Nessun lavaggio nel periodo.</div>
+    {% endif %}
+    {% endwith %}
+  </div>
+</div>
+{% endblock %}
