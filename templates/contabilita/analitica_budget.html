@@ -1,0 +1,92 @@
+{% extends "base.html" %}
+{% load contabilita_info %}
+{% block title %}Budget {{ periodo }}{% endblock %}
+
+{% block extra_css %}{% include "contabilita/_stile.html" %}
+<style>
+.prospetto td { padding: 4px 8px; }
+.prospetto .uguale td { font-weight: 800; border-top: 2px solid #0f766e; color: #0f766e; }
+.prospetto .uguale .neg { color: #b91c1c; }
+.modulo-budget input { min-width: 80px; }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="dash-page">
+  <div class="dash-header">
+    <h4><i class="bi bi-pie-chart me-2"></i>Contabilit&agrave; analitica &mdash; {{ periodo }}</h4>
+    {% include "contabilita/_nav.html" %}
+  </div>
+
+  {% include "contabilita/_schede_analitica.html" %}
+
+  <div class="row g-3">
+    <div class="col-xl-6">
+      <div class="panel h-100">
+        <div class="panel-title"><i class="bi bi-bar-chart-steps"></i> Dal budget all'effettivo &mdash; servito, {{ periodo }}</div>
+        {% if b.scostamenti %}
+        <div class="panel-sub">Ogni riga &egrave; l'effetto sul risultato del servito (positivo = meglio del budget). Mesi contati: {{ b.contati|join:", " }}.
+          {% if b.saltati %}Senza budget n&eacute; dati dell'anno prima: {{ b.saltati|join:", " }}.{% endif %}</div>
+        <div class="panel-body">
+          <table class="table table-sm prospetto">
+            <tbody>
+              <tr><td>Risultato di budget</td><td class="tab-num {% if b.risultato_bdg < 0 %}neg{% endif %}">&euro;{{ b.risultato_bdg|floatformat:"0g" }}</td></tr>
+              {% for s in b.scostamenti %}
+              <tr><td>{{ s.nome }}{% info s.nome %}</td><td class="tab-num {% if s.valore < 0 %}giu{% elif s.valore > 0 %}su{% endif %}">{% if s.valore > 0 %}+{% endif %}&euro;{{ s.valore|floatformat:"0g" }}</td></tr>
+              {% endfor %}
+              <tr class="uguale"><td>Risultato effettivo</td><td class="tab-num {% if b.risultato_eff < 0 %}neg{% endif %}">&euro;{{ b.risultato_eff|floatformat:"0g" }}</td></tr>
+            </tbody>
+          </table>
+        </div>
+        {% else %}
+        <div class="panel-body small text-muted">Nessun mese del periodo ha sia l'effettivo sia un budget (inserito qui sotto o dallo stesso mese dell'anno prima).</div>
+        {% endif %}
+      </div>
+    </div>
+    <div class="col-xl-6">
+      <div class="panel h-100">
+        <div class="panel-title"><i class="bi bi-list-columns"></i> Budget ed effettivo</div>
+        {% if b.confronto %}
+        <div class="panel-body tabella-scroll">
+          <table class="table table-sm bilancio">
+            <thead><tr><th></th><th class="tab-num">Budget</th><th class="tab-num">Effettivo</th><th class="tab-num">Differenza</th></tr></thead>
+            <tbody>
+              {% for r in b.confronto %}
+              <tr class="riga-voce"><td class="col-nome">{{ r.nome }}</td>
+                <td class="tab-num">{% include "contabilita/_valore.html" with v=r.bdg formato=r.formato %}</td>
+                <td class="tab-num">{% include "contabilita/_valore.html" with v=r.eff formato=r.formato %}</td>
+                <td class="tab-num">{% include "contabilita/_valore.html" with v=r.diff formato=r.formato %}</td></tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+        {% else %}<div class="panel-body small text-muted">&mdash;</div>{% endif %}
+      </div>
+    </div>
+  </div>
+
+  <form method="post" class="panel mt-3">
+    {% csrf_token %}
+    <div class="panel-title"><i class="bi bi-pencil-square"></i> Budget del servito {{ anno }}</div>
+    <div class="panel-sub">Scrivi solo quello che vuoi cambiare: <strong>un campo vuoto vale quanto lo stesso mese del {{ anno|add:"-1" }}</strong> (in grigio). Importi senza IVA.
+      Altri costi fissi = costo pieno del servito meno consumi e personale (manutenzioni, ammortamenti, quota dei costi comuni&hellip;).</div>
+    <div class="panel-body tabella-scroll modulo-budget">
+      <table class="table table-sm align-middle">
+        <thead><tr><th>Mese</th>{% for c, nome in b.campi %}<th>{{ nome }}</th>{% endfor %}</tr></thead>
+        <tbody>
+          {% for m in b.modulo %}
+          <tr><td class="col-nome">{{ m.nome }}</td>
+            {% for f in m.campi %}
+            <td><input type="text" inputmode="decimal" name="b_{{ m.mese.month }}_{{ f.campo }}" class="form-control form-control-sm"
+                 value="{% if f.valore != None %}{{ f.valore|floatformat:'-2' }}{% endif %}"
+                 placeholder="{% if f.prima != None %}{% if f.campo == 'lavaggi' or f.campo == 'altri_fissi' or f.campo == 'ore_pagate' %}{{ f.prima|floatformat:0 }}{% else %}{{ f.prima|floatformat:2 }}{% endif %}{% endif %}"></td>
+            {% endfor %}
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+      <button class="btn btn-primary btn-sm"><i class="bi bi-save"></i> Salva il budget</button>
+    </div>
+  </form>
+</div>
+{% endblock %}

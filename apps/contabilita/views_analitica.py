@@ -90,6 +90,43 @@ def clienti_abbonamenti(request):
 
 
 @accesso
+def budget(request):
+    from .budget import GRANDEZZE, budget_e_scostamenti
+    from .models import BudgetServito
+    mesi, contesto = _periodo(request)
+    anno = contesto['anno']
+    if request.method == 'POST':
+        errori, salvati = [], 0
+        for n in range(1, 13):
+            mese = date(anno, n, 1)
+            valori = {}
+            for campo in GRANDEZZE:
+                testo = (request.POST.get(f'b_{n}_{campo}') or '').strip()
+                if not testo:
+                    valori[campo] = None
+                    continue
+                numero = _decimale(testo)
+                if numero is None or numero < 0 or (campo == 'lavaggi' and numero != numero.to_integral_value()):
+                    errori.append(f'{NOMI_MESI[n - 1]}: valore non valido "{testo}"')
+                    valori = None
+                    break
+                valori[campo] = int(numero) if campo == 'lavaggi' else numero
+            if valori is None:
+                continue
+            if any(v is not None for v in valori.values()):
+                BudgetServito.objects.update_or_create(mese=mese, defaults=valori)
+                salvati += 1
+            else:
+                BudgetServito.objects.filter(mese=mese).delete()
+        for e in errori:
+            messages.error(request, e)
+        messages.success(request, f'Budget {anno} salvato ({salvati} mesi con valori propri).')
+        return redirect(f"{request.path}?anno={anno}&mese={contesto['mese']}&ricavi={contesto['base']}")
+    return render(request, 'contabilita/analitica_budget.html', {
+        'b': budget_e_scostamenti(mesi, anno, contesto['base']), 'scheda': 'budget', **contesto})
+
+
+@accesso
 def impostazioni_analitica(request):
     from apps.personale.models import Dipendente
     if request.method == 'POST':

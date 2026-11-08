@@ -423,6 +423,32 @@ Il conto economico invece mette il prezzo nel giorno della vendita.
 
 - C'è anche la distribuzione dei clienti per numero di lavaggi nel periodo.
 
+**Scheda Budget** (servito)
+
+Per ogni mese si inseriscono, tutti facoltativi:
+- lavaggi;
+- ricavo per lavaggio e consumi per lavaggio;
+- ore pagate e costo orario del personale;
+- altri costi fissi (costo pieno meno consumi e personale, cioè con la quota dei costi comuni).
+
+**Un campo vuoto vale quanto lo stesso mese dell'anno prima**, così il confronto con l'anno prima funziona anche senza scrivere nulla.
+
+Risultato = lavaggi × (ricavo − consumi per lavaggio) − ore × costo orario − altri fissi. Gli scostamenti sono l'effetto sul risultato (positivo = meglio del budget):
+
+| Scostamento | Calcolo |
+|---|---|
+| Volume dei lavaggi sui ricavi | (L_eff − L_bdg) × R_bdg |
+| Prezzo e mix | (R_eff − R_bdg) × L_eff |
+| Consumi per il volume | −(L_eff − L_bdg) × V_bdg |
+| Consumi di ogni lavaggio | −(V_eff − V_bdg) × L_eff |
+| Ore per il volume | −(ore attese − ore_bdg) × c_bdg, con ore attese = ore_bdg / L_bdg × L_eff |
+| Efficienza | −(ore_eff − ore attese) × c_bdg |
+| Costo orario del personale | −(c_eff − c_bdg) × ore_eff |
+| Altri costi fissi | −(F_eff − F_bdg) |
+
+- La somma va dal risultato di budget a quello effettivo.
+- Per un anno si sommano i mesi passati che hanno effettivo e budget. I mesi senza budget né dati dell'anno prima sono indicati a parte.
+
 ## Fase 5: indici e KPI
 
 Pagina **Indici e KPI**. Gli indici usano i mesi chiusi dell'anno da quando parte la contabilità (il primo saldo iniziale dei conti), riportati a 12 mesi. I ricavi seguono la stessa base del conto economico (rilevato reale − IVA o scontrini fiscali). Ogni indice ha la formula e un colore: verde in linea con la prassi bancaria per piccole imprese, giallo da tenere d'occhio, rosso critico.

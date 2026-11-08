@@ -441,3 +441,68 @@ class ClientiAbbonamentiTest(TestCase):
                     '/contabilita/analitica/clienti/?anno=2099'):
             self.assertEqual(VisteAnaliticaTest.apri(self, url).status_code, 200, url)
         self.assertContains(VisteAnaliticaTest.apri(self, '/contabilita/analitica/clienti/?anno=2026&mese=10'), 'Mensile prova')
+
+
+class BudgetTest(TestCase):
+    """Effettivo di ottobre: 1 lavaggio a 100, consumi 30, 6 ore a 10 euro,
+    altri fissi 100: risultato -90."""
+    def setUp(self):
+        from django.core.cache import cache
+        cache.clear()
+        AnaliticaTest.setUp(self)
+
+    def budget(self, **campi):
+        from .models import BudgetServito
+        valori = dict(lavaggi=2, ricavo_lavaggio=Decimal('90'), consumi_lavaggio=Decimal('25'), ore_pagate=Decimal('5'),
+                      costo_orario=Decimal('12'), altri_fissi=Decimal('80'))
+        valori.update(campi)
+        return BudgetServito.objects.create(mese=OTTOBRE, **valori)
+
+    def test_grandezze_e_scostamenti(self):
+        from .budget import budget_del_mese, grandezze, risultato, scostamenti
+        from .produttivita import kpi_mese
+        e = grandezze(kpi_mese(OTTOBRE, 'scontrini'))
+        self.assertEqual((e['lavaggi'], e['ricavo_lavaggio'], e['consumi_lavaggio'], e['ore_pagate'], e['costo_orario'],
+                          e['altri_fissi']), (1, Decimal('100'), Decimal('30'), Decimal('6'), Decimal('10'), Decimal('100')))
+        self.assertEqual(risultato(e), Decimal('-90'))
+        self.assertIsNone(budget_del_mese(OTTOBRE, 'scontrini'))          # niente budget e niente 2025
+        b = budget_del_mese(OTTOBRE, 'scontrini', self.budget())
+        self.assertEqual(risultato(b), Decimal('-10'))                    # 2 x 65 - 60 - 80
+        s = scostamenti(e, b)
+        self.assertEqual((s['volume'], s['prezzo'], s['consumi_volume'], s['consumi_spesa']),
+                         (Decimal('-90'), Decimal('10'), Decimal('25'), Decimal('-5')))
+        self.assertEqual((s['ore_attese'], s['ore_volume'], s['efficienza'], s['costo_orario'], s['fissi']),
+                         (Decimal('2.5'), Decimal('30'), Decimal('-42'), Decimal('12'), Decimal('-20')))
+        totale = sum((v for k, v in s.items() if k != 'ore_attese'), ZERO)
+        self.assertEqual(totale, risultato(e) - risultato(b))             # -80
+
+    def test_campi_vuoti_dall_anno_prima(self):
+        from unittest import mock
+
+        from .budget import budget_del_mese
+        prima = {'lavaggi': 4, 'ricavi': Decimal('80'), 'variabili': Decimal('8'), 'ore': Decimal('10'),
+                 'personale': Decimal('90'), 'pieno': Decimal('150'), 'abbonamento': 0, 'giorni_persona': ZERO,
+                 'giorni_aperti': 1}
+        with mock.patch('apps.contabilita.produttivita.kpi_mese', return_value=prima):
+            b = budget_del_mese(OTTOBRE, 'scontrini', self.budget(lavaggi=None, costo_orario=None))
+        self.assertEqual((b['lavaggi'], b['costo_orario'], b['ricavo_lavaggio']), (4, Decimal('9'), Decimal('90')))
+
+    def test_periodo_e_pagina(self):
+        from .budget import budget_e_scostamenti
+        from .models import BudgetServito
+        vuoto = budget_e_scostamenti([OTTOBRE], 2026, 'scontrini')
+        self.assertIsNone(vuoto['scostamenti'])
+        self.assertEqual(vuoto['saltati'], ['Ott'])
+        self.budget()
+        r = budget_e_scostamenti([OTTOBRE], 2026, 'scontrini')
+        self.assertEqual((r['risultato_bdg'], r['risultato_eff'], r['contati']), (Decimal('-10'), Decimal('-90'), ['Ott']))
+        self.assertEqual(sum((s['valore'] for s in r['scostamenti']), ZERO), Decimal('-80'))
+        VisteAnaliticaTest.setUp(self)
+        for url in ('/contabilita/analitica/budget/?anno=2026', '/contabilita/analitica/budget/?anno=2026&mese=10'):
+            self.assertEqual(VisteAnaliticaTest.apri(self, url).status_code, 200, url)
+        self.client.post('/contabilita/analitica/budget/?anno=2026', {'b_11_lavaggi': '300', 'b_11_ricavo_lavaggio': '24,50',
+                                                                      'b_12_lavaggi': '1,5'})
+        nov = BudgetServito.objects.get(mese=date(2026, 11, 1))
+        self.assertEqual((nov.lavaggi, nov.ricavo_lavaggio, nov.ore_pagate), (300, Decimal('24.50'), None))
+        self.assertFalse(BudgetServito.objects.filter(mese=date(2026, 12, 1)).exists())   # 1,5 lavaggi: errore
+        self.assertFalse(BudgetServito.objects.filter(mese=OTTOBRE).exists())             # riga vuota: tolto

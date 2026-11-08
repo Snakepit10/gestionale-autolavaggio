@@ -542,6 +542,37 @@ class ParametriAnalitica(models.Model):
         return cls.objects.first() or cls()
 
 
+class BudgetServito(models.Model):
+    """Budget del servito per un mese. Ogni campo vuoto vale quanto lo
+    stesso mese dell'anno prima (effettivo), cosi' il confronto funziona
+    anche senza inserire nulla."""
+    CAMPI = [
+        ('lavaggi', 'Lavaggi'),
+        ('ricavo_lavaggio', 'Ricavo per lavaggio'),
+        ('consumi_lavaggio', 'Consumi per lavaggio'),
+        ('ore_pagate', 'Ore pagate'),
+        ('costo_orario', 'Costo orario del personale'),
+        ('altri_fissi', 'Altri costi fissi (comuni compresi)'),
+    ]
+    mese = models.DateField(unique=True, help_text='Primo giorno del mese')
+    lavaggi = models.PositiveIntegerField(null=True, blank=True)
+    ricavo_lavaggio = models.DecimalField(max_digits=8, decimal_places=2, null=True, blank=True,
+                                          help_text='IVA esclusa')
+    consumi_lavaggio = models.DecimalField(max_digits=8, decimal_places=2, null=True, blank=True)
+    ore_pagate = models.DecimalField(max_digits=8, decimal_places=1, null=True, blank=True)
+    costo_orario = models.DecimalField(max_digits=8, decimal_places=2, null=True, blank=True,
+                                       help_text='Costo del personale del servito per ora pagata')
+    altri_fissi = models.DecimalField(max_digits=10, decimal_places=2, null=True, blank=True,
+                                      help_text='Costo pieno meno consumi e personale')
+
+    class Meta:
+        verbose_name = 'Budget del servito'
+        verbose_name_plural = 'Budget del servito'
+        ordering = ['mese']
+
+    def __str__(self):
+        return f'Budget servito {self.mese:%m/%Y}'
+
 
 # ---------------------------------------------------------------- finanziamenti e indici
 

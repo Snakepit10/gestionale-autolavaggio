@@ -21,6 +21,7 @@ urlpatterns = [
     path('analitica/', views_analitica.analitica, name='analitica'),
     path('analitica/produttivita/', views_analitica.produttivita, name='analitica_produttivita'),
     path('analitica/clienti/', views_analitica.clienti_abbonamenti, name='analitica_clienti'),
+    path('analitica/budget/', views_analitica.budget, name='analitica_budget'),
     path('indici/', views_indici.indici, name='indici'),
     path('finanziamenti/', views_indici.finanziamenti, name='finanziamenti'),
     path('analitica/impostazioni/', views_analitica.impostazioni_analitica, name='impostazioni_analitica'),

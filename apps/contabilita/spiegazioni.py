@@ -161,6 +161,34 @@ SPIEGAZIONI = {
         'Totale dei loro ordini di lavaggio nel periodo / 1,22 / clienti attivi.',
         'Quanto vale in media un cliente registrato nel periodo.'),
 
+    # ------------------------------------------------------- analitica: budget
+    'Volume dei lavaggi sui ricavi': (
+        '(Lavaggi effettivi − lavaggi di budget) × ricavo per lavaggio di budget.',
+        'Quanto hanno spostato il risultato le auto in più o in meno.'),
+    'Prezzo e mix': (
+        '(Ricavo per lavaggio effettivo − di budget) × lavaggi effettivi.',
+        'L\'effetto di prezzi, sconti, extra e scelta dei servizi.'),
+    'Consumi per il volume': (
+        '−(Lavaggi effettivi − di budget) × consumi per lavaggio di budget.',
+        'I consumi in più o in meno dovuti solo al numero di auto: va letto insieme al volume.'),
+    'Consumi di ogni lavaggio': (
+        '−(Consumi per lavaggio effettivi − di budget) × lavaggi effettivi.',
+        'Se ogni auto è costata di più o di meno in chimici, materiale ed energia.'),
+    'Ore per il volume': (
+        'Ore attese = ore di budget / lavaggi di budget × lavaggi effettivi; effetto = −(ore attese − ore di budget) × '
+        'costo orario di budget.',
+        'Le ore in più o in meno giustificate dal numero di auto.'),
+    'Efficienza (ore in più o in meno)': (
+        '−(Ore pagate effettive − ore attese) × costo orario di budget.',
+        'Le ore pagate oltre quelle che servivano per le auto lavorate: è l\'effetto dei turni.',
+        'Negativo vuol dire più ore di quelle che il volume giustificava.'),
+    'Costo orario del personale': (
+        '−(Costo orario effettivo − di budget) × ore pagate effettive.',
+        'L\'effetto di paghe, contributi e bonus diversi dal budget.'),
+    'Altri costi fissi': (
+        '−(Altri costi fissi effettivi − di budget). Altri costi fissi = costo pieno − consumi − personale.',
+        'Manutenzioni, ammortamenti e quota dei costi comuni diversi dal budget.'),
+
     # ------------------------------------------------------- analitica: produttivita'
     'Ore pagate servito': (
         'Ore lavorate del calendario presenze × quota sul servito di ogni dipendente. Ferie e malattia non contano.',
