@@ -50,6 +50,28 @@
   </div>
   {% endwith %}
 
+  <div class="panel">
+    <div class="panel-title"><i class="bi bi-person-check"></i> Pareggio del servito &mdash; {{ periodo }}</div>
+    {% with q=p.pareggio %}
+    {% if q %}
+    <div class="panel-sub">Quante auto deve lavare ogni persona in una giornata per pagare s&eacute; stessa e la sua parte di struttura. Margine per lavaggio = ricavo &minus; consumi; costo per giorno-persona = (costo pieno &minus; consumi) / giorni-persona del servito.</div>
+    <div class="panel-body">
+      <div class="row g-2">
+        <div class="col-6 col-md"><div class="kpi-mini"><div class="label">Margine per lavaggio{% info "Margine per lavaggio" %}</div><div class="value">&euro;{{ q.mdc|floatformat:2 }}</div><div class="small text-muted">ricavo &euro;{{ q.ricavo|floatformat:2 }} &minus; consumi &euro;{{ q.consumi|floatformat:2 }}</div></div></div>
+        <div class="col-6 col-md"><div class="kpi-mini"><div class="label">Costo per giorno-persona{% info "Costo per giorno-persona" %}</div><div class="value">&euro;{{ q.costo_gp|floatformat:2 }}</div></div></div>
+        <div class="col-6 col-md"><div class="kpi-mini"><div class="label">Lavaggi a pareggio{% info "Lavaggi per persona a pareggio" %}</div><div class="value">{% if q.pareggio != None %}{{ q.pareggio|floatformat:1 }}{% else %}&mdash;{% endif %}</div><div class="small text-muted">per persona al giorno</div></div></div>
+        <div class="col-6 col-md"><div class="kpi-mini"><div class="label">Per il margine del {{ q.margine_obiettivo|floatformat:0 }}%{% info "Lavaggi per persona per il margine obiettivo" %}</div><div class="value">{% if q.obiettivo != None %}{{ q.obiettivo|floatformat:1 }}{% else %}non raggiungibile{% endif %}</div><div class="small text-muted">per persona al giorno</div></div></div>
+        <div class="col-6 col-md"><div class="kpi-mini"><div class="label">Effettivi</div><div class="value {% if q.pareggio != None and q.effettivi < q.pareggio %}text-danger{% endif %}">{{ q.effettivi|floatformat:1 }}</div><div class="small text-muted">la previsione dei turni usa {{ q.previsione|floatformat:"-1"|default:"—" }}</div></div></div>
+      </div>
+      <div class="small text-muted mt-2">Nelle tabelle qui sotto, <strong>consigliate</strong> = lavaggi medi / lavaggi per persona al margine obiettivo, arrotondato per eccesso; in rosso quando sono meno delle persone presenti in media.
+        {% if q.obiettivo == None %}Con questi prezzi e consumi il margine obiettivo non si raggiunge a nessun volume: il margine per lavaggio non basta.{% endif %}</div>
+    </div>
+    {% else %}
+    <div class="panel-body small text-muted">Servono lavaggi e presenze nel periodo per calcolare il pareggio.</div>
+    {% endif %}
+    {% endwith %}
+  </div>
+
   <div class="row g-3">
     <div class="col-xl-6">
       <div class="panel h-100">
@@ -58,7 +80,7 @@
         <div class="panel-body tabella-scroll">
           {% if p.settimana %}
           <table class="table table-sm bilancio">
-            <thead><tr><th>Giorno</th><th class="tab-num">Giorni</th><th class="tab-num">Lavaggi</th><th class="tab-num">Persone</th><th class="tab-num">Lavaggi per persona{% info "Lavaggi per persona al giorno" %}</th><th class="tab-num">Ricavo</th></tr></thead>
+            <thead><tr><th>Giorno</th><th class="tab-num">Giorni</th><th class="tab-num">Lavaggi</th><th class="tab-num">Persone</th><th class="tab-num">Lavaggi per persona{% info "Lavaggi per persona al giorno" %}</th><th class="tab-num">Ricavo</th>{% if p.pareggio.obiettivo %}<th class="tab-num">Consigliate</th>{% endif %}</tr></thead>
             <tbody>{% for g in p.settimana %}{% include "contabilita/_riga_giorni.html" %}{% endfor %}</tbody>
           </table>
           {% else %}<div class="small text-muted">Nessun giorno con lavaggi nel periodo.</div>{% endif %}
@@ -73,7 +95,7 @@
           {% if p.meteo == None %}<div class="small text-muted">Il servizio meteo non risponde: riprova pi&ugrave; tardi.</div>
           {% elif p.meteo %}
           <table class="table table-sm bilancio">
-            <thead><tr><th>Giorni</th><th class="tab-num">Giorni</th><th class="tab-num">Lavaggi</th><th class="tab-num">Persone</th><th class="tab-num">Lavaggi per persona</th><th class="tab-num">Ricavo</th></tr></thead>
+            <thead><tr><th>Giorni</th><th class="tab-num">Giorni</th><th class="tab-num">Lavaggi</th><th class="tab-num">Persone</th><th class="tab-num">Lavaggi per persona</th><th class="tab-num">Ricavo</th>{% if p.pareggio.obiettivo %}<th class="tab-num">Consigliate</th>{% endif %}</tr></thead>
             <tbody>{% for g in p.meteo %}{% include "contabilita/_riga_giorni.html" %}{% endfor %}</tbody>
           </table>
           {% else %}<div class="small text-muted">Nessun giorno con lavaggi nel periodo.</div>{% endif %}

@@ -7,11 +7,19 @@
   giorno aperto (con almeno un lavaggio).
 - Mix ed extra: servizio principale = la riga di servizio col prezzo
   piu' alto, extra = le altre righe di servizio.
+- Pareggio: margine di contribuzione per lavaggio = ricavo - consumi per
+  lavaggio; costo per giorno-persona = (costo pieno - consumi) /
+  giorni-persona; lavaggi per persona al giorno a pareggio = costo per
+  giorno-persona / margine per lavaggio; per il margine obiettivo m =
+  costo per giorno-persona / (margine per lavaggio - m x ricavo per
+  lavaggio), dall'equazione utile = m x ricavi. Persone consigliate =
+  lavaggi medi / lavaggi per persona al margine obiettivo, per eccesso.
 
 Le ore e le persone del servito vengono dalle presenze giornaliere, per
 la quota servito della ripartizione di ogni dipendente. L'ora di
 creazione degli ordini non e' affidabile: niente analisi per fascia
 oraria, solo per giorno."""
+import math
 from collections import defaultdict
 from datetime import date, timedelta
 from decimal import Decimal
@@ -258,13 +266,50 @@ def mix_ed_extra(dal, al):
             'ricavo_extra': ricavo_extra / lavaggi, 'mix': mix[:12], 'altri': len(mix) - 12 if len(mix) > 12 else 0}
 
 
+# ---------------------------------------------------------------- pareggio
+
+def pareggio(k, margine_obiettivo):
+    """Lavaggi per persona al giorno che servono a pareggio e per il margine
+    obiettivo, dalle somme del periodo (kpi_mese)."""
+    from apps.personale.models import ParametriPrevisione
+    if not k or not k['lavaggi'] or not k['giorni_persona']:
+        return None
+    lavaggi = Decimal(k['lavaggi'])
+    ricavo = k['ricavi'] / lavaggi
+    consumi = k['variabili'] / lavaggi
+    mdc = ricavo - consumi
+    costo_gp = (k['pieno'] - k['variabili']) / k['giorni_persona']
+    m = Decimal(margine_obiettivo) / 100
+    denominatore = mdc - m * ricavo
+    return {
+        'ricavo': ricavo, 'consumi': consumi, 'mdc': mdc, 'costo_gp': costo_gp,
+        'pareggio': costo_gp / mdc if mdc > 0 else None,
+        'obiettivo': costo_gp / denominatore if denominatore > 0 else None,
+        'effettivi': lavaggi / k['giorni_persona'],
+        'previsione': ParametriPrevisione.attuali().lavaggi_per_persona,
+        'margine_obiettivo': margine_obiettivo,
+    }
+
+
+def persone_consigliate(righe, lavaggi_per_persona):
+    """Aggiunge a ogni riga (medie dei giorni) le persone consigliate:
+    lavaggi medi / lavaggi per persona al margine obiettivo, per eccesso."""
+    for r in righe or []:
+        r['consigliate'] = math.ceil(r['lavaggi'] / lavaggi_per_persona) if lavaggi_per_persona else None
+    return righe
+
+
 def produttivita(mesi, anno, base):
+    from .models import ParametriAnalitica
     dal, al = mesi[0], fine_mese(mesi[-1])
     giorni = giorni_del_periodo(dal, al)
+    p = pareggio(somma_kpi([kpi_mese(m, base) for m in mesi]), ParametriAnalitica.attuali().margine_obiettivo)
+    obiettivo = p['obiettivo'] if p else None
     return {
         'andamento': andamento(anno, base),
-        'settimana': per_giorno_settimana(giorni),
-        'meteo': per_meteo(giorni, dal, al),
+        'pareggio': p,
+        'settimana': persone_consigliate(per_giorno_settimana(giorni), obiettivo),
+        'meteo': persone_consigliate(per_meteo(giorni, dal, al), obiettivo),
         'mix': mix_ed_extra(dal, min(al, timezone.localdate())),
         'giorni_aperti': len(giorni),
     }

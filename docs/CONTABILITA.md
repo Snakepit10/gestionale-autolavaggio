@@ -381,6 +381,19 @@ Ogni servizio ha i suoi **minuti-persona standard**: i minuti di lavoro di tutte
 - giorno di pioggia = almeno 1 mm o 2 ore di pioggia, dall'archivio Open-Meteo, come nella previsione della squadra;
 - l'ora di creazione degli ordini non è affidabile, quindi niente analisi per fascia oraria.
 
+*Pareggio del servito* (sul periodo scelto):
+
+| Grandezza | Calcolo |
+|---|---|
+| Margine per lavaggio | ricavo per lavaggio − consumi per lavaggio |
+| Costo per giorno-persona | (costo pieno − consumi) / giorni-persona del servito |
+| Lavaggi per persona al giorno a pareggio | costo per giorno-persona / margine per lavaggio |
+| Lavaggi per persona per il margine obiettivo m | costo per giorno-persona / (margine per lavaggio − m × ricavo per lavaggio), da utile = m × ricavi |
+
+- Si confrontano con i lavaggi per persona effettivi e con quelli usati dalla previsione della squadra.
+- Nelle tabelle per giorno della settimana e per pioggia/asciutto, **persone consigliate** = lavaggi medi / lavaggi per persona al margine obiettivo, arrotondato per eccesso.
+- La previsione della squadra non cambia.
+
 *Mix ed extra:*
 - servizio principale = la riga di servizio dell'ordine col prezzo più alto; extra = le altre righe di servizio;
 - si vedono la percentuale di lavaggi con extra, il ricavo extra per lavaggio e la quota e il prezzo medio dei servizi principali.

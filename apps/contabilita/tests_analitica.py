@@ -287,6 +287,18 @@ class ProduttivitaTest(TestCase):
                          (1, 1, Decimal('100'), Decimal('10')))
         self.assertEqual((m['mix'][0]['nome'], m['mix'][0]['ricavo']), ('Lavaggio a mano', Decimal('100')))
 
+    def test_pareggio_e_persone_consigliate(self):
+        from .produttivita import kpi_mese, pareggio, persone_consigliate
+        q = pareggio(kpi_mese(OTTOBRE, 'scontrini'), Decimal('30'))
+        self.assertEqual((q['ricavo'], q['consumi'], q['mdc']), (Decimal('100'), Decimal('30'), Decimal('70')))
+        self.assertEqual(round(q['costo_gp'], 2), Decimal('213.33'))     # (190 - 30) / 0,75 giorni-persona
+        self.assertEqual(round(q['pareggio'], 2), Decimal('3.05'))       # 213,33 / 70
+        self.assertEqual(round(q['obiettivo'], 2), Decimal('5.33'))      # 213,33 / (70 - 0,3 x 100)
+        self.assertEqual(round(q['effettivi'], 2), Decimal('1.33'))
+        self.assertIsNone(pareggio(kpi_mese(OTTOBRE, 'scontrini'), Decimal('80'))['obiettivo'])   # 70 - 80 < 0
+        righe = persone_consigliate([{'lavaggi': Decimal('6')}], q['obiettivo'])
+        self.assertEqual(righe[0]['consigliate'], 2)                     # 6 / 5,33 = 1,1 -> 2
+
     def test_pagina(self):
         from unittest import mock
         VisteAnaliticaTest.setUp(self)
@@ -295,6 +307,7 @@ class ProduttivitaTest(TestCase):
                 r = VisteAnaliticaTest.apri(self, url)
                 self.assertEqual(r.status_code, 200, url)
                 self.assertContains(r, 'Auto per ora-persona')
+                self.assertContains(r, 'Pareggio del servito')
 
 
 class CapacitaTest(TestCase):

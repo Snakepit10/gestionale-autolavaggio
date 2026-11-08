@@ -174,6 +174,21 @@ SPIEGAZIONI = {
     'Lavaggi con extra': (
         'Ordini di lavaggio con almeno due righe di servizio / lavaggi. Il principale è la riga col prezzo più alto.',
         'Quanto spesso il cliente aggiunge qualcosa al lavaggio: misura le vendite aggiuntive.'),
+    'Margine per lavaggio': (
+        'Ricavo per lavaggio − consumi per lavaggio.',
+        'Quanto lascia ogni auto per pagare personale e struttura.'),
+    'Costo per giorno-persona': (
+        '(Costo pieno del servito − consumi) / giorni-persona del servito.',
+        'Quanto costa in media una persona in turno per una giornata, con la sua parte di struttura.'),
+    'Lavaggi per persona a pareggio': (
+        'Costo per giorno-persona / margine per lavaggio.',
+        'Quante auto deve lavare ogni persona in una giornata perché il servito non perda.',
+        'Se i lavaggi per persona effettivi sono sotto questo numero, in turno c\'è più gente di quanta ne paghino le auto.'),
+    'Lavaggi per persona per il margine obiettivo': (
+        'Costo per giorno-persona / (margine per lavaggio − margine obiettivo × ricavo per lavaggio). Viene da: utile = '
+        'margine obiettivo × ricavi.',
+        'Quante auto per persona al giorno servono per avere il margine obiettivo. Diviso nei lavaggi previsti dà le '
+        'persone da mettere in turno.'),
     'Ricavo extra per lavaggio': (
         'Somma delle righe di servizio diverse dalla principale, IVA esclusa / lavaggi.',
         'Quanto portano in media gli extra su ogni auto.'),
