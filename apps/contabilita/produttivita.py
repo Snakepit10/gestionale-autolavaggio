@@ -138,21 +138,21 @@ def derivati(k):
     }
 
 
-# (chiave, nome, formato, meglio se sale)
+# (chiave, nome, formato, meglio se sale, usa costi e presenze)
 RIGHE_ANDAMENTO = [
-    ('lavaggi', 'Lavaggi', 'intero', True),
-    ('abbonamento', 'di cui in abbonamento', 'intero', None),
-    ('ore', 'Ore pagate servito', 'intero', None),
-    ('auto_ora', 'Auto per ora-persona', 'due', True),
-    ('persone_giorno', 'Persone medie al giorno', 'uno', None),
-    ('lavaggi_persona', 'Lavaggi per persona al giorno', 'uno', True),
-    ('ricavo_lavaggio', 'Ricavo per lavaggio', 'euro2', True),
-    ('consumi_lavaggio', 'Consumi per lavaggio', 'euro2', False),
-    ('costo_lavaggio', 'Costo pieno per lavaggio', 'euro2', False),
-    ('risultato_lavaggio', 'Risultato per lavaggio', 'euro2', True),
-    ('lavoro_ricavi', 'Costo del lavoro sui ricavi', 'pct', False),
-    ('ricavi', 'Ricavi servito', 'euro', True),
-    ('risultato', 'Risultato pieno servito', 'euro', True),
+    ('lavaggi', 'Lavaggi', 'intero', True, False),
+    ('abbonamento', 'di cui in abbonamento', 'intero', None, False),
+    ('ore', 'Ore pagate servito', 'intero', None, True),
+    ('auto_ora', 'Auto per ora-persona', 'due', True, True),
+    ('persone_giorno', 'Persone medie al giorno', 'uno', None, True),
+    ('lavaggi_persona', 'Lavaggi per persona al giorno', 'uno', True, True),
+    ('ricavo_lavaggio', 'Ricavo per lavaggio', 'euro2', True, False),
+    ('consumi_lavaggio', 'Consumi per lavaggio', 'euro2', False, True),
+    ('costo_lavaggio', 'Costo pieno per lavaggio', 'euro2', False, True),
+    ('risultato_lavaggio', 'Risultato per lavaggio', 'euro2', True, True),
+    ('lavoro_ricavi', 'Costo del lavoro sui ricavi', 'pct', False, True),
+    ('ricavi', 'Ricavi servito', 'euro', True, False),
+    ('risultato', 'Risultato pieno servito', 'euro', True, True),
 ]
 
 
@@ -172,12 +172,15 @@ def andamento(anno, base):
     totale_prima = somma_kpi([p for p, c in zip(precedenti, correnti) if c])
     colonne = [derivati(k) for k in correnti] + [derivati(totale)]
     colonne_prima = [derivati(k) for k in precedenti] + [derivati(totale_prima)]
+    # l'anno prima senza presenze (es. il 2025, prima della contabilita'): costi e ore non confrontabili
+    completi = [bool(k and k['ore']) for k in precedenti]
+    completi.append(bool(totale_prima) and all(c for c, k in zip(completi, correnti) if k))
     righe = []
-    for chiave, nome, formato, meglio_su in RIGHE_ANDAMENTO:
+    for chiave, nome, formato, meglio_su, usa_costi in RIGHE_ANDAMENTO:
         celle = []
-        for col, prima in zip(colonne, colonne_prima):
+        for col, prima, completo in zip(colonne, colonne_prima, completi):
             v = col[chiave] if col else None
-            p = prima[chiave] if prima else None
+            p = prima[chiave] if prima and (completo or not usa_costi) else None
             var = _variazione(v, p)
             buono = None if var is None or meglio_su is None or abs(var) < Decimal('0.5') else (var > 0) == meglio_su
             celle.append({'v': v, 'prima': p, 'var': var, 'buono': buono})

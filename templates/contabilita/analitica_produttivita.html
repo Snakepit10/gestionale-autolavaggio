@@ -28,7 +28,8 @@
   <div class="panel">
     <div class="panel-title"><i class="bi bi-calendar3"></i> Servito mese per mese &mdash; {{ anno }}</div>
     <div class="panel-sub">Sotto ogni valore la variazione rispetto allo stesso mese del {{ t.anno_prima }} (passa sopra per vedere il valore): verde se migliora, rosso se peggiora.
-      Il totale dell'anno prima conta solo i mesi gi&agrave; passati di quest'anno. Costi e ricavi come nella scheda Centri; ore e persone dalle presenze, per la quota servito di ogni dipendente.</div>
+      Il totale dell'anno prima conta solo i mesi gi&agrave; passati di quest'anno. Le righe di costi e ore non si confrontano con i mesi dell'anno prima senza presenze registrate.
+      Costi e ricavi come nella scheda Centri, ma la quota dei costi comuni &egrave; divisa mese per mese: il totale pu&ograve; differire di poco da quello della scheda Centri. Ore e persone dalle presenze, per la quota servito di ogni dipendente.</div>
     <div class="panel-body tabella-scroll">
       <table class="table table-sm bilancio andamento">
         <thead><tr><th></th>{% for m in t.mesi %}<th class="tab-num">{{ m }}</th>{% endfor %}</tr></thead>

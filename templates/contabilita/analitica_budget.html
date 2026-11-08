@@ -26,7 +26,7 @@
         <div class="panel-title"><i class="bi bi-bar-chart-steps"></i> Dal budget all'effettivo &mdash; servito, {{ periodo }}</div>
         {% if b.scostamenti %}
         <div class="panel-sub">Ogni riga &egrave; l'effetto sul risultato del servito (positivo = meglio del budget). Mesi contati: {{ b.contati|join:", " }}.
-          {% if b.saltati %}Senza budget n&eacute; dati dell'anno prima: {{ b.saltati|join:", " }}.{% endif %}</div>
+          {% if b.saltati %}Senza budget n&eacute; dati completi dell'anno prima (servono lavaggi e presenze): {{ b.saltati|join:", " }}.{% endif %}</div>
         <div class="panel-body">
           <table class="table table-sm prospetto">
             <tbody>
@@ -39,7 +39,7 @@
           </table>
         </div>
         {% else %}
-        <div class="panel-body small text-muted">Nessun mese del periodo ha sia l'effettivo sia un budget (inserito qui sotto o dallo stesso mese dell'anno prima).</div>
+        <div class="panel-body small text-muted">Nessun mese del periodo ha sia l'effettivo sia un budget completo: inseriscilo qui sotto. L'anno prima vale come budget solo se ha lavaggi e presenze registrate.</div>
         {% endif %}
       </div>
     </div>
@@ -68,7 +68,7 @@
   <form method="post" class="panel mt-3">
     {% csrf_token %}
     <div class="panel-title"><i class="bi bi-pencil-square"></i> Budget del servito {{ anno }}</div>
-    <div class="panel-sub">Scrivi solo quello che vuoi cambiare: <strong>un campo vuoto vale quanto lo stesso mese del {{ anno|add:"-1" }}</strong> (in grigio). Importi senza IVA.
+    <div class="panel-sub">Scrivi solo quello che vuoi cambiare: <strong>un campo vuoto vale quanto lo stesso mese del {{ anno|add:"-1" }}</strong> (in grigio), se quel mese ha lavaggi e presenze registrate; altrimenti il mese va compilato tutto. Importi senza IVA.
       Altri costi fissi = costo pieno del servito meno consumi e personale (manutenzioni, ammortamenti, quota dei costi comuni&hellip;).</div>
     <div class="panel-body tabella-scroll modulo-budget">
       <table class="table table-sm align-middle">

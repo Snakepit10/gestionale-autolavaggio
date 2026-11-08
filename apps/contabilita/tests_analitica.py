@@ -506,3 +506,34 @@ class BudgetTest(TestCase):
         self.assertEqual((nov.lavaggi, nov.ricavo_lavaggio, nov.ore_pagate), (300, Decimal('24.50'), None))
         self.assertFalse(BudgetServito.objects.filter(mese=date(2026, 12, 1)).exists())   # 1,5 lavaggi: errore
         self.assertFalse(BudgetServito.objects.filter(mese=OTTOBRE).exists())             # riga vuota: tolto
+
+
+class AnnoPrimaIncompletoTest(TestCase):
+    """L'anno prima con lavaggi ma senza presenze (come il 2025): non fa da
+    budget e non si confronta sulle righe di costi e ore."""
+    def setUp(self):
+        from django.core.cache import cache
+        cache.clear()
+        AnaliticaTest.setUp(self)
+
+    def kpi(self, mese, base):
+        from .produttivita import kpi_mese as originale
+        if mese.year == 2025:
+            return {'lavaggi': 2, 'abbonamento': 0, 'ore': ZERO, 'giorni_persona': ZERO, 'giorni_aperti': 1,
+                    'ricavi': Decimal('50'), 'variabili': ZERO, 'personale': ZERO, 'pieno': Decimal('5')}
+        return originale(mese, base)
+
+    def test_niente_budget_e_niente_confronto_sui_costi(self):
+        from unittest import mock
+
+        from . import produttivita
+        from .budget import budget_del_mese
+        originale = produttivita.kpi_mese
+        with mock.patch('apps.contabilita.produttivita.kpi_mese',
+                        side_effect=lambda m, b: self.kpi(m, b) if m.year == 2025 else originale(m, b)):
+            self.assertIsNone(budget_del_mese(OTTOBRE, 'scontrini'))
+            t = produttivita.andamento(2026, 'scontrini')
+        righe = {r['chiave']: r['celle'][9] for r in t['righe']}
+        self.assertEqual(righe['lavaggi']['var'], Decimal('-50'))          # 1 contro 2: si confronta
+        self.assertIsNone(righe['costo_lavaggio']['var'])                  # 2025 senza presenze
+        self.assertIsNone(righe['costo_lavaggio']['prima'])

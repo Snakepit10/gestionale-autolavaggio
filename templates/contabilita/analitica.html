@@ -33,7 +33,7 @@ details summary { cursor: pointer; font-size: .75rem; color: #475569; font-weigh
 
   <div class="panel">
     <div class="panel-title"><i class="bi bi-grid-3x3"></i> Quadro per centro (euro, IVA esclusa)</div>
-    <div class="panel-sub">Costi fino all'EBIT divisi sui centri. Il margine del centro conta solo i costi del centro; la quota dei costi comuni li divide con il criterio di ogni voce (impostazioni), cos&igrave; il risultato pieno della colonna Comune va a zero. Il totale coincide con il conto economico (stessa base dei ricavi) prima di oneri finanziari e imposte.
+    <div class="panel-sub">Costi fino all'EBIT divisi sui centri. Il margine del centro conta solo i costi del centro; la quota dei costi comuni li divide con il criterio di ogni voce (impostazioni), cos&igrave; nel risultato pieno della colonna Comune restano solo gli eventuali ricavi senza centro. Il totale coincide con il conto economico (stessa base dei ricavi) prima di oneri finanziari e imposte.
       {% if base == 'rilevato' %}Ricavi: servito e vendita prodotti = il totale degli ordini meno l'IVA del registratore fiscale; cambia gettoni = le chiusure di cassa diviso 1,22; monete online = il fatturato diviso 1,22; portali = il resto del rilevato reale (tolti ordini e cambia gettoni) meno l'IVA delle chiusure dei portali.{% else %}Ricavi dagli scontrini fiscali: servito e vendita prodotti = il registratore fiscale diviso 1,22; portali, cambia gettoni e monete online = il fatturato diviso 1,22.{% endif %}</div>
     <div class="panel-body tabella-scroll">
       <table class="table table-sm bilancio">

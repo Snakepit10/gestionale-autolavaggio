@@ -295,7 +295,7 @@ Tutti i centri hanno gli stessi livelli:
 | Quota costi comuni | somma delle quote delle voci comuni |
 | Risultato pieno | margine del centro − quota comuni |
 
-- La somma dei risultati pieni è l'EBIT; il Comune va a zero.
+- La somma dei risultati pieni è l'EBIT. Sul Comune restano solo gli eventuali ricavi senza centro: i ricavi non si dividono.
 - Costo per ciclo di portale = costi comuni divisi per cicli / cicli totali dei portali.
 
 **Lavaggi:** ordini non annullati con almeno un servizio, senza le vendite di soli prodotti. Contano gli accessi in abbonamento; la vendita dell'abbonamento (ordine senza righe) no.
@@ -375,6 +375,8 @@ Ogni servizio ha i suoi **minuti-persona standard**: i minuti di lavoro di tutte
 | Costo del lavoro sui ricavi | personale del servito / ricavi del servito |
 
 - I mesi già chiusi si tengono in memoria per un'ora: una fattura appena caricata compare al più tardi dopo un'ora.
+- La quota dei costi comuni è divisa mese per mese, quindi il totale può differire di poco dalla scheda Centri, che la divide sull'intero periodo.
+- Le righe di costi e ore non si confrontano con i mesi dell'anno prima senza presenze registrate (per esempio il 2025, prima della contabilità).
 
 *Per giorno della settimana* e *pioggia e asciutto*:
 - medie dei giorni aperti, cioè con almeno un lavaggio, fino a ieri: lavaggi, persone (presenze per la quota servito), lavaggi per persona e ricavo (totale degli ordini di lavaggio senza IVA);
@@ -431,7 +433,7 @@ Per ogni mese si inseriscono, tutti facoltativi:
 - ore pagate e costo orario del personale;
 - altri costi fissi (costo pieno meno consumi e personale, cioè con la quota dei costi comuni).
 
-**Un campo vuoto vale quanto lo stesso mese dell'anno prima**, così il confronto con l'anno prima funziona anche senza scrivere nulla.
+**Un campo vuoto vale quanto lo stesso mese dell'anno prima**, così il confronto con l'anno prima funziona anche senza scrivere nulla. Vale solo se quel mese ha lavaggi e presenze registrate; altrimenti il mese va compilato tutto (succede nel 2026, perché il 2025 non ha costi né presenze).
 
 Risultato = lavaggi × (ricavo − consumi per lavaggio) − ore × costo orario − altri fissi. Gli scostamenti sono l'effetto sul risultato (positivo = meglio del budget):
 

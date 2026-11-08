@@ -43,8 +43,10 @@ def _div(a, b):
 
 
 def grandezze(k):
-    """Dalle somme di kpi_mese alle grandezze del budget."""
-    if not k or not k['lavaggi']:
+    """Dalle somme di kpi_mese alle grandezze del budget. None se il mese
+    non ha lavaggi o non ha presenze (costi del personale non registrati,
+    come nel 2025): non puo' fare da effettivo ne' da budget."""
+    if not k or not k['lavaggi'] or not k['ore']:
         return None
     lavaggi = Decimal(k['lavaggi'])
     return {
