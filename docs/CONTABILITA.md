@@ -271,6 +271,37 @@ Con tutte le basi il totale del quadro per centro coincide con l'EBIT del conto 
 - **Personale:** costo e ore di ogni dipendente si dividono con la sua ripartizione. Si imposta in Analitica › Impostazioni, con lo storico "valida dal mese". Senza ripartizione il dipendente conta 100% servito.
 - **Ammortamenti:** sul centro del cespite.
 
+**Costi comuni e risultato pieno**
+
+Quello che resta sul Comune va sugli altri centri, voce per voce, con un criterio (driver) che si sceglie in Analitica › Impostazioni:
+
+| Driver | Quote |
+|---|---|
+| **Ricavi** (predefinito) | ricavi di self, servito e vendita prodotti |
+| **Cicli dei portali** | cicli self contro cicli del servito; vendita prodotti 0. È il prezzo interno del ciclo: il servito paga i passaggi al portale che usa |
+| **Ore del personale** | ore lavorate per centro |
+
+- Il personale rimasto sul Comune va sempre per ore. Le fatture da classificare vanno per ricavi.
+- Se un driver non ha base (per esempio nessun ciclo registrato), quel costo va per ricavi.
+- I cespiti del centro Comune hanno il loro driver.
+- La pagina propone un driver dal nome (manutenzione, chimici, acqua, impianti → cicli; software, divise, formazione → ore). Il predefinito resta ricavi finché non si salva.
+
+Tutti i centri hanno gli stessi livelli:
+
+| Livello | Calcolo |
+|---|---|
+| Margine di contribuzione | ricavi − costi variabili |
+| Margine del centro | − costi fissi, personale e ammortamenti del centro |
+| Quota costi comuni | somma delle quote delle voci comuni |
+| Risultato pieno | margine del centro − quota comuni |
+
+- La somma dei risultati pieni è l'EBIT; il Comune va a zero.
+- Costo per ciclo di portale = costi comuni divisi per cicli / cicli totali dei portali.
+
+**Lavaggi:** ordini non annullati con almeno un servizio, senza le vendite di soli prodotti. Contano gli accessi in abbonamento; la vendita dell'abbonamento (ordine senza righe) no.
+
+**Cicli del servito:** come nel report giornata. Un ciclo per pezzo dei servizi con programmi portale, tranne quelli chiusi senza portale, più gli abbinati a mano dei servizi senza programmi. I cicli self sono i cicli delle chiusure dei portali meno quelli del servito.
+
 **Self-service: direct costing**
 
 | Voce | Calcolo |
@@ -278,8 +309,8 @@ Con tutte le basi il totale del quadro per centro coincide con l'EBIT del conto 
 | Margine I | ricavi self (portali, piste, monete online) − costi variabili |
 | Margine II | margine I − costi fissi specifici del self |
 
-- I costi comuni non si ripartiscono sul self.
-- Valori per ciclo dei portali: ricavo, costo variabile, cicli di pareggio.
+- Sotto il margine II si vedono anche la quota dei costi comuni e il risultato pieno.
+- Valori per ciclo dei portali: ricavo, costo variabile, cicli di pareggio, costo per ciclo di portale.
 
 **Servito: full costing**
 
@@ -288,14 +319,14 @@ Con tutte le basi il totale del quadro per centro coincide con l'EBIT del conto 
 | Margine diretto | ricavi − costi diretti |
 | Risultato pieno | margine diretto − quota dei costi comuni |
 
-- La quota dei costi comuni è in proporzione ai ricavi del servito, oppure una percentuale fissa (si sceglie nelle impostazioni).
+- La quota dei costi comuni viene dai driver delle voci (vedi sopra). Si vede anche quanti cicli dei portali usa il servito e quanto paga dei costi divisi per cicli.
 - Si calcolano anche:
   - costo pieno per lavaggio;
   - costo pieno per ora lavorata;
   - costo pieno per servizio (costo orario × durata dal catalogo), confrontato col ricavo netto medio.
 
 **Vendita prodotti**
-- Margine = ricavi − costi assegnati al centro prodotti (per esempio "Prodotti per la rivendita").
+- Margine = ricavi − costi assegnati al centro prodotti (per esempio "Prodotti per la rivendita"), poi quota dei costi comuni e risultato pieno.
 
 **Rientro degli investimenti**
 - Usa i cespiti registrati per centro, più il totale aziendale. Il flusso del periodo è riportato a un anno, contando solo i mesi già iniziati.
@@ -307,6 +338,7 @@ Con tutte le basi il totale del quadro per centro coincide con l'EBIT del conto 
 - **Data stimata di rientro:** parte dalla data media di acquisto, pesata sul valore, e suppone lo stesso flusso anche negli anni passati.
 
 **Quadro per centro**
+- Righe: ricavi, costi variabili, margine di contribuzione, costi fissi, personale, ammortamenti, margine del centro, quota costi comuni, risultato pieno.
 - Il totale coincide con l'EBIT del conto economico.
 
 ## Fase 5: indici e KPI

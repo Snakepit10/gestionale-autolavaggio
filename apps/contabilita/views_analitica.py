@@ -9,8 +9,31 @@ from django.utils import timezone
 
 from .analitica import analitica as calcola_analitica
 from .conto_economico import BASI_RICAVI, NOMI_MESI
-from .models import CENTRI, ParametriAnalitica, RipartizionePersonale
-from .views import _decimale, _mese, accesso, campi_ripartizione, ripartizione_da_post
+from .models import CENTRI, DRIVER_COMUNI, Cespite, RipartizionePersonale, VoceConto
+from .views import _mese, accesso, campi_ripartizione, ripartizione_da_post
+
+SEZIONI_SENZA_DRIVER = ('ricavi', 'non_economico', 'oneri_finanziari', 'imposte')
+
+
+def driver_consigliato(nome):
+    """Proposta di driver dal nome della voce o del cespite."""
+    n = nome.lower()
+    if any(k in n for k in ('manutenz', 'chimic', 'acqua', 'portal', 'impiant', 'spazzol')):
+        return 'cicli'
+    if any(k in n for k in ('software', 'gestional', 'divis', 'formazion', 'personale')):
+        return 'ore'
+    return 'ricavi'
+
+
+def voci_e_cespiti_comuni():
+    """Voci di costo senza ripartizione (i loro costi restano sul Comune,
+    salvo righe ripartite a mano) e cespiti del centro Comune."""
+    voci = [v for v in VoceConto.objects.filter(attiva=True).exclude(sezione__in=SEZIONI_SENZA_DRIVER)
+            if not v.ripartizione]
+    cespiti = list(Cespite.objects.filter(centro='comune'))
+    for x in voci + cespiti:
+        x.consigliato = driver_consigliato(str(x))
+    return voci, cespiti
 
 
 @accesso
@@ -65,15 +88,17 @@ def impostazioni_analitica(request):
                 messages.error(request, e)
             if salvati:
                 messages.success(request, f'Ripartizione aggiornata per {salvati} dipendenti dal {dal:%m/%Y}.')
-        elif p.get('azione') == 'parametri':
-            parametri = ParametriAnalitica.attuali()
-            pct = _decimale(p.get('percentuale_servito'))
-            if p.get('criterio_comuni') not in dict(ParametriAnalitica.CRITERI) or pct is None or not 0 <= pct <= 100:
-                messages.error(request, 'Parametri non validi.')
-            else:
-                parametri.criterio_comuni, parametri.percentuale_servito = p['criterio_comuni'], pct
-                parametri.save()
-                messages.success(request, 'Criterio dei costi comuni salvato.')
+        elif p.get('azione') == 'driver':
+            validi, cambiati = dict(DRIVER_COMUNI), 0
+            voci, cespiti = voci_e_cespiti_comuni()
+            for prefisso, oggetti in (('drv_v', voci), ('drv_c', cespiti)):
+                for x in oggetti:
+                    scelto = p.get(f'{prefisso}_{x.pk}')
+                    if scelto in validi and scelto != x.driver_comuni:
+                        x.driver_comuni = scelto
+                        x.save(update_fields=['driver_comuni'])
+                        cambiati += 1
+            messages.success(request, f'Criteri dei costi comuni salvati ({cambiati} cambiati).')
         return redirect('contabilita:impostazioni_analitica')
 
     oggi = timezone.localdate().replace(day=1)
@@ -83,11 +108,13 @@ def impostazioni_analitica(request):
         d.campi_rip = campi_ripartizione(attuale.ripartizione if attuale else {}, {'servito': 100})
         d.storico = list(d.ripartizioni_centri.all())
         d.prefisso_rip = f'rip_{d.pk}'
+    voci, cespiti = voci_e_cespiti_comuni()
     return render(request, 'contabilita/impostazioni_analitica.html', {
         'dipendenti': dipendenti,
         'centri': CENTRI,
-        'parametri': ParametriAnalitica.attuali(),
-        'criteri': ParametriAnalitica.CRITERI,
+        'voci_comuni': voci,
+        'cespiti_comuni': cespiti,
+        'driver': DRIVER_COMUNI,
         'oggi': oggi,
     })
 

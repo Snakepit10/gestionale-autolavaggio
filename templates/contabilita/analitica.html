@@ -48,14 +48,14 @@ details summary { cursor: pointer; font-size: .75rem; color: #475569; font-weigh
 
   <div class="panel">
     <div class="panel-title"><i class="bi bi-grid-3x3"></i> Quadro per centro (euro, IVA esclusa)</div>
-    <div class="panel-sub">Costi fino all'EBIT divisi sui centri. Il totale coincide con il conto economico (stessa base dei ricavi) prima di oneri finanziari e imposte.
+    <div class="panel-sub">Costi fino all'EBIT divisi sui centri. Il margine del centro conta solo i costi del centro; la quota dei costi comuni li divide con il criterio di ogni voce (impostazioni), cos&igrave; il risultato pieno della colonna Comune va a zero. Il totale coincide con il conto economico (stessa base dei ricavi) prima di oneri finanziari e imposte.
       {% if base == 'rilevato' %}Ricavi: servito e vendita prodotti = il totale degli ordini meno l'IVA del registratore fiscale; cambia gettoni = le chiusure di cassa diviso 1,22; monete online = il fatturato diviso 1,22; portali = il resto del rilevato reale (tolti ordini e cambia gettoni) meno l'IVA delle chiusure dei portali.{% else %}Ricavi dagli scontrini fiscali: servito e vendita prodotti = il registratore fiscale diviso 1,22; portali, cambia gettoni e monete online = il fatturato diviso 1,22.{% endif %}</div>
     <div class="panel-body tabella-scroll">
       <table class="table table-sm bilancio">
         <thead><tr><th></th>{% for c in a.centri %}<th class="tab-num">{{ c }}</th>{% endfor %}<th class="tab-num">Totale</th></tr></thead>
         <tbody>
           {% for r in a.quadro %}
-          <tr class="{% if forloop.last %}riga-risultato{% elif forloop.first %}riga-totale{% endif %}">
+          <tr class="{{ r.classe }}">
             <td class="col-nome">{{ r.nome }}{% info r.nome %}</td>
             {% for v in r.valori %}<td class="tab-num {% if v < 0 %}neg{% endif %}">{{ v|floatformat:"0g" }}</td>{% endfor %}
             <td class="tab-num col-totale {% if r.totale < 0 %}neg{% endif %}">{{ r.totale|floatformat:"0g" }}</td>
@@ -81,6 +81,8 @@ details summary { cursor: pointer; font-size: .75rem; color: #475569; font-weigh
               <tr class="uguale"><td>Margine di contribuzione I {% if s.mdc1_pct != None %}<span class="fw-normal">({{ s.mdc1_pct|floatformat:1 }}%)</span>{% endif %}{% info "Margine di contribuzione I" %}</td><td class="tab-num {% if s.mdc1 < 0 %}neg{% endif %}">&euro;{{ s.mdc1|floatformat:"0g" }}</td></tr>
               <tr class="meno"><td>Costi fissi specifici (manutenzione, personale self, ammortamenti)</td><td class="tab-num">&euro;{{ s.fissi_specifici|floatformat:"0g" }}</td></tr>
               <tr class="uguale"><td>Margine di contribuzione II {% if s.mdc2_pct != None %}<span class="fw-normal">({{ s.mdc2_pct|floatformat:1 }}%)</span>{% endif %}{% info "Margine di contribuzione II" %}</td><td class="tab-num {% if s.mdc2 < 0 %}neg{% endif %}">&euro;{{ s.mdc2|floatformat:"0g" }}</td></tr>
+              <tr class="meno"><td>Quota costi comuni{% info "Quota costi comuni" %}</td><td class="tab-num">&euro;{{ s.quota_comuni|floatformat:"0g" }}</td></tr>
+              <tr class="uguale"><td>Risultato pieno {% if s.risultato_pct != None %}<span class="fw-normal">({{ s.risultato_pct|floatformat:1 }}%)</span>{% endif %}{% info "Risultato pieno" %}</td><td class="tab-num {% if s.risultato < 0 %}neg{% endif %}">&euro;{{ s.risultato|floatformat:"0g" }}</td></tr>
             </tbody>
           </table>
           <div class="row g-2 mb-2">
@@ -89,7 +91,8 @@ details summary { cursor: pointer; font-size: .75rem; color: #475569; font-weigh
             <div class="col-6 col-md-3"><div class="kpi-mini"><div class="label">Costo var. / ciclo{% info "Costo var. / ciclo" %}</div><div class="value">{% if s.variabile_ciclo != None %}&euro;{{ s.variabile_ciclo|floatformat:2 }}{% else %}&mdash;{% endif %}</div></div></div>
             <div class="col-6 col-md-3"><div class="kpi-mini"><div class="label">Cicli di pareggio{% info "Cicli di pareggio" %}</div><div class="value">{{ s.cicli_pareggio|default:"—" }}</div></div></div>
           </div>
-          <div class="text-muted" style="font-size:.7rem">Valori per ciclo indicativi: i costi variabili comprendono anche le piste. Cicli di pareggio = costi fissi specifici / margine I per ciclo.</div>
+          <div class="text-muted" style="font-size:.7rem">Valori per ciclo indicativi: i costi variabili comprendono anche le piste. Cicli di pareggio = costi fissi specifici / margine I per ciclo.
+            {% if s.costo_ciclo_portale != None %}Costi comuni divisi per cicli: &euro;{{ s.costo_ciclo_portale|floatformat:2 }} per ciclo di portale{% info "Costo per ciclo di portale" %}.{% endif %}</div>
           <details class="mt-2"><summary>Dettaglio dei costi del self-service</summary>
             <table class="table table-sm bilancio mt-1"><tbody>{% include "contabilita/_sezioni_centro.html" with sezioni=s.sezioni %}</tbody></table>
           </details>
@@ -102,7 +105,8 @@ details summary { cursor: pointer; font-size: .75rem; color: #475569; font-weigh
     <div class="col-xl-6">
       <div class="panel h-100">
         <div class="panel-title"><i class="bi bi-person-gear"></i> Servito &mdash; full costing</div>
-        <div class="panel-sub">Al servito vanno i suoi costi diretti e una quota dei costi comuni ({{ a.servito.criterio|lower }}: {{ a.servito.quota_pct|floatformat:1 }}%).</div>
+        <div class="panel-sub">Al servito vanno i suoi costi diretti e la sua quota dei costi comuni ({{ a.servito.quota_pct|floatformat:1 }}%, con il criterio di ogni voce).
+          {% if a.servito.cicli_portale %}Usa {{ a.servito.cicli_portale }} cicli dei portali{% if a.servito.costo_cicli_portale %}, che paga &euro;{{ a.servito.costo_cicli_portale|floatformat:"0g" }} dei costi divisi per cicli{% endif %}.{% endif %}</div>
         <div class="panel-body">
           {% with s=a.servito %}
           <table class="table table-sm prospetto mb-3">
@@ -115,7 +119,8 @@ details summary { cursor: pointer; font-size: .75rem; color: #475569; font-weigh
             </tbody>
           </table>
           <div class="row g-2 mb-2">
-            <div class="col-6 col-md-3"><div class="kpi-mini"><div class="label">Lavaggi{% info "Lavaggi" %}</div><div class="value">{{ s.lavaggi }}</div></div></div>
+            <div class="col-6 col-md-3"><div class="kpi-mini"><div class="label">Lavaggi{% info "Lavaggi" %}</div><div class="value">{{ s.lavaggi }}</div>
+              {% if s.lavaggi_abbonamento %}<div class="text-muted" style="font-size:.68rem">di cui {{ s.lavaggi_abbonamento }} in abbonamento</div>{% endif %}</div></div>
             <div class="col-6 col-md-3"><div class="kpi-mini"><div class="label">Costo pieno / lavaggio{% info "Costo pieno / lavaggio" %}</div><div class="value">{% if s.costo_lavaggio != None %}&euro;{{ s.costo_lavaggio|floatformat:2 }}{% else %}&mdash;{% endif %}</div>
               <div class="text-muted" style="font-size:.68rem">ricavo &euro;{{ s.ricavo_lavaggio|floatformat:2|default:"—" }}</div></div></div>
             <div class="col-6 col-md-3"><div class="kpi-mini"><div class="label">Ore lavorate servito{% info "Ore lavorate servito" %}</div><div class="value">{{ s.ore|floatformat:"0g" }}</div></div></div>
@@ -158,6 +163,8 @@ details summary { cursor: pointer; font-size: .75rem; color: #475569; font-weigh
               <tr><td>Ricavi vendita prodotti</td><td class="tab-num">&euro;{{ p.ricavi|floatformat:"0g" }}</td></tr>
               <tr class="meno"><td>Costi dei prodotti (acquisti per la rivendita&hellip;)</td><td class="tab-num">&euro;{{ p.costi|floatformat:"0g" }}</td></tr>
               <tr class="uguale"><td>Margine {% if p.margine_pct != None %}<span class="fw-normal">({{ p.margine_pct|floatformat:1 }}%)</span>{% endif %}</td><td class="tab-num {% if p.margine < 0 %}neg{% endif %}">&euro;{{ p.margine|floatformat:"0g" }}</td></tr>
+              <tr class="meno"><td>Quota costi comuni</td><td class="tab-num">&euro;{{ p.quota_comuni|floatformat:"0g" }}</td></tr>
+              <tr class="uguale"><td>Risultato pieno {% if p.risultato_pct != None %}<span class="fw-normal">({{ p.risultato_pct|floatformat:1 }}%)</span>{% endif %}</td><td class="tab-num {% if p.risultato < 0 %}neg{% endif %}">&euro;{{ p.risultato|floatformat:"0g" }}</td></tr>
             </tbody>
           </table>
           {% endwith %}
@@ -167,12 +174,23 @@ details summary { cursor: pointer; font-size: .75rem; color: #475569; font-weigh
     <div class="col-xl-6">
       <div class="panel">
         <div class="panel-title"><i class="bi bi-building"></i> Costi comuni (struttura)</div>
-        <div class="panel-sub">Fuori dal direct costing del self-service; nel full costing ne va una quota al servito.</div>
+        <div class="panel-sub">Fuori dai margini dei centri; nel risultato pieno ogni voce va sui centri con il suo criterio (<a href="{% url 'contabilita:impostazioni_analitica' %}">impostazioni</a>).</div>
         <div class="panel-body">
-          <div class="fw-bold mb-1">&euro;{{ a.comune.costi|floatformat:"0g" }}</div>
-          <details><summary>Dettaglio</summary>
-            <table class="table table-sm bilancio mt-1"><tbody>{% include "contabilita/_sezioni_centro.html" with sezioni=a.comune.sezioni %}</tbody></table>
-          </details>
+          <div class="fw-bold mb-1">&euro;{{ a.comuni.totale|floatformat:"0g" }}</div>
+          {% if a.comuni.dettaglio %}
+          <div class="tabella-scroll">
+            <table class="table table-sm bilancio mt-1">
+              <thead><tr><th>Voce</th><th>Criterio</th><th class="tab-num">Importo</th>{% for c in a.comuni.centri %}<th class="tab-num">{{ c }}</th>{% endfor %}</tr></thead>
+              <tbody>
+                {% for d in a.comuni.dettaglio %}
+                <tr class="riga-voce"><td class="col-nome">{{ d.nome }}</td><td class="small text-muted">{{ d.nome_driver }}</td><td class="tab-num">{{ d.importo|floatformat:"0g" }}</td>
+                  {% for q in d.quote %}<td class="tab-num">{{ q|floatformat:"0g" }}</td>{% endfor %}</tr>
+                {% endfor %}
+                <tr class="riga-totale"><td>Totale</td><td></td><td class="tab-num">{{ a.comuni.totale|floatformat:"0g" }}</td>{% for q in a.comuni.quote %}<td class="tab-num">{{ q|floatformat:"0g" }}</td>{% endfor %}</tr>
+              </tbody>
+            </table>
+          </div>
+          {% endif %}
         </div>
       </div>
     </div>

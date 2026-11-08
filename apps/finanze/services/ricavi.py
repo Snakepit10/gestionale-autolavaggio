@@ -11,9 +11,34 @@ divergono. Importi lordi (IVA compresa).
 - monete online: acquisti di monete virtuali pagati (app)."""
 from decimal import Decimal
 
-from django.db.models import Sum
+from django.db.models import Count, Sum
 
 ZERO = Decimal('0.00')
+
+
+def ordini_di_lavaggio(ordini):
+    """Lavaggi = ordini con almeno un servizio, senza le vendite di soli
+    prodotti. Gli accessi in abbonamento (servizio a 0 euro) contano; la
+    vendita dell'abbonamento (ordine senza righe) no."""
+    return ordini.filter(vendita_prodotti=False, items__servizio_prodotto__tipo='servizio').distinct()
+
+
+def cicli_servito_portale(dal, al):
+    """Cicli dei portali usati dal servito, come l'abbinamento del report
+    giornata: un ciclo per pezzo dei servizi con programmi portale, tranne
+    quelli chiusi senza portale, piu' gli abbinati a mano dei servizi
+    senza programmi."""
+    from apps.ordini.models import ItemOrdine
+
+    from ..models import AbbinamentoPortale
+    con_programmi = (ItemOrdine.objects.filter(ordine__data_ora__date__gte=dal, ordine__data_ora__date__lte=al,
+                                               senza_portale__isnull=True)
+                     .exclude(servizio_prodotto__programmi_portale='').exclude(ordine__stato='annullato')
+                     .aggregate(q=Sum('quantita'))['q'] or 0)
+    a_mano = (AbbinamentoPortale.objects.filter(item__ordine__data_ora__date__gte=dal, item__ordine__data_ora__date__lte=al,
+                                                item__servizio_prodotto__programmi_portale='')
+              .exclude(item__ordine__stato='annullato').aggregate(n=Count('id'))['n'])
+    return int(con_programmi) + a_mano
 
 
 def ricavi_periodo(dal, al):
@@ -40,12 +65,7 @@ def ricavi_periodo(dal, al):
         else:
             cambia_gettoni += c.vendita_totale
 
-    # Cicli dei portali fatti per il servito: lavaggi completi degli ordini
-    # (stessa regola del report periodo: aggregato - servito = self)
-    from apps.ordini.models import ItemOrdine
-    cicli_servito = int(ItemOrdine.objects.filter(ordine__in=ordini, servizio_prodotto__titolo__icontains='lavaggio completo')
-                        .aggregate(q=Sum('quantita'))['q'] or 0)
-
+    lavaggi = ordini_di_lavaggio(ordini)
     monete_online = (AcquistoMonete.objects
                      .filter(stato__in=('pagato', 'accreditato'), creato_il__date__gte=dal, creato_il__date__lte=al)
                      .aggregate(s=Sum('importo'))['s'] or ZERO)
@@ -58,7 +78,8 @@ def ricavi_periodo(dal, al):
         'servito_ordinato': servito_ordinato,
         'registratore': registratore,
         'washcycles': washcycles,
-        'cicli_servito': cicli_servito,
-        'ordini_lavaggio': ordini.filter(vendita_prodotti=False).count(),
+        'cicli_servito': cicli_servito_portale(dal, al),
+        'ordini_lavaggio': lavaggi.count(),
+        'lavaggi_abbonamento': lavaggi.filter(origine='abbonamento').count(),
         'rp': rp,
     }

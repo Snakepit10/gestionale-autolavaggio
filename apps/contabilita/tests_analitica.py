@@ -11,10 +11,11 @@ from django.utils import timezone
 from .analitica import analitica, dividi
 from .conto_economico import conto_economico
 from .importa import importa_file
-from .models import Cespite, ParametriAnalitica, RipartizionePersonale, VoceConto
+from .models import Cespite, RipartizionePersonale, VoceConto
 from .tests import fattura_xml
 
 OTTOBRE = date(2026, 10, 1)
+ZERO = Decimal('0.00')
 
 
 def fattura(numero, imponibile, codice, ripartizione_riga=None):
@@ -34,12 +35,18 @@ class DividiTest(TestCase):
 
 class AnaliticaTest(TestCase):
     def setUp(self):
+        from apps.core.models import Categoria, ServizioProdotto
         from apps.finanze.models import Cassa, ChiusuraCassaAutomatica
-        from apps.ordini.models import Ordine
+        from apps.ordini.models import ItemOrdine, Ordine
         from apps.personale.models import Dipendente, MesePersonale, ParametroRetributivo, Presenza, RigaMese
-        # ricavi: servito 100 netti, portali 200 netti con 20 cicli
+        # ricavi: servito 100 netti (un lavaggio a mano, senza portale), portali 200 netti con 20 cicli
         ordine = Ordine.objects.create(totale=Decimal('122'), totale_finale=Decimal('122'))
-        Ordine.objects.filter(pk=ordine.pk).update(data_ora=timezone.make_aware(datetime(2026, 10, 6, 10, 0)))
+        self.categoria = Categoria.objects.create(nome='Servito')
+        a_mano = ServizioProdotto.objects.create(titolo='Lavaggio a mano', categoria=self.categoria, prezzo=Decimal('122'),
+                                                 descrizione='', programmi_portale='')
+        ItemOrdine.objects.create(ordine=ordine, servizio_prodotto=a_mano, quantita=1, prezzo_unitario=a_mano.prezzo)
+        Ordine.objects.filter(pk=ordine.pk).update(data_ora=timezone.make_aware(datetime(2026, 10, 6, 10, 0)),
+                                                   totale=Decimal('122'), totale_finale=Decimal('122'))
         registratore = Cassa.objects.create(nome='Registratore prova', tipo='automatica', modalita_registratore=True)
         ChiusuraCassaAutomatica.objects.create(cassa=registratore, data=date(2026, 10, 6), incasso_totale=Decimal('122'))
         portale = Cassa.objects.create(nome='Portale prova', tipo='automatica', tracking_washcycles=True)
@@ -72,35 +79,80 @@ class AnaliticaTest(TestCase):
         self.assertEqual((s['cicli'], s['ricavo_ciclo'], s['variabile_ciclo']), (20, Decimal('10'), Decimal('6')))
         self.assertEqual(s['cicli_pareggio'], Decimal('30'))         # 120 / (80 / 20)
 
-    def test_cicli_self_tolgono_il_servito(self):
-        """I lavaggi completi degli ordini passano dal portale: non sono cicli self."""
-        from apps.core.models import Categoria, ServizioProdotto
+    def aggiungi_portale(self, quantita, chiuso_senza_portale=0):
+        """Servizi del servito con programmi portale: un ciclo per pezzo."""
+        from apps.core.models import ServizioProdotto
+        from apps.finanze.models import LavaggioSenzaPortale
         from apps.ordini.models import ItemOrdine, Ordine
-        completo = ServizioProdotto.objects.create(titolo='Lavaggio Completo - Media', categoria=Categoria.objects.create(
-            nome='Servito'), prezzo=Decimal('22'), descrizione='')
+        completo = ServizioProdotto.objects.create(titolo='Lavaggio Completo - Media', categoria=self.categoria,
+                                                   prezzo=Decimal('0'), descrizione='', programmi_portale='1,2')
         ordine = Ordine.objects.get()
-        ItemOrdine.objects.create(ordine=ordine, servizio_prodotto=completo, quantita=4, prezzo_unitario=completo.prezzo)
+        ItemOrdine.objects.create(ordine=ordine, servizio_prodotto=completo, quantita=quantita, prezzo_unitario=0)
+        for _ in range(chiuso_senza_portale):
+            item = ItemOrdine.objects.create(ordine=ordine, servizio_prodotto=completo, quantita=1, prezzo_unitario=0)
+            LavaggioSenzaPortale.objects.create(item=item)
+        Ordine.objects.filter(pk=ordine.pk).update(totale=Decimal('122'), totale_finale=Decimal('122'))
+
+    def test_cicli_self_tolgono_il_servito(self):
+        """I servizi con programmi portale passano dal portale: non sono cicli self.
+        Quelli chiusi senza portale non contano."""
+        self.aggiungi_portale(4, chiuso_senza_portale=1)
         s = analitica([OTTOBRE], 'scontrini')['self']
         self.assertEqual((s['cicli_totali'], s['cicli_servito'], s['cicli']), (20, 4, 16))
         self.assertEqual(s['ricavo_ciclo'], Decimal('12.5'))         # 200 / 16
+
+    def test_lavaggi_senza_vendite_di_abbonamenti(self):
+        """La vendita di un abbonamento (ordine senza righe) non e' un lavaggio;
+        l'accesso in abbonamento (servizio a 0 euro) si'."""
+        from apps.core.models import ServizioProdotto
+        from apps.ordini.models import ItemOrdine, Ordine
+        quando = timezone.make_aware(datetime(2026, 10, 7, 9, 0))
+        vendita = Ordine.objects.create(totale=Decimal('50'), totale_finale=Decimal('50'), origine='abbonamento')
+        accesso = Ordine.objects.create(totale=0, totale_finale=0, origine='abbonamento')
+        ItemOrdine.objects.create(ordine=accesso, servizio_prodotto=ServizioProdotto.objects.get(titolo='Lavaggio a mano'),
+                                  quantita=1, prezzo_unitario=0)
+        Ordine.objects.filter(pk__in=(vendita.pk, accesso.pk)).update(data_ora=quando)
+        s = analitica([OTTOBRE], 'scontrini')['servito']
+        self.assertEqual((s['lavaggi'], s['lavaggi_abbonamento']), (2, 1))
 
     def test_full_costing_servito(self):
         s = analitica([OTTOBRE], 'scontrini')['servito']
         self.assertEqual(s['ricavi'], Decimal('100.00'))
         self.assertEqual(s['diretti'], Decimal('90.00'))             # acqua 30 + personale 60
         self.assertEqual(s['comuni'], Decimal('300.00'))
-        self.assertEqual(s['quota_comuni'], Decimal('100.00'))       # ricavi 100 su 300
+        self.assertEqual(s['quota_comuni'], Decimal('100.00'))       # affitto per ricavi: 100 su 300
         self.assertEqual(s['risultato'], Decimal('-90.00'))
         self.assertEqual((s['lavaggi'], s['costo_lavaggio']), (1, Decimal('190.00')))
         self.assertEqual(s['ore'], Decimal('6'))
-        ParametriAnalitica.objects.create(criterio_comuni='percentuale', percentuale_servito=Decimal('50'))
-        self.assertEqual(analitica([OTTOBRE], 'scontrini')['servito']['quota_comuni'], Decimal('150.00'))
+
+    def test_driver_dei_costi_comuni(self):
+        affitto = VoceConto.objects.get(codice='CF.AFFITTO')
+        # ore: 2 self, 6 servito
+        affitto.driver_comuni = 'ore'
+        affitto.save()
+        a = analitica([OTTOBRE], 'scontrini')
+        self.assertEqual((a['self']['quota_comuni'], a['servito']['quota_comuni']), (Decimal('75.00'), Decimal('225.00')))
+        # cicli: nessun ciclo del servito, tutto al self
+        affitto.driver_comuni = 'cicli'
+        affitto.save()
+        a = analitica([OTTOBRE], 'scontrini')
+        self.assertEqual((a['self']['quota_comuni'], a['servito']['quota_comuni']), (Decimal('300.00'), ZERO))
+        self.assertEqual(a['self']['costo_ciclo_portale'], Decimal('15'))   # 300 / 20 cicli
+        # 16 cicli self e 4 del servito: il servito paga 4 cicli a 15 euro
+        self.aggiungi_portale(4)
+        s = analitica([OTTOBRE], 'scontrini')['servito']
+        self.assertEqual((s['quota_comuni'], s['cicli_portale'], s['costo_cicli_portale']),
+                         (Decimal('60.00'), 4, Decimal('60.00')))
 
     def test_quadra_col_conto_economico(self):
         a = analitica([OTTOBRE], 'scontrini')
         ebit = next(r['totale'] for r in conto_economico([OTTOBRE], 'scontrini')['righe'] if r['chiave'] == 'ebit')
         self.assertEqual(a['quadro'][-1]['totale'], ebit)
         self.assertEqual(ebit, Decimal('-330.00'))
+        # risultati pieni: self -240, servito -90, prodotti 0; il Comune va a zero
+        self.assertEqual(a['quadro'][-1]['nome'], 'Risultato pieno')
+        self.assertEqual(a['quadro'][-1]['valori'], [Decimal('-240.00'), Decimal('-90.00'), ZERO, ZERO])
+        self.assertEqual(a['self']['risultato'], Decimal('-240.00'))
 
     def test_rientro_investimenti(self):
         from .models import ContoFinanziario, MovimentoFinanziario
@@ -169,6 +221,10 @@ class VisteAnaliticaTest(TestCase):
                                                                   f'rip_{d.pk}_servito': '80', f'rip_{d.pk}_self': '20'})
         r = RipartizionePersonale.objects.get()
         self.assertEqual((r.valido_dal, r.ripartizione), (OTTOBRE, {'servito': 80, 'self': 20}))
-        self.client.post('/contabilita/analitica/impostazioni/', {'azione': 'parametri', 'criterio_comuni': 'percentuale',
-                                                                  'percentuale_servito': '60'})
-        self.assertEqual(ParametriAnalitica.attuali().percentuale_servito, Decimal('60'))
+        affitto = VoceConto.objects.get(codice='CF.AFFITTO')
+        self.assertContains(self.apri('/contabilita/analitica/impostazioni/'), f'drv_v_{affitto.pk}')
+        self.client.post('/contabilita/analitica/impostazioni/', {'azione': 'driver', f'drv_v_{affitto.pk}': 'cicli',
+                                                                  f'drv_c_{Cespite.objects.get().pk}': 'ore'})
+        affitto.refresh_from_db()
+        self.assertEqual(affitto.driver_comuni, 'cicli')
+        self.assertEqual(Cespite.objects.get().driver_comuni, 'ricavi')      # cespite del self: non si tocca

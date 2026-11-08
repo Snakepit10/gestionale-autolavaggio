@@ -19,6 +19,12 @@ CENTRI = [
     ('comune', 'Comune'),
 ]
 NOMI_CENTRI = dict(CENTRI)
+# Come un costo rimasto sul Comune si divide sui centri nel risultato pieno
+DRIVER_COMUNI = [
+    ('ricavi', 'Ricavi'),
+    ('cicli', 'Cicli dei portali'),
+    ('ore', 'Ore del personale'),
+]
 
 
 def ripartizione_valida(rip):
@@ -73,6 +79,8 @@ class VoceConto(models.Model):
     flusso = models.CharField(max_length=15, choices=FLUSSI, default='operativo')
     # {'self': 70, 'servito': 30}: percentuali per centro; vuota = comune
     ripartizione = models.JSONField(default=dict, blank=True)
+    # se resta sul Comune: con che criterio va sui centri nel risultato pieno
+    driver_comuni = models.CharField(max_length=10, choices=DRIVER_COMUNI, default='ricavi')
     ordine = models.PositiveIntegerField(default=0)
     attiva = models.BooleanField(default=True)
 
@@ -453,6 +461,8 @@ class Cespite(models.Model):
     valore = models.DecimalField(max_digits=12, decimal_places=2, help_text='Imponibile, IVA esclusa')
     anni = models.PositiveSmallIntegerField(default=10, help_text="Durata dell'ammortamento")
     centro = models.CharField(max_length=10, choices=CENTRI, default='comune')
+    driver_comuni = models.CharField(max_length=10, choices=DRIVER_COMUNI, default='ricavi',
+                                     help_text="Se il centro e' Comune: come si divide sui centri")
     note = models.CharField(max_length=255, blank=True)
 
     class Meta:
@@ -515,18 +525,17 @@ class RipartizionePersonale(models.Model):
 
 
 class ParametriAnalitica(models.Model):
-    """Come i costi comuni (quello che resta sul centro Comune) si
-    attribuiscono al servito nel full costing. Una sola riga."""
-    CRITERI = [('ricavi', 'In proporzione ai ricavi del servito'), ('percentuale', 'Percentuale fissa')]
-    criterio_comuni = models.CharField(max_length=15, choices=CRITERI, default='ricavi')
-    percentuale_servito = models.DecimalField(max_digits=5, decimal_places=2, default=Decimal('50'))
+    """Parametri dell'analitica. Una sola riga. I costi comuni si dividono
+    sui centri con il driver di ogni voce (VoceConto.driver_comuni)."""
+    margine_obiettivo = models.DecimalField(max_digits=5, decimal_places=2, default=Decimal('30'),
+                                            help_text='Margine sui ricavi netti, in %')
 
     class Meta:
         verbose_name = "Parametri dell'analitica"
         verbose_name_plural = "Parametri dell'analitica"
 
     def __str__(self):
-        return self.get_criterio_comuni_display()
+        return f'Margine obiettivo {self.margine_obiettivo}%'
 
     @classmethod
     def attuali(cls):

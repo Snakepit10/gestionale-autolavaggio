@@ -39,9 +39,19 @@ SPIEGAZIONI = {
         'Quanta cassa arriva da banche e titolare, o torna a loro.'),
 
     # ------------------------------------------------------------------ analitica
-    'Risultato del centro': (
+    'Margine del centro': (
         'Ricavi del centro − i costi attribuiti al centro (variabili, fissi, personale, ammortamenti).',
         'Quanto guadagna ogni attività prima di dividere i costi comuni. La colonna Comune raccoglie i costi non attribuiti.'),
+    'Quota costi comuni': (
+        'Ogni costo rimasto sul Comune va sui centri con il criterio della sua voce o del suo cespite: ricavi del centro, '
+        'cicli dei portali (self contro servito) oppure ore del personale. Il personale sul Comune va per ore, le fatture '
+        'da classificare per ricavi. Nella colonna Comune la stessa cifra esce con il segno meno.',
+        'La parte di struttura che ogni attività deve pagare.',
+        'Se un criterio non ha base (es. nessun ciclo registrato) quel costo va per ricavi. I criteri si cambiano nelle '
+        'impostazioni dell\'analitica.'),
+    'Costo per ciclo di portale': (
+        'Costi comuni divisi per cicli (manutenzione dei portali, chimici, acqua…) / cicli totali dei portali, self più servito.',
+        'Il prezzo interno di un passaggio al portale: il servito lo paga per ogni ciclo che usa.'),
     'Margine di contribuzione I': (
         'Ricavi del self-service − i suoi costi variabili.',
         'Quanto resta dalle vendite del self dopo i consumi diretti.'),
@@ -52,14 +62,15 @@ SPIEGAZIONI = {
         'Ricavi del servito − i suoi costi diretti (quota del personale, consumabili, tutto ciò che è attribuito al centro Servito).',
         'Quanto rende il servito prima di pagare la sua parte di struttura.'),
     'Risultato pieno': (
-        'Margine diretto − quota dei costi comuni.',
-        'L\'utile vero del servito, dopo aver pagato anche energia, acqua, assicurazioni e tutta la struttura per la sua parte.'),
+        'Margine del centro − quota dei costi comuni. La somma dei risultati pieni dei centri è l\'EBIT del conto economico.',
+        'L\'utile vero di ogni attività, dopo aver pagato anche assicurazioni, manutenzioni comuni e tutta la struttura per la sua parte.'),
     'Cicli portali': (
-        'Cicli scritti nelle chiusure dei due portali nel periodo, meno i lavaggi completi degli ordini del servito '
-        '(che passano anche loro dal portale). Sotto il valore si vedono i cicli totali e quelli del servito.',
+        'Cicli scritti nelle chiusure dei due portali nel periodo, meno i cicli del servito (che passano anche loro dal '
+        'portale). Sotto il valore si vedono i cicli totali e quelli del servito.',
         'Quanti lavaggi hanno fatto i clienti self ai portali a spazzole.',
-        'Le piste non contano. I giorni senza chiusura della cassa non entrano nel conteggio. Per il servito contano '
-        'i servizi con "lavaggio completo" nel nome, come nel report periodo.'),
+        'Le piste non contano. I giorni senza chiusura della cassa non entrano nel conteggio. I cicli del servito sono '
+        'come nel report giornata: un ciclo per ogni servizio con programmi portale, tranne quelli chiusi senza portale, '
+        'più gli abbinati a mano.'),
     'Ricavo / ciclo': (
         'Ricavi dei portali, IVA esclusa, diviso i cicli self. Con il rilevato reale i ricavi dei portali sono il resto '
         'del rilevato, tolti gli ordini e il cambia gettoni, meno l\'IVA dei portali.',
@@ -73,7 +84,8 @@ SPIEGAZIONI = {
         'Quanti cicli servono nel periodo per pagare i costi fissi del self-service.',
         'Indicativo: il margine I comprende anche le piste, ma i cicli sono solo quelli self dei portali.'),
     'Lavaggi': (
-        'Ordini del periodo non annullati, escluse le vendite di soli prodotti. Ogni ordine conta 1, anche con più servizi.',
+        'Ordini del periodo non annullati con almeno un servizio, escluse le vendite di soli prodotti. Ogni ordine conta 1, '
+        'anche con più servizi. Gli accessi in abbonamento contano (l\'auto si lava), la vendita dell\'abbonamento no.',
         'Il volume di lavoro del servito.'),
     'Costo pieno / lavaggio': (
         '(Costi diretti del servito + quota dei costi comuni) / lavaggi. Dentro ci sono personale, consumabili, ammortamenti '
