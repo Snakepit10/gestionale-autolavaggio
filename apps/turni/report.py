@@ -77,6 +77,55 @@ def intero(testo):
         return None
 
 
+def unisci_blocchi(lavorazioni, adesso=None):
+    """Una fase per operatore, ordine e postazione, anche con piu' blocchi.
+
+    "Avvia" crea una riga per ogni blocco scelto dall'operatore a inizio
+    turno, con gli stessi orari: e' lo stesso lavoro della stessa persona.
+    Le righe della stessa sessione, ordine e postazione con orari
+    sovrapposti diventano una fase sola, con il tempo della piu' lunga.
+    Righe che non si sovrappongono (la postazione rifatta piu' tardi)
+    restano fasi separate.
+    """
+    adesso = adesso or timezone.now()
+    righe = sorted(lavorazioni, key=lambda l: (l.sessione_id, l.ordine_id, l.postazione_cq_id, l.inizio))
+    fasi = []
+    for lav in righe:
+        chiave = (lav.sessione_id, lav.ordine_id, lav.postazione_cq_id)
+        fine = lav.fine or adesso
+        ultima = fasi[-1] if fasi else None
+        if ultima and ultima['chiave'] == chiave and lav.inizio <= ultima['fine_gruppo']:
+            ultima['fine_gruppo'] = max(ultima['fine_gruppo'], fine)
+            ultima['minuti'] = max(ultima['minuti'], lav.tempo_lavoro_netto_minuti)
+            ultima['pausa'] = max(ultima['pausa'], lav.tempo_pausa_totale.total_seconds() / 60)
+            ultima['in_corso'] = ultima['in_corso'] or lav.stato != 'completato'
+            if lav.fine and ultima['fine'] and lav.fine > ultima['fine']:
+                ultima['fine'] = lav.fine
+            if lav.blocco:
+                ultima['blocchi'].append(lav.blocco.nome)
+            continue
+        fasi.append({
+            'chiave': chiave,
+            'lav': lav,
+            'postazione': lav.postazione_cq,
+            'operatore': nome(lav.sessione.operatore),
+            'inizio': lav.inizio,
+            'fine': lav.fine,
+            'fine_gruppo': fine,
+            'in_corso': lav.stato != 'completato',
+            'stato': lav.get_stato_display(),
+            'minuti': lav.tempo_lavoro_netto_minuti,
+            'pausa': lav.tempo_pausa_totale.total_seconds() / 60,
+            'blocchi': [lav.blocco.nome] if lav.blocco else [],
+        })
+    for f in fasi:
+        if f['in_corso']:
+            f['fine'] = None
+            f['stato'] = 'In corso'
+    fasi.sort(key=lambda f: f['inizio'])
+    return fasi
+
+
 def report(dal, al, operatore_id=None, postazione_id=None):
     lavorazioni = LavorazioneOperatore.objects.filter(
         stato='completato', inizio__date__range=(dal, al),
@@ -86,15 +135,7 @@ def report(dal, al, operatore_id=None, postazione_id=None):
     if postazione_id:
         lavorazioni = lavorazioni.filter(postazione_cq_id=postazione_id)
 
-    fasi = []
-    for lav in lavorazioni:
-        fasi.append({
-            'lav': lav,
-            'postazione': lav.postazione_cq,
-            'operatore': nome(lav.sessione.operatore),
-            'minuti': lav.tempo_lavoro_netto_minuti,
-            'pausa': lav.tempo_pausa_totale.total_seconds() / 60,
-        })
+    fasi = unisci_blocchi(lavorazioni)
 
     # Postazioni
     per_post = {}
@@ -196,21 +237,12 @@ def dettaglio_ordine(ordine):
     lavorazioni = list(LavorazioneOperatore.objects.filter(ordine=ordine).select_related(
         'sessione__operatore', 'postazione_cq', 'blocco').order_by('inizio'))
     adesso = timezone.now()
-    fasi = []
-    for lav in lavorazioni:
-        fasi.append({
-            'lav': lav,
-            'postazione': lav.postazione_cq.nome,
-            'sigla': lav.postazione_cq.sigla or lav.postazione_cq.nome[:2].upper(),
-            'blocco': lav.blocco.nome if lav.blocco else '',
-            'operatore': nome(lav.sessione.operatore),
-            'inizio': lav.inizio,
-            'fine': lav.fine,
-            'in_corso': lav.stato != 'completato',
-            'stato': lav.get_stato_display(),
-            'pausa': lav.tempo_pausa_totale.total_seconds() / 60,
-            'minuti': lav.tempo_lavoro_netto_minuti,
-        })
+    fasi = unisci_blocchi(lavorazioni, adesso)
+    for f in fasi:
+        p = f['postazione']
+        f['sigla'] = p.sigla or p.nome[:2].upper()
+        f['postazione'] = p.nome
+        f['blocco'] = ', '.join(f['blocchi'])
     if not fasi:
         return {'fasi': [], 'minuti': 0, 'pausa': 0, 'durata': None, 'operatori': 0}
     inizio = fasi[0]['inizio']

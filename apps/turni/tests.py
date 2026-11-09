@@ -7,7 +7,7 @@ from django.test import RequestFactory, TestCase
 from django.urls import resolve, reverse
 from django.utils import timezone
 
-from apps.cq.models import PostazioneCQ
+from apps.cq.models import BloccoPostazione, PostazioneCQ
 from apps.ordini.models import Ordine
 from apps.turni import report as rep
 from apps.turni.models import LavorazioneOperatore, SessioneTurno
@@ -97,3 +97,24 @@ class ReportTest(TestCase):
         self.assertIn('16 min', html)
         d = rep.dettaglio_ordine(ordine)
         self.assertEqual([f['sinistra'] for f in d['fasi']], [0, 62.5])
+
+    def test_blocchi_della_stessa_fase_contano_una_volta(self):
+        # "Avvia" crea una riga per blocco con gli stessi orari: e' una fase sola.
+        interni = BloccoPostazione.objects.create(postazione=self.asciugatura, codice='t-int', nome='Interni')
+        bauliera = BloccoPostazione.objects.create(postazione=self.asciugatura, codice='t-bau', nome='Bauliera')
+        ordine = self._ordine((self.prelavaggio, 10))
+        t = self.inizio + timedelta(minutes=10)
+        for blocco, secondi in ((interni, 0), (bauliera, 2)):
+            LavorazioneOperatore.objects.create(
+                sessione=self.sessione, ordine=ordine, postazione_cq=self.asciugatura, blocco=blocco,
+                inizio=t, fine=t + timedelta(minutes=6, seconds=secondi), stato='completato')
+        # La stessa postazione rifatta piu' tardi resta una fase a parte.
+        LavorazioneOperatore.objects.create(
+            sessione=self.sessione, ordine=ordine, postazione_cq=self.asciugatura, blocco=interni,
+            inizio=t + timedelta(minutes=30), fine=t + timedelta(minutes=33), stato='completato')
+        oggi = timezone.localdate()
+        d = rep.report(oggi, oggi)
+        self.assertEqual(d['n_fasi'], 3)
+        self.assertAlmostEqual(d['ordini'][0]['minuti'], 10 + 6 + 2 / 60 + 3)
+        dettaglio = rep.dettaglio_ordine(ordine)
+        self.assertEqual([f['blocco'] for f in dettaglio['fasi']], ['', 'Interni, Bauliera', 'Interni'])

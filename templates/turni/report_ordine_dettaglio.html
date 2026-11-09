@@ -84,7 +84,7 @@
           <div class="linea">
             {% for f in fasi %}
             <div class="riga">
-              <div class="nome"><span class="sigla">{{ f.sigla }}</span>{{ f.postazione }}<div class="chi">{{ f.operatore }}</div></div>
+              <div class="nome"><span class="sigla">{{ f.sigla }}</span>{{ f.postazione }}<div class="chi">{{ f.operatore }}{% if f.blocco %} &middot; {{ f.blocco }}{% endif %}</div></div>
               <div class="pista">
                 <div class="tratto {% if f.in_corso %}in-corso{% endif %}" style="left: {{ f.sinistra|stringformat:'s' }}%; width: {{ f.larghezza|stringformat:'s' }}%;" title="{{ f.inizio|date:'H:i' }}–{% if f.fine %}{{ f.fine|date:'H:i' }}{% else %}in corso{% endif %}">{{ f.minuti|durata }}</div>
               </div>
@@ -106,7 +106,7 @@
     <div class="panel-body tabella-scroll">
       <table class="table table-sm align-middle">
         <thead><tr>
-          <th>Postazione</th><th class="d-none d-md-table-cell">Blocco</th><th>Operatore</th>
+          <th>Postazione</th><th class="d-none d-md-table-cell">Blocchi</th><th>Operatore</th>
           <th class="tab-num">Inizio</th><th class="tab-num">Fine</th><th class="tab-num">Pausa</th><th class="tab-num">Netto</th>
         </tr></thead>
         <tbody>
