@@ -31,7 +31,7 @@ from django.utils import timezone
 from .conto_economico import IVA, NOMI_MESI, ZERO, fine_mese
 
 DURATA_CACHE = 60 * 60          # un'ora per i mesi gia' chiusi
-VERSIONE_CACHE = 1
+VERSIONE_CACHE = 2
 GIORNI_SETTIMANA = ['Lunedì', 'Martedì', 'Mercoledì', 'Giovedì', 'Venerdì', 'Sabato', 'Domenica']
 
 
@@ -94,7 +94,10 @@ def kpi_mese(mese, base):
     sv = c['centri']['servito']
     presenze = presenze_servito(mese, fine_mese(mese))
     lavaggi = lavaggi_per_giorno(mese, fine_mese(mese))
+    con_extra, extra = extra_del_periodo(mese, fine_mese(mese))
     dati = {
+        'con_extra': con_extra,
+        'extra': extra,
         'lavaggi': c['dati']['ordini_lavaggio'],
         'abbonamento': c['dati']['lavaggi_abbonamento'],
         'ore': c['dati']['ore']['servito'],
@@ -125,6 +128,9 @@ def derivati(k):
         'lavaggi': k['lavaggi'],
         'abbonamento': k['abbonamento'],
         'ore': k['ore'],
+        'auto_giorno': _div(Decimal(k['lavaggi']), k['giorni_aperti']),
+        'pct_extra': _div(Decimal(k.get('con_extra', 0)) * 100, k['lavaggi']),
+        'extra_lavaggio': _div(k.get('extra', ZERO), k['lavaggi']),
         'auto_ora': _div(Decimal(k['lavaggi']), k['ore']),
         'persone_giorno': _div(k['giorni_persona'], k['giorni_aperti']),
         'lavaggi_persona': _div(Decimal(k['lavaggi']), k['giorni_persona']),
@@ -142,11 +148,14 @@ def derivati(k):
 RIGHE_ANDAMENTO = [
     ('lavaggi', 'Lavaggi', 'intero', True, False),
     ('abbonamento', 'di cui in abbonamento', 'intero', None, False),
+    ('auto_giorno', 'Auto al giorno', 'uno', True, False),
     ('ore', 'Ore pagate servito', 'intero', None, True),
     ('auto_ora', 'Auto per ora-persona', 'due', True, True),
     ('persone_giorno', 'Persone medie al giorno', 'uno', None, True),
     ('lavaggi_persona', 'Lavaggi per persona al giorno', 'uno', True, True),
     ('ricavo_lavaggio', 'Ricavo per lavaggio', 'euro2', True, False),
+    ('pct_extra', 'Lavaggi con extra', 'pct', True, False),
+    ('extra_lavaggio', 'Ricavo extra per lavaggio', 'euro2', True, False),
     ('consumi_lavaggio', 'Consumi per lavaggio', 'euro2', False, True),
     ('costo_lavaggio', 'Costo pieno per lavaggio', 'euro2', False, True),
     ('risultato_lavaggio', 'Risultato per lavaggio', 'euro2', True, True),
@@ -238,9 +247,10 @@ def per_meteo(giorni, dal, al):
 
 # ---------------------------------------------------------------- mix ed extra
 
-def mix_ed_extra(dal, al):
-    """Servizio principale (la riga di servizio col prezzo piu' alto) ed
-    extra (le altre righe di servizio) degli ordini di lavaggio."""
+def _servizi_per_ordine(dal, al):
+    """{ordine: [(titolo, prezzo, quantita), ...]} delle righe di servizio
+    degli ordini di lavaggio, dalla piu' cara: la prima e' il servizio
+    principale, le altre sono extra."""
     from apps.finanze.services.ricavi import ordini_di_lavaggio
     from apps.ordini.models import ItemOrdine, Ordine
     ordini = Ordine.objects.filter(data_ora__date__gte=dal, data_ora__date__lte=al).exclude(stato='annullato')
@@ -250,13 +260,31 @@ def mix_ed_extra(dal, al):
                                              .values_list('ordine_id', 'servizio_prodotto__titolo', 'prezzo_unitario',
                                                           'quantita')):
         per_ordine[ordine].append((titolo, prezzo or ZERO, quantita or 1))
+    for righe in per_ordine.values():
+        righe.sort(key=lambda r: -r[1])
+    return per_ordine
+
+
+def extra_del_periodo(dal, al):
+    """(lavaggi con extra, ricavo degli extra senza IVA)."""
+    con_extra, ricavo = 0, ZERO
+    for righe in _servizi_per_ordine(dal, al).values():
+        if len(righe) > 1:
+            con_extra += 1
+            ricavo += sum((p * q for _, p, q in righe[1:]), ZERO) / IVA
+    return con_extra, ricavo
+
+
+def mix_ed_extra(dal, al):
+    """Servizio principale (la riga di servizio col prezzo piu' alto) ed
+    extra (le altre righe di servizio) degli ordini di lavaggio."""
+    per_ordine = _servizi_per_ordine(dal, al)
     lavaggi = len(per_ordine)
     if not lavaggi:
         return None
     con_extra, ricavo_extra = 0, ZERO
     principali = defaultdict(lambda: {'n': 0, 'ricavo': ZERO})
     for righe in per_ordine.values():
-        righe.sort(key=lambda r: -r[1])
         titolo, prezzo, _ = righe[0]
         principali[titolo]['n'] += 1
         principali[titolo]['ricavo'] += prezzo / IVA

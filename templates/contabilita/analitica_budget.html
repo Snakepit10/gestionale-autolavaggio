@@ -1,13 +1,24 @@
 {% extends "base.html" %}
 {% load contabilita_info %}
-{% block title %}Budget {{ periodo }}{% endblock %}
+{% block title %}Obiettivi {{ periodo }}{% endblock %}
 
 {% block extra_css %}{% include "contabilita/_stile.html" %}
 <style>
 .prospetto td { padding: 4px 8px; }
-.prospetto .uguale td { font-weight: 800; border-top: 2px solid #0f766e; color: #0f766e; }
-.prospetto .uguale .neg { color: #b91c1c; }
-.modulo-budget input { min-width: 80px; }
+.prospetto .uguale td, .ponte .uguale td { font-weight: 800; border-top: 2px solid #0f766e; color: #0f766e; }
+.prospetto .uguale .neg, .ponte .uguale .neg { color: #b91c1c; }
+.ponte .risultato td { font-weight: 700; color: #334155; }
+.ponte td, .ponte th, .indicatori td, .indicatori th { white-space: nowrap; }
+.indicatori .obj { display: block; font-size: .64rem; font-weight: 600; color: #94a3b8; }
+.indicatori .obj.buono { color: #047857; }
+.indicatori .obj.cattivo { color: #b91c1c; }
+.modulo-budget input { min-width: 78px; }
+.modulo-budget input.media::placeholder { color: #b45309; }
+.sim-leve label { font-size: .72rem; font-weight: 700; color: #475569; margin-bottom: 2px; }
+.sim-leve .form-control { font-variant-numeric: tabular-nums; }
+.sim-esiti td { padding: 3px 8px; }
+.sim-esiti .delta { font-size: .72rem; font-weight: 700; }
+.sim-esiti tr.forte td { font-weight: 800; }
 </style>
 {% endblock %}
 
@@ -20,42 +31,108 @@
 
   {% include "contabilita/_schede_analitica.html" %}
 
+  {# ------------------------------------------------------------ simulatore #}
+  {% if b.simulatore %}{% with s=b.simulatore v=b.simulatore.valore %}
   <div class="row g-3">
+    <div class="col-xl-7">
+      <form method="post" class="panel h-100" id="simulatore">
+        {% csrf_token %}
+        <input type="hidden" name="azione" value="simulatore">
+        <div class="panel-title"><i class="bi bi-sliders2"></i> Simulatore del servito &mdash; partendo dal {{ periodo }}</div>
+        <div class="panel-sub">Le leve partono dai valori effettivi del periodo (giorni aperti e altri costi fissi sono i totali del periodo). Cambiale e guarda subito risultato e costo pieno. Importi senza IVA.</div>
+        <div class="panel-body">
+          <div class="row g-2 sim-leve mb-3">
+            {% for l in s.leve %}
+            <div class="col-6 col-md-4 col-lg-3">
+              <label for="sim_{{ l.campo }}">{{ l.nome }}{% if l.campo == 'altri_fissi' %} (periodo){% endif %}</label>
+              <input type="number" step="any" min="0" class="form-control form-control-sm" id="sim_{{ l.campo }}" name="sim_{{ l.campo }}" value="{{ l.valore|stringformat:'s' }}">
+            </div>
+            {% endfor %}
+          </div>
+          <table class="table table-sm sim-esiti mb-2">
+            <thead><tr><th></th><th class="tab-num">Oggi</th><th class="tab-num">Simulato</th><th class="tab-num">Differenza</th></tr></thead>
+            <tbody id="sim-esiti"></tbody>
+          </table>
+          <div class="small text-muted mb-2" id="sim-prezzo"></div>
+          <div class="border-top pt-2">
+            <div class="small fw-bold mb-1">Salva come obiettivo le leve per giorno (auto, prezzo, extra, consumi, persone, ore, costo orario) nei mesi del {{ anno }}:</div>
+            <div class="d-flex flex-wrap gap-2 mb-2">
+              {% for n, nome in mesi_nomi %}
+              <label class="form-check form-check-inline small m-0"><input class="form-check-input" type="checkbox" name="mesi_obiettivo" value="{{ n }}" checked> {{ nome }}</label>
+              {% endfor %}
+            </div>
+            <button class="btn btn-primary btn-sm"><i class="bi bi-flag"></i> Salva come obiettivo</button>
+            <span class="small text-muted ms-2">Giorni aperti e altri costi fissi restano quelli di ogni mese, nella tabella in fondo.</span>
+          </div>
+        </div>
+      </form>
+    </div>
+    <div class="col-xl-5">
+      <div class="panel h-100">
+        <div class="panel-title"><i class="bi bi-lightning"></i> Quanto vale ogni leva &mdash; {{ periodo }}</div>
+        <div class="panel-sub">Una leva alla volta, sui valori effettivi del periodo: effetto sul risultato del servito e nuovo costo pieno per lavaggio (oggi &euro;{{ v.base.costo_pieno|floatformat:2 }}).</div>
+        <div class="panel-body">
+          <table class="table table-sm prospetto">
+            <thead><tr><th>Leva</th><th class="tab-num">Risultato</th><th class="tab-num">Costo pieno</th></tr></thead>
+            <tbody>
+              {% for r in v.righe %}
+              <tr><td>{{ r.nome }}</td>
+                <td class="tab-num {% if r.effetto > 0 %}su{% elif r.effetto < 0 %}giu{% endif %}">{% if r.effetto > 0 %}+{% endif %}&euro;{{ r.effetto|floatformat:"0g" }}</td>
+                <td class="tab-num">{% if r.diff_costo != None %}&euro;{{ r.costo_pieno|floatformat:2 }}{% else %}<span class="text-muted">invariato</span>{% endif %}</td></tr>
+              {% endfor %}
+            </tbody>
+          </table>
+          <div class="small text-muted">
+            {% if v.perdita_prezzo != None %}Con +&euro;1 al listino puoi perdere fino al <strong>{{ v.perdita_prezzo|floatformat:1 }}% dei lavaggi</strong> (circa {{ v.perdita_auto|floatformat:1 }} auto al giorno) prima di guadagnare meno di oggi.<br>{% endif %}
+            Pareggio: <strong>{{ v.calcolo.pareggio_auto|floatformat:1 }} auto al giorno</strong> con questo personale{% if v.calcolo.obiettivo_auto != None %}; per il margine obiettivo del {{ b.margine_obiettivo|floatformat:0 }}%: <strong>{{ v.calcolo.obiettivo_auto|floatformat:1 }}</strong>{% endif %}.
+            Le leve si influenzano a vicenda (meno personale pu&ograve; voler dire pi&ugrave; attesa e meno extra): per combinarle usa il simulatore.
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+  {{ s.json|json_script:"dati-simulatore" }}
+  {% endwith %}{% else %}
+  <div class="panel"><div class="panel-body small text-muted">Il simulatore parte dai valori effettivi del periodo: servono lavaggi e presenze registrate.</div></div>
+  {% endif %}
+
+  {# ------------------------------------------------------------ periodo #}
+  <div class="row g-3 mt-0">
     <div class="col-xl-6">
       <div class="panel h-100">
-        <div class="panel-title"><i class="bi bi-bar-chart-steps"></i> Dal budget all'effettivo &mdash; servito, {{ periodo }}</div>
-        {% if b.scostamenti %}
-        <div class="panel-sub">Ogni riga &egrave; l'effetto sul risultato del servito (positivo = meglio del budget). Mesi contati: {{ b.contati|join:", " }}.
-          {% if b.saltati %}Senza budget n&eacute; dati completi dell'anno prima (servono lavaggi e presenze): {{ b.saltati|join:", " }}.{% endif %}</div>
+        <div class="panel-title"><i class="bi bi-bar-chart-steps"></i> Dall'obiettivo all'effettivo &mdash; servito, {{ periodo }}</div>
+        {% if b.aggregato %}
+        <div class="panel-sub">Ogni riga &egrave; l'effetto di una leva sul risultato del servito (positivo = meglio dell'obiettivo). Mesi chiusi contati: {{ b.contati|join:", " }}.
+          {% if b.saltati %}Senza obiettivo completo o senza presenze: {{ b.saltati|join:", " }}.{% endif %}</div>
         <div class="panel-body">
           <table class="table table-sm prospetto">
             <tbody>
-              <tr><td>Risultato di budget</td><td class="tab-num {% if b.risultato_bdg < 0 %}neg{% endif %}">&euro;{{ b.risultato_bdg|floatformat:"0g" }}</td></tr>
-              {% for s in b.scostamenti %}
+              <tr><td>Risultato obiettivo</td><td class="tab-num {% if b.aggregato.risultato_bdg < 0 %}neg{% endif %}">&euro;{{ b.aggregato.risultato_bdg|floatformat:"0g" }}</td></tr>
+              {% for s in b.aggregato.scostamenti %}
               <tr><td>{{ s.nome }}{% info s.nome %}</td><td class="tab-num {% if s.valore < 0 %}giu{% elif s.valore > 0 %}su{% endif %}">{% if s.valore > 0 %}+{% endif %}&euro;{{ s.valore|floatformat:"0g" }}</td></tr>
               {% endfor %}
-              <tr class="uguale"><td>Risultato effettivo</td><td class="tab-num {% if b.risultato_eff < 0 %}neg{% endif %}">&euro;{{ b.risultato_eff|floatformat:"0g" }}</td></tr>
+              <tr class="uguale"><td>Risultato effettivo</td><td class="tab-num {% if b.aggregato.risultato_eff < 0 %}neg{% endif %}">&euro;{{ b.aggregato.risultato_eff|floatformat:"0g" }}</td></tr>
             </tbody>
           </table>
         </div>
         {% else %}
-        <div class="panel-body small text-muted">Nessun mese del periodo ha sia l'effettivo sia un budget completo: inseriscilo qui sotto. L'anno prima vale come budget solo se ha lavaggi e presenze registrate.</div>
+        <div class="panel-body small text-muted">Nessun mese chiuso del periodo ha sia l'effettivo sia un obiettivo completo. Il mese in corso entra quando &egrave; chiuso.</div>
         {% endif %}
       </div>
     </div>
     <div class="col-xl-6">
       <div class="panel h-100">
-        <div class="panel-title"><i class="bi bi-list-columns"></i> Budget ed effettivo</div>
-        {% if b.confronto %}
+        <div class="panel-title"><i class="bi bi-list-columns"></i> Obiettivo ed effettivo &mdash; {{ periodo }}</div>
+        {% if b.aggregato %}
         <div class="panel-body tabella-scroll">
           <table class="table table-sm bilancio">
-            <thead><tr><th></th><th class="tab-num">Budget</th><th class="tab-num">Effettivo</th><th class="tab-num">Differenza</th></tr></thead>
+            <thead><tr><th></th><th class="tab-num">Obiettivo</th><th class="tab-num">Effettivo</th><th class="tab-num">Differenza</th></tr></thead>
             <tbody>
-              {% for r in b.confronto %}
+              {% for r in b.aggregato.confronto %}
               <tr class="riga-voce"><td class="col-nome">{{ r.nome }}</td>
                 <td class="tab-num">{% include "contabilita/_valore.html" with v=r.bdg formato=r.formato %}</td>
                 <td class="tab-num">{% include "contabilita/_valore.html" with v=r.eff formato=r.formato %}</td>
-                <td class="tab-num">{% include "contabilita/_valore.html" with v=r.diff formato=r.formato %}</td></tr>
+                <td class="tab-num {% if r.buono == True %}su{% elif r.buono == False %}giu{% endif %}">{% include "contabilita/_valore.html" with v=r.diff formato=r.formato %}</td></tr>
               {% endfor %}
             </tbody>
           </table>
@@ -65,28 +142,143 @@
     </div>
   </div>
 
-  <form method="post" class="panel mt-3">
-    {% csrf_token %}
-    <div class="panel-title"><i class="bi bi-pencil-square"></i> Budget del servito {{ anno }}</div>
-    <div class="panel-sub">Scrivi solo quello che vuoi cambiare: <strong>un campo vuoto vale quanto lo stesso mese del {{ anno|add:"-1" }}</strong> (in grigio), se quel mese ha lavaggi e presenze registrate; altrimenti il mese va compilato tutto. Importi senza IVA.
-      Altri costi fissi = costo pieno del servito meno consumi e personale (manutenzioni, ammortamenti, quota dei costi comuni&hellip;).</div>
-    <div class="panel-body tabella-scroll modulo-budget">
-      <table class="table table-sm align-middle">
-        <thead><tr><th>Mese</th>{% for c, nome in b.campi %}<th>{{ nome }}</th>{% endfor %}</tr></thead>
+  {# ------------------------------------------------------------ mese su mese #}
+  {% if b.indicatori %}
+  <div class="panel mt-3">
+    <div class="panel-title"><i class="bi bi-calendar3"></i> Le leve mese per mese &mdash; {{ anno }}</div>
+    <div class="panel-sub">Valori effettivi; sotto, in piccolo, l'obiettivo: verde se l'effettivo &egrave; meglio, rosso se peggio (entro l'1% &egrave; pari). Il mese in corso (*) &egrave; parziale.</div>
+    <div class="panel-body tabella-scroll">
+      <table class="table table-sm bilancio indicatori">
+        <thead><tr><th></th>{% for c in b.colonne %}<th class="tab-num">{{ c.nome }}{% if c.in_corso %}*{% endif %}</th>{% endfor %}<th class="tab-num">Totale</th></tr></thead>
         <tbody>
-          {% for m in b.modulo %}
-          <tr><td class="col-nome">{{ m.nome }}</td>
-            {% for f in m.campi %}
-            <td><input type="text" inputmode="decimal" name="b_{{ m.mese.month }}_{{ f.campo }}" class="form-control form-control-sm"
-                 value="{% if f.valore != None %}{{ f.valore|floatformat:'-2' }}{% endif %}"
-                 placeholder="{% if f.prima != None %}{% if f.campo == 'lavaggi' or f.campo == 'altri_fissi' or f.campo == 'ore_pagate' %}{{ f.prima|floatformat:0 }}{% else %}{{ f.prima|floatformat:2 }}{% endif %}{% endif %}"></td>
+          {% for r in b.indicatori %}
+          <tr class="{% if forloop.last %}riga-totale{% endif %}"><td class="col-nome">{{ r.nome }}{% info r.nome %}</td>
+            {% for c in r.celle %}
+            <td class="tab-num {% if forloop.last %}col-totale{% endif %}">{% include "contabilita/_valore.html" with v=c.v formato=r.formato %}
+              {% if c.obj != None %}<span class="obj {% if c.buono == True %}buono{% elif c.buono == False %}cattivo{% endif %}">obj {% include "contabilita/_valore.html" with v=c.obj formato=r.formato %}</span>{% endif %}</td>
             {% endfor %}
           </tr>
           {% endfor %}
         </tbody>
       </table>
-      <button class="btn btn-primary btn-sm"><i class="bi bi-save"></i> Salva il budget</button>
+    </div>
+  </div>
+  {% endif %}
+
+  {% if b.ponte_obiettivo %}
+  <div class="panel mt-3">
+    <div class="panel-title"><i class="bi bi-flag"></i> Mese per mese contro l'obiettivo &mdash; {{ anno }}</div>
+    <div class="panel-sub">Per ogni mese chiuso, dal risultato dell'obiettivo a quello effettivo: ogni riga &egrave; una leva. Le righe Efficienza ed Extra misurano tempi morti e vendite aggiuntive gi&agrave; depurati dal numero di auto.</div>
+    <div class="panel-body tabella-scroll">
+      {% include "contabilita/_ponte_mesi.html" with righe=b.ponte_obiettivo colonne=b.colonne %}
+    </div>
+  </div>
+  {% endif %}
+  {% if b.ponte_precedente %}
+  <div class="panel mt-3">
+    <div class="panel-title"><i class="bi bi-arrow-left-right"></i> Mese per mese contro il mese precedente &mdash; {{ anno }}</div>
+    <div class="panel-sub">Dal risultato del mese prima a quello del mese, a parit&agrave; di volume: l'effetto della stagione sta in Giorni di apertura e Affluenza, tutto il resto &egrave; gestione. Altri costi fissi oscilla anche per motivi contabili (una fattura che cade tutta in un mese). Gennaio si confronta con dicembre dell'anno prima, se ha presenze.</div>
+    <div class="panel-body tabella-scroll">
+      {% include "contabilita/_ponte_mesi.html" with righe=b.ponte_precedente colonne=b.colonne %}
+    </div>
+  </div>
+  {% endif %}
+
+  {# ------------------------------------------------------------ obiettivi mensili #}
+  <form method="post" class="panel mt-3">
+    {% csrf_token %}
+    <input type="hidden" name="azione" value="budget">
+    <div class="panel-title"><i class="bi bi-pencil-square"></i> Obiettivi del servito {{ anno }}</div>
+    <div class="panel-sub">Scrivi solo quello che vuoi cambiare. <strong>Un campo vuoto vale quanto lo stesso mese del {{ anno|add:"-1" }}</strong> (in grigio){% if b.riserva %}; se quel mese non ha presenze, i costi vengono dalla media dei mesi chiusi del {{ b.riserva.anno }} (in arancione) e le persone dalle auto con {{ b.riserva.lavaggi_persona|floatformat:1 }} lavaggi per persona{% endif %}.
+      Lavaggi = giorni aperti &times; auto al giorno; ore = giorni &times; persone &times; ore per persona. Prezzo del servizio principale e valore di un extra senza IVA. Altri costi fissi del mese = costo pieno meno consumi e personale (manutenzioni, ammortamenti, quota dei costi comuni&hellip;).</div>
+    <div class="panel-body tabella-scroll modulo-budget">
+      <table class="table table-sm align-middle">
+        <thead><tr><th>Mese</th>{% for c, nome in b.campi %}<th class="small">{{ nome }}</th>{% endfor %}</tr></thead>
+        <tbody>
+          {% for m in b.modulo %}
+          <tr><td class="col-nome">{{ m.nome }}</td>
+            {% for f in m.campi %}
+            <td><input type="text" inputmode="decimal" name="b_{{ m.mese.month }}_{{ f.campo }}" class="form-control form-control-sm {% if f.origine == 'media' %}media{% endif %}"
+                 value="{% if f.valore != None %}{{ f.valore|floatformat:'-2' }}{% endif %}"
+                 placeholder="{% if f.segnaposto != None %}{{ f.segnaposto|floatformat:f.decimali }}{% endif %}"
+                 title="{% if f.origine == 'anno prima' %}Dallo stesso mese del {{ anno|add:'-1' }}{% elif f.origine == 'media' %}Media dei mesi chiusi{% elif f.origine == None %}Da compilare{% endif %}"></td>
+            {% endfor %}
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+      <button class="btn btn-primary btn-sm"><i class="bi bi-save"></i> Salva gli obiettivi</button>
     </div>
   </form>
 </div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+(function () {
+  var nodo = document.getElementById('dati-simulatore');
+  if (!nodo) return;
+  var d = JSON.parse(nodo.textContent), form = document.getElementById('simulatore');
+
+  function leggi() {
+    var g = {};
+    d.campi.forEach(function (c) { var v = parseFloat(form.elements['sim_' + c].value); g[c] = isNaN(v) ? 0 : v; });
+    return g;
+  }
+  // stesse formule di apps/contabilita/budget.py::calcola
+  function calcola(g) {
+    var lavaggi = g.giorni_aperti * g.auto_giorno, extra = g.pct_extra / 100 * g.valore_extra;
+    var ricavo = g.prezzo_principale + extra, consumi = g.consumi_lavaggio;
+    var ore = g.giorni_aperti * g.persone_giorno * g.ore_giornata, personale = ore * g.costo_orario;
+    var fissi = personale + g.altri_fissi, ricavi = lavaggi * ricavo, ris = lavaggi * (ricavo - consumi) - fissi;
+    var resta = ricavo - consumi - d.margine / 100 * ricavo;
+    return {
+      lavaggi: lavaggi, ricavo: ricavo, ricavi: ricavi, personale: personale, risultato: ris,
+      margine: ricavi ? ris * 100 / ricavi : null,
+      costo_pieno: lavaggi ? consumi + fissi / lavaggi : null,
+      lavaggi_persona: g.persone_giorno ? g.auto_giorno / g.persone_giorno : null,
+      ore_lavaggio: lavaggi ? ore / lavaggi : null,
+      pareggio_auto: g.giorni_aperti && ricavo > consumi ? fissi / (g.giorni_aperti * (ricavo - consumi)) : null,
+      obiettivo_auto: g.giorni_aperti && resta > 0 ? fissi / (g.giorni_aperti * resta) : null
+    };
+  }
+  function fmt(v, tipo) {
+    if (v === null || !isFinite(v)) return '—';
+    var dec = {euro: 0, euro2: 2, uno: 1, due: 2, intero: 0, pct: 1}[tipo];
+    var s = Math.abs(v).toLocaleString('it-IT', {minimumFractionDigits: dec, maximumFractionDigits: dec});
+    var segno = v < 0 ? '−' : '';
+    if (tipo === 'euro' || tipo === 'euro2') return segno + '€' + s;
+    return segno + s + (tipo === 'pct' ? '%' : '');
+  }
+  var RIGHE = [
+    ['lavaggi', 'Lavaggi', 'intero', 1], ['ricavo', 'Ricavo per lavaggio', 'euro2', 1], ['ricavi', 'Ricavi', 'euro', 1],
+    ['personale', 'Personale', 'euro', -1], ['risultato', 'Risultato del servito', 'euro', 1, 'forte'],
+    ['margine', 'Margine sui ricavi', 'pct', 1], ['costo_pieno', 'Costo pieno per lavaggio', 'euro2', -1, 'forte'],
+    ['lavaggi_persona', 'Lavaggi per persona al giorno', 'uno', 1], ['ore_lavaggio', 'Ore per lavaggio', 'due', -1],
+    ['pareggio_auto', 'Auto al giorno a pareggio', 'uno', -1],
+    ['obiettivo_auto', 'Auto al giorno per il margine obiettivo (' + d.margine.toLocaleString('it-IT') + '%)', 'uno', -1]
+  ];
+  var base = calcola(d.base), corpo = document.getElementById('sim-esiti'), nota = document.getElementById('sim-prezzo');
+  function aggiorna() {
+    var g = leggi(), r = calcola(g), html = '';
+    RIGHE.forEach(function (x) {
+      var a = base[x[0]], b = r[x[0]], diff = (a === null || b === null) ? null : b - a;
+      var classe = diff === null || Math.abs(diff) < 1e-9 ? '' : ((diff > 0) === (x[3] > 0) ? 'su' : 'giu');
+      var testo = diff === null || Math.abs(diff) < 1e-9 ? '' : (diff > 0 ? '+' : '') + fmt(diff, x[2]);
+      html += '<tr class="' + (x[4] || '') + '"><td>' + x[1] + '</td><td class="tab-num">' + fmt(a, x[2]) +
+        '</td><td class="tab-num">' + fmt(b, x[2]) + '</td><td class="tab-num delta ' + classe + '">' + testo + '</td></tr>';
+    });
+    corpo.innerHTML = html;
+    if (r.ricavo > base.ricavo && r.ricavo > g.consumi_lavaggio) {
+      var perdita = (r.ricavo - base.ricavo) / (r.ricavo - g.consumi_lavaggio);
+      nota.textContent = 'Con il nuovo ricavo per lavaggio puoi perdere fino al ' + fmt(perdita * 100, 'pct') +
+        ' dei lavaggi (circa ' + fmt(perdita * d.base.auto_giorno, 'uno') + ' auto al giorno) prima di guadagnare meno, a parità del resto.';
+    } else {
+      nota.textContent = '';
+    }
+  }
+  form.addEventListener('input', aggiorna);
+  aggiorna();
+})();
+</script>
 {% endblock %}

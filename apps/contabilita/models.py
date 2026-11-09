@@ -543,23 +543,34 @@ class ParametriAnalitica(models.Model):
 
 
 class BudgetServito(models.Model):
-    """Budget del servito per un mese. Ogni campo vuoto vale quanto lo
-    stesso mese dell'anno prima (effettivo), cosi' il confronto funziona
-    anche senza inserire nulla."""
+    """Obiettivi del servito per un mese, espressi con le leve: giorni,
+    auto al giorno, prezzo, extra, consumi, persone, ore, costo orario,
+    altri fissi. Ogni campo vuoto vale quanto lo stesso mese dell'anno
+    prima (effettivo); vedi budget.budget_del_mese."""
     CAMPI = [
-        ('lavaggi', 'Lavaggi'),
-        ('ricavo_lavaggio', 'Ricavo per lavaggio'),
+        ('giorni_aperti', 'Giorni aperti'),
+        ('auto_giorno', 'Auto al giorno'),
+        ('prezzo_principale', 'Prezzo servizio principale'),
+        ('pct_extra', '% lavaggi con extra'),
+        ('valore_extra', 'Valore di un extra'),
         ('consumi_lavaggio', 'Consumi per lavaggio'),
-        ('ore_pagate', 'Ore pagate'),
-        ('costo_orario', 'Costo orario del personale'),
-        ('altri_fissi', 'Altri costi fissi (comuni compresi)'),
+        ('persone_giorno', 'Persone al giorno'),
+        ('ore_giornata', 'Ore per persona al giorno'),
+        ('costo_orario', 'Costo orario'),
+        ('altri_fissi', 'Altri costi fissi'),
     ]
     mese = models.DateField(unique=True, help_text='Primo giorno del mese')
-    lavaggi = models.PositiveIntegerField(null=True, blank=True)
-    ricavo_lavaggio = models.DecimalField(max_digits=8, decimal_places=2, null=True, blank=True,
-                                          help_text='IVA esclusa')
+    giorni_aperti = models.PositiveSmallIntegerField(null=True, blank=True)
+    auto_giorno = models.DecimalField(max_digits=7, decimal_places=2, null=True, blank=True)
+    prezzo_principale = models.DecimalField(max_digits=8, decimal_places=2, null=True, blank=True,
+                                            help_text='Ricavo per lavaggio senza gli extra, IVA esclusa')
+    pct_extra = models.DecimalField(max_digits=5, decimal_places=1, null=True, blank=True)
+    valore_extra = models.DecimalField(max_digits=8, decimal_places=2, null=True, blank=True,
+                                       help_text='Ricavo medio di un lavaggio con extra dovuto agli extra, IVA esclusa')
     consumi_lavaggio = models.DecimalField(max_digits=8, decimal_places=2, null=True, blank=True)
-    ore_pagate = models.DecimalField(max_digits=8, decimal_places=1, null=True, blank=True)
+    persone_giorno = models.DecimalField(max_digits=5, decimal_places=2, null=True, blank=True)
+    ore_giornata = models.DecimalField(max_digits=5, decimal_places=2, null=True, blank=True,
+                                       help_text='Ore pagate per giorno-persona')
     costo_orario = models.DecimalField(max_digits=8, decimal_places=2, null=True, blank=True,
                                        help_text='Costo del personale del servito per ora pagata')
     altri_fissi = models.DecimalField(max_digits=10, decimal_places=2, null=True, blank=True,

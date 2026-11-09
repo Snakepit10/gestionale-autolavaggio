@@ -444,68 +444,152 @@ class ClientiAbbonamentiTest(TestCase):
 
 
 class BudgetTest(TestCase):
-    """Effettivo di ottobre: 1 lavaggio a 100, consumi 30, 6 ore a 10 euro,
-    altri fissi 100: risultato -90."""
+    """Effettivo di ottobre: 1 giorno aperto con 1 lavaggio a 100, niente
+    extra, consumi 30, 0,75 persone per 8 ore (6 ore) a 10 euro, altri
+    fissi 100: risultato -90."""
     def setUp(self):
         from django.core.cache import cache
         cache.clear()
         AnaliticaTest.setUp(self)
 
+    OBIETTIVO = dict(giorni_aperti=1, auto_giorno=Decimal('2'), prezzo_principale=Decimal('80'), pct_extra=Decimal('50'),
+                     valore_extra=Decimal('20'), consumi_lavaggio=Decimal('25'), persone_giorno=Decimal('0.5'),
+                     ore_giornata=Decimal('10'), costo_orario=Decimal('12'), altri_fissi=Decimal('80'))
+
     def budget(self, **campi):
         from .models import BudgetServito
-        valori = dict(lavaggi=2, ricavo_lavaggio=Decimal('90'), consumi_lavaggio=Decimal('25'), ore_pagate=Decimal('5'),
-                      costo_orario=Decimal('12'), altri_fissi=Decimal('80'))
+        valori = dict(self.OBIETTIVO)
         valori.update(campi)
         return BudgetServito.objects.create(mese=OTTOBRE, **valori)
 
-    def test_grandezze_e_scostamenti(self):
-        from .budget import budget_del_mese, grandezze, risultato, scostamenti
+    def effettivo(self):
+        from .budget import grandezze
         from .produttivita import kpi_mese
-        e = grandezze(kpi_mese(OTTOBRE, 'scontrini'))
-        self.assertEqual((e['lavaggi'], e['ricavo_lavaggio'], e['consumi_lavaggio'], e['ore_pagate'], e['costo_orario'],
-                          e['altri_fissi']), (1, Decimal('100'), Decimal('30'), Decimal('6'), Decimal('10'), Decimal('100')))
-        self.assertEqual(risultato(e), Decimal('-90'))
-        self.assertIsNone(budget_del_mese(OTTOBRE, 'scontrini'))          # niente budget e niente 2025
-        b = budget_del_mese(OTTOBRE, 'scontrini', self.budget())
-        self.assertEqual(risultato(b), Decimal('-10'))                    # 2 x 65 - 60 - 80
-        s = scostamenti(e, b)
-        self.assertEqual((s['volume'], s['prezzo'], s['consumi_volume'], s['consumi_spesa']),
-                         (Decimal('-90'), Decimal('10'), Decimal('25'), Decimal('-5')))
-        self.assertEqual((s['ore_attese'], s['ore_volume'], s['efficienza'], s['costo_orario'], s['fissi']),
-                         (Decimal('2.5'), Decimal('30'), Decimal('-42'), Decimal('12'), Decimal('-20')))
-        totale = sum((v for k, v in s.items() if k != 'ore_attese'), ZERO)
-        self.assertEqual(totale, risultato(e) - risultato(b))             # -80
+        return grandezze(kpi_mese(OTTOBRE, 'scontrini'))
 
-    def test_campi_vuoti_dall_anno_prima(self):
+    def test_leve_effettive_e_calcoli(self):
+        from .budget import calcola
+        e = self.effettivo()
+        self.assertEqual([e[c] for c in ('giorni_aperti', 'auto_giorno', 'prezzo_principale', 'pct_extra', 'valore_extra')],
+                         [1, 1, Decimal('100'), 0, 0])
+        self.assertEqual([e[c] for c in ('consumi_lavaggio', 'persone_giorno', 'ore_giornata', 'costo_orario', 'altri_fissi')],
+                         [Decimal('30'), Decimal('0.75'), Decimal('8'), Decimal('10'), Decimal('100')])
+        r = calcola(e, Decimal('30'))
+        self.assertEqual((r['lavaggi'], r['ore'], r['personale'], r['risultato'], r['costo_pieno']),
+                         (1, Decimal('6'), Decimal('60'), Decimal('-90'), Decimal('190')))
+        self.assertEqual(round(r['pareggio_auto'], 4), Decimal('2.2857'))      # 160 / 70
+        self.assertEqual(round(r['obiettivo_auto'], 4), Decimal('4.0000'))     # 160 / (70 - 30)
+        b = calcola(self.OBIETTIVO)
+        self.assertEqual((b['lavaggi'], b['extra'], b['ricavo'], b['ore'], b['risultato']),
+                         (2, Decimal('10'), Decimal('90'), Decimal('5'), Decimal('-10')))     # 2 x 65 - 60 - 80
+
+    def test_ponte(self):
+        from .budget import calcola, ponte
+        e = self.effettivo()
+        s = ponte(self.OBIETTIVO, e)
+        self.assertEqual((s['giorni'], s['auto_giorno'], s['prezzo'], s['extra'], s['consumi']),
+                         (0, Decimal('-65'), Decimal('20'), Decimal('-10'), Decimal('-5')))
+        self.assertEqual((s['ore_volume'], s['efficienza'], s['costo_orario'], s['fissi']),
+                         (Decimal('30'), Decimal('-42'), Decimal('12'), Decimal('-20')))   # ore attese 2,5
+        self.assertEqual(sum(s.values(), ZERO), Decimal('-80'))
+        # con giorni diversi la somma torna lo stesso
+        a = {**self.OBIETTIVO, 'giorni_aperti': Decimal('3'), 'auto_giorno': Decimal('1.5')}
+        b = {**e, 'giorni_aperti': Decimal('2'), 'auto_giorno': Decimal('2.5')}
+        s = ponte(a, b)
+        self.assertEqual(s['giorni'], Decimal('-97.5'))                        # -1 x 1,5 x 65
+        self.assertEqual(round(sum(s.values(), ZERO), 6), round(calcola(b)['risultato'] - calcola(a)['risultato'], 6))
+
+    def test_valore_delle_leve(self):
+        from .budget import valore_delle_leve
+        v = valore_delle_leve(self.effettivo(), Decimal('30'))
+        righe = {r['nome']: r for r in v['righe']}
+        auto = righe['+1 auto al giorno, stesso personale']
+        self.assertEqual((auto['effetto'], auto['costo_pieno']), (Decimal('70'), Decimal('110')))
+        self.assertEqual(round(righe['+€1 sui prezzi di listino (IVA inclusa)']['effetto'], 4), Decimal('0.8197'))
+        self.assertIsNone(righe['+€1 sui prezzi di listino (IVA inclusa)']['diff_costo'])   # costo invariato
+        self.assertEqual(round(righe['−10% delle ore di personale']['effetto'], 4), Decimal('6.0000'))
+        self.assertEqual(round(righe['−1 ora pagata al giorno, stesse auto']['effetto'], 4), Decimal('10.0000'))
+        self.assertEqual(round(righe['−10% di struttura e costi comuni']['effetto'], 4), Decimal('10.0000'))
+        self.assertEqual(round(v['perdita_prezzo'], 3), Decimal('1.157'))     # 0,82 / 70,82
+
+    def test_campi_vuoti_dall_anno_prima_e_dalla_media(self):
         from unittest import mock
 
-        from .budget import budget_del_mese
-        prima = {'lavaggi': 4, 'ricavi': Decimal('80'), 'variabili': Decimal('8'), 'ore': Decimal('10'),
-                 'personale': Decimal('90'), 'pieno': Decimal('150'), 'abbonamento': 0, 'giorni_persona': ZERO,
-                 'giorni_aperti': 1}
+        from .budget import budget_del_mese, riserva_costi, valori_del_mese
+        self.assertIsNone(budget_del_mese(OTTOBRE, 'scontrini'))          # niente obiettivo e niente 2025
+        # l'anno prima con lavaggi ma senza presenze: costi dalla media dei mesi chiusi
+        riserva = riserva_costi(2026, 'scontrini')
+        self.assertEqual((riserva['consumi_lavaggio'], riserva['ore_giornata'], riserva['costo_orario'],
+                          riserva['altri_fissi'], riserva['anno']),
+                         (Decimal('30'), Decimal('8'), Decimal('10'), Decimal('100'), 2026))
+        prima = {'lavaggi': 40, 'giorni_aperti': 20, 'ricavi': Decimal('1000'), 'extra': Decimal('40'), 'con_extra': 4,
+                 'ore': ZERO, 'giorni_persona': ZERO, 'variabili': ZERO, 'personale': ZERO, 'pieno': ZERO,
+                 'abbonamento': 0}
         with mock.patch('apps.contabilita.produttivita.kpi_mese', return_value=prima):
-            b = budget_del_mese(OTTOBRE, 'scontrini', self.budget(lavaggi=None, costo_orario=None))
-        self.assertEqual((b['lavaggi'], b['costo_orario'], b['ricavo_lavaggio']), (4, Decimal('9'), Decimal('90')))
+            v = valori_del_mese(OTTOBRE, 'scontrini', self.budget(auto_giorno=None, persone_giorno=None, costo_orario=None),
+                                riserva)
+        self.assertEqual(v['auto_giorno'], (Decimal('2'), 'anno prima'))
+        self.assertEqual(v['prezzo_principale'], (Decimal('80'), 'obiettivo'))
+        self.assertEqual(v['costo_orario'], (Decimal('10'), 'media'))
+        self.assertEqual(v['persone_giorno'], (Decimal('1.5'), 'media'))   # 2 auto / (1 lavaggio / 0,75 persone)
+
+    def test_extra_dagli_ordini(self):
+        from apps.core.models import ServizioProdotto
+        from apps.ordini.models import ItemOrdine, Ordine
+
+        from .produttivita import extra_del_periodo, kpi_mese
+        cera = ServizioProdotto.objects.create(titolo='Cera', categoria=self.categoria, prezzo=Decimal('12.20'),
+                                               descrizione='', programmi_portale='')
+        ItemOrdine.objects.create(ordine=Ordine.objects.get(), servizio_prodotto=cera, quantita=1,
+                                  prezzo_unitario=cera.prezzo)
+        self.assertEqual(extra_del_periodo(OTTOBRE, date(2026, 10, 31)), (1, Decimal('10')))
+        e = self.effettivo()
+        self.assertEqual((e['pct_extra'], e['valore_extra'], e['prezzo_principale']), (100, Decimal('10'), Decimal('90')))
+        self.assertEqual(kpi_mese(OTTOBRE, 'scontrini')['extra'], Decimal('10'))
 
     def test_periodo_e_pagina(self):
         from .budget import budget_e_scostamenti
         from .models import BudgetServito
         vuoto = budget_e_scostamenti([OTTOBRE], 2026, 'scontrini')
-        self.assertIsNone(vuoto['scostamenti'])
+        self.assertIsNone(vuoto['aggregato'])
         self.assertEqual(vuoto['saltati'], ['Ott'])
+        self.assertIsNotNone(vuoto['simulatore'])
+        self.assertIsNotNone(vuoto['indicatori'])
         self.budget()
         r = budget_e_scostamenti([OTTOBRE], 2026, 'scontrini')
-        self.assertEqual((r['risultato_bdg'], r['risultato_eff'], r['contati']), (Decimal('-10'), Decimal('-90'), ['Ott']))
-        self.assertEqual(sum((s['valore'] for s in r['scostamenti']), ZERO), Decimal('-80'))
+        a = r['aggregato']
+        self.assertEqual((a['risultato_bdg'], a['risultato_eff'], r['contati']), (Decimal('-10'), Decimal('-90'), ['Ott']))
+        self.assertEqual(sum((s['valore'] for s in a['scostamenti']), ZERO), Decimal('-80'))
+        confronto = {c['nome']: c for c in a['confronto']}
+        self.assertEqual((confronto['Auto al giorno']['bdg'], confronto['Auto al giorno']['eff']), (2, 1))
+        self.assertFalse(confronto['Auto al giorno']['buono'])
+        # mese su mese: ottobre e' la decima colonna, l'ultima e' il totale
+        ponte = {riga['nome']: riga['celle'] for riga in r['ponte_obiettivo']}
+        self.assertEqual(ponte['Efficienza (ore in più o in meno)'][9], Decimal('-42'))
+        self.assertEqual(ponte['Risultato effettivo'][-1], Decimal('-90'))
+        self.assertIsNone(r['ponte_precedente'])                         # settembre senza presenze
         VisteAnaliticaTest.setUp(self)
-        for url in ('/contabilita/analitica/budget/?anno=2026', '/contabilita/analitica/budget/?anno=2026&mese=10'):
+        for url in ('/contabilita/analitica/budget/?anno=2026', '/contabilita/analitica/budget/?anno=2026&mese=10',
+                    '/contabilita/analitica/budget/?anno=2099'):
             self.assertEqual(VisteAnaliticaTest.apri(self, url).status_code, 200, url)
-        self.client.post('/contabilita/analitica/budget/?anno=2026', {'b_11_lavaggi': '300', 'b_11_ricavo_lavaggio': '24,50',
-                                                                      'b_12_lavaggi': '1,5'})
+        self.client.post('/contabilita/analitica/budget/?anno=2026', {
+            'azione': 'budget', 'b_11_auto_giorno': '20', 'b_11_prezzo_principale': '24,50',
+            'b_12_giorni_aperti': '1,5', 'b_9_pct_extra': '120'})
         nov = BudgetServito.objects.get(mese=date(2026, 11, 1))
-        self.assertEqual((nov.lavaggi, nov.ricavo_lavaggio, nov.ore_pagate), (300, Decimal('24.50'), None))
-        self.assertFalse(BudgetServito.objects.filter(mese=date(2026, 12, 1)).exists())   # 1,5 lavaggi: errore
+        self.assertEqual((nov.auto_giorno, nov.prezzo_principale, nov.persone_giorno), (20, Decimal('24.50'), None))
+        self.assertFalse(BudgetServito.objects.filter(mese=date(2026, 12, 1)).exists())   # 1,5 giorni: errore
+        self.assertFalse(BudgetServito.objects.filter(mese=date(2026, 9, 1)).exists())    # 120%: errore
         self.assertFalse(BudgetServito.objects.filter(mese=OTTOBRE).exists())             # riga vuota: tolto
+        # dal simulatore: le leve per giorno nei mesi scelti, giorni e fissi no
+        self.client.post('/contabilita/analitica/budget/?anno=2026', {
+            'azione': 'simulatore', 'sim_auto_giorno': '20', 'sim_prezzo_principale': '22.3', 'sim_pct_extra': '30',
+            'sim_valore_extra': '9', 'sim_consumi_lavaggio': '3.86', 'sim_persone_giorno': '3.5',
+            'sim_ore_giornata': '9', 'sim_costo_orario': '9.55', 'sim_giorni_aperti': '276', 'sim_altri_fissi': '18888',
+            'mesi_obiettivo': ['11', '12']})
+        dic = BudgetServito.objects.get(mese=date(2026, 12, 1))
+        self.assertEqual((dic.auto_giorno, dic.persone_giorno, dic.giorni_aperti, dic.altri_fissi),
+                         (20, Decimal('3.5'), None, None))
+        self.assertEqual(BudgetServito.objects.get(mese=date(2026, 11, 1)).prezzo_principale, Decimal('22.30'))
 
 
 class AnnoPrimaIncompletoTest(TestCase):

@@ -89,38 +89,73 @@ def clienti_abbonamenti(request):
         'c': clienti_e_abbonamenti(mesi, contesto['base']), 'scheda': 'clienti', **contesto})
 
 
+def _leva_da_testo(campo, testo):
+    """Valore di una leva dal testo del modulo: Decimal (int per i giorni),
+    None se vuoto; ValueError se non valido."""
+    from decimal import Decimal
+
+    from .models import BudgetServito
+    testo = (testo or '').strip()
+    if not testo:
+        return None
+    numero = _decimale(testo)
+    if numero is None or numero < 0:
+        raise ValueError(testo)
+    if campo == 'giorni_aperti':
+        if numero != numero.to_integral_value() or numero > 31:
+            raise ValueError(testo)
+        return int(numero)
+    if campo == 'pct_extra' and numero > 100:
+        raise ValueError(testo)
+    if campo in ('persone_giorno', 'ore_giornata') and numero > 99:
+        raise ValueError(testo)
+    return numero.quantize(Decimal(1).scaleb(-BudgetServito._meta.get_field(campo).decimal_places))
+
+
 @accesso
 def budget(request):
-    from .budget import GRANDEZZE, budget_e_scostamenti
+    from .budget import LEVE, LEVE_PER_GIORNO, budget_e_scostamenti
     from .models import BudgetServito
     mesi, contesto = _periodo(request)
     anno = contesto['anno']
     if request.method == 'POST':
-        errori, salvati = [], 0
-        for n in range(1, 13):
-            mese = date(anno, n, 1)
+        p = request.POST
+        if p.get('azione') == 'simulatore':
+            # le leve per giorno del simulatore diventano l'obiettivo dei mesi scelti
             valori = {}
-            for campo in GRANDEZZE:
-                testo = (request.POST.get(f'b_{n}_{campo}') or '').strip()
-                if not testo:
-                    valori[campo] = None
+            try:
+                for campo in LEVE_PER_GIORNO:
+                    valori[campo] = _leva_da_testo(campo, p.get(f'sim_{campo}'))
+            except ValueError as e:
+                messages.error(request, f'Valore non valido "{e}": obiettivo non salvato.')
+                valori = None
+            scelti = [int(n) for n in p.getlist('mesi_obiettivo') if n.isdigit() and 1 <= int(n) <= 12]
+            if valori is not None and scelti:
+                for n in scelti:
+                    BudgetServito.objects.update_or_create(mese=date(anno, n, 1), defaults=valori)
+                messages.success(request, f'Obiettivo salvato per {len(scelti)} mesi del {anno}: '
+                                          + ', '.join(NOMI_MESI[n - 1] for n in scelti) + '.')
+            elif valori is not None:
+                messages.error(request, 'Scegli almeno un mese.')
+        else:
+            errori, salvati = [], 0
+            for n in range(1, 13):
+                mese = date(anno, n, 1)
+                valori = {}
+                try:
+                    for campo in LEVE:
+                        valori[campo] = _leva_da_testo(campo, p.get(f'b_{n}_{campo}'))
+                except ValueError as e:
+                    errori.append(f'{NOMI_MESI[n - 1]}: valore non valido "{e}"')
                     continue
-                numero = _decimale(testo)
-                if numero is None or numero < 0 or (campo == 'lavaggi' and numero != numero.to_integral_value()):
-                    errori.append(f'{NOMI_MESI[n - 1]}: valore non valido "{testo}"')
-                    valori = None
-                    break
-                valori[campo] = int(numero) if campo == 'lavaggi' else numero
-            if valori is None:
-                continue
-            if any(v is not None for v in valori.values()):
-                BudgetServito.objects.update_or_create(mese=mese, defaults=valori)
-                salvati += 1
-            else:
-                BudgetServito.objects.filter(mese=mese).delete()
-        for e in errori:
-            messages.error(request, e)
-        messages.success(request, f'Budget {anno} salvato ({salvati} mesi con valori propri).')
+                if any(v is not None for v in valori.values()):
+                    BudgetServito.objects.update_or_create(mese=mese, defaults=valori)
+                    salvati += 1
+                else:
+                    BudgetServito.objects.filter(mese=mese).delete()
+            for e in errori:
+                messages.error(request, e)
+            messages.success(request, f'Obiettivi {anno} salvati ({salvati} mesi con valori propri).')
         return redirect(f"{request.path}?anno={anno}&mese={contesto['mese']}&ricavi={contesto['base']}")
     return render(request, 'contabilita/analitica_budget.html', {
         'b': budget_e_scostamenti(mesi, anno, contesto['base']), 'scheda': 'budget', **contesto})

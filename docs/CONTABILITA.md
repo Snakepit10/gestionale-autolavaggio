@@ -367,12 +367,14 @@ Ogni servizio ha i suoi **minuti-persona standard**: i minuti di lavoro di tutte
 | Riga | Calcolo |
 |---|---|
 | Lavaggi, di cui in abbonamento | come nella scheda Centri |
+| Auto al giorno | lavaggi / giorni con lavaggi |
 | Ore pagate servito | ore lavorate × quota servito della ripartizione |
 | Auto per ora-persona | lavaggi / ore pagate servito |
 | Persone medie al giorno | giorni-persona del servito / giorni con lavaggi. Un giorno-persona è una presenza con ore, per la quota servito |
 | Lavaggi per persona al giorno | lavaggi / giorni-persona |
 | Ricavo, consumi, costo pieno e risultato per lavaggio | ricavi, costi variabili, costo pieno (con la quota comuni) e risultato del servito / lavaggi |
 | Costo del lavoro sui ricavi | personale del servito / ricavi del servito |
+| Lavaggi con extra, ricavo extra per lavaggio | dalle righe degli ordini: extra = righe di servizio diverse dalla più cara, IVA esclusa |
 
 - I mesi già chiusi si tengono in memoria per un'ora: una fattura appena caricata compare al più tardi dopo un'ora.
 - La quota dei costi comuni è divisa mese per mese, quindi il totale può differire di poco dalla scheda Centri, che la divide sull'intero periodo.
@@ -425,31 +427,53 @@ Il conto economico invece mette il prezzo nel giorno della vendita.
 
 - C'è anche la distribuzione dei clienti per numero di lavaggi nel periodo.
 
-**Scheda Budget** (servito)
+**Scheda Obiettivi e scostamenti** (servito)
 
-Per ogni mese si inseriscono, tutti facoltativi:
-- lavaggi;
-- ricavo per lavaggio e consumi per lavaggio;
-- ore pagate e costo orario del personale;
-- altri costi fissi (costo pieno meno consumi e personale, cioè con la quota dei costi comuni).
+Tutto si ragiona con le **leve** di un mese:
 
-**Un campo vuoto vale quanto lo stesso mese dell'anno prima**, così il confronto con l'anno prima funziona anche senza scrivere nulla. Vale solo se quel mese ha lavaggi e presenze registrate; altrimenti il mese va compilato tutto (succede nel 2026, perché il 2025 non ha costi né presenze).
-
-Risultato = lavaggi × (ricavo − consumi per lavaggio) − ore × costo orario − altri fissi. Gli scostamenti sono l'effetto sul risultato (positivo = meglio del budget):
-
-| Scostamento | Calcolo |
+| Leva | Effettivo |
 |---|---|
-| Volume dei lavaggi sui ricavi | (L_eff − L_bdg) × R_bdg |
-| Prezzo e mix | (R_eff − R_bdg) × L_eff |
-| Consumi per il volume | −(L_eff − L_bdg) × V_bdg |
-| Consumi di ogni lavaggio | −(V_eff − V_bdg) × L_eff |
-| Ore per il volume | −(ore attese − ore_bdg) × c_bdg, con ore attese = ore_bdg / L_bdg × L_eff |
-| Efficienza | −(ore_eff − ore attese) × c_bdg |
-| Costo orario del personale | −(c_eff − c_bdg) × ore_eff |
-| Altri costi fissi | −(F_eff − F_bdg) |
+| G giorni aperti | giorni con almeno un lavaggio |
+| l auto al giorno | lavaggi / G |
+| p prezzo del servizio principale | ricavo per lavaggio − ricavo extra per lavaggio |
+| x % lavaggi con extra, e valore di un extra | dalle righe degli ordini: extra = righe di servizio diverse dalla più cara, IVA esclusa |
+| V consumi per lavaggio | costi variabili del servito / lavaggi |
+| n persone al giorno | giorni-persona del servito / G |
+| h ore per persona al giorno | ore pagate servito / giorni-persona |
+| c costo orario | personale del servito / ore pagate |
+| S altri costi fissi | costo pieno − consumi − personale (quota dei costi comuni compresa) |
 
-- La somma va dal risultato di budget a quello effettivo.
-- Per un anno si sommano i mesi passati che hanno effettivo e budget. I mesi senza budget né dati dell'anno prima sono indicati a parte.
+Calcoli: lavaggi L = G × l; extra per lavaggio E = x × e; ricavo per lavaggio R = p + E; ore = G × n × h. Risultato = L × (R − V) − ore × c − S. Costo pieno per lavaggio = V + (ore × c + S) / L.
+
+**Simulatore.** Parte dalle leve effettive del periodo scelto (giorni e altri fissi sono i totali del periodo). Cambiando le leve mostra subito, contro oggi: lavaggi, ricavi, personale, risultato, margine, costo pieno per lavaggio, lavaggi per persona, ore per lavaggio, auto al giorno a pareggio = (personale + S) / (G × (R − V)) e per il margine obiettivo m = (personale + S) / (G × (R − V − m × R)). Se il ricavo per lavaggio sale, dice quanti lavaggi si possono perdere prima di guadagnare meno: (R_nuovo − R_oggi) / (R_nuovo − V).
+- Accanto, **quanto vale ogni leva**: una alla volta (+1 auto al giorno, +€1 al listino, +10 punti di extra, +€1 sul valore di un extra, −1 ora pagata al giorno, −10% di ore, −€0,50 di costo orario, −10% di consumi, −10% di altri fissi), con l'effetto sul risultato e il nuovo costo pieno.
+- **Salva come obiettivo** scrive le leve per giorno (auto, prezzo, extra, consumi, persone, ore, costo orario) nei mesi scelti. Giorni aperti e altri fissi restano quelli di ogni mese.
+
+**Obiettivi mensili.** Per ogni mese le stesse leve, tutte facoltative. **Un campo vuoto vale quanto lo stesso mese dell'anno prima.** Se quel mese non ha presenze (il 2025, prima della contabilità), le leve dei costi vengono dalla media dei mesi chiusi dell'anno con presenze, e le persone dalle auto al giorno con i lavaggi per persona medi.
+
+**Ponte.** Da un riferimento A (obiettivo, o mese precedente) all'effettivo B, l'effetto di ogni leva sul risultato (positivo = meglio):
+
+| Riga | Calcolo |
+|---|---|
+| Giorni di apertura | (G_B − G_A) × l_A × (R_A − V_A) |
+| Affluenza (auto al giorno) | G_B × (l_B − l_A) × (R_A − V_A) |
+| Prezzo dei servizi principali | (p_B − p_A) × L_B |
+| Extra (upselling) | (E_B − E_A) × L_B |
+| Consumi di ogni lavaggio | −(V_B − V_A) × L_B |
+| Ore per il volume | −(ore attese − ore_A) × c_A, con ore attese = ore_A / L_A × L_B |
+| Efficienza | −(ore_B − ore attese) × c_A |
+| Paghe (costo orario) | −(c_B − c_A) × ore_B |
+| Altri costi fissi | −(S_B − S_A) |
+
+- La somma va dal risultato di A a quello di B. Il volume vale il margine per lavaggio, non tutto lo scontrino.
+- Efficienza misura i tempi morti, Extra le vendite aggiuntive, già depurati dal numero di auto.
+
+**La pagina mostra:**
+- per il periodo scelto, il ponte dall'obiettivo all'effettivo e il confronto obiettivo/effettivo delle leve (mesi chiusi con effettivo e obiettivo completi);
+- le leve mese per mese con l'obiettivo sotto ogni valore (verde meglio, rosso peggio, pari entro l'1%);
+- il ponte mese per mese contro l'obiettivo, con il totale;
+- il ponte mese per mese contro il mese precedente (gennaio contro dicembre dell'anno prima, se ha presenze).
+- Il mese in corso non entra nei ponti finché non è chiuso.
 
 ## Fase 5: indici e KPI
 

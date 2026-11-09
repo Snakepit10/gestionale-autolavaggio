@@ -1,0 +1,13 @@
+{% load contabilita_info %}
+<table class="table table-sm bilancio ponte">
+  <thead><tr><th></th>{% for c in colonne %}<th class="tab-num">{{ c.nome }}{% if c.in_corso %}*{% endif %}</th>{% endfor %}<th class="tab-num">Totale</th></tr></thead>
+  <tbody>
+    {% for r in righe %}
+    <tr class="{{ r.tipo }}"><td class="col-nome">{{ r.nome }}{% if r.tipo == 'effetto' %}{% info r.nome %}{% endif %}</td>
+      {% for v in r.celle %}
+      <td class="tab-num {% if forloop.last %}col-totale{% endif %} {% if r.tipo == 'effetto' %}{% if v > 0 %}su{% elif v < 0 %}giu{% endif %}{% elif v != None and v < 0 %}neg{% endif %}">{% if v == None %}&mdash;{% else %}{% if r.tipo == 'effetto' and v > 0 %}+{% endif %}&euro;{{ v|floatformat:"0g" }}{% endif %}</td>
+      {% endfor %}
+    </tr>
+    {% endfor %}
+  </tbody>
+</table>

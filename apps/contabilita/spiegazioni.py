@@ -161,33 +161,53 @@ SPIEGAZIONI = {
         'Totale dei loro ordini di lavaggio nel periodo / 1,22 / clienti attivi.',
         'Quanto vale in media un cliente registrato nel periodo.'),
 
-    # ------------------------------------------------------- analitica: budget
-    'Volume dei lavaggi sui ricavi': (
-        '(Lavaggi effettivi − lavaggi di budget) × ricavo per lavaggio di budget.',
-        'Quanto hanno spostato il risultato le auto in più o in meno.'),
-    'Prezzo e mix': (
-        '(Ricavo per lavaggio effettivo − di budget) × lavaggi effettivi.',
-        'L\'effetto di prezzi, sconti, extra e scelta dei servizi.'),
-    'Consumi per il volume': (
-        '−(Lavaggi effettivi − di budget) × consumi per lavaggio di budget.',
-        'I consumi in più o in meno dovuti solo al numero di auto: va letto insieme al volume.'),
+    # ------------------------------------------------------- analitica: obiettivi e scostamenti
+    'Giorni di apertura': (
+        '(Giorni aperti effettivi − di riferimento) × auto al giorno di riferimento × margine per lavaggio di '
+        'riferimento (ricavo − consumi).',
+        'L\'effetto del calendario: giorni di apertura in più o in meno.'),
+    'Affluenza (auto al giorno)': (
+        'Giorni aperti effettivi × (auto al giorno effettive − di riferimento) × margine per lavaggio di riferimento.',
+        'L\'effetto delle auto in più o in meno a parità di giorni: stagione, meteo, promozioni.',
+        'Il volume vale il margine per lavaggio, non tutto lo scontrino: un\'auto in più porta il suo margine.'),
+    'Prezzo dei servizi principali': (
+        '(Prezzo del servizio principale effettivo − di riferimento) × lavaggi effettivi. Prezzo del servizio '
+        'principale = ricavo per lavaggio − ricavo extra per lavaggio.',
+        'L\'effetto di listino, sconti e scelta di servizi più grandi o più piccoli.'),
+    'Extra (upselling)': (
+        '(Ricavo extra per lavaggio effettivo − di riferimento) × lavaggi effettivi. Ricavo extra per lavaggio = % '
+        'lavaggi con extra × valore di un extra.',
+        'Quanto hanno reso le vendite aggiuntive rispetto al riferimento, già depurate dal numero di auto.'),
     'Consumi di ogni lavaggio': (
-        '−(Consumi per lavaggio effettivi − di budget) × lavaggi effettivi.',
+        '−(Consumi per lavaggio effettivi − di riferimento) × lavaggi effettivi.',
         'Se ogni auto è costata di più o di meno in chimici, materiale ed energia.'),
     'Ore per il volume': (
-        'Ore attese = ore di budget / lavaggi di budget × lavaggi effettivi; effetto = −(ore attese − ore di budget) × '
-        'costo orario di budget.',
+        'Ore attese = ore di riferimento / lavaggi di riferimento × lavaggi effettivi; effetto = −(ore attese − ore di '
+        'riferimento) × costo orario di riferimento.',
         'Le ore in più o in meno giustificate dal numero di auto.'),
     'Efficienza (ore in più o in meno)': (
-        '−(Ore pagate effettive − ore attese) × costo orario di budget.',
-        'Le ore pagate oltre quelle che servivano per le auto lavorate: è l\'effetto dei turni.',
+        '−(Ore pagate effettive − ore attese) × costo orario di riferimento.',
+        'Le ore pagate oltre quelle che servivano per le auto lavorate: misura i tempi morti e l\'effetto dei turni.',
         'Negativo vuol dire più ore di quelle che il volume giustificava.'),
-    'Costo orario del personale': (
-        '−(Costo orario effettivo − di budget) × ore pagate effettive.',
-        'L\'effetto di paghe, contributi e bonus diversi dal budget.'),
+    'Paghe (costo orario)': (
+        '−(Costo orario effettivo − di riferimento) × ore pagate effettive.',
+        'L\'effetto di paghe, contributi, straordinari e bonus diversi dal riferimento.'),
     'Altri costi fissi': (
-        '−(Altri costi fissi effettivi − di budget). Altri costi fissi = costo pieno − consumi − personale.',
-        'Manutenzioni, ammortamenti e quota dei costi comuni diversi dal budget.'),
+        '−(Altri costi fissi effettivi − di riferimento). Altri costi fissi = costo pieno − consumi − personale.',
+        'Manutenzioni, ammortamenti e quota dei costi comuni diversi dal riferimento.',
+        'Oscilla anche per motivi contabili, per esempio una fattura che cade tutta in un mese.'),
+    'Auto al giorno': (
+        'Lavaggi / giorni aperti (giorni con almeno un lavaggio).',
+        'L\'affluenza media di una giornata di apertura.'),
+    'Prezzo del servizio principale': (
+        'Ricavo per lavaggio − ricavo extra per lavaggio, IVA esclusa.',
+        'Quanto rende in media il servizio principale, senza gli extra.'),
+    'Ore per lavaggio': (
+        'Ore pagate servito / lavaggi.',
+        'Quante ore di personale si pagano per ogni auto: scende quando si riducono i tempi morti.'),
+    'Costo orario': (
+        'Costo del personale del servito / ore pagate servito.',
+        'Quanto costa in media un\'ora di personale, contributi compresi.'),
 
     # ------------------------------------------------------- analitica: produttivita'
     'Ore pagate servito': (
