@@ -153,6 +153,66 @@ class ReportTest(TestCase):
         self.assertAlmostEqual(chiusa.tempo_pausa_totale.total_seconds(), 60, delta=5)
         self.assertAlmostEqual(chiusa.tempo_lavoro_netto_minuti, 9, delta=0.1)
 
+    def test_l_operatore_sceglie_la_fase(self):
+        import json
+        from apps.turni.models import PostazioneTurno
+        from apps.turni.views import api_completa_lavoro, api_inizia_lavoro, api_ordine_dettaglio
+        SessioneTurno.objects.filter(pk=self.sessione.pk).update(stato='attivo')
+        PostazioneCQ.objects.exclude(codice__startswith='t-').update(attiva=False)
+        # Mario e' in turno al prelavaggio; Lucia e' sull'asciugatura.
+        PostazioneTurno.objects.create(sessione=self.sessione, postazione_cq=self.prelavaggio)
+        finale = PostazioneCQ.objects.create(codice='t-cf', nome='Controllo prova', ordine=9, is_controllo_finale=True)
+        lucia = User.objects.create_user('lucia_test', first_name='Lucia')
+        turno_lucia = SessioneTurno.objects.create(operatore=lucia)
+        ordine = Ordine.objects.create(totale=Decimal('20'), totale_finale=Decimal('20'))
+
+        def chiama(vista, utente, *args, corpo=None):
+            req = RequestFactory().post('/', json.dumps(corpo or {}), content_type='application/json')
+            req.user = utente
+            return json.loads(vista(req, *args).content)
+
+        def fasi():
+            return [(f['nome'], f['mia'], f['stato'], f['chi'])
+                    for f in chiama(api_ordine_dettaglio, self.mario, ordine.pk)['fasi_avviabili']]
+
+        # Prima le sue, poi quelle dopo nella linea, poi quelle prima; il
+        # controllo finale non e' nel suo turno.
+        prima = PostazioneCQ.objects.create(codice='t-0', nome='Accoglienza prova', ordine=0)
+        self.assertEqual(fasi(), [('Prelavaggio prova', True, 'da_fare', ''),
+                                  ('Asciugatura prova', False, 'da_fare', ''),
+                                  ('Accoglienza prova', False, 'da_fare', '')])
+        prima.delete()
+        LavorazioneOperatore.objects.create(sessione=turno_lucia, ordine=ordine, postazione_cq=self.asciugatura)
+        self.assertEqual(fasi()[1], ('Asciugatura prova', False, 'in_corso', 'Lucia'))
+
+        # Avvia solo il prelavaggio, poi lo chiude e passa all'asciugatura.
+        r = chiama(api_inizia_lavoro, self.mario, ordine.pk, corpo={'postazione': self.prelavaggio.pk})
+        self.assertTrue(r['ok'])
+        mie = LavorazioneOperatore.objects.filter(sessione=self.sessione)
+        self.assertEqual([l.postazione_cq for l in mie], [self.prelavaggio])
+        chiama(api_completa_lavoro, self.mario, mie[0].pk)
+        LavorazioneOperatore.objects.filter(sessione=turno_lucia).delete()
+        self.assertEqual(fasi(), [('Prelavaggio prova', True, 'fatta_da_me', ''),
+                                  ('Asciugatura prova', False, 'da_fare', '')])
+        r = chiama(api_inizia_lavoro, self.mario, ordine.pk, corpo={'postazione': self.asciugatura.pk})
+        self.assertTrue(r['ok'])
+        aperta = LavorazioneOperatore.objects.get(sessione=self.sessione, stato='in_lavorazione')
+        self.assertEqual(aperta.postazione_cq, self.asciugatura)
+        # Mentre lavora non gli si propone la fase che ha aperta.
+        self.assertNotIn('Asciugatura prova', [f[0] for f in fasi()])
+
+        # Il controllo finale fuori turno non si puo' avviare.
+        chiama(api_completa_lavoro, self.mario, aperta.pk)
+        r = chiama(api_inizia_lavoro, self.mario, ordine.pk, corpo={'postazione': finale.pk})
+        self.assertEqual((r['ok'], r['error']), (False, 'Fase non disponibile.'))
+
+        # Una fase chiusa da un altro non si propone piu'.
+        altro = Ordine.objects.create(totale=Decimal('20'), totale_finale=Decimal('20'))
+        LavorazioneOperatore.objects.create(sessione=turno_lucia, ordine=altro, postazione_cq=self.asciugatura,
+                                            stato='completato', fine=timezone.now())
+        nomi = [f['nome'] for f in chiama(api_ordine_dettaglio, self.mario, altro.pk)['fasi_avviabili']]
+        self.assertEqual(nomi, ['Prelavaggio prova'])
+
     def test_elimina_tempi(self):
         from apps.turni.views import report_elimina_tempi
         prova = self._ordine((self.prelavaggio, 10), (self.asciugatura, 6))

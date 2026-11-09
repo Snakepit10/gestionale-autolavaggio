@@ -151,6 +151,8 @@ html, body { overflow: hidden !important; height: 100%; background: #fff; }
 }
 .completata-meta { font-size: .72rem; color: #6b7280; }
 .prezzo-ordine { display: inline-block; font-weight: 800; font-size: .85rem; color: #065f46; background: #d1fae5; border-radius: 6px; padding: 1px 7px; font-variant-numeric: tabular-nums; }
+.btn-fase { min-width: 11rem; line-height: 1.2; }
+.btn-fase .fase-nota { font-size: .72rem; font-weight: 400; opacity: .8; }
 .prezzo-ordine.abbonamento { color: #3730a3; background: #e0e7ff; font-weight: 700; font-size: .75rem; }
 @keyframes ordine-active-pulse-green {
     0%, 100% { box-shadow: 0 0 0 0 rgba(16, 185, 129, .6); }
@@ -646,7 +648,7 @@ async function selezionaOrdine(ordineId) {
   if (!data.ok) return;
 
   currentOrdineId = ordineId;
-  renderAreaOperativa(data.ordine, data.lavorazione, data.lavorazioni_attive || [], data.fasi_completate || [], data.segnalazioni || []);
+  renderAreaOperativa(data.ordine, data.lavorazione, data.lavorazioni_attive || [], data.fasi_completate || [], data.segnalazioni || [], data.fasi_avviabili || []);
   showDetailMobile();
 }
 
@@ -663,7 +665,32 @@ function prezzoOrdine(ordine) {
   return `<span class="prezzo-ordine">&euro;${euro}</span>`;
 }
 
-function renderAreaOperativa(ordine, lavorazione, lavorazioniAttive, fasiCompletate, segnalazioni) {
+/* Un pulsante per fase: prima quelle del turno, poi "Altra fase" con le
+   altre ancora da fare (chi aspira puo' fare anche plastiche e vetri). */
+function pulsantiFasi(fasi) {
+  if (!fasi.length) return '<div class="text-muted">Tutte le fasi sono fatte.</div>';
+  const pulsante = (f, grande) => {
+    const icona = f.stato === 'fatta_da_me' ? 'bi-arrow-counterclockwise' : 'bi-play-circle';
+    const nota = f.stato === 'fatta_da_me' ? '<small class="d-block fase-nota">riapri</small>'
+      : f.stato === 'in_corso' ? `<small class="d-block fase-nota">con ${f.chi}</small>` : '';
+    const cls = grande ? 'btn-primary' : 'btn-outline-primary';
+    return `<button class="btn ${cls} btn-lavoro btn-fase" onclick="iniziaLavoro(${f.id}, this)"><i class="bi ${icona}"></i> ${f.nome}${nota}</button>`;
+  };
+  const mie = fasi.filter(f => f.mia && f.stato !== 'fatta_da_me');
+  // "Riapri" (fase gia' chiusa da lui) sempre in fondo
+  const altre = fasi.filter(f => !mie.includes(f) && f.stato !== 'fatta_da_me')
+    .concat(fasi.filter(f => f.stato === 'fatta_da_me'));
+  let html = `<div class="d-flex flex-wrap justify-content-center gap-2">${mie.map(f => pulsante(f, true)).join('')}</div>`;
+  if (altre.length) {
+    const altreHtml = `<div class="d-flex flex-wrap justify-content-center gap-2 mt-2">${altre.map(f => pulsante(f, !mie.length && f.stato !== 'fatta_da_me')).join('')}</div>`;
+    html += mie.length
+      ? `<button type="button" class="btn btn-link btn-sm mt-2" data-bs-toggle="collapse" data-bs-target="#altreFasi"><i class="bi bi-chevron-down"></i> Altra fase</button><div id="altreFasi" class="collapse">${altreHtml}</div>`
+      : `<div class="small text-muted mt-1">Scegli la fase da fare:</div>${altreHtml}`;
+  }
+  return html;
+}
+
+function renderAreaOperativa(ordine, lavorazione, lavorazioniAttive, fasiCompletate, segnalazioni, fasiAvviabili) {
   const area = document.getElementById('areaOperativa');
   currentLavIds = lavorazioniAttive.map(l => l.id);
 
@@ -712,7 +739,7 @@ function renderAreaOperativa(ordine, lavorazione, lavorazioniAttive, fasiComplet
   } else {
     currentLavIds = []; currentLavStato = '';
     timerHtml = '<div class="timer-display text-muted" id="timerDisplay">--:--</div>';
-    buttonsHtml = `<button class="btn btn-primary btn-lavoro" onclick="iniziaLavoro()"><i class="bi bi-play-circle"></i> Inizia Lavoro</button>`;
+    buttonsHtml = pulsantiFasi(fasiAvviabili || []);
   }
 
   // --- Fasi completate ---
@@ -1102,12 +1129,14 @@ async function apiPost(url, body) {
   return res.json();
 }
 
-async function iniziaLavoro() {
+async function iniziaLavoro(postazioneId, btn) {
   if (!currentOrdineId) return;
-  const data = await apiPost(`/turni/api/ordine/${currentOrdineId}/inizia-lavoro/`);
+  if (btn) btn.disabled = true;  // niente doppio tocco
+  const data = await apiPost(`/turni/api/ordine/${currentOrdineId}/inizia-lavoro/`, {postazione: postazioneId});
   if (data.ok) {
     selezionaOrdine(currentOrdineId);
   } else {
+    if (btn) btn.disabled = false;
     alert(data.error);
   }
 }

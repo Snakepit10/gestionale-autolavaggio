@@ -68,6 +68,58 @@ def _get_coda_ordini(sessione):
     )
 
 
+def _postazioni_scelta(sessione):
+    """Postazioni fra cui l'operatore puo' scegliere la fase: tutte quelle
+    della linea, piu' il controllo finale solo se e' nel suo turno."""
+    mie = {pt.postazione_cq_id for pt in sessione.postazioni.all()}
+    return [
+        p for p in PostazioneCQ.objects.filter(attiva=True).prefetch_related('blocchi').order_by('ordine')
+        if not p.is_controllo_finale or p.pk in mie
+    ], mie
+
+
+def _fasi_ordine(sessione, ordine):
+    """Fasi che l'operatore puo' avviare su un ordine: prima quelle del suo
+    turno, poi le altre ancora da fare (chi aspira puo' fare anche plastiche
+    e vetri se la macchina davanti non e' pronta).
+
+    stato: 'da_fare', 'in_corso' (ci lavora un altro: chi), 'fatta_da_me'
+    (chiusa da lui in questo turno: riavviarla la riapre).
+    Le fasi chiuse da altri non si propongono.
+    """
+    postazioni, mie = _postazioni_scelta(sessione)
+    righe = list(LavorazioneOperatore.objects.filter(ordine=ordine).select_related('sessione__operatore'))
+    fasi = []
+    for p in postazioni:
+        sue = [r for r in righe if r.postazione_cq_id == p.pk]
+        chiuse = [r for r in sue if r.stato == 'completato']
+        blocchi = [b.pk for b in p.blocchi.all()]
+        fatta = bool(chiuse) and (not blocchi or {r.blocco_id for r in chiuse} >= set(blocchi))
+        aperte_altri = [r for r in sue if r.stato != 'completato' and r.sessione_id != sessione.pk]
+        if any(r.stato != 'completato' and r.sessione_id == sessione.pk for r in sue):
+            continue  # la sta gia' facendo lui: c'e' il cronometro
+        if fatta:
+            if not any(r.sessione_id == sessione.pk for r in chiuse):
+                continue
+            stato = 'fatta_da_me'
+        elif aperte_altri:
+            stato = 'in_corso'
+        else:
+            stato = 'da_fare'
+        chi = sorted({r.sessione.operatore.first_name or r.sessione.operatore.username for r in aperte_altri})
+        fasi.append({
+            'id': p.pk, 'nome': p.nome, 'sigla': p.sigla or p.codice[:3].upper(),
+            'mia': p.pk in mie, 'stato': stato, 'chi': ', '.join(chi), '_ordine': p.ordine,
+        })
+    # Prima le sue, poi quelle che vengono dopo la sua nella linea (a chi
+    # aspira serve plastiche e vetri, non il prelavaggio), poi le precedenti.
+    sua = min((p.ordine for p in postazioni if p.pk in mie), default=0)
+    fasi.sort(key=lambda f: (not f['mia'], f['_ordine'] < sua))
+    for f in fasi:
+        del f['_ordine']
+    return fasi
+
+
 def _json_ok(data=None, **kwargs):
     return JsonResponse({'ok': True, **(data or {}), **kwargs})
 
@@ -490,6 +542,7 @@ def api_ordine_dettaglio(request, ordine_id):
         },
         'lavorazione': lavorazione,
         'lavorazioni_attive': lavorazioni_attive,
+        'fasi_avviabili': _fasi_ordine(sessione, ordine) if sessione else [],
         'fasi_completate': fasi_completate,
         'segnalazioni': segnalazioni,
     })
@@ -523,14 +576,31 @@ def api_inizia_lavoro(request, ordine_id):
     if not post_turno:
         return _json_err('Nessuna postazione assegnata al turno.')
 
-    # Crea una LavorazioneOperatore per OGNI blocco/postazione del turno
-    # (se l'operatore ha scelto 3 blocchi, crea 3 lavorazioni)
+    try:
+        scelta = json.loads(request.body or b'{}').get('postazione')
+    except (ValueError, AttributeError):
+        scelta = None
+    if scelta:
+        # L'operatore ha scelto la fase: anche una postazione fuori dal suo turno.
+        postazioni, _ = _postazioni_scelta(sessione)
+        postazione = next((p for p in postazioni if str(p.pk) == str(scelta)), None)
+        if not postazione:
+            return _json_err('Fase non disponibile.')
+        blocchi = [pt.blocco for pt in post_turno if pt.postazione_cq_id == postazione.pk]
+        if not blocchi or blocchi == [None]:
+            blocchi = list(postazione.blocchi.all()) or [None]
+        fasi = [(postazione, b) for b in blocchi]
+    else:
+        # Pagine vecchie senza scelta: tutte le postazioni del turno insieme.
+        fasi = [(pt.postazione_cq, pt.blocco) for pt in post_turno]
+
+    # Una LavorazioneOperatore per ogni blocco/postazione della fase
     lavorazioni_create = []
-    for pt in post_turno:
+    for postazione_cq, blocco in fasi:
         # Evita duplicati: non creare se esiste gia una lavorazione non completata
         existing = LavorazioneOperatore.objects.filter(
             sessione=sessione, ordine=ordine,
-            postazione_cq=pt.postazione_cq, blocco=pt.blocco,
+            postazione_cq=postazione_cq, blocco=blocco,
         ).exclude(stato='completato').first()
         if existing:
             lavorazioni_create.append(existing)
@@ -541,7 +611,7 @@ def api_inizia_lavoro(request, ordine_id):
         # crearne un'altra; il tempo da chiusa conta come pausa.
         chiusa = LavorazioneOperatore.objects.filter(
             sessione=sessione, ordine=ordine,
-            postazione_cq=pt.postazione_cq, blocco=pt.blocco, stato='completato',
+            postazione_cq=postazione_cq, blocco=blocco, stato='completato',
         ).order_by('-fine').first()
         if chiusa:
             chiusa.riapri()
@@ -551,16 +621,16 @@ def api_inizia_lavoro(request, ordine_id):
         lav = LavorazioneOperatore.objects.create(
             sessione=sessione,
             ordine=ordine,
-            postazione_cq=pt.postazione_cq,
-            blocco=pt.blocco,
+            postazione_cq=postazione_cq,
+            blocco=blocco,
         )
         lavorazioni_create.append(lav)
 
         # CQ integration: auto-crea OperatorePostazioneTurno per ogni blocco
         OperatorePostazioneTurno.objects.get_or_create(
             ordine=ordine,
-            postazione=pt.postazione_cq.codice,
-            blocco_codice=pt.blocco.codice if pt.blocco else '',
+            postazione=postazione_cq.codice,
+            blocco_codice=blocco.codice if blocco else '',
             operatore=request.user,
         )
 
