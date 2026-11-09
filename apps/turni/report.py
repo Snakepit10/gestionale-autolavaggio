@@ -23,6 +23,10 @@ MIN_FASI_MEDIANA = 5
 
 LIMITE_ORDINI = 100
 
+# Due fasi dello stesso operatore, ordine e postazione con meno di questo
+# stacco sono una fase sola (chiusa e riavviata subito).
+STACCO_MAX = timedelta(minutes=2)
+
 
 def _data(testo):
     try:
@@ -84,8 +88,8 @@ def unisci_blocchi(lavorazioni, adesso=None):
     turno, con gli stessi orari: e' lo stesso lavoro della stessa persona.
     Le righe della stessa sessione, ordine e postazione con orari
     sovrapposti diventano una fase sola, con il tempo della piu' lunga.
-    Righe che non si sovrappongono (la postazione rifatta piu' tardi)
-    restano fasi separate.
+    Fasi chiuse e riavviate entro STACCO_MAX si uniscono anche loro; la
+    postazione rifatta piu' tardi resta una fase separata.
     """
     adesso = adesso or timezone.now()
     righe = sorted(lavorazioni, key=lambda l: (l.sessione_id, l.ordine_id, l.postazione_cq_id, l.inizio))
@@ -118,12 +122,30 @@ def unisci_blocchi(lavorazioni, adesso=None):
             'pausa': lav.tempo_pausa_totale.total_seconds() / 60,
             'blocchi': [lav.blocco.nome] if lav.blocco else [],
         })
+    # Fasi chiuse e riavviate subito (un "Fine" premuto troppo presto):
+    # con meno di STACCO_MAX fra una e l'altra sono la stessa fase; i minuti
+    # netti si sommano e lo stacco conta come pausa.
+    unite = []
     for f in fasi:
+        prima = unite[-1] if unite else None
+        if prima and prima['chiave'] == f['chiave'] and f['inizio'] - prima['fine_gruppo'] <= STACCO_MAX:
+            stacco = (f['inizio'] - prima['fine_gruppo']).total_seconds() / 60
+            prima['minuti'] += f['minuti']
+            prima['pausa'] += f['pausa'] + stacco
+            prima['fine_gruppo'] = f['fine_gruppo']
+            prima['fine'] = f['fine']
+            prima['in_corso'] = prima['in_corso'] or f['in_corso']
+            prima['blocchi'] += [b for b in f['blocchi'] if b not in prima['blocchi']]
+            prima['riprese'] += 1
+            continue
+        f['riprese'] = 0
+        unite.append(f)
+    for f in unite:
         if f['in_corso']:
             f['fine'] = None
             f['stato'] = 'In corso'
-    fasi.sort(key=lambda f: f['inizio'])
-    return fasi
+    unite.sort(key=lambda f: f['inizio'])
+    return unite
 
 
 def report(dal, al, operatore_id=None, postazione_id=None):

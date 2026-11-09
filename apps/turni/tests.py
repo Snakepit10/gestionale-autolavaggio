@@ -118,3 +118,37 @@ class ReportTest(TestCase):
         self.assertAlmostEqual(d['ordini'][0]['minuti'], 10 + 6 + 2 / 60 + 3)
         dettaglio = rep.dettaglio_ordine(ordine)
         self.assertEqual([f['blocco'] for f in dettaglio['fasi']], ['', 'Interni, Bauliera', 'Interni'])
+
+    def test_fase_ripresa_entro_due_minuti(self):
+        ordine = self._ordine((self.asciugatura, 6))
+        t = self.inizio + timedelta(minutes=6, seconds=30)
+        # Dati gia' registrati: chiusa e riavviata dopo 30 secondi, e poi
+        # ancora dopo 5 minuti (questa resta separata).
+        for da, a in ((0, 6), (6.5, 17.5), (22.5, 25.5)):
+            LavorazioneOperatore.objects.create(
+                sessione=self.sessione, ordine=ordine, postazione_cq=self.prelavaggio,
+                inizio=t + timedelta(minutes=da), fine=t + timedelta(minutes=a), stato='completato')
+        fasi = rep.dettaglio_ordine(ordine)['fasi']
+        # asciugatura 6; prelavaggio 6 + 11 ripresa dopo 30 secondi; prelavaggio 3
+        self.assertEqual([round(f['minuti'], 1) for f in fasi], [6, 17, 3])
+        self.assertEqual([f['riprese'] for f in fasi], [0, 1, 0])
+        self.assertAlmostEqual(fasi[1]['pausa'], 0.5)
+
+    def test_riavviare_una_postazione_chiusa_la_riapre(self):
+        from apps.turni.models import PostazioneTurno
+        from apps.turni.views import api_inizia_lavoro
+        SessioneTurno.objects.filter(pk=self.sessione.pk).update(stato='attivo')
+        PostazioneTurno.objects.create(sessione=self.sessione, postazione_cq=self.prelavaggio)
+        ordine = Ordine.objects.create(totale=Decimal('20'), totale_finale=Decimal('20'))
+        chiusa = LavorazioneOperatore.objects.create(
+            sessione=self.sessione, ordine=ordine, postazione_cq=self.prelavaggio,
+            inizio=timezone.now() - timedelta(minutes=10), stato='completato',
+            fine=timezone.now() - timedelta(minutes=1))
+        req = RequestFactory().post('/')
+        req.user = self.mario
+        self.assertEqual(api_inizia_lavoro(req, ordine.pk).status_code, 200)
+        self.assertEqual(LavorazioneOperatore.objects.filter(ordine=ordine).count(), 1)
+        chiusa.refresh_from_db()
+        self.assertEqual((chiusa.stato, chiusa.fine), ('in_lavorazione', None))
+        self.assertAlmostEqual(chiusa.tempo_pausa_totale.total_seconds(), 60, delta=5)
+        self.assertAlmostEqual(chiusa.tempo_lavoro_netto_minuti, 9, delta=0.1)

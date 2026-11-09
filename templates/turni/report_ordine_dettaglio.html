@@ -78,13 +78,13 @@
     <div class="col-12">
       <div class="panel h-100">
         <div class="panel-title"><i class="bi bi-bar-chart-steps"></i> Linea del tempo</div>
-        <div class="panel-sub">Ogni barra va dall'avvio alla chiusura della fase (pause comprese); il numero sono i minuti netti.{% if aperte %} A righe gialle le fasi ancora aperte.{% endif %}</div>
+        <div class="panel-sub">Ogni barra va dall'avvio alla chiusura della fase (pause comprese); il numero sono i minuti netti. Una fase chiusa e ripresa entro 2 minuti &egrave; una fase sola: lo stacco conta come pausa.{% if aperte %} A righe gialle le fasi ancora aperte.{% endif %}</div>
         <div class="panel-body">
           {% if fasi %}
           <div class="linea">
             {% for f in fasi %}
             <div class="riga">
-              <div class="nome"><span class="sigla">{{ f.sigla }}</span>{{ f.postazione }}<div class="chi">{{ f.operatore }}{% if f.blocco %} &middot; {{ f.blocco }}{% endif %}</div></div>
+              <div class="nome"><span class="sigla">{{ f.sigla }}</span>{{ f.postazione }}<div class="chi">{{ f.operatore }}{% if f.blocco %} &middot; {{ f.blocco }}{% endif %}{% if f.riprese %} &middot; <span class="text-warning-emphasis">chiusa e ripresa</span>{% endif %}</div></div>
               <div class="pista">
                 <div class="tratto {% if f.in_corso %}in-corso{% endif %}" style="left: {{ f.sinistra|stringformat:'s' }}%; width: {{ f.larghezza|stringformat:'s' }}%;" title="{{ f.inizio|date:'H:i' }}–{% if f.fine %}{{ f.fine|date:'H:i' }}{% else %}in corso{% endif %}">{{ f.minuti|durata }}</div>
               </div>

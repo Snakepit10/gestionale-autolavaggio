@@ -372,6 +372,15 @@ class LavorazioneOperatore(models.Model):
             self.stato = 'in_lavorazione'
             self.save(update_fields=['stato', 'pausa_inizio', 'tempo_pausa_totale'])
 
+    def riapri(self):
+        """Riapre una fase chiusa: il tempo passato da chiusa conta come pausa."""
+        if self.stato == 'completato' and self.fine:
+            adesso = timezone.now()
+            self.tempo_pausa_totale += max(adesso - self.fine, timedelta(0))
+            self.fine = None
+            self.stato = 'in_lavorazione'
+            self.save(update_fields=['stato', 'fine', 'tempo_pausa_totale'])
+
     def completa(self):
         if self.stato == 'in_pausa':
             self.riprendi()

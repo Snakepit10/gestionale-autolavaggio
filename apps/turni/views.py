@@ -534,6 +534,18 @@ def api_inizia_lavoro(request, ordine_id):
             lavorazioni_create.append(existing)
             continue
 
+        # Postazione gia' chiusa da lui su quest'ordine nello stesso turno
+        # (un "Fine" premuto troppo presto): riapre quella fase invece di
+        # crearne un'altra; il tempo da chiusa conta come pausa.
+        chiusa = LavorazioneOperatore.objects.filter(
+            sessione=sessione, ordine=ordine,
+            postazione_cq=pt.postazione_cq, blocco=pt.blocco, stato='completato',
+        ).order_by('-fine').first()
+        if chiusa:
+            chiusa.riapri()
+            lavorazioni_create.append(chiusa)
+            continue
+
         lav = LavorazioneOperatore.objects.create(
             sessione=sessione,
             ordine=ordine,
