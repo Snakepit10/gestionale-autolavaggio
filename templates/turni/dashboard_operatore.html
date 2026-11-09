@@ -665,8 +665,8 @@ function prezzoOrdine(ordine) {
   return `<span class="prezzo-ordine">&euro;${euro}</span>`;
 }
 
-/* Un pulsante per fase: prima quelle del turno, poi "Altra fase" con le
-   altre ancora da fare (chi aspira puo' fare anche plastiche e vetri). */
+/* Un pulsante per fase, tutti visibili: in grande quelle del turno, sotto
+   le altre ancora da fare (chi aspira puo' fare anche plastiche e vetri). */
 function pulsantiFasi(fasi) {
   if (!fasi.length) return '<div class="text-muted">Tutte le fasi sono fatte.</div>';
   const pulsante = (f, grande) => {
@@ -683,9 +683,7 @@ function pulsantiFasi(fasi) {
   let html = `<div class="d-flex flex-wrap justify-content-center gap-2">${mie.map(f => pulsante(f, true)).join('')}</div>`;
   if (altre.length) {
     const altreHtml = `<div class="d-flex flex-wrap justify-content-center gap-2 mt-2">${altre.map(f => pulsante(f, !mie.length && f.stato !== 'fatta_da_me')).join('')}</div>`;
-    html += mie.length
-      ? `<button type="button" class="btn btn-link btn-sm mt-2" data-bs-toggle="collapse" data-bs-target="#altreFasi"><i class="bi bi-chevron-down"></i> Altra fase</button><div id="altreFasi" class="collapse">${altreHtml}</div>`
-      : `<div class="small text-muted mt-1">Scegli la fase da fare:</div>${altreHtml}`;
+    html += `<div class="small text-muted mt-2">${mie.length ? 'Altre fasi:' : 'Scegli la fase da fare:'}</div>${altreHtml}`;
   }
   return html;
 }
