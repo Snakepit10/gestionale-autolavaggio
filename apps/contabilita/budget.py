@@ -42,6 +42,9 @@ COSTI = ('consumi_lavaggio', 'persone_giorno', 'ore_giornata', 'costo_orario', '
 LEVE_PER_GIORNO = [c for c in LEVE if c not in ('giorni_aperti', 'altri_fissi')]
 DECIMALI = {'giorni_aperti': 0, 'auto_giorno': 2, 'prezzo_principale': 2, 'pct_extra': 1, 'valore_extra': 2,
             'consumi_lavaggio': 2, 'persone_giorno': 2, 'ore_giornata': 2, 'costo_orario': 2, 'altri_fissi': 0}
+# nel simulatore qualche decimale in piu': arrotondando persone e ore il risultato di partenza si sposta di centinaia di euro
+DECIMALI_SIMULATORE = {**DECIMALI, 'auto_giorno': 3, 'prezzo_principale': 3, 'pct_extra': 2, 'valore_extra': 3,
+                       'consumi_lavaggio': 3, 'persone_giorno': 4, 'ore_giornata': 4, 'costo_orario': 3}
 
 RIGHE_PONTE = [
     ('giorni', 'Giorni di apertura'),
@@ -153,8 +156,8 @@ def ponte(a, b):
     }
 
 
-def arrotonda(g):
-    return {c: g[c].quantize(Decimal(1).scaleb(-DECIMALI[c])) for c in LEVE}
+def arrotonda(g, decimali=DECIMALI):
+    return {c: g[c].quantize(Decimal(1).scaleb(-decimali[c])) for c in LEVE}
 
 
 def valore_delle_leve(g, margine_obiettivo):
@@ -390,7 +393,7 @@ def budget_e_scostamenti(mesi, anno, base):
     effettivo_periodo = grandezze(somma_kpi([kpi_mese(m, base) for m in mesi]))
     simulatore = None
     if completo(effettivo_periodo):
-        leve = arrotonda(effettivo_periodo)
+        leve = arrotonda(effettivo_periodo, DECIMALI_SIMULATORE)
         simulatore = {
             'leve': [{'campo': c, 'nome': nome, 'valore': leve[c], 'decimali': DECIMALI[c],
                       'per_giorno': c in LEVE_PER_GIORNO} for c, nome in BudgetServito.CAMPI],

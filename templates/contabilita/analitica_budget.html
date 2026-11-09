@@ -245,7 +245,7 @@
   function fmt(v, tipo) {
     if (v === null || !isFinite(v)) return '—';
     var dec = {euro: 0, euro2: 2, uno: 1, due: 2, intero: 0, pct: 1}[tipo];
-    var s = Math.abs(v).toLocaleString('it-IT', {minimumFractionDigits: dec, maximumFractionDigits: dec});
+    var s = Math.abs(v).toLocaleString('it-IT', {minimumFractionDigits: dec, maximumFractionDigits: dec, useGrouping: 'always'});
     var segno = v < 0 ? '−' : '';
     if (tipo === 'euro' || tipo === 'euro2') return segno + '€' + s;
     return segno + s + (tipo === 'pct' ? '%' : '');
