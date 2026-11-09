@@ -150,6 +150,8 @@ html, body { overflow: hidden !important; height: 100%; background: #fff; }
     animation: ordine-active-pulse-green 1.8s ease-in-out infinite;
 }
 .completata-meta { font-size: .72rem; color: #6b7280; }
+.prezzo-ordine { display: inline-block; font-weight: 800; font-size: .85rem; color: #065f46; background: #d1fae5; border-radius: 6px; padding: 1px 7px; font-variant-numeric: tabular-nums; }
+.prezzo-ordine.abbonamento { color: #3730a3; background: #e0e7ff; font-weight: 700; font-size: .75rem; }
 @keyframes ordine-active-pulse-green {
     0%, 100% { box-shadow: 0 0 0 0 rgba(16, 185, 129, .6); }
     50% { box-shadow: 0 0 0 8px rgba(16, 185, 129, 0); }
@@ -418,6 +420,7 @@ html, body { overflow: hidden !important; height: 100%; background: #fff; }
               <div class="flex-grow-1 me-2">
                 <div class="d-flex align-items-center gap-2 flex-wrap">
                   <strong class="text-primary fs-6">#{{ entry.ordine.numero_progressivo|slice:"-4:" }}</strong>
+                  {% include "turni/_prezzo_ordine.html" with o=entry.ordine %}
                   {% if entry.ordine.cliente %}
                     <span class="fw-semibold">{{ entry.ordine.cliente }}</span>
                   {% else %}
@@ -494,6 +497,7 @@ html, body { overflow: hidden !important; height: 100%; background: #fff; }
                 <div class="flex-grow-1 me-2">
                   <div class="d-flex align-items-center gap-2 flex-wrap">
                     <strong class="text-success fs-6">#{{ lav.ordine.numero_progressivo|slice:"-4:" }}</strong>
+                    {% include "turni/_prezzo_ordine.html" with o=lav.ordine %}
                     {% if lav.ordine.cliente %}
                       <span class="fw-semibold">{{ lav.ordine.cliente }}</span>
                     {% else %}
@@ -653,6 +657,12 @@ if (currentOrdineId) showDetailMobile();
 const SUPPLEMENTI = {{ supplementi_json|safe }};
 const ZONE_DIFETTI = {{ zone_difetti_json|safe }};
 
+function prezzoOrdine(ordine) {
+  if (ordine.abbonamento) return '<span class="prezzo-ordine abbonamento"><i class="bi bi-card-checklist"></i> Abbonamento</span>';
+  const euro = Number(ordine.totale).toLocaleString('it-IT', {minimumFractionDigits: 2, maximumFractionDigits: 2});
+  return `<span class="prezzo-ordine">&euro;${euro}</span>`;
+}
+
 function renderAreaOperativa(ordine, lavorazione, lavorazioniAttive, fasiCompletate, segnalazioni) {
   const area = document.getElementById('areaOperativa');
   currentLavIds = lavorazioniAttive.map(l => l.id);
@@ -764,7 +774,7 @@ function renderAreaOperativa(ordine, lavorazione, lavorazioniAttive, fasiComplet
   area.innerHTML = `
     <div class="card mb-3">
       <div class="card-header py-2 bg-dark text-white d-flex justify-content-between align-items-center">
-        <span><i class="bi bi-stopwatch"></i> Lavorazione &mdash; #${ordine.numero}</span>
+        <span><i class="bi bi-stopwatch"></i> Lavorazione &mdash; #${ordine.numero} ${prezzoOrdine(ordine)}</span>
         <span class="badge bg-light text-dark">${ordine.stato}</span>
       </div>
       <div class="card-body text-center py-3">

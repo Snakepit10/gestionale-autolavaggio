@@ -177,3 +177,37 @@ class ReportTest(TestCase):
 
         html = self.apri(reverse('turni:report_ordine_dettaglio', args=[vero.pk]))
         self.assertIn("Elimina i tempi di quest'ordine", html)
+
+    def test_ordini_in_lavorazione(self):
+        ordine = self._ordine((self.prelavaggio, 10))
+        adesso = timezone.now()
+        LavorazioneOperatore.objects.create(
+            sessione=self.sessione, ordine=ordine, postazione_cq=self.asciugatura,
+            inizio=adesso - timedelta(minutes=8), stato='in_pausa',
+            pausa_inizio=adesso - timedelta(minutes=3), tempo_pausa_totale=timedelta(minutes=1))
+        self._ordine((self.prelavaggio, 5))  # chiuso: non e' in lavorazione
+        attivi = rep.in_lavorazione()
+        self.assertEqual([o['ordine'] for o in attivi], [ordine])
+        aperta = attivi[0]['aperte'][0]
+        # 8 minuti trascorsi - 1 di pausa passata - 3 della pausa in corso
+        self.assertAlmostEqual(aperta['minuti'], 4, delta=0.1)
+        self.assertEqual((aperta['stato'], aperta['in_pausa']), ('In pausa', True))
+        self.assertAlmostEqual(attivi[0]['minuti'], 14, delta=0.1)
+        oggi = timezone.localdate()
+        d = rep.report(oggi, oggi)
+        self.assertEqual((d['in_corso'], d['in_pausa']), (1, 1))
+        html = self.apri(reverse('turni:report_lavorazioni') + '?periodo=oggi')
+        self.assertIn('In lavorazione adesso', html)
+
+    def test_prezzo_nella_dashboard_operatore(self):
+        from django.template.loader import render_to_string
+        from apps.turni.views import api_ordine_dettaglio
+        ordine = Ordine.objects.create(totale=Decimal('18'), totale_finale=Decimal('15.50'))
+        self.assertIn('15,50', render_to_string('turni/_prezzo_ordine.html', {'o': ordine}))
+        accesso = Ordine.objects.create(totale=0, totale_finale=0, origine='abbonamento')
+        self.assertIn('Abbonamento', render_to_string('turni/_prezzo_ordine.html', {'o': accesso}))
+        req = RequestFactory().get('/')
+        req.user = self.mario
+        import json
+        dati = json.loads(api_ordine_dettaglio(req, ordine.pk).content)['ordine']
+        self.assertEqual((dati['totale'], dati['abbonamento']), ('15.50', False))

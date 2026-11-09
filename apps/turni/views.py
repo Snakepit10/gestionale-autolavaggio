@@ -481,6 +481,8 @@ def api_ordine_dettaglio(request, ordine_id):
             'tipo_auto': ordine.tipo_auto or '',
             'nota': ordine.nota or '',
             'stato': ordine.stato,
+            'totale': str(ordine.totale_finale),
+            'abbonamento': ordine.origine == 'abbonamento' and not ordine.totale_finale,
             'tipo_consegna': ordine.tipo_consegna or '',
             'ora_consegna': ordine.ora_consegna_richiesta.strftime('%H:%M') if ordine.ora_consegna_richiesta else '',
             'items': items,

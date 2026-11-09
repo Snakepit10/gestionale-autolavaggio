@@ -103,6 +103,7 @@ def unisci_blocchi(lavorazioni, adesso=None):
             ultima['minuti'] = max(ultima['minuti'], lav.tempo_lavoro_netto_minuti)
             ultima['pausa'] = max(ultima['pausa'], lav.tempo_pausa_totale.total_seconds() / 60)
             ultima['in_corso'] = ultima['in_corso'] or lav.stato != 'completato'
+            ultima['in_pausa'] = ultima['in_pausa'] or lav.stato == 'in_pausa'
             if lav.fine and ultima['fine'] and lav.fine > ultima['fine']:
                 ultima['fine'] = lav.fine
             if lav.blocco:
@@ -118,6 +119,7 @@ def unisci_blocchi(lavorazioni, adesso=None):
             'fine': lav.fine,
             'fine_gruppo': fine,
             'in_corso': lav.stato != 'completato',
+            'in_pausa': lav.stato == 'in_pausa',
             'stato': lav.get_stato_display(),
             'minuti': lav.tempo_lavoro_netto_minuti,
             'pausa': lav.tempo_pausa_totale.total_seconds() / 60,
@@ -137,6 +139,7 @@ def unisci_blocchi(lavorazioni, adesso=None):
             prima['fine_gruppo'] = f['fine_gruppo']
             prima['fine'] = f['fine']
             prima['in_corso'] = prima['in_corso'] or f['in_corso']
+            prima['in_pausa'] = prima['in_pausa'] or f['in_pausa']
             prima['blocchi'] += [b for b in f['blocchi'] if b not in prima['blocchi']]
             prima['riprese'] += 1
             prima['ids'] += f['ids']
@@ -146,7 +149,7 @@ def unisci_blocchi(lavorazioni, adesso=None):
     for f in unite:
         if f['in_corso']:
             f['fine'] = None
-            f['stato'] = 'In corso'
+            f['stato'] = 'In pausa' if f['in_pausa'] else 'In corso'
     unite.sort(key=lambda f: f['inizio'])
     return unite
 
@@ -238,7 +241,8 @@ def report(dal, al, operatore_id=None, postazione_id=None):
         o['operatori'] = ', '.join(sorted(o['operatori']))
     totali = [o['minuti'] for o in ordini]
 
-    in_corso = LavorazioneOperatore.objects.exclude(stato='completato')
+    attivi = in_lavorazione()
+    aperte = [f for o in attivi for f in o['fasi'] if f['in_corso']]
 
     return {
         'n_ordini': len(ordini),
@@ -248,13 +252,44 @@ def report(dal, al, operatore_id=None, postazione_id=None):
         'ore': ore_totali,
         'ore_pausa': sum(f['pausa'] for f in fasi) / 60,
         'fuori_scala': sum(1 for f in fasi if f['fuori_scala']),
-        'in_corso': in_corso.count(),
-        'in_pausa': in_corso.filter(stato='in_pausa').count(),
+        'in_corso': len(aperte),
+        'in_pausa': sum(1 for f in aperte if f['in_pausa']),
+        'in_lavorazione': attivi,
         'postazioni': postazioni,
         'operatori': operatori,
         'ordini': ordini[:LIMITE_ORDINI],
         'ordini_nascosti': max(0, len(ordini) - LIMITE_ORDINI),
     }
+
+
+def in_lavorazione():
+    """Ordini con almeno una fase aperta adesso, con tutte le loro fasi.
+
+    I minuti delle fasi aperte arrivano fino a questo momento.
+    """
+    adesso = timezone.now()
+    ordini_ids = (LavorazioneOperatore.objects.exclude(stato='completato')
+                  .values_list('ordine_id', flat=True).distinct())
+    righe = LavorazioneOperatore.objects.filter(ordine_id__in=list(ordini_ids)).select_related(
+        'sessione__operatore', 'ordine', 'postazione_cq', 'blocco')
+    per_ordine = {}
+    for f in unisci_blocchi(righe, adesso):
+        d = per_ordine.setdefault(f['lav'].ordine_id, {'ordine': f['lav'].ordine, 'fasi': []})
+        d['fasi'].append(f)
+    ordini = []
+    for d in per_ordine.values():
+        fasi = d['fasi']
+        inizio = min(f['inizio'] for f in fasi)
+        d.update({
+            'inizio': inizio,
+            'trascorsi': (adesso - inizio).total_seconds() / 60,
+            'minuti': sum(f['minuti'] for f in fasi),
+            'aperte': [f for f in fasi if f['in_corso']],
+            'operatori': ', '.join(sorted({f['operatore'] for f in fasi if f['in_corso']})),
+        })
+        ordini.append(d)
+    ordini.sort(key=lambda o: o['inizio'])
+    return ordini
 
 
 def dettaglio_ordine(ordine):

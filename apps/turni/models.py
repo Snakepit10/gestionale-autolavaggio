@@ -349,9 +349,13 @@ class LavorazioneOperatore(models.Model):
     @property
     def tempo_lavoro_netto(self):
         """Tempo netto di lavorazione escludendo le pause."""
-        fine = self.fine or timezone.now()
+        adesso = timezone.now()
+        fine = self.fine or adesso
         durata_totale = fine - self.inizio
-        return durata_totale - self.tempo_pausa_totale
+        pausa = self.tempo_pausa_totale
+        if self.stato == 'in_pausa' and self.pausa_inizio:
+            pausa += adesso - self.pausa_inizio  # la pausa in corso
+        return durata_totale - pausa
 
     @property
     def tempo_lavoro_netto_minuti(self):

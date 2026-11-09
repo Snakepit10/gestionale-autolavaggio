@@ -20,6 +20,8 @@
 .chip b { color: #075985; }
 .chip.fuori { border-color: #fdba74; background: #fff7ed; }
 .chip.fuori b { color: #c2410c; }
+.chip.aperta { border-color: #f59e0b; background: repeating-linear-gradient(45deg, #fef3c7, #fef3c7 6px, #fde68a 6px, #fde68a 12px); }
+.chip.aperta b { color: #92400e; }
 .fuori-scala { color: #c2410c; font-weight: 700; }
 .riga-ordine { cursor: pointer; }
 .col-sel { width: 28px; }
@@ -119,6 +121,46 @@
       </div>
     </div>
   </div>
+
+  {# In lavorazione adesso #}
+  {% if in_lavorazione %}
+  <div class="panel">
+    <div class="panel-title">
+      <i class="bi bi-play-circle"></i> In lavorazione adesso
+      <span class="badge rounded-pill bg-warning text-dark">{{ in_lavorazione|length }}</span>
+      <a href="{{ request.get_full_path }}" class="ms-auto small text-decoration-none" style="text-transform: none; letter-spacing: 0;"><i class="bi bi-arrow-clockwise"></i> Aggiorna ({% now "H:i" %})</a>
+    </div>
+    <div class="panel-sub">Ordini con almeno una fase aperta, qualunque sia il periodo scelto. A righe gialle le fasi in corso, con i minuti fino a ora; <em>Da</em> &egrave; il tempo dall'avvio della prima fase. Una fase aperta da ore &egrave; quasi sempre dimenticata: va chiusa da chi la sta facendo.</div>
+    <div class="panel-body tabella-scroll">
+      <table class="table table-sm align-middle">
+        <thead><tr>
+          <th>Ordine</th><th class="d-none d-md-table-cell">Cliente / auto</th><th>Fasi</th>
+          <th class="tab-num">Lavoro</th><th class="tab-num">Da</th><th class="d-none d-lg-table-cell">Ci sta lavorando</th>
+        </tr></thead>
+        <tbody>
+          {% for o in in_lavorazione %}
+          <tr class="riga-ordine" data-href="{% url 'turni:report_ordine_dettaglio' o.ordine.pk %}{% if filtri %}?{{ filtri }}{% endif %}">
+            <td class="text-nowrap">
+              <a href="{% url 'turni:report_ordine_dettaglio' o.ordine.pk %}{% if filtri %}?{{ filtri }}{% endif %}" class="fw-bold text-decoration-none">{{ o.ordine.numero_progressivo }}</a>
+              <div class="small text-muted">{{ o.inizio|date:"D d/m H:i" }}</div>
+            </td>
+            <td class="d-none d-md-table-cell">
+              {{ o.ordine.cliente|default:"—" }}
+              {% if o.ordine.tipo_auto %}<div class="small text-muted">{{ o.ordine.tipo_auto }}</div>{% endif %}
+            </td>
+            <td>
+              {% for f in o.fasi %}<span class="chip {% if f.in_corso %}aperta{% endif %}" title="{{ f.postazione.nome }} — {{ f.operatore }}{% if f.in_corso %} — {{ f.stato|lower }}{% endif %}"><b>{{ f.postazione.sigla|default:f.postazione.nome }}</b>{% if f.in_pausa %}<i class="bi bi-pause-fill"></i>{% endif %}{{ f.minuti|durata }}</span>{% endfor %}
+            </td>
+            <td class="tab-num fw-bold">{{ o.minuti|durata }}</td>
+            <td class="tab-num {% if o.trascorsi > 180 %}fuori-scala{% endif %}">{{ o.trascorsi|durata }}</td>
+            <td class="d-none d-lg-table-cell small">{{ o.operatori }}</td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+  {% endif %}
 
   {% if not n_fasi %}
   <div class="panel">

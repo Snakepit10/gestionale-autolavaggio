@@ -1,0 +1,1 @@
+{% if o.origine == 'abbonamento' and not o.totale_finale %}<span class="prezzo-ordine abbonamento"><i class="bi bi-card-checklist"></i> Abbonamento</span>{% else %}<span class="prezzo-ordine">&euro;{{ o.totale_finale|floatformat:2 }}</span>{% endif %}
