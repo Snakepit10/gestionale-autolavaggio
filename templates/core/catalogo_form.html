@@ -126,6 +126,14 @@
                                 </label>
                             </div>
                         </div>
+                        <div class="col-md-6 mt-2">
+                            <div class="form-check form-switch">
+                                {{ form.is_supplemento }}
+                                <label class="form-check-label" for="{{ form.is_supplemento.id_for_label }}">
+                                    Supplemento (lo aggiungono gli operatori da Il mio turno)
+                                </label>
+                            </div>
+                        </div>
                         <div class="col-md-4 mt-3">
                             {{ form.ordine_visualizzazione|as_crispy_field }}
                             <small class="form-text text-muted d-block mt-1">

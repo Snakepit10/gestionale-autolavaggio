@@ -55,3 +55,22 @@ class SottocategorieTest(TestCase):
         form = ServizioProdottoForm()
         self.assertEqual(form.fields['gruppo'].label, 'Sottocategoria')
         self.assertEqual(form.sottocategorie_esistenti, ['Panni', 'Profumi'])
+
+    def test_la_pagina_di_modifica_mostra_tutti_i_campi_salvati(self):
+        # Un campo del form che la pagina non mostra viene salvato vuoto a
+        # ogni modifica: cosi' cambiare il prezzo toglieva "supplemento" e
+        # il supplemento spariva dalla dashboard degli operatori.
+        from django.contrib.messages.storage.fallback import FallbackStorage
+        from apps.core.forms import ServizioProdottoForm
+        from apps.core.models import Postazione
+        from apps.core.views import CatalogoUpdateView
+        Postazione.objects.create(nome='Postazione prova')  # le caselle compaiono solo con delle scelte
+        servizio = ServizioProdotto.objects.create(
+            titolo='Supplemento prova', categoria=self.altra, prezzo=Decimal('10'), descrizione='',
+            tipo='servizio', is_supplemento=True)
+        req = RequestFactory().get('/')
+        req.user, req.session = self.user, {}
+        req._messages = FallbackStorage(req)
+        html = CatalogoUpdateView.as_view()(req, pk=servizio.pk).rendered_content
+        for campo in ServizioProdottoForm.Meta.fields:
+            self.assertIn(f'name="{campo}"', html, campo)
