@@ -1,149 +1,259 @@
 {% extends "base.html" %}
-{% block title %}Report Tempi Lavorazione{% endblock %}
+{% load report_turni %}
+{% block title %}Tempi di lavorazione{% endblock %}
+
+{% block extra_css %}{% include "personale/_stile.html" %}
+<style>
+.filtri { display: flex; flex-wrap: wrap; gap: 10px 16px; align-items: flex-end; }
+.filtri .gruppo label { display: block; font-size: .64rem; text-transform: uppercase; letter-spacing: .4px; color: #64748b; font-weight: 700; margin-bottom: 2px; }
+.filtri .periodi { display: flex; flex-wrap: wrap; gap: 4px; }
+.filtri .periodi a { font-size: .78rem; padding: 4px 10px; border-radius: 999px; background: #f1f5f9; color: #334155; text-decoration: none; font-weight: 600; }
+.filtri .periodi a.attivo { background: #0f766e; color: #fff; }
+.filtri input[type=date] { width: 140px; }
+.filtri select { min-width: 150px; }
+.intervallo { font-size: .78rem; color: #64748b; }
+.barra-cella { position: relative; min-width: 110px; }
+.barra-cella .barra { position: absolute; left: 0; top: 50%; transform: translateY(-50%); height: 18px; background: #ccfbf1; border-radius: 4px; z-index: 0; }
+.barra-cella span { position: relative; z-index: 1; font-weight: 700; }
+.sigla { display: inline-block; min-width: 26px; text-align: center; font-size: .66rem; font-weight: 800; background: #e0f2fe; color: #075985; border-radius: 4px; padding: 1px 4px; margin-right: 6px; }
+.chip { display: inline-flex; align-items: center; gap: 4px; font-size: .72rem; border: 1px solid #e2e8f0; border-radius: 6px; padding: 1px 6px; margin: 1px 2px 1px 0; background: #fff; white-space: nowrap; }
+.chip b { color: #075985; }
+.chip.fuori { border-color: #fdba74; background: #fff7ed; }
+.chip.fuori b { color: #c2410c; }
+.fuori-scala { color: #c2410c; font-weight: 700; }
+.riga-ordine { cursor: pointer; }
+.riga-ordine:hover td { background: #f8fafc; }
+.vuoto { text-align: center; padding: 36px 16px; color: #64748b; }
+.vuoto i { font-size: 2rem; color: #94a3b8; }
+.kpi-tile.hero .sub { opacity: .85; }
+</style>
+{% endblock %}
 
 {% block content %}
-<div class="d-flex justify-content-between align-items-center mb-3">
-  <h5 class="mb-0"><i class="bi bi-graph-up"></i> Report Tempi di Lavorazione</h5>
-  <div class="btn-group btn-group-sm">
-    <a href="?periodo=settimana" class="btn btn-outline-primary {% if periodo == 'settimana' %}active{% endif %}">Settimana</a>
-    <a href="?periodo=mese" class="btn btn-outline-primary {% if periodo == 'mese' %}active{% endif %}">Mese</a>
-    <a href="?periodo=trimestre" class="btn btn-outline-primary {% if periodo == 'trimestre' %}active{% endif %}">Trimestre</a>
-  </div>
-</div>
-
-{# Riepilogo #}
-<div class="row g-3 mb-4">
-  <div class="col-md-3">
-    <div class="card text-center">
-      <div class="card-body py-3">
-        <div class="fs-3 fw-bold text-primary">{{ totale_ordini }}</div>
-        <div class="text-muted small">Ordini lavorati</div>
-      </div>
-    </div>
-  </div>
-  <div class="col-md-3">
-    <div class="card text-center">
-      <div class="card-body py-3">
-        <div class="fs-3 fw-bold text-success">{{ totale_lavorazioni }}</div>
-        <div class="text-muted small">Fasi completate</div>
-      </div>
-    </div>
-  </div>
-  <div class="col-md-3">
-    <div class="card text-center">
-      <div class="card-body py-3">
-        <div class="fs-3 fw-bold text-info">{{ stats_operatore|length }}</div>
-        <div class="text-muted small">Operatori attivi</div>
-      </div>
-    </div>
-  </div>
-  <div class="col-md-3">
-    <div class="card text-center">
-      <div class="card-body py-3">
-        <div class="fs-3 fw-bold text-warning">{{ stats_postazione|length }}</div>
-        <div class="text-muted small">Postazioni coinvolte</div>
-      </div>
-    </div>
-  </div>
-</div>
-
-<div class="row g-3 mb-4">
-  {# Grafico tempi per postazione #}
-  <div class="col-md-6">
-    <div class="card">
-      <div class="card-header py-2"><i class="bi bi-bar-chart"></i> Tempo medio per postazione (min)</div>
-      <div class="card-body">
-        <canvas id="chartPostazioni" height="200"></canvas>
-      </div>
-    </div>
+<div class="dash-page">
+  <div class="dash-header">
+    <h4><i class="bi bi-stopwatch me-2"></i>Tempi di lavorazione</h4>
+    <span class="intervallo">dal {{ dal|date:"d/m/Y" }} al {{ al|date:"d/m/Y" }}</span>
   </div>
 
-  {# Tabella operatori #}
-  <div class="col-md-6">
-    <div class="card">
-      <div class="card-header py-2"><i class="bi bi-people"></i> Performance Operatori</div>
-      <div class="card-body p-0">
-        <table class="table table-sm table-hover mb-0">
-          <thead class="table-light">
-            <tr><th>Operatore</th><th class="text-center">Ordini</th><th class="text-center">Media (min)</th><th class="text-center">Totale (min)</th></tr>
-          </thead>
-          <tbody>
-            {% for op in stats_operatore %}
-            <tr>
-              <td>{{ op.nome }}</td>
-              <td class="text-center">{{ op.n_ordini }}</td>
-              <td class="text-center">{{ op.tempo_medio }}</td>
-              <td class="text-center">{{ op.tempo_totale }}</td>
-            </tr>
-            {% empty %}
-            <tr><td colspan="4" class="text-muted text-center py-3">Nessun dato</td></tr>
+  {# Filtri #}
+  <div class="panel">
+    <div class="panel-body pt-3">
+      <form method="get" class="filtri" id="filtri">
+        <div class="gruppo">
+          <label>Periodo</label>
+          <div class="periodi">
+            {% for chiave, etichetta in periodi %}
+            <a href="?periodo={{ chiave }}{% if operatore_id %}&operatore={{ operatore_id }}{% endif %}{% if postazione_id %}&postazione={{ postazione_id }}{% endif %}" class="{% if periodo == chiave %}attivo{% endif %}">{{ etichetta }}</a>
             {% endfor %}
-          </tbody>
-        </table>
+          </div>
+        </div>
+        <div class="gruppo">
+          <label for="f-dal">Dal</label>
+          <input type="date" id="f-dal" name="dal" value="{{ dal|date:'Y-m-d' }}" class="form-control form-control-sm">
+        </div>
+        <div class="gruppo">
+          <label for="f-al">Al</label>
+          <input type="date" id="f-al" name="al" value="{{ al|date:'Y-m-d' }}" class="form-control form-control-sm">
+        </div>
+        <div class="gruppo">
+          <label for="f-op">Operatore</label>
+          <select id="f-op" name="operatore" class="form-select form-select-sm">
+            <option value="">Tutti</option>
+            {% for pk, nome in scelta_operatori %}<option value="{{ pk }}" {% if pk == operatore_id %}selected{% endif %}>{{ nome }}</option>{% endfor %}
+          </select>
+        </div>
+        <div class="gruppo">
+          <label for="f-post">Postazione</label>
+          <select id="f-post" name="postazione" class="form-select form-select-sm">
+            <option value="">Tutte</option>
+            {% for p in scelta_postazioni %}<option value="{{ p.pk }}" {% if p.pk == postazione_id %}selected{% endif %}>{{ p.nome }}</option>{% endfor %}
+          </select>
+        </div>
+        <div class="gruppo">
+          <button type="submit" class="btn btn-sm btn-primary"><i class="bi bi-funnel"></i> Applica</button>
+          {% if operatore_id or postazione_id or periodo != 'mese' %}<a href="?" class="btn btn-sm btn-link text-muted">Azzera</a>{% endif %}
+        </div>
+      </form>
+    </div>
+  </div>
+
+  {# Riepilogo #}
+  <div class="row g-2 mb-3">
+    <div class="col-6 col-md-4 col-xl">
+      <div class="kpi-tile hero">
+        <div class="label">Ordini lavorati</div>
+        <div class="value">{{ n_ordini }}</div>
+        <div class="sub">con almeno una fase chiusa</div>
+      </div>
+    </div>
+    <div class="col-6 col-md-4 col-xl">
+      <div class="kpi-tile">
+        <div class="label">Tempo per ordine</div>
+        <div class="value">{{ mediana_ordine|durata }}</div>
+        <div class="sub">mediana &middot; media {{ media_ordine|durata }}</div>
+      </div>
+    </div>
+    <div class="col-6 col-md-4 col-xl">
+      <div class="kpi-tile">
+        <div class="label">Ore rilevate</div>
+        <div class="value">{{ ore|ore }}</div>
+        <div class="sub">nette, pause escluse ({{ ore_pausa|ore }})</div>
+      </div>
+    </div>
+    <div class="col-6 col-md-6 col-xl">
+      <div class="kpi-tile">
+        <div class="label">Fasi chiuse</div>
+        <div class="value">{{ n_fasi }}</div>
+        <div class="sub">{% if fuori_scala %}<span class="fuori-scala">{{ fuori_scala }} fuori scala</span>{% else %}nessuna fuori scala{% endif %}</div>
+      </div>
+    </div>
+    <div class="col-12 col-md-6 col-xl">
+      <div class="kpi-tile">
+        <div class="label">In corso adesso</div>
+        <div class="value">{{ in_corso }}</div>
+        <div class="sub">{% if in_pausa %}di cui {{ in_pausa }} in pausa{% else %}fasi aperte, nessuna in pausa{% endif %}</div>
       </div>
     </div>
   </div>
-</div>
 
-{# Dettaglio ordini #}
-<div class="card">
-  <div class="card-header py-2"><i class="bi bi-list-ul"></i> Dettaglio Ordini</div>
-  <div class="card-body p-0">
-    <table class="table table-sm table-hover mb-0">
-      <thead class="table-light">
-        <tr><th>Ordine</th><th>Data</th><th>Cliente</th><th>Fasi</th><th class="text-center">Tempo Tot. (min)</th><th>Operatori</th><th></th></tr>
-      </thead>
-      <tbody>
-        {% for entry in ordini_list %}
-        <tr>
-          <td><strong>#{{ entry.ordine.numero_progressivo|slice:"-4:" }}</strong></td>
-          <td>{{ entry.ordine.data_ora|date:"d/m H:i" }}</td>
-          <td>{{ entry.ordine.cliente|default:"—" }}</td>
-          <td>
-            {% for fase in entry.fasi %}
-              <span class="badge bg-light text-dark border">{{ fase.postazione }} {{ fase.minuti }}m</span>
-            {% endfor %}
-          </td>
-          <td class="text-center fw-bold">{{ entry.tempo_totale }}</td>
-          <td>{{ entry.operatori }}</td>
-          <td>
-            <a href="{% url 'turni:report_ordine_dettaglio' entry.ordine.pk %}" class="btn btn-outline-primary btn-sm py-0">
-              <i class="bi bi-eye"></i>
-            </a>
-          </td>
-        </tr>
-        {% empty %}
-        <tr><td colspan="7" class="text-muted text-center py-3">Nessuna lavorazione nel periodo</td></tr>
-        {% endfor %}
-      </tbody>
-    </table>
+  {% if not n_fasi %}
+  <div class="panel">
+    <div class="vuoto">
+      <i class="bi bi-hourglass"></i>
+      <div class="fw-bold mt-2">Nessuna fase rilevata in questo periodo</div>
+      <div class="small mt-1">I tempi arrivano quando gli operatori avviano e chiudono le fasi da <strong>Il mio turno</strong>.
+        {% if operatore_id or postazione_id %}Prova a togliere i filtri di operatore o postazione.{% else %}Prova un periodo pi&ugrave; lungo.{% endif %}</div>
+    </div>
   </div>
+  {% else %}
+
+  <div class="row g-3">
+    {# Postazioni #}
+    <div class="col-xl-6">
+      <div class="panel h-100">
+        <div class="panel-title"><i class="bi bi-geo-alt"></i> Per postazione</div>
+        <div class="panel-sub">Minuti netti di una fase. La mediana &egrave; il tempo tipico e non si lascia spostare dalle fasi dimenticate aperte; la barra la confronta fra le postazioni.</div>
+        <div class="panel-body tabella-scroll">
+          <table class="table table-sm align-middle">
+            <thead><tr>
+              <th>Postazione</th><th class="tab-num">Fasi</th><th>Mediana</th>
+              <th class="tab-num">Media</th><th class="tab-num d-none d-md-table-cell">Min &ndash; max</th>
+              <th class="tab-num">Ore</th>
+            </tr></thead>
+            <tbody>
+              {% for p in postazioni %}
+              <tr>
+                <td class="text-nowrap"><span class="sigla">{{ p.sigla }}</span>{{ p.nome }}</td>
+                <td class="tab-num">{{ p.fasi }}{% if p.fuori_scala %} <span class="fuori-scala small text-nowrap" title="{{ p.fuori_scala }} fas{{ p.fuori_scala|pluralize:'e,i' }} fuori scala: oltre {{ fuori_scala_volte }} volte la mediana"><i class="bi bi-exclamation-triangle-fill"></i> {{ p.fuori_scala }}</span>{% endif %}</td>
+                <td class="barra-cella"><div class="barra" style="width: {{ p.barra }}%"></div><span>{{ p.mediana|durata }}</span></td>
+                <td class="tab-num">{{ p.media|durata }}</td>
+                <td class="tab-num d-none d-md-table-cell text-muted">{{ p.minimo|durata }} &ndash; {{ p.massimo|durata }}</td>
+                <td class="tab-num">{{ p.ore|ore }}</td>
+              </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
+    {# Operatori #}
+    <div class="col-xl-6">
+      <div class="panel h-100">
+        <div class="panel-title"><i class="bi bi-people"></i> Per operatore</div>
+        <div class="panel-sub">Ore nette rilevate da ciascuno e quota sul totale; media = minuti di una fase, su tutte le postazioni.</div>
+        <div class="panel-body tabella-scroll">
+          <table class="table table-sm align-middle">
+            <thead><tr>
+              <th>Operatore</th><th class="tab-num">Ordini</th><th class="tab-num">Fasi</th>
+              <th>Ore</th><th class="tab-num">Quota</th><th class="tab-num">Media fase</th>
+            </tr></thead>
+            <tbody>
+              {% for o in operatori %}
+              <tr>
+                <td class="text-nowrap fw-semibold">{{ o.nome }}</td>
+                <td class="tab-num">{{ o.ordini }}</td>
+                <td class="tab-num">{{ o.fasi }}</td>
+                <td class="barra-cella"><div class="barra" style="width: {{ o.barra }}%"></div><span>{{ o.ore|ore }}</span></td>
+                <td class="tab-num">{{ o.quota|floatformat:0 }}%</td>
+                <td class="tab-num">{{ o.media|durata }}</td>
+              </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  {# Ordini #}
+  <div class="panel mt-3">
+    <div class="panel-title">
+      <i class="bi bi-list-ul"></i> Ordini
+      <input type="search" id="cerca-ordini" class="form-control form-control-sm ms-auto" style="max-width: 220px; text-transform: none; letter-spacing: 0;" placeholder="Cerca numero, cliente, operatore">
+    </div>
+    <div class="panel-sub">Dal pi&ugrave; recente. Ogni etichetta &egrave; una fase: sigla della postazione e minuti netti.
+      In arancione le fasi <strong>fuori scala</strong>, cio&egrave; oltre {{ fuori_scala_volte }} volte la mediana della postazione (con almeno {{ min_fasi_mediana }} fasi): di solito una fase dimenticata aperta.
+      Tocca una riga per il dettaglio.</div>
+    <div class="panel-body tabella-scroll">
+      <table class="table table-sm align-middle" id="tabella-ordini">
+        <thead><tr>
+          <th>Ordine</th><th class="d-none d-md-table-cell">Cliente / auto</th><th>Fasi</th>
+          <th class="tab-num">Totale</th><th class="d-none d-lg-table-cell">Operatori</th>
+        </tr></thead>
+        <tbody>
+          {% for o in ordini %}
+          <tr class="riga-ordine" data-href="{% url 'turni:report_ordine_dettaglio' o.ordine.pk %}{% if filtri %}?{{ filtri }}{% endif %}">
+            <td class="text-nowrap">
+              <a href="{% url 'turni:report_ordine_dettaglio' o.ordine.pk %}{% if filtri %}?{{ filtri }}{% endif %}" class="fw-bold text-decoration-none">{{ o.ordine.numero_progressivo }}</a>
+              <div class="small text-muted">{{ o.inizio|date:"D d/m H:i" }}</div>
+            </td>
+            <td class="d-none d-md-table-cell">
+              {{ o.ordine.cliente|default:"—" }}
+              {% if o.ordine.tipo_auto %}<div class="small text-muted">{{ o.ordine.tipo_auto }}</div>{% endif %}
+            </td>
+            <td>
+              {% for f in o.fasi %}<span class="chip {% if f.fuori_scala %}fuori{% endif %}" title="{{ f.postazione.nome }} — {{ f.operatore }}"><b>{{ f.postazione.sigla|default:f.postazione.nome }}</b>{{ f.minuti|durata }}</span>{% endfor %}
+            </td>
+            <td class="tab-num fw-bold {% if o.fuori_scala %}fuori-scala{% endif %}">{{ o.minuti|durata }}</td>
+            <td class="d-none d-lg-table-cell small">{{ o.operatori }}</td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+      <div id="nessun-risultato" class="text-muted small text-center py-3" hidden>Nessun ordine corrisponde alla ricerca.</div>
+      {% if ordini_nascosti %}<div class="text-muted small text-center py-2">Mostrati i 100 ordini pi&ugrave; recenti; altri {{ ordini_nascosti }} nel periodo. Restringi le date per vederli.</div>{% endif %}
+    </div>
+  </div>
+  {% endif %}
 </div>
 {% endblock %}
 
 {% block extra_js %}
 <script>
-const statsData = {{ stats_postazione_json|safe }};
-if (statsData.length > 0) {
-  const ctx = document.getElementById('chartPostazioni').getContext('2d');
-  new Chart(ctx, {
-    type: 'bar',
-    data: {
-      labels: statsData.map(s => s.nome),
-      datasets: [{
-        label: 'Tempo medio (min)',
-        data: statsData.map(s => s.media),
-        backgroundColor: 'rgba(54, 162, 235, 0.6)',
-        borderColor: 'rgba(54, 162, 235, 1)',
-        borderWidth: 1,
-      }]
-    },
-    options: {
-      responsive: true,
-      plugins: { legend: { display: false } },
-      scales: { y: { beginAtZero: true, title: { display: true, text: 'Minuti' } } },
-    }
+document.querySelectorAll('.riga-ordine').forEach(function (riga) {
+  riga.addEventListener('click', function (e) {
+    if (e.target.closest('a')) return;
+    window.location = riga.dataset.href;
   });
-}
+});
+
+(function () {
+  var cerca = document.getElementById('cerca-ordini');
+  if (!cerca) return;
+  var righe = Array.from(document.querySelectorAll('#tabella-ordini tbody tr'));
+  var vuoto = document.getElementById('nessun-risultato');
+  cerca.addEventListener('input', function () {
+    var q = cerca.value.trim().toLowerCase();
+    var visibili = 0;
+    righe.forEach(function (r) {
+      var ok = !q || r.textContent.toLowerCase().indexOf(q) !== -1;
+      r.hidden = !ok;
+      if (ok) visibili++;
+    });
+    vuoto.hidden = visibili > 0;
+  });
+})();
 </script>
 {% endblock %}

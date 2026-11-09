@@ -1150,129 +1150,60 @@ def api_salva_verifica(request, compilata_id):
 
 @login_required
 def report_lavorazioni(request):
+    from urllib.parse import urlencode
+
+    from django.contrib.auth.models import User
+    from apps.turni import report as rep
+
     if not utente_nel_gruppo(request.user, 'titolare', 'responsabile'):
         messages.error(request, 'Accesso riservato.')
         return redirect('core:home')
 
-    oggi = date.today()
-    periodo = request.GET.get('periodo', 'mese')
-    if periodo == 'settimana':
-        data_inizio = oggi - timedelta(days=7)
-    elif periodo == 'trimestre':
-        data_inizio = oggi - timedelta(days=90)
+    chiave, dal, al = rep.periodo(request.GET)
+    operatore_id = rep.intero(request.GET.get('operatore'))
+    postazione_id = rep.intero(request.GET.get('postazione'))
+    dati = rep.report(dal, al, operatore_id, postazione_id)
+
+    filtri = {}
+    if chiave == 'personalizzato':
+        filtri.update(dal=dal.isoformat(), al=al.isoformat())
     else:
-        data_inizio = oggi.replace(day=1)
-
-    lavorazioni = LavorazioneOperatore.objects.filter(
-        stato='completato',
-        inizio__date__gte=data_inizio,
-    ).select_related(
-        'sessione__operatore', 'ordine', 'postazione_cq', 'blocco',
-    )
-
-    # Statistiche globali
-    totale_ordini = lavorazioni.values('ordine').distinct().count()
-    totale_lavorazioni = lavorazioni.count()
-
-    # Tempo medio per postazione
-    tempi_per_postazione = {}
-    tempi_per_operatore = {}
-    ordini_tempi = {}
-
-    for lav in lavorazioni:
-        minuti = lav.tempo_lavoro_netto_minuti
-        post_nome = lav.postazione_cq.nome
-        op = lav.sessione.operatore
-
-        tempi_per_postazione.setdefault(post_nome, []).append(minuti)
-
-        op_nome = op.get_full_name() or op.username
-        tempi_per_operatore.setdefault(op_nome, {'minuti': [], 'ordini': set()})
-        tempi_per_operatore[op_nome]['minuti'].append(minuti)
-        tempi_per_operatore[op_nome]['ordini'].add(lav.ordine_id)
-
-        ordini_tempi.setdefault(lav.ordine_id, {
-            'ordine': lav.ordine,
-            'fasi': [],
-            'tempo_totale': 0,
-            'operatori': set(),
-        })
-        ordini_tempi[lav.ordine_id]['fasi'].append({
-            'postazione': post_nome,
-            'operatore': op_nome,
-            'minuti': round(minuti, 1),
-        })
-        ordini_tempi[lav.ordine_id]['tempo_totale'] += minuti
-        ordini_tempi[lav.ordine_id]['operatori'].add(op_nome)
-
-    # Statistiche postazione
-    stats_postazione = []
-    for nome, minuti_list in tempi_per_postazione.items():
-        stats_postazione.append({
-            'nome': nome,
-            'media': round(sum(minuti_list) / len(minuti_list), 1),
-            'totale': round(sum(minuti_list), 1),
-            'count': len(minuti_list),
-        })
-
-    # Statistiche operatore
-    stats_operatore = []
-    for nome, dati in tempi_per_operatore.items():
-        ml = dati['minuti']
-        stats_operatore.append({
-            'nome': nome,
-            'n_ordini': len(dati['ordini']),
-            'tempo_medio': round(sum(ml) / len(ml), 1),
-            'tempo_totale': round(sum(ml), 1),
-        })
-
-    # Ordini dettaglio
-    ordini_list = sorted(ordini_tempi.values(), key=lambda x: x['ordine'].data_ora, reverse=True)
-    for o in ordini_list:
-        o['tempo_totale'] = round(o['tempo_totale'], 1)
-        o['operatori'] = ', '.join(o['operatori'])
-
+        filtri['periodo'] = chiave
+    if operatore_id:
+        filtri['operatore'] = operatore_id
+    if postazione_id:
+        filtri['postazione'] = postazione_id
+    operatori = User.objects.filter(
+        sessioni_turno__lavorazioni__isnull=False,
+    ).distinct().order_by('first_name', 'last_name', 'username')
     return render(request, 'turni/report_lavorazioni.html', {
-        'periodo': periodo,
-        'data_inizio': data_inizio,
-        'totale_ordini': totale_ordini,
-        'totale_lavorazioni': totale_lavorazioni,
-        'stats_postazione': stats_postazione,
-        'stats_postazione_json': json.dumps(stats_postazione),
-        'stats_operatore': stats_operatore,
-        'ordini_list': ordini_list[:50],
+        **dati,
+        'periodi': rep.PERIODI,
+        'periodo': chiave,
+        'dal': dal,
+        'al': al,
+        'operatore_id': operatore_id,
+        'postazione_id': postazione_id,
+        'scelta_operatori': [(u.pk, rep.nome(u)) for u in operatori],
+        'scelta_postazioni': PostazioneCQ.objects.order_by('ordine', 'nome'),
+        'filtri': urlencode(filtri),
+        'fuori_scala_volte': rep.FUORI_SCALA,
+        'min_fasi_mediana': rep.MIN_FASI_MEDIANA,
     })
 
 
 @login_required
 def report_ordine_dettaglio(request, ordine_id):
+    from apps.turni import report as rep
+
     if not utente_nel_gruppo(request.user, 'titolare', 'responsabile'):
         return redirect('core:home')
 
     ordine = get_object_or_404(Ordine, pk=ordine_id)
-    lavorazioni = LavorazioneOperatore.objects.filter(
-        ordine=ordine, stato='completato'
-    ).select_related('sessione__operatore', 'postazione_cq', 'blocco').order_by('inizio')
-
-    fasi = []
-    tempo_totale = timedelta(0)
-    for lav in lavorazioni:
-        tempo_netto = lav.tempo_lavoro_netto
-        fasi.append({
-            'postazione': lav.postazione_cq.nome,
-            'blocco': lav.blocco.nome if lav.blocco else '',
-            'operatore': lav.sessione.operatore.get_full_name() or lav.sessione.operatore.username,
-            'inizio': lav.inizio,
-            'fine': lav.fine,
-            'pausa_min': round(lav.tempo_pausa_totale.total_seconds() / 60, 1),
-            'tempo_netto_min': round(tempo_netto.total_seconds() / 60, 1),
-        })
-        tempo_totale += tempo_netto
-
     return render(request, 'turni/report_ordine_dettaglio.html', {
         'ordine': ordine,
-        'fasi': fasi,
-        'tempo_totale_min': round(tempo_totale.total_seconds() / 60, 1),
+        'filtri': request.GET.urlencode(),
+        **rep.dettaglio_ordine(ordine),
     })
 
 
