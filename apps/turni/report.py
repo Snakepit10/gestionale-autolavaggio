@@ -107,6 +107,7 @@ def unisci_blocchi(lavorazioni, adesso=None):
                 ultima['fine'] = lav.fine
             if lav.blocco:
                 ultima['blocchi'].append(lav.blocco.nome)
+            ultima['ids'].append(lav.pk)
             continue
         fasi.append({
             'chiave': chiave,
@@ -121,6 +122,7 @@ def unisci_blocchi(lavorazioni, adesso=None):
             'minuti': lav.tempo_lavoro_netto_minuti,
             'pausa': lav.tempo_pausa_totale.total_seconds() / 60,
             'blocchi': [lav.blocco.nome] if lav.blocco else [],
+            'ids': [lav.pk],
         })
     # Fasi chiuse e riavviate subito (un "Fine" premuto troppo presto):
     # con meno di STACCO_MAX fra una e l'altra sono la stessa fase; i minuti
@@ -137,6 +139,7 @@ def unisci_blocchi(lavorazioni, adesso=None):
             prima['in_corso'] = prima['in_corso'] or f['in_corso']
             prima['blocchi'] += [b for b in f['blocchi'] if b not in prima['blocchi']]
             prima['riprese'] += 1
+            prima['ids'] += f['ids']
             continue
         f['riprese'] = 0
         unite.append(f)

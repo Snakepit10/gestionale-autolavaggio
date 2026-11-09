@@ -37,5 +37,6 @@ urlpatterns = [
     # Report
     path('report/', views.report_lavorazioni, name='report_lavorazioni'),
     path('report/ordine/<int:ordine_id>/', views.report_ordine_dettaglio, name='report_ordine_dettaglio'),
+    path('report/elimina/', views.report_elimina_tempi, name='report_elimina_tempi'),
     path('api/report/dati/', views.api_report_dati, name='api_report_dati'),
 ]

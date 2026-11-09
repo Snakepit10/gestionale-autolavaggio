@@ -22,6 +22,9 @@
 .chip.fuori b { color: #c2410c; }
 .fuori-scala { color: #c2410c; font-weight: 700; }
 .riga-ordine { cursor: pointer; }
+.col-sel { width: 28px; }
+.barra-elimina { position: sticky; top: 0; z-index: 5; display: flex; align-items: center; gap: 10px; margin: 0 12px 6px; padding: 6px 10px; background: #fef2f2; border: 1px solid #fecaca; border-radius: 8px; font-size: .8rem; font-weight: 600; color: #991b1b; }
+.barra-elimina[hidden] { display: none; }
 .riga-ordine:hover td { background: #f8fafc; }
 .vuoto { text-align: center; padding: 36px 16px; color: #64748b; }
 .vuoto i { font-size: 2rem; color: #94a3b8; }
@@ -195,16 +198,26 @@
     </div>
     <div class="panel-sub">Dal pi&ugrave; recente. Ogni etichetta &egrave; una fase: sigla della postazione e minuti netti. I blocchi della stessa postazione lavorati insieme dallo stesso operatore contano come una fase sola, e cos&igrave; una fase chiusa e ripresa entro 2 minuti.
       In arancione le fasi <strong>fuori scala</strong>, cio&egrave; oltre {{ fuori_scala_volte }} volte la mediana della postazione (con almeno {{ min_fasi_mediana }} fasi): di solito una fase dimenticata aperta.
-      Tocca una riga per il dettaglio.</div>
+      Tocca una riga per il dettaglio. Per togliere ordini di prova o sbagliati, spuntali e premi <strong>Elimina tempi</strong>: si cancellano solo le fasi rilevate, l'ordine resta in cassa.</div>
+    <form method="post" action="{% url 'turni:report_elimina_tempi' %}" id="form-elimina">
+    {% csrf_token %}
+    <input type="hidden" name="torna" value="{{ request.get_full_path }}">
+    <div class="barra-elimina" id="barra-elimina" hidden>
+      <span id="conta-selezionati"></span>
+      <button type="submit" class="btn btn-sm btn-danger"><i class="bi bi-trash"></i> Elimina tempi</button>
+      <button type="button" class="btn btn-sm btn-link text-muted" id="annulla-selezione">Annulla</button>
+    </div>
     <div class="panel-body tabella-scroll">
       <table class="table table-sm align-middle" id="tabella-ordini">
         <thead><tr>
+          <th class="col-sel"><input type="checkbox" class="form-check-input" id="sel-tutti" title="Seleziona tutti quelli visibili"></th>
           <th>Ordine</th><th class="d-none d-md-table-cell">Cliente / auto</th><th>Fasi</th>
           <th class="tab-num">Totale</th><th class="d-none d-lg-table-cell">Operatori</th>
         </tr></thead>
         <tbody>
           {% for o in ordini %}
-          <tr class="riga-ordine" data-href="{% url 'turni:report_ordine_dettaglio' o.ordine.pk %}{% if filtri %}?{{ filtri }}{% endif %}">
+          <tr class="riga-ordine" data-href="{% url 'turni:report_ordine_dettaglio' o.ordine.pk %}{% if filtri %}?{{ filtri }}{% endif %}" data-numero="{{ o.ordine.numero_progressivo }}">
+            <td class="col-sel"><input type="checkbox" class="form-check-input sel-ordine" name="ordine" value="{{ o.ordine.pk }}" aria-label="Seleziona {{ o.ordine.numero_progressivo }}"></td>
             <td class="text-nowrap">
               <a href="{% url 'turni:report_ordine_dettaglio' o.ordine.pk %}{% if filtri %}?{{ filtri }}{% endif %}" class="fw-bold text-decoration-none">{{ o.ordine.numero_progressivo }}</a>
               <div class="small text-muted">{{ o.inizio|date:"D d/m H:i" }}</div>
@@ -225,6 +238,7 @@
       <div id="nessun-risultato" class="text-muted small text-center py-3" hidden>Nessun ordine corrisponde alla ricerca.</div>
       {% if ordini_nascosti %}<div class="text-muted small text-center py-2">Mostrati i 100 ordini pi&ugrave; recenti; altri {{ ordini_nascosti }} nel periodo. Restringi le date per vederli.</div>{% endif %}
     </div>
+    </form>
   </div>
   {% endif %}
 </div>
@@ -234,7 +248,7 @@
 <script>
 document.querySelectorAll('.riga-ordine').forEach(function (riga) {
   riga.addEventListener('click', function (e) {
-    if (e.target.closest('a')) return;
+    if (e.target.closest('a, input, .col-sel')) return;
     window.location = riga.dataset.href;
   });
 });
@@ -245,6 +259,8 @@ document.querySelectorAll('.riga-ordine').forEach(function (riga) {
   var righe = Array.from(document.querySelectorAll('#tabella-ordini tbody tr'));
   var vuoto = document.getElementById('nessun-risultato');
   cerca.addEventListener('input', function () {
+    document.querySelectorAll('.sel-ordine').forEach(function (c) { c.checked = false; });
+    aggiornaSelezione();
     var q = cerca.value.trim().toLowerCase();
     var visibili = 0;
     righe.forEach(function (r) {
@@ -253,6 +269,33 @@ document.querySelectorAll('.riga-ordine').forEach(function (riga) {
       if (ok) visibili++;
     });
     vuoto.hidden = visibili > 0;
+  });
+})();
+
+function aggiornaSelezione() {
+  var scelti = document.querySelectorAll('.sel-ordine:checked');
+  var barra = document.getElementById('barra-elimina');
+  if (!barra) return;
+  barra.hidden = scelti.length === 0;
+  document.getElementById('conta-selezionati').textContent =
+    scelti.length === 1 ? '1 ordine selezionato' : scelti.length + ' ordini selezionati';
+}
+(function () {
+  var form = document.getElementById('form-elimina');
+  if (!form) return;
+  document.querySelectorAll('.sel-ordine').forEach(function (c) { c.addEventListener('change', aggiornaSelezione); });
+  document.getElementById('sel-tutti').addEventListener('change', function (e) {
+    document.querySelectorAll('#tabella-ordini tbody tr:not([hidden]) .sel-ordine').forEach(function (c) { c.checked = e.target.checked; });
+    aggiornaSelezione();
+  });
+  document.getElementById('annulla-selezione').addEventListener('click', function () {
+    document.querySelectorAll('.sel-ordine, #sel-tutti').forEach(function (c) { c.checked = false; });
+    aggiornaSelezione();
+  });
+  form.addEventListener('submit', function (e) {
+    var numeri = Array.from(document.querySelectorAll('.sel-ordine:checked')).map(function (c) { return c.closest('tr').dataset.numero; });
+    var elenco = numeri.length > 6 ? numeri.slice(0, 6).join(', ') + ' e altri ' + (numeri.length - 6) : numeri.join(', ');
+    if (!confirm('Eliminare tutti i tempi rilevati di ' + elenco + '? Gli ordini restano in cassa; le fasi cancellate non si recuperano.')) e.preventDefault();
   });
 })();
 </script>

@@ -1220,6 +1220,40 @@ def report_ordine_dettaglio(request, ordine_id):
 
 
 @login_required
+def report_elimina_tempi(request):
+    """Elimina le fasi rilevate (non l'ordine) di ordini di prova o sporchi."""
+    from django.urls import reverse
+    from django.utils.http import url_has_allowed_host_and_scheme
+    from apps.turni import report as rep
+
+    if not utente_nel_gruppo(request.user, 'titolare', 'responsabile'):
+        return redirect('core:home')
+    torna = request.POST.get('torna', '')
+    if not url_has_allowed_host_and_scheme(torna, {request.get_host()}, request.is_secure()):
+        torna = reverse('turni:report_lavorazioni')
+    if request.method != 'POST':
+        return redirect(torna)
+
+    ordini = [i for i in map(rep.intero, request.POST.getlist('ordine')) if i]
+    righe = [i for i in map(rep.intero, request.POST.getlist('lavorazione')) if i]
+    if ordini:
+        da_eliminare = LavorazioneOperatore.objects.filter(ordine_id__in=ordini)
+    elif righe:
+        da_eliminare = LavorazioneOperatore.objects.filter(pk__in=righe)
+    else:
+        messages.warning(request, 'Nessun tempo selezionato.')
+        return redirect(torna)
+
+    n_ordini = da_eliminare.values('ordine').distinct().count()
+    n_righe, _ = da_eliminare.delete()
+    if ordini:
+        messages.success(request, f'Eliminati i tempi di {n_ordini} ordin{"e" if n_ordini == 1 else "i"}. Gli ordini restano in cassa.')
+    else:
+        messages.success(request, 'Fase eliminata.' if n_righe else 'La fase era già stata eliminata.')
+    return redirect(torna)
+
+
+@login_required
 def api_report_dati(request):
     if not utente_nel_gruppo(request.user, 'titolare', 'responsabile'):
         return _json_err('Non autorizzato', 403)

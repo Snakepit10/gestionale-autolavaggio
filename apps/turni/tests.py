@@ -152,3 +152,28 @@ class ReportTest(TestCase):
         self.assertEqual((chiusa.stato, chiusa.fine), ('in_lavorazione', None))
         self.assertAlmostEqual(chiusa.tempo_pausa_totale.total_seconds(), 60, delta=5)
         self.assertAlmostEqual(chiusa.tempo_lavoro_netto_minuti, 9, delta=0.1)
+
+    def test_elimina_tempi(self):
+        from apps.turni.views import report_elimina_tempi
+        prova = self._ordine((self.prelavaggio, 10), (self.asciugatura, 6))
+        vero = self._ordine((self.prelavaggio, 8), (self.asciugatura, 5))
+
+        def invia(dati):
+            req = RequestFactory().post('/turni/report/elimina/', dati)
+            req.user, req.session = self.utente, {}
+            req._messages = FallbackStorage(req)
+            return report_elimina_tempi(req)
+
+        r = invia({'ordine': [prova.pk], 'torna': '/turni/report/?periodo=7g'})
+        self.assertEqual((r.status_code, r.url), (302, '/turni/report/?periodo=7g'))
+        self.assertFalse(LavorazioneOperatore.objects.filter(ordine=prova).exists())
+        self.assertTrue(Ordine.objects.filter(pk=prova.pk).exists())
+        self.assertEqual(LavorazioneOperatore.objects.filter(ordine=vero).count(), 2)
+
+        fase = rep.dettaglio_ordine(vero)['fasi'][0]
+        r = invia({'lavorazione': fase['ids'], 'torna': 'https://altro-sito.example/'})
+        self.assertEqual(r.url, reverse('turni:report_lavorazioni'))
+        self.assertEqual(LavorazioneOperatore.objects.filter(ordine=vero).count(), 1)
+
+        html = self.apri(reverse('turni:report_ordine_dettaglio', args=[vero.pk]))
+        self.assertIn("Elimina i tempi di quest'ordine", html)
