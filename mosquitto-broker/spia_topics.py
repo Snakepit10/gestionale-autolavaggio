@@ -6,7 +6,7 @@ Sostituto minimale di MQTT Explorer per il collaudo. Uso:
 
 Esempio (endpoint TCP Proxy di Railway, utente debug):
 
-    python mosquitto-broker/spia_topics.py tramway.proxy.rlwy.net 12345 debug LaPasswordDebug
+    python mosquitto-broker/spia_topics.py sakura.proxy.rlwy.net 46500 debug LaPasswordDebug
 
 Poi genera un impulso sullo Shelly e guarda cosa compare (topic e
 payload). Ctrl+C per uscire.
