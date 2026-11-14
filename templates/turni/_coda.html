@@ -67,13 +67,11 @@ Si ricarica da sola ogni pochi secondi (api/coda-html/).{% endcomment %}
                   {% endfor %}
                 </div>
               {% endwith %}
-              {% if not lavorazione_attiva or lavorazione_attiva.ordine_id != entry.ordine.pk %}
-                <button type="button" class="btn btn-sm btn-outline-secondary btn-salta flex-shrink-0"
-                        onclick="event.stopPropagation(); saltaLavorazione({{ entry.ordine.pk }}, '{{ entry.ordine.numero_progressivo|slice:"-4:" }}')"
-                        title="Tempi non segnati: le tue fasi contano come fatte, senza tempi">
-                  <i class="bi bi-skip-forward"></i> Salta
-                </button>
-              {% endif %}
+              <button type="button" class="btn btn-sm btn-outline-secondary btn-salta flex-shrink-0"
+                      onclick="event.stopPropagation(); scegliFaseDaSaltare({{ entry.ordine.pk }}, '{{ entry.ordine.numero_progressivo|slice:"-4:" }}')"
+                      title="Tempi non segnati: la fase scelta conta come fatta, senza tempi">
+                <i class="bi bi-skip-forward"></i> Salta
+              </button>
             </div>
           </div>
         </div>

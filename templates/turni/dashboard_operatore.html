@@ -431,6 +431,21 @@ html, body { overflow: hidden !important; height: 100%; background: #fff; }
 </div>
 
 {# ===== Menu (la dashboard e' a schermo intero, senza barra del menu) ===== #}
+<div class="modal fade" id="saltaFase" tabindex="-1">
+  <div class="modal-dialog modal-dialog-centered">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title"><i class="bi bi-skip-forward"></i> Salta una fase &mdash; #<span id="saltaNumero"></span></h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+      </div>
+      <div class="modal-body">
+        <p class="small text-muted mb-3">Usalo solo se hai dimenticato di segnare i tempi: la fase conta come fatta, ma senza tempi.</p>
+        <div id="saltaFasi" class="d-grid gap-2"></div>
+      </div>
+    </div>
+  </div>
+</div>
+
 <div class="modal fade" id="menuTurno" tabindex="-1">
   <div class="modal-dialog modal-dialog-centered">
     <div class="modal-content">
@@ -1044,11 +1059,25 @@ async function invalidateDashboardCache() {
   } catch(e) { /* ignora errori cache */ }
 }
 
-/* ---- Salta lavorazione (tempi non segnati) ---- */
-async function saltaLavorazione(ordineId, numero) {
-  if (!confirm(`Salta l'ordine #${numero}?\n\nLe tue fasi contano come fatte ma senza tempi: usalo solo se hai dimenticato di segnarli.`)) return;
-  const data = await apiPost(`/turni/api/ordine/${ordineId}/salta/`);
-  if (!data.ok) { alert(data.error); return; }
+/* ---- Salta una fase (tempi non segnati) ---- */
+async function scegliFaseDaSaltare(ordineId, numero) {
+  const res = await fetch(`/turni/api/ordine/${ordineId}/dettaglio/`, {cache: 'no-store'});
+  const data = await res.json();
+  if (!data.ok) return;
+  const fasi = (data.fasi_avviabili || []).filter(f => f.stato === 'da_fare');
+  document.getElementById('saltaNumero').textContent = numero;
+  document.getElementById('saltaFasi').innerHTML = fasi.length
+    ? fasi.map(f => `<button type="button" class="btn ${f.mia ? 'btn-secondary' : 'btn-outline-secondary'} text-start"
+        onclick="saltaFase(${ordineId}, ${f.id}, this)"><i class="bi bi-skip-forward"></i> ${f.nome}</button>`).join('')
+    : '<div class="text-muted">Nessuna fase da saltare: sono gia fatte o qualcuno ci sta lavorando.</div>';
+  bootstrap.Modal.getOrCreateInstance(document.getElementById('saltaFase')).show();
+}
+
+async function saltaFase(ordineId, postazioneId, btn) {
+  btn.disabled = true;
+  const data = await apiPost(`/turni/api/ordine/${ordineId}/salta/`, {postazione: postazioneId});
+  if (!data.ok) { btn.disabled = false; alert(data.error); return; }
+  bootstrap.Modal.getOrCreateInstance(document.getElementById('saltaFase')).hide();
   await aggiornaColonna();
   if (currentOrdineId === ordineId) selezionaOrdine(ordineId);
 }
@@ -1118,7 +1147,8 @@ function aggiornaCountdown() {
   const adesso = Date.now();
   document.querySelectorAll('.consegna-countdown').forEach(el => {
     const min = Math.round((new Date(el.dataset.consegna).getTime() - adesso) / 60000);
-    const durata = m => m >= 60 ? `${Math.floor(m / 60)} h ${String(m % 60).padStart(2, '0')} min` : `${m} min`;
+    const durata = m => m >= 1440 ? (Math.floor(m / 1440) === 1 ? 'oltre un giorno' : `${Math.floor(m / 1440)} giorni`)
+      : m >= 60 ? `${Math.floor(m / 60)} h ${String(m % 60).padStart(2, '0')} min` : `${m} min`;
     if (min > 0) {
       el.textContent = `tra ${durata(min)}`;
       el.className = 'consegna-countdown fw-semibold ' + (min <= 15 ? 'text-warning-emphasis' : 'text-success');

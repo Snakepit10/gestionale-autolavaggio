@@ -291,15 +291,21 @@ class ReportTest(TestCase):
         self.assertIn('Salta', coda(self.mario))
         self.assertIn('Lavaggio prova', coda(self.mario))
 
-        # Mentre ci lavora non si salta: deve premere Fine.
-        chiama(api_inizia_lavoro, self.mario, ordine.pk, corpo={'postazione': self.prelavaggio.pk})
+        pre, asc = {'postazione': self.prelavaggio.pk}, {'postazione': self.asciugatura.pk}
+        non_si_puo = "Questa fase non si puo' saltare: e' gia' fatta o qualcuno ci sta lavorando."
         r = chiama(api_salta_lavorazione, self.mario, ordine.pk)
-        self.assertEqual((r['ok'], r['error']), (False, 'Stai lavorando su questo ordine: premi Fine.'))
-        LavorazioneOperatore.objects.filter(sessione=self.sessione).delete()
+        self.assertEqual(r['error'], 'Scegli la fase da saltare.')
 
-        # Mario salta: fase chiusa senza tempi, l'ordine esce dalla sua coda
-        # ma non si chiude finche' Lucia non finisce l'asciugatura.
-        r = chiama(api_salta_lavorazione, self.mario, ordine.pk)
+        # Non si salta una fase in corso (sua o di altri): si preme Fine.
+        chiama(api_inizia_lavoro, self.mario, ordine.pk, corpo=pre)
+        self.assertEqual(chiama(api_salta_lavorazione, self.mario, ordine.pk, corpo=pre)['error'], non_si_puo)
+        chiama(api_inizia_lavoro, lucia, ordine.pk, corpo=asc)
+        self.assertEqual(chiama(api_salta_lavorazione, self.mario, ordine.pk, corpo=asc)['error'], non_si_puo)
+        LavorazioneOperatore.objects.all().delete()
+
+        # Mario salta il prelavaggio: fase chiusa senza tempi, l'ordine esce
+        # dalla sua coda ma non si chiude finche' l'asciugatura non e' fatta.
+        r = chiama(api_salta_lavorazione, self.mario, ordine.pk, corpo=pre)
         self.assertEqual((r['ok'], r['saltate'], r['ordine_completato']), (True, 1, False))
         saltata = LavorazioneOperatore.objects.get(sessione=self.sessione)
         self.assertEqual((saltata.stato, saltata.postazione_cq, saltata.tempo_lavoro_netto_minuti),
@@ -310,8 +316,7 @@ class ReportTest(TestCase):
         self.assertIn('Saltata', coda(self.mario))
         self.assertIn('Lavaggio prova', coda(lucia))
         self.assertEqual([s['stato'] for s in ordine.get_stati_postazioni()], ['completato', 'in_attesa'])
-        r = chiama(api_salta_lavorazione, self.mario, ordine.pk)
-        self.assertEqual(r['error'], 'Le tue fasi su questo ordine sono gia chiuse.')
+        self.assertEqual(chiama(api_salta_lavorazione, self.mario, ordine.pk, corpo=pre)['error'], non_si_puo)
 
         # Le fasi saltate non entrano nei report dei tempi.
         oggi = timezone.localdate()
@@ -326,11 +331,18 @@ class ReportTest(TestCase):
 
         # Saltata per sbaglio: riaprirla fa ripartire i tempi da adesso.
         altro = Ordine.objects.create(totale=Decimal('20'), totale_finale=Decimal('20'))
-        chiama(api_salta_lavorazione, self.mario, altro.pk)
-        r = chiama(api_inizia_lavoro, self.mario, altro.pk, corpo={'postazione': self.prelavaggio.pk})
+        chiama(api_salta_lavorazione, self.mario, altro.pk, corpo=pre)
+        r = chiama(api_inizia_lavoro, self.mario, altro.pk, corpo=pre)
         self.assertTrue(r['ok'])
         riaperta = LavorazioneOperatore.objects.get(sessione=self.sessione, ordine=altro)
         self.assertEqual((riaperta.stato, riaperta.fine), ('in_lavorazione', None))
+
+        # Si puo' saltare anche una fase che non e' del suo turno.
+        terzo = Ordine.objects.create(totale=Decimal('20'), totale_finale=Decimal('20'))
+        LavorazioneOperatore.objects.filter(sessione=self.sessione, stato='in_lavorazione').delete()
+        r = chiama(api_salta_lavorazione, self.mario, terzo.pk, corpo=asc)
+        self.assertTrue(r['ok'])
+        self.assertEqual(LavorazioneOperatore.objects.get(ordine=terzo).postazione_cq, self.asciugatura)
 
     def test_prezzo_nella_dashboard_operatore(self):
         from django.template.loader import render_to_string

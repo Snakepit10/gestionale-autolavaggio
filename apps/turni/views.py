@@ -753,9 +753,9 @@ def api_completa_lavoro(request, lav_id):
 @login_required
 @transaction.atomic
 def api_salta_lavorazione(request, ordine_id):
-    """L'operatore non ha segnato i tempi di un ordine (dimenticanza o
-    altro): le fasi del suo turno contano come fatte, senza tempi. L'ordine
-    esce dalla sua coda e si chiude se le altre fasi sono fatte."""
+    """L'operatore non ha segnato i tempi di una fase (dimenticanza o
+    altro): la fase scelta conta come fatta, senza tempi. Si possono
+    saltare le fasi ancora da fare (non quelle in corso o gia' chiuse)."""
     if request.method != 'POST':
         return _json_err('Metodo non consentito', 405)
     sessione = _get_sessione_attiva(request.user)
@@ -764,32 +764,36 @@ def api_salta_lavorazione(request, ordine_id):
     ordine = get_object_or_404(Ordine, pk=ordine_id)
     if ordine.stato not in ('in_attesa', 'in_lavorazione'):
         return _json_err("L'ordine non e' piu' in lavorazione.")
-    if LavorazioneOperatore.objects.filter(sessione=sessione, ordine=ordine).exclude(stato__in=STATI_CHIUSI).exists():
-        return _json_err('Stai lavorando su questo ordine: premi Fine.')
+    try:
+        scelta = json.loads(request.body or b'{}').get('postazione')
+    except (ValueError, AttributeError):
+        scelta = None
+    if not scelta:
+        return _json_err('Scegli la fase da saltare.')
+    da_fare = {f['id'] for f in _fasi_ordine(sessione, ordine) if f['stato'] == 'da_fare'}
+    postazioni, _ = _postazioni_scelta(sessione)
+    postazione = next((p for p in postazioni if str(p.pk) == str(scelta) and p.pk in da_fare), None)
+    if not postazione:
+        return _json_err("Questa fase non si puo' saltare: e' gia' fatta o qualcuno ci sta lavorando.")
 
     post_turno = list(sessione.postazioni.select_related('postazione_cq', 'blocco').all())
-    if not post_turno:
-        return _json_err('Nessuna postazione assegnata al turno.')
-    gia_chiuse = set(LavorazioneOperatore.objects.filter(sessione=sessione, ordine=ordine)
-                     .values_list('postazione_cq_id', 'blocco_id'))
+    chiuse = set(LavorazioneOperatore.objects.filter(ordine=ordine, postazione_cq=postazione, stato__in=STATI_CHIUSI)
+                 .values_list('blocco_id', flat=True))
     adesso = timezone.now()
     saltate = 0
-    for postazione in {pt.postazione_cq_id: pt.postazione_cq for pt in post_turno}.values():
-        for blocco in _blocchi_fase(post_turno, postazione):
-            if (postazione.pk, blocco.pk if blocco else None) in gia_chiuse:
-                continue
-            LavorazioneOperatore.objects.create(
-                sessione=sessione, ordine=ordine, postazione_cq=postazione, blocco=blocco,
-                inizio=adesso, fine=adesso, stato='saltato',
-            )
-            # La fase l'ha fatta lui: conta per la scheda del controllo qualita'.
-            OperatorePostazioneTurno.objects.get_or_create(
-                ordine=ordine, postazione=postazione.codice,
-                blocco_codice=blocco.codice if blocco else '', operatore=request.user,
-            )
-            saltate += 1
-    if not saltate:
-        return _json_err('Le tue fasi su questo ordine sono gia chiuse.')
+    for blocco in _blocchi_fase(post_turno, postazione):
+        if (blocco.pk if blocco else None) in chiuse:
+            continue
+        LavorazioneOperatore.objects.create(
+            sessione=sessione, ordine=ordine, postazione_cq=postazione, blocco=blocco,
+            inizio=adesso, fine=adesso, stato='saltato',
+        )
+        # La fase l'ha fatta lui: conta per la scheda del controllo qualita'.
+        OperatorePostazioneTurno.objects.get_or_create(
+            ordine=ordine, postazione=postazione.codice,
+            blocco_codice=blocco.codice if blocco else '', operatore=request.user,
+        )
+        saltate += 1
 
     if ordine.stato == 'in_attesa':
         ordine.stato = 'in_lavorazione'
