@@ -259,6 +259,79 @@ class ReportTest(TestCase):
         html = self.apri(reverse('turni:report_lavorazioni') + '?periodo=oggi')
         self.assertIn('In lavorazione adesso', html)
 
+    def test_salta_lavorazione(self):
+        import json
+        from apps.core.models import Categoria, ServizioProdotto
+        from apps.cq.models import OperatorePostazioneTurno
+        from apps.ordini.models import ItemOrdine
+        from apps.turni.models import PostazioneTurno
+        from apps.turni.views import (api_coda_html, api_completa_lavoro, api_inizia_lavoro,
+                                      api_salta_lavorazione)
+        SessioneTurno.objects.filter(pk=self.sessione.pk).update(stato='attivo')
+        PostazioneCQ.objects.exclude(codice__startswith='t-').update(attiva=False)
+        PostazioneTurno.objects.create(sessione=self.sessione, postazione_cq=self.prelavaggio)
+        lucia = User.objects.create_user('lucia_test', first_name='Lucia')
+        turno_lucia = SessioneTurno.objects.create(operatore=lucia)
+        PostazioneTurno.objects.create(sessione=turno_lucia, postazione_cq=self.asciugatura)
+        servizio = ServizioProdotto.objects.create(titolo='Lavaggio prova', categoria=Categoria.objects.create(nome='Prova'),
+                                                   prezzo=Decimal('20'), descrizione='')
+        ordine = Ordine.objects.create(totale=Decimal('20'), totale_finale=Decimal('20'))
+        ItemOrdine.objects.create(ordine=ordine, servizio_prodotto=servizio, quantita=1, prezzo_unitario=Decimal('20'))
+
+        def chiama(vista, utente, *args, corpo=None):
+            req = RequestFactory().post('/', json.dumps(corpo or {}), content_type='application/json')
+            req.user = utente
+            return json.loads(vista(req, *args).content)
+
+        def coda(utente):
+            req = RequestFactory().get('/')
+            req.user = utente
+            return api_coda_html(req).content.decode()
+
+        self.assertIn('Salta', coda(self.mario))
+        self.assertIn('Lavaggio prova', coda(self.mario))
+
+        # Mentre ci lavora non si salta: deve premere Fine.
+        chiama(api_inizia_lavoro, self.mario, ordine.pk, corpo={'postazione': self.prelavaggio.pk})
+        r = chiama(api_salta_lavorazione, self.mario, ordine.pk)
+        self.assertEqual((r['ok'], r['error']), (False, 'Stai lavorando su questo ordine: premi Fine.'))
+        LavorazioneOperatore.objects.filter(sessione=self.sessione).delete()
+
+        # Mario salta: fase chiusa senza tempi, l'ordine esce dalla sua coda
+        # ma non si chiude finche' Lucia non finisce l'asciugatura.
+        r = chiama(api_salta_lavorazione, self.mario, ordine.pk)
+        self.assertEqual((r['ok'], r['saltate'], r['ordine_completato']), (True, 1, False))
+        saltata = LavorazioneOperatore.objects.get(sessione=self.sessione)
+        self.assertEqual((saltata.stato, saltata.postazione_cq, saltata.tempo_lavoro_netto_minuti),
+                         ('saltato', self.prelavaggio, 0))
+        self.assertTrue(OperatorePostazioneTurno.objects.filter(ordine=ordine, operatore=self.mario,
+                                                                postazione='t-pre').exists())
+        self.assertNotIn('Lavaggio prova', coda(self.mario).split('Lavorazioni completate')[0])
+        self.assertIn('Saltata', coda(self.mario))
+        self.assertIn('Lavaggio prova', coda(lucia))
+        self.assertEqual([s['stato'] for s in ordine.get_stati_postazioni()], ['completato', 'in_attesa'])
+        r = chiama(api_salta_lavorazione, self.mario, ordine.pk)
+        self.assertEqual(r['error'], 'Le tue fasi su questo ordine sono gia chiuse.')
+
+        # Le fasi saltate non entrano nei report dei tempi.
+        oggi = timezone.localdate()
+        self.assertEqual(rep.report(oggi, oggi)['postazioni'], [])
+        self.assertEqual(rep.dettaglio_ordine(ordine)['fasi'], [])
+        self.assertIsNone(ordine.iniziato_il)
+
+        # Lucia finisce l'asciugatura: l'ordine si chiude.
+        chiama(api_inizia_lavoro, lucia, ordine.pk, corpo={'postazione': self.asciugatura.pk})
+        r = chiama(api_completa_lavoro, lucia, LavorazioneOperatore.objects.get(sessione=turno_lucia).pk)
+        self.assertTrue(r['ordine_completato'])
+
+        # Saltata per sbaglio: riaprirla fa ripartire i tempi da adesso.
+        altro = Ordine.objects.create(totale=Decimal('20'), totale_finale=Decimal('20'))
+        chiama(api_salta_lavorazione, self.mario, altro.pk)
+        r = chiama(api_inizia_lavoro, self.mario, altro.pk, corpo={'postazione': self.prelavaggio.pk})
+        self.assertTrue(r['ok'])
+        riaperta = LavorazioneOperatore.objects.get(sessione=self.sessione, ordine=altro)
+        self.assertEqual((riaperta.stato, riaperta.fine), ('in_lavorazione', None))
+
     def test_prezzo_nella_dashboard_operatore(self):
         from django.template.loader import render_to_string
         from apps.turni.views import api_ordine_dettaglio

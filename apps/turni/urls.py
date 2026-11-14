@@ -14,12 +14,14 @@ urlpatterns = [
     # API operatore (AJAX)
     path('api/ordine/<int:ordine_id>/dettaglio/', views.api_ordine_dettaglio, name='api_ordine_dettaglio'),
     path('api/ordine/<int:ordine_id>/inizia-lavoro/', views.api_inizia_lavoro, name='api_inizia_lavoro'),
+    path('api/ordine/<int:ordine_id>/salta/', views.api_salta_lavorazione, name='api_salta_lavorazione'),
     path('api/lavorazione/<int:lav_id>/pausa/', views.api_pausa_lavoro, name='api_pausa_lavoro'),
     path('api/lavorazione/<int:lav_id>/riprendi/', views.api_riprendi_lavoro, name='api_riprendi_lavoro'),
     path('api/lavorazione/<int:lav_id>/completa/', views.api_completa_lavoro, name='api_completa_lavoro'),
     path('api/ordine/<int:ordine_id>/aggiungi-item/', views.api_aggiungi_item, name='api_aggiungi_item'),
     path('api/ordine/<int:ordine_id>/segnala-difetto/', views.api_segnala_difetto, name='api_segnala_difetto'),
     path('api/coda/', views.api_coda_ordini, name='api_coda_ordini'),
+    path('api/coda-html/', views.api_coda_html, name='api_coda_html'),
 
     # Configurazione checklist (titolare)
     path('configurazione/checklist/', views.config_checklist, name='config_checklist'),

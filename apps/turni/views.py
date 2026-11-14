@@ -6,7 +6,7 @@ from django.contrib.auth.decorators import login_required
 from django.db import models as db_models, transaction
 from django.db.models import Count, Sum, Avg, Q, F, Case, When, IntegerField
 from django.db.models.functions import Coalesce
-from django.http import JsonResponse
+from django.http import HttpResponse, JsonResponse
 from django.shortcuts import get_object_or_404, redirect, render
 from django.utils import timezone
 
@@ -20,7 +20,7 @@ from apps.turni.models import (
     SessioneTurno, PostazioneTurno, ChecklistItem,
     ChecklistCompilata, LavorazioneOperatore,
     CategoriaChecklist, EsitoChecklist, VerificaChecklist,
-    SegnalazioneDifetto,
+    SegnalazioneDifetto, STATI_CHIUSI,
 )
 
 
@@ -39,11 +39,11 @@ def _get_coda_ordini(sessione):
     """
     Restituisce gli items in coda per l'operatore della sessione.
     Esclude gli ordini per cui l'operatore ha gia almeno una
-    LavorazioneOperatore completata (sono in 'lavorazioni completate').
+    LavorazioneOperatore completata o saltata (sono in 'lavorazioni completate').
     """
     ordini_completati_da_me_ids = list(
         LavorazioneOperatore.objects.filter(
-            sessione=sessione, stato='completato'
+            sessione=sessione, stato__in=STATI_CHIUSI
         ).values_list('ordine_id', flat=True).distinct()
     )
 
@@ -68,6 +68,26 @@ def _get_coda_ordini(sessione):
     )
 
 
+def _contesto_coda(sessione):
+    """Dati della colonna di sinistra della dashboard: coda, lavorazione
+    attiva e lavorazioni chiuse in questo turno."""
+    ordini_dict = {}
+    for item in _get_coda_ordini(sessione):
+        ordini_dict.setdefault(item.ordine.pk, {'ordine': item.ordine, 'items': []})['items'].append(item)
+    return {
+        'ordini_coda': list(ordini_dict.values()),
+        'lavorazione_attiva': LavorazioneOperatore.objects.filter(
+            sessione=sessione, stato__in=['in_lavorazione', 'in_pausa'],
+        ).select_related('ordine', 'postazione_cq', 'blocco').first(),
+        'lavorazioni_completate': (
+            LavorazioneOperatore.objects.filter(sessione=sessione, stato__in=STATI_CHIUSI)
+            .select_related('ordine', 'ordine__cliente', 'postazione_cq', 'blocco')
+            .prefetch_related('ordine__items__servizio_prodotto')
+            .order_by('-fine')[:20]
+        ),
+    }
+
+
 def _postazioni_scelta(sessione):
     """Postazioni fra cui l'operatore puo' scegliere la fase: tutte quelle
     della linea, piu' il controllo finale solo se e' nel suo turno."""
@@ -76,6 +96,40 @@ def _postazioni_scelta(sessione):
         p for p in PostazioneCQ.objects.filter(attiva=True).prefetch_related('blocchi').order_by('ordine')
         if not p.is_controllo_finale or p.pk in mie
     ], mie
+
+
+def _blocchi_fase(post_turno, postazione):
+    """Blocchi di una postazione per il turno: quelli scelti a inizio turno,
+    altrimenti tutti quelli della postazione (o [None] se non ne ha)."""
+    blocchi = [pt.blocco for pt in post_turno if pt.postazione_cq_id == postazione.pk]
+    if not blocchi or blocchi == [None]:
+        blocchi = list(postazione.blocchi.all()) or [None]
+    return blocchi
+
+
+def _chiudi_ordine_se_finito(ordine):
+    """L'ordine e' completato quando TUTTE le PostazioneCQ attive (escluso
+    il controllo finale) e tutti i loro blocchi hanno una lavorazione chiusa,
+    fatta o saltata. Restituisce True se l'ha chiuso."""
+    chiuse = set(LavorazioneOperatore.objects.filter(ordine=ordine, stato__in=STATI_CHIUSI)
+                 .values_list('postazione_cq_id', 'blocco_id'))
+    postazioni_chiuse = {p for p, _ in chiuse}
+    for pcq in PostazioneCQ.objects.filter(attiva=True, is_controllo_finale=False).prefetch_related('blocchi'):
+        blocchi = list(pcq.blocchi.all())
+        if blocchi:
+            if any((pcq.pk, b.pk) not in chiuse for b in blocchi):
+                return False
+        elif pcq.pk not in postazioni_chiuse:
+            return False
+
+    ordine.stato = 'completato'
+    ordine.save(update_fields=['stato'])
+    now = timezone.now()
+    for item in ordine.items.exclude(stato='completato'):
+        item.stato = 'completato'
+        item.fine_lavorazione = now
+        item.save(update_fields=['stato', 'fine_lavorazione'])
+    return True
 
 
 def _fasi_ordine(sessione, ordine):
@@ -92,11 +146,11 @@ def _fasi_ordine(sessione, ordine):
     fasi = []
     for p in postazioni:
         sue = [r for r in righe if r.postazione_cq_id == p.pk]
-        chiuse = [r for r in sue if r.stato == 'completato']
+        chiuse = [r for r in sue if r.stato in STATI_CHIUSI]
         blocchi = [b.pk for b in p.blocchi.all()]
         fatta = bool(chiuse) and (not blocchi or {r.blocco_id for r in chiuse} >= set(blocchi))
-        aperte_altri = [r for r in sue if r.stato != 'completato' and r.sessione_id != sessione.pk]
-        if any(r.stato != 'completato' and r.sessione_id == sessione.pk for r in sue):
+        aperte_altri = [r for r in sue if r.stato not in STATI_CHIUSI and r.sessione_id != sessione.pk]
+        if any(r.stato not in STATI_CHIUSI and r.sessione_id == sessione.pk for r in sue):
             continue  # la sta gia' facendo lui: c'e' il cronometro
         if fatta:
             if not any(r.sessione_id == sessione.pk for r in chiuse):
@@ -351,24 +405,7 @@ def dashboard_operatore(request):
     if has_checklist and not sessione.checklist_inizio_compilata:
         return redirect('turni:checklist')
 
-    coda = _get_coda_ordini(sessione)
-
-    # Raggruppa per ordine
-    ordini_dict = {}
-    for item in coda:
-        ordine = item.ordine
-        if ordine.pk not in ordini_dict:
-            ordini_dict[ordine.pk] = {
-                'ordine': ordine,
-                'items': [],
-            }
-        ordini_dict[ordine.pk]['items'].append(item)
-    ordini_coda = list(ordini_dict.values())
-
-    # Lavorazione attiva
-    lavorazione_attiva = LavorazioneOperatore.objects.filter(
-        sessione=sessione, stato__in=['in_lavorazione', 'in_pausa']
-    ).select_related('ordine', 'postazione_cq', 'blocco').first()
+    contesto_coda = _contesto_coda(sessione)
 
     # Servizi supplemento per il form aggiungi item (solo servizi marcati is_supplemento)
     supplementi = list(
@@ -412,22 +449,10 @@ def dashboard_operatore(request):
                 'tipi': tipi,
             })
 
-    # Lavorazioni completate dall'operatore in questa sessione
-    lavorazioni_completate = (
-        LavorazioneOperatore.objects.filter(
-            sessione=sessione, stato='completato'
-        )
-        .select_related('ordine', 'ordine__cliente', 'postazione_cq', 'blocco')
-        .prefetch_related('ordine__items__servizio_prodotto')
-        .order_by('-fine')[:20]
-    )
-
     return render(request, 'turni/dashboard_operatore.html', {
+        **contesto_coda,
         'sessione': sessione,
         'postazioni_turno': post_turno,
-        'ordini_coda': ordini_coda,
-        'lavorazione_attiva': lavorazione_attiva,
-        'lavorazioni_completate': lavorazioni_completate,
         'supplementi_json': json.dumps(supplementi, default=str),
         'zone_difetti_json': json.dumps(zone_difetti),
     })
@@ -485,7 +510,7 @@ def api_ordine_dettaglio(request, ordine_id):
     if sessione:
         lavs = LavorazioneOperatore.objects.filter(
             sessione=sessione, ordine=ordine
-        ).exclude(stato='completato').select_related('postazione_cq', 'blocco')
+        ).exclude(stato__in=STATI_CHIUSI).select_related('postazione_cq', 'blocco')
         for lav in lavs:
             lav_data = {
                 'id': lav.pk,
@@ -504,7 +529,7 @@ def api_ordine_dettaglio(request, ordine_id):
     # Fasi completate (da tutti gli operatori, con info blocco)
     fasi_completate = []
     for lav_c in LavorazioneOperatore.objects.filter(
-        ordine=ordine, stato='completato'
+        ordine=ordine, stato__in=STATI_CHIUSI
     ).select_related('postazione_cq', 'blocco', 'sessione__operatore').order_by('inizio'):
         op = lav_c.sessione.operatore
         label = lav_c.postazione_cq.sigla or lav_c.postazione_cq.nome
@@ -514,6 +539,7 @@ def api_ordine_dettaglio(request, ordine_id):
             'postazione': label,
             'operatore': op.get_full_name() or op.username,
             'tempo_min': round(lav_c.tempo_lavoro_netto_minuti, 1),
+            'saltata': lav_c.stato == 'saltato',
         })
 
     # Stato postazioni
@@ -586,10 +612,7 @@ def api_inizia_lavoro(request, ordine_id):
         postazione = next((p for p in postazioni if str(p.pk) == str(scelta)), None)
         if not postazione:
             return _json_err('Fase non disponibile.')
-        blocchi = [pt.blocco for pt in post_turno if pt.postazione_cq_id == postazione.pk]
-        if not blocchi or blocchi == [None]:
-            blocchi = list(postazione.blocchi.all()) or [None]
-        fasi = [(postazione, b) for b in blocchi]
+        fasi = [(postazione, b) for b in _blocchi_fase(post_turno, postazione)]
     else:
         # Pagine vecchie senza scelta: tutte le postazioni del turno insieme.
         fasi = [(pt.postazione_cq, pt.blocco) for pt in post_turno]
@@ -601,9 +624,23 @@ def api_inizia_lavoro(request, ordine_id):
         existing = LavorazioneOperatore.objects.filter(
             sessione=sessione, ordine=ordine,
             postazione_cq=postazione_cq, blocco=blocco,
-        ).exclude(stato='completato').first()
+        ).exclude(stato__in=STATI_CHIUSI).first()
         if existing:
             lavorazioni_create.append(existing)
+            continue
+
+        # Fase saltata per sbaglio: i tempi partono da adesso.
+        saltata = LavorazioneOperatore.objects.filter(
+            sessione=sessione, ordine=ordine,
+            postazione_cq=postazione_cq, blocco=blocco, stato='saltato',
+        ).first()
+        if saltata:
+            saltata.stato = 'in_lavorazione'
+            saltata.inizio = timezone.now()
+            saltata.fine = None
+            saltata.tempo_pausa_totale = timedelta()
+            saltata.save(update_fields=['stato', 'inizio', 'fine', 'tempo_pausa_totale'])
+            lavorazioni_create.append(saltata)
             continue
 
         # Postazione gia' chiusa da lui su quest'ordine nello stesso turno
@@ -689,7 +726,7 @@ def api_completa_lavoro(request, lav_id):
     lav = get_object_or_404(
         LavorazioneOperatore, pk=lav_id, sessione__operatore=request.user
     )
-    if lav.stato == 'completato':
+    if lav.stato in STATI_CHIUSI:
         return _json_err('Lavorazione gia completata.')
 
     lav.completa()
@@ -704,42 +741,60 @@ def api_completa_lavoro(request, lav_id):
         ordine.stato = 'in_lavorazione'
         ordine.save(update_fields=['stato'])
 
-    # Verifica se tutte le postazioni (e tutti i blocchi) hanno completato
-    from apps.cq.models import PostazioneCQ
-    tutte_completate = True
-    for pcq in PostazioneCQ.objects.filter(attiva=True, is_controllo_finale=False).prefetch_related('blocchi'):
-        blocchi = list(pcq.blocchi.all())
-        if blocchi:
-            # Postazione con blocchi: ogni blocco deve avere una lavorazione completata
-            for blocco in blocchi:
-                if not LavorazioneOperatore.objects.filter(
-                    ordine=ordine, postazione_cq=pcq, blocco=blocco, stato='completato'
-                ).exists():
-                    tutte_completate = False
-                    break
-        else:
-            # Postazione senza blocchi: deve avere almeno una lavorazione completata
-            if not LavorazioneOperatore.objects.filter(
-                ordine=ordine, postazione_cq=pcq, stato='completato'
-            ).exists():
-                tutte_completate = False
-        if not tutte_completate:
-            break
-
-    if tutte_completate:
-        ordine.stato = 'completato'
-        ordine.save(update_fields=['stato'])
-        now = timezone.now()
-        for item in ordine.items.exclude(stato='completato'):
-            item.stato = 'completato'
-            item.fine_lavorazione = now
-            item.save(update_fields=['stato', 'fine_lavorazione'])
+    _chiudi_ordine_se_finito(ordine)
 
     return _json_ok({
         'stato': lav.stato,
         'tempo_netto_min': round(lav.tempo_lavoro_netto_minuti, 1),
         'ordine_completato': ordine.stato == 'completato',
     })
+
+
+@login_required
+@transaction.atomic
+def api_salta_lavorazione(request, ordine_id):
+    """L'operatore non ha segnato i tempi di un ordine (dimenticanza o
+    altro): le fasi del suo turno contano come fatte, senza tempi. L'ordine
+    esce dalla sua coda e si chiude se le altre fasi sono fatte."""
+    if request.method != 'POST':
+        return _json_err('Metodo non consentito', 405)
+    sessione = _get_sessione_attiva(request.user)
+    if not sessione:
+        return _json_err('Nessuna sessione turno attiva.')
+    ordine = get_object_or_404(Ordine, pk=ordine_id)
+    if ordine.stato not in ('in_attesa', 'in_lavorazione'):
+        return _json_err("L'ordine non e' piu' in lavorazione.")
+    if LavorazioneOperatore.objects.filter(sessione=sessione, ordine=ordine).exclude(stato__in=STATI_CHIUSI).exists():
+        return _json_err('Stai lavorando su questo ordine: premi Fine.')
+
+    post_turno = list(sessione.postazioni.select_related('postazione_cq', 'blocco').all())
+    if not post_turno:
+        return _json_err('Nessuna postazione assegnata al turno.')
+    gia_chiuse = set(LavorazioneOperatore.objects.filter(sessione=sessione, ordine=ordine)
+                     .values_list('postazione_cq_id', 'blocco_id'))
+    adesso = timezone.now()
+    saltate = 0
+    for postazione in {pt.postazione_cq_id: pt.postazione_cq for pt in post_turno}.values():
+        for blocco in _blocchi_fase(post_turno, postazione):
+            if (postazione.pk, blocco.pk if blocco else None) in gia_chiuse:
+                continue
+            LavorazioneOperatore.objects.create(
+                sessione=sessione, ordine=ordine, postazione_cq=postazione, blocco=blocco,
+                inizio=adesso, fine=adesso, stato='saltato',
+            )
+            # La fase l'ha fatta lui: conta per la scheda del controllo qualita'.
+            OperatorePostazioneTurno.objects.get_or_create(
+                ordine=ordine, postazione=postazione.codice,
+                blocco_codice=blocco.codice if blocco else '', operatore=request.user,
+            )
+            saltate += 1
+    if not saltate:
+        return _json_err('Le tue fasi su questo ordine sono gia chiuse.')
+
+    if ordine.stato == 'in_attesa':
+        ordine.stato = 'in_lavorazione'
+        ordine.save(update_fields=['stato'])
+    return _json_ok({'saltate': saltate, 'ordine_completato': _chiudi_ordine_se_finito(ordine)})
 
 
 # ---------------------------------------------------------------------------
@@ -806,6 +861,16 @@ def api_aggiungi_item(request, ordine_id):
 # ---------------------------------------------------------------------------
 # API: Coda ordini
 # ---------------------------------------------------------------------------
+
+@login_required
+def api_coda_html(request):
+    """Colonna coda + completate gia' pronta: la dashboard la ricarica
+    ogni pochi secondi per restare aggiornata."""
+    sessione = _get_sessione_attiva(request.user)
+    if not sessione:
+        return HttpResponse(status=204)
+    return render(request, 'turni/_coda.html', _contesto_coda(sessione))
+
 
 @login_required
 def api_coda_ordini(request):

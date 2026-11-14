@@ -1,0 +1,176 @@
+{% comment %}Coda ordini e lavorazioni completate della dashboard operatore.
+Si ricarica da sola ogni pochi secondi (api/coda-html/).{% endcomment %}
+      <div class="d-flex justify-content-between align-items-center mb-3">
+        <h6 class="mb-0"><i class="bi bi-list-ol"></i> Coda Ordini</h6>
+        <span class="badge bg-primary" id="codaCount">{{ ordini_coda|length }}</span>
+      </div>
+
+      <div id="codaContainer">
+        {% for entry in ordini_coda %}
+        <div class="card ordine-card mb-2 {% if lavorazione_attiva and lavorazione_attiva.ordine_id == entry.ordine.pk %}active in-lavorazione{% endif %}"
+             data-ordine-id="{{ entry.ordine.pk }}"
+             onclick="selezionaOrdine({{ entry.ordine.pk }})">
+          <div class="ordine-card-body">
+            <div class="d-flex justify-content-between align-items-start">
+              <div class="flex-grow-1 me-2">
+                <div class="d-flex align-items-center gap-2 flex-wrap">
+                  <strong class="text-primary fs-6">#{{ entry.ordine.numero_progressivo|slice:"-4:" }}</strong>
+                  {% include "turni/_prezzo_ordine.html" with o=entry.ordine %}
+                  {% if entry.ordine.cliente %}
+                    <span class="fw-semibold">{{ entry.ordine.cliente }}</span>
+                  {% else %}
+                    <span class="text-muted small">Anonimo</span>
+                  {% endif %}
+                </div>
+              </div>
+              <span class="badge {% if entry.ordine.stato == 'in_lavorazione' %}bg-warning text-dark{% else %}bg-secondary{% endif %}">
+                {{ entry.ordine.stato }}
+              </span>
+            </div>
+
+            {% if entry.ordine.tipo_auto %}
+              <div class="mt-1 fw-semibold" style="color:#2c3e50">
+                <i class="bi bi-car-front-fill me-1"></i>{{ entry.ordine.tipo_auto }}
+              </div>
+            {% endif %}
+
+            <div class="small mt-1 d-flex align-items-center flex-wrap gap-1">
+              {% if entry.ordine.tipo_consegna == 'programmata' %}
+                <span class="badge bg-warning text-dark"><i class="bi bi-calendar-event"></i> Programmata{% if entry.ordine.ora_consegna_richiesta %} {{ entry.ordine.ora_consegna_richiesta|time:"H:i" }}{% endif %}</span>
+                {% with scadenza=entry.ordine.consegna_programmata_il %}
+                  {% if scadenza %}<span class="consegna-countdown fw-semibold" data-consegna="{{ scadenza|date:'c' }}"></span>{% endif %}
+                {% endwith %}
+              {% else %}
+                <span class="badge bg-info text-dark"><i class="bi bi-lightning-charge"></i> Immediata</span>
+                {% if entry.ordine.ora_consegna_richiesta %}<span class="text-muted">consegna {{ entry.ordine.ora_consegna_richiesta|time:"H:i" }}</span>{% endif %}
+              {% endif %}
+            </div>
+
+            {% if entry.ordine.nota %}
+              <div class="alert alert-info py-1 px-2 mb-0 mt-2 small">
+                <i class="bi bi-sticky"></i> {{ entry.ordine.nota }}
+              </div>
+            {% endif %}
+
+            <div class="mt-2 d-flex flex-wrap gap-1">
+              {% for item in entry.items %}
+                <span class="badge bg-light text-dark border small">{{ item.servizio_prodotto.titolo }}</span>
+              {% endfor %}
+            </div>
+
+            <div class="mt-2 d-flex justify-content-between align-items-end gap-2">
+              {% with stati=entry.ordine.get_stati_postazioni %}
+                <div class="d-flex flex-wrap gap-1">
+                  {% for sp in stati %}
+                    <span class="badge {% if sp.stato == 'completato' %}bg-success{% elif sp.stato == 'in_lavorazione' %}bg-warning text-dark{% else %}bg-primary{% endif %}"
+                          title="{{ sp.nome }}: {{ sp.stato }}" style="font-size:.7rem">{{ sp.sigla }}</span>
+                  {% endfor %}
+                </div>
+              {% endwith %}
+              {% if not lavorazione_attiva or lavorazione_attiva.ordine_id != entry.ordine.pk %}
+                <button type="button" class="btn btn-sm btn-outline-secondary btn-salta flex-shrink-0"
+                        onclick="event.stopPropagation(); saltaLavorazione({{ entry.ordine.pk }}, '{{ entry.ordine.numero_progressivo|slice:"-4:" }}')"
+                        title="Tempi non segnati: le tue fasi contano come fatte, senza tempi">
+                  <i class="bi bi-skip-forward"></i> Salta
+                </button>
+              {% endif %}
+            </div>
+          </div>
+        </div>
+        {% empty %}
+        <div class="text-center text-muted py-5">
+          <i class="bi bi-inbox fs-1"></i>
+          <p class="mt-2">Nessun ordine in coda</p>
+        </div>
+        {% endfor %}
+      </div>
+
+      {# ===== Lavorazioni completate (sotto la coda) ===== #}
+      {% if lavorazioni_completate %}
+      <div class="completate-section mt-4">
+        <div class="d-flex justify-content-between align-items-center mb-2">
+          <h6 class="mb-0 text-success"><i class="bi bi-check2-circle"></i> Lavorazioni completate</h6>
+          <span class="badge bg-success">{{ lavorazioni_completate|length }}</span>
+        </div>
+        <div id="completateContainer">
+          {% for lav in lavorazioni_completate %}
+          <div class="card ordine-card completata-card mb-2"
+               data-ordine-id="{{ lav.ordine.pk }}"
+               onclick="selezionaOrdine({{ lav.ordine.pk }})">
+            <div class="ordine-card-body">
+              <div class="d-flex justify-content-between align-items-start">
+                <div class="flex-grow-1 me-2">
+                  <div class="d-flex align-items-center gap-2 flex-wrap">
+                    <strong class="text-success fs-6">#{{ lav.ordine.numero_progressivo|slice:"-4:" }}</strong>
+                    {% include "turni/_prezzo_ordine.html" with o=lav.ordine %}
+                    {% if lav.ordine.cliente %}
+                      <span class="fw-semibold">{{ lav.ordine.cliente }}</span>
+                    {% else %}
+                      <span class="text-muted small">Anonimo</span>
+                    {% endif %}
+                  </div>
+                </div>
+                {% if lav.stato == 'saltato' %}
+                  <span class="badge bg-secondary" title="Tempi non segnati">
+                    <i class="bi bi-skip-forward"></i> Saltata {{ lav.fine|date:"H:i" }}
+                  </span>
+                {% else %}
+                  <span class="badge bg-success">
+                    <i class="bi bi-check2"></i> {{ lav.fine|date:"H:i" }}
+                  </span>
+                {% endif %}
+              </div>
+
+              {% if lav.ordine.tipo_auto %}
+                <div class="mt-1 fw-semibold" style="color:#2c3e50">
+                  <i class="bi bi-car-front-fill me-1"></i>{{ lav.ordine.tipo_auto }}
+                </div>
+              {% endif %}
+
+              {% if lav.ordine.ora_consegna_richiesta %}
+                <div class="text-muted small mt-1">
+                  <i class="bi bi-clock"></i> Consegna {{ lav.ordine.ora_consegna_richiesta|time:"H:i" }}
+                  {% if lav.ordine.tipo_consegna == 'programmata' %}
+                    <span class="badge bg-warning text-dark ms-1" style="font-size:.65rem">Programmata</span>
+                  {% endif %}
+                </div>
+              {% endif %}
+
+              {% if lav.ordine.nota %}
+                <div class="alert alert-info py-1 px-2 mb-0 mt-2 small">
+                  <i class="bi bi-sticky"></i> {{ lav.ordine.nota }}
+                </div>
+              {% endif %}
+
+              <div class="mt-2 d-flex flex-wrap gap-1">
+                {% for item in lav.ordine.items.all %}
+                  <span class="badge bg-light text-dark border small">{{ item.servizio_prodotto.titolo }}</span>
+                {% endfor %}
+              </div>
+
+              {% with stati=lav.ordine.get_stati_postazioni %}
+                {% if stati %}
+                  <div class="mt-2 d-flex flex-wrap gap-1">
+                    {% for sp in stati %}
+                      <span class="badge {% if sp.stato == 'completato' %}bg-success{% elif sp.stato == 'in_lavorazione' %}bg-warning text-dark{% else %}bg-primary{% endif %}"
+                            title="{{ sp.nome }}: {{ sp.stato }}" style="font-size:.7rem">{{ sp.sigla }}</span>
+                    {% endfor %}
+                  </div>
+                {% endif %}
+              {% endwith %}
+
+              <div class="completata-meta mt-2 pt-2 border-top">
+                <i class="bi bi-tools"></i>
+                {{ lav.postazione_cq.nome }}{% if lav.blocco %} &middot; {{ lav.blocco.nome }}{% endif %}
+                {% if lav.stato == 'saltato' %}
+                  <span class="ms-2 text-muted">senza tempi</span>
+                {% else %}
+                  <span class="ms-2"><i class="bi bi-stopwatch"></i> {{ lav.tempo_lavoro_netto_minuti|floatformat:0 }} min</span>
+                {% endif %}
+              </div>
+            </div>
+          </div>
+          {% endfor %}
+        </div>
+      </div>
+      {% endif %}

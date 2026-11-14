@@ -199,11 +199,21 @@ class Ordine(models.Model):
         return max(orari) if orari else None
 
     @property
+    def consegna_programmata_il(self):
+        """Data e ora della consegna programmata (l'ora richiesta nel giorno
+        dell'ordine); None per le consegne immediate o senza ora."""
+        if self.tipo_consegna != 'programmata' or not self.ora_consegna_richiesta:
+            return None
+        giorno = timezone.localtime(self.data_ora).date() if self.data_ora else timezone.localdate()
+        return timezone.make_aware(datetime.combine(giorno, self.ora_consegna_richiesta))
+
+    @property
     def iniziato_il(self):
         """Quando e' iniziata la lavorazione: la prima lavorazione avviata
         da un operatore (dashboard turno) o, in mancanza, il primo servizio
         messo in lavorazione. None se mai avviata."""
-        orari = [lav.inizio for lav in self.lavorazioni_operatore.all() if lav.inizio]
+        orari = [lav.inizio for lav in self.lavorazioni_operatore.all()
+                 if lav.inizio and lav.stato != 'saltato']
         orari += [i.inizio_lavorazione for i in self.items.all()
                   if i.inizio_lavorazione and i.servizio_prodotto.tipo != 'prodotto']
         return min(orari) if orari else None
@@ -376,7 +386,9 @@ class Ordine(models.Model):
         mappa = {}
         for lav in lavorazioni:
             pcq_id = lav['postazione_cq_id']
-            mappa.setdefault(pcq_id, {})[lav['blocco_id']] = lav['stato']
+            # Saltata (senza tempi) = fatta
+            stato_lav = 'completato' if lav['stato'] == 'saltato' else lav['stato']
+            mappa.setdefault(pcq_id, {})[lav['blocco_id']] = stato_lav
 
         output = []
         for pcq in postazioni:

@@ -4,7 +4,7 @@ from statistics import median
 
 from django.utils import timezone
 
-from apps.turni.models import LavorazioneOperatore
+from apps.turni.models import STATI_CHIUSI, LavorazioneOperatore
 
 PERIODI = [
     ('oggi', 'Oggi'),
@@ -268,9 +268,9 @@ def in_lavorazione():
     I minuti delle fasi aperte arrivano fino a questo momento.
     """
     adesso = timezone.now()
-    ordini_ids = (LavorazioneOperatore.objects.exclude(stato='completato')
+    ordini_ids = (LavorazioneOperatore.objects.exclude(stato__in=STATI_CHIUSI)
                   .values_list('ordine_id', flat=True).distinct())
-    righe = LavorazioneOperatore.objects.filter(ordine_id__in=list(ordini_ids)).select_related(
+    righe = LavorazioneOperatore.objects.filter(ordine_id__in=list(ordini_ids)).exclude(stato='saltato').select_related(
         'sessione__operatore', 'ordine', 'postazione_cq', 'blocco')
     per_ordine = {}
     for f in unisci_blocchi(righe, adesso):
@@ -294,7 +294,7 @@ def in_lavorazione():
 
 def dettaglio_ordine(ordine):
     """Fasi di un ordine con la posizione sulla linea del tempo (in %)."""
-    lavorazioni = list(LavorazioneOperatore.objects.filter(ordine=ordine).select_related(
+    lavorazioni = list(LavorazioneOperatore.objects.filter(ordine=ordine).exclude(stato='saltato').select_related(
         'sessione__operatore', 'postazione_cq', 'blocco').order_by('inizio'))
     adesso = timezone.now()
     fasi = unisci_blocchi(lavorazioni, adesso)

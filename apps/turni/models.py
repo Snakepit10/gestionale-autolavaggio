@@ -311,11 +311,19 @@ class SegnalazioneDifetto(models.Model):
 # Lavorazione operatore (tracking tempo per operatore/ordine/fase)
 # ---------------------------------------------------------------------------
 
+# Fasi chiuse: fatte col cronometro o saltate senza tempi.
+STATI_CHIUSI = ('completato', 'saltato')
+
+
 class LavorazioneOperatore(models.Model):
     STATO_CHOICES = [
         ('in_lavorazione', 'In Lavorazione'),
         ('in_pausa', 'In Pausa'),
         ('completato', 'Completato'),
+        # L'operatore non ha segnato i tempi (dimenticanza o altro): la fase
+        # conta come fatta per la coda e per chiudere l'ordine, ma nei
+        # report dei tempi non entra.
+        ('saltato', 'Saltata (senza tempi)'),
     ]
     sessione = models.ForeignKey(
         SessioneTurno, on_delete=models.CASCADE, related_name='lavorazioni',

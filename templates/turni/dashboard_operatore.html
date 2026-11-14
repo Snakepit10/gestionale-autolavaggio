@@ -54,6 +54,7 @@ html, body { overflow: hidden !important; height: 100%; background: #fff; }
     position: relative;
 }
 .ordine-card .ordine-card-body { padding: 12px 14px; }
+.btn-salta { font-size: .75rem; padding: 2px 8px; }
 
 /* Stato selezionato - molto evidente */
 .ordine-card.active {
@@ -407,160 +408,7 @@ html, body { overflow: hidden !important; height: 100%; background: #fff; }
         </span>
       </div>
       <div class="p-3">
-      <div class="d-flex justify-content-between align-items-center mb-3">
-        <h6 class="mb-0"><i class="bi bi-list-ol"></i> Coda Ordini</h6>
-        <span class="badge bg-primary" id="codaCount">{{ ordini_coda|length }}</span>
-      </div>
-
-      <div id="codaContainer">
-        {% for entry in ordini_coda %}
-        <div class="card ordine-card mb-2 {% if lavorazione_attiva and lavorazione_attiva.ordine_id == entry.ordine.pk %}active in-lavorazione{% endif %}"
-             data-ordine-id="{{ entry.ordine.pk }}"
-             onclick="selezionaOrdine({{ entry.ordine.pk }})">
-          <div class="ordine-card-body">
-            <div class="d-flex justify-content-between align-items-start">
-              <div class="flex-grow-1 me-2">
-                <div class="d-flex align-items-center gap-2 flex-wrap">
-                  <strong class="text-primary fs-6">#{{ entry.ordine.numero_progressivo|slice:"-4:" }}</strong>
-                  {% include "turni/_prezzo_ordine.html" with o=entry.ordine %}
-                  {% if entry.ordine.cliente %}
-                    <span class="fw-semibold">{{ entry.ordine.cliente }}</span>
-                  {% else %}
-                    <span class="text-muted small">Anonimo</span>
-                  {% endif %}
-                </div>
-              </div>
-              <span class="badge {% if entry.ordine.stato == 'in_lavorazione' %}bg-warning text-dark{% else %}bg-secondary{% endif %}">
-                {{ entry.ordine.stato }}
-              </span>
-            </div>
-
-            {% if entry.ordine.tipo_auto %}
-              <div class="mt-1 fw-semibold" style="color:#2c3e50">
-                <i class="bi bi-car-front-fill me-1"></i>{{ entry.ordine.tipo_auto }}
-              </div>
-            {% endif %}
-
-            {% if entry.ordine.ora_consegna_richiesta %}
-              <div class="text-muted small mt-1">
-                <i class="bi bi-clock"></i> Consegna {{ entry.ordine.ora_consegna_richiesta|time:"H:i" }}
-                {% if entry.ordine.tipo_consegna == 'programmata' %}
-                  <span class="badge bg-warning text-dark ms-1" style="font-size:.65rem">Programmata</span>
-                {% endif %}
-              </div>
-            {% endif %}
-
-            {% if entry.ordine.nota %}
-              <div class="alert alert-info py-1 px-2 mb-0 mt-2 small">
-                <i class="bi bi-sticky"></i> {{ entry.ordine.nota }}
-              </div>
-            {% endif %}
-
-            <div class="mt-2 d-flex flex-wrap gap-1">
-              {% for item in entry.items %}
-                <span class="badge bg-light text-dark border small">{{ item.servizio_prodotto.titolo }}</span>
-              {% endfor %}
-            </div>
-
-            {% with stati=entry.ordine.get_stati_postazioni %}
-              {% if stati %}
-                <div class="mt-2 d-flex flex-wrap gap-1">
-                  {% for sp in stati %}
-                    <span class="badge {% if sp.stato == 'completato' %}bg-success{% elif sp.stato == 'in_lavorazione' %}bg-warning text-dark{% else %}bg-primary{% endif %}"
-                          title="{{ sp.nome }}: {{ sp.stato }}" style="font-size:.7rem">{{ sp.sigla }}</span>
-                  {% endfor %}
-                </div>
-              {% endif %}
-            {% endwith %}
-          </div>
-        </div>
-        {% empty %}
-        <div class="text-center text-muted py-5">
-          <i class="bi bi-inbox fs-1"></i>
-          <p class="mt-2">Nessun ordine in coda</p>
-        </div>
-        {% endfor %}
-      </div>
-
-      {# ===== Lavorazioni completate (sotto la coda) ===== #}
-      {% if lavorazioni_completate %}
-      <div class="completate-section mt-4">
-        <div class="d-flex justify-content-between align-items-center mb-2">
-          <h6 class="mb-0 text-success"><i class="bi bi-check2-circle"></i> Lavorazioni completate</h6>
-          <span class="badge bg-success">{{ lavorazioni_completate|length }}</span>
-        </div>
-        <div id="completateContainer">
-          {% for lav in lavorazioni_completate %}
-          <div class="card ordine-card completata-card mb-2"
-               data-ordine-id="{{ lav.ordine.pk }}"
-               onclick="selezionaOrdine({{ lav.ordine.pk }})">
-            <div class="ordine-card-body">
-              <div class="d-flex justify-content-between align-items-start">
-                <div class="flex-grow-1 me-2">
-                  <div class="d-flex align-items-center gap-2 flex-wrap">
-                    <strong class="text-success fs-6">#{{ lav.ordine.numero_progressivo|slice:"-4:" }}</strong>
-                    {% include "turni/_prezzo_ordine.html" with o=lav.ordine %}
-                    {% if lav.ordine.cliente %}
-                      <span class="fw-semibold">{{ lav.ordine.cliente }}</span>
-                    {% else %}
-                      <span class="text-muted small">Anonimo</span>
-                    {% endif %}
-                  </div>
-                </div>
-                <span class="badge bg-success">
-                  <i class="bi bi-check2"></i> {{ lav.fine|date:"H:i" }}
-                </span>
-              </div>
-
-              {% if lav.ordine.tipo_auto %}
-                <div class="mt-1 fw-semibold" style="color:#2c3e50">
-                  <i class="bi bi-car-front-fill me-1"></i>{{ lav.ordine.tipo_auto }}
-                </div>
-              {% endif %}
-
-              {% if lav.ordine.ora_consegna_richiesta %}
-                <div class="text-muted small mt-1">
-                  <i class="bi bi-clock"></i> Consegna {{ lav.ordine.ora_consegna_richiesta|time:"H:i" }}
-                  {% if lav.ordine.tipo_consegna == 'programmata' %}
-                    <span class="badge bg-warning text-dark ms-1" style="font-size:.65rem">Programmata</span>
-                  {% endif %}
-                </div>
-              {% endif %}
-
-              {% if lav.ordine.nota %}
-                <div class="alert alert-info py-1 px-2 mb-0 mt-2 small">
-                  <i class="bi bi-sticky"></i> {{ lav.ordine.nota }}
-                </div>
-              {% endif %}
-
-              <div class="mt-2 d-flex flex-wrap gap-1">
-                {% for item in lav.ordine.items.all %}
-                  <span class="badge bg-light text-dark border small">{{ item.servizio_prodotto.titolo }}</span>
-                {% endfor %}
-              </div>
-
-              {% with stati=lav.ordine.get_stati_postazioni %}
-                {% if stati %}
-                  <div class="mt-2 d-flex flex-wrap gap-1">
-                    {% for sp in stati %}
-                      <span class="badge {% if sp.stato == 'completato' %}bg-success{% elif sp.stato == 'in_lavorazione' %}bg-warning text-dark{% else %}bg-primary{% endif %}"
-                            title="{{ sp.nome }}: {{ sp.stato }}" style="font-size:.7rem">{{ sp.sigla }}</span>
-                    {% endfor %}
-                  </div>
-                {% endif %}
-              {% endwith %}
-
-              <div class="completata-meta mt-2 pt-2 border-top">
-                <i class="bi bi-tools"></i>
-                {{ lav.postazione_cq.nome }}{% if lav.blocco %} &middot; {{ lav.blocco.nome }}{% endif %}
-                <span class="ms-2"><i class="bi bi-stopwatch"></i> {{ lav.tempo_lavoro_netto_minuti|floatformat:0 }} min</span>
-              </div>
-            </div>
-          </div>
-          {% endfor %}
-        </div>
-      </div>
-      {% endif %}
+      <div id="colonnaCoda">{% include "turni/_coda.html" %}</div>
       </div>{# /p-3 #}
     </div>
 
@@ -643,11 +491,12 @@ async function selezionaOrdine(ordineId) {
   if (card) card.classList.add('active');
 
   // Carica dettaglio
-  const res = await fetch(`/turni/api/ordine/${ordineId}/dettaglio/`);
+  const res = await fetch(`/turni/api/ordine/${ordineId}/dettaglio/`, {cache: 'no-store'});
   const data = await res.json();
   if (!data.ok) return;
 
   currentOrdineId = ordineId;
+  ultimoDettaglio = JSON.stringify(data);
   renderAreaOperativa(data.ordine, data.lavorazione, data.lavorazioni_attive || [], data.fasi_completate || [], data.segnalazioni || [], data.fasi_avviabili || []);
   showDetailMobile();
 }
@@ -691,6 +540,7 @@ function pulsantiFasi(fasi) {
 function renderAreaOperativa(ordine, lavorazione, lavorazioniAttive, fasiCompletate, segnalazioni, fasiAvviabili) {
   const area = document.getElementById('areaOperativa');
   currentLavIds = lavorazioniAttive.map(l => l.id);
+  difZonaAttiva = null;  // il pannello difetti si ridisegna chiuso
 
   // --- Chip supplementi (click per aggiungere al carrello) ---
   let supplChipsHtml = '';
@@ -744,7 +594,9 @@ function renderAreaOperativa(ordine, lavorazione, lavorazioniAttive, fasiComplet
   let fasiHtml = '';
   if (fasiCompletate.length > 0) {
     fasiHtml = '<div class="mb-2"><div class="section-header mb-1"><i class="bi bi-check2-all"></i> Fasi completate</div><div class="d-flex flex-wrap gap-1">';
-    for (const f of fasiCompletate) fasiHtml += `<span class="badge bg-success"><i class="bi bi-check-circle"></i> ${f.postazione} — ${f.operatore} (${f.tempo_min}m)</span>`;
+    for (const f of fasiCompletate) fasiHtml += f.saltata
+      ? `<span class="badge bg-secondary" title="Tempi non segnati"><i class="bi bi-skip-forward"></i> ${f.postazione} — ${f.operatore} (saltata)</span>`
+      : `<span class="badge bg-success"><i class="bi bi-check-circle"></i> ${f.postazione} — ${f.operatore} (${f.tempo_min}m)</span>`;
     fasiHtml += '</div></div>';
   }
 
@@ -1192,19 +1044,99 @@ async function invalidateDashboardCache() {
   } catch(e) { /* ignora errori cache */ }
 }
 
-/* ---- Polling coda ---- */
-async function aggiornaCoда() {
-  try {
-    const res = await fetch('/turni/api/coda/');
-    const data = await res.json();
-    if (!data.ok) return;
-    document.getElementById('codaCount').textContent = data.ordini.length;
-    // Refresh simple - reload per semplicita
-    // In futuro si puo fare update parziale del DOM
-  } catch(e) {}
+/* ---- Salta lavorazione (tempi non segnati) ---- */
+async function saltaLavorazione(ordineId, numero) {
+  if (!confirm(`Salta l'ordine #${numero}?\n\nLe tue fasi contano come fatte ma senza tempi: usalo solo se hai dimenticato di segnarli.`)) return;
+  const data = await apiPost(`/turni/api/ordine/${ordineId}/salta/`);
+  if (!data.ok) { alert(data.error); return; }
+  await aggiornaColonna();
+  if (currentOrdineId === ordineId) selezionaOrdine(ordineId);
 }
 
-setInterval(aggiornaCoда, 10000);
+/* ---- Pagina sempre aggiornata ----
+   Ogni pochi secondi ricarica la coda (ordini nuovi, lavorati da altri,
+   prezzi, bollini delle fasi) e il dettaglio dell'ordine aperto. Il
+   dettaglio si ridisegna solo se e' cambiato e se l'operatore non sta
+   compilando supplementi o difetti (non perde quello che ha inserito). */
+const AGGIORNA_OGNI_MS = 5000;
+let ultimaColonna = null;
+let ultimoDettaglio = null;
+
+function evidenziaSelezionato() {
+  if (!currentOrdineId) return;
+  const card = document.querySelector(`.ordine-card[data-ordine-id="${currentOrdineId}"], .completata-card[data-ordine-id="${currentOrdineId}"]`);
+  if (card) card.classList.add('active');
+}
+
+async function aggiornaColonna() {
+  const res = await fetch('/turni/api/coda-html/', {cache: 'no-store'});
+  if (res.redirected || res.status !== 200) return;  // 204 = turno chiuso
+  const html = await res.text();
+  if (html === ultimaColonna) return;
+  ultimaColonna = html;
+  const colonna = document.getElementById('colonnaCoda');
+  const scroll = isMobileLayout() ? document.scrollingElement : (colonna.closest('.panel-left') || document.scrollingElement);
+  const top = scroll.scrollTop;
+  colonna.innerHTML = html;
+  scroll.scrollTop = top;
+  evidenziaSelezionato();
+  aggiornaCountdown();
+}
+
+function staCompilando() {
+  return (typeof supplCart !== 'undefined' && Object.keys(supplCart).length > 0)
+      || (typeof defectCart !== 'undefined' && defectCart.length > 0)
+      || (typeof difZonaAttiva !== 'undefined' && difZonaAttiva);
+}
+
+async function aggiornaDettaglio() {
+  if (!currentOrdineId || staCompilando()) return;
+  const id = currentOrdineId;
+  const res = await fetch(`/turni/api/ordine/${id}/dettaglio/`, {cache: 'no-store'});
+  if (res.redirected || !res.ok) return;
+  const data = await res.json();
+  if (!data.ok || id !== currentOrdineId || staCompilando()) return;
+  const firma = JSON.stringify(data);
+  if (firma === ultimoDettaglio) return;
+  ultimoDettaglio = firma;
+  renderAreaOperativa(data.ordine, data.lavorazione, data.lavorazioni_attive || [], data.fasi_completate || [], data.segnalazioni || [], data.fasi_avviabili || []);
+}
+
+let aggiornando = false;
+async function aggiornaPagina() {
+  if (aggiornando || document.hidden) return;
+  aggiornando = true;
+  try {
+    await aggiornaColonna();
+    await aggiornaDettaglio();
+  } catch (e) { /* rete assente: si riprova al giro dopo */ }
+  aggiornando = false;
+}
+
+/* Quanto manca alla consegna programmata: "tra 25 min", "in ritardo di 5 min" */
+function aggiornaCountdown() {
+  const adesso = Date.now();
+  document.querySelectorAll('.consegna-countdown').forEach(el => {
+    const min = Math.round((new Date(el.dataset.consegna).getTime() - adesso) / 60000);
+    const durata = m => m >= 60 ? `${Math.floor(m / 60)} h ${String(m % 60).padStart(2, '0')} min` : `${m} min`;
+    if (min > 0) {
+      el.textContent = `tra ${durata(min)}`;
+      el.className = 'consegna-countdown fw-semibold ' + (min <= 15 ? 'text-warning-emphasis' : 'text-success');
+    } else if (min === 0) {
+      el.textContent = 'adesso';
+      el.className = 'consegna-countdown fw-semibold text-danger';
+    } else {
+      el.textContent = `in ritardo di ${durata(-min)}`;
+      el.className = 'consegna-countdown fw-semibold text-danger';
+    }
+  });
+}
+aggiornaCountdown();
+setInterval(aggiornaCountdown, 15000);
+
+setInterval(aggiornaPagina, AGGIORNA_OGNI_MS);
+// Tornando sulla pagina (telefono sbloccato, altra scheda) aggiorna subito
+document.addEventListener('visibilitychange', () => { if (!document.hidden) aggiornaPagina(); });
 
 // Auto-carica ordine in lavorazione attiva al caricamento pagina
 {% if lavorazione_attiva %}
