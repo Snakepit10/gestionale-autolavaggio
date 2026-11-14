@@ -301,6 +301,11 @@ class ReportTest(TestCase):
         self.assertEqual(chiama(api_salta_lavorazione, self.mario, ordine.pk, corpo=pre)['error'], non_si_puo)
         chiama(api_inizia_lavoro, lucia, ordine.pk, corpo=asc)
         self.assertEqual(chiama(api_salta_lavorazione, self.mario, ordine.pk, corpo=asc)['error'], non_si_puo)
+        # Nella card si vedono i timer accesi: il suo e quello di Lucia.
+        html = coda(self.mario)
+        self.assertIn('<strong>Tu</strong>', html)
+        self.assertIn('<strong>Lucia</strong>', html)
+        self.assertEqual(html.count('timer-altro-tempo'), 2)
         LavorazioneOperatore.objects.all().delete()
 
         # Mario salta il prelavaggio: fase chiusa senza tempi, l'ordine esce

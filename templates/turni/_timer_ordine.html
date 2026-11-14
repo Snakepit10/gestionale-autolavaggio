@@ -1,0 +1,11 @@
+{% comment %}Timer accesi sull'ordine (o.timer_aperti): chi, quale fase e da quanto.
+Il tempo scorre nella pagina (aggiornaTimerAltri); in pausa resta fermo.{% endcomment %}
+{% for t in o.timer_aperti %}
+  <div class="timer-altro small mt-1 d-flex align-items-center flex-wrap gap-1 {% if t.in_pausa %}in-pausa{% endif %}">
+    <i class="bi bi-stopwatch"></i>
+    <span class="timer-altro-tempo" data-inizio="{{ t.inizio_ms }}" data-pausa="{{ t.pausa_ms }}"{% if t.in_pausa %} data-fermo="{{ t.pausa_inizio_ms }}"{% endif %}></span>
+    {% if t.in_pausa %}<span class="badge bg-warning text-dark">in pausa</span>{% endif %}
+    <strong>{{ t.chi }}</strong>
+    <span>&middot; {{ t.fase }}</span>
+  </div>
+{% endfor %}

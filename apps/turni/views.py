@@ -74,18 +74,51 @@ def _contesto_coda(sessione):
     ordini_dict = {}
     for item in _get_coda_ordini(sessione):
         ordini_dict.setdefault(item.ordine.pk, {'ordine': item.ordine, 'items': []})['items'].append(item)
+    completate = list(
+        LavorazioneOperatore.objects.filter(sessione=sessione, stato__in=STATI_CHIUSI)
+        .select_related('ordine', 'ordine__cliente', 'postazione_cq', 'blocco')
+        .prefetch_related('ordine__items__servizio_prodotto')
+        .order_by('-fine')[:20]
+    )
+    ordini = [e['ordine'] for e in ordini_dict.values()] + [lav.ordine for lav in completate]
+    timer = _timer_aperti(sessione, {o.pk for o in ordini})
+    for o in ordini:
+        o.timer_aperti = timer.get(o.pk, [])
     return {
         'ordini_coda': list(ordini_dict.values()),
         'lavorazione_attiva': LavorazioneOperatore.objects.filter(
             sessione=sessione, stato__in=['in_lavorazione', 'in_pausa'],
         ).select_related('ordine', 'postazione_cq', 'blocco').first(),
-        'lavorazioni_completate': (
-            LavorazioneOperatore.objects.filter(sessione=sessione, stato__in=STATI_CHIUSI)
-            .select_related('ordine', 'ordine__cliente', 'postazione_cq', 'blocco')
-            .prefetch_related('ordine__items__servizio_prodotto')
-            .order_by('-fine')[:20]
-        ),
+        'lavorazioni_completate': completate,
     }
+
+
+def _timer_aperti(sessione, ordini_ids):
+    """{ordine_id: [timer accesi]}: chi ci lavora, su quale fase e da quando
+    (in millisecondi, per il conteggio nella pagina). I blocchi della stessa
+    fase avviati insieme sono un solo timer."""
+    def ms(dt):
+        return int(dt.timestamp() * 1000) if dt else None
+
+    timer = {}
+    for lav in (LavorazioneOperatore.objects
+                .filter(ordine_id__in=ordini_ids, stato__in=['in_lavorazione', 'in_pausa'])
+                .select_related('sessione__operatore', 'postazione_cq').order_by('inizio')):
+        chiave = (lav.sessione_id, lav.postazione_cq_id)
+        lista = timer.setdefault(lav.ordine_id, [])
+        if any(t['chiave'] == chiave for t in lista):
+            continue
+        op = lav.sessione.operatore
+        lista.append({
+            'chiave': chiave,
+            'chi': 'Tu' if lav.sessione_id == sessione.pk else (op.first_name or op.username),
+            'fase': lav.postazione_cq.nome,
+            'in_pausa': lav.stato == 'in_pausa',
+            'inizio_ms': ms(lav.inizio),
+            'pausa_ms': int(lav.tempo_pausa_totale.total_seconds() * 1000),
+            'pausa_inizio_ms': ms(lav.pausa_inizio),
+        })
+    return timer
 
 
 def _postazioni_scelta(sessione):

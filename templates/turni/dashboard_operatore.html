@@ -55,6 +55,9 @@ html, body { overflow: hidden !important; height: 100%; background: #fff; }
 }
 .ordine-card .ordine-card-body { padding: 12px 14px; }
 .btn-salta { font-size: .75rem; padding: 2px 8px; }
+.timer-altro { color: #0d6efd; }
+.timer-altro.in-pausa { color: #997404; }
+.timer-altro-tempo { font-weight: 700; font-variant-numeric: tabular-nums; }
 
 /* Stato selezionato - molto evidente */
 .ordine-card.active {
@@ -1110,6 +1113,7 @@ async function aggiornaColonna() {
   scroll.scrollTop = top;
   evidenziaSelezionato();
   aggiornaCountdown();
+  aggiornaTimerAltri();
 }
 
 function staCompilando() {
@@ -1163,6 +1167,21 @@ function aggiornaCountdown() {
 }
 aggiornaCountdown();
 setInterval(aggiornaCountdown, 15000);
+
+/* Timer accesi da chiunque sugli ordini della colonna: tempo netto
+   (senza pause) che scorre; in pausa resta fermo. */
+function aggiornaTimerAltri() {
+  const adesso = Date.now();
+  document.querySelectorAll('.timer-altro-tempo').forEach(el => {
+    const fine = el.dataset.fermo ? Number(el.dataset.fermo) : adesso;
+    const sec = Math.max(0, Math.floor((fine - Number(el.dataset.inizio) - Number(el.dataset.pausa)) / 1000));
+    const h = Math.floor(sec / 3600), m = Math.floor(sec % 3600 / 60), s = sec % 60;
+    const mmss = `${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`;
+    el.textContent = h ? `${h}:${mmss}` : mmss;
+  });
+}
+aggiornaTimerAltri();
+setInterval(aggiornaTimerAltri, 1000);
 
 setInterval(aggiornaPagina, AGGIORNA_OGNI_MS);
 // Tornando sulla pagina (telefono sbloccato, altra scheda) aggiorna subito
