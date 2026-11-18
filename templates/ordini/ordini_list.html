@@ -133,16 +133,17 @@
 .pren-legend { display: flex; flex-wrap: wrap; gap: 10px; margin-bottom: .5rem; font-size: .72rem; color: #64748b; }
 .pren-legend .dot { display:inline-block; width:10px; height:10px; border-radius:50%; margin-right:4px; vertical-align:middle; }
 
-/* Checkbox servizi nel modal checkin */
-.ck-servizio-label {
-    display: inline-flex; align-items: center;
-    padding: 4px 10px; border-radius: 999px;
-    background: #fff; border: 1px solid #e2e8f0;
-    font-size: .82rem; user-select: none;
-    transition: all .12s;
-}
-.ck-servizio-label:hover { border-color: #3b82f6; background: #eff6ff; }
-.ck-servizio-label:has(input:checked) { border-color: #10b981; background: #ecfdf5; color: #065f46; font-weight: 600; }
+/* Servizi prenotati nel modal checkin: una riga per servizio */
+.ck-servizi-lista { border: 1px solid #e2e8f0; border-radius: 8px; overflow: hidden; background: #fff; }
+.ck-servizio-riga { display: flex; align-items: center; gap: 10px; padding: 9px 12px; border-bottom: 1px solid #f1f5f9; }
+.ck-servizio-riga .ck-icona { color: #10b981; font-size: 1.1rem; flex-shrink: 0; }
+.ck-servizio-riga .ck-nome { font-weight: 600; font-size: .95rem; line-height: 1.2; }
+.ck-servizio-riga .ck-cat { font-size: .75rem; color: #64748b; }
+.ck-servizio-riga .ck-prezzo { margin-left: auto; font-weight: 600; white-space: nowrap; }
+.ck-servizio-riga .ck-togli { border: 0; background: transparent; color: #94a3b8; padding: 2px 6px; border-radius: 6px; }
+.ck-servizio-riga .ck-togli:hover { color: #dc2626; background: #fef2f2; }
+.ck-servizi-vuoto { padding: 12px; text-align: center; color: #94a3b8; font-size: .85rem; border-bottom: 1px solid #f1f5f9; }
+.ck-servizi-totale { display: flex; justify-content: space-between; padding: 8px 12px; background: #f8fafc; font-size: .85rem; }
 
 /* Slot availability grid nel modal prenota cassa */
 .slot-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(80px, 1fr)); gap: 6px; max-height: 180px; overflow-y: auto; padding: 4px; background: #f8fafc; border-radius: 8px; }
@@ -671,6 +672,7 @@ function proponiConferma() {
             data-tipo-auto="{{ p.tipo_auto|default:'' }}"
             data-servizi="{% for s in p.servizi.all %}{{ s.titolo }}{% if not forloop.last %}, {% endif %}{% endfor %}"
             data-servizi-ids="{% for s in p.servizi.all %}{{ s.id }}{% if not forloop.last %},{% endif %}{% endfor %}"
+            data-servizi-json="{{ p.servizi_json }}"
             data-durata="{{ p.durata_stimata_minuti|default:'' }}"
             data-stato="{{ p.stato }}"
             data-nota-cliente="{{ p.nota_cliente|default:'' }}"
@@ -780,25 +782,27 @@ function proponiConferma() {
               <div id="ckNotaCliente" class="alert alert-light py-2 px-3 mb-0 small">&mdash;</div>
             </div>
             <div class="col-12">
-              <label class="form-label small fw-bold text-muted d-flex justify-content-between align-items-center">
-                <span>Servizi prenotati</span>
-                <span class="text-muted" style="font-weight:400;">selezionabili &mdash; modifica se necessario</span>
-              </label>
-              <div id="ckServiziBox" class="border rounded p-2" style="max-height:200px; overflow-y:auto; background:#f8fafc;">
-                {% regroup servizi_disponibili by categoria as categorie_list %}
-                {% for cat in categorie_list %}
-                <div class="mb-2">
-                  <div class="text-muted small fw-bold mb-1">{{ cat.grouper|default:"Altro" }}</div>
-                  <div class="d-flex flex-wrap gap-1">
-                    {% for s in cat.list %}
-                    <label class="form-check ck-servizio-label" style="cursor:pointer;">
-                      <input type="checkbox" class="form-check-input ck-servizio-chk me-1" value="{{ s.id }}" data-titolo="{{ s.titolo }}">
-                      <span class="form-check-label small">{{ s.titolo }} <span class="text-muted">&euro;{{ s.prezzo }}</span></span>
-                    </label>
-                    {% endfor %}
-                  </div>
+              <label class="form-label small fw-bold text-muted">Servizi prenotati</label>
+              <div class="ck-servizi-lista">
+                <div id="ckServiziRighe"></div>
+                <div class="ck-servizi-totale">
+                  <span class="text-muted">Totale servizi</span>
+                  <strong id="ckServiziTotale">&euro; 0,00</strong>
                 </div>
-                {% endfor %}
+              </div>
+              <div class="input-group input-group-sm mt-2">
+                <span class="input-group-text"><i class="bi bi-plus-circle"></i></span>
+                <select id="ckAggiungiServizio" class="form-select">
+                  <option value="">Aggiungi un servizio&hellip;</option>
+                  {% regroup servizi_disponibili by categoria as categorie_list %}
+                  {% for cat in categorie_list %}
+                  <optgroup label="{{ cat.grouper|default:'Altro' }}">
+                    {% for s in cat.list %}
+                    <option value="{{ s.id }}" data-titolo="{{ s.titolo }}" data-prezzo="{{ s.prezzo|stringformat:'s' }}" data-categoria="{{ cat.grouper|default:'' }}">{{ s.titolo }} &mdash; &euro; {{ s.prezzo }}</option>
+                    {% endfor %}
+                  </optgroup>
+                  {% endfor %}
+                </select>
               </div>
               <input type="hidden" name="servizi_ids" id="ckServiziIds">
             </div>
@@ -879,13 +883,60 @@ function ckToggleOra() {
     input.value = '';
   }
 }
+// Servizi scelti nel modal: [{id, titolo, prezzo, categoria}]
+let ckServizi = [];
+
+function ckEuro(n) {
+    return '€ ' + (Number(n) || 0).toFixed(2).replace('.', ',');
+}
+
+function ckEsc(t) {
+    const d = document.createElement('div');
+    d.textContent = t == null ? '' : String(t);
+    return d.innerHTML;
+}
+
+function ckRenderServizi() {
+    const box = document.getElementById('ckServiziRighe');
+    if (!ckServizi.length) {
+        box.innerHTML = '<div class="ck-servizi-vuoto">Nessun servizio: aggiungine uno dal menu qui sotto</div>';
+    } else {
+        box.innerHTML = ckServizi.map((s, i) => `
+            <div class="ck-servizio-riga">
+                <i class="bi bi-check-circle-fill ck-icona"></i>
+                <div>
+                    <div class="ck-nome">${ckEsc(s.titolo)}</div>
+                    ${s.categoria ? `<div class="ck-cat">${ckEsc(s.categoria)}</div>` : ''}
+                </div>
+                <span class="ck-prezzo">${ckEuro(s.prezzo)}</span>
+                <button type="button" class="ck-togli" title="Togli servizio" onclick="ckTogliServizio(${i})">
+                    <i class="bi bi-x-lg"></i>
+                </button>
+            </div>`).join('');
+    }
+    const tot = ckServizi.reduce((a, s) => a + (Number(s.prezzo) || 0), 0);
+    document.getElementById('ckServiziTotale').textContent = ckEuro(tot);
+    ckSyncServiziIds();
+}
+
+function ckTogliServizio(i) {
+    ckServizi.splice(i, 1);
+    ckRenderServizi();
+}
+
 function ckSyncServiziIds() {
-    const selected = Array.from(document.querySelectorAll('.ck-servizio-chk:checked')).map(c => c.value);
-    document.getElementById('ckServiziIds').value = selected.join(',');
+    document.getElementById('ckServiziIds').value = ckServizi.map(s => s.id).join(',');
+}
+
+function ckServiziOk() {
+    if (ckServizi.length) return true;
+    alert('Serve almeno un servizio.');
+    return false;
 }
 
 function ckSalvaModifiche() {
     if (!ckPrenotazionePk) return;
+    if (!ckServiziOk()) return;
     const form = document.getElementById('formCheckin');
     const fd = new FormData(form);
     // Manda gli stessi campi del check-in, ma all'endpoint "aggiorna inline"
@@ -1055,17 +1106,35 @@ function ckEliminaPrenotazione() {
         peBox.innerHTML = '';
     }
 
-    // Precheck servizi correnti
-    const serviziIds = (btn.getAttribute('data-servizi-ids') || '').split(',').filter(Boolean);
-    document.querySelectorAll('.ck-servizio-chk').forEach(chk => {
-        chk.checked = serviziIds.includes(chk.value);
-    });
-    ckSyncServiziIds();
+    // Servizi prenotati: tutti quelli della prenotazione, anche se non
+    // sono nel menu "Aggiungi" (categorie solo online)
+    try {
+        ckServizi = JSON.parse(btn.getAttribute('data-servizi-json') || '[]');
+    } catch (e) {
+        ckServizi = [];
+    }
+    document.getElementById('ckAggiungiServizio').value = '';
+    ckRenderServizi();
   });
 
-  // Sync servizi_ids hidden quando l'utente cambia i checkbox
-  document.querySelectorAll('.ck-servizio-chk').forEach(chk => {
-    chk.addEventListener('change', ckSyncServiziIds);
+  document.getElementById('formCheckin').addEventListener('submit', function(e){
+    if (!ckServiziOk()) e.preventDefault();
+  });
+
+  // Aggiungi servizio dal menu (una volta sola per servizio)
+  document.getElementById('ckAggiungiServizio').addEventListener('change', function(){
+    const opt = this.options[this.selectedIndex];
+    if (!this.value) return;
+    if (!ckServizi.some(s => String(s.id) === this.value)) {
+        ckServizi.push({
+            id: parseInt(this.value),
+            titolo: opt.getAttribute('data-titolo'),
+            prezzo: parseFloat(opt.getAttribute('data-prezzo')) || 0,
+            categoria: opt.getAttribute('data-categoria') || '',
+        });
+        ckRenderServizi();
+    }
+    this.value = '';
   });
 })();
 </script>

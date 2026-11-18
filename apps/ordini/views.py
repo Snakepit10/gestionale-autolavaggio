@@ -921,7 +921,7 @@ class OrdiniListView(LoginRequiredMixin, ListView):
                 ordine__isnull=True,
             )
             .select_related('cliente', 'slot')
-            .prefetch_related('servizi')
+            .prefetch_related('servizi__categoria')
             .order_by('slot__ora_inizio')
         )
 
@@ -948,6 +948,18 @@ class OrdiniListView(LoginRequiredMixin, ListView):
                 cat = 'future'
             p.delta_min = delta_min
             p.status_cat = cat
+            # Servizi prenotati per la lista del modal check-in: tutti,
+            # anche quelli di categorie solo online che non sono nel
+            # menu "Aggiungi" (cosi' al salvataggio non si perdono).
+            p.servizi_json = json.dumps([
+                {
+                    'id': s.pk,
+                    'titolo': s.titolo,
+                    'prezzo': float(s.prezzo),
+                    'categoria': s.categoria.nome if s.categoria else '',
+                }
+                for s in p.servizi.all()
+            ])
             prenotazioni_list.append(p)
 
         context['prenotazioni_upcoming'] = prenotazioni_list
