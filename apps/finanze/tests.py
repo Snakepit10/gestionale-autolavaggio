@@ -1293,6 +1293,33 @@ class ImportAutomaticoWashtecTest(TestCase):
         dorme.assert_called_once_with(60)
         self.assertEqual(ia.EsecuzioneImportWashtec.objects.get().esito, 'ok')
 
+    def test_giro_bloccato_chiude_il_servizio(self):
+        import threading
+
+        from apps.finanze.services import import_automatico as ia
+        uscite, sbloccato = [], threading.Event()
+
+        def esci(codice):
+            uscite.append(codice)
+            sbloccato.set()
+
+        def bloccato():
+            # come un Chromium piantato: finisce solo dopo la sorveglianza
+            sbloccato.wait(5)
+            return 'fine'
+
+        log = []
+        ia._con_sorveglianza(bloccato, timedelta(seconds=0.1), log.append, esci)
+        self.assertEqual(uscite, [1])
+        self.assertIn('bloccato', log[0])
+        # un giro normale non chiude niente
+        self.assertEqual(ia._con_sorveglianza(lambda: 7, timedelta(seconds=5), log.append, esci), 7)
+        self.assertEqual(uscite, [1])
+
+    def test_chromium_senza_dev_shm(self):
+        from apps.finanze.services import import_automatico as ia
+        self.assertIn('--disable-dev-shm-usage', ia.ARGOMENTI_CHROMIUM)
+
     def test_comando_senza_database_url(self):
         from django.core.management import CommandError, call_command
         with self.settings(DEBUG=False):

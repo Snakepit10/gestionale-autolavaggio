@@ -11,6 +11,7 @@ quando qualcuno preme "Aggiorna ora" (riga EsecuzioneImportWashtec
 'richiesta').
 """
 import os
+import threading
 import time as orologio
 from datetime import timedelta
 from pathlib import Path
@@ -32,6 +33,9 @@ ATTESA_MAX_RICHIESTA = timedelta(minutes=3)
 RITARDO_ALLARME = timedelta(minutes=30)
 # Esecuzioni tenute in archivio
 DA_TENERE = 200
+# Chromium nei container: /dev/shm e' piccola e le pagine pesanti di
+# WashTec lo mandano in crash ("Target crashed"); niente GPU sul server
+ARGOMENTI_CHROMIUM = ['--disable-dev-shm-usage', '--disable-gpu']
 
 
 def _intero_env(nome, predefinito):
@@ -164,7 +168,7 @@ def estrai_playwright(dal, al, visibile=False):
         raise RuntimeError('Credenziali mancanti: imposta WASHTEC_COMMITTENTE, WASHTEC_UTENTE e WASHTEC_PASSWORD.')
     script = SCRIPT_ESTRAZIONE.read_text(encoding='utf-8')
     with sync_playwright() as p:
-        browser = p.chromium.launch(headless=not visibile)
+        browser = p.chromium.launch(headless=not visibile, args=ARGOMENTI_CHROMIUM)
         try:
             # WashTec mostra gli orari nel fuso del browser: deve essere il
             # nostro, non quello (UTC) del server. Interfaccia in italiano,
@@ -216,11 +220,33 @@ def verifica_database():
     return None
 
 
-def ciclo(attesa=15, estrai=None, giri=None, scrivi=print, attesa_errore=60):
+def _con_sorveglianza(funzione, limite, scrivi, esci):
+    """Esegue `funzione()`; se non finisce entro `limite` (timedelta)
+    chiude il processo con `esci(1)`. Un Chromium piantato blocca il giro
+    per sempre e il processo resta vivo: Railway riavvia un servizio solo
+    quando si chiude. Il giro rimasto 'in_corso' lo chiude
+    _chiudi_giri_morti al riavvio."""
+    def scaduto():
+        scrivi(f'Import WashTec: giro bloccato da oltre {limite}, chiudo il servizio per farlo riavviare.')
+        esci(1)
+
+    timer = threading.Timer(limite.total_seconds(), scaduto)
+    timer.daemon = True
+    timer.start()
+    try:
+        return funzione()
+    finally:
+        timer.cancel()
+
+
+def ciclo(attesa=15, estrai=None, giri=None, scrivi=print, attesa_errore=60,
+          limite_giro=DURATA_MAX_GIRO, esci=os._exit):
     """Worker: ogni `attesa` secondi guarda se c'e' una richiesta e, in
     orario, fa comunque un giro ogni intervallo(). `giri` limita i
     controlli (per i test). Un errore (es. database irraggiungibile) non
-    ferma il worker: si scrive nel log e si riprova dopo `attesa_errore`."""
+    ferma il worker: si scrive nel log e si riprova dopo `attesa_errore`.
+    Un giro che supera `limite_giro` chiude il processo (vedi
+    _con_sorveglianza)."""
     from django.db import close_old_connections
 
     ultimo_programmato = None
@@ -241,7 +267,8 @@ def ciclo(attesa=15, estrai=None, giri=None, scrivi=print, attesa_errore=60):
             if richiesta or dovuto:
                 if not richiesta:
                     ultimo_programmato = adesso
-                e = esegui(richiesta, estrai=estrai)
+                e = _con_sorveglianza(lambda: esegui(richiesta, estrai=estrai),
+                                      limite_giro, scrivi, esci)
                 scrivi(f'{timezone.localtime(e.finita_il):%d/%m %H:%M:%S} import WashTec {e.esito}: '
                        f'{e.righe} righe, {e.nuove} nuove {e.messaggio[:200]}'.strip())
         except Exception as e:                  # noqa: BLE001 - il worker deve restare in piedi

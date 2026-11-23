@@ -61,6 +61,11 @@ python manage.py importa_washtec_auto --dal 2026-10-01 --al 2026-10-05   # recup
   preferito).
 - *"Il servizio di aggiornamento WashTec non risponde"*: il worker su
   Railway e' spento o in errore (vedi i log del servizio).
+- *"Target crashed"*: Chromium e' andato in crash. Gira con
+  `--disable-dev-shm-usage` (la /dev/shm dei container e' piccola); se
+  un giro resta bloccato oltre 15 minuti il worker si chiude da solo e
+  Railway lo riavvia. Serve **Restart Policy = On Failure** (o Always)
+  nelle Settings del servizio worker.
 
 Nel frattempo si puo' sempre importare a mano con il preferito dalla
 pagina Finanze > Importa WashTec.
